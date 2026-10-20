@@ -934,6 +934,22 @@ var operationExcludedErrors = map[string][]string{
 	// gone renders the step again. sch.not_found is remapped as for
 	// getFlowStep.
 	"submitFlowStep": {"domain.ErrFlowSSOUnavailable", "domain.ErrIDPConnectionNotFound", "domain.ErrJSONSchemaNotFound", "domain.ErrSSOStateInvalid"},
+	// The identifier lookup of the flow path turns a bound user schema the
+	// project does not hold into domain.ErrInternal (resolveIdentifier), so
+	// sch.not_found never reaches the response.
+	"verifyChallengeProof": {"domain.ErrJSONSchemaNotFound"},
+	// sch.not_found is remapped as for verifyChallengeProof.
+	"finishUserPasskeyRegistration": {"domain.ErrJSONSchemaNotFound"},
+	// Create and revise run the engine's connection parse after the schema
+	// check. The schema already refuses a missing protocol block, scopes
+	// without openid, and a cleartext endpoint as req.invalid, so only the
+	// parse's own rule, the partial endpoint block, reaches the caller; any
+	// other parse refusal is reported as req.invalid.
+	"createIdp": {
+		"domain.ErrIDPEndpointCleartext",
+		"domain.ErrIDPProtocolBlockMissing",
+		"domain.ErrIDPScopesMissingOpenID",
+	},
 	// A new flow has no parked SSO row, so the collection step's prefill
 	// returns before it reads the attempt's row or a connection.
 	"createFlow": {
@@ -942,10 +958,8 @@ var operationExcludedErrors = map[string][]string{
 		"domain.ErrIDPConnectionNotFound",
 		"domain.ErrIDPEndpointCleartext",
 		"domain.ErrIDPEndpointsPartial",
-		"domain.ErrIDPOAuth2Unsupported",
 		"domain.ErrIDPProtocolBlockMissing",
 		"domain.ErrIDPScopesMissingOpenID",
-		"domain.ErrIDPStrategyPointerUnsupported",
 	},
 }
 

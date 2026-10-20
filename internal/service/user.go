@@ -88,6 +88,13 @@ type ListPasskeysInput struct {
 	Limit     int
 }
 
+type ListIdentityLinksInput struct {
+	ProjectID string
+	UserID    string
+	PageToken string
+	Limit     int
+}
+
 type ListUserTeamsInput struct {
 	ProjectID string
 	UserID    string
@@ -124,6 +131,7 @@ type UserService interface {
 	DeleteUser(ctx context.Context, input DeleteUserInput) error
 	ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error)
 	ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error)
+	ListIdentityLinks(ctx context.Context, input ListIdentityLinksInput) (links []*domain.IDPIdentityLink, nextPage string, err error)
 	ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error)
 	GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error)
 	PatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error)
@@ -162,6 +170,9 @@ func NewUserService(
 }
 
 func (s *userService) ApplyActions(ctx context.Context, actions ...UserAction) (err error) {
+	ctx, end := startSpan(ctx, "UserService.ApplyActions")
+	defer end(&err)
+
 	for _, action := range actions {
 		err = action.Prepare(ctx)
 		if err != nil {
@@ -204,6 +215,9 @@ func emitUserCreateFailedBestEffort(ctx context.Context, pool StatementPool, act
 }
 
 func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.CreateUser")
+	defer end(&err)
+
 	action := NewCreateUserAction(input, s.schemaStore)
 	if err := s.ApplyActions(ctx, action); err != nil {
 		emitUserCreateFailedBestEffort(ctx, s.v2Pool, action, err)
@@ -249,12 +263,18 @@ func (s *userService) attachUserRefs(ctx context.Context, projectID string, user
 	return nil
 }
 
-func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) error {
+func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) (err error) {
+	ctx, end := startSpan(ctx, "UserService.DeleteUser")
+	defer end(&err)
+
 	action := NewDeleteUserAction(input)
 	return s.ApplyActions(ctx, action)
 }
 
-func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error) {
+func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *ListUsersOutput, err error) {
+	ctx, end := startSpan(ctx, "UserService.ListUsers")
+	defer end(&err)
+
 	columnFilters, queryOpts, err := splitUserFilters(input.Filters)
 	if err != nil {
 		return nil, err
@@ -420,6 +440,9 @@ func userField(field string) (domain.UserField, error) {
 }
 
 func (s *userService) ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error) {
+	ctx, end := startSpan(ctx, "UserService.ListPasskeys")
+	defer end(&err)
+
 	dbpasskeys, err := s.v2Pool.Statements().ListUserPasskeys(
 		ctx, &database.ListOptions[domain.UserPasskeyField]{
 			Filter: database.And(
@@ -439,21 +462,54 @@ func (s *userService) ListPasskeys(ctx context.Context, input ListPasskeysInput)
 		},
 	)
 	if err != nil {
-		return nil, "", domain.ErrInternal(err).WithMessage("failed to get user passkeys from database")
+		return nil, "", mapListError(err, "failed to list user passkeys from database")
 	}
 
-	// Distinguish "user not found" from "user has no passkeys".
 	if len(dbpasskeys.Items) == 0 {
-		exists, err := s.v2Pool.Statements().UserExists(ctx, input.ProjectID, input.UserID)
-		if err != nil {
-			return nil, "", domain.ErrInternal(err).WithMessage("failed to get user from database")
-		}
-		if !exists {
-			return nil, "", domain.ErrUserNotFound()
+		if err := s.requireUser(ctx, input.ProjectID, input.UserID); err != nil {
+			return nil, "", err
 		}
 	}
 
 	return dbpasskeys.Items, string(dbpasskeys.NextCursor), nil
+}
+
+// ListIdentityLinks pages the user's identity links. The id breaks ties
+// between links created in the same instant, so a page boundary never skips or
+// repeats one.
+func (s *userService) ListIdentityLinks(ctx context.Context, input ListIdentityLinksInput) (links []*domain.IDPIdentityLink, nextPage string, err error) {
+	ctx, end := startSpan(ctx, "UserService.ListIdentityLinks")
+	defer end(&err)
+
+	result, err := s.v2Pool.Statements().ListIDPIdentityLinks(
+		ctx, &database.ListOptions[domain.IDPIdentityLinkField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.IDPIdentityLinkFieldProjectID), input.ProjectID),
+				database.Equal(database.Col(domain.IDPIdentityLinkFieldUserID), input.UserID),
+			),
+			Pagination: database.Page[domain.IDPIdentityLinkField]{
+				Limit:  uint32(normalizeLimit(input.Limit)),
+				Cursor: []byte(input.PageToken),
+				OrderBy: database.OrderBy[domain.IDPIdentityLinkField]{
+					Columns: []database.Column[domain.IDPIdentityLinkField]{
+						database.Col(domain.IDPIdentityLinkFieldCreatedAt),
+						database.Col(domain.IDPIdentityLinkFieldID),
+					},
+					Direction: database.OrderAsc,
+				},
+			},
+		},
+	)
+	if err != nil {
+		return nil, "", mapListError(err, "failed to list user identity links from database")
+	}
+	if len(result.Items) == 0 {
+		if err := s.requireUser(ctx, input.ProjectID, input.UserID); err != nil {
+			return nil, "", err
+		}
+	}
+
+	return result.Items, string(result.NextCursor), nil
 }
 
 // ListUserTeams serves the user's team roster one page at a time, each entry
@@ -462,7 +518,10 @@ func (s *userService) ListPasskeys(ctx context.Context, input ListPasskeysInput)
 // The roster is not lifecycle ownership (ADR 024): a user can sit on several
 // rosters while owning their own lifecycle, which is reported on the user
 // itself.
-func (s *userService) ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error) {
+func (s *userService) ListUserTeams(ctx context.Context, input ListUserTeamsInput) (_ *ListUserTeamsOutput, err error) {
+	ctx, end := startSpan(ctx, "UserService.ListUserTeams")
+	defer end(&err)
+
 	onRoster := make([]database.Filter[domain.UserTeamField], 0, len(domain.RosterMembershipStatuses))
 	for _, status := range domain.RosterMembershipStatuses {
 		onRoster = append(onRoster, database.Equal(database.Col(domain.UserTeamFieldStatus), status.String()))
@@ -491,12 +550,8 @@ func (s *userService) ListUserTeams(ctx context.Context, input ListUserTeamsInpu
 	}
 
 	if len(teams.Items) == 0 {
-		exists, err := s.v2Pool.Statements().UserExists(ctx, input.ProjectID, input.UserID)
-		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
-		}
-		if !exists {
-			return nil, domain.ErrUserNotFound()
+		if err := s.requireUser(ctx, input.ProjectID, input.UserID); err != nil {
+			return nil, err
 		}
 	}
 
@@ -506,7 +561,24 @@ func (s *userService) ListUserTeams(ctx context.Context, input ListUserTeamsInpu
 	}, nil
 }
 
-func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error) {
+// requireUser answers ErrUserNotFound for a user that does not exist. A list
+// keyed on the user calls it on an empty page, where no row proved the user
+// exists, to tell an unknown user from one with nothing to list.
+func (s *userService) requireUser(ctx context.Context, projectID, userID string) error {
+	exists, err := s.v2Pool.Statements().UserExists(ctx, projectID, userID)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to get user from database")
+	}
+	if !exists {
+		return domain.ErrUserNotFound()
+	}
+	return nil
+}
+
+func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.GetUserByID")
+	defer end(&err)
+
 	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
 		database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
 		database.Equal(database.Col(domain.UserFieldID), input.UserID),
@@ -528,7 +600,10 @@ func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (*dom
 // fresh read and the patch statement refuses to write over a row whose
 // updated_at moved past that read, so a lost race re-merges against the
 // interleaved write instead of clobbering it.
-func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error) {
+func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.PatchUser")
+	defer end(&err)
+
 	const maxPatchAttempts = 3
 	for attempt := 1; ; attempt++ {
 		action := NewPatchUserAction(input, s.v2Pool, s.schemaStore)
@@ -547,7 +622,10 @@ func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (*dom
 	return s.GetUserByID(ctx, GetUserInput{ProjectID: input.ProjectID, UserID: input.UserID})
 }
 
-func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (*domain.User, error) {
+func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.PatchMyUser")
+	defer end(&err)
+
 	sessionToken := input.SessionToken
 	if !validSessionToken(sessionToken) {
 		return nil, domain.ErrSessionTokenInvalid()
@@ -563,11 +641,17 @@ func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (
 }
 
 func (s *userService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
+	ctx, end := startSpan(ctx, "UserService.SetPassword")
+	defer end(&err)
+
 	action := NewSetUserPasswordAction(input, s.hashers)
 	return s.ApplyActions(ctx, action)
 }
 
-func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error) {
+func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.GetMyUser")
+	defer end(&err)
+
 	sessionToken := input.SessionToken
 	if !validSessionToken(sessionToken) {
 		return nil, domain.ErrSessionTokenInvalid()
@@ -811,7 +895,9 @@ func (o *SetPasswordUserAction) Prepare(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
+	_, end := startSpan(ctx, "password.Hash")
 	o.hash, err = domain.HashPassword(o.Password, hasher)
+	end(&err)
 	return err
 }
 
@@ -886,10 +972,15 @@ type UserStatementsLookup struct {
 
 // GetByAttributes resolves a login identifier, so it matches only uniquely
 // registered values: an equal value in a non-unique property of another user
-// must not make the lookup ambiguous and reject the sign-in.
-func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
+// must not make the lookup ambiguous and reject the sign-in. It matches only
+// users of the given schema URLs, so a user of another schema can neither
+// match nor collide (ADR 058 §5).
+func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID string, schemaURLs []string, attrs []domain.Attribute) (*domain.User, error) {
 	return l.Pool.Statements().GetUser(ctx,
-		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+			database.Or(equalIDFilters(domain.UserFieldSchemaURL, schemaURLs)...),
+		),
 		UserQueryOptions{Attributes: attrs, UniqueAttributesOnly: true},
 	)
 }

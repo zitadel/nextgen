@@ -8,6 +8,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/idp"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/idpconnection"
 )
@@ -62,7 +63,10 @@ func NewIDPConnectionService(v2Pool *DB, schemas BuiltinSchemaProvider) IDPConne
 
 // CreateOrRevise stores document as a new connection when its slug is new in
 // the project, and as a new revision of the existing connection otherwise.
-func (s *idpConnectionService) CreateOrRevise(ctx context.Context, projectID string, document []byte) (*CreateIDPConnectionOutput, error) {
+func (s *idpConnectionService) CreateOrRevise(ctx context.Context, projectID string, document []byte) (_ *CreateIDPConnectionOutput, err error) {
+	ctx, end := startSpan(ctx, "IDPConnectionService.CreateOrRevise")
+	defer end(&err)
+
 	slug, err := s.validate(document)
 	if err != nil {
 		return nil, err
@@ -99,6 +103,12 @@ var errIDPSlugTaken = errors.New("identity provider connection slug taken")
 // validate checks document against the idp-connection.json schema and returns
 // its slug. The request decoder cannot do this alone: its model drops the
 // schema's root allOf, which ties each protocol to its block.
+//
+// The engine's parse then runs on the document, so a connection the engine
+// would refuse at sign-in is refused here, while the author can still fix it:
+// an oidc block that sets an endpoint without the others. The parse's other
+// rules repeat the schema's, which already passed, so any other refusal is
+// reported as req.invalid.
 func (s *idpConnectionService) validate(document []byte) (string, error) {
 	uri, err := s.schemas.LatestSchemaURI(domain.SchemaKindIDPConnection)
 	if err != nil {
@@ -114,6 +124,12 @@ func (s *idpConnectionService) validate(document []byte) (string, error) {
 	}
 	if err := schema.Validate(doc); err != nil {
 		return "", domain.ErrRequestInvalid().WithDetails(domain.FlattenValidationErrors(err)).WithParent(err)
+	}
+	if _, err := idp.ParseConnection("", document); err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok && de.Code == domain.ErrIDPEndpointsPartial(nil).Code {
+			return "", err
+		}
+		return "", domain.ErrRequestInvalid().WithParent(err)
 	}
 	slug, _ := doc["slug"].(string)
 	return slug, nil
@@ -214,7 +230,10 @@ func emitIDPConnectionEvent(ctx context.Context, tx Statementer[AllStatements], 
 	})
 }
 
-func (s *idpConnectionService) Get(ctx context.Context, projectID, id string) (*domain.IDPConnection, error) {
+func (s *idpConnectionService) Get(ctx context.Context, projectID, id string) (_ *domain.IDPConnection, err error) {
+	ctx, end := startSpan(ctx, "IDPConnectionService.Get")
+	defer end(&err)
+
 	return s.get(ctx, projectID, domain.IDPConnectionFieldID, id)
 }
 
@@ -222,7 +241,10 @@ func (s *idpConnectionService) Get(ctx context.Context, projectID, id string) (*
 // it outside any management request, so the list runs unrestricted, like the
 // flow definition lookup on the same path. A zero limit compiles to no LIMIT,
 // so one page holds every match.
-func (s *idpConnectionService) GetBySlugs(ctx context.Context, projectID string, slugs []string) ([]*domain.IDPConnection, error) {
+func (s *idpConnectionService) GetBySlugs(ctx context.Context, projectID string, slugs []string) (_ []*domain.IDPConnection, err error) {
+	ctx, end := startSpan(ctx, "IDPConnectionService.GetBySlugs")
+	defer end(&err)
+
 	// An empty OR compiles to nothing and leaves a dangling AND in the WHERE.
 	if len(slugs) == 0 {
 		return nil, nil
@@ -251,7 +273,10 @@ func idpConnectionBy(projectID string, field domain.IDPConnectionField, value st
 	)
 }
 
-func (s *idpConnectionService) GetRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error) {
+func (s *idpConnectionService) GetRevision(ctx context.Context, projectID, revisionID string) (_ *domain.IDPConnection, err error) {
+	ctx, end := startSpan(ctx, "IDPConnectionService.GetRevision")
+	defer end(&err)
+
 	entity, err := s.v2Pool.Statements().GetIDPConnectionRevision(ctx, projectID, revisionID)
 	return entity, mapIDPConnectionReadError(err)
 }
@@ -267,7 +292,10 @@ func mapIDPConnectionReadError(err error) error {
 }
 
 // List returns each connection of the project once, at its newest revision.
-func (s *idpConnectionService) List(ctx context.Context, input ListIDPConnectionsInput) (*ListIDPConnectionsOutput, error) {
+func (s *idpConnectionService) List(ctx context.Context, input ListIDPConnectionsInput) (_ *ListIDPConnectionsOutput, err error) {
+	ctx, end := startSpan(ctx, "IDPConnectionService.List")
+	defer end(&err)
+
 	filters := make([]database.Filter[domain.IDPConnectionField], 0, len(input.Filters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.IDPConnectionFieldProjectID), input.ProjectID))
 	for _, f := range input.Filters {
@@ -298,7 +326,10 @@ func (s *idpConnectionService) List(ctx context.Context, input ListIDPConnection
 }
 
 // ListRevisions pages one connection's revisions, newest first.
-func (s *idpConnectionService) ListRevisions(ctx context.Context, input ListIDPConnectionRevisionsInput) (*ListIDPConnectionsOutput, error) {
+func (s *idpConnectionService) ListRevisions(ctx context.Context, input ListIDPConnectionRevisionsInput) (_ *ListIDPConnectionsOutput, err error) {
+	ctx, end := startSpan(ctx, "IDPConnectionService.ListRevisions")
+	defer end(&err)
+
 	// The revisions statement answers an unknown connection with an empty
 	// page, so the lookup is what tells a miss from a connection's history.
 	if _, err := s.Get(ctx, input.ProjectID, input.ID); err != nil {

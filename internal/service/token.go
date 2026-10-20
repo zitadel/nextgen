@@ -40,10 +40,13 @@ func NewTokenService(
 	}
 }
 
-func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (string, error) {
+func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (_ string, err error) {
+	ctx, end := startSpan(ctx, "TokenService.GenerateJWE")
+	defer end(&err)
+
 	// Spanner may retry this callback after abort; CreateToken keep-if-sets
 	// data.TokenID so a second attempt does not reject the minted id.
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().CreateToken(ctx, data); err != nil {
 			return err
 		}
@@ -62,7 +65,10 @@ func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (str
 	return data.JWE(tokenCrypter)
 }
 
-func (s *tokenService) GetActivePreviewToken(ctx context.Context, projectID string) (*domain.Token, error) {
+func (s *tokenService) GetActivePreviewToken(ctx context.Context, projectID string) (_ *domain.Token, err error) {
+	ctx, end := startSpan(ctx, "TokenService.GetActivePreviewToken")
+	defer end(&err)
+
 	opts := &database.ListOptions[domain.TokenField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.TokenFieldProjectID), projectID),
@@ -99,11 +105,14 @@ func (s *tokenService) GetActivePreviewToken(ctx context.Context, projectID stri
 	return nil, domain.TokenNotFound()
 }
 
-func (s *tokenService) RevokeToken(ctx context.Context, projectID, tokenID string) error {
+func (s *tokenService) RevokeToken(ctx context.Context, projectID, tokenID string) (err error) {
+	ctx, end := startSpan(ctx, "TokenService.RevokeToken")
+	defer end(&err)
+
 	if tokenID == "" {
 		return nil
 	}
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().DeleteTokenByID(ctx, projectID, tokenID); err != nil {
 			return err
 		}
@@ -134,7 +143,10 @@ func tokenUserID(tok *domain.Token) *string {
 	return &uid
 }
 
-func (s *tokenService) IntrospectToken(ctx context.Context, token string) (*domain.Token, error) {
+func (s *tokenService) IntrospectToken(ctx context.Context, token string) (_ *domain.Token, err error) {
+	ctx, end := startSpan(ctx, "TokenService.IntrospectToken")
+	defer end(&err)
+
 	payload, err := domain.ParseAndValidateToken(ctx, token,
 		func(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Decrypter, error) {
 			return s.keys.GetCrypter(ctx, keyID, algorithm)

@@ -7,8 +7,9 @@ demo apps. Instead, it builds the current workspace packages, publishes packed
 tarballs to a temporary registry, creates empty app directories outside the
 repo, runs the customer local CLI flow through `npx`, starts the generated apps,
 and verifies that real users can register, log out, and log in again across
-all eight frameworks: Next, Nuxt, React, Vue, Angular, Solid, Svelte, and
-Qwik (`scripts/frameworks.mjs` is the authoritative list).
+every supported framework: the SPA families (React, Vue, Angular, Solid,
+Svelte, Qwik) and the meta-frameworks (Next, Nuxt, SvelteKit, TanStack Start,
+SolidStart, Qwik Router). `scripts/frameworks.mjs` is the authoritative list.
 
 ## Local runner
 
@@ -46,8 +47,9 @@ moon run e2e:journey -- --concurrency 2
 moon run e2e:journey -- --tarballs-dir dist/release/<version>/npm
 ```
 
-- `--framework <id>` runs one framework (`next`, `nuxt`, `react`, `vue`,
-  `angular`, `solid`, `svelte`, or `qwik`) instead of the full matrix.
+- `--framework <id>` runs one framework (any id in `frameworkIds` in
+  `scripts/frameworks.mjs`, e.g. `next`, `sveltekit`, `qwik-router`) instead of
+  the full matrix.
 - `--suite frameworks|testkit` selects the lane: `frameworks` (default) runs
   the scaffold journey matrix; `testkit` runs the `@zitadel/testing` consumer
   lane.
@@ -109,7 +111,10 @@ its CLI steps in `timings.json` in the lane's work dir, which the runner reads.
 ## CI gate
 
 The required PR CI job runs the framework matrix against the default binary
-runtime. It does not use public Zitadel packages or GHCR images; it publishes
+runtime. The matrix skips SvelteKit, TanStack Start, SolidStart and Qwik Router
+(`ciExcludedFrameworkIds` in `scripts/frameworks.mjs`): their scaffolders track
+upstream `create-*@latest` releases, so a red lane could come from outside the PR.
+They stay registered and run by hand with `--framework`. It does not use public Zitadel packages or GHCR images; it publishes
 the current workflow's package tarballs to Verdaccio and runs the same `npx`
 local setup flow against the generated app. The Docker fallback journey remains
 an opt-in local/manual check via

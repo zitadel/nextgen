@@ -11,6 +11,9 @@ rules:
   no-unused-components: error
   operation-2xx-response: error
   operation-4xx-response: off
+  # An operation's or a webhook's description is its API reference page's
+  # body, and its first sentence the page's description (api/openapi/AGENTS.md).
+  operation-description: error
   operation-operationId: error
   tag-description: error
 
@@ -44,4 +47,16 @@ rules:
       property: name
     assertions:
       notPattern: /[a-z][A-Z]/
+    severity: error
+
+  # The first sentence of an operation's or a webhook's description is its API
+  # reference page's description (api/openapi/AGENTS.md), so the description
+  # opens with a sentence: not a heading, a quote, a list, a table, a code
+  # fence or HTML.
+  rule/operation-description-opens-with-sentence:
+    subject:
+      type: Operation
+      property: description
+    assertions:
+      notPattern: /^\s*(#|>|[-*+]\s|\d+[.)]\s|\||```|~~~|<)/
     severity: error

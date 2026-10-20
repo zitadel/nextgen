@@ -91,6 +91,7 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
+import { missingEndpoints } from "@zitadel/config/idp";
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
 
@@ -447,22 +448,11 @@ function immutableFieldClash(
       return field;
     }
   }
-  // The authority is the issuer for OIDC, and the token endpoint with the
-  // userinfo endpoint for OAuth 2.0.
-  for (const [block, fields] of [
-    ["oidc", ["issuer"]],
-    ["oauth2", ["token_endpoint", "userinfo_endpoint"]],
-  ] as const) {
-    const was = before[block];
-    const now = after[block];
-    if (!isObject(was) || !isObject(now)) {
-      continue;
-    }
-    for (const field of fields) {
-      if (was[field] !== undefined && was[field] !== now[field]) {
-        return `${block}.${field}`;
-      }
-    }
+  // The authority is the issuer.
+  const was = before.oidc;
+  const now = after.oidc;
+  if (isObject(was) && isObject(now) && was.issuer !== undefined && was.issuer !== now.issuer) {
+    return "oidc.issuer";
   }
   return undefined;
 }
@@ -1336,9 +1326,10 @@ export function setupPlatformHandlers() {
     }),
 
     // --- identity provider connections -----------------------------------
-    // The CLI's connection syncer publishes `.zitadel/idps/*.json` here. The
-    // Go service does not exist yet (#1003), so without these the SSO journey
-    // cannot be exercised end to end at all.
+    // The CLI's connection syncer publishes `.zitadel/idps/*.json` here. These
+    // stand in for the Go service in the CLI specs and the SSO journey, so
+    // they mirror its refusals: a CLI check the mock skipped would pass a test
+    // the real service fails.
 
     http.post("*/idps", async ({ request }) => {
       const query = parse(CreateIdpQueryParams, queryRecord(request), "invalid_query");
@@ -1355,6 +1346,20 @@ export function setupPlatformHandlers() {
       }
 
       const definition = body.data.idp as unknown as Record<string, unknown>;
+      // An oidc block names no endpoint or every one it needs. The server
+      // refuses anything in between before it looks the slug up, and nests
+      // the missing endpoints under details like any domain error's details.
+      const missing = missingEndpoints(definition.oidc);
+      if (missing.length > 0) {
+        return HttpResponse.json(
+          errorBody(
+            "idp.endpoints_partial",
+            "identity provider connection: the endpoints are partially set",
+            { details: { missing } },
+          ),
+          { status: 400 },
+        );
+      }
       const slug = definition.slug as string;
       const now = nowIso();
       // A slug that already exists is revised under its own id, so everything

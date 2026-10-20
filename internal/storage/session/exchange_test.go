@@ -22,7 +22,11 @@ func TestHashHandoffToken(t *testing.T) {
 
 func TestExchangeTTL(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, domain.SessionAnonymousTTL, session.ExchangeTTL(0))
+	// No TTL given: an exchanged session gets the signed-in default, not the
+	// anonymous shell's.
+	assert.Equal(t, domain.SessionDefaultTTL, session.ExchangeTTL(0))
+	assert.Equal(t, domain.SessionDefaultTTL, session.ExchangeTTL(-time.Minute))
+	assert.Greater(t, session.ExchangeTTL(0), domain.SessionAnonymousTTL)
 	assert.Equal(t, 2*time.Hour, session.ExchangeTTL(2*time.Hour))
 }
 

@@ -2,33 +2,25 @@ post:
   operationId: createRelease
   summary: Create a release
   description: |
-    Assembles a release from revisions that already exist, supplied as
-    `(kind, revision_id)` pairs. No new revisions are allocated: to build a
-    release from the files on disk, use `POST /releases/build`, which
-    allocates them.
+    Assembles a release from existing revisions, given as
+    `(kind, revision_id)` pairs. To build one from files on disk, use
+    `POST /releases/build`.
 
-    Every referenced `revision_id` must exist in the project. Each one's
-    handle is read from the revision itself and recorded on the release, so a
-    resource is always pinned under the identity it declares.
+    Each revision must exist in the project and is recorded under the handle
+    it declares. The release must be complete and consistent:
 
-    Every handle a pinned resource references, such as a flow definition's
-    `user_schema` naming a schema by `objectType`, or a flow step's
-    `sso_providers` naming IDP connections by `slug`, must be pinned by the
-    same release. A handle the release does not pin refuses the request with
-    `rel.unresolved_reference`. The message names the pointer and the handle
-    that did not resolve, for example
-    `flow_definition default-login: user_schema human-user not found`,
-    because a release pins many and the code alone does not say which one
-    failed.
+    - Every handle its revisions name must be in the release: a flow's
+      `user_schema`, and the IDP connections named by a flow step's
+      `sso_providers` or a schema's `x-auth-methods.sso.providers`. A missing
+      one answers `rel.unresolved_reference`, naming the resource and the
+      handle, e.g. `flow_definition default-login: user_schema human-user not found`.
+    - Every flow is validated as on save, against the user schema revision
+      in the release. A flow that fails answers `rel.invalid`, with the
+      reason in `details`.
 
-    Idempotent on the pinned set: metadata is excluded from the comparison,
-    so re-submitting the same revisions with a different `message` answers
-    `200` with the release that already pins them rather than creating a
-    second one. A release the project did not hold before answers `201`.
-
-    Creating a release does not deploy it. A release is not tied to an
-    origin, and the same release can later be deployed to any number of
-    origins unchanged.
+    Idempotent on the set of revisions: the same revisions with a different
+    `message` answer `200` with the existing release. A new release answers
+    `201`. Creating a release does not deploy it.
   tags:
     - Releases
   parameters:
@@ -153,6 +145,7 @@ post:
 
 get:
   operationId: listReleases
+  x-zitadel-cli: releases list
   summary: List releases
   description: |
     Lists the project's releases, newest first.

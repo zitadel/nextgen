@@ -5,8 +5,64 @@ type AddOriginRes interface {
 	addOriginRes()
 }
 
+type AuthAttemptCreatedRes interface {
+	authAttemptCreatedRes()
+}
+
+type AuthAttemptHandedOffRes interface {
+	authAttemptHandedOffRes()
+}
+
+type AuthCheckFailedRes interface {
+	authCheckFailedRes()
+}
+
+type AuthCheckSucceededRes interface {
+	authCheckSucceededRes()
+}
+
+type AuthFactorPasskeyEnrolledRes interface {
+	authFactorPasskeyEnrolledRes()
+}
+
+type AuthFactorPasswordSetRes interface {
+	authFactorPasswordSetRes()
+}
+
+type AuthSsoAuthorizationFailedRes interface {
+	authSsoAuthorizationFailedRes()
+}
+
+type AuthSsoExchangeFailedRes interface {
+	authSsoExchangeFailedRes()
+}
+
+type AuthSsoExchangeSucceededRes interface {
+	authSsoExchangeSucceededRes()
+}
+
+type AuthTokenIssuedRes interface {
+	authTokenIssuedRes()
+}
+
+type AuthTokenRevokedRes interface {
+	authTokenRevokedRes()
+}
+
+type AuthzGrantedRes interface {
+	authzGrantedRes()
+}
+
+type AuthzRevokedRes interface {
+	authzRevokedRes()
+}
+
 type BeginUserPasskeyRegistrationRes interface {
 	beginUserPasskeyRegistrationRes()
+}
+
+type BrandingCreatedRes interface {
+	brandingCreatedRes()
 }
 
 type BuildReleaseRes interface {
@@ -89,12 +145,28 @@ type DeleteVariableRes interface {
 	deleteVariableRes()
 }
 
+type DeploymentCreatedRes interface {
+	deploymentCreatedRes()
+}
+
 type ExchangeHandoffRes interface {
 	exchangeHandoffRes()
 }
 
 type FinishUserPasskeyRegistrationRes interface {
 	finishUserPasskeyRegistrationRes()
+}
+
+type FlowdefCreatedRes interface {
+	flowdefCreatedRes()
+}
+
+type FlowdefDeletedRes interface {
+	flowdefDeletedRes()
+}
+
+type FlowdefUpdatedRes interface {
+	flowdefUpdatedRes()
 }
 
 type GetAuthAttemptRes interface {
@@ -201,6 +273,18 @@ type GetVariablesRes interface {
 	getVariablesRes()
 }
 
+type IdpCreatedRes interface {
+	idpCreatedRes()
+}
+
+type IdpIdentityLinkCreatedRes interface {
+	idpIdentityLinkCreatedRes()
+}
+
+type IdpUpdatedRes interface {
+	idpUpdatedRes()
+}
+
 type InitClaimRes interface {
 	initClaimRes()
 }
@@ -245,12 +329,24 @@ type ListSchemasRes interface {
 	listSchemasRes()
 }
 
+type ListUserIdentityLinksRes interface {
+	listUserIdentityLinksRes()
+}
+
 type ListUserPasskeysRes interface {
 	listUserPasskeysRes()
 }
 
 type ListUserTeamsRes interface {
 	listUserTeamsRes()
+}
+
+type OriginAddedRes interface {
+	originAddedRes()
+}
+
+type OriginRemovedRes interface {
+	originRemovedRes()
 }
 
 type PatchMyUserRes interface {
@@ -263,6 +359,18 @@ type PatchProjectRes interface {
 
 type PatchUserByIDRes interface {
 	patchUserByIDRes()
+}
+
+type ProjectCreatedRes interface {
+	projectCreatedRes()
+}
+
+type ProjectDeletedRes interface {
+	projectDeletedRes()
+}
+
+type ProjectUpdatedRes interface {
+	projectUpdatedRes()
 }
 
 type QueryGrantsRes interface {
@@ -289,12 +397,24 @@ type QueryUsersRes interface {
 	queryUsersRes()
 }
 
+type ReleaseCreatedRes interface {
+	releaseCreatedRes()
+}
+
+type ReleaseRevokedRes interface {
+	releaseRevokedRes()
+}
+
 type RemoveOriginRes interface {
 	removeOriginRes()
 }
 
 type RemovePreviewRes interface {
 	removePreviewRes()
+}
+
+type RequestApiRes interface {
+	requestApiRes()
 }
 
 type RevokeMySessionRes interface {
@@ -313,6 +433,18 @@ type RollbackDeploymentRes interface {
 	rollbackDeploymentRes()
 }
 
+type SchemaCreatedRes interface {
+	schemaCreatedRes()
+}
+
+type SessionDeletedRes interface {
+	sessionDeletedRes()
+}
+
+type SessionEstablishedRes interface {
+	sessionEstablishedRes()
+}
+
 type SetUserPasswordRes interface {
 	setUserPasswordRes()
 }
@@ -321,12 +453,48 @@ type SubmitFlowStepRes interface {
 	submitFlowStepRes()
 }
 
+type TeamCreatedRes interface {
+	teamCreatedRes()
+}
+
+type TeamDeactivatedRes interface {
+	teamDeactivatedRes()
+}
+
+type TeamUpdatedRes interface {
+	teamUpdatedRes()
+}
+
 type UpdateTeamRes interface {
 	updateTeamRes()
 }
 
 type UpdateVariablesRes interface {
 	updateVariablesRes()
+}
+
+type UserCreateFailedRes interface {
+	userCreateFailedRes()
+}
+
+type UserCreatedRes interface {
+	userCreatedRes()
+}
+
+type UserDeletedRes interface {
+	userDeletedRes()
+}
+
+type UserUpdatedRes interface {
+	userUpdatedRes()
+}
+
+type VariableRemovedRes interface {
+	variableRemovedRes()
+}
+
+type VariableSetRes interface {
+	variableSetRes()
 }
 
 type VerifyChallengeProofRes interface {

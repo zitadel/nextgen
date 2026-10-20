@@ -80,6 +80,7 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("previews", func(t *testing.T) { battlePreviews(t, d) })
 		t.Run("idp_connections", func(t *testing.T) { battleIDPConnections(t, d) })
 		t.Run("idp_connection_revisions", func(t *testing.T) { battleIDPConnectionRevisions(t, d) })
+		t.Run("idp_identity_links", func(t *testing.T) { battleIDPIdentityLinks(t, d) })
 		t.Run("flow_definitions", func(t *testing.T) { battleFlowDefinitions(t, d) })
 		t.Run("json_schemas", func(t *testing.T) { battleJSONSchemas(t, d) })
 		t.Run("json_schemas_latest", func(t *testing.T) { battleJSONSchemasLatest(t, d) })
@@ -772,4 +773,50 @@ func battleIDPConnectionRevisions(t *testing.T, d dialect) {
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
 		return d.stmts.ListIDPConnectionRevisions(unfilteredListCtx(t), projectID, entity.ID, page)
 	}, func(c *domain.IDPConnection) string { return c.RevisionID }, 2)
+}
+
+// battleIDPIdentityLinks drains one user's links in the service's order,
+// created_at then id. Another user's link on the same connection is seeded too,
+// so the exact drain also pins that the user filter keeps it out.
+func battleIDPIdentityLinks(t *testing.T, d dialect) {
+	t.Helper()
+	f := newIDPIdentityLinkFixture(t, d.stmts)
+	links := make([]*domain.IDPIdentityLink, 0, 5)
+	for i := range 5 {
+		link := f.link("subject-" + string(rune('a'+i)))
+		require.NoError(t, d.stmts.CreateIDPIdentityLink(t.Context(), link))
+		links = append(links, link)
+	}
+	stranger := f.link("subject-stranger")
+	stranger.UserID = createLinkUser(t, d.stmts, f.projectID, f.schemaURL, "stranger")
+	require.NoError(t, d.stmts.CreateIDPIdentityLink(t.Context(), stranger))
+
+	// Links created in the same instant tie on created_at, so the expected
+	// order comes from the stored values rather than the insert order.
+	slices.SortFunc(links, func(a, b *domain.IDPIdentityLink) int {
+		if c := a.CreatedAt.Compare(b.CreatedAt); c != 0 {
+			return c
+		}
+		return strings.Compare(a.ID, b.ID)
+	})
+	want := make([]string, len(links))
+	for i, link := range links {
+		want[i] = link.ID
+	}
+	filter := database.And(
+		database.Equal(database.Col(domain.IDPIdentityLinkFieldProjectID), f.projectID),
+		database.Equal(database.Col(domain.IDPIdentityLinkFieldUserID), f.userID),
+	)
+	orderAsc := database.OrderBy[domain.IDPIdentityLinkField]{
+		Columns: []database.Column[domain.IDPIdentityLinkField]{
+			database.Col(domain.IDPIdentityLinkFieldCreatedAt),
+			database.Col(domain.IDPIdentityLinkFieldID),
+		},
+		Direction: database.OrderAsc,
+	}
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.IDPIdentityLinkField]) (*database.ListResult[*domain.IDPIdentityLink], error) {
+		return d.stmts.ListIDPIdentityLinks(t.Context(), &database.ListOptions[domain.IDPIdentityLinkField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(link *domain.IDPIdentityLink) string { return link.ID }, 2)
 }

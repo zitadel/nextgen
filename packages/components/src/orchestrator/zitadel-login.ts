@@ -11,7 +11,8 @@ import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
 import { css, html, LitElement, nothing, type PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
+import { property } from "../internal/property.js";
 
 import "../atoms/index.js";
 import type { ZlFieldInputDetail, ZlSubmitDetail } from "../atoms/index.js";
@@ -35,6 +36,7 @@ import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { en, builtinLocales, mergeLocale, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { resolveApi } from "./resolve-api.js";
+import { returnPathFromLocation } from "./return-path.js";
 import { createSanitiser } from "./sanitiser.js";
 import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
@@ -195,11 +197,25 @@ export class ZitadelLogin extends ZitadelSurface {
    * URL to navigate to after a successful embedded sign-in. When set, the
    * orchestrator exchanges the terminal `handoff_token` via the generated
    * API client (setting the session cookie) and then performs a full
-   * navigation to this URL so host middleware can observe the cookie.
-   * For `complete: "redirect"` the orchestrator follows `redirect_uri`
-   * instead and does not run the exchange.
+   * navigation so host middleware can observe the cookie.
+   *
+   * The navigation returns to the path the page's `next` query parameter
+   * names, when that is a path on this origin: every server SDK's middleware
+   * sends a signed-out request for a protected route to the login page with
+   * `?next=<path>`. Without one, or with {@link forcePostSignInUrl}, it goes
+   * to this URL. For `complete: "redirect"` the orchestrator follows
+   * `redirect_uri` instead and does not run the exchange.
    */
   @property({ type: String, attribute: "post-sign-in-url" }) accessor postSignInUrl = "";
+
+  /**
+   * Go to {@link postSignInUrl} after sign-in even when the page's `next`
+   * query parameter names a path to return to. For a host that keeps a value
+   * of its own in `next`, such as the console, whose `next` is relative to its
+   * deployment prefix and already joined with it in `postSignInUrl`.
+   */
+  @property({ type: Boolean, attribute: "force-post-sign-in-url" })
+  accessor forcePostSignInUrl = false;
 
   /**
    * Existing flow handle to resume rather than start a new flow. When set,
@@ -211,8 +227,16 @@ export class ZitadelLogin extends ZitadelSurface {
    * Leaving it empty falls back to the `flow` query parameter, which is how a
    * provider callback hands the flow back (see {@link flowIdFromLocation}), so
    * a host page needs no code of its own for external sign-in to finish.
+   * Unset, `null` or `""` all mean "no handle".
    */
-  @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
+  @property({ type: String, attribute: "resume-flow-id" })
+  get resumeFlowId(): string {
+    return this.#resumeFlowId;
+  }
+  set resumeFlowId(value: string | null | undefined) {
+    this.#resumeFlowId = value || "";
+  }
+  #resumeFlowId = "";
 
   /**
    * Hide the show/hide button on password fields. The button is shown by
@@ -991,7 +1015,8 @@ export class ZitadelLogin extends ZitadelSurface {
    *   `response.redirect_uri` (OIDC/SAML `auth_request_id` resolved). This
    *   takes precedence over `post-sign-in-url`.
    * - `step.complete === "show"` — when `post-sign-in-url` is set, exchange
-   *   the `handoff_token` for a session cookie and navigate there.
+   *   the `handoff_token` for a session cookie and navigate to
+   *   {@link postSignInTarget}.
    *
    * `zitadel-flow-complete` is always emitted so hosts with custom post-sign-in
    * flows can handle the handoff themselves when `post-sign-in-url` is omitted.
@@ -1023,13 +1048,25 @@ export class ZitadelLogin extends ZitadelSurface {
           "<zitadel-login>",
         );
         await exchangeSession(api, { handoff_token: handoffToken }, { project_id: cfg.projectId });
-        window.location.assign(this.postSignInUrl);
+        window.location.assign(this.postSignInTarget());
       } catch (error) {
         this.handleTransportError(error);
       } finally {
         this.loading = false;
       }
     }
+  }
+
+  /**
+   * Where a completed sign-in sends the browser: back to the protected route
+   * the server SDK's middleware sent it from (the page's `next` query
+   * parameter), when that is a path on this origin, else `post-sign-in-url`.
+   * Read at completion, not at mount: the flow keeps the page's query, and a
+   * provider callback returns to the same URL (see {@link returnTargetFor}).
+   */
+  private postSignInTarget(): string {
+    if (this.forcePostSignInUrl) return this.postSignInUrl;
+    return returnPathFromLocation() ?? this.postSignInUrl;
   }
 
   private renderStep(step: CreateFlow201Step, engine: Liquid): string {

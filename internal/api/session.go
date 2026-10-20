@@ -140,7 +140,16 @@ func (h Handler) mySession(ctx context.Context, withUserIdentity bool) (*domain.
 	return session, nil
 }
 
-func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) {
+// GetMySession reads the cookie's session. With project_id, a session of any
+// other project is refused before it is looked up: an app asks which of its own
+// users is signed in, and a live session of another project on the same server
+// is not one of them, whatever state it is in.
+func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams) (api.GetMySessionRes, error) {
+	if projectID, ok := params.ProjectID.Get(); ok {
+		if token, ok := sessionTokenFromContext(ctx); ok && token.ProjectID != string(projectID) {
+			return nil, domain.ErrSessionProjectMismatch()
+		}
+	}
 	session, err := h.mySession(ctx, true)
 	if err != nil {
 		return nil, err
@@ -402,17 +411,14 @@ func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrSessionNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrSessionTokenCreationFailed().Code:
-		return errorResponseWithStatusCode(http.StatusInternalServerError, err)
 	case domain.ErrSessionExchangeConflict().Code,
 		domain.ErrSessionInvalidHandoffToken().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrSessionTokenInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
-	case domain.ErrSessionPermissionDenied().Code:
+	case domain.ErrSessionPermissionDenied().Code,
+		domain.ErrSessionProjectMismatch().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
-	case domain.ErrNotImplemented().Code:
-		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
 	case domain.ErrSessionInvalidTTL().Code:
 		apiErr := &api.ErrorDetailsStatusCode{
 			StatusCode: http.StatusBadRequest,

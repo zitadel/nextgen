@@ -25,6 +25,8 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel/log"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
@@ -392,13 +394,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			cfg.Platform.ResolvedProjectID(),
 		).WithPersonalTeamEnsurer(personalTeams),
 		api.NewSecurityHandler(tokenService),
-		oasapi.WithMiddleware(
-			middleware.AddOperationIdToContext(),
-			// logging is done at net/http level
-		),
-		oasapi.WithMeterProvider(telemetry.MeterProvider()),
-		oasapi.WithTracerProvider(telemetry.TracerProvider()),
-		oasapi.WithErrorHandler(api.OgenErrorHandler))
+		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider())...)
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
 	}
@@ -587,7 +583,9 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	// origins.shared_hosts is not SetDefault'd: viper merges map defaults with
 	// overrides, which would break replace-defaults. Nil after unmarshal means
 	// "use DefaultSharedHosts"; an explicit empty map disables the checks.
-	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
+	// default_ttl is the lifetime of a signed-in session, not of the
+	// anonymous shell POST /sessions mints (domain.SessionAnonymousTTL).
+	v.SetDefault("session.default_ttl", domain.SessionDefaultTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 	// Empty means "the deployment's first-created non-platform project is the
 	// default" (Console ADR 0004 §2; the built-in platform row is skipped by
@@ -722,6 +720,20 @@ func mustBindEnv(v *viper.Viper, key string) {
 }
 
 // ----------------------------- HTTP --------------------------------------
+
+// apiServerOptions are the options of the ogen API server that buildHTTPMux
+// mounts, shared with the test of that chain.
+func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider) []oasapi.ServerOption {
+	return []oasapi.ServerOption{
+		oasapi.WithMiddleware(
+			middleware.AddOperationIdToContext(),
+			// logging is done at net/http level
+		),
+		oasapi.WithMeterProvider(meterProvider),
+		oasapi.WithTracerProvider(api.NewOgenTracerProvider(tracerProvider)),
+		oasapi.WithErrorHandler(api.OgenErrorHandler),
+	}
+}
 
 func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
 	mux := http.NewServeMux()

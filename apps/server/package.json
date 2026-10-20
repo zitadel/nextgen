@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/server",
-  "version": "1.0.0-alpha.25",
+  "version": "1.0.0-alpha.27",
   "description": "Zitadel server binary launcher.",
   "homepage": "https://github.com/zitadel/nextgen#readme",
   "bugs": {
@@ -15,6 +15,14 @@
   },
   "bin": {
     "zitadel-server": "./bin/zitadel-server.js"
+  },
+  "exports": {
+    "./binary": {
+      "types": "./bin/binary.d.ts",
+      "default": "./bin/binary.js"
+    },
+    "./bin/zitadel-server.js": "./bin/zitadel-server.js",
+    "./package.json": "./package.json"
   },
   "files": [
     "bin"

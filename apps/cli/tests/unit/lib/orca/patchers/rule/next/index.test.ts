@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import type {
   FileOp,
   ScaffoldPlan,
@@ -168,6 +169,17 @@ describe("NextPatcher.plan", () => {
     expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "0.1.0-alpha.0" });
   });
 
+  it.each([
+    ["1.2.0", "latest"],
+    ["2.0.0-beta.3", "beta"],
+  ])("pins the SDK for CLI %s at %s", (cliVersion, expected) => {
+    const plan = new NextPatcher().plan({ ...ctxFor("app"), cliVersion });
+    const dep = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep",
+    );
+    expect(dep?.version).toBe(expected);
+  });
+
   it("leaves schema and flow files for setup's resource materializer", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     expect(writeContents(plan, ".zitadel/schemas/user.json")).toBeUndefined();
@@ -235,5 +247,11 @@ describe("NextPatcher.artifacts", () => {
     });
     expect(artifacts.markedFiles).toContain("proxy.ts");
     expect(artifacts.markedFiles).not.toContain("middleware.ts");
+  });
+});
+
+describe("NextPatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new NextPatcher().canPatch(id)).toBe(id === "next");
   });
 });

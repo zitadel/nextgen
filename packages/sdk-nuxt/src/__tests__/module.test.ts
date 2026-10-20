@@ -1,7 +1,8 @@
 import type { Nuxt } from "@nuxt/schema";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { addPlugin, addTypeTemplate } from "@nuxt/kit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import nextgenModule from "../module";
@@ -13,6 +14,7 @@ vi.mock("@nuxt/kit", async (importOriginal) => ({
   addPlugin: vi.fn(),
   addServerHandler: vi.fn(),
   addImportsDir: vi.fn(),
+  addTypeTemplate: vi.fn(),
 }));
 
 interface ModuleRuntimeConfig {
@@ -40,13 +42,16 @@ async function install(
     nextgen?: Record<string, unknown>;
     publicRuntimeConfig?: Record<string, unknown>;
     envLocal?: string;
+    dev?: boolean;
   } = {},
 ): Promise<ModuleRuntimeConfig> {
   if (app.envLocal !== undefined) {
     writeFileSync(join(rootDir, ".env.local"), app.envLocal);
   }
   const runtimeConfig = { public: { ...app.publicRuntimeConfig } };
-  const nuxt = { options: { rootDir, nextgen: app.nextgen ?? {}, runtimeConfig } };
+  const nuxt = {
+    options: { rootDir, dev: app.dev ?? false, nextgen: app.nextgen ?? {}, runtimeConfig },
+  };
   await nextgenModule({}, nuxt as unknown as Nuxt);
   return runtimeConfig as unknown as ModuleRuntimeConfig;
 }
@@ -58,6 +63,44 @@ describe("@zitadel/sdk-nuxt module", () => {
     expect(runtime.nextgen.proxyPath).toBe("/auth");
     expect(runtime.public.zitadelProxyPath).toBe("/auth");
     expect(runtime.public.nextgenProxyPath).toBe("/auth");
+  });
+
+  it("loads the widget elements in the browser only", async () => {
+    await install();
+
+    expect(addPlugin).toHaveBeenCalledWith({
+      src: expect.stringMatching(/runtime[\\/]components\.client$/),
+      mode: "client",
+    });
+  });
+
+  it("types the business locales the client plugin provides", async () => {
+    await install();
+
+    const [template] = vi.mocked(addTypeTemplate).mock.calls[0] ?? [];
+    expect(template?.filename).toBe("types/zitadel-business-locales.d.ts");
+    const contents = String(
+      (template as { getContents: (data: unknown) => string }).getContents({}),
+    );
+    expect(contents).toContain("$zitadelBusinessLocales: ZitadelBusinessLocales");
+    expect(contents).toContain('declare module "#app"');
+    // The app does not install @zitadel/components, so the types must not import it.
+    expect(contents).not.toContain("@zitadel/components");
+  });
+
+  // The widget packages load in the browser (client-only plugin) or run as
+  // plain ESM from node_modules on the server, so an app needs no
+  // `build.transpile` entry for them; the module adds none and leaves the
+  // app's own list alone.
+  it("adds no build.transpile entries of its own", async () => {
+    const build = { transpile: ["my-lib"] };
+    const nuxt = {
+      options: { rootDir, dev: false, nextgen: {}, runtimeConfig: { public: {} }, build },
+    };
+
+    await nextgenModule({}, nuxt as unknown as Nuxt);
+
+    expect(build.transpile).toEqual(["my-lib"]);
   });
 
   it("hands every middleware option to the server middleware", async () => {
@@ -89,42 +132,100 @@ describe("@zitadel/sdk-nuxt module", () => {
   it("defaults to the local server and the /__nextgen prefix", async () => {
     const runtime = await install();
 
-    expect(runtime.nextgen.url).toBe("http://localhost:8080");
+    expect(runtime.nextgen.url).toBe("");
     expect(runtime.nextgen.proxyPath).toBe("/__nextgen");
-    expect(runtime.nextgen.projectSecret).toBeUndefined();
+    expect(runtime.nextgen.projectSecret).toBe("");
     expect(runtime.public.zitadelProjectId).toBe("");
   });
 
-  it("reads the URL, the project id and the secret from .env.local", async () => {
-    const runtime = await install({
-      envLocal: [
-        "ZITADEL_URL=https://zitadel.example",
-        "NUXT_PUBLIC_ZITADEL_PROJECT_ID=proj_local",
-        "ZITADEL_PROJECT_SECRET=sk_local",
-      ].join("\n"),
-    });
+  it("reads the project id from .env.local", async () => {
+    const runtime = await install({ envLocal: "NUXT_PUBLIC_ZITADEL_PROJECT_ID=proj_local\n" });
 
-    expect(runtime.nextgen.url).toBe("https://zitadel.example");
     expect(runtime.public.zitadelProjectId).toBe("proj_local");
-    expect(runtime.nextgen.projectSecret).toBe("sk_local");
   });
 
-  it("prefers the environment over .env.local", async () => {
-    vi.stubEnv("ZITADEL_URL", "https://env.example");
-    vi.stubEnv("NUXT_PUBLIC_ZITADEL_PROJECT_ID", "proj_env");
-    vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_env");
+  // A build must not pin the project sessions are held to: the public project
+  // id (NUXT_PUBLIC_ZITADEL_PROJECT_ID at runtime) decides unless the app names
+  // one, and the runtime ZITADEL_PROJECT_ID is the last fallback.
+  it("leaves the session project to runtime unless nuxt.config names one", async () => {
+    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_build_env");
 
-    const runtime = await install({
-      envLocal: [
-        "ZITADEL_URL=https://zitadel.example",
-        "NUXT_PUBLIC_ZITADEL_PROJECT_ID=proj_local",
-        "ZITADEL_PROJECT_SECRET=sk_local",
-      ].join("\n"),
+    const unnamed = await install({ envLocal: "ZITADEL_PROJECT_ID=proj_local\n" });
+    const named = await install({ nextgen: { projectId: "proj_config" } });
+
+    expect(unnamed.nextgen).toHaveProperty("projectId", undefined);
+    expect(named.nextgen.projectId).toBe("proj_config");
+  });
+
+  it("prefers the environment over .env.local for the project id", async () => {
+    vi.stubEnv("NUXT_PUBLIC_ZITADEL_PROJECT_ID", "proj_env");
+
+    const runtime = await install({ envLocal: "NUXT_PUBLIC_ZITADEL_PROJECT_ID=proj_local\n" });
+
+    expect(runtime.public.zitadelProjectId).toBe("proj_env");
+  });
+
+  // `nuxt build` writes the runtime config into `.output/`, so whatever the
+  // module puts there ends up on disk and can no longer change per deployment.
+  describe("in a production build", () => {
+    it("does not bake ZITADEL_PROJECT_SECRET from the environment into the runtime config", async () => {
+      vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_env");
+
+      const runtime = await install();
+
+      expect(runtime.nextgen.projectSecret).toBe("");
+      expect(JSON.stringify(runtime)).not.toContain("sk_env");
     });
 
-    expect(runtime.nextgen.url).toBe("https://env.example");
-    expect(runtime.public.zitadelProjectId).toBe("proj_env");
-    expect(runtime.nextgen.projectSecret).toBe("sk_env");
+    it("does not bake ZITADEL_PROJECT_SECRET from .env.local into the runtime config", async () => {
+      const runtime = await install({ envLocal: "ZITADEL_PROJECT_SECRET=sk_local\n" });
+
+      expect(runtime.nextgen.projectSecret).toBe("");
+      expect(JSON.stringify(runtime)).not.toContain("sk_local");
+    });
+
+    it("does not bake ZITADEL_URL from the environment or .env.local into the runtime config", async () => {
+      vi.stubEnv("ZITADEL_URL", "https://env.example");
+
+      const runtime = await install({ envLocal: "ZITADEL_URL=https://zitadel.example\n" });
+
+      expect(runtime.nextgen.url).toBe("");
+    });
+
+    it("keeps no secret in the public runtime config", async () => {
+      vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_env");
+
+      const runtime = await install();
+
+      expect(JSON.stringify(runtime.public)).not.toContain("sk_env");
+    });
+  });
+
+  // `nuxt dev` writes no build output, and its server does not see
+  // `.env.local`, so the module hands it the values.
+  describe("in nuxt dev", () => {
+    it("reads the URL and the secret from .env.local", async () => {
+      const runtime = await install({
+        dev: true,
+        envLocal: "ZITADEL_URL=https://zitadel.example\nZITADEL_PROJECT_SECRET=sk_local\n",
+      });
+
+      expect(runtime.nextgen.url).toBe("https://zitadel.example");
+      expect(runtime.nextgen.projectSecret).toBe("sk_local");
+    });
+
+    it("prefers the environment over .env.local", async () => {
+      vi.stubEnv("ZITADEL_URL", "https://env.example");
+      vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_env");
+
+      const runtime = await install({
+        dev: true,
+        envLocal: "ZITADEL_URL=https://zitadel.example\nZITADEL_PROJECT_SECRET=sk_local\n",
+      });
+
+      expect(runtime.nextgen.url).toBe("https://env.example");
+      expect(runtime.nextgen.projectSecret).toBe("sk_env");
+    });
   });
 
   it("keeps a URL and a project id set in nuxt.config", async () => {
@@ -142,6 +243,7 @@ describe("@zitadel/sdk-nuxt module", () => {
 
   it("parses .env.local like dotenv", async () => {
     const runtime = await install({
+      dev: true,
       envLocal: [
         "# written by zitadel setup",
         "ZITADEL_URL=",
@@ -151,8 +253,41 @@ describe("@zitadel/sdk-nuxt module", () => {
     });
 
     // An empty value counts as unset.
-    expect(runtime.nextgen.url).toBe("http://localhost:8080");
+    expect(runtime.nextgen.url).toBe("");
     expect(runtime.public.zitadelProjectId).toBe("proj #1");
     expect(runtime.nextgen.projectSecret).toBe("sk_#1");
   });
+});
+
+// The module registers `runtime/components.client` from the published dist, so
+// a build that leaves it out breaks every app that loads the module.
+describe("client plugin", () => {
+  it("ships the widget-loading plugin in the built runtime directory", () => {
+    const built = join(import.meta.dirname, "../../dist/runtime");
+    expect(existsSync(join(built, "components.client.js"))).toBe(true);
+  });
+});
+
+// The module auto-imports `runtime/composables` from the published dist, so a
+// composable the build leaves out is an undefined global in every app page
+// (`useZitadelProject is not defined`). `sdk-nuxt:test` runs after the build.
+describe("auto-imported composables", () => {
+  const source = join(import.meta.dirname, "../runtime/composables");
+  const built = join(import.meta.dirname, "../../dist/runtime/composables");
+
+  it.each(readdirSync(source).filter((file) => file.endsWith(".ts")))(
+    "ships %s in the built composables directory",
+    (file) => {
+      expect(existsSync(join(built, file.replace(/\.ts$/, ".js")))).toBe(true);
+    },
+  );
+
+  // Nuxt types each auto-import as `typeof import("<dist>/…/useAuth")`; without
+  // a declaration beside the `.js`, apps get `any`.
+  it.each(readdirSync(source).filter((file) => file.endsWith(".ts")))(
+    "ships a declaration for %s in the built composables directory",
+    (file) => {
+      expect(existsSync(join(built, file.replace(/\.ts$/, ".d.ts")))).toBe(true);
+    },
+  );
 });

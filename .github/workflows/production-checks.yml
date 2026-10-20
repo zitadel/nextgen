@@ -2,10 +2,11 @@ name: production-checks
 
 # Tests a production deployment of the Vercel project `cloud` before Vercel
 # assigns it the production domains, and reports each suite's result as a
-# commit status of its own on the deployed commit: `docs (Production)` and
-# `console (Production)`. Vercel's Deployment Checks hold the domains until
-# the statuses they list pass, once they are added to the project
-# (docs/runbooks/cloud.md, "Deployment checks"); until then they only report.
+# commit status of its own on the deployed commit: `docs (Production)`,
+# `console (Production)` and `schemas (Production)`. Vercel's Deployment
+# Checks hold the domains until the statuses they list pass, once they are
+# added to the project (docs/runbooks/cloud.md, "Deployment checks"); until
+# then they only report.
 #
 # Why not `deployment_status`, like the previews: Vercel posts its GitHub
 # deployment when it assigns the domains, which is exactly what a blocking
@@ -34,7 +35,7 @@ permissions:
 env:
   # Every suite reports the status "<suite> (Production)", which is what
   # Vercel's Deployment Checks match on: renaming one means updating them.
-  SUITES: docs console
+  SUITES: docs console schemas
   SHA: ${{ github.event.client_payload.git.sha }}
   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
@@ -90,6 +91,7 @@ jobs:
           # not (deployment-checks.yml); read below as PASSED_<SUITE>.
           PASSED_DOCS: ${{ needs.suites.outputs.docs }}
           PASSED_CONSOLE: ${{ needs.suites.outputs.console }}
+          PASSED_SCHEMAS: ${{ needs.suites.outputs.schemas }}
         run: |
           for suite in $SUITES; do
             passed="$(printenv "PASSED_$(echo "$suite" | tr a-z A-Z)" || true)"
