@@ -151,7 +151,7 @@ to run. That check asks the npm registry before the dry-run branch, so an offlin
 `full-pr` runs the same check (`node scripts/release.mjs check-npm`), so a new
 public package fails the version PR instead of landing a version on `main` that
 cannot be published. The release job runs on
-Depot, which npm treats as self-hosted; keep `NPM_CONFIG_PROVENANCE=false` until npm
+Depot, which npm treats as self-hosted; keep `PNPM_CONFIG_PROVENANCE=false` (pnpm 12 ignores `NPM_CONFIG_PROVENANCE`) until npm
 provenance is supported for that runner environment or the publish job moves to
 GitHub-hosted runners.
 

@@ -112,6 +112,14 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin :project="project" theme="light" @flowComplete="track" />
 ```
 
+## Standard HTML attributes
+
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`) and pass them to the widget element, so you can position, style and label the widget without an extra wrapper element. Nothing else reaches the element: any other prop is ignored.
+
+```vue
+<ZitadelLogin :project="project" class="login" data-testid="login" aria-label="Sign in" />
+```
+
 ## Runtime model
 
 <Steps>

@@ -8,6 +8,8 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  proxySessionCookies,
+  SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
 } from "@zitadel/sdk-core/middleware";
@@ -120,7 +122,7 @@ export async function nextgenMiddleware(
   }
 
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-    return proxyRequest(req, url, proxyPath, proxyTimeoutMs);
+    return proxyRequest(req, url, proxyPath, projectId, proxyTimeoutMs);
   }
 
   return handleAuth(req, {
@@ -140,7 +142,9 @@ export async function nextgenMiddleware(
 
 /**
  * Forwards a `/__nextgen/*` request to the upstream auth backend and streams
- * the response back verbatim, stripping hop-by-hop headers in both directions.
+ * the response back, stripping hop-by-hop headers in both directions. The
+ * session cookie travels under this project's name in the browser and the
+ * server's name upstream ({@link proxySessionCookies}).
  *
  * All non-hop-by-hop headers from the incoming request are forwarded, including
  * any `X-Forwarded-For` chain already set by an upstream CDN or load balancer.
@@ -152,12 +156,14 @@ export async function nextgenMiddleware(
  * @param req        - The incoming edge request.
  * @param authUrl    - Base URL of the auth backend.
  * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
+ * @param projectId  - The project this app signs its users in to.
  * @returns The proxied upstream `Response`.
  */
 async function proxyRequest(
   req: NextRequest,
   authUrl: string,
   proxyPath: string,
+  projectId: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
   const url = new URL(req.url);
@@ -188,6 +194,25 @@ async function proxyRequest(
 
   if (!upstreamHeaders.has("x-forwarded-proto")) {
     upstreamHeaders.set("x-forwarded-proto", url.protocol.replace(":", ""));
+  }
+
+  const sessionCookies = proxySessionCookies(
+    {
+      method: req.method,
+      path: suffix,
+      search: url.search,
+      cookie: req.headers.get("cookie"),
+      requestUrl: url,
+      forwardedProto: req.headers.get("x-forwarded-proto"),
+      forwardedHost: req.headers.get("x-forwarded-host"),
+    },
+    projectId,
+    { url: authUrl, timeoutMs: proxyTimeoutMs },
+  );
+  if (sessionCookies.upstreamCookie === null) {
+    upstreamHeaders.delete("cookie");
+  } else {
+    upstreamHeaders.set("cookie", sessionCookies.upstreamCookie);
   }
 
   const hasBody = !["GET", "HEAD"].includes(req.method);
@@ -221,12 +246,15 @@ async function proxyRequest(
   // the base a relative one resolves against.
   const responseHeaders = filterResponseHeaders(upstream.headers, req.nextUrl.toString());
 
-  const setCookies = upstream.headers.getSetCookie?.() ?? [];
-  for (const cookie of setCookies) {
+  const answer = await sessionCookies.toBrowser(upstream);
+  for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
   }
+  if (answer.setCookies.length > 0) {
+    responseHeaders.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
+  }
 
-  return new Response(upstream.body, {
+  return new Response(answer.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
@@ -247,8 +275,9 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
  * Judges the session and tunnels the token of a signed-in user to server
  * components via a request header, where `auth()` verifies it again.
  * Redirects to the login page when nobody is signed in on a protected route.
- * When the backend cannot say whether the session is live, the cookies stay
- * and a protected route answers `503`.
+ * Either way the response carries the session cookies the judgement asks for.
+ * When the backend cannot say whether the session is live, a protected route
+ * answers `503` instead.
  *
  * @param req  - The incoming edge request.
  * @param opts - Auth handler options.
@@ -259,43 +288,51 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
 
   const authHeader = req.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cookieToken = req.cookies.get("__nextgen_session")?.value ?? null;
-  const { auth, clearCookies, undecided } = await resolveSession(
-    { bearer: bearerToken, cookie: cookieToken },
+  const { auth, undecided, cookies } = await resolveSession(
+    {
+      bearer: bearerToken,
+      cookie: (name) => req.cookies.get(name)?.value,
+      requestUrl: req.url,
+      forwardedProto: req.headers.get("x-forwarded-proto"),
+      forwardedHost: req.headers.get("x-forwarded-host"),
+    },
     verification,
   );
 
+  let response: NextResponse;
   if (auth.isAuthenticated) {
     const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": auth.session.token });
-    return NextResponse.next({ request: { headers: tunnelled } });
+    response = NextResponse.next({ request: { headers: tunnelled } });
+  } else if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    // The backend could not say whether the session is live. The user may well
+    // be signed in, so a protected route answers 503 rather than send them to
+    // the login page.
+    response = new NextResponse("Service Unavailable", { status: 503 });
+  } else if (matchesRoutes(pathname, protectedRoutes)) {
+    response = NextResponse.redirect(loginRedirectUrl(loginPath, req.url), { status: 302 });
+  } else {
+    const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
+    response = NextResponse.next({ request: { headers: tunnelled } });
   }
 
-  // The backend could not say whether the session is live. The user may well
-  // be signed in, so a protected route answers 503 rather than send them to
-  // the login page.
-  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
-    return new NextResponse("Service Unavailable", { status: 503 });
+  // A dead session's cookie is cleared so the browser stops replaying it, and a
+  // session of this project still under the shared name is copied to the
+  // project's own cookie. A live session that signs no one in here (an
+  // anonymous one, or one of another project) keeps its cookie, and so does one
+  // the backend gave no verdict on. The cookies go through the response's
+  // cookie jar, so a middleware composed around this one that sets a cookie of
+  // its own through it keeps them.
+  for (const cookie of cookies) {
+    response.cookies.set(cookie.name, cookie.value, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: cookie.secure,
+      ...(cookie.maxAge === undefined ? {} : { maxAge: cookie.maxAge }),
+    });
   }
-
-  const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
-  // Dead credentials are cleared so the browser stops replaying them. A live
-  // session that signs no one in here (an anonymous one, or one of another
-  // project) keeps its cookie, and so does one the backend gave no verdict on.
-  const staleNextgenCookies = clearCookies
-    ? req.cookies.getAll().filter((c: { name: string }) => c.name.startsWith("__nextgen"))
-    : [];
-
-  if (matchesRoutes(pathname, protectedRoutes)) {
-    const redirect = NextResponse.redirect(loginRedirectUrl(loginPath, req.url), { status: 302 });
-    for (const cookie of staleNextgenCookies) {
-      redirect.cookies.delete(cookie.name);
-    }
-    return redirect;
-  }
-
-  const response = NextResponse.next({ request: { headers: tunnelled } });
-  for (const cookie of staleNextgenCookies) {
-    response.cookies.delete(cookie.name);
+  if (cookies.length > 0) {
+    response.headers.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
   }
   return response;
 }

@@ -22,6 +22,7 @@ import {
 import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
 import { createOrca } from "../../../../src/lib/orca";
 import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
+import { bearerOnlyProxyConf } from "../../../helpers/proxy-conf";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
 import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
 import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
@@ -954,6 +955,47 @@ describe("ManagedFilesCheck", () => {
     expect(outcome.status).toBe("warn");
     expect(outcome.message).toContain("unverifiable managed config wiring");
     expect(outcome.message).toContain("angular.json");
+  });
+
+  // Sign-in works without the session-cookie hooks (ADR 073); without them the
+  // Console and the app share one session cookie on localhost.
+  it("warns while the managed proxy lacks the session-cookie hooks, and --fix adds them", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    await writeFile(proxyPath, bearerOnlyProxyConf());
+    const check = new ManagedFilesCheck();
+
+    const outcome = await check.run(ctxFor(cwd));
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain(
+      "unapplied managed config edit(s): proxy.conf.cjs (doctor --fix applies them)",
+    );
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  // The edit leaves a managed proxy it cannot recognize as it is, so that
+  // --fix does not fail; the doctor must not read that as applied.
+  it("warns that the session-cookie hooks need adding by hand to a managed proxy changed since", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    const reformatted = bearerOnlyProxyConf().replace(
+      'configure: (proxy) => proxy.on("proxyReq", setBearer),',
+      "configure: (proxy) => proxy.on('proxyReq', setBearer),",
+    );
+    await writeFile(proxyPath, reformatted);
+    const check = new ManagedFilesCheck();
+
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("unverifiable managed config wiring");
+    expect(outcome.message).toContain("session-cookie hooks (ADR 073) must be added by hand");
+    await check.fix(ctxFor(cwd));
+    expect(await readFile(proxyPath, "utf8")).toBe(reformatted);
   });
 
   it("warns when an unrecognized legacy proxy may still over-forward the project secret", async () => {
