@@ -74,7 +74,7 @@ roots they sit in are closed in a shipped build and open under test
 - `pnpm test` runs the three projects of `vitest.config.ts`: `unit` (jsdom),
   `browser` (Chromium, `*.browser.spec.ts`) and `closed-roots` (Chromium with
   the shipped closed roots, `*.closed.browser.spec.ts`). `pnpm test:unit` is
-  the fast lane; `pnpm test:browser` runs the two Chromium projects.
+  the fast lane (the build-output specs read `dist/`: build first); `pnpm test:browser` runs the two Chromium projects.
 - Put a test in the lowest project that proves it (the ladder in
   [`packages/testing/AGENTS.md`](../testing/AGENTS.md#which-layer-a-test-belongs-in)):
   form association and focus in `browser`, markup and ARIA in `unit`.
@@ -123,7 +123,9 @@ server resolves `dist`, so it gets closed roots too.
   hides the inner nodes, so every inner event looks like the host's own. Mark
   the events your own listeners handled instead (`zl-button`, `zl-select`).
 - Secrets never cross the shadow boundary: no secret value in an event that
-  leaves a root, in a host property or in an attribute.
+  leaves a root, in a host property or in an attribute. A closed root does not
+  hide native `key`, `data` or paste events, so this rule is what keeps a value
+  from the page.
 - Playwright pierces open roots only. Use `test` or `widgetTest` from
   `@zitadel/testing/playwright`, which open them; never patch `attachShadow`
   in a suite.

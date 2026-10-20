@@ -8,7 +8,9 @@ and locators and DOM walks find nothing inside them. Two ways in:
   `openShadowRoots(page)` from `@zitadel/testing/playwright` (its `test` and
   `widgetTest` do it for you). Any driver with a run-before-the-page hook
   (Playwright `addInitScript`, Puppeteer `evaluateOnNewDocument`, CDP
-  `Page.addScriptToEvaluateOnNewDocument`) can install this instead:
+  `Page.addScriptToEvaluateOnNewDocument`) can install this instead. It applies
+  only to pages loaded after it is installed, so reload a page that was already
+  open:
 
   ```js
   const attachShadow = Element.prototype.attachShadow;

@@ -275,19 +275,20 @@ This is a guard against casual reads, not a security boundary. It does not stop:
 
 - A script that inspects the element's own properties. Lit keeps the part it renders into on the element, and that part's `parentNode` is the root: in the console, `Object.values(el).find((v) => v?.parentNode instanceof ShadowRoot)?.parentNode` returns it for `<zitadel-login>` and for a nested `<zl-field>`. A test pins this limitation.
 - A script that runs before the widget, for example one that patches `Element.prototype.attachShadow` and keeps the root, or replaces the element classes.
-- Native keyboard, paste and composition events. The browser delivers them to a page-level capture listener with their `key` or `data`, whatever the root.
+- Native events. The browser delivers `keydown` and `keyup` with their `key`, `beforeinput` and `input` with their `data`, `paste` with its clipboard data, and composition events to a page-level capture listener, whatever the root.
+- The values the widget itself publishes: the `zl-input` and `zitadel-flow-input` event details carry what was typed until the separate secret-leak change stops them.
 - Browser extensions and developer tooling, which read closed roots on purpose.
 
 Full isolation of a credential field from the page that hosts it needs a cross-origin iframe, which this package does not use. The tests prove only this: with closed roots every element has no reachable `shadowRoot`, a capture listener on the page sees only the host as the target of a keystroke and no node or root in `composedPath()`, and the widget still signs in with keyboard input.
 
-Autofill works through a closed root, because the browser fills a field at the platform level. Password manager extensions differ in how they find fields; those that look inside a shadow root through `element.shadowRoot` will not see these fields, and those that use the extension-only access to closed roots do. This has not been verified against any extension.
+Autofill and password managers have not been verified against closed roots. The browser's own autofill fills a field at the platform level, but extensions differ in how they find fields: those that look inside a shadow root through `element.shadowRoot` will not see these fields, and those that use the extension-only access to closed roots do.
 
 ### Driving the closed roots
 
 Playwright locators (`getByRole`, `getByLabel`, `locator("zl-field input")`) find nothing inside a closed root. Open the roots first:
 
 - With `@zitadel/testing/playwright`, its `test` and `widgetTest` (for a suite without a Zitadel instance) open the roots of every page of the test. For a page or context you create by hand, call `openShadowRoots(page)` before the first navigation.
-- Any driver that can run a script before the page's own (Playwright `addInitScript`, Puppeteer `evaluateOnNewDocument`, CDP `Page.addScriptToEvaluateOnNewDocument`) can install the same override, after which DOM-walking and locators work as for open roots:
+- Any driver that can run a script before the page's own (Playwright `addInitScript`, Puppeteer `evaluateOnNewDocument`, CDP `Page.addScriptToEvaluateOnNewDocument`) can install the same override, after which DOM-walking and locators work as for open roots. It applies only to pages loaded after it is installed, so reload a page that was already open:
 
 ```js
 const attachShadow = Element.prototype.attachShadow;

@@ -135,7 +135,7 @@ If your app renders on the server, mount the widget on the client only, after hy
 - Run the Vite app with generated environment variables.
 - Register or sign in through the rendered widget.
 - Confirm logout returns to the configured login path.
-- In browser automation, use shadow-DOM-aware locators because the native inputs live inside shared web components.
+- In browser automation, use shadow-DOM-aware locators because the native inputs live inside shared web components, and open their closed shadow roots first with `openShadowRoots(page)` from `@zitadel/testing/playwright`.
 
 ## See also
 

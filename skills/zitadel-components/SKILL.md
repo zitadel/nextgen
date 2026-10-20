@@ -132,7 +132,8 @@ these before writing it — don't reproduce a catalogue from memory.
   locators find nothing in them. Open them first: `openShadowRoots(page)` from
   `@zitadel/testing/playwright` (its `test` and `widgetTest` already do), or an
   init script that replaces `Element.prototype.attachShadow` to always attach
-  with `mode: "open"`; a driver on the DevTools protocol can instead read the
+  with `mode: "open"` (it only applies to pages loaded after it, so reload an
+  open page); a driver on the DevTools protocol can instead read the
   closed roots with `DOM.getDocument` (`pierce: true`) and the accessibility
   tree. Once open, the automation hooks sit inside nested shadow roots, so a
   flat `document.querySelector('[data-testid="zitadel-input-email"]')` misses

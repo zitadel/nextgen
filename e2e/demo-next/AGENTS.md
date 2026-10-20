@@ -58,5 +58,7 @@ here.
   framework's middleware.
 - One behaviour per spec file, named so a failure points at its boundary, and
   one terminal assertion per behaviour.
-- Use web-first locators (`getByRole`, `getByLabel`), so shadow DOM is
-  pierced the same way everywhere.
+- Use web-first locators (`getByRole`, `getByLabel`). They pierce open shadow
+  roots only, and the built widget's are closed, so a spec that drives the
+  widget takes `test` or `widgetTest` from `@zitadel/testing/playwright`,
+  never `@playwright/test`.
