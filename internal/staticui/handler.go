@@ -61,8 +61,13 @@ func fileHandler(root fs.FS) http.Handler {
 			return
 		}
 
+		// ServeFileFS reads r.URL.Path: a route ending in /index.html would
+		// redirect and one holding ".." would answer 400. The fallback always
+		// serves the same file, so it gets a neutral path.
+		fallback := r.Clone(r.Context())
+		fallback.URL.Path, fallback.URL.RawPath = "/", ""
 		setCacheHeaders(w, "index.html")
-		http.ServeFileFS(w, r, root, "index.html")
+		http.ServeFileFS(w, fallback, root, "index.html")
 	})
 }
 

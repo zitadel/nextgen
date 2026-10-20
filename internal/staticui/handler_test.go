@@ -87,6 +87,8 @@ func TestNew_fallbackAndMissingAssets(t *testing.T) {
 	}{
 		{name: "route ending in a dotted id", path: "/ui/console/schemas/https%3A%2F%2Fh%2Fx.json", wantCode: http.StatusOK, wantBody: "spa-shell"},
 		{name: "dotted route beside the assets folder", path: "/ui/console/assetsX/y.js", wantCode: http.StatusOK, wantBody: "spa-shell"},
+		{name: "route ending in index.html", path: "/ui/console/schemas/https%3A%2F%2Fh%2Findex.html", wantCode: http.StatusOK, wantBody: "spa-shell"},
+		{name: "route holding a dot-dot segment", path: "/ui/console/schemas/a%2F..%2Fb.json", wantCode: http.StatusOK, wantBody: "spa-shell"},
 		{name: "missing asset", path: "/ui/console/assets/x.js", wantCode: http.StatusNotFound},
 	}
 	for _, tt := range tests {
