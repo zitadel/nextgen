@@ -18,7 +18,7 @@ export function SiteHeader() {
           <a href="/" aria-label="Zitadel preview home" className="rounded-sm">
             <Logo id="header-logo" className="h-5 w-auto" autoplay />
           </a>
-          <span className="rounded-full border border-tint/15 px-2 py-0.5 font-semibold text-[0.6875rem] text-text-secondary leading-4">
+          <span className="rounded-full bg-tint/10 px-2 py-0.5 font-semibold text-[0.6875rem] text-text-secondary leading-4">
             Preview
           </span>
         </div>
