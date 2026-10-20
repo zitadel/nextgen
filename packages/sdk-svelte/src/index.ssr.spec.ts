@@ -1,10 +1,10 @@
-// @vitest-environment node
 import { render } from "svelte/server";
 import { describe, expect, it } from "vitest";
 
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
+import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
 
 /** The attributes of the first `<tag>` in server-rendered HTML. */
 function serverAttributes(
@@ -25,7 +25,7 @@ describe("server-rendered widget config", () => {
 
   it("puts the login flow config into the server markup", () => {
     expect(
-      serverAttributes("zitadel-login", ZitadelLogin, {
+      serverAttributes(widgetTags.login, ZitadelLogin, {
         project: handle,
         purpose: "register",
         flowName: "signup",
@@ -41,13 +41,13 @@ describe("server-rendered widget config", () => {
 
   it("puts the discrete project props into the login markup", () => {
     expect(
-      serverAttributes("zitadel-login", ZitadelLogin, { projectId: "p1", proxyPath: "/px" }),
+      serverAttributes(widgetTags.login, ZitadelLogin, { projectId: "p1", proxyPath: "/px" }),
     ).toMatchObject({ purpose: "login", "project-id": "p1", "proxy-path": "/px" });
   });
 
   it("puts the session config into the server markup", () => {
     expect(
-      serverAttributes("zitadel-session", ZitadelSession, {
+      serverAttributes(widgetTags.session, ZitadelSession, {
         project: handle,
         postSignOutUrl: "/bye",
       }),
@@ -61,7 +61,7 @@ describe("server-rendered widget config", () => {
 
   it("puts the logout config into the server markup", () => {
     expect(
-      serverAttributes("zitadel-logout", ZitadelLogout, {
+      serverAttributes(widgetTags.logout, ZitadelLogout, {
         project: handle,
         postSignOutUrl: "/bye",
       }),
@@ -74,9 +74,9 @@ describe("server-rendered widget config", () => {
   });
 
   it.each([
-    ["zitadel-login", ZitadelLogin],
-    ["zitadel-session", ZitadelSession],
-    ["zitadel-logout", ZitadelLogout],
+    [widgetTags.login, ZitadelLogin],
+    [widgetTags.session, ZitadelSession],
+    [widgetTags.logout, ZitadelLogout],
   ])("lets the project handle win over discrete props in %s", (tag, component) => {
     expect(
       serverAttributes(tag, component, {
@@ -88,9 +88,9 @@ describe("server-rendered widget config", () => {
   });
 
   it.each([
-    ["zitadel-login", ZitadelLogin],
-    ["zitadel-session", ZitadelSession],
-    ["zitadel-logout", ZitadelLogout],
+    [widgetTags.login, ZitadelLogin],
+    [widgetTags.session, ZitadelSession],
+    [widgetTags.logout, ZitadelLogout],
   ])("writes an empty proxy path as / in %s", (tag, component) => {
     expect(
       serverAttributes(tag, component, { project: { projectId: "p", proxyPath: "" } }),
@@ -98,9 +98,9 @@ describe("server-rendered widget config", () => {
   });
 
   it.each([
-    ["zitadel-login", ZitadelLogin],
-    ["zitadel-session", ZitadelSession],
-    ["zitadel-logout", ZitadelLogout],
+    [widgetTags.login, ZitadelLogin],
+    [widgetTags.session, ZitadelSession],
+    [widgetTags.logout, ZitadelLogout],
   ])("does not stringify the project handle into %s", (tag, component) => {
     expect(serverAttributes(tag, component, { project: handle })).not.toHaveProperty("project");
   });
@@ -109,7 +109,7 @@ describe("server-rendered widget config", () => {
 describe("server-rendered widget options", () => {
   it("puts the resume flow id and post-sign-in URL into the login markup", () => {
     expect(
-      serverAttributes("zitadel-login", ZitadelLogin, {
+      serverAttributes(widgetTags.login, ZitadelLogin, {
         projectId: "proj-test",
         resumeFlowId: "flow_123",
         postSignInUrl: "/home",
@@ -119,7 +119,76 @@ describe("server-rendered widget options", () => {
 
   it("leaves unset props out of the session markup", () => {
     expect(
-      serverAttributes("zitadel-session", ZitadelSession, { projectId: "proj-test" }),
+      serverAttributes(widgetTags.session, ZitadelSession, { projectId: "proj-test" }),
     ).not.toHaveProperty("heading");
   });
+});
+
+/** The attributes on the widget's element in the markup a server would send. */
+async function renderAttributes(
+  widget: WidgetName,
+  props: Readonly<Record<string, unknown>>,
+): Promise<Record<string, string>> {
+  return serverAttributes(
+    widgetTags[widget],
+    { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget],
+    { ...props },
+  );
+}
+
+// standard-attributes-server:begin
+describe.each(widgetNames)("%s server-rendered standard attributes", (widget) => {
+  it("puts the standard attributes into the server markup", async () => {
+    const attributes = await renderAttributes(widget, {
+      id: "probe",
+      title: "probe",
+      slot: "probe",
+      role: "region",
+      tabindex: "3",
+      "data-testid": "probe",
+      "aria-label": "probe",
+    });
+    expect(attributes).toMatchObject({
+      id: "probe",
+      title: "probe",
+      slot: "probe",
+      role: "region",
+      tabindex: "3",
+      "data-testid": "probe",
+      "aria-label": "probe",
+    });
+  });
+
+  it("leaves props outside the standard set out of the server markup", async () => {
+    const attributes = await renderAttributes(widget, {
+      srcdoc: "probe",
+      onclick: "probe",
+      part: "probe",
+      dir: "probe",
+    });
+    for (const name of ["srcdoc", "onclick", "part", "dir"]) {
+      expect(attributes).not.toHaveProperty(name);
+    }
+  });
+});
+// standard-attributes-server:end
+
+describe("the package entry on a Node server", () => {
+  it.each(widgetNames)(
+    "renders the %s widget from the entry a consumer resolves",
+    async (widget) => {
+      const sdk = await import("@zitadel/sdk-svelte");
+      const component = {
+        login: sdk.ZitadelLogin,
+        logout: sdk.ZitadelLogout,
+        session: sdk.ZitadelSession,
+      }[widget];
+      expect(
+        serverAttributes(widgetTags[widget], component, { projectId: "p1", proxyPath: "/px" }),
+      ).toMatchObject({
+        "project-id": "p1",
+        "proxy-path": "/px",
+      });
+    },
+  );
 });

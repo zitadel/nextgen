@@ -24,6 +24,21 @@
   "exports": {
     "./package.json": "./package.json",
     ".": {
+      "workerd": {
+        "types": "./dist/server.d.mts",
+        "browser": "./dist/server.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "worker": {
+        "types": "./dist/server.d.mts",
+        "browser": "./dist/server.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "edge-light": {
+        "types": "./dist/server.d.mts",
+        "browser": "./dist/server.mjs",
+        "default": "./dist/index.mjs"
+      },
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
@@ -81,6 +96,7 @@
     "normalize-url": "catalog:"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@tsdown/css": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

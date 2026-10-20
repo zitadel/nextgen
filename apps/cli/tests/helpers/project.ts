@@ -504,12 +504,18 @@ export class ScaffoldedApp {
 
   /** The port a start reported its server on. */
   localPortOf(result: CliResult): number {
-    return this.envelopeOf<{ runtime: { port: number } }>(result).data.runtime.port;
+    return this.localRuntimeOf(result).port;
   }
 
   /** The process a start reported its server as. */
   localPidOf(result: CliResult): number {
-    return this.envelopeOf<{ runtime: { pid: number } }>(result).data.runtime.pid;
+    return this.localRuntimeOf(result).pid;
+  }
+
+  /** The server a start reported; a refused start fails here with its error code. */
+  private localRuntimeOf(result: CliResult): { port: number; pid: number } {
+    expect(result, "start should have succeeded").toSucceed();
+    return this.envelopeOf<{ runtime: { port: number; pid: number } }>(result).data.runtime;
   }
 
   /** Leaves this directory with a record of its local server that cannot be read. */

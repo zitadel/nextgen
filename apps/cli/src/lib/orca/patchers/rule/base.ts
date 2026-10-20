@@ -109,7 +109,9 @@ export abstract class AbstractRulePatcher implements Patcher {
    * merge transform's own idempotency: the transforms only add what is
    * missing and return the source unchanged when everything they manage is
    * present, so a changed output means the wiring is absent from the user's
-   * config. Every labelled wiring gets a verdict: a missing host file is
+   * config. An op whose transform leaves a file it cannot recognize as it is
+   * brings its own `verify`, so that such a file reads as `unknown`, not
+   * applied. Every labelled wiring gets a verdict: a missing host file is
    * `detached` (the wiring cannot be applied in a file that does not exist),
    * and a transform that throws on restructured content yields `unknown` —
    * surfaced rather than silently dropped, so a deleted `angular.json` can
@@ -140,11 +142,16 @@ export abstract class AbstractRulePatcher implements Patcher {
         continue;
       }
       try {
-        statuses.push({
-          path,
-          wiring: op.wiring,
-          state: op.edit(source) === source ? "applied" : "detached",
-        });
+        const verdict = op.verify
+          ? op.verify(source)
+          : op.edit(source) === source
+            ? "applied"
+            : "detached";
+        statuses.push(
+          typeof verdict === "string"
+            ? { path, wiring: op.wiring, state: verdict }
+            : { path, wiring: op.wiring, state: "unknown", reason: verdict.unknown },
+        );
       } catch (error) {
         statuses.push({
           path,

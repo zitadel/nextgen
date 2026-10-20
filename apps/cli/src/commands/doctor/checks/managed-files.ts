@@ -113,7 +113,7 @@ export class ManagedFilesCheck implements SanityCheck {
     }
     if (detachedConvenience.length > 0) {
       warnings.push(
-        `unapplied managed config edit(s): ${detachedConvenience.map((s) => s.path).join(", ")}`,
+        `unapplied managed config edit(s): ${detachedConvenience.map((s) => s.path).join(", ")} (doctor --fix applies them)`,
       );
     }
     if (unverifiable.length > 0) {

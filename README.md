@@ -182,16 +182,11 @@ For product direction and the four pillars, see [VISION.md](VISION.md).
 ## CI
 
 Pull requests are gated by the GitHub Actions context `full-pr`, shown in the
-pull request UI as `ci / full-pr`. On a 16-core runner it runs a Go
-generated-file drift check, lint, type checks, builds, unit and browser
-tests, Go tests including Postgres/Spanner/SQLite dialect integration, a
-non-publishing release snapshot, and fresh-app journeys against the snapshot's
-npm tarballs.
-Changesets version PRs run a smaller release validation path instead, and
-Changesets comments give release-intent feedback without adding a blocking
-gate. The full step list lives in
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) and
-[CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
+pull request UI as `ci / full-pr`: generated-file checks, lint, type checks,
+builds, unit and browser tests, the Go database lanes, a non-publishing release
+snapshot, and the end-to-end suites against the snapshot's npm tarballs.
+Changesets version PRs run a smaller release validation path instead. The full
+step list is in [CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
 
 ## Releases
 

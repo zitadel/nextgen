@@ -16,13 +16,25 @@ export {
   jwtNamesProject,
   resolveSession,
   SESSION_PROJECT_MISMATCH,
+  SERVER_SESSION_COOKIE,
+  sessionCookieName,
+  serializeSessionCookie,
+  proxySessionCookies,
+  clearSessionCheckCache,
+  SESSION_COOKIE_CACHE_CONTROL,
 } from "./middleware.js";
 export type {
   OpaqueSession,
   OpaqueSessionCheck,
-  SessionTokens,
+  SessionRequest,
+  SessionCookie,
   ResolveSessionOptions,
   ResolvedSession,
+  ProxiedRequest,
+  ProxiedAnswer,
+  ProxiedSessionCookies,
+  ProxyUpstream,
+  BrowserRequest,
 } from "./middleware.js";
 export {
   verifyJwt,
