@@ -67,7 +67,12 @@ import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
 import { LocalServer } from "../../lib/local-server/server";
 import { readNearestRuntimeMetadata, readPlatformRuntime } from "../../lib/local-server/runtime";
-import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
+import {
+  readProjectServer,
+  readZitadelConfig,
+  readZitadelSecret,
+  writeZitadelSecret,
+} from "../../lib/project";
 import {
   createOrca,
   inspectScaffoldTarget,
@@ -93,6 +98,7 @@ import {
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
+import { moveDevPort } from "./move-dev-port";
 import {
   askCustomSettings,
   PickFrameworkPrompt,
@@ -174,7 +180,7 @@ export default class Setup extends BaseCommand {
     }),
     "dev-port": Flags.integer({
       description:
-        "Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected port. Use distinct ports to run several scaffolded apps side by side.",
+        "Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected port. Use distinct ports to run several scaffolded apps side by side. In an app already set up, moves it to this port: the dev script, ZITADEL_ISSUER and the allowed origin.",
     }),
     "skip-install": Flags.boolean({
       description: "Do not install dependencies after setup updates package.json.",
@@ -260,6 +266,11 @@ export default class Setup extends BaseCommand {
     const { cwd, nonInteractive, dryRun, force } = this.meta;
 
     if (await hasZitadelConfig(cwd)) {
+      // An app already set up has nothing left to scaffold, but an explicit
+      // --dev-port is how it moves to another port.
+      if (flags["dev-port"] !== undefined) {
+        return this.moveToDevPort(cwd, assertDevPort(flags["dev-port"]), dryRun);
+      }
       return this.emit({ status: "skipped", reason: "already-initialized" });
     }
     if (await hasZitadelSecret(cwd)) {
@@ -360,14 +371,7 @@ export default class Setup extends BaseCommand {
     // different port in vite.config.*/angular.json keeps it — pass --dev-port to
     // match that pin (or remove it) if the origin check rejects requests.
     if (flags["dev-port"] !== undefined) {
-      const devPort = flags["dev-port"];
-      if (!Number.isInteger(devPort) || devPort < 1 || devPort > 65535) {
-        throw new ZitadelError(
-          "E_VALIDATION",
-          `--dev-port must be an integer in 1..65535, got ${devPort}`,
-        );
-      }
-      app = { ...app, devPort };
+      app = { ...app, devPort: assertDevPort(flags["dev-port"]) };
     }
 
     let answers: SetupAnswers = {
@@ -952,6 +956,59 @@ export default class Setup extends BaseCommand {
       },
     });
   }
+
+  /**
+   * `setup --dev-port <n>` on an app setup already patched: moves the app to
+   * the new port (see {@link moveDevPort}) instead of skipping the directory.
+   */
+  private async moveToDevPort(
+    cwd: string,
+    devPort: number,
+    dryRun: boolean,
+  ): Promise<JsonEnvelope> {
+    const config = await readZitadelConfig(cwd);
+    const server = readProjectServer(config);
+    consola.start(`Moving the app to ${issuerFromPort(devPort)}${dryRun ? " (dry run)" : ""}`);
+    const move = await moveDevPort({
+      cwd,
+      devPort,
+      source: server,
+      orca: createOrca(),
+      cliVersion: this.meta.cliVersion,
+      dryRun,
+    });
+    for (const file of move.result.filesWritten) {
+      consola.info(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
+    }
+    if (move.staleOrigin !== undefined) {
+      reportWarning(
+        `Could not remove ${move.staleOrigin} from the project's origins; it admits a port nothing serves any more.`,
+      );
+    }
+    for (const slug of move.ssoProviders) {
+      reportWarning(
+        `Social sign-in with ${slug} redirects to the old port: add ${callbackUriFor(move.issuer, slug)} as a redirect URI at the provider.`,
+      );
+    }
+    const moved = move.previousIssuer !== move.issuer;
+    if (moved) {
+      consola.success(`Moved from ${move.previousIssuer} to ${move.issuer}`);
+    } else {
+      consola.success(`Already on ${move.issuer}`);
+    }
+    return this.emit({
+      status: "ok",
+      data: {
+        title: moved ? `Moved the app to ${move.issuer}.` : `The app is already on ${move.issuer}.`,
+        moved,
+        previous_issuer: move.previousIssuer,
+        issuer: move.issuer,
+        dev_port: devPort,
+        files_written: move.result.filesWritten.map((file) => relativeDisplay(cwd, file)),
+        next_actions: [`Restart the dev server and open ${move.issuer}/login.`],
+      },
+    });
+  }
 }
 
 function frameworkDetectionWithScaffoldTarget(
@@ -1481,6 +1538,17 @@ async function createProjectWithLocalHint(
       },
     });
   }
+}
+
+/** `--dev-port`, refused unless it is a TCP port. */
+function assertDevPort(devPort: number): number {
+  if (!Number.isInteger(devPort) || devPort < 1 || devPort > 65535) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `--dev-port must be an integer in 1..65535, got ${devPort}`,
+    );
+  }
+  return devPort;
 }
 
 function defaultProjectName(cwd: string, framework: string): string {

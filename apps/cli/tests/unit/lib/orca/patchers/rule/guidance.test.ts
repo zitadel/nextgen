@@ -211,3 +211,14 @@ describe("guidance content", () => {
     expect(nuxtAgents).not.toContain("@zitadel/sdk-next/jsx");
   });
 });
+
+describe("moving the dev port", () => {
+  it.each([
+    ["README", readmeGuidanceSection],
+    ["AGENTS.md", agentsGuidanceSection],
+  ])("the %s section names the command for a taken port", (_name, section) => {
+    const out = section(ctx);
+    expect(out).toContain("EADDRINUSE");
+    expect(out).toContain("npx @zitadel/cli@0.1.0-alpha.15 setup --dev-port <port>");
+  });
+});
