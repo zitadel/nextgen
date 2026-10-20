@@ -44,7 +44,9 @@ web components' `project` property.
 A browser app that authenticates management calls with the
 `__nextgen_session` cookie (the Console does) must send the session's CSRF
 token on state-changing requests. Load it once per session from
-`GET /sessions/me/csrf` and hand it to `setApiCsrfToken(token)`; `customFetch`
+`GET /sessions/me/csrf`, passing your project as `project_id` so that a session
+of another app on the same host gets none, and hand it to
+`setApiCsrfToken(token)`; `customFetch`
 then adds the `X-Zitadel-CSRF` header to unsafe requests to that server. The
 token is stored with the origin it was issued for — the page's own by default,
 or `setApiCsrfToken(token, origin)` for an API on another origin — and is never

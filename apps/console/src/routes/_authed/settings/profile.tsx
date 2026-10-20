@@ -12,7 +12,7 @@ import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
 import { api } from "@/api/zitadel";
-import { invalidateSessionCache } from "@/auth/session";
+import { consoleSessionProject, invalidateSessionCache } from "@/auth/session";
 import { useSubmit } from "@/hooks/use-submit";
 import { displayValue, field } from "@/lib/record";
 import { type SchemaField, attributeValue, schemaFields } from "@/lib/schema";
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authed/settings/profile")({
   loader: async () => {
     // A failed schema read leaves the identifier alone (below), never a boundary.
     const [user, schema] = await Promise.all([
-      api.getMyUser(),
+      api.getMyUser(consoleSessionProject()),
       readOwnUserSchema().catch(() => undefined),
     ]);
     return { user, schema };
@@ -101,7 +101,7 @@ function ProfileScreen() {
       // a `format` and reads as a value rather than its absence.
       patch[entry.key] = value === "" ? null : attributeValue(entry, value);
     }
-    await api.patchMyUser({ attributes: patch });
+    await api.patchMyUser({ attributes: patch }, consoleSessionProject());
     // The account menu renders the session's `display`; drop the cached
     // session so a changed name shows without waiting out the cache.
     invalidateSessionCache();

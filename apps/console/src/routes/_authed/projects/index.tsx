@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Boxes } from "lucide-react";
 
 import { api } from "@/api/zitadel";
-import { validateNextSearch } from "@/auth/session";
+import { consoleSessionProject, validateNextSearch } from "@/auth/session";
 import {
   LoadMore,
   RESOURCE_CELL,
@@ -52,7 +52,7 @@ export const Route = createFileRoute("/_authed/projects/")({
     // The projects the signed-in person can act on (root ADR 053 §6), read with
     // the session cookie — not `POST /projects/query`, which the server pins to
     // the calling credential's one home project (#1237).
-    const page = await api.listMyProjects({ limit: PAGE_SIZE });
+    const page = await api.listMyProjects({ limit: PAGE_SIZE, ...consoleSessionProject() });
     return { projects: page.projects, nextPageToken: page.next_page_token ?? undefined };
   },
   component: ProjectsScreen,
@@ -77,7 +77,11 @@ function ProjectsScreen() {
   const paging = useLoadMore(
     loaded,
     async (pageToken) => {
-      const page = await api.listMyProjects({ limit: PAGE_SIZE, page_token: pageToken });
+      const page = await api.listMyProjects({
+        limit: PAGE_SIZE,
+        page_token: pageToken,
+        ...consoleSessionProject(),
+      });
       return { items: page.projects, nextPageToken: page.next_page_token ?? undefined };
     },
     "Could not load more projects.",

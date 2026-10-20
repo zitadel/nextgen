@@ -7762,6 +7762,8 @@ func (s *Server) handleGetMySessionRequest(args [0]string, argsEscaped bool, w h
 // HttpOnly cookie is still the credential, and a cross-site page cannot
 // read this response. It stays the same for the life of the session, so a
 // client fetches it once per session.
+// With `project_id`, the token is returned only when the session belongs to
+// that project.
 //
 // GET /sessions/me/csrf
 func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -7879,6 +7881,16 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 			return
 		}
 	}
+	params, err := decodeGetMySessionCsrfTokenParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 
@@ -7891,13 +7903,18 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 			OperationID:      "getMySessionCsrfToken",
 			Body:             nil,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = struct{}
+			Params   = GetMySessionCsrfTokenParams
 			Response = GetMySessionCsrfTokenRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -7907,14 +7924,14 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 		](
 			m,
 			mreq,
-			nil,
+			unpackGetMySessionCsrfTokenParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetMySessionCsrfToken(ctx)
+				response, err = s.h.GetMySessionCsrfToken(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetMySessionCsrfToken(ctx)
+		response, err = s.h.GetMySessionCsrfToken(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -7936,6 +7953,8 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 // Returns the user signed in to the session that authenticates the request.
 // The project and the user both come from the session cookie, so a caller only
 // ever reads their own user.
+// With `project_id`, the user is returned only when the session belongs to
+// that project.
 //
 // GET /users/me
 func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -8053,6 +8072,16 @@ func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http
 			return
 		}
 	}
+	params, err := decodeGetMyUserParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 
@@ -8065,13 +8094,18 @@ func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http
 			OperationID:      "getMyUser",
 			Body:             nil,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = struct{}
+			Params   = GetMyUserParams
 			Response = GetMyUserRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -8081,14 +8115,14 @@ func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http
 		](
 			m,
 			mreq,
-			nil,
+			unpackGetMyUserParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetMyUser(ctx)
+				response, err = s.h.GetMyUser(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetMyUser(ctx)
+		response, err = s.h.GetMyUser(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -11553,6 +11587,9 @@ func (s *Server) handleListIdpRevisionsRequest(args [1]string, argsEscaped bool,
 // This is not the same question as `queryProjects`, which answers with the one
 // project the calling credential is bound to. Here the session is the caller
 // and the grants are the answer, so the list spans projects.
+// With `project_id`, the projects are listed only when the session belongs to
+// that project. It names the project the session was signed in to, not one to
+// list.
 //
 // GET /users/me/projects
 func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -11701,6 +11738,10 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 					Name: "page_token",
 					In:   "query",
 				}: params.PageToken,
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
 			},
 			Raw: r,
 		}
@@ -13215,6 +13256,8 @@ func (s *Server) handleListUserTeamsRequest(args [1]string, argsEscaped bool, w 
 // Partially updates the caller's own schema-defined attributes. The merged
 // result is validated against the user's schema before commit. Concurrent
 // writes are last-write-wins.
+// With `project_id`, the user is updated only when the session belongs to
+// that project.
 //
 // PATCH /users/me
 func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -13332,6 +13375,16 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 			return
 		}
 	}
+	params, err := decodePatchMyUserParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 	request, rawBody, close, err := s.decodePatchMyUserRequest(r)
@@ -13359,13 +13412,18 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 			OperationID:      "patchMyUser",
 			Body:             request,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = *PatchMyUserRequest
-			Params   = struct{}
+			Params   = PatchMyUserParams
 			Response = PatchMyUserRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -13375,14 +13433,14 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 		](
 			m,
 			mreq,
-			nil,
+			unpackPatchMyUserParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.PatchMyUser(ctx, request)
+				response, err = s.h.PatchMyUser(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.PatchMyUser(ctx, request)
+		response, err = s.h.PatchMyUser(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -15536,9 +15594,12 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 //
 // Logs out by permanently deleting the session.
 // The `__nextgen_session` cookie issued at creation (or superseded by a handoff
-// exchange) is required. Idempotent: if the session is already gone this still
-// returns 204. Any tokens derived from the session are invalidated, and the
-// cookie itself is cleared in the response.
+// exchange) is required, with the session's token from `GET /sessions/me/csrf`
+// in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
+// this still returns 204. Any tokens derived from the session are invalidated,
+// and the cookie itself is cleared in the response.
+// With `project_id`, only a session of that project is deleted. A session of
+// another project is left alone, and so is its cookie.
 //
 // DELETE /sessions/me
 func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -15656,6 +15717,16 @@ func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, 
 			return
 		}
 	}
+	params, err := decodeRevokeMySessionParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 
@@ -15668,13 +15739,18 @@ func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, 
 			OperationID:      "revokeMySession",
 			Body:             nil,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = struct{}
+			Params   = RevokeMySessionParams
 			Response = RevokeMySessionRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -15684,14 +15760,14 @@ func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, 
 		](
 			m,
 			mreq,
-			nil,
+			unpackRevokeMySessionParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.RevokeMySession(ctx)
+				response, err = s.h.RevokeMySession(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.RevokeMySession(ctx)
+		response, err = s.h.RevokeMySession(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)

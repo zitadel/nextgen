@@ -83,6 +83,21 @@ afterAll(async () => {
 });
 
 /**
+ * The `__nextgen_session` cookie of a session belonging to `project`, active
+ * with a verified factor.
+ */
+async function sessionCookie(project: string): Promise<string> {
+  const handoff = await signHandoffToken({ sub: project, iss: BASE });
+  const exchange = await fetch(`${BASE}/sessions/exchange?project_id=${project}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ handoff_token: handoff }),
+  });
+  const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("__nextgen_session="));
+  return setCookie?.split(";")[0] ?? "";
+}
+
+/**
  * Helper: a valid flow-definition body that satisfies the spec's
  * `flow-definition.yaml` required fields. Used by the flow_definitions
  * tests so the response (which inlines this body) passes zod validation.
@@ -185,6 +200,67 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     }
   });
 
+  // Mirrors the server: the CSRF token read and sign-out hold the session to
+  // the project they name the way the read does, and a refused sign-out leaves
+  // the session and its cookie alone.
+  test("GET /sessions/me/csrf and DELETE /sessions/me with project_id refuse a session of another project", async () => {
+    const cookie = await sessionCookie("proj_me_signout");
+    const headers = { cookie };
+    // Sign-out is a write: it carries the session's CSRF token, which is
+    // checked before the project hold and the parameter, as on the server.
+    const signOutHeaders = { cookie, "x-zitadel-csrf": csrfTokenFor(cookie.split("=")[1] ?? "") };
+
+    const refusedToken = await fetch(`${BASE}/sessions/me/csrf?project_id=proj_me_other`, {
+      headers,
+    });
+    expect(refusedToken.status).toBe(403);
+    expect(refusedToken.headers.get("cache-control")).toBe("private, no-store");
+    expect(await refusedToken.json()).toMatchObject({ code: "sess.project_mismatch" });
+
+    const refusedSignOut = await fetch(`${BASE}/sessions/me?project_id=proj_me_other`, {
+      method: "DELETE",
+      headers: signOutHeaders,
+    });
+    expect(refusedSignOut.status).toBe(403);
+    expect(await refusedSignOut.json()).toMatchObject({ code: "sess.project_mismatch" });
+    expect(refusedSignOut.headers.getSetCookie()).toEqual([]);
+
+    // A project_id that is no project id is a bad request, one shaped as an
+    // object by the query parser too. The server authenticates first, so
+    // without a cookie the answer is the 401.
+    for (const query of ["project_id=", "project_id=proj%20me", "project_id[toString]=x"]) {
+      const rejectedToken = await fetch(`${BASE}/sessions/me/csrf?${query}`, { headers });
+      expect(rejectedToken.status).toBe(400);
+      const rejectedSignOut = await fetch(`${BASE}/sessions/me?${query}`, {
+        method: "DELETE",
+        headers: signOutHeaders,
+      });
+      expect(rejectedSignOut.status).toBe(400);
+      const forgedSignOut = await fetch(`${BASE}/sessions/me?${query}`, {
+        method: "DELETE",
+        headers,
+      });
+      expect(forgedSignOut.status).toBe(403);
+      expect((await fetch(`${BASE}/sessions/me/csrf?${query}`)).status).toBe(401);
+      expect((await fetch(`${BASE}/sessions/me?${query}`, { method: "DELETE" })).status).toBe(401);
+    }
+
+    // The refusals ended nothing: its own project still gets its token and
+    // signs it out.
+    const token = await fetch(`${BASE}/sessions/me/csrf?project_id=proj_me_signout`, {
+      headers,
+    });
+    expect(token.status).toBe(200);
+    expect(await token.json()).toEqual({ csrf_token: csrfTokenFor(cookie.split("=")[1] ?? "") });
+
+    const signedOut = await fetch(`${BASE}/sessions/me?project_id=proj_me_signout`, {
+      method: "DELETE",
+      headers: signOutHeaders,
+    });
+    expect(signedOut.status).toBe(204);
+    expect(signedOut.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
+  });
+
   test("GET /sessions/me returns body parseable by GetMySessionResponse with a user ref", async () => {
     const handoff = await signHandoffToken({ sub: "me@example.com", iss: BASE });
     const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me`, {
@@ -283,9 +359,21 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const before = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
     expect(before.status).toBe(200);
 
-    const revoke = await fetch(`${BASE}/sessions/me`, {
+    // Without the session's CSRF token, sign-out is refused and ends nothing.
+    const forged = await fetch(`${BASE}/sessions/me`, {
       method: "DELETE",
       headers: { cookie: sessionCookie },
+    });
+    expect(forged.status).toBe(403);
+    expect(await forged.json()).toMatchObject({ code: "auth.csrf_invalid" });
+    expect(forged.headers.getSetCookie()).toEqual([]);
+
+    const revoke = await fetch(`${BASE}/sessions/me`, {
+      method: "DELETE",
+      headers: {
+        cookie: sessionCookie,
+        "x-zitadel-csrf": csrfTokenFor(sessionCookie.split("=")[1] ?? ""),
+      },
     });
     expect(revoke.status).toBe(204);
     expect(revoke.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
@@ -324,17 +412,42 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${BASE}/sessions/me`, { method: "DELETE" });
     expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("unauthenticated");
+    expect(body.code).toBe("auth.unauthorized");
   });
 
-  test("DELETE /sessions/me with an unknown session token returns 404", async () => {
+  // The server's token gate refuses a cookie whose token record is gone (never
+  // issued, revoked) or expired before the handler runs, so it answers 401
+  // whatever project the request names.
+  test("DELETE /sessions/me with an unknown session token returns 401", async () => {
     const res = await fetch(`${BASE}/sessions/me`, {
       method: "DELETE",
       headers: { cookie: "__nextgen_session=deadbeefdeadbeef" },
     });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("session_not_found");
+    expect(body.code).toBe("auth.unauthorized");
+  });
+
+  test("an expired session answers 401, not the project mismatch, on sign-out and the CSRF read", async () => {
+    const cookie = await sessionCookie("proj_me_expired");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      // Past the mock's one-hour session lifetime.
+      vi.setSystemTime(Date.now() + 2 * 3_600_000);
+      for (const route of [
+        { path: "/sessions/me", method: "DELETE" },
+        { path: "/sessions/me/csrf", method: "GET" },
+      ]) {
+        const res = await fetch(`${BASE}${route.path}?project_id=proj_me_other`, {
+          method: route.method,
+          headers: { cookie },
+        });
+        expect(res.status).toBe(401);
+        expect(await res.json()).toMatchObject({ code: "auth.unauthorized" });
+      }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("GET /console/runtime.json names the project the console signs into", async () => {
@@ -851,22 +964,9 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     );
   }
 
-  // A session belonging to `project`, active with a verified factor. The claim
-  // page runs in the platform project, so an eligible claim session uses
-  // PLATFORM_PROJECT_ID; passing a customer project yields an ineligible one.
-  async function sessionCookie(project: string): Promise<string> {
-    const handoff = await signHandoffToken({ sub: project, iss: BASE });
-    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=${project}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ handoff_token: handoff }),
-    });
-    const setCookie = exchange.headers
-      .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="));
-    return setCookie?.split(";")[0] ?? "";
-  }
-
+  // The claim page runs in the platform project, so an eligible claim session
+  // uses PLATFORM_PROJECT_ID; passing a customer project yields an ineligible
+  // one.
   const platformSessionCookie = () => sessionCookie(PLATFORM_PROJECT_ID);
 
   /**
