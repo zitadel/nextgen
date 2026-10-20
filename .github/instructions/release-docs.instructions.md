@@ -25,7 +25,7 @@ state of the repo.
 - Docs that mention repo behavior point at `AGENTS.md`; changeset requirements
   at `.changeset/README.md`; PR title conventions at
   [`CONTRIBUTING.md#title-format`](../../CONTRIBUTING.md#title-format); the
-  CLI agent contract at `apps/cli/SKILLS.md`. Define a rule once and link it —
+  CLI agent contract at `apps/cli/skills/zitadel-cli/SKILL.md`. Define a rule once and link it —
   do not restate it into a second home.
 - Changeset summaries are customer-facing copy rendered verbatim into
   `CHANGELOG.md` and the GitHub Release. Review them for a reader who uses our

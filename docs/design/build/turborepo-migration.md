@@ -235,7 +235,7 @@ moon at the cutover.
 ### `runInCI` (72 uses)
 
 Turbo runs what is named. The gate names `lint typecheck build test
-check-adrs check-moon-graph`; every `runInCI: false` task has another name
+check-adrs check-moon-graph check-agent-docs`; every `runInCI: false` task has another name
 (`build-release`, `dev`, …) and is never reached. Moon's e2e lanes are
 `runInCI: "skip"`, which keeps them out of the `moon ci` graph, and ci.yml runs
 them in a step of its own with `moon exec e2e:all --ignore-ci-checks`; turbo
@@ -347,7 +347,7 @@ set.
 | `MOON_SUMMARY=detailed` | `--summarize` + `report-turbo-failures.mjs` |
 | `node scripts/ci-mode.mjs <base>` | same, with `NEXTGEN_TASK_RUNNER=turbo` |
 | `moon run server:check-generate-pruned` | `turbo run check-generate-pruned --filter=@zitadel/server`, on pushes to main too, so that its result is in the remote cache |
-| `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations` | `turbo run lint typecheck build test check-adrs check-moon-graph --continue=dependencies-successful --summarize` |
+| `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph :check-agent-docs --downstream deep --include-relations` | `turbo run lint typecheck build test check-adrs check-moon-graph check-agent-docs --continue=dependencies-successful --summarize` |
 | `moon run server:test` | dropped: part of the gate (moon re-ran it because `moon ci` selects by affectedness) |
 | `moon run server:test-postgres` / `test-sqlite` | `turbo run test-postgres --filter=@zitadel/server` / `test-sqlite` |
 | `env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container` | `RELEASE_SKIP_CONTAINER=1 turbo run snapshot --filter=@zitadel/release` (no `env -u`; no arguments after `--`, see turborepo.md) |

@@ -600,6 +600,17 @@ test("an empty affected set for unallowlisted files fails open (tsconfig.base.js
   }
 });
 
+test("an affected set of only the repo-wide agent-docs check still counts as empty", () => {
+  const targets = ["workspace:check-agent-docs"];
+  const { gates, reason } = resolveGates({ mode: "full", files: ["VISION.md"], targets });
+  assert.ok(allTrue(gates), "VISION.md must still force a full run");
+  assert.equal(reason, "empty affected set for files outside the inert allowlist");
+
+  const docsOnly = resolveGates({ mode: "full", files: ["docs/design/notes.md"], targets });
+  assert.equal(docsOnly.reason, null);
+  assert.ok(allFalse(docsOnly.gates));
+});
+
 test("known repo-wide inputs force full even when the rest of the diff is claimed", () => {
   const { gates, reason } = resolveGates({
     mode: "full",

@@ -219,7 +219,7 @@ jobs:
       - name: Run turbo build and test graph
         id: turbo-gate
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: turbo run lint typecheck build test check-adrs check-moon-graph --continue=dependencies-successful --summarize
+        run: turbo run lint typecheck build test check-adrs check-moon-graph check-agent-docs --continue=dependencies-successful --summarize
 
       - name: Report turbo failures
         if: ${{ failure() && steps.turbo-gate.conclusion == 'failure' }}

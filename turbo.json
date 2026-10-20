@@ -147,6 +147,8 @@
         "scripts/release-manifest.mjs",
         "scripts/render-builtin-schemas.mjs",
         "scripts/render-builtin-schemas.test.mjs",
+        "scripts/check-agent-docs.mjs",
+        "scripts/check-agent-docs.test.mjs",
         "api/openapi/endpoints/schemas/*.json",
         "scripts/assert-file.mjs",
         "vitest.config.ts"
@@ -198,6 +200,13 @@
     },
     "//#check-adrs": {
       "inputs": ["docs/adrs/**/*.md", "scripts/check-adrs-index.mjs", "scripts/dev-process.mjs"]
+    },
+    // Reads every file, as its moon task says: the Markdown for links and the
+    // AGENTS.md budgets, the rest for the doc anchors they cite. The root
+    // package's default inputs are every file git does not ignore (`**` would
+    // add node_modules).
+    "//#check-agent-docs": {
+      "inputs": ["$TURBO_DEFAULT$"]
     },
     "//#doctor": {
       "cache": false,

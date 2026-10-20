@@ -6,7 +6,7 @@ applyTo: "apps/cli/**"
 
 The CLI is an agent-facing product surface. Canonical sources, in order:
 [`apps/cli/AGENTS.md`](../../apps/cli/AGENTS.md) (scope pointers + telemetry
-rules), [`apps/cli/SKILLS.md`](../../apps/cli/SKILLS.md) (the agent contract),
+rules), [`apps/cli/skills/zitadel-cli/SKILL.md`](../../apps/cli/skills/zitadel-cli/SKILL.md) (the agent contract),
 and the root [`AGENTS.md` — CLI Contract](../../AGENTS.md#cli-contract)
 (JSON envelope). Review pointers on top of those:
 
@@ -20,7 +20,7 @@ and the root [`AGENTS.md` — CLI Contract](../../AGENTS.md#cli-contract)
   scaffold posture ([ADR 042](../../docs/adrs/042-scaffolded-file-ownership-and-drift-detection.md)/
   [043](../../docs/adrs/043-framework-version-floors.md)/
   [044](../../docs/adrs/044-scaffold-embedding-posture-defaults.md)), or agent
-  guidance must update tests, `SKILLS.md`, and the generated README command
+  guidance must update tests, `SKILL.md`, and the generated README command
   section together.
 - `--server local` must resolve through `.zitadel/local/runtime.json` only
   when the local runtime is healthy, otherwise return a stable

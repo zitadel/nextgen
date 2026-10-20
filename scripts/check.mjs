@@ -108,9 +108,18 @@ async function phaseGoSpanner() {
   await runTargets("server:test-spanner");
 }
 
+// The tasks of the ci workflow's build and test graph step.
 async function phaseNode() {
   await run("corepack", ["pnpm", "install", "--frozen-lockfile"]);
-  const gate = workspaceCommand(["lint", "typecheck", "build", "test"]);
+  const gate = workspaceCommand([
+    "lint",
+    "typecheck",
+    "build",
+    "test",
+    "check-adrs",
+    "check-moon-graph",
+    "check-agent-docs",
+  ]);
   await run(gate.command, gate.args);
 }
 

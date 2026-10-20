@@ -72,6 +72,12 @@ function isInertWhenUnclaimed(file) {
   );
 }
 
+// Tasks whose inputs are every file in the repository: the agent-docs check
+// reads them all for links and cited doc anchors. They claim a file without
+// saying anything about what it reaches, so an affected set of only these
+// counts as empty.
+const REPO_WIDE_TARGETS = new Set(["workspace:check-agent-docs"]);
+
 // Workflow steps run fixed targets, so gates are membership checks on the
 // affected set.
 //
@@ -180,7 +186,7 @@ export function resolveGates({ mode, files, targets }) {
   const forced =
     forceFullReason(files) ??
     (targets === null ? "affected query failed" : null) ??
-    (targets.length === 0 && !files.every(isInertWhenUnclaimed)
+    (targets.every((target) => REPO_WIDE_TARGETS.has(target)) && !files.every(isInertWhenUnclaimed)
       ? "empty affected set for files outside the inert allowlist"
       : null);
   if (forced) {
@@ -335,6 +341,7 @@ const TURBO_GRAPH_TASKS = [
   "summarize",
   "check-adrs",
   "check-moon-graph",
+  "check-agent-docs",
   "check-typecheck",
   "check-openapi-rules",
   "doctor",

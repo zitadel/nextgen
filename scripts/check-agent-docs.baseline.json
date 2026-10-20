@@ -1,0 +1,45 @@
+{
+  "oversized": {
+    ".moon/AGENTS.md": 6421,
+    "AGENTS.md": 26117,
+    "apps/cli/AGENTS.md": 12406,
+    "apps/cli/tests/AGENTS.md": 10015,
+    "apps/console/AGENTS.md": 9162,
+    "apps/docs/AGENTS.md": 9468,
+    "apps/storybook/AGENTS.md": 12184,
+    "apps/website/AGENTS.md": 14495,
+    "e2e/journey/AGENTS.md": 6717,
+    "internal/storage/AGENTS.md": 9363,
+    "packages/api-mock/AGENTS.md": 10932,
+    "packages/components/AGENTS.md": 15951,
+    "packages/design-tokens/AGENTS.md": 8410,
+    "packages/testing/AGENTS.md": 10651
+  },
+  "oversizedChains": {
+    ".moon": 32538,
+    "api/openapi": 30447,
+    "apps": 29448,
+    "apps/cli": 41854,
+    "apps/cli/src/lib/local-server": 46396,
+    "apps/cli/tests": 51869,
+    "apps/console": 38610,
+    "apps/docs": 38916,
+    "apps/storybook": 41632,
+    "apps/website": 43943,
+    "e2e/console": 31200,
+    "e2e/demo-next": 29303,
+    "e2e/demo-nuxt": 28953,
+    "e2e/journey": 32834,
+    "internal": 30374,
+    "internal/service": 32442,
+    "internal/storage": 39737,
+    "packages": 30259,
+    "packages/api-mock": 41191,
+    "packages/components": 46210,
+    "packages/design-tokens": 38669,
+    "packages/testing": 40910
+  },
+  "claudeMd": [
+    "CLAUDE.md"
+  ]
+}

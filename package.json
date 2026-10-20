@@ -12,7 +12,7 @@
     "docs": "moon run docs:dev",
     "check": "node scripts/check.mjs",
     "check:cloud": "turbo run e2e-deployment console-deployment schemas-deployment --continue",
-    "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/render-builtin-schemas.test.mjs && vitest run scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/render-builtin-schemas.test.mjs",
+    "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/render-builtin-schemas.test.mjs scripts/check-agent-docs.test.mjs && vitest run scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/render-builtin-schemas.test.mjs scripts/check-agent-docs.test.mjs",
     "test:all": "pnpm run test",
     "release:snapshot": "moon run release:snapshot",
     "release:publish": "moon run release:publish",
@@ -21,6 +21,7 @@
     "check-openapi-rules": "node scripts/assert-file.mjs scripts/openapi-casing-rules.test.mjs && vitest run scripts/openapi-casing-rules.test.mjs",
     "check-moon-graph": "node scripts/check-moon-graph.mjs",
     "check-adrs": "node scripts/check-adrs-index.mjs",
+    "check-agent-docs": "node scripts/check-agent-docs.mjs",
     "server-debug": "node scripts/run-server-debug.mjs",
     "build-local-image": "node scripts/build-local-runtime-image.mjs",
     "smoke-container": "node scripts/smoke-container.mjs"
