@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 // typechecks: Vitest 4 no longer augments Vite's own `UserConfig` with `test`.
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject } from "../../vitest.shared.mjs";
 
 export default defineConfig({
   root: import.meta.dirname,
@@ -23,6 +23,22 @@ export default defineConfig({
   test: {
     ...baseTest,
     name: "@zitadel/sdk-core",
-    environment: "node",
+    projects: [
+      {
+        cacheDir: ".vitest/node",
+        test: {
+          name: "node",
+          globals: true,
+          environment: "node",
+          include: ["src/**/*.{test,spec}.{ts,tsx}"],
+        },
+      },
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
+      edgeProject({
+        include: ["src/**/*.spec.ts"],
+        // Reads the SDK packages' sources and manifests from disk.
+        exclude: ["src/contract.spec.ts"],
+      }),
+    ],
   },
 });

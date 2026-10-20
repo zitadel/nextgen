@@ -48,6 +48,18 @@ tasks:
       - "/packages/sdk-solid/src/index.ssr.spec.tsx"
       - "/packages/sdk-qwik/src/index.spec.tsx"
       - "/packages/sdk-qwik/src/index.ssr.spec.tsx"
+      # The client SDK entries, their edge specs and the configs that declare the edge project.
+      - "/packages/sdk-react/src/index.tsx"
+      - "/packages/sdk-vue/src/index.ts"
+      - "/packages/sdk-angular/src/public-api.ts"
+      - "/packages/sdk-svelte/src/lib/index.ts"
+      - "/packages/sdk-solid/src/index.tsx"
+      - "/packages/sdk-qwik/src/index.tsx"
+      - "/packages/sdk-next/src/client.ts"
+      - "/packages/sdk-nuxt/src/index.ts"
+      - "/packages/sdk-tanstack-start/src/react.tsx"
+      - "/packages/sdk-*/src/*.edge.spec.{ts,tsx}"
+      - "/packages/*/vitest.config.ts"
       # And the meta-framework SDKs' server tests, to check they share their titles.
       - "/packages/sdk-*/src/__tests__/*.test.ts"
       - "/packages/sdk-*/src/__tests__/*/*.test.ts"

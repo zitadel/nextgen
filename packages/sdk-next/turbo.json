@@ -2,8 +2,9 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
+    // client.edge.test.ts imports this package's built dist.
     "typecheck": {
-      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+      "dependsOn": ["build"]
     },
     "build": {
       "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
