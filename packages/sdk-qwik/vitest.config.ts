@@ -3,7 +3,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject } from "../../vitest.shared.mjs";
 
 /**
  * Two projects in one config:
@@ -58,6 +58,10 @@ export default defineConfig({
           environment: "node",
           include: ["src/**/*.ssr.spec.tsx"],
         },
+      },
+      {
+        ...edgeProject({ include: ["src/index.ssr.spec.tsx"], conditions: ["edge-light"] }),
+        plugins: [qwikVite()],
       },
     ],
   },

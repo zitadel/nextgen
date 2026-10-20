@@ -1659,6 +1659,9 @@ importers:
         specifier: workspace:*
         version: link:../sdk-core
     devDependencies:
+      '@edge-runtime/vm':
+        specifier: 'catalog:'
+        version: 5.0.0
       '@qwik.dev/core':
         specifier: 'catalog:'
         version: 2.0.0-rc.3(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.9.10)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.23))(cssnano@8.0.5(postcss@8.5.30))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.30)(uglify-js@3.19.3))
@@ -1803,6 +1806,9 @@ importers:
         specifier: workspace:*
         version: link:../sdk-core
     devDependencies:
+      '@edge-runtime/vm':
+        specifier: 'catalog:'
+        version: 5.0.0
       '@solidjs/testing-library':
         specifier: ^0.8.10
         version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.17))(solid-js@1.9.17)
@@ -1895,6 +1901,9 @@ importers:
         specifier: workspace:*
         version: link:../sdk-core
     devDependencies:
+      '@edge-runtime/vm':
+        specifier: 'catalog:'
+        version: 5.0.0
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.3.1
         version: 7.3.1(svelte@5.56.3(@typescript-eslint/types@8.59.3))(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))
