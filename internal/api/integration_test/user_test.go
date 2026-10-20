@@ -848,18 +848,22 @@ func TestPatchUserFailedMigration(t *testing.T) {
 		collide    bool
 		wantStatus any
 		wantCode   string
+		// wantFields, when set, is the details.fields a schema failure names.
+		wantFields string
 	}{
 		{
 			name:         "a required attribute of the target revision is missing",
 			targetSchema: requiresGivenName,
 			wantStatus:   &api.PatchUserByIDBadRequest{},
-			wantCode:     domain.ErrUserInvalid().Code,
+			wantCode:     domain.ErrRequestInvalid().Code,
+			wantFields:   `{"fields":["attributes.givenName"]}`,
 		},
 		{
 			name:         "a value violates a tightened rule",
 			targetSchema: restrictsColor,
 			wantStatus:   &api.PatchUserByIDBadRequest{},
-			wantCode:     domain.ErrUserInvalid().Code,
+			wantCode:     domain.ErrRequestInvalid().Code,
+			wantFields:   `{"fields":["attributes.color"]}`,
 		},
 		{
 			name:         "a value collides with another user's unique attribute",
@@ -900,6 +904,9 @@ func TestPatchUserFailedMigration(t *testing.T) {
 			require.NoError(t, err)
 			require.IsType(t, tc.wantStatus, resp, helpers.MustMarshal(t, resp))
 			assertAuthzError(t, resp, tc.wantCode)
+			if tc.wantFields != "" {
+				assert.JSONEq(t, tc.wantFields, string(resp.(*api.PatchUserByIDBadRequest).Details.Value["details"]))
+			}
 
 			after := readStored(t, user.ID)
 			assert.Equal(t, before.schemaURL, after.schemaURL, "schema reference")
