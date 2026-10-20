@@ -134,6 +134,27 @@ describe("verifyJwt JWKS caching", () => {
   });
 });
 
+describe("verifyJwt issuer address", () => {
+  it("fetches the JWKS and matches the issuer for an address given with a trailing slash", async () => {
+    const issuer = freshIssuer();
+    const fetchMock = serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+
+    expect(
+      await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(`${issuer}/`)),
+    ).toMatchObject({ sub: "u1" });
+    expect(fetchMock).toHaveBeenCalledWith(`${issuer}/auth/keys`, expect.anything());
+  });
+
+  it("rejects a token whose issuer differs from the address beyond its trailing slash", async () => {
+    const issuer = freshIssuer();
+    serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+
+    expect(
+      await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(`${issuer}/other/`)),
+    ).toBeNull();
+  });
+});
+
 describe("verifyJwt key selection", () => {
   // RFC 7517 makes a JWK's alg optional; the curve decides an EC key's algorithm.
   it("verifies an ES256 token against an EC key that names no alg", async () => {

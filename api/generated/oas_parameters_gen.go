@@ -3466,6 +3466,101 @@ func decodeGetIdpRevisionByIdParams(args [1]string, argsEscaped bool, r *http.Re
 	return params, nil
 }
 
+// GetMySessionParams is parameters of getMySession operation.
+type GetMySessionParams struct {
+	// The project the caller signs its users in to. The session is returned only
+	// when it belongs to this project, and answers `403` with
+	// `sess.project_mismatch` otherwise.
+	// A session belongs to one project, while a browser sends its cookie to every
+	// app on the same host. An app that reads the session to decide who is signed
+	// in passes its own project, so that a session of another project never reads
+	// as one of its users. The SDKs do this for you.
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in
+	// its own project, so keep its cookie.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
+}
+
+func unpackGetMySessionParams(packed middleware.Parameters) (params GetMySessionParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ProjectID = v.(OptProjectID)
+		}
+	}
+	return params
+}
+
+func decodeGetMySessionParams(args [0]string, argsEscaped bool, r *http.Request) (params GetMySessionParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal ProjectID
+				if err := func() error {
+					var paramsDotProjectIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotProjectIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID.SetTo(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.ProjectID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // GetProjectParams is parameters of getProject operation.
 type GetProjectParams struct {
 	// The unique identifier of the project.
@@ -7057,6 +7152,160 @@ func unpackListMyProjectsParams(packed middleware.Parameters) (params ListMyProj
 }
 
 func decodeListMyProjectsParams(args [0]string, argsEscaped bool, r *http.Request) (params ListMyProjectsParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Set default value for query: limit.
+	{
+		val := int(20)
+		params.Limit.SetTo(Limit(val))
+	}
+	// Decode query: limit.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotLimitVal Limit
+				if err := func() error {
+					var paramsDotLimitValVal int
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToInt(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotLimitValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotLimitVal = Limit(paramsDotLimitValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.Limit.SetTo(paramsDotLimitVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.Limit.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "limit",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: page_token.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotPageTokenVal PageToken
+				if err := func() error {
+					var paramsDotPageTokenValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotPageTokenValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotPageTokenVal = PageToken(paramsDotPageTokenValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.PageToken.SetTo(paramsDotPageTokenVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "page_token",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// ListMyTeamsParams is parameters of listMyTeams operation.
+type ListMyTeamsParams struct {
+	// Maximum number of items to return.
+	Limit OptLimit `json:",omitempty,omitzero"`
+	// Token for fetching the next page of results.
+	// Obtain this value from `next_page_token` in the previous response.
+	// Omit to start from the beginning.
+	// Its format is opaque and may change between releases.
+	PageToken OptPageToken `json:",omitempty,omitzero"`
+}
+
+func unpackListMyTeamsParams(packed middleware.Parameters) (params ListMyTeamsParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "limit",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.Limit = v.(OptLimit)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "page_token",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.PageToken = v.(OptPageToken)
+		}
+	}
+	return params
+}
+
+func decodeListMyTeamsParams(args [0]string, argsEscaped bool, r *http.Request) (params ListMyTeamsParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Set default value for query: limit.
 	{

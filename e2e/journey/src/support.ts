@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { SESSION_COOKIE_NAME } from "@zitadel/testing/playwright";
+import { sessionCookieName } from "@zitadel/testing/playwright";
 
 import { frameworkForId } from "../scripts/frameworks.mjs";
 
@@ -144,13 +144,24 @@ export async function logout(page: Page): Promise<void> {
   await expectSessionCleared(page);
 }
 
+/**
+ * The cookie the app keeps its session in: every scaffold's proxy, a server
+ * SDK's or the dev proxy setup writes for an SPA, keeps it under the app's
+ * project's name (ADR 073). setup records the project in `.zitadel/secret`.
+ */
+export async function appSessionCookieName(): Promise<string> {
+  const secret = JSON.parse(
+    await readFile(join(requiredEnv("JOURNEY_APP_DIR"), ".zitadel/secret"), "utf8"),
+  ) as { project_id: string };
+  return sessionCookieName(secret.project_id);
+}
+
 async function expectSessionCleared(page: Page): Promise<void> {
+  const name = await appSessionCookieName();
   await expect
-    .poll(
-      async () =>
-        (await page.context().cookies()).some((cookie) => cookie.name === SESSION_COOKIE_NAME),
-      { timeout: 5000 },
-    )
+    .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === name), {
+      timeout: 5000,
+    })
     .toBe(false);
 }
 

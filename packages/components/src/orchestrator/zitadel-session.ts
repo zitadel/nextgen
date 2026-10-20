@@ -108,9 +108,8 @@ export class ZitadelSession extends ZitadelSurface {
   /** Sign-out action label. */
   @property({ type: String, attribute: "logout-label" }) accessor logoutLabel = "Sign out";
 
-  private readonly session = new SessionController(
-    this,
-    () => resolveApi(this.project, this.projectAttrs, "<zitadel-session>").api,
+  private readonly session = new SessionController(this, () =>
+    resolveApi(this.project, this.projectAttrs, "<zitadel-session>"),
   );
 
   override willUpdate(): void {

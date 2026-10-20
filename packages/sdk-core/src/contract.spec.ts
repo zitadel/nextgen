@@ -16,7 +16,100 @@ import {
   type ZitadelLoginConfig,
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
+  standardAttributes,
+  widgetTags,
 } from "./types.js";
+
+/**
+ * The spec files the guards below read, by SDK: `client` is the spec that carries
+ * the SDK's client-side tests, `server` the one that carries its server-markup
+ * tests. Angular is not here: its wrapper forwards no standard attribute, since
+ * its component tag already is the element that carries them, so it has no
+ * standard-attribute block (see {@link ANGULAR_SPEC}).
+ */
+const SDK_SPECS = {
+  "sdk-react": {
+    client: "../../sdk-react/src/index.spec.tsx",
+    server: "../../sdk-react/src/index.spec.tsx",
+  },
+  "sdk-vue": {
+    client: "../../sdk-vue/src/components.spec.ts",
+    server: "../../sdk-vue/src/components.spec.ts",
+  },
+  "sdk-svelte": {
+    client: "../../sdk-svelte/src/index.spec.ts",
+    server: "../../sdk-svelte/src/index.ssr.spec.ts",
+  },
+  "sdk-solid": {
+    client: "../../sdk-solid/src/index.spec.tsx",
+    server: "../../sdk-solid/src/index.ssr.spec.tsx",
+  },
+  "sdk-qwik": {
+    client: "../../sdk-qwik/src/index.spec.tsx",
+    server: "../../sdk-qwik/src/index.ssr.spec.tsx",
+  },
+} as const;
+
+/** Angular's spec: it carries the shared server-render table but no standard-attribute block. */
+const ANGULAR_SPEC = "../../sdk-angular/src/lib/components.spec.ts";
+
+/** The first place two lists of test titles differ, or "" when they are the same. */
+const firstDifference = (titles: readonly string[], canonical: readonly string[]): string => {
+  const length = Math.max(titles.length, canonical.length);
+  for (let index = 0; index < length; index++) {
+    if (titles[index] !== canonical[index]) {
+      return `test ${index + 1} is ${JSON.stringify(titles[index])}, expected ${JSON.stringify(canonical[index])}`;
+    }
+  }
+  return "";
+};
+
+// Matches `it("title"`, `it.each(…)("title"`, `describe("title"` and `describe.each(…)("title"`.
+const BLOCK_TITLE = /\b(?:it|describe)(?:\.each\([^)]*\))?\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+
+/** Where the `// name:edge` marker comment, alone on its line, starts; -1 when there is none. */
+const markerAt = (source: string, name: string, edge: "begin" | "end"): number => {
+  const marker = new RegExp(`^[ \\t]*// ${name}:${edge}[ \\t]*$`, "m").exec(source);
+  return marker ? marker.index + marker[0].indexOf("//") : -1;
+};
+
+const blockIn = (source: string, name: string): string | undefined => {
+  const begin = markerAt(source, name, "begin");
+  const end = markerAt(source, name, "end");
+  return begin >= 0 && end > begin ? source.slice(begin, end) : undefined;
+};
+
+const titlesIn = (block: string): string[] =>
+  Array.from(block.matchAll(BLOCK_TITLE), (match) => match[2] ?? "");
+
+/**
+ * What is wrong with the `name` blocks of the given sources: a block that is
+ * missing, one whose titles are not the canonical ones, in order and without an
+ * extra, and one whose body is not the first source's, byte for byte.
+ */
+const problems = (
+  sources: Readonly<Record<string, string>>,
+  name: string,
+  canonical: readonly string[],
+): string[] => {
+  const blocks = Object.entries(sources).map(
+    ([sdk, source]) => [sdk, source, blockIn(source, name)] as const,
+  );
+  const reference = blocks[0]?.[2];
+  return blocks.flatMap(([sdk, source, block]) => {
+    if (block === undefined) return [`${sdk} has no ${name} block`];
+    const found = [];
+    const difference = firstDifference(titlesIn(block), canonical);
+    if (difference) found.push(`${sdk}: ${difference}`);
+    if (block !== reference) found.push(`${sdk}: the body differs from the first SDK's`);
+    const outside = titlesIn(source.replace(block, "")).filter((title) =>
+      canonical.includes(title),
+    );
+    if (outside.length > 0)
+      found.push(`${sdk}: ${JSON.stringify(outside[0])} is also tested outside the block`);
+    return found;
+  });
+};
 
 /**
  * The element↔contract drift guard.
@@ -52,6 +145,22 @@ describe("SPA widget contract ↔ @zitadel/components", () => {
 });
 
 /**
+ * The tag names. `@zitadel/components` cannot depend on this package, so the
+ * check lives here, where both are visible: the elements register under exactly
+ * the names {@link widgetTags} defines, which every SDK reads instead of
+ * spelling them out.
+ */
+describe("widget tags ↔ @zitadel/components", () => {
+  it.each([
+    ["login", ZitadelLogin],
+    ["logout", ZitadelLogout],
+    ["session", ZitadelSession],
+  ] as const)("registers the %s element under its tag", (widget, element) => {
+    expect(customElements.get(widgetTags[widget])).toBe(element);
+  });
+});
+
+/**
  * The element↔config drift guard for properties.
  *
  * The SPA SDK wrappers take their props from the config types in `types.ts`,
@@ -79,6 +188,7 @@ const LOGIN_CONFIG_KEYS = {
   purpose: true,
   flowName: true,
   postSignInUrl: true,
+  forcePostSignInUrl: true,
   resumeFlowId: true,
   locales: true,
   lang: true,
@@ -141,9 +251,9 @@ function publicProperties(ctor: ElementCtor, tag: string): string[] {
 
 describe("config types ↔ element properties", () => {
   describe.each([
-    ["zitadel-login", ZitadelLogin, LOGIN_CONFIG_KEYS, LOGIN_ELEMENT_ONLY],
-    ["zitadel-session", ZitadelSession, SESSION_CONFIG_KEYS, SESSION_ELEMENT_ONLY],
-    ["zitadel-logout", ZitadelLogout, LOGOUT_CONFIG_KEYS, LOGOUT_ELEMENT_ONLY],
+    [widgetTags.login, ZitadelLogin, LOGIN_CONFIG_KEYS, LOGIN_ELEMENT_ONLY],
+    [widgetTags.session, ZitadelSession, SESSION_CONFIG_KEYS, SESSION_ELEMENT_ONLY],
+    [widgetTags.logout, ZitadelLogout, LOGOUT_CONFIG_KEYS, LOGOUT_ELEMENT_ONLY],
   ] as const)("<%s>", (tag, ctor, configKeys, elementOnly) => {
     const properties = publicProperties(ctor as ElementCtor, tag);
 
@@ -186,10 +296,10 @@ describe("config types ↔ element properties", () => {
  */
 describe("server-render cases ↔ SDK specs", () => {
   const SPECS = [
-    "../../sdk-react/src/index.spec.tsx",
-    "../../sdk-vue/src/components.spec.ts",
-    "../../sdk-angular/src/lib/components.spec.ts",
-    "../../sdk-svelte/src/index.spec.ts",
+    SDK_SPECS["sdk-react"].client,
+    SDK_SPECS["sdk-vue"].client,
+    ANGULAR_SPEC,
+    SDK_SPECS["sdk-svelte"].client,
   ];
 
   const casesIn = (spec: string): string => {
@@ -203,6 +313,154 @@ describe("server-render cases ↔ SDK specs", () => {
 
   it.each(SPECS)("%s carries the same cases as the React spec", (spec) => {
     expect(casesIn(spec)).toBe(casesIn(SPECS[0]!));
+  });
+});
+
+/**
+ * The standard attributes and the widget props are disjoint by construction: a
+ * wrapper hands the element the standard attributes besides its own props, so
+ * if a widget prop shared a name with one, the wrapper would shadow it.
+ */
+describe("standard attributes ↔ widget props", () => {
+  it.each([
+    ["ZitadelLogin", LOGIN_CONFIG_KEYS, ZITADEL_LOGIN_EVENT_HANDLERS],
+    ["ZitadelLogout", LOGOUT_CONFIG_KEYS, ZITADEL_LOGOUT_EVENT_HANDLERS],
+    ["ZitadelSession", SESSION_CONFIG_KEYS, ZITADEL_SESSION_EVENT_HANDLERS],
+  ] as const)("%s has no prop that is a standard attribute", (_widget, configKeys, handlers) => {
+    const props = {
+      ...configKeys,
+      ...Object.fromEntries(Object.values(handlers).map((n) => [n, true])),
+    };
+    expect(standardAttributes(props)).toEqual({});
+  });
+});
+
+/**
+ * The standard-attribute tests.
+ *
+ * Every SPA SDK except Angular passes the element's standard HTML attributes to
+ * the widget element, and every SDK spec proves it with the same tests between
+ * marker comments: the same titles, in the same order, with none missing, none
+ * extra and none unmarked inside the block, and the same bodies, byte for byte.
+ * Only the glue above each block (`mountWidget`, `renderAttributes` and the two
+ * props type aliases) differs. A behaviour left untested in one SDK, or tested
+ * under another title, fails here instead of drifting unnoticed.
+ *
+ * One documented exception: Angular's component tag already is the element that
+ * carries the standard attributes, so its wrapper does not forward anything and
+ * its spec has no block.
+ */
+describe("standard-attribute tests ↔ SDK specs", () => {
+  const CLIENT_TITLES = [
+    "%s standard attributes",
+    "forwards the class to the widget element",
+    "forwards the style to the widget element",
+    "forwards the id to the widget element",
+    "forwards data attributes to the widget element",
+    "forwards aria attributes to the widget element",
+    "forwards the remaining standard attributes to the widget element",
+    "forwards the slot to the widget element",
+    "renders a false aria or data attribute as the string false",
+    "updates a forwarded attribute when the prop changes",
+    "removes a forwarded attribute when the prop is removed",
+    "does not forward props outside the standard set",
+    "gives access to the widget element through a ref",
+    "accepts the standard attributes in its props",
+    "rejects the attributes it does not forward in its props",
+  ];
+
+  const SERVER_TITLES = [
+    "%s server-rendered standard attributes",
+    "puts the standard attributes into the server markup",
+    "leaves props outside the standard set out of the server markup",
+  ];
+
+  const read = (spec: string): string =>
+    readFileSync(fileURLToPath(new URL(spec, import.meta.url)), "utf8");
+
+  const specsOf = (side: "client" | "server"): Record<string, string> =>
+    Object.fromEntries(
+      Object.entries(SDK_SPECS).flatMap(([sdk, specs]) => {
+        const spec =
+          side === "client" ? specs.client : "server" in specs ? specs.server : undefined;
+        return spec === undefined ? [] : [[sdk, read(spec)]];
+      }),
+    );
+
+  it.each([
+    ["standard-attributes", "client", CLIENT_TITLES],
+    ["standard-attributes-server", "server", SERVER_TITLES],
+  ] as const)("the %s block is canonical in every SDK", (name, side, canonical) => {
+    expect(problems(specsOf(side), name, canonical)).toEqual([]);
+  });
+
+  it("has no block in Angular, the one documented exception", () => {
+    const angular = read(ANGULAR_SPEC);
+    expect(blockIn(angular, "standard-attributes")).toBeUndefined();
+    expect(blockIn(angular, "standard-attributes-server")).toBeUndefined();
+  });
+
+  // The guard's own logic, on sources it is made to reject.
+  describe("the guard", () => {
+    const block = [
+      "// x:begin",
+      'describe.each(widgetNames)("%s group", (widget) => {',
+      '  it("first", () => {});',
+      '  it.each([1, 2])("second", () => {});',
+      "});",
+      "// x:end",
+    ].join("\n");
+    const canonical = ["%s group", "first", "second"];
+    const check = (other: string): string[] => problems({ one: block, two: other }, "x", canonical);
+
+    it("accepts blocks that match", () => {
+      expect(check(block)).toEqual([]);
+    });
+
+    it("reads it, it.each and describe.each titles", () => {
+      expect(titlesIn(blockIn(block, "x") ?? "")).toEqual(canonical);
+    });
+
+    it("sees a dropped title", () => {
+      expect(check(block.replace('  it("first", () => {});\n', ""))).toHaveLength(2);
+    });
+
+    it("sees a renamed title", () => {
+      expect(check(block.replace('"first"', '"primary"'))).toHaveLength(2);
+    });
+
+    it("sees a reordered title", () => {
+      const swapped = block
+        .replace('  it("first", () => {});\n', "")
+        .replace(
+          '  it.each([1, 2])("second", () => {});',
+          '  it.each([1, 2])("second", () => {});\n  it("first", () => {});',
+        );
+      expect(check(swapped)).toHaveLength(2);
+    });
+
+    it("sees an extra test inside the block", () => {
+      expect(
+        check(block.replace("});\n// x:end", '  it("extra", () => {});\n});\n// x:end')),
+      ).toHaveLength(2);
+    });
+
+    it("sees a changed body and names it", () => {
+      expect(
+        check(block.replace('it("first", () => {})', 'it("first", () => { run(); })')),
+      ).toEqual(["two: the body differs from the first SDK's"]);
+    });
+
+    it("sees a canonical test outside the block", () => {
+      expect(check(`it("first", () => {});\n${block}`)).toEqual([
+        'two: "first" is also tested outside the block',
+      ]);
+    });
+
+    it("sees a block that is missing or unterminated", () => {
+      expect(check("nothing here")).toEqual(["two has no x block"]);
+      expect(check("// x:begin\nno end")).toEqual(["two has no x block"]);
+    });
   });
 });
 
@@ -264,6 +522,11 @@ describe("widget loading ↔ SDK packages", () => {
     (file) => {
       const config = read(`${packagesDir}sdk-core/${file}`);
       for (const input of [
+        ...new Set(
+          [ANGULAR_SPEC, ...Object.values(SDK_SPECS).flatMap((specs) => Object.values(specs))].map(
+            (spec) => spec.replace("../../", "packages/"),
+          ),
+        ),
         "packages/sdk-*/src/__tests__/*.test.ts",
         "packages/sdk-*/src/__tests__/*/*.test.ts",
         "packages/sdk-*/package.json",
@@ -416,13 +679,15 @@ describe("server SDK test titles", () => {
     "sdk-nuxt": "sdk-nuxt/src/__tests__/server/middleware.test.ts",
     "sdk-sveltekit": "sdk-sveltekit/src/__tests__/handle.test.ts",
     "sdk-solid-start": "sdk-solid-start/src/__tests__/middleware.test.ts",
-    "sdk-qwik-city": "sdk-qwik-city/src/__tests__/request-handler.test.ts",
+    "sdk-qwik-router": "sdk-qwik-router/src/__tests__/request-handler.test.ts",
     "sdk-tanstack-start": "sdk-tanstack-start/src/__tests__/middleware.test.ts",
   } as const;
 
   const CANONICAL_TITLES = [
     "public route with no token continues as unauthenticated",
     "protected route with no token redirects to /login?next=/admin",
+    "protected route with a query string redirects to /login?next=/admin?tab=x",
+    "does not nest a next parameter the request already carries",
     "protected route requested with a trailing slash redirects to login",
     "protected route with a valid cookie token authenticates",
     "protected route with a valid Bearer token authenticates",
@@ -441,11 +706,21 @@ describe("server SDK test titles", () => {
     "protocol-relative loginPath throws",
     "refuses a request that carries the auth header on the proxy path",
     "forwards upstream Set-Cookie headers",
+    "passes cookies through to the backend when no project is configured",
+    "names a proxied session cookie for this app's project",
+    "sends this project's session cookie upstream under the server's name",
+    "keeps other projects' session cookies from the backend",
+    "sends the shared session cookie only to this project's session probe",
+    "copies this project's session out of the shared cookie on the session probe",
+    "ends and clears a session of this project kept under the shared name on sign-out",
+    "leaves the Console's session of another project under the shared name on sign-out",
     "forwards an upstream Location %s onto this app as %s",
     "keeps a caller-supplied credential on the handoff exchange",
     "appends the client IP to an existing X-Forwarded-For chain",
     "sets X-Forwarded-For from the client IP when no chain exists",
     "omits X-Forwarded-For when no client IP is available",
+    "ignores a client-supplied x-real-ip when the runtime provides an address",
+    "ignores a client-supplied x-real-ip when an X-Forwarded-For chain exists",
     "does not proxy a path that only shares the prefix without a separator",
     "skips auth handling on an ignored route",
     "hands the auth result to the next handler when the request continues",
@@ -455,7 +730,33 @@ describe("server SDK test titles", () => {
     "signs in a live session that names a user",
     "redirects an anonymous session on a protected route to login",
     "keeps an anonymous session's cookie, since its sign-in may still complete",
+    "treats a 200 session without a user as anonymous on a public route",
+    "redirects a session whose answer has a null user id to login on a protected route",
     "clears a dead session cookie on a public page",
+    "clears a dead session cookie and redirects on a protected route",
+    "clears the cookie of a session that is gone",
+    "when the session check gets %s",
+    "keeps the session cookie and renders a public page signed out",
+    "answers 503 on a protected route and keeps the session cookie",
+    "does not sign in a live session of another project",
+    "reads a live session of another project as signed out on a public page",
+    "keeps the cookie of another project's session",
+    "reads the session from this project's cookie before the shared one",
+    "ignores the session cookie of another project's app",
+    "copies this project's session out of the shared cookie",
+    "keeps a page that sets a session cookie out of shared caches",
+    "copies with Secure behind a TLS proxy that talks to the app over loopback",
+    "clears a dead session cookie without Secure over plain http to a loopback address",
+    "clears only this project's dead session cookie",
+    "asks the backend for the session in this app's project",
+    "does not sign in a session the backend refuses for this project",
+    "does not sign in a JWT issued for %s",
+    "does not sign in a Bearer JWT issued for another project",
+    "keeps the cookie of a JWT issued for another project",
+    "signs in by the session cookie behind a Bearer JWT of another project",
+    "signs in a JWT whose audience includes this project",
+    "signs in no one when no project is configured",
+    "holds sessions to the project from %s",
     "does not attach the project secret to %s %s",
     "attaches the project secret only to POST /sessions/exchange, ignoring the query",
     "preserves the upstream session cache policy",
@@ -468,34 +769,111 @@ describe("server SDK test titles", () => {
     "lets a request without the auth header through",
     "sends the exchange bearer from %s",
     "proxies to the backend from %s",
+    "proxies to a backend url given with a trailing slash",
+    "verifies a JWT against a backend url given with a trailing slash",
+    "asks the session probe at a backend url given with a trailing slash",
   ];
 
   // Matches `it("title"`, `it.fails("title"` and the `it.each([...])("title"` form.
   const TITLE = /(?:\bit(?:\.fails)?\(|\]\)\()\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
 
-  const titlesOf = (sdk: keyof typeof TEST_FILES): string[] =>
-    [...readFileSync(`${packagesPath}${TEST_FILES[sdk]}`, "utf8").matchAll(TITLE)].map(
-      (match) => match[2]!,
-    );
+  const sourceOf = (sdk: keyof typeof TEST_FILES): string =>
+    readFileSync(`${packagesPath}${TEST_FILES[sdk]}`, "utf8");
 
-  const firstDifference = (titles: readonly string[]): string => {
-    const length = Math.max(titles.length, CANONICAL_TITLES.length);
-    for (let index = 0; index < length; index++) {
-      if (titles[index] !== CANONICAL_TITLES[index]) {
-        return `test ${index + 1} is ${JSON.stringify(titles[index])}, expected ${JSON.stringify(CANONICAL_TITLES[index])}`;
-      }
-    }
-    return "";
-  };
+  const titlesOf = (sdk: keyof typeof TEST_FILES): string[] =>
+    [...sourceOf(sdk).matchAll(TITLE)].map((match) => match[2]!);
 
   it.each(Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[])(
     "%s carries exactly the canonical tests, in the canonical order",
     (sdk) => {
       const titles = titlesOf(sdk);
       expect(
-        firstDifference(titles),
+        firstDifference(titles, CANONICAL_TITLES),
         `${sdk} has ${titles.length} tests, expected ${CANONICAL_TITLES.length}`,
       ).toBe("");
     },
   );
+
+  /**
+   * The backend-url tests are the one group of cases the server SDKs also
+   * carry byte for byte: the same rows and bodies between the same markers, so
+   * every SDK resolves the url the same way. Only the glue outside the block
+   * (`serve`, `captureFetch`, `signer`) differs.
+   */
+  describe("the backend-url block", () => {
+    const URL_TITLES = [
+      "proxies to a backend url given with a trailing slash",
+      "verifies a JWT against a backend url given with a trailing slash",
+      "asks the session probe at a backend url given with a trailing slash",
+    ];
+
+    it("is canonical in every SDK", () => {
+      const sources = Object.fromEntries(
+        (Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[]).map((sdk) => [sdk, sourceOf(sdk)]),
+      );
+      expect(problems(sources, "backend-url", URL_TITLES)).toEqual([]);
+    });
+
+    // The guard's own logic, on a fixture block it is made to reject.
+    describe("the guard", () => {
+      const fixture = [
+        "describe('x', () => {",
+        "  // backend-url:begin",
+        '  it("proxies to a backend url given with a trailing slash", () => {',
+        '    expect(proxied("http://a.test/")).toBe("http://a.test/v1");',
+        "  });",
+        '  it("verifies a JWT against a backend url given with a trailing slash", () => {});',
+        '  it("asks the session probe at a backend url given with a trailing slash", () => {});',
+        "  // backend-url:end",
+        "});",
+      ].join("\n");
+      const check = (other: string): string[] =>
+        problems({ one: fixture, two: other }, "backend-url", URL_TITLES);
+      const CHANGED = ["two: the body differs from the first SDK's"];
+
+      it("accepts blocks that match", () => {
+        expect(check(fixture)).toEqual([]);
+      });
+
+      it("sees a changed body and names the SDK", () => {
+        expect(check(fixture.replace('"http://a.test/"', '"http://a.test"'))).toEqual(CHANGED);
+      });
+
+      it("sees an extra test", () => {
+        expect(
+          check(
+            fixture.replace(
+              "  // backend-url:end",
+              '  it("extra", () => {});\n  // backend-url:end',
+            ),
+          ),
+        ).toHaveLength(2);
+      });
+
+      it("sees a changed assertion", () => {
+        expect(check(fixture.replace(").toBe(", ").not.toBe("))).toEqual(CHANGED);
+      });
+
+      it("sees a missing marker", () => {
+        expect(check(fixture.replace("  // backend-url:end\n", ""))).toEqual([
+          "two has no backend-url block",
+        ]);
+      });
+
+      it("does not take a longer marker for its own", () => {
+        expect(check(fixture.replace("// backend-url:end", "// backend-url:end2"))).toEqual([
+          "two has no backend-url block",
+        ]);
+        expect(check(fixture.replace("// backend-url:begin", "// backend-url:begin2"))).toEqual([
+          "two has no backend-url block",
+        ]);
+      });
+
+      it("does not take a marker inside other text for its own", () => {
+        expect(check(fixture.replace("  // backend-url:end", "  x // backend-url:end"))).toEqual([
+          "two has no backend-url block",
+        ]);
+      });
+    });
+  });
 });

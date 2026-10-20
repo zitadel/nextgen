@@ -62,7 +62,7 @@ func run() error {
 		return err
 	}
 	slog.Info("oidc-mock listening", "issuer", cfg.Issuer, "redirect_uris", cfg.RedirectURIs, "users_file", cfg.UsersFile)
-	return (&http.Server{Addr: ":" + port, Handler: handler}).ListenAndServe()
+	return (&http.Server{Addr: "127.0.0.1:" + port, Handler: handler}).ListenAndServe()
 }
 
 func main() {

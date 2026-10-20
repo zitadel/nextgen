@@ -639,12 +639,13 @@ func (UnimplementedHandler) GetLive(ctx context.Context) (r GetLiveRes, _ error)
 //
 // Returns the current state of the current session including its factors and all currently
 // satisfied assurance levels.
+// With `project_id`, the session is returned only when it belongs to that project.
 // `assurance_levels[]` may shrink over time as factor freshness windows expire,
 // without the session itself expiring. Use step-up authentication (a new `auth_attempt`
 // against the same `session_id`) to restore a dropped assurance level.
 //
 // GET /sessions/me
-func (UnimplementedHandler) GetMySession(ctx context.Context) (r GetMySessionRes, _ error) {
+func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessionParams) (r GetMySessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -671,6 +672,15 @@ func (UnimplementedHandler) GetMySessionCsrfToken(ctx context.Context) (r GetMyS
 //
 // GET /users/me
 func (UnimplementedHandler) GetMyUser(ctx context.Context) (r GetMyUserRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetMyUserSchema implements getMyUserSchema operation.
+//
+// The schema the signed-in user's own record is validated against.
+//
+// GET /users/me/schema
+func (UnimplementedHandler) GetMyUserSchema(ctx context.Context) (r GetMyUserSchemaRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -897,6 +907,15 @@ func (UnimplementedHandler) ListIdpRevisions(ctx context.Context, params ListIdp
 //
 // GET /users/me/projects
 func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyProjectsParams) (r ListMyProjectsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListMyTeams implements listMyTeams operation.
+//
+// The signed-in user's own team roster, ordered by team name.
+//
+// GET /users/me/teams
+func (UnimplementedHandler) ListMyTeams(ctx context.Context, params ListMyTeamsParams) (r ListMyTeamsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

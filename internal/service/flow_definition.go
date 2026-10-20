@@ -46,7 +46,7 @@ func NewFlowDefinitionService(
 	v2Pool *DB,
 	schemaProvider BuiltinSchemaProvider,
 	flowDefinitionValidatorFn flowDefinitionValidatorFunc,
-) FlowDefinitionService {
+) *flowDefinitionService {
 	if flowDefinitionValidatorFn == nil {
 		flowDefinitionValidatorFn = domain.ValidateFlowDefinition
 	}
@@ -61,6 +61,45 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	ctx, end := startSpan(ctx, "FlowDefinitionService.Create")
 	defer end(&err)
 
+	stmts := fd.v2Pool.Statements()
+	userSchema, err := resolveUserSchema(ctx, stmts, req.ProjectID, req.UserSchema)
+	if err != nil {
+		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
+			return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q not found", req.UserSchema), err)
+		}
+		return nil, domain.ErrSchemaFetchFailed("failed to fetch user schema", err)
+	}
+	flowDefinition, err := fd.prepareFlowDefinition(ctx, stmts, req, userSchema, nil)
+	if err != nil {
+		return nil, err
+	}
+	err = fd.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		return fd.createFlowDefinition(ctx, tx.Statements(), flowDefinition)
+	})
+	if err != nil {
+		// The id is server-minted, so the only unique constraint a create can
+		// lose is (project_id, name, created_at): another revision of the same
+		// flow landed on the same instant. Other integrity violations (foreign
+		// key, check) are not that race and keep their own semantics.
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			return nil, domain.ErrFlowDefinitionRevisionConflict().WithParent(err)
+		}
+		return nil, err
+	}
+	return flowDefinition, nil
+}
+
+// prepareFlowDefinition validates and builds a flow definition without writing.
+// userSchema is the schema the flow operates on — callers resolve the handle.
+// bundleFlows names other flows in the same Build bundle (active ones only)
+// so pivoting can target a sibling that is not yet persisted.
+func (fd *flowDefinitionService) prepareFlowDefinition(
+	ctx context.Context,
+	stmts AllStatements,
+	req FlowDefinitionRequest,
+	userSchema *domain.JSONSchema,
+	bundleFlows map[string]bool,
+) (*domain.FlowDefinition, error) {
 	purposes, err := mapPurposesToDomain(req.Purposes)
 	if err != nil {
 		return nil, err
@@ -69,12 +108,8 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("invalid status: %q", req.Status), err)
 	}
-	userSchema, err := resolveUserSchema(ctx, fd.v2Pool.Statements(), req.ProjectID, req.UserSchema)
-	if err != nil {
-		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
-			return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q not found", req.UserSchema), err)
-		}
-		return nil, domain.ErrSchemaFetchFailed("failed to fetch user schema", err)
+	if userSchema.ObjectType == nil || *userSchema.ObjectType == "" {
+		return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q declares no objectType", req.UserSchema), nil)
 	}
 	flowDefinition, err := domain.NewFlowDefinition(
 		"",
@@ -90,38 +125,86 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		return nil, err
 	}
-
-	err = fd.validate(ctx, flowDefinition, userSchema)
-	if err != nil {
-		return nil, err
-	}
-	err = fd.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().CreateFlowDefinition(ctx, flowDefinition); err != nil {
-			return err
-		}
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeFlowdefCreated,
-			Category:   domain.EventCategoryAdmin,
-			ProjectID:  flowDefinition.ProjectID,
-			EntityType: "flow_definition",
-			EntityID:   flowDefinition.ID,
-			Payload:    domain.FlowdefPayloadSnapshot(flowDefinition),
-		})
-	})
-	if err != nil {
-		// The id is server-minted, so the only unique constraint a create can
-		// lose is (project_id, name, created_at): another revision of the same
-		// flow landed on the same instant. Other integrity violations (foreign
-		// key, check) are not that race and keep their own semantics.
-		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			return nil, domain.ErrFlowDefinitionRevisionConflict().WithParent(err)
-		}
+	if err := fd.validate(ctx, stmts, flowDefinition, userSchema, bundleFlows); err != nil {
 		return nil, err
 	}
 	return flowDefinition, nil
 }
 
-func (fd *flowDefinitionService) validate(ctx context.Context, flowDefinition *domain.FlowDefinition, sch *domain.JSONSchema) error {
+// createFlowDefinition inserts a prepared flow definition and emits its event on stmts.
+func (fd *flowDefinitionService) createFlowDefinition(ctx context.Context, stmts AllStatements, flowDefinition *domain.FlowDefinition) error {
+	if err := stmts.CreateFlowDefinition(ctx, flowDefinition); err != nil {
+		return err
+	}
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeFlowdefCreated,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  flowDefinition.ProjectID,
+		EntityType: "flow_definition",
+		EntityID:   flowDefinition.ID,
+		Payload:    domain.FlowdefPayloadSnapshot(flowDefinition),
+	})
+}
+
+// resolveOrCreateFlow reuses any existing revision of the flow name whose
+// content matches (preferring the newest match), otherwise inserts.
+func (fd *flowDefinitionService) resolveOrCreateFlow(
+	ctx context.Context,
+	stmts AllStatements,
+	projectID string,
+	definition *domain.FlowDefinition,
+) (*domain.FlowDefinition, error) {
+	match, err := matchingFlowByName(ctx, stmts, projectID, definition)
+	if err != nil {
+		return nil, err
+	}
+	if match != nil {
+		return match, nil
+	}
+	if err := fd.createFlowDefinition(ctx, stmts, definition); err != nil {
+		return nil, err
+	}
+	return definition, nil
+}
+
+// matchingFlowByName returns the newest revision of name whose content equals
+// want, or nil when none match. Scanning every revision lets Build reuse an
+// older revision when the newest has diverged (A→B→A content-hash reuse).
+func matchingFlowByName(ctx context.Context, stmts AllStatements, projectID string, want *domain.FlowDefinition) (*domain.FlowDefinition, error) {
+	result, err := stmts.ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
+			database.Equal(database.Col(domain.FlowDefinitionFieldName), want.Name),
+		),
+		Pagination: database.Page[domain.FlowDefinitionField]{
+			Limit: maxHistoricalRevisions,
+			OrderBy: database.OrderBy[domain.FlowDefinitionField]{
+				Columns: []database.Column[domain.FlowDefinitionField]{
+					database.Col(domain.FlowDefinitionFieldCreatedAt),
+					database.Col(domain.FlowDefinitionFieldID),
+				},
+				Direction: database.OrderDesc,
+			},
+		},
+	}, FlowDefinitionQueryOptions{})
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list flow definitions")
+	}
+	for _, item := range result.Items {
+		if want.Equal(item) {
+			return item, nil
+		}
+	}
+	return nil, nil
+}
+
+func (fd *flowDefinitionService) validate(
+	ctx context.Context,
+	stmts AllStatements,
+	flowDefinition *domain.FlowDefinition,
+	sch *domain.JSONSchema,
+	bundleFlows map[string]bool,
+) error {
 	userSchema, err := sch.Document()
 	if err != nil {
 		return domain.ErrSchemaFetchFailed("failed to unmarshal user schema", err)
@@ -132,15 +215,24 @@ func (fd *flowDefinitionService) validate(ctx context.Context, flowDefinition *d
 		return err
 	}
 
-	return fd.validatePivotingTargets(ctx, pivotingTargets, flowDefinition.ProjectID)
+	return fd.validatePivotingTargets(ctx, stmts, pivotingTargets, flowDefinition.ProjectID, bundleFlows)
 }
 
-func (fd *flowDefinitionService) validatePivotingTargets(ctx context.Context, pivotingTargets []domain.PivotingTarget, projectID string) error {
+func (fd *flowDefinitionService) validatePivotingTargets(
+	ctx context.Context,
+	stmts AllStatements,
+	pivotingTargets []domain.PivotingTarget,
+	projectID string,
+	bundleFlows map[string]bool,
+) error {
 	if len(pivotingTargets) == 0 {
 		return nil
 	}
 	for _, target := range pivotingTargets {
-		defs, err := fd.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
+		if bundleFlows[target.Name] {
+			continue
+		}
+		defs, err := stmts.ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 			Filter: database.And(
 				database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 				database.Equal(database.Col(domain.FlowDefinitionFieldName), target.Name),
@@ -157,6 +249,11 @@ func (fd *flowDefinitionService) validatePivotingTargets(ctx context.Context, pi
 	}
 	return nil
 }
+
+// maxHistoricalRevisions caps how far Build looks for a content match when
+// reusing an older revision. Revisions accumulate forever; the cap covers
+// normal authoring without unbounded scans.
+const maxHistoricalRevisions = 100
 
 func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefinitionPurpose]string, error) {
 	purposes := make(map[domain.FlowDefinitionPurpose]string, len(reqPurposes))

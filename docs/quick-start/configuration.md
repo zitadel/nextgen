@@ -87,6 +87,28 @@ does not cover IAM setup.
 
 Migrations run automatically when the server starts.
 
+## Sessions
+
+| YAML key              | Environment                   | Default          | Description                                                                                      |
+| --------------------- | ----------------------------- | ---------------- | ------------------------------------------------------------------------------------------------ |
+| `session.default_ttl` | `NEXTGEN_SESSION_DEFAULT_TTL` | `24h`            | How long a session lasts after a completed sign-in, when the sign-in does not ask for a lifetime |
+| `session.max_ttl`     | `NEXTGEN_SESSION_MAX_TTL`     | `720h` (30 days) | Longest lifetime a sign-in may ask for. `default_ttl` must not exceed it                         |
+
+Both take Go durations (`90m`, `24h`, `168h`); there is no unit for days.
+
+The lifetime starts when the sign-in completes (`POST /sessions/exchange`). Using the session does not extend it. When
+it runs out, the session cookie stops working, `GET /sessions/me` answers `401`, and the user signs in again. A sign-in
+can ask for another lifetime with the `ttl` field of the exchange, up to `session.max_ttl`; the SDKs do not set it.
+
+An anonymous session, which a client can create before anyone signs in (`POST /sessions`), lasts 10 minutes. This is
+not configurable. When a sign-in completes on that session, it gets the full lifetime above.
+
+```yaml
+session:
+  default_ttl: 168h # a week
+  max_ttl: 720h
+```
+
 ## Logging
 
 | YAML key                      | Environment                           | Default                                       | Description                   |

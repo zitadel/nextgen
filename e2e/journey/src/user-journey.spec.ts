@@ -10,11 +10,11 @@ import {
   loginWithPassword,
   registerWithPasskey,
   registerWithPassword,
-  SESSION_COOKIE_NAME,
   type ProfileEntry,
 } from "@zitadel/testing/playwright";
 
 import {
+  appSessionCookieName,
   expectSignedIn,
   expectsProtectedRouteRedirect,
   gotoLogin,
@@ -147,19 +147,16 @@ async function expectProtectedRouteToRedirect(page: Page): Promise<void> {
 }
 
 async function expectSessionCookie(page: Page): Promise<void> {
+  const name = await appSessionCookieName();
   await expect
     .poll(
       async () =>
         Boolean(
-          (await page.context().cookies()).find(
-            (cookie) => cookie.name === SESSION_COOKIE_NAME && cookie.value,
-          ),
+          (await page.context().cookies()).find((cookie) => cookie.name === name && cookie.value),
         ),
       { timeout: 10_000 },
     )
     .toBe(true);
-  const sessionCookie = (await page.context().cookies()).find(
-    (cookie) => cookie.name === SESSION_COOKIE_NAME,
-  );
+  const sessionCookie = (await page.context().cookies()).find((cookie) => cookie.name === name);
   expect(sessionCookie?.httpOnly).toBe(true);
 }

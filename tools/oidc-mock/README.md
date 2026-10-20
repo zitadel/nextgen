@@ -2,9 +2,9 @@
 
 A test-only OpenID Connect provider for the journey e2e runner. It wraps the
 example server of [zitadel/oidc](https://github.com/zitadel/oidc) with one
-confidential client (basic auth, PKCE S256) and the fixed accounts in
-`users.json` (password `journey-pass`, verified email). It is a nested Go
-module and never a product dependency.
+confidential client (basic auth; it accepts PKCE S256 and a nonce but does not
+require PKCE) and the fixed accounts in `users.json` (password `journey-pass`,
+verified email). It is a nested Go module and never a product dependency.
 
 Environment: `PORT` (required), `REDIRECT_URI` (required, comma separated),
 `USERS_FILE` (required), `CLIENT_ID` (default `journey`), `CLIENT_SECRET`

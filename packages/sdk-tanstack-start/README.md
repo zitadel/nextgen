@@ -1,6 +1,6 @@
 # @zitadel/sdk-tanstack-start
 
-TanStack Start request middleware and helpers for Nextgen Auth.
+TanStack Start request middleware and helpers for Zitadel.
 
 ## Installation
 
@@ -54,7 +54,7 @@ The middleware runs on every request and does three things in one pass:
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and places the
    result on the request context as `nextgenAuth`, which server functions
    receive.
-3. **Redirects** unauthenticated requests to `loginPath` for protected routes.
+3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in.
 
 The proxy/verify/protect decision is also exported as the framework-agnostic
 `handleNextgenRequest(request, options)` if you prefer to wire it into a custom
@@ -150,8 +150,9 @@ const onFlowComplete = (detail: ZitadelFlowCompleteDetail) => console.log(detail
 
 | Option              | Type                 | Default                      | Description                                                          |
 | ------------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------- |
-| `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend                                 |
+| `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend. A trailing slash is ignored.   |
 | `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project secret, sent as the bearer on the handoff exchange only           |
+| `projectId`         | `string`             | `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID` env | The project this app signs its users in to. A session of any other project on the server reads as signed out and keeps its cookie; with no project, no session counts |
 | `proxyPath`         | `string`             | `"/__nextgen"`               | Path prefix proxied to the auth backend                              |
 | `protectedRoutes`   | `string[]`           | `[]`                         | Paths requiring a valid session. Trailing `*` matches sub-paths      |
 | `ignoredRoutes`     | `string[]`           | `[]`                         | Paths skipped entirely — no JWT check. Trailing `*` matches sub-paths |

@@ -148,6 +148,43 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
   });
 
+  // Mirrors the server: a read that names a project refuses a session of any
+  // other project, and serves its own as before.
+  test("GET /sessions/me with project_id refuses a session of another project", async () => {
+    const handoff = await signHandoffToken({ sub: "app-user@example.com", iss: BASE });
+    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me_app`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handoff_token: handoff }),
+    });
+    expect(exchange.status).toBe(200);
+    const cookie = exchange.headers
+      .getSetCookie()
+      .find((c) => c.startsWith("__nextgen_session="))
+      ?.split(";")[0];
+
+    const refused = await fetch(`${BASE}/sessions/me?project_id=proj_me_other`, {
+      headers: { cookie: cookie ?? "" },
+    });
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({ code: "sess.project_mismatch" });
+
+    const served = await fetch(`${BASE}/sessions/me?project_id=proj_me_app`, {
+      headers: { cookie: cookie ?? "" },
+    });
+    expect(served.status).toBe(200);
+    expect(await served.json()).toMatchObject({ project_id: "proj_me_app" });
+
+    // Like the server, a project_id outside the project-id pattern is a bad
+    // request, not a verdict on the session.
+    for (const invalid of ["", "proj%20me"]) {
+      const rejected = await fetch(`${BASE}/sessions/me?project_id=${invalid}`, {
+        headers: { cookie: cookie ?? "" },
+      });
+      expect(rejected.status).toBe(400);
+    }
+  });
+
   test("GET /sessions/me returns body parseable by GetMySessionResponse with a user ref", async () => {
     const handoff = await signHandoffToken({ sub: "me@example.com", iss: BASE });
     const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me`, {
