@@ -556,9 +556,11 @@ type Invoker interface {
 	// HttpOnly cookie is still the credential, and a cross-site page cannot
 	// read this response. It stays the same for the life of the session, so a
 	// client fetches it once per session.
+	// With `project_id`, the token is returned only when the session belongs to
+	// that project.
 	//
 	// GET /sessions/me/csrf
-	GetMySessionCsrfToken(ctx context.Context) (GetMySessionCsrfTokenRes, error)
+	GetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (GetMySessionCsrfTokenRes, error)
 	// GetMyUser invokes getMyUser operation.
 	//
 	// Returns the user signed in to the session that authenticates the request.
@@ -923,9 +925,11 @@ type Invoker interface {
 	// exchange) is required. Idempotent: if the session is already gone this still
 	// returns 204. Any tokens derived from the session are invalidated, and the
 	// cookie itself is cleared in the response.
+	// With `project_id`, only a session of that project is deleted. A session of
+	// another project is left alone, and so is its cookie.
 	//
 	// DELETE /sessions/me
-	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
+	RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error)
 	// RevokeRelease invokes revokeRelease operation.
 	//
 	// Marks the release revoked, so that its content is never served again.
@@ -6728,14 +6732,16 @@ func (c *Client) sendGetMySession(ctx context.Context, params GetMySessionParams
 // HttpOnly cookie is still the credential, and a cross-site page cannot
 // read this response. It stays the same for the life of the session, so a
 // client fetches it once per session.
+// With `project_id`, the token is returned only when the session belongs to
+// that project.
 //
 // GET /sessions/me/csrf
-func (c *Client) GetMySessionCsrfToken(ctx context.Context) (GetMySessionCsrfTokenRes, error) {
-	res, err := c.sendGetMySessionCsrfToken(ctx)
+func (c *Client) GetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (GetMySessionCsrfTokenRes, error) {
+	res, err := c.sendGetMySessionCsrfToken(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetMySessionCsrfToken(ctx context.Context) (res GetMySessionCsrfTokenRes, err error) {
+func (c *Client) sendGetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (res GetMySessionCsrfTokenRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMySessionCsrfToken"),
 		semconv.HTTPRequestMethodKey.String("GET"),
@@ -6775,6 +6781,30 @@ func (c *Client) sendGetMySessionCsrfToken(ctx context.Context) (res GetMySessio
 	var pathParts [1]string
 	pathParts[0] = "/sessions/me/csrf"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
@@ -12987,14 +13017,16 @@ func (c *Client) sendRemovePreview(ctx context.Context, request *RemovePreviewRe
 // exchange) is required. Idempotent: if the session is already gone this still
 // returns 204. Any tokens derived from the session are invalidated, and the
 // cookie itself is cleared in the response.
+// With `project_id`, only a session of that project is deleted. A session of
+// another project is left alone, and so is its cookie.
 //
 // DELETE /sessions/me
-func (c *Client) RevokeMySession(ctx context.Context) (RevokeMySessionRes, error) {
-	res, err := c.sendRevokeMySession(ctx)
+func (c *Client) RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error) {
+	res, err := c.sendRevokeMySession(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendRevokeMySession(ctx context.Context) (res RevokeMySessionRes, err error) {
+func (c *Client) sendRevokeMySession(ctx context.Context, params RevokeMySessionParams) (res RevokeMySessionRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("revokeMySession"),
 		semconv.HTTPRequestMethodKey.String("DELETE"),
@@ -13034,6 +13066,30 @@ func (c *Client) sendRevokeMySession(ctx context.Context) (res RevokeMySessionRe
 	var pathParts [1]string
 	pathParts[0] = "/sessions/me"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "DELETE", u)

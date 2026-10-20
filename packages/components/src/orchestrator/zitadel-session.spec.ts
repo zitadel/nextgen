@@ -39,6 +39,7 @@ let currentEmail = "alice@acme.com";
 let currentUserId = "user_test";
 let currentProjectId = "test";
 let sessionStatus = 200;
+let revokeStatus = 204;
 const getLog: string[] = [];
 
 const getHandler = http.get(`${API_BASE}/sessions/me`, ({ request }) => {
@@ -61,6 +62,18 @@ const deleteHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
     method: request.method,
     credentials: request.credentials,
   });
+  if (revokeStatus === 401) {
+    return HttpResponse.json(
+      { code: "auth.unauthorized", message: "Missing or invalid session token." },
+      { status: 401 },
+    );
+  }
+  if (revokeStatus === 403) {
+    return HttpResponse.json(
+      { code: "sess.project_mismatch", message: "The session belongs to a different project." },
+      { status: 403 },
+    );
+  }
   return new HttpResponse(null, { status: 204 });
 });
 
@@ -78,6 +91,7 @@ afterEach(() => {
   currentUserId = "user_test";
   currentProjectId = "test";
   sessionStatus = 200;
+  revokeStatus = 204;
   server.resetHandlers(getHandler, deleteHandler);
 });
 
@@ -215,7 +229,7 @@ describe("<zitadel-session>", () => {
     ).toBeNull();
   });
 
-  it("calls DELETE /sessions/me with credentials and fires zitadel-signout on Sign out", async () => {
+  it("calls DELETE /sessions/me in its own project with credentials and fires zitadel-signout on Sign out", async () => {
     const element = mount();
     await flush(element);
 
@@ -228,19 +242,47 @@ describe("<zitadel-session>", () => {
 
     expect(deleteLog).toHaveLength(1);
     expect(deleteLog[0]?.method).toBe("DELETE");
-    expect(deleteLog[0]?.url).toBe(`${API_BASE}/sessions/me`);
+    expect(deleteLog[0]?.url).toBe(`${API_BASE}/sessions/me?project_id=test`);
     expect(deleteLog[0]?.credentials).toBe("include");
     expect(events).toHaveLength(1);
     expect(events[0]?.detail).toEqual({ display: "", identifier: "alice@acme.com" });
   });
 
   // On a shared host the cookie may hold another project's session (the
-  // Console's, on localhost). Signing out of this app must not end it.
+  // Console's, on localhost), whether the identity read found it or the cookie
+  // changed since (the Console signed in, in another tab). Signing out of this
+  // app sends the revoke in its own project, which the server refuses: that
+  // session stays, and sign-out completes.
   it.each([
-    ["the server refuses it", () => (sessionStatus = 403)],
-    ["an older server answers for it", () => (currentProjectId = "other")],
+    ["the identity read found it", () => (sessionStatus = 403)],
+    ["the cookie changed after the identity read", () => undefined],
   ])("leaves another project's session alone on Sign out when %s", async (_label, arrange) => {
     arrange();
+    revokeStatus = 403;
+    const loc = stubLocation();
+    const element = mount();
+    element.postSignOutUrl = "https://app.test/login";
+    await flush(element);
+
+    const events: CustomEvent[] = [];
+    element.addEventListener("zitadel-signout", (e) => events.push(e as CustomEvent));
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    await element.updateComplete;
+
+    expect(deleteLog).toHaveLength(1);
+    expect(new URL(deleteLog[0]?.url ?? "").searchParams.get("project_id")).toBe("test");
+    expect(events).toHaveLength(1);
+    expect(element.shadowRoot?.querySelector(".error")).toBeNull();
+    expect(loc.current).toBe("https://app.test/login");
+  });
+
+  // The reverse: the page loaded while the cookie held another project's
+  // session, and the app was signed in since (in another tab). Sign out ends
+  // the app's session.
+  it("signs out of this app's session when the cookie held another project's at load", async () => {
+    sessionStatus = 403;
     const element = mount();
     await flush(element);
 
@@ -251,8 +293,31 @@ describe("<zitadel-session>", () => {
     await new Promise((resolve) => setTimeout(resolve, 16));
     await element.updateComplete;
 
-    expect(deleteLog).toHaveLength(0);
+    expect(deleteLog).toHaveLength(1);
+    expect(new URL(deleteLog[0]?.url ?? "").searchParams.get("project_id")).toBe("test");
     expect(events).toHaveLength(1);
+  });
+
+  // A session that ended elsewhere (signed out in another tab, or expired) is
+  // refused as no session at all: there is nothing left to sign out of.
+  it("completes Sign out when the session is already gone", async () => {
+    revokeStatus = 401;
+    const loc = stubLocation();
+    const element = mount();
+    element.postSignOutUrl = "https://app.test/login";
+    await flush(element);
+
+    const events: CustomEvent[] = [];
+    element.addEventListener("zitadel-signout", (e) => events.push(e as CustomEvent));
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    await element.updateComplete;
+
+    expect(deleteLog).toHaveLength(1);
+    expect(events).toHaveLength(1);
+    expect(element.shadowRoot?.querySelector(".error")).toBeNull();
+    expect(loc.current).toBe("https://app.test/login");
   });
 
   it("navigates to post-sign-out-url after a successful revoke", async () => {
@@ -279,7 +344,7 @@ describe("<zitadel-session>", () => {
       await new Promise((resolve) => setTimeout(resolve, 32));
 
       expect(deleteLog).toHaveLength(1);
-      expect(deleteLog[0]?.url).toBe(`${API_BASE}/sessions/me`);
+      expect(deleteLog[0]?.url).toBe(`${API_BASE}/sessions/me?project_id=test`);
       expect(deleteLog[0]?.credentials).toBe("include");
     } finally {
       configureZitadel({ proxyPath: API_BASE, projectId: "test" });

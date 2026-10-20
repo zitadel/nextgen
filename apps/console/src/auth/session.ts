@@ -116,6 +116,16 @@ async function readSession(): Promise<ConsoleSession | null> {
 }
 
 /**
+ * The `project_id` the token read and sign-out hold the cookie's session to:
+ * the console's, once the runtime document names it. The server refuses an
+ * app's session there too (`403 sess.project_mismatch`).
+ */
+function consoleProject(): { project_id: string } | undefined {
+  const projectId = getConsoleProjectId();
+  return projectId ? { project_id: projectId } : undefined;
+}
+
+/**
  * Reads the current session (`GET /sessions/me`).
  *
  * Returns `null` when there is no usable session — missing/expired cookie
@@ -162,9 +172,9 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
   return session;
 }
 
-/** Reads the token; `undefined` when the read fails. */
+/** Reads the token; `undefined` when the read fails, for an app's session too. */
 function readCsrfToken(): Promise<string | undefined> {
-  return api.getMySessionCsrfToken(withCredentials).then(
+  return api.getMySessionCsrfToken(consoleProject(), withCredentials).then(
     (body) => body.csrf_token,
     () => undefined,
   );
@@ -231,15 +241,17 @@ setApiCsrfRejectionHandler(() => {
  * Revokes the current session (`DELETE /sessions/me`). The server deletes the
  * session and clears the cookie via `Set-Cookie: Max-Age=0`. Errors are
  * swallowed: an already-invalid session is an acceptable sign-out outcome,
- * and the caller navigates to the login screen either way.
+ * and the caller navigates to the login screen either way. The revoke names the
+ * console's project, so it never ends an app's session the cookie holds.
  */
 export async function signOut(): Promise<void> {
   invalidateSessionCache();
   try {
-    await api.revokeMySession(withCredentials);
+    await api.revokeMySession(consoleProject(), withCredentials);
   } catch {
-    // Already signed out (401) or unreachable — the redirect to /login is
-    // the user-visible outcome either way.
+    // Already signed out (401), an app's session (403 sess.project_mismatch)
+    // or unreachable — the redirect to /login is the user-visible outcome
+    // either way.
   }
 }
 

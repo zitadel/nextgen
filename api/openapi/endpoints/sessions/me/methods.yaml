@@ -13,25 +13,7 @@ get:
   tags:
     - Sessions
   parameters:
-    # Declared here rather than shared: the shared `project_id` parameter is
-    # required and names the project to act on. Here it is optional and states
-    # which project the caller expects the cookie's session to belong to.
-    - name: project_id
-      in: query
-      description: |
-        The project the caller signs its users in to. The session is returned only
-        when it belongs to this project, and answers `403` with
-        `sess.project_mismatch` otherwise.
-
-        A session belongs to one project, while a browser sends its cookie to every
-        app on the same host. An app that reads the session to decide who is signed
-        in passes its own project, so that a session of another project never reads
-        as one of its users. The SDKs do this for you.
-
-        `sess.project_mismatch` does not mean the session is invalid: it is live in
-        its own project, so keep its cookie.
-      schema:
-        $ref: ../../../components/schemas/project-id.yaml
+    - $ref: ../../../components/parameters/session-project-id.yaml
   security:
     - nextgenSession: []
   responses:
@@ -84,8 +66,13 @@ delete:
     exchange) is required. Idempotent: if the session is already gone this still
     returns 204. Any tokens derived from the session are invalidated, and the
     cookie itself is cleared in the response.
+
+    With `project_id`, only a session of that project is deleted. A session of
+    another project is left alone, and so is its cookie.
   tags:
     - Sessions
+  parameters:
+    - $ref: ../../../components/parameters/session-project-id.yaml
   security:
     - nextgenSession: []
   responses:
@@ -100,6 +87,17 @@ delete:
         application/json:
           schema:
             $ref: ../../../components/schemas/errors/auth-unauthorized.yaml
+    '403':
+      description: |
+        `sess.project_mismatch`: the session belongs to a different project than
+        `project_id`. It is not deleted, and its cookie is not cleared.
+
+        `auth.csrf_invalid`: the request came from another site (see the
+        `nextgenSession` scheme). It is refused before the session is looked at.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
 
     default:
       $ref: revokeMySession-error-response.yaml

@@ -248,7 +248,7 @@ describe("<zitadel-logout>", () => {
 
     expect(requestLog).toHaveLength(1);
     expect(requestLog[0]?.method).toBe("DELETE");
-    expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me`);
+    expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me?project_id=test`);
     expect(requestLog[0]?.credentials).toBe("include");
     expect(signoutEvents).toHaveLength(1);
     expect(signoutEvents[0]?.detail).toEqual({
@@ -293,11 +293,45 @@ describe("<zitadel-logout>", () => {
       await new Promise((resolve) => setTimeout(resolve, 32));
 
       expect(requestLog).toHaveLength(1);
-      expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me`);
+      expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me?project_id=test`);
       expect(requestLog[0]?.credentials).toBe("include");
     } finally {
       configureZitadel({ proxyPath: API_BASE, projectId: "test" });
     }
+  });
+
+  // A session that ended elsewhere (signed out in another tab, or expired) is
+  // refused as no session at all: there is nothing left to sign out of.
+  it("completes sign-out when the session is already gone", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, href: "" },
+      writable: true,
+    });
+    const element = mount();
+    element.postSignOutUrl = "https://app.test/done";
+    await flush(element);
+    server.use(
+      http.delete(`${API_BASE}/sessions/me`, () =>
+        HttpResponse.json(
+          { code: "auth.unauthorized", message: "Missing or invalid session token." },
+          { status: 401 },
+        ),
+      ),
+    );
+
+    const signoutEvents: Event[] = [];
+    element.addEventListener("zitadel-signout", (event: Event) => signoutEvents.push(event));
+
+    shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+    await element.updateComplete;
+    shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    await element.updateComplete;
+
+    expect(signoutEvents).toHaveLength(1);
+    expect(element.shadowRoot?.querySelector(".error-bar")).toBeNull();
+    expect(window.location.href).toBe("https://app.test/done");
   });
 
   it("surfaces a network error in the dropdown without redirecting", async () => {

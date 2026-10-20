@@ -12,6 +12,7 @@ import {
   invalidateSessionCache,
   sanitizeNextPath,
   sessionPage,
+  signOut,
 } from "./session";
 import { _resetRuntimeForTesting, _setRuntimeForTesting } from "@/runtime/runtime";
 import { makeTestSession } from "@/test/session.fixture";
@@ -256,6 +257,39 @@ describe("fetchSession, held to the console's project", () => {
 
     expect(await fetchSession()).toBeNull();
     expect(calls()).toBe(0);
+  });
+
+  it("names the console's project in the token read", async () => {
+    stubSessionBody({ project_id: "proj_platform" });
+    const urls: string[] = [];
+    server.use(
+      http.get("*/sessions/me/csrf", ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json({ csrf_token: "tok" });
+      }),
+    );
+
+    await fetchSession();
+    expect(new URL(urls[0] ?? "").searchParams.get("project_id")).toBe("proj_platform");
+    expect(getApiCsrfToken()).toBe("tok");
+  });
+
+  // The server refuses to revoke an app's session the cookie holds, so signing
+  // out of the console never signs anyone out of the app.
+  it("names the console's project in the sign-out, and takes its refusal as signed out", async () => {
+    const urls: string[] = [];
+    server.use(
+      http.delete("*/sessions/me", ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json(
+          { code: "sess.project_mismatch", message: "different project" },
+          { status: 403 },
+        );
+      }),
+    );
+
+    await expect(signOut()).resolves.toBeUndefined();
+    expect(new URL(urls[0] ?? "").searchParams.get("project_id")).toBe("proj_platform");
   });
 });
 
