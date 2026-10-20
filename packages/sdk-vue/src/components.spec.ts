@@ -314,7 +314,8 @@ describe("hydrating a server-rendered login", () => {
     expect(first.url).toContain("flow_123");
     expect(host.querySelector(widgetTags.login)).toBe(rendered);
     await firstStep;
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await rendered?.updateComplete;
+    await Promise.all(fetched.mock.results.map((result) => result.value));
     expect(fetched).toHaveBeenCalledTimes(1);
     host.remove();
   });
