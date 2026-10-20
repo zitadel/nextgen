@@ -1,0 +1,4 @@
+type: string
+enum:
+  - oidc
+description: The protocol used by the identity provider. OIDC is the only protocol.

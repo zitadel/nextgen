@@ -1,0 +1,49 @@
+get:
+  operationId: getVariable
+  x-zitadel-cli: variables get
+  summary: Get a variable
+  description: |
+    Reads one variable by name, with its value per kind. A name with no
+    value for the requested kind answers `var.not_found`. A secret reads
+    back as `{"secret": true}`.
+  tags:
+    - Variables
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/variable-name.yaml
+    - $ref: ../../../components/parameters/variable-kind.yaml
+  security:
+    - oauth2:
+        - variable.read
+  responses:
+    '200':
+      description: The variable was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../variable-by-kind.yaml
+    default:
+      $ref: getVariable-error-response.yaml
+
+delete:
+  operationId: deleteVariable
+  x-zitadel-cli: variables delete
+  summary: Delete a variable
+  description: |
+    Removes a variable for the requested kind, or for both kinds without
+    `kind`. A name with no value for that kind answers `var.not_found`.
+    Existing deployments keep the values they froze.
+  tags:
+    - Variables
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/variable-name.yaml
+    - $ref: ../../../components/parameters/variable-kind.yaml
+  security:
+    - oauth2:
+        - variable.write
+  responses:
+    '204':
+      description: The variable was deleted.
+    default:
+      $ref: deleteVariable-error-response.yaml

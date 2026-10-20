@@ -20,24 +20,80 @@ jobs:
     timeout-minutes: 120
     permissions:
       contents: read
-      # Uncomment together with the Spanner test-instance steps below to mint the
-      # OIDC token for Workload Identity Federation (trusted runs only).
-      # id-token: write
     env:
       # Moon marks failed tasks by color alone, so a failed `moon ci` can end at
       # "Tasks: 1 failed" with no named target. The summary names them in plain
       # text and replays each failed task's own output. Green runs pay only a
       # pass/fail list; the replay section is empty when nothing failed.
       MOON_SUMMARY: detailed
+      # Suppress CLI telemetry for every step in CI. DO_NOT_TRACK is the
+      # cross-tool standard (https://consoledonottrack.com) the CLI honors, so
+      # no build runs here ever ship events to the telemetry backend.
+      DO_NOT_TRACK: "1"
+      # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
+      # warns on every process that also sees NO_COLOR. Blank it so only the
+      # test output is left in the log.
+      NO_COLOR: ""
     steps:
+      # Depot runs some jobs on plain EC2 instances, whose root disk is an EBS
+      # volume that writes about 250 MB/s. Linux writes dirty pages back only
+      # once they are 30 s old or 10 % of the memory (6-12 GB there), so that
+      # disk idles while the job unpacks its caches, and the backlog grows to
+      # several GB. A sync waits for all of it, and Docker syncs the root
+      # filesystem on every container create (it unmounts the container's
+      # init layer, an overlay): the postgres lane's first testcontainer
+      # waited 22-29 s there, 2-4 s on Depot's microVMs. With writeback from
+      # 64 MB on, it waited 8-22 s. The cost: writers get throttled from
+      # about 10 % of the memory dirty instead of 15 %.
+      - name: Write dirty pages back early
+        run: sudo sysctl -w vm.dirty_background_bytes=67108864
+
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
+      # The queue squashes a version PR onto the PRs queued ahead of it, and
+      # while it waits GitHub refuses release-publish's refresh of
+      # changeset-release/main. A changeset one of those PRs adds would land
+      # unrecorded in .changeset/pre.json, and release-publish's preflight
+      # would then refuse to publish the version. Running that preflight here
+      # drops the stale version PR from the queue instead; release-publish
+      # refreshes it once the PRs ahead land. Any other merge group skips.
+      - name: Check a queued version PR is current
+        if: ${{ github.event_name == 'merge_group' }}
+        env:
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+        run: node scripts/release-automation.mjs publish --base "$BASE_SHA"
+
+      # The postgres lane (server:test-postgres) starts its databases through
+      # testcontainers, and every package of the lane waits while the first
+      # one pulls the image: 6-8 s on Depot's microVMs, 11-12 s on its EC2
+      # runners. Pull it now, in the background while the job installs, so
+      # the lane finds it there. The image name comes from the testdb package,
+      # so the two cannot drift; the output goes to a file, so the step
+      # returns at once.
+      - name: Pull the postgres lane's image
+        run: |
+          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' internal/storage/testdb/postgres.go)"
+          if [ -z "$image" ]; then
+            echo "::warning::internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
+            exit 0
+          fi
+          nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
+
+      # Keyed on both modules' go.sum (tools/bench is a module of its own)
+      # instead of setup-go's default, go.mod. ci-turbo.yml shared the go.mod
+      # key until it got a cache of its own, and its entry there for Go 1.26.8
+      # holds Go's own cache files. On Depot this job builds through GOCACHEPROG
+      # (`depot gocache`, which keeps depot-* files in GOCACHE), so it cannot
+      # use them.
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: |
+            go.sum
+            tools/bench/go.sum
 
       - uses: pnpm/action-setup@v5
         with:
@@ -65,12 +121,13 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: node scripts/check-pr-title.mjs --title "$PR_TITLE" --base "$BASE_SHA" --summary
 
-      # Emits `mode`, per-lane affected gates (go_tests, snapshot,
+      # Emits `mode`, per-lane affected gates (go_tests, e2e, snapshot,
       # journey_fresh_app, journey_passkey, journey_preexisting,
       # journey_testkit, suites_*, browsers), and the journey_matrix scope,
-      # computed from moon's affected task selection. Gates fail open — unclaimed files, empty
-      # diffs, and query failures all force a full run. Logic + tests:
-      # scripts/ci-mode.mjs.
+      # computed from moon's affected task selection. This workflow reads
+      # go_tests, e2e, snapshot and journey_matrix. Gates fail open — unclaimed
+      # files, empty diffs, and query failures all force a full run. Logic +
+      # tests: scripts/ci-mode.mjs.
       - name: Detect CI mode
         id: ci-mode
         run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
@@ -83,171 +140,176 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
         run: moon run server:check-generate-pruned
 
+      # Chromium for the e2e lanes (`e2e:all`, in the e2e step below). moon's
+      # component/storybook browser lanes install their own through an
+      # `install-browsers` dep; this covers the Playwright e2e specs.
       - name: Cache Playwright browsers
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
-        uses: actions/cache@v4
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Playwright Chromium
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
-        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: corepack pnpm --filter @zitadel/e2e exec playwright install chromium
 
+      - name: Keep Docker's interface churn away from Chromium
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        # Chromium aborts every in-flight request when the host gains or loses
+        # an IP address (ERR_NETWORK_CHANGED), failing whichever browser-mode
+        # suite is loading a module at that moment. The containers the Go
+        # integration suites start add addresses in two ways: with IPv6 on, the
+        # kernel gives each container's host veth interface a link-local
+        # address, and the job's first container brings up the docker0 bridge,
+        # which then gets one too. Disable IPv6 on interfaces created from here
+        # on and on docker0, which already exists; loopback and the runner's
+        # NIC keep it. (#1490)
+        run: |
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+          if [ -d /proc/sys/net/ipv6/conf/docker0 ]; then
+            sudo sysctl -w net.ipv6.conf.docker0.disable_ipv6=1
+          fi
+
+      # Builds, lint, typecheck and unit tests. `:test` is unit tests here as in
+      # a local `pnpm run check`; the e2e suite runs in its own step below.
       - name: Run Moon build and test graph
         id: moon-ci
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon ci :lint :typecheck :build :test :test-browser :check-adrs
+        # moon ci only selects tasks whose own inputs changed. --downstream deep
+        # with --include-relations also runs the tasks of every project that
+        # depends on a changed one, so an api change re-tests its consumers.
+        run: moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations
 
-      - name: Report Moon CI failures
-        if: ${{ failure() && steps.moon-ci.conclusion == 'failure' }}
-        run: node scripts/report-moon-failures.mjs
-
-      - name: Run Go tests
+      # The graph step above runs the Go database lanes whenever moon finds
+      # them affected, as dependents of the console and login UI builds their
+      # binary embeds. When ci-mode forces a full run for files neither lane
+      # lists as input (a workflow-only edit, say), go_tests is on but moon
+      # finds the lanes unaffected, so the two steps below are their only run.
+      # This step reads the graph's report, so those steps run only the lanes
+      # it did not.
+      - name: Find the Go database lanes the graph ran
+        id: graph-lanes
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
-        run: moon run server:test
+        run: node scripts/ci-mode.mjs --ran-in-graph postgres=server:test-postgres sqlite=server:test-sqlite
 
       - name: Run Go integration tests (postgres)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.graph-lanes.outputs.postgres != 'true' }}
         run: moon run server:test-postgres
 
-      # The emulator is the canary: its one-transaction-at-a-time limit forces the
-      # aborts that prove the retry path still works. Do not move these off it.
-      - name: Run Go integration tests (spanner emulator)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
-        run: moon run server:test-spanner
-
-      # ---------------------------------------------------------------------
-      # Spanner test instance — kept, deliberately not wired (#788, removal #793).
-      #
-      # The flake this was built for turned out to be an application bug, not an
-      # emulator limitation, so CI runs the emulator only: it is what forces the
-      # aborts that keep the abort-retry path honest. Re-enable ONLY if the
-      # emulator is shown to be inadequate, never to make a failing test pass.
-      #
-      # To re-wire: uncomment `id-token: write` in permissions above, uncomment
-      # the two steps below, add the `if` guard back to the emulator step so the
-      # two do not both run:
-      #   if: ${{ … && steps.spanner-auth.outcome != 'success' }}
-      # and set the `SPANNER_TEST_INSTANCE` variable plus the
-      # `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_SERVICE_ACCOUNT` secrets.
-      # The Go side (internal/storage/testdb) already supports this and needs
-      # no change.
-      #
-      # Auth when SPANNER_TEST_INSTANCE is set (trusted runs). Vars are safe in
-      # if:; secrets stay only in with:. Unset var / forks → emulator step.
-      # Auth hard-fails if the var is set but WIF is broken (no silent fallback).
-      #
-      # - name: Authenticate to Google Cloud (Spanner test instance)
-      #   id: spanner-auth
-      #   if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && vars.SPANNER_TEST_INSTANCE != '' }}
-      #   uses: google-github-actions/auth@v2
-      #   with:
-      #     workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      #     service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      #
-      # - name: Run Go integration tests (spanner test instance)
-      #   if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.spanner-auth.outcome == 'success' }}
-      #   env:
-      #     ZITADEL_TEST_SPANNER_INSTANCE: ${{ vars.SPANNER_TEST_INSTANCE }}
-      #   run: moon run server:test-spanner
-      # ---------------------------------------------------------------------
+      # The Spanner emulator lane is not part of this job: it runs in
+      # spanner.yml (nightly and on demand) and is not a required check.
 
       - name: Run Go integration tests (sqlite)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.graph-lanes.outputs.sqlite != 'true' }}
         run: moon run server:test-sqlite
 
-      # The snapshot exists here to feed the journeys, so it runs iff any
-      # journey does (the tarball handoff is a filesystem contract moon
-      # cannot see).
-      - name: Build release snapshot without container
+      # Build the journey's release tarballs outside any moon graph, then hand
+      # them to the journey via JOURNEY_TARBALLS_DIR. The journey must not pack
+      # inside the e2e step below: that would spawn a second, concurrent moon
+      # graph (forbidden — see packages/testing/AGENTS.md) and race the
+      # dist-rewriting build tasks. `release:*` are runInCI:false, so unset CI
+      # to run them.
+      - name: Build release snapshot for the journey
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
+        run: |
+          env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
+          version="$(node -p "require('./apps/server/package.json').version")"
+          echo "JOURNEY_TARBALLS_DIR=$PWD/dist/release/${version}/npm" >> "$GITHUB_ENV"
 
-      # journey_matrix=single collapses the framework matrix to Next when no
-      # SDK, CLI, or journey surface moved — the flow widget is
-      # framework-independent, so a server-only change proves as much on one
-      # framework as on the full matrix (apps/cli-journey-e2e/scripts/frameworks.mjs).
-      - name: Run binary fresh-app journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.journey_fresh_app == 'true' }}
+      # Verdaccio proxies every public framework package the journey scaffolds
+      # pull from npmjs; persisting its storage turns a dozen cold npm installs
+      # into warm ones. restore-keys pulls the newest saved store (on Depot
+      # runners from any branch: Depot's cache has no branch scopes); the key is
+      # per attempt, so a re-run starts from the newest store too, not from its
+      # first attempt's. The journey always republishes the @zitadel packages
+      # fresh (local-registry.mjs), so a stale store is still valid. The steps
+      # after the e2e suites save it again only when the journey fetched new
+      # tarballs into it.
+      - name: Restore journey registry packages
+        id: journey-registry
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ runner.temp }}/journey-verdaccio-storage
+          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            journey-verdaccio-${{ runner.os }}-
+
+      - name: List restored journey registry packages
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        run: >-
+          node e2e/journey/scripts/registry-cache.mjs list
+          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
+
+      # The e2e suite, after the graph rather than inside it: run alongside the
+      # unit suites, its browsers and dev servers slowed both sides into
+      # timeouts (run 38496066612). `e2e:all` depends on every lane (console
+      # smoke/real/embedded/platform, demo mock/real, the CLI journey matrix,
+      # the kit's real-instance suite), and moon runs them side by side: only
+      # the two demo-next lanes share a mutex (e2e/moon.yml).
+      # The lanes are `runInCI: "skip"`, which keeps them out of the graph step
+      # above; `--ignore-ci-checks` runs them here. ci-mode's `e2e` gate says
+      # when: moon finds e2e:all affected, or the run is forced full (a
+      # workflow, root-script or moon.yml edit, which no lane lists as input).
+      # The journey reads the prebuilt JOURNEY_TARBALLS_DIR from the snapshot
+      # step.
+      - name: Run e2e suites
+        id: moon-e2e
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.e2e == 'true' }}
+        # Streamed rather than buffered: buffered, a task's output reached the
+        # log only when the task ended, every line under one timestamp (run
+        # 38585094551). Each line still names its task, and MOON_SUMMARY still
+        # replays the failed tasks' output after the run.
+        run: moon exec e2e:all --ignore-ci-checks --on-failure continue --output-style stream
         env:
+          # The journey's options, as ci-turbo.yml passes them: the work dir the
+          # diagnostics upload below reads, ci-mode's framework scope (`single`
+          # unless an SDK, the CLI, the test kit or the journey's own files
+          # moved), and the Verdaccio storage the restore step above fills.
+          JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
           JOURNEY_MATRIX: ${{ steps.ci-mode.outputs.journey_matrix }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          matrix_args=()
-          if [ "$JOURNEY_MATRIX" = "single" ]; then
-            matrix_args=(--framework next)
-          fi
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
-            --runtime binary \
-            --concurrency 5 \
-            "${matrix_args[@]}" \
-            --work-dir "${RUNNER_TEMP}/ci-journey" \
-            --tarballs-dir "dist/release/${version}/npm"
+          JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
 
-      # One framework is enough here: the preset decides the scaffolded
-      # flow shape, not the SDK — the matrix above already covers SDKs.
-      - name: Run passkey-first preset journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.journey_passkey == 'true' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
-            --runtime binary \
-            --framework next \
-            --preset passkey-first \
-            --work-dir "${RUNNER_TEMP}/ci-journey-passkey-first" \
-            --tarballs-dir "dist/release/${version}/npm"
+      # Saves the store only when the journey changed what a later run gets from
+      # it: new npmjs tarballs, or packuments it refreshed when local-registry.mjs
+      # keeps them for longer than Verdaccio's 2-minute default
+      # (registry-cache.mjs says why). An unchanged store would upload the same
+      # ~700 MB again, about 8 s of every run. Only after green e2e suites, as
+      # the cache action's post step did.
+      - name: Look for journey registry changes
+        id: journey-registry-changes
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        run: >-
+          node e2e/journey/scripts/registry-cache.mjs compare
+          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
 
-      # The ADR 044 widget posture end to end: seed minimal pre-existing Next
-      # and Nuxt apps, run setup against them, and drive the auth loop through
-      # the emitted variant="widget" pages inside the host apps' own shells.
-      # Fresh scaffolds keep covering the page posture in the matrix above.
-      - name: Run pre-existing-app journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.journey_preexisting == 'true' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
-            --runtime binary \
-            --preexisting-app \
-            --work-dir "${RUNNER_TEMP}/ci-journey-preexisting" \
-            --tarballs-dir "dist/release/${version}/npm"
+      - name: Save journey registry packages
+        if: ${{ steps.journey-registry-changes.outputs.save == 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/journey-verdaccio-storage
+          key: ${{ steps.journey-registry.outputs.cache-primary-key }}
 
-      # Customer-configuration proof for @zitadel/testing: a fresh app
-      # installs the kit from the journey registry and runs its withZitadel()
-      # suite against the published binary — embedded UIs, no repo env
-      # overrides (unlike the in-repo e2e-real lanes below).
-      - name: Run test-kit consumer journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.journey_testkit == 'true' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-testkit -- \
-            --work-dir "${RUNNER_TEMP}/ci-journey-testkit" \
-            --tarballs-dir "dist/release/${version}/npm"
-
-      # Gates the test-kit's central promise: boot a real seeded instance,
-      # then drive the real browser login with per-test users. Reuses the Go
-      # build cache and Playwright Chromium installed above.
-      - name: Run @zitadel/testing real-instance suites
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_testing_demo == 'true' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run testing:test-integration demo-next-e2e:e2e-real
-
-      # Dogfoods @zitadel/testing through a second consumer. Keep this separate
-      # from the demo suite so two local-server instances do not contend.
-      - name: Run console real-instance suite
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-real
-
-      # The embedded-surface suite: the binary serves console, hosted login,
-      # and the API from one origin — the only lane exercising the production
-      # request path (no Vite proxy rewriting /api). Its own step so the two
-      # console instances run sequentially, same rationale as above.
-      - name: Run console embedded-surface suite
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-embedded
+      # Reads moon's newest run report, so it names the failures of whichever
+      # moon step failed.
+      - name: Report Moon CI failures
+        if: ${{ failure() && (steps.moon-ci.conclusion == 'failure' || steps.moon-e2e.conclusion == 'failure') }}
+        run: node scripts/report-moon-failures.mjs
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: env -u CI -u GITHUB_ACTIONS moon run release:version
+
+      # npm trusted publishing cannot create a package, so release publish
+      # stops a version that includes a public package npm has never seen, or
+      # one with only prereleases of the pre tag (scripts/release-dist-tags.mjs).
+      # It used to find out only after the version commit was on main (run
+      # 39324183811). Asking npm here fails the version PR and its merge group
+      # instead, with the one-time commands that fix it.
+      - name: Check npm can publish the version PR's packages
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: node scripts/release.mjs check-npm
 
       - name: Pack version PR artifacts
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
@@ -257,38 +319,27 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
-          node apps/cli-journey-e2e/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
-
-      - name: Upload release snapshot
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-snapshot
-          path: dist/release
-          if-no-files-found: ignore
-          retention-days: 7
+          node e2e/journey/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
 
       - name: Upload journey diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: journey-diagnostics
-          path: |
-            ${{ runner.temp }}/ci-journey/diagnostics
-            ${{ runner.temp }}/ci-journey-passkey-first/diagnostics
-            ${{ runner.temp }}/ci-journey-preexisting/diagnostics
-            ${{ runner.temp }}/ci-journey-testkit/diagnostics
+          path: ${{ runner.temp }}/ci-journey/diagnostics
           if-no-files-found: ignore
           retention-days: 7
 
-      # The handshake is deliberately excluded: it carries the project secret.
-      - name: Upload console e2e diagnostics
+      # Every lane's results, each in its config folder's test-results/ and
+      # playwright-report/. The handshake is deliberately excluded: it carries
+      # the project secret and sits beside them in .zitadel-testing/.
+      - name: Upload e2e diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: console-e2e-diagnostics
+          name: e2e-diagnostics
           path: |
-            apps/console-e2e/test-results
-            apps/console-e2e/playwright-report
+            e2e/*/test-results
+            e2e/*/playwright-report
           if-no-files-found: ignore
           retention-days: 7

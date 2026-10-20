@@ -14,8 +14,8 @@ import {
  * Console runtime discovery (Console ADR 0004 §3): the document is fetched
  * once, an unreachable or erroring endpoint is reported as a failure rather
  * than guessed to be `standalone`, `VITE_CONSOLE_RUNTIME_FALLBACK` is the
- * backend-less opt-in back to that fallback, and the dev env override wins
- * over the discovered project id.
+ * backend-less opt-in back to that fallback, and the discovered project id is
+ * the only source of the project the console signs into.
  */
 const fetchMock = vi.fn();
 
@@ -23,15 +23,10 @@ beforeEach(() => {
   _resetRuntimeForTesting();
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
-  // Re-applied per test: `unstubAllEnvs` below drops `test-setup.ts`'s
-  // hermetic defaults along with each test's own stubs.
-  vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
-  vi.stubEnv("VITE_CONSOLE_RUNTIME_FALLBACK", "");
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -175,7 +170,9 @@ describe("retryRuntime", () => {
     fetchMock.mockRejectedValueOnce(new TypeError("network down"));
     expect(await initRuntime()).toMatchObject({ ok: false });
 
-    fetchMock.mockResolvedValue(jsonResponse({ mode: "standalone", console_project_id: "proj_up" }));
+    fetchMock.mockResolvedValue(
+      jsonResponse({ mode: "standalone", console_project_id: "proj_up" }),
+    );
 
     expect(await retryRuntime()).toEqual({
       ok: true,
@@ -191,18 +188,7 @@ describe("retryRuntime", () => {
 });
 
 describe("getConsoleProjectId", () => {
-  it("prefers the VITE_CONSOLE_PROJECT_ID dev override", async () => {
-    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_env");
-    fetchMock.mockResolvedValue(
-      jsonResponse({ mode: "standalone", console_project_id: "proj_discovered" }),
-    );
-    await initRuntime();
-
-    expect(getConsoleProjectId()).toBe("proj_env");
-  });
-
-  it("uses the discovered console project id when no override is set", async () => {
-    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
+  it("uses the discovered console project id", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse({ mode: "standalone", console_project_id: "proj_discovered" }),
     );
@@ -212,7 +198,6 @@ describe("getConsoleProjectId", () => {
   });
 
   it("resolves to an empty id before discovery", () => {
-    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
     expect(getRuntime()).toEqual({ mode: "standalone" });
     expect(getConsoleProjectId()).toBe("");
   });

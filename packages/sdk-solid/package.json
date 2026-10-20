@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-solid",
-  "version": "1.0.0-alpha.22",
+  "version": "1.0.0-alpha.27",
   "description": "Solid components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-solid#readme",
   "bugs": {
@@ -27,9 +27,12 @@
   },
   "scripts": {
     "build": "vite build",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
-    "lint": "eslint ."
+    "test:all": "pnpm run test",
+    "lint": "biome check .",
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
@@ -40,26 +43,18 @@
     "solid-js": ">=1.6"
   },
   "devDependencies": {
-    "@eslint/js": "catalog:",
-    "@eslint/json": "catalog:",
-    "@eslint/markdown": "catalog:",
     "@solidjs/testing-library": "^0.8.10",
     "@testing-library/jest-dom": "^6.0.0",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-import-resolver-typescript": "catalog:",
-    "eslint-plugin-import": "catalog:",
-    "eslint-plugin-perfectionist": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "eslint-plugin-solid": "^0.14.5",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "@zitadel/api-mock": "workspace:*",
     "jsdom": "catalog:",
-    "prettier": "catalog:",
-    "solid-js": "^1.9.12",
+    "msw": "catalog:",
+    "solid-js": "^1.9.16",
     "typescript": "catalog:",
-    "typescript-eslint": "catalog:",
-    "vite": "catalog:sdk",
+    "vite": "catalog:",
     "vite-plugin-dts": "catalog:",
     "vite-plugin-solid": "^2.11.0",
-    "vitest": "catalog:sdk"
+    "vitest": "catalog:"
   }
 }

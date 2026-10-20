@@ -71,7 +71,7 @@ describe("validateLoginTemplate", () => {
   });
 
   it("rejects oversized templates", () => {
-    const filler = `{% mandatory_gates %}` + "a".repeat(MAX_TEMPLATE_BYTES);
+    const filler = `{% mandatory_gates %}${"a".repeat(MAX_TEMPLATE_BYTES)}`;
     expect(rules(filler)).toContain("size");
   });
 });
@@ -84,11 +84,11 @@ describe("branding designs", () => {
     }
   });
 
-  it("designs map to a degrade layout and reference the sibling template file", () => {
+  it("designs carry a layout and reference the sibling template file", () => {
     for (const design of BRANDING_DESIGNS) {
       const { branding } = getDefaultBrandingConfig(design);
       expect(["centered", "split"]).toContain(branding.layout);
-      expect(branding.liquid_template_file).toBe("./login.liquid");
+      expect(branding.liquid_template).toEqual({ $file: "./login.liquid" });
     }
   });
 

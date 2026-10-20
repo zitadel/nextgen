@@ -31,11 +31,17 @@
     "sync:export": "tsx scripts/sync-from-export.ts",
     "generate": "tsx scripts/build.ts",
     "build": "tsdown",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:all": "pnpm run test",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
+    "lint": "biome check ."
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
-    "tsx": "catalog:"
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

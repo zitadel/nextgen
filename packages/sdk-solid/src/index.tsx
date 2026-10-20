@@ -7,6 +7,7 @@ import type {
 import "@zitadel/components";
 import type { JSX } from "solid-js";
 
+import { standardAttributes, widgetTags } from "@zitadel/sdk-core/types";
 import {
   configureZitadel,
   getApi,
@@ -17,6 +18,7 @@ import {
 
 import type {
   ZitadelFlowCompleteDetail,
+  ZitadelFlowRedirectDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
@@ -24,44 +26,50 @@ import type {
   ZitadelLogoutProps,
   ZitadelSessionProps,
   ZitadelSignoutDetail,
+  ZitadelWidgetAttributes,
 } from "./types";
 
 declare module "solid-js" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
-      "zitadel-login": Omit<HTMLAttributes<HTMLElement>, "ref"> & {
+      [widgetTags.login]: Omit<HTMLAttributes<HTMLElement>, "ref"> & {
         ref?: ZitadelLoginElement | ((el: ZitadelLoginElement) => void);
         "prop:project"?: ZitadelProject;
         "prop:locales"?: Record<string, Partial<Record<string, string>>>;
         "prop:lang"?: string;
         "project-id"?: string;
         "proxy-path"?: string;
+        url?: string;
         purpose?: string;
         "flow-name"?: string;
         "post-sign-in-url"?: string;
+        "prop:forcePostSignInUrl"?: boolean;
         variant?: "widget" | "page";
         theme?: "light" | "dark" | "auto";
         "prop:suppressHeader"?: boolean;
+        "prop:suppressPasswordToggle"?: boolean;
         "on:zitadel-flow-step"?: (event: CustomEvent<ZitadelFlowStepDetail>) => void;
         "on:zitadel-flow-input"?: (event: CustomEvent<ZitadelFlowInputDetail>) => void;
         "on:zitadel-flow-complete"?: (event: CustomEvent<ZitadelFlowCompleteDetail>) => void;
+        "on:zitadel-flow-redirect"?: (event: CustomEvent<ZitadelFlowRedirectDetail>) => void;
         "on:zitadel-flow-error"?: (event: CustomEvent<ZitadelFlowErrorDetail>) => void;
       };
-      "zitadel-logout": Omit<HTMLAttributes<HTMLElement>, "ref"> & {
+      [widgetTags.logout]: Omit<HTMLAttributes<HTMLElement>, "ref"> & {
         ref?: ZitadelLogoutElement | ((el: ZitadelLogoutElement) => void);
         "prop:project"?: ZitadelProject;
         "project-id"?: string;
         "proxy-path"?: string;
+        url?: string;
         "post-sign-out-url"?: string;
         theme?: "light" | "dark" | "auto";
         "on:zitadel-signout"?: (event: CustomEvent<ZitadelSignoutDetail>) => void;
       };
-      "zitadel-session": Omit<HTMLAttributes<HTMLElement>, "ref"> & {
+      [widgetTags.session]: Omit<HTMLAttributes<HTMLElement>, "ref"> & {
         ref?: ZitadelSessionElement | ((el: ZitadelSessionElement) => void);
         "prop:project"?: ZitadelProject;
         "project-id"?: string;
         "proxy-path"?: string;
+        url?: string;
         "post-sign-out-url"?: string;
         heading?: string;
         "logout-label"?: string;
@@ -73,6 +81,45 @@ declare module "solid-js" {
     }
   }
 }
+
+/**
+ * The project coordinates as attributes, so they are in the server markup. The
+ * `project` handle stays a property too (it carries the publishable key and is
+ * what the element prefers once Solid hydrates); its fields win over the
+ * discrete props, as they do inside the widget. An empty proxy path is written
+ * as `/`: the widget treats an empty `proxy-path` attribute as unset and falls
+ * back to its default, while `/` normalizes to the site root.
+ */
+function projectAttributes(props: {
+  readonly project?: ZitadelProject;
+  readonly projectId?: string;
+  readonly proxyPath?: string;
+}) {
+  const proxyPath = props.project?.proxyPath ?? props.proxyPath;
+  return {
+    "project-id": props.project?.projectId ?? props.projectId,
+    "proxy-path": proxyPath === "" ? "/" : proxyPath,
+    url: props.project?.url,
+  };
+}
+
+/** Props of `ZitadelLogin`: the widget's own plus the standard HTML attributes. */
+export type ZitadelLoginSolidProps = ZitadelLoginProps &
+  ZitadelWidgetAttributes & {
+    ref?: ZitadelLoginElement | ((el: ZitadelLoginElement) => void);
+  };
+
+/** Props of `ZitadelLogout`: the widget's own plus the standard HTML attributes. */
+export type ZitadelLogoutSolidProps = ZitadelLogoutProps &
+  ZitadelWidgetAttributes & {
+    ref?: ZitadelLogoutElement | ((el: ZitadelLogoutElement) => void);
+  };
+
+/** Props of `ZitadelSession`: the widget's own plus the standard HTML attributes. */
+export type ZitadelSessionSolidProps = ZitadelSessionProps &
+  ZitadelWidgetAttributes & {
+    ref?: ZitadelSessionElement | ((el: ZitadelSessionElement) => void);
+  };
 
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
@@ -91,28 +138,31 @@ export { businessLocales } from "@zitadel/components";
  * A forwarded `ref` resolves to the underlying `<zitadel-login>` DOM element,
  * so consumers can imperatively access the upgraded web component.
  */
-export function ZitadelLogin(
-  props: ZitadelLoginProps & {
-    ref?: ZitadelLoginElement | ((el: ZitadelLoginElement) => void);
-  },
-): JSX.Element {
+export function ZitadelLogin(props: ZitadelLoginSolidProps): JSX.Element {
+  // The standard HTML attributes are the only extra props the element takes.
+  // Solid would assign them to a custom element as properties, so they take its `attr:` prefix.
+  const attributes = () => standardAttributes(props, "attr:");
   return (
     <zitadel-login
+      {...attributes()}
       ref={props.ref}
       prop:project={props.project}
       prop:locales={props.locales}
       prop:lang={props.lang}
-      project-id={props.projectId}
-      proxy-path={props.proxyPath}
+      {...projectAttributes(props)}
       purpose={props.purpose ?? "login"}
       flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
+      prop:forcePostSignInUrl={props.forcePostSignInUrl}
+      resume-flow-id={props.resumeFlowId}
       variant={props.variant}
       theme={props.theme}
       prop:suppressHeader={props.suppressHeader}
+      prop:suppressPasswordToggle={props.suppressPasswordToggle}
       on:zitadel-flow-step={(event) => props.onFlowStep?.(event.detail)}
       on:zitadel-flow-input={(event) => props.onFlowInput?.(event.detail)}
       on:zitadel-flow-complete={(event) => props.onFlowComplete?.(event.detail)}
+      on:zitadel-flow-redirect={(event) => props.onFlowRedirect?.(event.detail)}
       on:zitadel-flow-error={(event) => props.onFlowError?.(event.detail)}
     />
   );
@@ -127,17 +177,16 @@ export function ZitadelLogin(
  * A forwarded `ref` resolves to the underlying `<zitadel-logout>` DOM element,
  * so consumers can imperatively access the upgraded web component.
  */
-export function ZitadelLogout(
-  props: ZitadelLogoutProps & {
-    ref?: ZitadelLogoutElement | ((el: ZitadelLogoutElement) => void);
-  },
-): JSX.Element {
+export function ZitadelLogout(props: ZitadelLogoutSolidProps): JSX.Element {
+  // The standard HTML attributes are the only extra props the element takes.
+  // Solid would assign them to a custom element as properties, so they take its `attr:` prefix.
+  const attributes = () => standardAttributes(props, "attr:");
   return (
     <zitadel-logout
+      {...attributes()}
       ref={props.ref}
       prop:project={props.project}
-      project-id={props.projectId}
-      proxy-path={props.proxyPath}
+      {...projectAttributes(props)}
       post-sign-out-url={props.postSignOutUrl}
       theme={props.theme}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
@@ -153,17 +202,16 @@ export function ZitadelLogout(
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
  */
-export function ZitadelSession(
-  props: ZitadelSessionProps & {
-    ref?: ZitadelSessionElement | ((el: ZitadelSessionElement) => void);
-  },
-): JSX.Element {
+export function ZitadelSession(props: ZitadelSessionSolidProps): JSX.Element {
+  // The standard HTML attributes are the only extra props the element takes.
+  // Solid would assign them to a custom element as properties, so they take its `attr:` prefix.
+  const attributes = () => standardAttributes(props, "attr:");
   return (
     <zitadel-session
+      {...attributes()}
       ref={props.ref}
       prop:project={props.project}
-      project-id={props.projectId}
-      proxy-path={props.proxyPath}
+      {...projectAttributes(props)}
       post-sign-out-url={props.postSignOutUrl}
       heading={props.heading}
       logout-label={props.logoutLabel}

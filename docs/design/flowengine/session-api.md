@@ -355,7 +355,7 @@ Content-Type: application/json
 ```
 
 - `session_token` supersedes any previously issued anonymous `session_token` for the same session. Clients must replace their stored token at this point.
-- The `handoff_token` is single-use; replaying it returns `410 Gone`.
+- The `handoff_token` is single-use; replaying it returns `400` with `sess.invalid_handoff_token`, the same answer as an unknown or expired token.
 
 See [auth_attempts state machine](../api/authn-and-auth-flows.md) for the full endpoint reference.
 

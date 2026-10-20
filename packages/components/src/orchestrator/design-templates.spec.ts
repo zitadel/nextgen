@@ -4,14 +4,25 @@
  * LiquidJS engine → DOMPurify sanitiser → `patchMandatoryGates` — and keep
  * the atoms a step needs. The authoring-side validation of the same files
  * lives in `packages/config/src/template.test.ts`.
+ *
+ * The retired page-layout designs (`split`, `split-right`, `hero`)
+ * are no longer ejectable, but revisions already published from them keep
+ * rendering on the `layout-chrome.css` split/hero chrome. Their last shipped
+ * templates live in `__fixtures__/legacy-designs/` so that promise stays
+ * tested until the chrome is removed.
  */
 import type { CreateFlow201Step } from "@zitadel/api/generated/model";
 import { BRANDING_DESIGNS, getDefaultBrandingConfig } from "@zitadel/config/defaults";
 import { describe, expect, it } from "vitest";
 
-import { createLiquidEngine } from "./liquid.js";
+import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
+import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
+import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
+import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
+import { en } from "./locales/en.js";
 import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
 import { createSanitiser } from "./sanitiser.js";
+import { TEMPLATE_NAMES } from "./template-names.js";
 
 const locale: Record<string, string> = {
   "identifier.title": "Sign in",
@@ -22,6 +33,11 @@ const locale: Record<string, string> = {
   "submit.continue": "Continue",
   "action.recover": "Forgot password?",
   "action.back": "Back",
+  "register.action.sign_in.lead": "Have an account already? ",
+  "register.action.sign_in.link": "Sign in",
+  "sso-conflict.action.sign_in": "Back to sign in",
+  "sso.continue_with": "Continue with {name}",
+  "sso.divider": "or",
 };
 
 const step: CreateFlow201Step = {
@@ -54,16 +70,39 @@ const context = {
   challenge: null,
 };
 
+const LEGACY_TEMPLATES: Record<string, string> = {
+  split: splitTemplate,
+  "split-right": splitRightTemplate,
+  hero: heroTemplate,
+};
+const LEGACY_DESIGNS = Object.keys(LEGACY_TEMPLATES);
+
+function legacyTemplate(design: string): string {
+  const template = LEGACY_TEMPLATES[design];
+  if (template === undefined) throw new Error(`no legacy fixture for ${design}`);
+  return template;
+}
+
+/** A shipped design's template, or a retired one's last published fixture. */
+function templateFor(design: string): string {
+  return LEGACY_DESIGNS.includes(design)
+    ? legacyTemplate(design)
+    : getDefaultBrandingConfig(design).template;
+}
+
 function renderDesign(design: string): string {
   const engine = createLiquidEngine({ locale });
-  const { template } = getDefaultBrandingConfig(design);
-  const rendered = engine.parseAndRenderSync(template, context);
+  const rendered = engine.parseAndRenderSync(templateFor(design), context);
   const sanitised = createSanitiser()(rendered);
   return patchMandatoryGates(sanitised, step, locale);
 }
 
 describe("branding design catalog", () => {
-  for (const design of BRANDING_DESIGNS) {
+  it("ships only widget-structure designs (#1039)", () => {
+    expect([...BRANDING_DESIGNS]).toEqual(["centered", "minimal"]);
+  });
+
+  for (const design of [...BRANDING_DESIGNS, ...LEGACY_DESIGNS]) {
     describe(design, () => {
       const html = renderDesign(design);
 
@@ -93,8 +132,7 @@ describe("branding design catalog", () => {
 
       it("renders no visible control for a kind: back action (gesture-only)", () => {
         const engine = createLiquidEngine({ locale });
-        const { template } = getDefaultBrandingConfig(design);
-        const rendered = engine.parseAndRenderSync(template, {
+        const rendered = engine.parseAndRenderSync(templateFor(design), {
           ...context,
           actions: [...step.actions, { name: "back", kind: "back", text_key: "action.back" }],
         });
@@ -108,7 +146,132 @@ describe("branding design catalog", () => {
     });
   }
 
-  it("split designs keep the brand pane and mirror class", () => {
+  // A verified unique provider claim renders read-only, so the user cannot
+  // type a value the server refuses on submit.
+  it.each([...BRANDING_DESIGNS])("%s renders a read_only field read-only", (design) => {
+    const engine = createLiquidEngine({ locale });
+    const rendered = engine.parseAndRenderSync(templateFor(design), {
+      ...context,
+      fields: [
+        { ...step.fields[0], value: "alice@example.com", read_only: true },
+        { name: "given_name", type: "text", text_key: "identifier.field.email" },
+      ],
+    });
+    const fields = createSanitiser()(rendered).match(/<zl-field\b[^>]*>/g) ?? [];
+
+    expect(fields).toHaveLength(2);
+    expect(fields.find((f) => f.includes('name="email"'))).toMatch(/\sreadonly[\s>=]/);
+    expect(fields.find((f) => f.includes('name="given_name"'))).not.toMatch(/\sreadonly[\s>=]/);
+  });
+
+  describe.each([...BRANDING_DESIGNS])("%s with identity providers", (design) => {
+    /** The step as the engine renders it once a connection is enabled. */
+    const withProviders = {
+      ...context,
+      sso_providers: [
+        { id: "google", name: "Google", template: "google" },
+        { id: "acme-sso", name: "Acme SSO", template: "oidc-generic" },
+      ],
+    };
+
+    function render(ctx: Record<string, unknown>): string {
+      const engine = createLiquidEngine({ locale });
+      const { template } = getDefaultBrandingConfig(design);
+      return createSanitiser()(engine.parseAndRenderSync(template, ctx));
+    }
+
+    it("renders the provider atom with the step's providers", () => {
+      const html = render(withProviders);
+
+      expect(html).toContain("<zl-sso-providers");
+      expect(html).toContain('data-testid="zitadel-sso-providers"');
+      // The payload survives sanitisation intact — the atom parses it back.
+      expect(html).toContain("google");
+      expect(html).toContain("acme-sso");
+    });
+
+    // The design draws no rule above the providers -- they sit directly under
+    // the primary action -- so the shipped templates pass no divider. The atom
+    // keeps the option for a tenant template that wants one.
+    it("passes the localised label format through, and no divider", () => {
+      const html = render(withProviders);
+
+      expect(html).toContain('label-format="Continue with {name}"');
+      expect(html).not.toContain("divider-label");
+    });
+
+    it("keeps the register row's copy for the register step's own sign_in", () => {
+      const html = render({
+        ...context,
+        actions: [
+          ...step.actions,
+          { name: "sign_in", kind: "navigate", text_key: "register.action.sign_in.link" },
+        ],
+      });
+
+      expect(html).toContain("Have an account already? ");
+      expect(html).toContain('data-action="sign_in"');
+    });
+
+    it("uses a step's own copy when it supplies one, without the register lead", () => {
+      // The SSO conflict screen has just said "you already have an account";
+      // repeating "Already have an account?" under it reads as a mistake.
+      const html = render({
+        ...context,
+        actions: [
+          ...step.actions,
+          { name: "sign_in", kind: "navigate", text_key: "sso-conflict.action.sign_in" },
+        ],
+      });
+
+      expect(html).toContain("Back to sign in");
+      expect(html).not.toContain("Have an account already? ");
+    });
+
+    it("renders nothing for a step with no providers", () => {
+      // The shipped presets carry none until `auth-method sso enable` adds one,
+      // so this is the common case and must cost the markup nothing.
+      expect(render(context)).not.toContain("zl-sso-providers");
+      expect(render({ ...context, sso_providers: [] })).not.toContain("zl-sso-providers");
+    });
+  });
+
+  /**
+   * A failed provider sign-in comes back as a plain step error key the engine's
+   * callback stored on the originating step (`flow_sso_callback.go`), and the
+   * step shows it like any other form-level error: the key's `.title` and
+   * `.body`, through the same localisation the orchestrator applies.
+   */
+  describe.each([...BRANDING_DESIGNS, "default.liquid"])(
+    "%s after a failed provider return",
+    (design) => {
+      function render(stepError: string): string {
+        const engine = createLiquidEngine({ locale: en });
+        const errors = localiseFlowErrorKeys(stepError, {
+          locale: en,
+          stepName: step.name ?? "",
+          fields: (step.fields ?? []).map((field) => field.name),
+        });
+        const ctx = { ...context, errors };
+        const rendered =
+          design === "default.liquid"
+            ? engine.renderFileSync(TEMPLATE_NAMES.default, ctx)
+            : engine.parseAndRenderSync(getDefaultBrandingConfig(design).template, ctx);
+        return createSanitiser()(rendered);
+      }
+
+      it.each(["error.sso_cancelled", "error.sso_failed"])("renders %s's title and body", (key) => {
+        const html = render(key);
+
+        expect(html).toContain(en[`${key}.title`]);
+        expect(html).toContain(en[`${key}.body`]);
+        // The key itself must not leak through as copy.
+        expect(html).not.toContain(key);
+      });
+    },
+  );
+
+  it("legacy split revisions keep the brand pane and mirror class", () => {
     const split = renderDesign("split");
     expect(split).toContain('class="zl-split"');
     expect(split).toContain('class="zl-split__brand"');
@@ -123,7 +286,7 @@ describe("branding design catalog", () => {
     const engine = createLiquidEngine({ locale });
     const noAssets = { ...context, branding: {} };
     for (const design of ["split", "split-right"]) {
-      const { template } = getDefaultBrandingConfig(design);
+      const template = legacyTemplate(design);
       const bare = createSanitiser()(engine.parseAndRenderSync(template, noAssets));
       // An empty brand pane renders the whole design as a lonely off-centre
       // card; the decorative panel must survive the sanitiser.
@@ -149,7 +312,7 @@ describe("branding design catalog", () => {
       branding: { hero_url: "https://cdn.example.com/hero.png" },
     };
     for (const design of ["split", "split-right"]) {
-      const { template } = getDefaultBrandingConfig(design);
+      const template = legacyTemplate(design);
       const html = patchMandatoryGates(
         createSanitiser()(engine.parseAndRenderSync(template, heroOnly)),
         step,

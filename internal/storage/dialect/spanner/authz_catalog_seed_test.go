@@ -85,6 +85,38 @@ SELECT COUNT(1) FROM authz_expression_edges WHERE catalog_id = @p1`, domain.Syst
 			})
 		})
 		require.NoError(t, err)
-		assert.Equal(t, int64(7), edgeCount)
+		// team.member and project.team direct, and direct + one rewrite on each
+		// of viewer (→ editor), editor (→ admin) and admin (TTU on project.team).
+		assert.Equal(t, int64(8), edgeCount)
+
+		// Roles are monotonic (ADR 054 §5): admin closes to editor and viewer,
+		// editor to viewer, and nothing closes upward. An exact match of the
+		// non-reflexive project rows pins both directions at once.
+		type implication struct {
+			from, to string
+			depth    int64
+		}
+		var implications []implication
+		err = db.Query(ctx, buildStatement(`
+SELECT from_relation, to_relation, depth FROM authz_relation_closure
+WHERE catalog_id = @p1
+  AND from_object_type = 'project' AND to_object_type = 'project'
+  AND from_relation <> to_relation`, domain.SystemCatalogID,
+		).statement(), func(iter *spanner.RowIterator) error {
+			return iter.Do(func(row *spanner.Row) error {
+				var r implication
+				if err := row.Columns(&r.from, &r.to, &r.depth); err != nil {
+					return err
+				}
+				implications = append(implications, r)
+				return nil
+			})
+		})
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []implication{
+			{"admin", "editor", 1},
+			{"admin", "viewer", 2},
+			{"editor", "viewer", 1},
+		}, implications)
 	})
 }

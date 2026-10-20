@@ -1,0 +1,21 @@
+type: object
+description: |
+  Deployments, newest first.
+
+  In the history (the default), each deployment carries every target it
+  made the release live on. In the live view (`live=true`), each deployment
+  carries only the targets it still serves.
+required:
+  - deployments
+properties:
+  deployments:
+    type: array
+    items:
+      $ref: deployment.yaml
+  next_page_token:
+    description: |
+      Token to pass as `page_token` in the next request to fetch the following page.
+      Absent when there are no more results.
+    oneOf:
+      - $ref: ../../components/schemas/page-token.yaml
+      - type: 'null'

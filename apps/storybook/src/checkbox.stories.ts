@@ -10,7 +10,7 @@ interface CheckboxArgs {
   required: boolean;
   /** Inline validation message shown under the row (empty = none). */
   error: string;
-  /** Preview-only knob: paints a Figma interaction state (hover/focus/pressed). */
+  /** Preview-only knob: paints an interaction state (hover/focus/pressed). */
   previewState: "" | "hovered" | "focused" | "pressed";
 }
 
@@ -25,7 +25,14 @@ interface CheckboxArgs {
 const meta: Meta<CheckboxArgs> = {
   title: "Atoms/Checkbox",
   tags: ["autodocs"],
-  args: { label: "Label", checked: false, disabled: false, required: false, error: "", previewState: "" },
+  args: {
+    label: "Label",
+    checked: false,
+    disabled: false,
+    required: false,
+    error: "",
+    previewState: "",
+  },
   argTypes: {
     label: { control: "text" },
     checked: { control: "boolean" },
@@ -35,7 +42,7 @@ const meta: Meta<CheckboxArgs> = {
     previewState: {
       control: "inline-radio",
       options: ["", "hovered", "focused", "pressed"],
-      description: "Preview the Figma interaction states without real pointer/focus.",
+      description: "Preview an interaction state without real pointer/focus.",
     },
   },
 };
@@ -43,7 +50,14 @@ const meta: Meta<CheckboxArgs> = {
 export default meta;
 type Story = StoryObj<CheckboxArgs>;
 
-const litCheckbox = ({ label, checked, disabled, required, error, previewState }: CheckboxArgs) => html`
+const checkbox = ({
+  label,
+  checked,
+  disabled,
+  required,
+  error,
+  previewState,
+}: CheckboxArgs) => html`
   <zl-checkbox
     label=${label || nothing}
     aria-label=${label ? nothing : "Accept terms"}
@@ -60,5 +74,5 @@ const litCheckbox = ({ label, checked, disabled, required, error, previewState }
 // zl-checkbox.browser.spec.ts), so re-clicking it here would duplicate upward.
 // The story still gets addon-vitest's automatic render smoke + a11y pass.
 export const Default: Story = {
-  render: (args) => litCheckbox(args),
+  render: (args) => checkbox(args),
 };

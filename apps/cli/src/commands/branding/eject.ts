@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { cancel, isCancel, select } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
@@ -13,13 +12,17 @@ import {
   brandingReadmeContent,
   getDefaultBrandingConfig,
 } from "@zitadel/config/defaults";
-import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
+import {
+  BRANDING_FILE_SCHEMA_REF,
+  META_SCHEMA_DIR,
+  metaSchemaFiles,
+} from "@zitadel/config/meta-schemas";
 
 import { BRANDING_DIR } from "../../lib/branding";
-import { BRANDING_DESIGN_INFO } from "../../lib/branding/designs";
+import { BRANDING_DESIGN_INFO, resolveBrandingDesign } from "../../lib/branding/designs";
 import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
-import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { hasZitadelConfig } from "../../lib/project";
 import {
   normalizePublicCliJson,
@@ -41,10 +44,15 @@ import {
 export default class BrandingEject extends BaseCommand {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
+  static override group = CommandGroups.configuration;
+  static override groupOrder = 4;
   static override flags = {
-    design: Flags.string({
-      description: `Design to start from (default: ${DEFAULT_BRANDING_DESIGN}).`,
-      options: [...BRANDING_DESIGNS],
+    force: Flags.boolean({ char: "f", description: "Overwrite an existing branding file." }),
+    // No oclif `options`: the retired designs (#1039) must reach
+    // resolveBrandingDesign to get their targeted error instead of oclif's
+    // generic "expected one of".
+    design: nonBlankString({
+      description: `Design to start from: ${BRANDING_DESIGNS.join(" or ")} (default: ${DEFAULT_BRANDING_DESIGN}).`,
     }),
   };
 
@@ -52,6 +60,10 @@ export default class BrandingEject extends BaseCommand {
     const { flags } = await this.parse(BrandingEject);
     await this.toMeta(flags);
     const { cwd, force, nonInteractive } = this.meta;
+    const flagDesign =
+      flags.design === undefined
+        ? undefined
+        : resolveBrandingDesign(flags.design, this.meta.cliVersion);
 
     if (!(await hasZitadelConfig(cwd))) {
       throw new ZitadelError("E_VALIDATION", "This directory is not a Zitadel project", {
@@ -60,7 +72,7 @@ export default class BrandingEject extends BaseCommand {
       });
     }
 
-    const design = flags.design ?? (await this.promptDesign(nonInteractive));
+    const design = flagDesign ?? (await this.promptDesign(nonInteractive));
     this.recordTelemetry({ design, force });
     const { branding, template } = getDefaultBrandingConfig(design);
 
@@ -130,7 +142,9 @@ export default class BrandingEject extends BaseCommand {
     if (nonInteractive) {
       return DEFAULT_BRANDING_DESIGN;
     }
-    const choice = await select({
+    return this.input({
+      kind: "select",
+      name: "design",
       message: "Which design do you want to start from?",
       initialValue: DEFAULT_BRANDING_DESIGN as string,
       options: BRANDING_DESIGNS.map((design) => ({
@@ -139,11 +153,6 @@ export default class BrandingEject extends BaseCommand {
         hint: BRANDING_DESIGN_INFO[design].hint,
       })),
     });
-    if (isCancel(choice)) {
-      cancel("Eject cancelled.");
-      throw new ZitadelError("E_VALIDATION", "Eject cancelled by user");
-    }
-    return choice;
   }
 }
 

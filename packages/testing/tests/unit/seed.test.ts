@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { connectZitadel } from "../../src/index";
+import { connectZitadel, identity } from "../../src/index";
 import type { InstanceHandle } from "../../src/types";
 
 const BASE = "http://zitadel-testing.invalid";
@@ -63,7 +63,7 @@ describe("seedUser via connectZitadel", () => {
     expect(captured.userAuth).toBe("Bearer secret_1");
     expect(captured.userQuery).toBe("proj_1");
     expect(captured.passwordUserId).toBe("user_1");
-    expect(captured.passwordBody).toEqual({ password: user.password, is_change_required: false });
+    expect(captured.passwordBody).toEqual({ password: user.password });
   });
 
   it("honors explicit email, password, and extra attributes", async () => {
@@ -118,6 +118,7 @@ describe("seedUser via connectZitadel", () => {
     const zitadel = connectZitadel(handle);
     expect(zitadel.appEnv).toEqual({
       ZITADEL_URL: BASE,
+      ZITADEL_PROJECT_ID: "proj_1",
       NEXT_PUBLIC_ZITADEL_PROJECT_ID: "proj_1",
       ZITADEL_PROJECT_SECRET: "secret_1",
     });
@@ -133,6 +134,12 @@ describe("seed vocabulary", () => {
     expect(one.email).not.toBe(two.email);
     expect(one.password).not.toBe(two.password);
     // onUnhandledRequest: "error" would fail this test if anything was called.
+  });
+
+  it("identity() is an export of its own, for suites without an instance", () => {
+    const who = identity();
+    expect(who.email).toMatch(/^e2e-[0-9a-f]{8}@example\.com$/);
+    expect(identity().email).not.toBe(who.email);
   });
 
   it("seedUsers applies the per-index template and keeps unique defaults", async () => {

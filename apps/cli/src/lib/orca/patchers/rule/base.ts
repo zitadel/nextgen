@@ -27,6 +27,13 @@ import type {
 import { reclaimableOps, withoutExistingTargets } from "./reclaim";
 
 /**
+ * Closes every {@link AbstractRulePatcher.preflight} refusal. `--force` is the
+ * obvious next try after an `E_CONFLICT`, and it changes nothing there.
+ */
+export const PREFLIGHT_FORCE_NOTE =
+  "--force can't fix this: it only replaces files at the paths setup writes.";
+
+/**
  * Base for rule-based (deterministic, template-driven) patchers, as opposed to
  * a future LLM-driven family. It applies the integration by building a
  * file-operation plan and running the file-writer — that strategy stays
@@ -35,13 +42,36 @@ import { reclaimableOps, withoutExistingTargets } from "./reclaim";
  * and the shared eject classification; subclasses contribute only their
  * framework-specific routes/middleware.
  */
+/**
+ * Written above the scaffolded entries in `.env.example` and `.env.local`.
+ * `zitadel start` hands every `NEXTGEN_*` variable in these files to the
+ * local server, so the files are also where a developer configures it.
+ */
+const LOCAL_SERVER_ENV_COMMENT = [
+  "Variables the scaffolded app reads. Any NEXTGEN_* variable added here",
+  "configures the local server that `zitadel start` runs, for example",
+  "NEXTGEN_INSTRUMENTATION_LOG_LEVEL=debug.",
+];
+
 export abstract class AbstractRulePatcher implements Patcher {
   abstract canPatch(framework: string): boolean;
 
   /** Apply the full plan (base `.zitadel/` files + framework routes). */
   async patch(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
+    await this.preflight(ctx, opts.cwd);
     return scaffold(this.plan(ctx), opts);
   }
+
+  /**
+   * Refuses, with `E_CONFLICT`, a project the plan would leave broken without
+   * conflicting on any path it writes: the file-writer only stops on a file
+   * at exactly a path in the plan, and some of the app's own files break the
+   * integration from another path. Setup's dry-run patch runs this before it
+   * creates a project. `force` does not skip it: forcing replaces files at the
+   * plan's paths, and these files sit elsewhere. `repair` does not run it —
+   * `doctor` reports what it finds instead. Defaults to nothing to check.
+   */
+  protected async preflight(_ctx: PatchContext, _cwd: string): Promise<void> {}
 
   /**
    * Re-apply only the reclaimable subset — env files, gitignore, the SDK
@@ -79,7 +109,9 @@ export abstract class AbstractRulePatcher implements Patcher {
    * merge transform's own idempotency: the transforms only add what is
    * missing and return the source unchanged when everything they manage is
    * present, so a changed output means the wiring is absent from the user's
-   * config. Every labelled wiring gets a verdict: a missing host file is
+   * config. An op whose transform leaves a file it cannot recognize as it is
+   * brings its own `verify`, so that such a file reads as `unknown`, not
+   * applied. Every labelled wiring gets a verdict: a missing host file is
    * `detached` (the wiring cannot be applied in a file that does not exist),
    * and a transform that throws on restructured content yields `unknown` —
    * surfaced rather than silently dropped, so a deleted `angular.json` can
@@ -95,7 +127,7 @@ export abstract class AbstractRulePatcher implements Patcher {
         continue;
       }
       const candidates = typeof op.path === "string" ? [op.path] : op.path;
-      let path = candidates[0]!;
+      let path = candidates[0] ?? "";
       let source: string | undefined;
       for (const candidate of candidates) {
         const contents = await readTextIfExists(join(opts.cwd, candidate));
@@ -110,11 +142,16 @@ export abstract class AbstractRulePatcher implements Patcher {
         continue;
       }
       try {
-        statuses.push({
-          path,
-          wiring: op.wiring,
-          state: op.edit(source) === source ? "applied" : "detached",
-        });
+        const verdict = op.verify
+          ? op.verify(source)
+          : op.edit(source) === source
+            ? "applied"
+            : "detached";
+        statuses.push(
+          typeof verdict === "string"
+            ? { path, wiring: op.wiring, state: verdict }
+            : { path, wiring: op.wiring, state: "unknown", reason: verdict.unknown },
+        );
       } catch (error) {
         statuses.push({
           path,
@@ -140,7 +177,10 @@ export abstract class AbstractRulePatcher implements Patcher {
       configEdits: this.routeConfigEdits(view),
       guidanceFiles: ["AGENTS.md", "README.md"],
       fileClasses: Object.fromEntries(
-        markedFiles.map((path) => [path, infrastructure.has(path) ? "infrastructure" : "presentation"]),
+        markedFiles.map((path) => [
+          path,
+          infrastructure.has(path) ? "infrastructure" : "presentation",
+        ]),
       ),
       conditionalFiles: this.conditionallyScaffoldedFiles(view),
       retiredAlternates: this.retiredAlternateFiles(view),
@@ -228,7 +268,12 @@ export abstract class AbstractRulePatcher implements Patcher {
           project_id: ctx.project.id,
           project_secret: ctx.project.project_secret,
           preview_secret: ctx.project.preview_secret,
-          preview_origins: ctx.project.preview_origins,
+          primary_origins: ctx.project.origins
+            .filter((origin) => origin.kind === "primary")
+            .map((origin) => origin.pattern),
+          preview_origins: ctx.project.origins
+            .filter((origin) => origin.kind === "preview")
+            .map((origin) => origin.pattern),
           created_at: ctx.project.created_at,
         })}\n`,
       },
@@ -236,6 +281,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       {
         kind: "merge-env",
         path: ".env.example",
+        comment: LOCAL_SERVER_ENV_COMMENT,
         entries: {
           ZITADEL_PROJECT_ID: "",
           ZITADEL_PROJECT_SECRET: "",
@@ -247,6 +293,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       {
         kind: "merge-env",
         path: ".env.local",
+        comment: LOCAL_SERVER_ENV_COMMENT,
         entries: {
           ZITADEL_PROJECT_ID: ctx.project.id,
           ZITADEL_PROJECT_SECRET: ctx.project.project_secret,
@@ -315,11 +362,14 @@ async function readTextIfExists(path: string): Promise<string | undefined> {
 /** Builds the `zitadel.json` body persisted at the project root. */
 function projectConfig(ctx: PatchContext): Record<string, unknown> {
   const environments: Record<string, unknown> = { development: { issuer: ctx.issuer } };
-  if (ctx.project.preview_origins.length > 0) {
-    // preview_origins are already full origins (scheme://host[:port]); don't
+  const previewPatterns = ctx.project.origins
+    .filter((origin) => origin.kind === "preview")
+    .map((origin) => origin.pattern);
+  if (previewPatterns.length > 0) {
+    // Preview patterns are already full origins (scheme://host[:port]); don't
     // prepend a scheme or it doubles up (https://http://localhost:3000).
     environments.preview = {
-      issuer_pattern: [...ctx.project.preview_origins],
+      issuer_pattern: [...previewPatterns],
     };
   }
   return {

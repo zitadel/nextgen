@@ -1,0 +1,14 @@
+{
+  "title": "Sessions",
+  "pages": [
+    "createSession",
+    "exchangeHandoff",
+    "getMySession",
+    "getMySessionCsrfToken",
+    "getSession",
+    "querySessions",
+    "revokeMySession",
+    "revokeSession",
+    "..."
+  ]
+}

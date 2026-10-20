@@ -16,7 +16,9 @@ import { listListeningTcpListeners } from "../../../../src/lib/prober/ports";
  * Promisified `execFile` invokes the callback the mock provides. Each test
  * sets the callback's behaviour via `mockImplementation`.
  */
-function whenLsof(impl: (cb: (err: NodeJS.ErrnoException | null, stdout: string) => void) => void): void {
+function whenLsof(
+  impl: (cb: (err: NodeJS.ErrnoException | null, stdout: string) => void) => void,
+): void {
   mockExecFile.mockImplementation(((
     _file: string,
     _args: readonly string[],
@@ -59,22 +61,18 @@ describe("listListeningTcpListeners", () => {
     const listeners = await listListeningTcpListeners();
 
     expect(listeners.map((l) => l.port)).toEqual([3000, 3000, 5050, 8080]);
-    expect(listeners.every((l) => l.host === "*" || l.host.includes("::1") || l.host === "127.0.0.1")).toBe(true);
+    expect(
+      listeners.every((l) => l.host === "*" || l.host.includes("::1") || l.host === "127.0.0.1"),
+    ).toBe(true);
   });
 
   it("keeps listener process metadata for diagnostics", async () => {
     whenLsof((cb) =>
       cb(
         null,
-        [
-          "p12345",
-          "czitadel-server",
-          "n*:8080",
-          "p23456",
-          "cnode",
-          "n127.0.0.1:3000",
-          "",
-        ].join("\n"),
+        ["p12345", "czitadel-server", "n*:8080", "p23456", "cnode", "n127.0.0.1:3000", ""].join(
+          "\n",
+        ),
       ),
     );
 

@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { _resetConfigForTesting } from "@zitadel/api/config";
+
 /**
  * Pins both branches of the API base (Console ADR 0002 §4, revised): the
  * embedded production build must target the origin root — `/api` exists only
  * under the dev server, whose proxy strips it, and the Go mux has never
- * served it. The embedded e2e lane (`console-e2e:e2e-embedded`) proves the
+ * served it. The embedded e2e lane (`e2e:console-embedded`) proves the
  * full request path but is opt-in local; this spec is the CI-visible guard
  * on the client half, the counterpart of `cmd/server/mux_test.go` pinning
  * the server half. The original bug — an unconditional `/api` default —
@@ -12,8 +14,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  */
 describe("apiBase", () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
     vi.resetModules();
+    _resetConfigForTesting();
   });
 
   it("targets the origin root in production builds", async () => {
@@ -35,6 +37,24 @@ describe("apiBase", () => {
     vi.stubEnv("VITE_CONSOLE_API_BASE", "/elsewhere");
     const { apiBase } = await import("./zitadel");
     expect(apiBase).toBe("/elsewhere");
+  });
+
+  it("allows a later import to bind a new proxyPath after reset", async () => {
+    // The write-once globalThis slot is what leaked across Vitest files, not
+    // the `apiBase` export: a fresh module can print the stubbed env while
+    // `configureZitadel` still returns the previous `/api` handle.
+    vi.stubEnv("DEV", true);
+    vi.stubEnv("VITE_CONSOLE_API_BASE", undefined);
+    const first = await import("./zitadel");
+    expect(first.apiBase).toBe("/api");
+
+    _resetConfigForTesting();
+    vi.resetModules();
+    vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
+    const second = await import("./zitadel");
+    const { getZitadelConfig } = await import("@zitadel/api/config");
+    expect(second.apiBase).toBe("http://localhost/api");
+    expect(getZitadelConfig()?.proxyPath).toBe("http://localhost/api");
   });
 
   it("treats an empty VITE_CONSOLE_API_BASE as unset, matching the dev proxy", async () => {

@@ -246,24 +246,77 @@ func writeListedObjectInConstraintTeam(w ArgWriter, env Env, params domain.Authz
 // member of a team. setIDExpr / memberIDExpr are raw SQL column refs; when
 // empty, setID / memberID are bound arguments. Check, List, TTU, and
 // principal-match all use this helper so ADR 053's home-project switch is one edit.
+//
+// The correlated EXISTS is the shape that performs, not a style choice.
+// Rewriting it as `set IN (SELECT e.set_id …)` sends the Spanner emulator's
+// planner pathological on the management-list predicate:
+// TestListAuthzTeamScopedOnlyPartialView ran 9m26s and timed out the lane, the
+// same class of planner blowup recorded in the #1007 / #1008 / #1009 history.
+// This shape is the one CI has proven; do not change it without a green Spanner
+// lane.
+//
+// Be aware that this test no longer catches it as sharply. It accounted for 94%
+// of the internal/api/integration_test package, so it was made serial, and
+// tests now delete their own projects when they finish. It therefore meets an
+// almost empty database instead of everything the package accumulated. The
+// blowup needs rows to show, so what is left is the Spanner lane's overall
+// duration. The other tests still run list predicates while the parallel phase
+// fills the tables, so a rewrite of this shape should still show up as the lane
+// getting dramatically slower rather than as one named test failing.
+//
+// Authorized-project discovery has no outer row to correlate to, so it writes
+// the IN form itself over writeMembershipEdgeMatch. The edge conditions live in
+// that one emitter, so the two read paths still cannot answer "whose grant is
+// this" differently.
 func writeUserMembershipInTeam(w ArgWriter, env Env, projectID, setIDExpr, setID, memberIDExpr, memberID string) {
 	w.WriteString(`EXISTS (
         SELECT 1
         FROM `)
 	writeTable(w, env, "authz_membership_edges")
 	w.WriteString(` e
-        WHERE e.project_id = `)
+        WHERE `)
+	writeMembershipEdgeMatch(w, projectID, setIDExpr, setID, memberIDExpr, memberID)
+	w.WriteString(`
+    )`)
+}
+
+// writeMembershipEdgeMatch emits the authz_membership_edges row conditions that
+// decide team membership, on the fixed alias e. Membership is read in one
+// project only: ADR 053 §3 makes that the principal's home project, never the
+// project being authorized.
+//
+// An empty setIDExpr and setID pair omits the set filter. That is the discovery
+// arm, which selects e.set_id instead of testing it; every other caller passes a
+// set and gets the full match.
+//
+// It takes no Env: the caller writes the FROM clause, so nothing here needs the
+// schema qualifier or the dialect clock.
+func writeMembershipEdgeMatch(w ArgWriter, projectID, setIDExpr, setID, memberIDExpr, memberID string) {
+	w.WriteString(`e.project_id = `)
 	w.WriteArg(projectID)
 	w.WriteString(`
-          AND e.set_type = 'team'
+          AND e.set_type = 'team'`)
+	if setIDExpr != "" || setID != "" {
+		w.WriteString(`
           AND e.set_id = `)
-	writeExprOrArg(w, setIDExpr, setID)
+		writeExprOrArg(w, setIDExpr, setID)
+	}
 	w.WriteString(`
           AND e.member_type = 'user'
           AND e.member_id = `)
 	writeExprOrArg(w, memberIDExpr, memberID)
-	w.WriteString(`
-    )`)
+}
+
+// writeDirectPrincipal emits the principal identity test on an assignment row:
+// the grant is held by this principal itself, with no set expansion.
+func writeDirectPrincipal(w ArgWriter, alias, principalType, principalID string) {
+	w.WriteString(alias)
+	w.WriteString(`.principal_type = `)
+	w.WriteArg(principalType)
+	w.WriteString(` AND `)
+	w.WriteString(alias)
+	w.WriteString(`.principal_id = `)
+	w.WriteArg(principalID)
 }
 
 func writeExprOrArg(w ArgWriter, expr, arg string) {
@@ -378,6 +431,13 @@ func writeScopedClosureExists(w ArgWriter, env Env, params domain.AuthzCheckPara
     )`)
 }
 
+// writeFullTTUExists is the tuple-to-userset arm of a Check. The edge is
+// matched through the relation closure rather than by name: a TTU written on
+// `admin` also answers `editor` and `viewer` checks when the catalog closes
+// admin to those, exactly as a direct `admin` assignment does through
+// writeScopedClosureExists. The compiler records computed usersets only in the
+// closure (compiler.go: "TTU and userset references … remain in the query
+// plan"), so without this join an inherited relation would never see the edge.
 func writeFullTTUExists(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	home := params.HomeProjectID()
 	ptype := params.PrincipalType.String()
@@ -387,6 +447,18 @@ func writeFullTTUExists(w ArgWriter, env Env, params domain.AuthzCheckParams) {
         FROM `)
 	writeTable(w, env, "authz_expression_edges")
 	w.WriteString(` edge
+        JOIN `)
+	writeTable(w, env, "authz_relation_closure")
+	w.WriteString(` ec
+          ON  ec.catalog_id       = edge.catalog_id
+          AND ec.from_object_type = edge.object_type
+          AND ec.from_relation    = edge.relation
+          AND ec.to_object_type   = `)
+	w.WriteArg(params.ObjectType)
+	w.WriteString(`
+          AND ec.to_relation      = `)
+	w.WriteArg(params.Relation)
+	w.WriteString(`
         JOIN `)
 	writeTable(w, env, "authz_assignments")
 	w.WriteString(` ts
@@ -406,9 +478,6 @@ func writeFullTTUExists(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	w.WriteString(`
           AND edge.object_type = `)
 	w.WriteArg(params.ObjectType)
-	w.WriteString(`
-          AND edge.relation = `)
-	w.WriteArg(params.Relation)
 	w.WriteString(`
           AND edge.kind = 'tuple_to_userset'
           AND (
@@ -449,26 +518,34 @@ func writeFullTTUExists(w ArgWriter, env Env, params domain.AuthzCheckParams) {
                       AND `)
 	writePrincipalMatch(w, env, "a", ptype, params.PrincipalID, home)
 	w.WriteString(`
-                      AND (
-                            (a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id)
-                         OR (a.scope_kind = 'resource' AND a.scope_resource_id = ts.principal_id)
-                         OR (a.scope_kind = 'project' AND a.object_type = edge.source_object_type)
-                      )
+                      AND `)
+	writeTTUScopeMatch(w, "a", "ts", "edge")
+	w.WriteString(`
                 )
           )
     )`)
 }
 
+// writeTTUScopeMatch emits the rule tying a user-side assignment to the tupleset
+// row it borrows from: the assignment is scoped at that exact team, at that
+// exact resource, or project-wide on the edge's source object type.
+//
+// Shared with authorized-project discovery, which walks the same bounded
+// tuple-to-userset path from the other end (ADR 053 §6). aAlias is the user-side
+// assignment, tsAlias the tupleset assignment, edgeAlias the expression edge.
+// The indentation is the resolver's; discovery inherits it, which costs nothing.
+func writeTTUScopeMatch(w ArgWriter, aAlias, tsAlias, edgeAlias string) {
+	w.WriteString(`(
+                            (` + aAlias + `.scope_kind = 'team' AND ` + aAlias + `.scope_team_id = ` + tsAlias + `.principal_id)
+                         OR (` + aAlias + `.scope_kind = 'resource' AND ` + aAlias + `.scope_resource_id = ` + tsAlias + `.principal_id)
+                         OR (` + aAlias + `.scope_kind = 'project' AND ` + aAlias + `.object_type = ` + edgeAlias + `.source_object_type)
+                      )`)
+}
+
 func writePrincipalMatch(w ArgWriter, env Env, alias, principalType, principalID, homeProjectID string) {
 	w.WriteString(`(
                 (`)
-	w.WriteString(alias)
-	w.WriteString(`.principal_type = `)
-	w.WriteArg(principalType)
-	w.WriteString(` AND `)
-	w.WriteString(alias)
-	w.WriteString(`.principal_id = `)
-	w.WriteArg(principalID)
+	writeDirectPrincipal(w, alias, principalType, principalID)
 	w.WriteString(`)
              OR (
                     `)

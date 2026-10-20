@@ -1,12 +1,15 @@
-import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { render, screen, within } from "@testing-library/react";
+import { RouterProvider, createBrowserHistory, createMemoryHistory } from "@tanstack/react-router";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { makeTestSession } from "../../auth/session.fixture";
+import { makeTestSession } from "@/test/session.fixture";
+import { listMyProjectsCached } from "../../lib/project-scope";
+import { _setRuntimeForTesting } from "../../runtime/runtime";
 import { createAppRouter } from "../../router";
+import { _resetClaimAttemptsForTesting } from "../../lib/claim";
+import { server } from "@/test/msw";
 
 /**
  * The claim page (#615): `claim/init` hands the CLI a URL of the form
@@ -52,32 +55,27 @@ const PROJECT_ID = "proj_claimme";
 const CHALLENGE_ID = "chal_1";
 const CLAIM_PATH = `/claim?challenge_id=${CHALLENGE_ID}&project_id=${PROJECT_ID}`;
 
-// A path pattern rather than an absolute URL: this spec imports the router
-// statically, so `api/zitadel.ts` binds its base before any `stubEnv`.
 const COMPLETE_PATTERN = `*/api/projects/${PROJECT_ID}/claim/complete`;
 const WINDOW_PATTERN = `*/api/projects/${PROJECT_ID}/claim/window`;
 
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterAll(() => server.close());
-
 beforeEach(() => {
   fetchSession.mockReset();
-  // The widget renders only when a project id resolves (ADR 0004 §§2–3);
-  // pin the dev override so the unauthenticated branch exercises it.
-  vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_platform");
-});
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-  server.resetHandlers();
+  // The spend gate outlives a mount by design, and every case here claims the
+  // same URL, so without this each test would replay the previous one's
+  // outcome instead of calling the server.
+  _resetClaimAttemptsForTesting();
+  // The widget renders only when a project id resolves (ADR 0004 §§2–3). A
+  // claim signs in to the platform project, which the runtime document names.
+  _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
+  // The page always reads the claim window for its countdown; an open one
+  // keeps the cases that are not about the countdown about the claim.
+  stubWindow(7);
 });
 
 async function renderAt(path: string) {
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
-  render(<RouterProvider router={router} />);
-  return router;
+  const { unmount } = render(<RouterProvider router={router} />);
+  return { router, unmount };
 }
 
 /** Answers the countdown read with a window closing `days` from now. */
@@ -139,6 +137,76 @@ describe("claim page", () => {
     // CLI picks the claim up on its own without being told to.
     expect(screen.getByRole("link", { name: "Open the console" })).toBeInTheDocument();
     expect(screen.queryByText(/terminal/i)).not.toBeInTheDocument();
+  });
+
+  it("opens the console on the project just claimed, not a list read before it", async () => {
+    // Before the claim the developer holds no project; afterwards, the claimed
+    // one. The console signs in to the platform project (claim mode), which
+    // they cannot manage, so the claimed project must be what gets selected.
+    fetchSession.mockResolvedValue(makeTestSession());
+    let claimed = false;
+    server.use(
+      http.get("*/api/users/me/projects", () =>
+        HttpResponse.json({
+          projects: claimed ? [{ id: PROJECT_ID, name: "Claimed" }] : [],
+        }),
+      ),
+      http.post("*/api/teams/query", () => HttpResponse.json({ teams: [] })),
+    );
+    stubComplete(() => {
+      claimed = true;
+      return HttpResponse.json({
+        project_id: PROJECT_ID,
+        team_id: "team_personal",
+        claimed_at: "2026-08-24T10:00:00Z",
+      });
+    });
+    // A list read before the claim, as the console's guard would have cached it.
+    expect((await listMyProjectsCached()).projects).toEqual([]);
+
+    const { router } = await renderAt(CLAIM_PATH);
+    await userEvent.click(await screen.findByRole("link", { name: "Open the console" }));
+
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: PROJECT_ID });
+  });
+
+  // The gap the in-component ref cannot cover: a fresh mount gets a fresh ref.
+  // The page was observed mounting twice on the way back from the sign-in
+  // widget, and the second mount re-spent a challenge the first had completed
+  // -- which the server refuses with 409 by contract, replacing the success
+  // already on screen with "Already claimed".
+  it("spends the challenge once across a remount, keeping the success", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    let calls = 0;
+    server.use(
+      http.post(COMPLETE_PATTERN, () => {
+        calls += 1;
+        // The second spend answers exactly as the server does.
+        return calls === 1
+          ? HttpResponse.json({
+              project_id: PROJECT_ID,
+              team_id: "team_personal",
+              claimed_at: "2026-08-24T10:00:00Z",
+            })
+          : HttpResponse.json(
+              {
+                code: "proj-already_claimed",
+                message: "The project is already claimed by a team.",
+                details: { team_id: "team_personal" },
+              },
+              { status: 409 },
+            );
+      }),
+    );
+
+    const first = await renderAt(CLAIM_PATH);
+    expect(await screen.findByRole("heading", { name: "Project claimed" })).toBeInTheDocument();
+    first.unmount();
+
+    await renderAt(CLAIM_PATH);
+    expect(await screen.findByRole("heading", { name: "Project claimed" })).toBeInTheDocument();
+    expect(calls).toBe(1);
   });
 
   it("shows the owning team's dashboard when the project is already claimed", async () => {
@@ -207,6 +275,28 @@ describe("claim page", () => {
       screen.getByText("The session user has no active personal team in the platform project."),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  // A CSRF refusal is not a team problem: it must not take the "no team yet"
+  // branch, and a plain retry would be refused the same way.
+  it("does not mistake a CSRF refusal for a missing team", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubComplete(() =>
+      HttpResponse.json(
+        {
+          code: "auth.csrf_invalid",
+          message: "The request failed cross-site request forgery validation.",
+        },
+        { status: 403 },
+      ),
+    );
+    await renderAt(CLAIM_PATH);
+
+    expect(
+      await screen.findByRole("heading", { name: "The claim was not accepted from this page" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Your account has no team yet" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
   });
 
   it("dead-ends claim.personal_team_not_active and names the remedy", async () => {
@@ -357,7 +447,11 @@ describe("claim window countdown", () => {
     fetchSession.mockResolvedValue(makeTestSession());
     stubWindow(9);
     stubComplete(() =>
-      HttpResponse.json({ project_id: PROJECT_ID, team_id: "team_1", claimed_at: "2026-08-24T10:00:00Z" }),
+      HttpResponse.json({
+        project_id: PROJECT_ID,
+        team_id: "team_1",
+        claimed_at: "2026-08-24T10:00:00Z",
+      }),
     );
 
     await renderAt(CLAIM_PATH);
@@ -370,7 +464,10 @@ describe("claim window countdown", () => {
     fetchSession.mockResolvedValue(makeTestSession());
     stubWindow(9);
     stubComplete(() =>
-      HttpResponse.json({ code: "proj.claim_expired", message: "the claim link expired" }, { status: 410 }),
+      HttpResponse.json(
+        { code: "proj.claim_expired", message: "the claim link expired" },
+        { status: 410 },
+      ),
     );
 
     await renderAt(CLAIM_PATH);
@@ -379,5 +476,50 @@ describe("claim window countdown", () => {
     // the project is still claimable for another nine days.
     expect(await screen.findByText("Claim link expired")).toBeInTheDocument();
     expect(await screen.findByText("Expires in 9 days")).toBeInTheDocument();
+  });
+
+  it("does not spend the challenge when the widget's history sentinel moves the router", async () => {
+    // The widget keeps a back-gesture sentinel on the history stack (ADR 022)
+    // and retires it with a traversal. The popstate that fires is a navigation
+    // to the router; a loader that reloaded on it could see the session the
+    // handoff exchange has just created and complete the claim in a document
+    // the widget's own navigation is about to replace — the next document then
+    // spends again and is told the project is already claimed.
+    fetchSession.mockResolvedValue(null);
+    const bodies = stubComplete(() =>
+      HttpResponse.json({
+        project_id: PROJECT_ID,
+        team_id: "team_personal",
+        claimed_at: "2026-08-24T10:00:00Z",
+      }),
+    );
+    window.history.replaceState(null, "", CLAIM_PATH);
+    const router = createAppRouter({ history: createBrowserHistory() });
+    const { unmount } = render(<RouterProvider router={router} />);
+    try {
+      await screen.findByTestId("zitadel-login");
+      expect(fetchSession).toHaveBeenCalledTimes(1);
+
+      // The exchange landed: a fresh read would now find a session.
+      fetchSession.mockResolvedValue(makeTestSession());
+      await act(async () => {
+        window.history.pushState({ zl: true }, "");
+        window.history.back();
+      });
+      // jsdom delivers the popstate asynchronously; wait until the router has
+      // seen it and settled, so any reload it triggered has run, before
+      // asserting that it changed nothing.
+      await waitFor(() => {
+        expect(router.state.resolvedLocation?.state).not.toMatchObject({ zl: true });
+        expect(router.state.status).toBe("idle");
+      });
+
+      expect(screen.getByTestId("zitadel-login")).toBeInTheDocument();
+      expect(fetchSession).toHaveBeenCalledTimes(1);
+      expect(bodies).toHaveLength(0);
+    } finally {
+      unmount();
+      window.history.replaceState(null, "", "/");
+    }
   });
 });

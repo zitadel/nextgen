@@ -11,6 +11,11 @@ properties:
       Which action to take. Must be a key from the step's `actions` dictionary:
       - A regular action (e.g., "submit", "register", "back")
       - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`)
+
+      A name the current step does not declare is refused with 400
+      (`flow.invalid_action`). That includes the outcome names the engine
+      routes on its own (`user_not_found`, `user_already_exists`,
+      `sso_user_not_found`, `sso_authenticated`), which are never actions.
   fields:
     type: object
     description: |
@@ -52,3 +57,16 @@ properties:
       ID of the selected SSO provider (from `sso_providers[].id`).
       Required when `action` is "sso".
     example: google
+  return_target:
+    type: string
+    maxLength: 2048
+    description: |
+      The page hosting the orchestrator, where the flow resumes after an
+      external sign-in: the callback sends the browser here unchanged, and
+      the page loads `GET /flow/{id}` to render the next step. The client
+      puts the flow id in it; the orchestrator reads `?flow=<id>` on the
+      reload. Required when `action` is "sso". An absolute URL; the server
+      parses it and keeps a fragment, so a hash-routed page returns to its
+      route. Its origin must equal the request origin; any other origin is
+      rejected and no sign-in is started.
+    example: https://login.example.com/login?flow=flow_2

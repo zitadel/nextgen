@@ -34,8 +34,9 @@ const (
 // → readMiss unless the principal has a foothold, at the cost of repeated-delete 204s.
 var errResourceGone = errors.New("authz: resource gone")
 
-// projectRelation is the catalog relation checked for an accessOp.
-// Until #420, the seeded viewer grant satisfies viewer/editor/admin Checks.
+// projectRelation is the catalog relation checked for an accessOp. Roles are
+// monotonic in the seeded catalog: an admin assignment closes to editor and
+// viewer, an editor one to viewer, so a stronger grant passes a weaker check.
 func projectRelation(op accessOp) string {
 	switch op {
 	case opRead:
@@ -117,15 +118,14 @@ var brandingAccess = resourceAccess{
 	denied:    domain.ErrBrandingPermissionDenied,
 }
 
-// environmentAccess gates the project's runtime slots (ADR 035, #534).
-// Reads are project-scoped: the list carries a project_id and the get
-// addresses an environment by name, so no route resolves a path id through
-// RSI and the kind is only used to narrow a partial-access list.
-var environmentAccess = resourceAccess{
-	kind:      domain.ResourceKindEnvironment,
-	readMiss:  domain.ErrEnvironmentNotFound,
-	writeMiss: domain.ErrEnvironmentProjectNotFound,
-	denied:    domain.ErrEnvironmentPermissionDenied,
+// variableAccess gates the project's variables and secrets (ADR 062). Like
+// grants and events, a variable has no minted id and no resource_scope_index
+// row — it is addressed by name under the project_id the request carries — so
+// every op is project-scoped and there is no kind to check.
+var variableAccess = resourceAccess{
+	readMiss:  domain.ErrVariableNotFound,
+	writeMiss: domain.ErrVariableNotFound,
+	denied:    domain.ErrVariablePermissionDenied,
 }
 
 // releaseAccess gates the project's release snapshots (ADR 035, #531).
@@ -137,6 +137,40 @@ var releaseAccess = resourceAccess{
 	readMiss:  domain.ErrReleaseNotFound,
 	writeMiss: domain.ErrReleaseProjectNotFound,
 	denied:    domain.ErrReleasePermissionDenied,
+}
+
+// idpAccess guards the project's identity provider connections (#1003). Every
+// route carries a project_id. The two connection-id reads (get and the
+// revision list) resolve the path id through RSI in that project, so a grant
+// on one connection reaches it. Create, query and the single revision read
+// stay project-scoped: revisions have no RSI row. On the query the kind
+// narrows a partial-access list.
+var idpAccess = resourceAccess{
+	kind:      domain.ResourceKindIDPConnection,
+	readMiss:  domain.ErrIDPConnectionNotFound,
+	writeMiss: domain.ErrIDPConnectionNotFound,
+	denied:    domain.ErrIDPConnectionPermissionDenied,
+}
+
+// deploymentAccess gates the record of what runs where (ADR 035, #532).
+// Same shape as releaseAccess: create and get are project-scoped — both carry
+// a project_id and the get filters its lookup by it — so no route resolves a
+// path id through RSI and the kind is only used to narrow a partial-access
+// list.
+var deploymentAccess = resourceAccess{
+	kind:      domain.ResourceKindDeployment,
+	readMiss:  domain.ErrDeploymentNotFound,
+	writeMiss: domain.ErrEnvironmentProjectNotFound,
+	denied:    domain.ErrDeploymentPermissionDenied,
+}
+
+// originAccess gates add/remove of project origin patterns. Origins have no
+// minted id and no RSI row — they are addressed by pattern under the
+// project_id the request carries — so every op is project-scoped.
+var originAccess = resourceAccess{
+	readMiss:  domain.ErrOriginNotFound,
+	writeMiss: domain.ErrOriginNotFound,
+	denied:    domain.ErrOriginPermissionDenied,
 }
 
 // eventsAccess gates the operator audit stream (ADR 049). List/get are
@@ -174,16 +208,48 @@ type resourceAccessStmts interface {
 // RSI miss on read/write → resource 404; on delete → errResourceGone for
 // operators (handlers map to 204), else readMiss. Returns project_id for DAL calls.
 func (h *Handler) requireResourceAccess(ctx context.Context, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
+	return h.requireResourceAccessInProject(ctx, "", resourceID, res, op)
+}
+
+// requireResourceAccessInProject is requireResourceAccess for ids that are unique only
+// within a project (schemas): projectHint, when set, names the project to
+// resolve the id in instead of the credential's own.
+func (h *Handler) requireResourceAccessInProject(ctx context.Context, projectHint, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
 	if h == nil || h.pool == nil {
 		return "", domain.ErrInternal(errors.New("authz statements not configured"))
 	}
-	return requireResourceAccess(ctx, h.pool.Statements(), resourceID, res, op)
+	return requireResourceAccess(ctx, h.pool.Statements(), projectHint, resourceID, res, op)
 }
 
-func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, resourceID string, res resourceAccess) (*domain.ResourceScope, error) {
+// lookupResourceScope finds the project a path id lives in. A project-bound
+// credential (secret) searches its own project; a user principal (a Console
+// session) is looked up across projects, because it manages projects other
+// than the one it signed in to (#1300 §3) — the Check that follows runs
+// against the resource's own project, so being found is not being allowed.
+// projectHint, when set, names the project a session searches instead; a
+// project secret ignores it and stays in its own project, so its containment
+// never rests on the Check alone. An id that is unique only per project (a
+// schema's `$id`) and matches in several projects resolves in the session's
+// own project, or not at all.
+func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, projectHint, resourceID string, res resourceAccess) (*domain.ResourceScope, error) {
+	cred, _ := GetScopeContext(ctx)
+	if cred.PrincipalType != domain.AuthzPrincipalTypeUser {
+		projectHint = ""
+	}
+	if res.kind != "" && projectHint == "" && cred.PrincipalType == domain.AuthzPrincipalTypeUser {
+		scope, err := stmts.GetResourceScope(ctx, resourceID)
+		if !errors.Is(err, new(database.MultipleRowsFoundError)) {
+			return scope, err
+		}
+		projectHint = cred.ProjectID
+	}
 	if res.kind != "" {
-		if cred, ok := GetScopeContext(ctx); ok && cred.ProjectID != "" {
-			scope, err := stmts.GetResourceScopeInProject(ctx, res.kind, cred.ProjectID, resourceID)
+		home := projectHint
+		if home == "" {
+			home = cred.ProjectID
+		}
+		if home != "" {
+			scope, err := stmts.GetResourceScopeInProject(ctx, res.kind, home, resourceID)
 			if err == nil {
 				return scope, nil
 			}
@@ -191,7 +257,7 @@ func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, resourc
 				return nil, err
 			}
 			// Same-project row under a different kind (e.g. schema id on a user route).
-			if same, gerr := stmts.GetResourceScopeByIDInProject(ctx, cred.ProjectID, resourceID); gerr == nil {
+			if same, gerr := stmts.GetResourceScopeByIDInProject(ctx, home, resourceID); gerr == nil {
 				return same, nil
 			} else if !errors.Is(gerr, new(database.NoRowFoundError)) {
 				return nil, gerr
@@ -202,8 +268,8 @@ func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, resourc
 	return stmts.GetResourceScope(ctx, resourceID)
 }
 
-func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resourceID string, res resourceAccess, op accessOp) (string, error) {
-	scope, err := lookupResourceScope(ctx, stmts, resourceID, res)
+func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, projectHint, resourceID string, res resourceAccess, op accessOp) (string, error) {
+	scope, err := lookupResourceScope(ctx, stmts, projectHint, resourceID, res)
 	if err != nil {
 		if errors.Is(err, new(database.NoRowFoundError)) {
 			if op == opDelete {
@@ -375,6 +441,48 @@ func requireExpandScope(ctx context.Context, scope string, denied func() domain.
 	return denied().WithMessage(msg)
 }
 
+// userReadsProject reports whether the credential is a user principal (the
+// Console session) with read on the whole of projectID, which stands in for the
+// team_membership.read / team.read scopes such a principal never mints. The
+// system catalog has no finer read permission than the project viewer role
+// (ADR 054 §5). Operations with no list check whose decision they can use ask
+// the resolver through requireMembershipReadIn.
+func (h *Handler) userReadsProject(ctx context.Context, projectID string) (bool, error) {
+	sc, ok := GetScopeContext(ctx)
+	if !ok || sc.PrincipalType != domain.AuthzPrincipalTypeUser {
+		return false, nil
+	}
+	if h == nil || h.pool == nil {
+		return false, domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	dec, err := checkProjectAccess(ctx, resolver.New(), h.pool.Statements(), projectID, opRead, nil)
+	if err != nil {
+		return false, err
+	}
+	return dec == resolver.DecisionAllow, nil
+}
+
+// requireMembershipReadIn gates a membership read of a user in projectID that
+// has no list check to lean on (GET /users/{id}?team_id=, GET /users/{id}/teams):
+// by scope for a project secret, by project-wide read for a session.
+func (h *Handler) requireMembershipReadIn(ctx context.Context, projectID string) error {
+	reads, err := h.userReadsProject(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	return requireMembershipReadUnless(ctx, reads)
+}
+
+// requireMembershipReadUnless is requireMembershipRead, waived when the caller
+// is a session with read on the whole project (the list check's project-wide
+// decision on POST /users/query, or requireMembershipReadIn).
+func requireMembershipReadUnless(ctx context.Context, sessionReadsProject bool) error {
+	if sessionReadsProject {
+		return nil
+	}
+	return requireMembershipRead(ctx)
+}
+
 func requireMembershipRead(ctx context.Context) error {
 	return requireExpandScope(ctx, "team_membership.read", domain.ErrUserPermissionDenied,
 		"reading a user's team memberships requires team_membership.read")
@@ -383,6 +491,11 @@ func requireMembershipRead(ctx context.Context) error {
 func requireTeamRead(ctx context.Context) error {
 	return requireExpandScope(ctx, "team.read", domain.ErrUserPermissionDenied,
 		"expanding a user's lifecycle owner team requires team.read")
+}
+
+func requireReleaseRead(ctx context.Context) error {
+	return requireExpandScope(ctx, "release.read", domain.ErrDeploymentPermissionDenied,
+		"expanding a deployment's release requires release.read")
 }
 
 func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) error {
@@ -401,29 +514,32 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 // requireProjectListAccess gates a management list and attaches the list
 // context: Allow stamps a one-shot EXISTS skip (consumed by the next
 // compileList / ListUsers); Forbidden attaches the EXISTS predicate via
-// the same Resolver used for Check; NotFound 404s.
-func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
+// the same Resolver used for Check; NotFound 404s. The bool reports whether
+// the access is project-wide (Allow) rather than partial (a foothold narrowed
+// by the filter).
+func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, bool, error) {
 	if h == nil || h.pool == nil {
-		return ctx, domain.ErrInternal(errors.New("authz statements not configured"))
+		return ctx, false, domain.ErrInternal(errors.New("authz statements not configured"))
 	}
 	return requireProjectListAccess(ctx, h.pool.Statements(), projectID, res, kind)
 }
 
-func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
+func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, bool, error) {
 	r := resolver.New()
 	dec, err := checkProjectAccess(ctx, r, stmts, projectID, opRead, nil)
 	if err != nil {
-		return ctx, mapCeilingError(err, res, opRead, nil)
+		return ctx, false, mapCeilingError(err, res, opRead, nil)
 	}
 	switch dec {
 	case resolver.DecisionAllow:
-		return service.WithAuthzListSkipOnce(ctx), nil
+		return service.WithAuthzListSkipOnce(ctx), true, nil
 	case resolver.DecisionForbidden:
-		return withAuthzListFilter(ctx, r, stmts, projectID, kind, opRead)
+		ctx, err := withAuthzListFilter(ctx, r, stmts, projectID, kind, opRead)
+		return ctx, false, err
 	case resolver.DecisionNotFound, resolver.DecisionUnspecified:
-		return ctx, res.miss(opRead)
+		return ctx, false, res.miss(opRead)
 	default:
-		return ctx, res.miss(opRead)
+		return ctx, false, res.miss(opRead)
 	}
 }
 

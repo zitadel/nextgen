@@ -1,206 +1,82 @@
 # Agent Instructions — `apps/cli`
 
-Scope pointers first — this file's own body covers **telemetry only**:
+## Where the rules live
 
-- The agent-facing command contract (JSON envelope, posture, claim, doctor
-  repair) is [`SKILLS.md`](SKILLS.md) — keep it aligned with the command
-  surface on every CLI behavior change (root `AGENTS.md` Generated Files rule).
-- Scaffold posture derivation (standalone page vs widget in a pre-existing
-  app) is [ADR 044](../../docs/adrs/044-scaffold-embedding-posture-defaults.md);
-  the implementation lives in `src/lib/orca/patchers/posture.ts` and the
-  manifest in `src/lib/scaffold-manifest.ts` (drift rules:
-  [ADR 042](../../docs/adrs/042-scaffolded-file-ownership-and-drift-detection.md)).
-- The claim lifecycle is
-  [ADR 046](../../docs/adrs/046-claim-lifecycle-v2.md) (`src/commands/claim.ts`,
-  `src/lib/claim-state.ts`, `src/commands/doctor/checks/claim.ts`).
-- The journey e2e contract is
-  [`apps/cli-journey-e2e/AGENTS.md`](../cli-journey-e2e/AGENTS.md).
+- [`SKILL.md`](skills/zitadel-cli/SKILL.md) is the agent-facing contract (JSON
+  envelope, invocation rules, claim, doctor repair). Update it with every
+  change to the command surface.
+- Tests: [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving
+  a test.
+- `start`, `stop`, `status`, `logs`, `reset`, `console`, `doctor` and how
+  `setup` finds a local server:
+  [`src/lib/local-server/AGENTS.md`](src/lib/local-server/AGENTS.md).
+- Scaffold posture: [ADR 044](../../docs/adrs/044-scaffold-embedding-posture-defaults.md)
+  (`src/lib/orca/patchers/posture.ts`); scaffolded-file drift:
+  [ADR 042](../../docs/adrs/042-scaffolded-file-ownership-and-drift-detection.md)
+  (`src/lib/scaffold-manifest.ts`).
+- Claim: [ADR 046](../../docs/adrs/046-claim-lifecycle-v2.md).
+- The fresh-app journey: [`e2e/journey/AGENTS.md`](../../e2e/journey/AGENTS.md).
 
-# Analytics Tracking — Mixpanel
+## Command code
 
-This package (`@zitadel/cli`) uses **Mixpanel** for anonymous product analytics.
-Mixpanel is the single source of truth for usage events. Do not introduce any
-other analytics tool, SDK, or tracking library without explicit instruction.
+- Report a warning through `reportWarning` (`src/lib/warnings.ts`) or a
+  result's `warnings`, never `consola.warn`: `--json` silences consola. A unit
+  test fails on any other `consola.warn`.
+- Ask for input through `this.input(...)` (`src/lib/input.ts`), never clack's
+  prompts and never a hand-written flag-or-stdin-or-prompt rule. A unit test
+  fails on a clack import elsewhere.
+- A command whose `--force` means something other than "yes to every
+  confirm" builds its own asker with `force: false`, as `setup` does.
+- The flag surface follows the [WebCLI spec](https://webcli.com/). Record a new
+  global flag, or a deviation, in `SKILL.md`'s invocation rules.
 
----
+## Telemetry
 
-## Before You Add or Modify Any Tracking
+Anonymous product analytics through Mixpanel's Node SDK (`mixpanel`).
 
-⛔ **Read this file before writing any Mixpanel tracking code.**
+- Add no other analytics tool or SDK, browser SDK included.
+- Send nothing that identifies a person, machine or credential: no user,
+  email, name, IP, URL, project id, file path, secret or free text. Allowed
+  values are enums, booleans, counts and versions.
+- The install id is a random UUID (`src/lib/telemetry/identity.ts`); there is
+  no `identify()`. The server URL is bucketed into `server_kind`, and the
+  country comes from the timezone with `ip: 0`.
+- Consent is opt-out (`--no-telemetry`, `DO_NOT_TRACK`, `ZITADEL_TELEMETRY=0`)
+  and resolved once in `resolveConsent` (`src/lib/telemetry/consent.ts`).
+  Never send around it.
+- `BaseCommand` (`src/lib/oclif/base.ts`) is the only place a client is
+  built; CLI-specific properties live in `src/lib/oclif/command-telemetry.ts`.
+- Telemetry never writes to stdout and never fails a command. The first-run
+  notice goes to stderr, in interactive mode only.
+- The baked-in ingestion tokens (`src/lib/telemetry/config.ts`) are write-only
+  and published on purpose. Without settings, events go to the production
+  project; `ZITADEL_TELEMETRY_ENV=development` selects the dev project, and CI
+  sets `DO_NOT_TRACK=1`.
+- `ci_provider` and `host_agent` also travel in the HTTP `User-Agent`
+  (`src/lib/user-agent.ts`) and obey the same opt-out.
 
-This is a **CLI**, not a web app, so the usual identity model does not apply:
-there is no logged-in user, no `identify()`/`reset()`, and no PII. Events are
-attributed to an anonymous, randomly-generated install id. Treat that as a hard
-invariant — never attach a user, email, project id, URL, or file path to an
-event.
+### Adding a dimension
 
-### Mandatory checklist
+`cli_command_started`, `cli_command_completed` and `cli_command_failed` fire
+from `BaseCommand` for every command. Add a dimension rather than an event:
 
-- [ ] The Node server-side SDK (`mixpanel`) is the correct SDK — do not add the browser SDK.
-- [ ] No CDP is involved; events go straight to Mixpanel.
-- [ ] Consent is opt-out and resolved centrally in `src/lib/telemetry/consent.ts` — never fire an event that bypasses it.
-- [ ] The new event only carries allow-listed dimensions (enums, booleans, counts, versions).
+1. Record it with `this.recordTelemetry({ … })`. It reaches the events fired
+   after it, so not `started`. Never fetch data just to record it.
+2. Name it `snake_case`; a boolean starts with `is_`, `has_`, `dry_` or
+   `non_`. Leave out empty values; `compact()` drops them.
+3. List it below, then cover it in `tests/unit/lib/telemetry/`. The
+   `setup-dimensions` and `variables-dimensions` tests fail on a recorded
+   dimension their line below does not name.
+4. Check that it arrives in Mixpanel's Live View. The region defaults to `eu`;
+   set `ZITADEL_TELEMETRY_REGION=us` for a US project, or events are silently
+   dropped.
 
----
+Dimensions each command records:
 
-## Tech Stack
-
-| Detail | Value |
-|---|---|
-| **Platform** | Node.js CLI (oclif), ESM, Node ≥ 24 |
-| **Mixpanel SDK** | `mixpanel` (server-side) |
-| **SDK version** | `^0.18.1` |
-| **Tracking method** | server-side, fire-and-forget |
-| **CDP (if any)** | none |
-| **Consent required** | yes — opt-out model (`DO_NOT_TRACK`, `ZITADEL_TELEMETRY=0`, `--no-telemetry`) |
-| **Project token location** | `src/lib/telemetry/config.ts` (write-only dev + prod tokens baked in) |
-| **Data region** | `ZITADEL_TELEMETRY_REGION` = `eu` (default, Zitadel projects' region) \| `us` |
-
-The ingestion token is **write-only** (cannot read data back), so embedding it
-in the published CLI is safe and intentional — this is how dev-tool telemetry
-works. Dev and prod are separate Mixpanel projects. The channel is **stamped into
-the bundle at build time** and **defaults to `development`**: `tsdown`'s `define`
-sets `__ZITADEL_TELEMETRY_CHANNEL__` from `ZITADEL_TELEMETRY_BUILD_CHANNEL` (else
-`development`), so every contributor/CI build routes to the dev project. **Only
-the release pipeline** (`cli:build-release` and CLI `prepack`) sets that env to
-`production`, so the **published CLI routes real user traffic to prod**. Runtime precedence:
-explicit `ZITADEL_TELEMETRY_ENV`, then a runtime `ZITADEL_TELEMETRY_BUILD_CHANNEL`,
-then the build-time stamp. Ambient `NODE_ENV` is intentionally not consulted.
-
----
-
-## Initialization
-
-Telemetry is constructed **once per command invocation** by `BaseCommand`
-(`src/lib/oclif/base.ts`) via `Telemetry.create({ env, flag, debug })` in
-`toMeta()`. The generic client lives in `src/lib/telemetry`; all CLI-specific
-property building (event names, `server_kind`, base/profile dimensions) lives in
-`src/lib/oclif/command-telemetry.ts`. The
-Mixpanel client is built lazily — only when consent is granted *and* a token is
-configured. Do not construct a `Mixpanel` client anywhere else.
-
-**File:** `src/lib/telemetry/index.ts`
-
-**Do not:**
-- Initialize Mixpanel outside `BaseCommand`.
-- Write to **stdout** from telemetry — the JSON envelope is the machine
-  contract; the one-time first-run notice goes to stderr and only in
-  interactive mode.
-- Let telemetry throw or block — every path fails open; the network is bounded
-  by `Telemetry.shutdown()`'s timeout in `BaseCommand.finally()`.
-
----
-
-## Identity
-
-There is **no user identity**. Each install gets a stable, anonymous
-`distinct_id` (a random UUID) persisted under the platform config dir
-(`src/lib/telemetry/identity.ts`). It is tied to no account and contains no
-fingerprint. On first run, `isFirstRun` drives the one-time consent notice.
-
----
-
-## Tracking Plan
-
-Three **lifecycle events** cover every command (one instrumentation point in
-`BaseCommand`, so new commands are covered automatically):
-
-| Event | Trigger | Key Properties | File |
-|---|---|---|---|
-| `cli_command_started` | a command begins (`toMeta`) | base dimensions | `src/lib/oclif/base.ts` |
-| `cli_command_completed` | a command succeeds or skips (`emit`) | `status`, `duration_ms`, command extras | `src/lib/oclif/base.ts` |
-| `cli_command_failed` | a command throws (`catch`) | `reason`, `exit_code`, `step` | `src/lib/oclif/base.ts` |
-
-**Value Moment:** `cli_command_completed` for `command=setup` — Zitadel auth is
-wired into the user's app.
-
-### Base dimensions (every event)
-
-`command`, `cli_version`, `os`, `arch`, `node_version`, `invocation_id`,
-`non_interactive`, `is_tty`, `is_ci`, `ci_provider`, `host_agent`,
-`invocation_channel`, `dry_run`, `force`, `server_kind` (bucketed
-`cloud`/`local`/`self_hosted` — **never the URL**), plus the reserved
-event properties `$os`/`mp_country_code` (country derived from the timezone, not
-the IP — `ip: 0` keeps IP geolocation off). First-run user profiles use the
-People API's `$country_code` profile property for the same derived country. Built
-in `src/lib/oclif/command-telemetry.ts` (using the generic env/geo helpers in
-`src/lib/telemetry/`).
-
-### Event shape
-
-Each event is one Mixpanel `track` call. We set the properties below;
-Mixpanel injects the transport fields (`time`, `$lib_version`,
-`$mp_api_endpoint`, `$user_id`, `mp_lib`, …) on ingestion — we do not send those.
-
-```json
-{
-  "event": "cli_command_completed",
-  "properties": {
-    "distinct_id": "09233195-cd34-468c-bb7b-151554e19fbc",
-    "$insert_id": "2398bc39-3cb6-4b05-835f-bb03908794b8",
-    "ip": 0,
-    "invocation_id": "6d919718-6168-42b4-9482-e656776445f0",
-    "command": "status",
-    "cli_version": "0.1.0-alpha.11",
-    "$os": "Mac OS X",
-    "mp_country_code": "AU",
-    "os": "darwin",
-    "arch": "arm64",
-    "node_version": "24.12.0",
-    "non_interactive": true,
-    "is_tty": false,
-    "is_ci": false,
-    "host_agent": "unknown",
-    "invocation_channel": "unknown",
-    "dry_run": false,
-    "force": false,
-    "server_kind": "cloud",
-    "status": "ok",
-    "duration_ms": 25
-  }
-}
-```
-
-### Command-specific dimensions
-
-Commands add dimensions via `this.recordTelemetry({ … })` (merged immutably onto
-each lifecycle event emitted *after* recording — typically `completed`/`failed`,
-since `started` fires before the command body runs):
-
-- **setup** — `framework`, `renderer`, `package_manager`, `scaffolded_skeleton`, `skip_install`, `dev_port_explicit`, `preset`, `use_case`, `design` (a `BRANDING_DESIGNS` value or `built-in`), `files_written_count`, `step` (`framework_resolved` → `project_created` → `files_patched` → `dependencies_installed`).
-- **plan / apply** — `creates`, `updates`, `deletes`, `revisions`, `total` (diff *counts* only).
-- **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (failing check **names**, never messages).
+- **setup** — `framework`, `renderer`, `package_manager`, `scaffolded_skeleton`, `skip_install`, `dev_port_explicit`, `preset`, `use_case`, `sso` (an `IDP_PROVIDERS` slug, `custom` for a developer-described connection but never its slug, `none`, or `multiple`), `files_written_count`, `step` (`framework_resolved` → `project_created` → `files_patched` → `dependencies_installed`).
+- **branding eject** — `design` (a `BRANDING_DESIGNS` value).
+- **plan / apply** — `creates`, `updates`, `deletes`, `revisions`, `total` (counts only).
+- **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (check names, never messages).
 - **start** — `runtime` (`binary` / `docker`).
-- **claim** — `claim_outcome` (`completed` / `already_claimed` / `expired` / `window_expired` / `timeout` / `dry_run`), `poll_count`, `browser_opened`. Deliberately *not* recorded: `challenge_id`, `team_id`, `claim_url`, `dashboard_url` — every one of them is an id or a URL.
-
-### Naming conventions
-
-- Event names: `snake_case`, past tense (`cli_command_completed`).
-- Property names: `snake_case`; booleans use `is_`/`has_`/`dry_`/`non_` style flags.
-- Omit empty properties — `compact()` drops `null`/`undefined`/`""`; never send them.
-
----
-
-## How to Add a New Event or Property
-
-1. Prefer enriching `this.telemetryProps` in the command over adding a new
-   event — the lifecycle events already cover command outcomes.
-2. Only add properties available at the moment the event fires; never fetch data
-   just for telemetry.
-3. Keep it allow-listed: enums, booleans, counts, versions. **No** URLs, ids,
-   paths, emails, secrets, or free-text.
-4. Add the property to the table above and cover it in
-   `tests/unit/lib/telemetry/`.
-5. Verify it lands in Mixpanel **Live View** (set `ZITADEL_TELEMETRY_REGION=eu`
-   first if the project is in the EU region — events to the wrong host are
-   silently dropped).
-
----
-
-## What Not to Do
-
-- **Do not** introduce another analytics tool.
-- **Do not** track PII — no emails, names, IPs, URLs, project ids, file paths, or secrets.
-- **Do not** write to stdout from telemetry.
-- **Do not** let a telemetry failure surface to the user — fail open, always.
-- **Do not** fire events that bypass `resolveConsent`.
+- **variables** — `is_secret`, `variable_count`. Never the variable's name or value.
+- **claim** — `claim_outcome` (`completed` / `already_claimed` / `expired` / `window_expired` / `timeout` / `dry_run`), `poll_count`, `browser_opened`. Never an id or a URL.

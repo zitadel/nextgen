@@ -1,13 +1,11 @@
 /**
  * `{% mandatory_gates %}` runtime patcher.
  *
- * Per `docs/design/branding/validator.md` §Runtime safety net:
- *
- *   "After the template finishes rendering, the tag inspects the produced DOM
- *    and appends:
- *      - Any required `fields[*]` without a matching `<zl-field>`.
- *      - Any required `gates[*]` without a matching consumer.
- *      - A primary `<zl-button type="submit">` if none was reached."
+ * Per `docs/design/branding/validator.md` §Runtime safety net, after the
+ * template finishes rendering this appends:
+ *   - any required `fields[*]` with no field atom of that name, and
+ *   - the step's primary action as a `<zl-button>`, if none was rendered.
+ * It does not append gate consumers.
  *
  * Implementation: the LiquidJS `{% mandatory_gates %}` tag emits a unique
  * marker comment. After Liquid renders, this patcher parses the produced
@@ -29,11 +27,7 @@ const FIELD_ATOM_TAGS = "zl-field, zl-select, zl-checkbox";
 
 export const mandatoryGatesMarkerComment = `<!--${MANDATORY_GATES_MARKER}-->`;
 
-export function patchMandatoryGates(
-  html: string,
-  step: CreateFlow201Step,
-  locale: Locale,
-): string {
+export function patchMandatoryGates(html: string, step: CreateFlow201Step, locale: Locale): string {
   const template = document.createElement("template");
   template.innerHTML = html;
   const fragment = template.content;
@@ -66,7 +60,9 @@ function collectMissingAtoms(
     for (const field of step.fields) {
       if (!field.required) continue;
       if (hasFieldFor(fragment, field.name)) continue;
-      additions.push(buildField(field.name, field.text_key, field.type, locale, field.required));
+      additions.push(
+        buildField(field.name, field.text_key, field.type, locale, field.required, field.read_only),
+      );
     }
   }
 
@@ -124,6 +120,7 @@ function buildField(
   type: string,
   locale: Locale,
   required: boolean,
+  readOnly: boolean | undefined,
 ): Element {
   const el = document.createElement("zl-field");
   el.setAttribute("name", name);
@@ -131,6 +128,9 @@ function buildField(
   el.setAttribute("type", type);
   if (required) {
     el.setAttribute("required", "");
+  }
+  if (readOnly) {
+    el.setAttribute("readonly", "");
   }
   return el;
 }

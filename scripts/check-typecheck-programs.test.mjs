@@ -1,12 +1,12 @@
 /**
  * Regression tests for the vacuous-typecheck classifier, run by the
- * `workspace:check-typecheck` task before the audit itself (node:test, no
+ * `workspace:check-typecheck` task before the audit itself (Vitest, no
  * dependencies). The classifier must judge every `&&` segment on its own —
  * a whole-command `--build` short-circuit once let a plain solution-style
  * segment hide behind a build segment.
  */
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 
 import { vacuousTscTargets } from "./check-typecheck-programs.mjs";
 
@@ -30,7 +30,10 @@ test("build mode walks references and is never vacuous", () => {
 
 test("a plain solution-style segment cannot hide behind a build segment", () => {
   assert.deepEqual(
-    vacuousTscTargets("tsc --build tsconfig.lib.json && tsc --noEmit -p tsconfig.json", solutionIsDefault),
+    vacuousTscTargets(
+      "tsc --build tsconfig.lib.json && tsc --noEmit -p tsconfig.json",
+      solutionIsDefault,
+    ),
     ["tsconfig.json"],
   );
 });
@@ -48,12 +51,21 @@ test("plain tsc against real configs passes, in and out of chains", () => {
 
 test("non-tsc segments and tool-owned programs are not tsc programs", () => {
   assert.deepEqual(
-    vacuousTscTargets("corepack pnpm --filter @zitadel/api run generate && tsc --noEmit -p tsconfig.app.json", solutionIsDefault),
+    vacuousTscTargets(
+      "corepack pnpm --filter @zitadel/api run generate && tsc --noEmit -p tsconfig.app.json",
+      solutionIsDefault,
+    ),
     [],
   );
-  assert.deepEqual(vacuousTscTargets("svelte-check --tsconfig ./tsconfig.json", solutionIsDefault), []);
   assert.deepEqual(
-    vacuousTscTargets("nuxt prepare && vue-tsc --noEmit -p .nuxt-typecheck/tsconfig.json", solutionIsDefault),
+    vacuousTscTargets("svelte-check --tsconfig ./tsconfig.json", solutionIsDefault),
+    [],
+  );
+  assert.deepEqual(
+    vacuousTscTargets(
+      "nuxt prepare && vue-tsc --noEmit -p .nuxt-typecheck/tsconfig.json",
+      solutionIsDefault,
+    ),
     [],
   );
 });

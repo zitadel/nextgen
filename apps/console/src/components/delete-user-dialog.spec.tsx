@@ -1,18 +1,17 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
-
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const USERS_URL = "http://localhost/api/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
@@ -26,14 +25,16 @@ const USER = {
   identifier_property: "email",
   attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
 };
-const server = setupServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
+// The list resolves each row's schema to label its columns; an empty schema
+// keeps these tests about the dialog.
+beforeEach(() =>
+  server.use(
+    http.get("http://localhost/api/schemas/:id", () =>
+      HttpResponse.json({ schema: { type: "object", properties: {} } }),
+    ),
+  ),
+);
 
 /**
  * Opens the dialog the way an operator does — through the list row's menu —
@@ -47,7 +48,7 @@ async function openDialog() {
     import("../router"),
   ]);
   const router = createAppRouter({
-    history: createMemoryHistory({ initialEntries: ["/users"] }),
+    history: createMemoryHistory({ initialEntries: [scopedPath("/users")] }),
   });
   render(<RouterProvider router={router} />);
   await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
@@ -57,9 +58,7 @@ async function openDialog() {
 
 describe("delete user dialog", () => {
   it("offers only actions that reach the API", async () => {
-    // The menu used to list Edit user, Reset password and Deactivate, none of
-    // which had an endpoint behind them. A menu of dead controls is worse than
-    // a short menu — it reads as a feature that is broken rather than absent.
+    // Every menu item reaches an endpoint.
     server.use(http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })));
     const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
       import("@tanstack/react-router"),
@@ -67,16 +66,20 @@ describe("delete user dialog", () => {
     ]);
     render(
       <RouterProvider
-        router={createAppRouter({ history: createMemoryHistory({ initialEntries: ["/users"] }) })}
+        router={createAppRouter({
+          history: createMemoryHistory({ initialEntries: [scopedPath("/users")] }),
+        })}
       />,
     );
     await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
 
-    expect(await screen.findByRole("menuitem", { name: "View details" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "Delete" })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Edit user" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Reset password" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Deactivate" })).not.toBeInTheDocument();
+    // Exactly these: Edit user, Reset password and Deactivate stay out until
+    // something serves them, and nothing new slips in unnoticed.
+    await screen.findByRole("menuitem", { name: "View details" });
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "View details",
+      "Delete",
+    ]);
   });
 
   it("names the user in the heading and keeps Delete locked until DELETE is typed", async () => {
@@ -93,11 +96,15 @@ describe("delete user dialog", () => {
     expect(confirm).toBeDisabled();
   });
 
-  it("does not accept the confirmation in the wrong case", async () => {
+  it("does not accept the confirmation in the wrong case or padded", async () => {
     server.use(http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })));
     await openDialog();
 
-    await userEvent.type(screen.getByLabelText("Type DELETE to confirm"), "delete");
+    const input = screen.getByLabelText("Type DELETE to confirm");
+    await userEvent.type(input, "delete");
+    expect(screen.getByRole("button", { name: "Delete user" })).toBeDisabled();
+    await userEvent.clear(input);
+    await userEvent.type(input, "DELETE ");
     expect(screen.getByRole("button", { name: "Delete user" })).toBeDisabled();
   });
 
@@ -131,9 +138,8 @@ describe("delete user dialog", () => {
   });
 
   it("cancels without deleting, even with the confirmation typed", async () => {
-    // Regression: the Radix Cancel primitive renders a bare `<button>`, which
-    // inside a `<form>` defaults to `type="submit"` — so Cancel submitted the
-    // form and deleted the user. Caught by the real-instance e2e, pinned here.
+    // Radix Cancel renders a bare `<button>`, which defaults to `type=submit`
+    // inside a form; Cancel must not submit.
     let deleteCalls = 0;
     server.use(
       http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })),
@@ -147,15 +153,20 @@ describe("delete user dialog", () => {
     await userEvent.type(screen.getByLabelText("Type DELETE to confirm"), "DELETE");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-    await waitFor(() =>
-      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(deleteCalls).toBe(0);
     // Reachable again after dismissal. This also pins the second bug the e2e
     // found: opening the dialog from inside the row menu left the menu open
     // underneath, and its `aria-hidden` on the rest of the page outlived the
     // dialog — so the list was invisible to assistive tech after cancelling.
     expect(screen.getByRole("link", { name: "Maya Patel" })).toBeInTheDocument();
+
+    // Reopening starts blank: the form remounts per opening, so the typed
+    // confirmation does not carry over.
+    await userEvent.click(screen.getByRole("button", { name: "Actions for Maya Patel" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    expect(await screen.findByLabelText("Type DELETE to confirm")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Delete user" })).toBeDisabled();
   });
 
   it("keeps the dialog open and shows the server's message when the delete fails", async () => {
@@ -177,8 +188,6 @@ describe("delete user dialog", () => {
     // Recoverable: the operator can retry without re-typing. (The list itself is
     // outside the modal's a11y tree while it is open, so it is not asserted on
     // here — the success case covers the row going away.)
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Delete user" })).toBeEnabled(),
-    );
+    await waitFor(() => expect(screen.getByRole("button", { name: "Delete user" })).toBeEnabled());
   });
 });

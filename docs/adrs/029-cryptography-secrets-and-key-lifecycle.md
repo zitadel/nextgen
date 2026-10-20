@@ -33,6 +33,24 @@ This is so that a tenant can have specific requirements such as FIPS.
 By default, we should use [`argon2id`](https://datatracker.ietf.org/doc/html/rfc9106)
 for password/secret hashing.
 
+The project's choice governs **hashing only**. Verification stays
+deployment-wide: the server keeps reading every hash it could read before, so
+choosing a method, or later changing it, never invalidates a stored password.
+Nothing is rehashed on a policy change either. A password moves to the new
+method the next time its owner sets one.
+
+The deployment restricts what a project may choose:
+
+- The algorithm must be one the server can both hash with and verify.
+- The cost parameters must fall inside the configured limits, the same limits an
+  imported hash has to clear.
+- The parameter set must be exact. An algorithm's cost is the whole of its
+  strength, so a missing parameter is not filled in from a default, and a
+  parameter belonging to another algorithm is refused rather than ignored.
+
+Those same limits are where a compliance profile (see [NIST](#nist)) will narrow
+the choice, so the per-project mechanism does not need to know about it.
+
 #### Tokens
 
 (Generated) Tokens should never be stored in the database. If a field is

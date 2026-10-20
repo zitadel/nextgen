@@ -2,7 +2,6 @@ package spanner
 
 import (
 	"context"
-	"fmt"
 
 	"cloud.google.com/go/spanner"
 
@@ -14,22 +13,37 @@ import (
 )
 
 const (
+	// The newest row is the current password, so a new row is stamped after
+	// the newest one even when the clock reads earlier: after the clock steps
+	// back, or within one microsecond, CURRENT_TIMESTAMP() alone would leave
+	// the replaced password current or collide with it. Reading the user's rows
+	// also makes two concurrent changes of one user conflict: Spanner aborts
+	// one, and ReadWriteTransaction replays it after the other commits, so it
+	// reads the other's row as the newest. The emulator cannot prove this: it
+	// runs one read-write transaction at a time process-wide.
 	setUserPasswordStmt = `INSERT INTO user_passwords (
-	id, project_id, user_id, encoded_hash, change_required, verification_id
-) VALUES (@p1, @p2, @p3, @p4, @p5, @p6)
-ON CONFLICT (project_id, user_id) DO UPDATE SET
-	encoded_hash = EXCLUDED.encoded_hash,
-	change_required = EXCLUDED.change_required,
-	verification_id = EXCLUDED.verification_id,
-	changed_at = CURRENT_TIMESTAMP(),
-	failed_attempts = 0,
-	last_successful_check = NULL,
-	updated_at = CURRENT_TIMESTAMP()
+	id, project_id, user_id, encoded_hash, created_at
+) SELECT @p1, @p2, @p3, @p4, GREATEST(CURRENT_TIMESTAMP(),
+	IFNULL(TIMESTAMP_ADD(MAX(created_at), INTERVAL 1 MICROSECOND), CURRENT_TIMESTAMP()))
+FROM user_passwords
+WHERE project_id = @p2 AND user_id = @p3
 THEN RETURN id`
 
-	userPasswordQuery = `SELECT id, project_id, user_id, encoded_hash, change_required,
-	changed_at, verification_id, last_successful_check, failed_attempts, created_at, updated_at
+	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at`
+
+	userPasswordQuery = `SELECT ` + userPasswordColumns + `
 FROM user_passwords`
+
+	currentUserPassword = `NOT EXISTS (SELECT 1 FROM user_passwords AS newer` +
+		` WHERE newer.project_id = user_passwords.project_id` +
+		` AND newer.user_id = user_passwords.user_id` +
+		` AND newer.created_at > user_passwords.created_at)`
+
+	userPasswordHistoryQuery = `SELECT ` + userPasswordColumns + `
+FROM user_passwords
+WHERE project_id = @p1 AND user_id = @p2
+ORDER BY created_at DESC
+LIMIT @p3 OFFSET 1`
 )
 
 type userPasswordStatements struct{ statement }
@@ -52,8 +66,6 @@ func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain
 		pw.ProjectID,
 		pw.UserID,
 		pw.EncodedHash,
-		pw.ChangeRequired,
-		verificationIDArg(pw.VerificationID),
 	).statement()
 	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		id, err := collectOneRow(iter, func(row *spanner.Row) (string, error) {
@@ -89,141 +101,58 @@ func (ps userPasswordStatements) GetUserPassword(ctx context.Context, filter dat
 
 // ListUserPasswords implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, userPasswordQuery, filter, userpassword.Schema); err != nil {
-		return nil, err
-	}
+	passwords, nextCursor, err := pagination.Page(filter.Pagination, userpassword.Schema, func(limit uint32) ([]*domain.UserPassword, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, userPasswordQuery, filter, userpassword.Schema, currentUserPassword); err != nil {
+			return nil, err
+		}
 
-	var passwords []*domain.UserPassword
-	err := ps.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		passwords, err = collectRows(iter, ps.scanUserPassword)
-		return err
+		var passwords []*domain.UserPassword
+		err := ps.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			passwords, err = collectRows(iter, ps.scanUserPassword)
+			return err
+		})
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return passwords, nil
 	})
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, err
 	}
-
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		passwords,
-		userpassword.Schema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.UserPassword]{
 		Items:      passwords,
 		NextCursor: nextCursor,
 	}, nil
 }
 
-// UpdateUserPassword implements [service.UserPasswordStatements].
-func (ps userPasswordStatements) UpdateUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField], updates ...domain.UserPasswordUpdate) error {
-	if filter == nil {
-		return fmt.Errorf("UserPassword filter is required")
-	}
-	if len(updates) == 0 {
-		return database.ErrNoChanges
-	}
-
-	var c statementCompiler
-	c.WriteString("UPDATE user_passwords SET ")
-	sep := ""
-	writeAssign := func(col string, arg any) {
-		c.WriteString(sep)
-		sep = ", "
-		c.WriteString(col)
-		c.WriteString(" = ")
-		c.WriteArg(arg)
-	}
-
-	for _, update := range updates {
-		switch u := update.(type) {
-		case *domain.UserPasswordEncodedHashUpdate:
-			writeAssign("encoded_hash", u.EncodedHash)
-		case *domain.UserPasswordChangeRequiredUpdate:
-			writeAssign("change_required", u.ChangeRequired)
-		case *domain.UserPasswordChangedAtUpdate:
-			writeAssign("changed_at", u.ChangedAt)
-		case *domain.UserPasswordVerificationIDUpdate:
-			writeAssign("verification_id", u.VerificationID)
-		case *domain.UserPasswordLastSuccessfulCheckUpdate:
-			writeAssign("last_successful_check", u.LastSuccessfulCheck)
-		case *domain.UserPasswordIncrementFailedAttemptsUpdate:
-			c.WriteString(sep)
-			sep = ", "
-			c.WriteString("failed_attempts = failed_attempts + ")
-			c.WriteArg(int64(u.Delta))
-		case *domain.UserPasswordResetFailedAttemptsUpdate:
-			writeAssign("failed_attempts", int64(0))
-		default:
-			return fmt.Errorf("unknown UserPasswordUpdate %T", update)
-		}
-	}
-
-	c.WriteString(", updated_at = CURRENT_TIMESTAMP() WHERE ")
-	compileFilter(&c, filter, userpassword.Schema)
-
-	n, err := ps.db.Update(ctx, c.statement())
-	if err != nil {
-		return wrapError(err)
-	}
-	if n == 0 {
-		return wrapError(spanner.ErrRowNotFound)
-	}
-	return nil
-}
-
-// DeleteUserPassword implements [service.UserPasswordStatements].
-func (ps userPasswordStatements) DeleteUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) error {
-	if filter == nil {
-		return fmt.Errorf("UserPassword filter is required")
-	}
-	var c statementCompiler
-	c.WriteString("DELETE FROM user_passwords WHERE ")
-	compileFilter(&c, filter, userpassword.Schema)
-	_, err := ps.db.Update(ctx, c.statement())
-	return wrapError(err)
+// GetUserPasswordHistory implements [service.UserPasswordStatements].
+func (ps userPasswordStatements) GetUserPasswordHistory(ctx context.Context, projectID, userID string) ([]*domain.UserPassword, error) {
+	var passwords []*domain.UserPassword
+	stmt := buildStatement(userPasswordHistoryQuery, projectID, userID, int64(domain.UserPasswordHistoryDepth)).statement()
+	err := ps.db.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
+		var err error
+		passwords, err = collectRows(iter, ps.scanUserPassword)
+		return err
+	})
+	return passwords, wrapError(err)
 }
 
 func (ps userPasswordStatements) scanUserPassword(row *spanner.Row) (*domain.UserPassword, error) {
 	pw := new(domain.UserPassword)
-	var (
-		verificationID      spanner.NullString
-		lastSuccessfulCheck spanner.NullTime
-		failedAttempts      int64
-	)
 	if err := row.Columns(
 		&pw.ID,
 		&pw.ProjectID,
 		&pw.UserID,
 		&pw.EncodedHash,
-		&pw.ChangeRequired,
-		&pw.ChangedAt,
-		&verificationID,
-		&lastSuccessfulCheck,
-		&failedAttempts,
 		&pw.CreatedAt,
-		&pw.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
-	if verificationID.Valid {
-		pw.VerificationID = &verificationID.StringVal
-	}
-	if lastSuccessfulCheck.Valid {
-		ts := lastSuccessfulCheck.Time
-		pw.LastSuccessfulCheck = &ts
-	}
-	pw.FailedAttempts = int16(failedAttempts)
 	return pw, nil
-}
-
-func verificationIDArg(id *string) any {
-	if id == nil {
-		return nil
-	}
-	return *id
 }
 
 var _ service.UserPasswordStatements = (*userPasswordStatements)(nil)

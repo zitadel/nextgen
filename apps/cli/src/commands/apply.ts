@@ -1,10 +1,9 @@
-import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
-import { createZitadelClient } from "@zitadel/api/client";
+import { reportWarning } from "../lib/warnings";
 
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { environmentSchema } from "../lib/environment";
+import { createZitadelClient } from "../lib/api-client";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import {
   buildSyncPlan,
   collectPlanWarnings,
@@ -28,13 +27,8 @@ import { publicCliCommand } from "../lib/public-cli";
  */
 export default class Apply extends BaseCommand {
   static override description = "Validate and upload repo config to the platform.";
-  static override flags = {
-    environment: Flags.string({
-      char: "e",
-      description: "Target environment (default: development).",
-      options: [...environmentSchema.options],
-    }),
-  };
+  static override group = CommandGroups.configuration;
+  static override groupOrder = 2;
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Apply);
@@ -44,10 +38,11 @@ export default class Apply extends BaseCommand {
     const secret = await readZitadelSecret(cwd);
     consola.info(`Project   ${secret.project_id}`);
     consola.info(`Server    ${source}`);
-    const client = createZitadelClient({
-      baseUrl: source,
-      token: secret.project_secret,
-    });
+    // Verbatim: the sync loop diffs and writes back what it reads.
+    const client = createZitadelClient(
+      { baseUrl: source, token: secret.project_secret },
+      { verbatim: true },
+    );
     const syncers = makeSyncers({
       client,
       projectId: secret.project_id,
@@ -57,8 +52,14 @@ export default class Apply extends BaseCommand {
 
     if (!dryRun) {
       consola.start("Syncing schemas and flows to Zitadel");
-      const { filesUpdated, applied } = await runSyncLoop(cwd, syncers);
-      consola.success("Sync complete");
+      const { filesUpdated, applied, unsupported } = await runSyncLoop(cwd, syncers);
+      if (applied.length === 0 && unsupported.length > 0) {
+        reportWarning(
+          `Nothing was applied: ${unsupported.length} removed file${unsupported.length === 1 ? "" : "s"} cannot be deleted from the platform yet.`,
+        );
+      } else {
+        consola.success("Sync complete");
+      }
       return this.emit({
         status: "ok",
         data: {
@@ -67,9 +68,15 @@ export default class Apply extends BaseCommand {
           // `files_updated` stays the local write-backs only.
           changes: applied,
           files_updated: filesUpdated,
+          unsupported_deletions: unsupported.length,
+          unsupported_deletion_files: unsupported,
           next_actions:
             applied.length === 0
-              ? ["Everything is already in sync — no changes were applied."]
+              ? [
+                  unsupported.length > 0
+                    ? `${unsupported.length} removed file${unsupported.length === 1 ? " was" : "s were"} not deleted from the platform: deleting is not supported yet (#1013). Restore ${unsupported.length === 1 ? "it" : "them"} if that was a mistake.`
+                    : "Everything is already in sync — no changes were applied.",
+                ]
               : [
                   "Changes are live — reload your app to see them.",
                   "Re-run plan to confirm local config and platform are in sync.",
@@ -93,7 +100,11 @@ export default class Apply extends BaseCommand {
       `Plan: ${summary.creates} create${summary.creates === 1 ? "" : "s"}, ` +
         `${summary.updates} update${summary.updates === 1 ? "" : "s"}, ` +
         `${summary.revisions} new revision${summary.revisions === 1 ? "" : "s"}, ` +
-        `${summary.deletes} delete${summary.deletes === 1 ? "" : "s"}`,
+        `${summary.moves} moved, ` +
+        `${summary.deletes} delete${summary.deletes === 1 ? "" : "s"}` +
+        (summary.unsupported_deletions > 0
+          ? `, ${summary.unsupported_deletions} removed but kept (cannot be deleted yet)`
+          : ""),
     );
     return this.emit({
       status: "ok",

@@ -10,8 +10,36 @@ import (
 	ht "github.com/ogen-go/ogen/http"
 )
 
+func encodeAddOriginRequest(
+	req *ProjectOrigin,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeBeginUserPasskeyRegistrationRequest(
 	req *BeginUserPasskeyRegistrationRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeBuildReleaseRequest(
+	req *BuildReleaseRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -66,6 +94,20 @@ func encodeCreateBrandingRequest(
 	return nil
 }
 
+func encodeCreateDeploymentRequest(
+	req *CreateDeploymentRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCreateFlowRequest(
 	req *CreateFlowRequest,
 	r *http.Request,
@@ -96,6 +138,20 @@ func encodeCreateFlowDefinitionRequest(
 
 func encodeCreateGrantRequest(
 	req *CreateGrantRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateIdpRequest(
+	req *CreateIdpRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -290,6 +346,20 @@ func encodeQueryGrantsRequest(
 	return nil
 }
 
+func encodeQueryIdpsRequest(
+	req *QueryIdpsRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeQueryProjectsRequest(
 	req *QueryProjectsRequest,
 	r *http.Request,
@@ -346,6 +416,54 @@ func encodeQueryUsersRequest(
 	return nil
 }
 
+func encodeRemoveOriginRequest(
+	req *RemoveOriginReq,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeRemovePreviewRequest(
+	req *RemovePreviewRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeRollbackDeploymentRequest(
+	req OptRollbackDeploymentRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	if !req.Set {
+		// Keep request with empty body if value is not set.
+		return nil
+	}
+	e := new(jx.Encoder)
+	{
+		if req.Set {
+			req.Encode(e)
+		}
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeSetUserPasswordRequest(
 	req *SetUserPasswordRequest,
 	r *http.Request,
@@ -376,6 +494,20 @@ func encodeSubmitFlowStepRequest(
 
 func encodeUpdateTeamRequest(
 	req *UpdateTeamRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeUpdateVariablesRequest(
+	req UpdateVariablesRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

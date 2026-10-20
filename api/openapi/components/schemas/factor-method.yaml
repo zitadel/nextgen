@@ -4,5 +4,6 @@ enum:
   - identifier
   - password
   - passkey
+  - sso
 example: password
 

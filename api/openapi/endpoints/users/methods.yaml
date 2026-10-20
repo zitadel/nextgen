@@ -1,11 +1,19 @@
 post:
   operationId: createUser
+  x-zitadel-cli: users create
   summary: Create user
+  description: |
+    Creates a user whose attributes satisfy the user schema the request names.
+
+    The server assigns the user's id. With `team_id`, the user also becomes an
+    active member of that team. A value the schema marks unique that another
+    user already holds is refused with `409`.
   tags:
     - Users
   security:
     - oauth2:
         - user.write
+    - nextgenSession: []
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
     # Declared here rather than shared: `team_id` is the team parameter across

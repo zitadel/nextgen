@@ -1,8 +1,9 @@
+import { Flags } from "@oclif/core";
 import { readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { ZitadelError } from "../lib/errors";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { publicCliCommand } from "../lib/public-cli";
 import { createOrca } from "../lib/orca";
 import { AGENTS_HEADER, removeGuidanceSection } from "../lib/orca/patchers/rule/guidance";
 import type { EjectActions } from "../lib/orca/patchers/types";
@@ -87,17 +88,32 @@ async function pathExists(path: string): Promise<boolean> {
  */
 export default class Eject extends BaseCommand {
   static override description = "Remove managed files and local Zitadel state.";
+  static override group = CommandGroups.project;
+  static override groupOrder = 4;
   static override aliases = ["uninstall"];
+  static override flags = {
+    force: Flags.boolean({
+      char: "f",
+      description: "Remove the managed files without the confirmation prompt.",
+    }),
+  };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Eject);
     await this.toMeta(flags);
-    const { cwd, force, nonInteractive, dryRun } = this.meta;
+    const { cwd, dryRun } = this.meta;
 
-    if (!force && nonInteractive) {
-      throw new ZitadelError("E_VALIDATION", "Eject requires --force in non-interactive mode", {
-        hint: "Re-run with --force to confirm deletion of managed files.",
-      });
+    // A dry run removes nothing, so it has nothing to confirm (as in `reset`).
+    const confirmed =
+      dryRun ||
+      (await this.input({
+        kind: "confirm",
+        name: "remove the managed files and local state",
+        message: "Remove the managed files and local Zitadel state?",
+        retry: publicCliCommand("eject --force", this.meta.cliVersion),
+      }));
+    if (!confirmed) {
+      return this.emit({ status: "skipped", reason: "eject-cancelled" });
     }
 
     const actions = await resolveEjectActions(cwd);

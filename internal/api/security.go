@@ -2,10 +2,12 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -34,7 +36,7 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 
 	payload, err := s.tokenService.IntrospectToken(ctx, t.Token)
 	if err != nil {
-		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		return nil, introspectionFailure(err)
 	}
 	if !payload.Type.IsProjectSecret() {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
@@ -64,21 +66,33 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 // one (dual-scheme OR). Anonymous sessions skip the grant/user-query ops
 // so a leftover building cookie cannot 401 a valid Bearer.
 func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
+	// A Bearer that already satisfied a dual-scheme operation is the
+	// credential; the cookie is not consulted at all. Otherwise a stale or
+	// malformed cookie riding along would fail here and 401 a request the
+	// Bearer authorized. Session-only operations never get this far with a
+	// ScopeContext, so they still validate the cookie below.
+	if _, ok := GetScopeContext(ctx); ok {
+		return ctx, nil
+	}
 	token, err := s.tokenService.IntrospectToken(ctx, t.APIKey)
 	if err != nil {
-		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		return nil, introspectionFailure(err)
 	}
 	err = domain.ValidateSessionToken(token)
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 	ctx = context.WithValue(ctx, sessionTokenKey{}, token)
-	if _, ok := GetScopeContext(ctx); ok {
-		return ctx, nil
-	}
 	if token.UserID == "" && userBoundSessionOperations[operationName] {
 		return ctx, ogenerrors.ErrSkipServerSecurity
 	}
+	// The cookie is the credential from here on, so a state-changing request
+	// must pass the CSRF checks (ADR 053 §5). A Bearer that satisfied the
+	// operation returned above and never reaches this.
+	if err := checkSessionCSRF(ctx, operationName, t.APIKey); err != nil {
+		return nil, err
+	}
+	ctx = context.WithValue(ctx, sessionCookieKey{}, t.APIKey)
 	ctx = withActorFromToken(ctx, token)
 	if token.UserID != "" {
 		// Session.Token() never mints Scope (always empty). Users skip the
@@ -95,24 +109,76 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
 
+// introspectionFailure decides what a failed IntrospectToken means for the
+// request. Only a credential the server judged and rejected (malformed,
+// undecryptable, naming an unknown key, expired or revoked) is an unsatisfied
+// requirement: 401. Anything else means the server could not tell (the token
+// store or key store failed), so it becomes an internal error and the error
+// handler answers 500. Collapsing it into a 401 would tell every client its
+// session is dead during an outage, and SDKs clear their session cookie on a
+// 401.
+func introspectionFailure(err error) error {
+	if errors.Is(err, domain.ErrInvalidToken()) ||
+		errors.Is(err, domain.ErrInvalidTokenIdentifiers()) ||
+		errors.Is(err, domain.ErrTokenRevoked()) ||
+		errors.Is(err, domain.ErrEncryptionKeyNotFound()) {
+		return ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	if errors.Is(err, domain.ErrInternal(nil)) {
+		return err
+	}
+	return domain.ErrInternal(err)
+}
+
 // sessionCookieOperations is the session-only 401 rewrite allowlist.
 // Dual-scheme ops stay off it so a bad Bearer is not a missing-session message.
 var sessionCookieOperations = map[api.OperationName]bool{
-	api.GetMySessionOperation:    true,
-	api.RevokeMySessionOperation: true,
-	api.GetMyUserOperation:       true,
-	api.PatchMyUserOperation:     true,
-	api.CompleteClaimOperation:   true,
+	api.GetMySessionOperation:          true,
+	api.GetMySessionCsrfTokenOperation: true,
+	api.RevokeMySessionOperation:       true,
+	api.GetMyUserOperation:             true,
+	api.PatchMyUserOperation:           true,
+	api.CompleteClaimOperation:         true,
+	api.ListMyProjectsOperation:        true,
+	api.GetMyUserSchemaOperation:       true,
+	api.ListMyTeamsOperation:           true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous
-// building cookies Skip so dual-scheme oauth2 can still satisfy.
+// building cookies Skip so dual-scheme oauth2 can still satisfy. On a
+// session-only operation nothing else can satisfy, so the skip becomes the 401
+// the contract declares.
 var userBoundSessionOperations = map[api.OperationName]bool{
-	api.CreateGrantOperation: true,
-	api.GetGrantOperation:    true,
-	api.DeleteGrantOperation: true,
-	api.QueryGrantsOperation: true,
-	api.QueryUsersOperation:  true,
+	api.CreateGrantOperation:     true,
+	api.GetGrantOperation:        true,
+	api.DeleteGrantOperation:     true,
+	api.QueryGrantsOperation:     true,
+	api.QueryUsersOperation:      true,
+	api.QueryTeamsOperation:      true,
+	api.GetTeamOperation:         true,
+	api.ListMyProjectsOperation:  true,
+	api.GetMyUserSchemaOperation: true,
+	api.ListMyTeamsOperation:     true,
+	api.GetProjectOperation:      true,
+	api.PatchProjectOperation:    true,
+	// Console management screens (#1300 §1). Their writes need the CSRF token
+	// (ADR 053 §5, csrf.go).
+	api.CreateUserOperation:            true,
+	api.GetUserByIDOperation:           true,
+	api.ListUserTeamsOperation:         true,
+	api.ListUserPasskeysOperation:      true,
+	api.ListUserIdentityLinksOperation: true,
+	api.DeleteUserByIDOperation:        true,
+	api.CreateTeamOperation:            true,
+	api.UpdateTeamOperation:            true,
+	api.ListSchemasOperation:           true,
+	api.GetSchemaByIdOperation:         true,
+	api.ListFlowDefinitionsOperation:   true,
+	api.GetFlowDefinitionOperation:     true,
+	api.ListBrandingOperation:          true,
+	api.GetBrandingByIdOperation:       true,
+	api.QueryIdpsOperation:             true,
+	api.GetIdpByIdOperation:            true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the
@@ -130,11 +196,32 @@ var secretHashOperations = map[api.OperationName]bool{
 
 type sessionTokenKey struct{}
 
+// sessionCookieKey carries the raw __nextgen_session value of a request the
+// cookie authenticated, so GET /sessions/me/csrf can derive its CSRF token.
+type sessionCookieKey struct{}
+
+func sessionCookieFromContext(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(sessionCookieKey{}).(string)
+	return v, ok && v != ""
+}
+
 // sessionTokenFromContext returns the session token parsed from the
 // __nextgen_session cookie by HandleNextgenSession.
 func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
 	v, ok := ctx.Value(sessionTokenKey{}).(*domain.Token)
 	return v, ok && v != nil
+}
+
+// requireSelf resolves the caller of a self-access operation (`/me`). A
+// refusal answers like a missing session, so it never tells a caller that its
+// cookie is genuine but its user is gone (#553).
+func requireSelf(ctx context.Context) (domain.Self, error) {
+	token, _ := sessionTokenFromContext(ctx)
+	self, err := domain.SelfFromSession(token, time.Now())
+	if err != nil {
+		return domain.Self{}, invalidSessionCredential(err)
+	}
+	return self, nil
 }
 
 type contextKey struct{}
@@ -146,10 +233,12 @@ type requestHostKey struct{}
 
 // WithRequestHostMiddleware injects the effective request proto+host into the
 // context so handlers can derive a WebAuthn RPID even when the browser omits
-// the Origin header (same-origin fetches).
+// the Origin header (same-origin fetches). A chain of proxies may send either
+// forwarded header as a comma-separated list; its first entry is the one the
+// client's request arrived with.
 func WithRequestHostMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		proto := r.Header.Get("X-Forwarded-Proto")
+		proto := firstForwarded(r.Header.Get("X-Forwarded-Proto"))
 		if proto == "" {
 			if r.TLS != nil {
 				proto = "https"
@@ -157,7 +246,7 @@ func WithRequestHostMiddleware(next http.Handler) http.Handler {
 				proto = "http"
 			}
 		}
-		host := r.Header.Get("X-Forwarded-Host")
+		host := firstForwarded(r.Header.Get("X-Forwarded-Host"))
 		if host == "" {
 			host = r.Host
 		}
@@ -168,6 +257,13 @@ func WithRequestHostMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// firstForwarded returns the first entry of a forwarded header that proxies
+// may have appended to ("a.example, b.internal").
+func firstForwarded(value string) string {
+	first, _, _ := strings.Cut(value, ",")
+	return strings.TrimSpace(first)
 }
 
 func requestOriginFromContext(ctx context.Context) (string, bool) {

@@ -1,0 +1,48 @@
+get:
+  operationId: listMyProjects
+  summary: List the projects I can act on
+  description: |
+    The projects the signed-in user holds an active grant on, either directly or
+    through a team they are a member of. Ordered by project id and paged with an
+    opaque cursor.
+
+    This is not the same question as `queryProjects`, which answers with the one
+    project the calling credential is bound to. Here the session is the caller
+    and the grants are the answer, so the list spans projects.
+  tags:
+    - Projects
+  security:
+    - nextgenSession: []
+  parameters:
+    - $ref: ../../../../components/parameters/limit.yaml
+    - $ref: ../../../../components/parameters/page-token.yaml
+  responses:
+    '200':
+      description: The projects the session user can act on.
+      headers:
+        Cache-Control:
+          $ref: ../../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: list-my-projects-response.yaml
+    '400':
+      description: The page token or limit was not valid.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid session token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/auth-unauthorized.yaml
+    '500':
+      description: Something went wrong on the server. This was not your fault.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      $ref: listMyProjects-error-response.yaml

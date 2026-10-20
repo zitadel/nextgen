@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -23,6 +24,17 @@ type ReleaseArtifactsModule = {
     ) => Promise<void>;
   }) => Promise<unknown>;
   containerTags: (input: { image?: string; version: string; prerelease: boolean }) => string[];
+  createArchives: (options: {
+    repoRoot: string;
+    outDir: string;
+    version: string;
+    run: (
+      command: string,
+      args: string[],
+      options: { cwd: string; env: NodeJS.ProcessEnv },
+    ) => Promise<void>;
+  }) => Promise<{ archives: string[]; checksumPath: string }>;
+  SERVER_PLATFORMS: Array<{ goos: string; goarch: string }>;
   TAG_PRERELEASE_AS_LATEST: boolean;
   readServerRelease: (repoRoot: string) => Promise<{
     name: string;
@@ -195,6 +207,62 @@ describe("release artifact helpers", () => {
     expect((await stat(destination)).mode & 0o111).toBeGreaterThan(0);
   });
 
+  it("compresses every platform archive at once and lists checksums in platform order", async () => {
+    const { createArchives, SERVER_PLATFORMS } = await loadModule();
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-archives-"));
+    tempDirs.push(repoRoot);
+    const outDir = join(repoRoot, "dist/release/0.1.0-alpha.6");
+    await writeFile(join(repoRoot, "LICENSE"), "license");
+    await writeFile(join(repoRoot, "README.md"), "readme");
+    for (const platform of SERVER_PLATFORMS) {
+      const dir = join(outDir, "build", platform.goos, platform.goarch);
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, platform.goos === "windows" ? "nextgen.exe" : "nextgen"), "binary");
+    }
+
+    let running = 0;
+    let mostRunning = 0;
+    let everyoneStarted: () => void = () => undefined;
+    const allStarted = new Promise<void>((resolve) => {
+      everyoneStarted = resolve;
+    });
+    const { archives, checksumPath } = await createArchives({
+      repoRoot,
+      outDir,
+      version: "0.1.0-alpha.6",
+      run: async (_command, args) => {
+        // tar -czf <archive> … and zip -qr <archive> . both name the archive second.
+        const archivePath = args[1];
+        if (!archivePath) {
+          throw new Error(`no archive path in: ${args.join(" ")}`);
+        }
+        running += 1;
+        mostRunning = Math.max(mostRunning, running);
+        if (running === SERVER_PLATFORMS.length) {
+          everyoneStarted();
+        }
+        await allStarted;
+        await writeFile(archivePath, `archive ${basename(archivePath)}`);
+        running -= 1;
+      },
+    });
+
+    expect(mostRunning).toBe(SERVER_PLATFORMS.length);
+    const names = SERVER_PLATFORMS.map(
+      (platform) =>
+        `nextgen_0.1.0-alpha.6_${platform.goos}_${platform.goarch}.${
+          platform.goos === "windows" ? "zip" : "tar.gz"
+        }`,
+    );
+    expect(archives.map((archive) => basename(archive))).toEqual(names);
+    const checksums = await readFile(checksumPath, "utf8");
+    expect(checksums.trimEnd().split("\n")).toEqual(
+      names.map(
+        (name) => `${createHash("sha256").update(`archive ${name}`).digest("hex")}  ${name}`,
+      ),
+    );
+  });
+
   it("rejects incomplete local release artifacts", async () => {
     const { verifyLocalArtifacts } = await loadModule();
     const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-artifacts-"));
@@ -242,7 +310,7 @@ describe("release artifact helpers", () => {
     ).rejects.toThrow(/requires .+\/dist before packing/);
   });
 
-  it("stamps CLI release packs with the production telemetry channel", async () => {
+  it("packs the CLI release tarball", async () => {
     const { packPublicPackages } = await loadModule();
     const manifest = (await import(
       new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
@@ -263,27 +331,19 @@ describe("release artifact helpers", () => {
       );
     }
 
-    const originalChannel = process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL;
-    process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL = "development";
     const calls: Array<{ args: string[]; env: NodeJS.ProcessEnv }> = [];
-    try {
-      await packPublicPackages({
-        repoRoot,
-        outDir,
-        version: "0.1.0-alpha.6",
-        run: async (_command, args, options) => {
-          calls.push({ args, env: options.env });
-        },
-      });
-    } finally {
-      if (originalChannel === undefined) {
-        delete process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL;
-      } else {
-        process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL = originalChannel;
-      }
-    }
+    await packPublicPackages({
+      repoRoot,
+      outDir,
+      version: "0.1.0-alpha.6",
+      run: async (_command, args, options) => {
+        calls.push({ args, env: options.env });
+      },
+    });
 
+    // The CLI ships as a single generic build, so its pack is invoked like
+    // every other public package — no special telemetry-channel env.
     const cliPack = calls.find((call) => call.args.includes("apps/cli"));
-    expect(cliPack?.env.ZITADEL_TELEMETRY_BUILD_CHANNEL).toBe("production");
+    expect(cliPack).toBeDefined();
   });
 });

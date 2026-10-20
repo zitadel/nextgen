@@ -25,7 +25,7 @@ const (
 	createAuthAttemptStmt     = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at, internal) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7)`
 	createAuthCheckStmt       = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 0)`
 	deleteAuthAttemptByIDStmt = `DELETE FROM auth_attempts WHERE project_id = @p1 AND id = @p2`
-	handoffAuthAttemptStmt    = `UPDATE auth_attempts SET handoff_token = @p1, handed_off_at = @p2 WHERE project_id = @p3 AND id = @p4 THEN RETURN handed_off_at`
+	handoffAuthAttemptStmt    = `UPDATE auth_attempts SET handoff_token = @p1, handed_off_at = @p2 WHERE project_id = @p3 AND id = @p4 AND handed_off_at IS NULL THEN RETURN handed_off_at`
 	// Spanner rejects a NULL_FILTERED unique index as ON CONFLICT arbiter
 	// ("Unimplemented"), so the challenge upsert is update-then-insert inside
 	// withTransaction instead of INSERT ... ON CONFLICT.
@@ -41,8 +41,32 @@ const (
 	insertAuthAttemptFactorStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_verified_at, factor_payload, failure_count)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 0)` +
 		` THEN RETURN id`
+	// The check id is part of the primary key, so AddAuthAttemptFactor cannot
+	// give a pending row a new id in place: it deletes the row and inserts.
+	deletePendingAuthAttemptCheckStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND last_verified_at IS NULL`
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = @p1, factor_payload = @p2, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 		` WHERE project_id = @p3 AND auth_attempt_id = @p4 AND type = @p5 AND id = @p6`
+	// Spanner DML cannot update a primary-key column, and a re-issue mints a
+	// fresh check id so a stale one cannot match, so the issue deletes the
+	// attempt's row and inserts the new one inside withTransaction.
+	deleteSSOStateStmt    = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3`
+	deleteSSOCallbackStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND id = @p4`
+	// markSSOCallbackCollisionStmt replaces the parked result with the
+	// collision marker alone.
+	markSSOCallbackCollisionStmt = `UPDATE checks SET factor_payload = @p5` +
+		` WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND id = @p4`
+	insertSSOStateStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, lookup_hash, failure_count)` +
+		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 0)`
+	selectPendingSSOStateStmt = `SELECT c.id, c.auth_attempt_id, c.challenge_payload, aa.created_at, aa.time_to_live` +
+		` FROM checks c` +
+		` JOIN auth_attempts aa ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id` +
+		` WHERE c.project_id = @p1 AND c.lookup_hash = @p2 AND c.type = @p3 AND c.last_challenged_at IS NOT NULL`
+	consumeSSOStateStmt = `UPDATE checks SET challenge_payload = NULL, last_challenged_at = NULL, factor_payload = NULL` +
+		` WHERE project_id = @p1 AND lookup_hash = @p2 AND type = @p3 AND last_challenged_at IS NOT NULL`
+	setSSOCallbackResultStmt = `UPDATE checks SET factor_payload = @p4` +
+		` WHERE project_id = @p1 AND lookup_hash = @p2 AND type = @p3 AND last_challenged_at IS NULL` +
+		` AND factor_payload IS NULL`
+
 	authAttemptChallengeFailedStmt = `UPDATE checks SET last_failed_at = @p1, failure_count = failure_count + 1` +
 		` WHERE project_id = @p2 AND auth_attempt_id = @p3 AND type = @p4 AND id = @p5` +
 		` THEN RETURN failure_count, last_failed_at`
@@ -287,11 +311,27 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 		})
 		return err
 	})
+	if _, noRow := errors.AsType[*database.NoRowFoundError](err); noRow {
+		return as.handoffRefused(ctx, attempt, fmt.Errorf("failed to handoff auth attempt: %w", err))
+	}
 	if err != nil {
 		return fmt.Errorf("failed to handoff auth attempt: %w", err)
 	}
 	attempt.HandedOffAt = &handedOffAt
 	return nil
+}
+
+// handoffRefused explains a handoff that updated no row: the attempt is
+// missing (noRow is returned) or another request already handed it off.
+func (as authAttemptStatements) handoffRefused(ctx context.Context, attempt *domain.AuthAttempt, noRow error) error {
+	_, err := as.GetAuthAttemptByID(ctx, attempt.ProjectID, attempt.ID)
+	if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
+		return noRow
+	}
+	if err != nil {
+		return err
+	}
+	return domain.ErrAuthAttemptAlreadyHandedOff()
 }
 
 // SetAuthAttemptChallenge implements [service.AuthAttemptStatements].
@@ -379,6 +419,40 @@ func (as authAttemptStatements) SetAuthAttemptFactor(ctx context.Context, projec
 	return returnedID, nil
 }
 
+// AddAuthAttemptFactor implements [service.AuthAttemptStatements]. The insert
+// hits the unique (project_id, auth_attempt_id, type) index when a verified
+// factor is still stored, which surfaces as a [database.UniqueError].
+func (as authAttemptStatements) AddAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	now := time.Now().UTC()
+	payloadStr, err := authattempt.MarshalPayloadString(factor.Payload())
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal factor payload: %w", err)
+	}
+	checkID := ""
+	if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+		return "", err
+	}
+	err = withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
+		deletePending := buildStatement(deletePendingAuthAttemptCheckStmt, projectID, authAttemptID, int64(factor.Type())).statement()
+		if _, err := tx.Update(ctx, deletePending); err != nil {
+			return err
+		}
+		insert := buildStatement(insertAuthAttemptFactorStmt,
+			projectID, authAttemptID, int64(factor.Type()), checkID, now, encodeSpannerJSONPtr(payloadStr)).statement()
+		return tx.Write(ctx, insert, func(iter *spanner.RowIterator) error {
+			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+				return struct{}{}, row.Columns(&checkID)
+			})
+			return err
+		})
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to add factor: %w", err)
+	}
+	factor.SetLastVerifiedAt(now)
+	return checkID, nil
+}
+
 // AuthAttemptChallengeSucceeded implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) AuthAttemptChallengeSucceeded(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor, challengeID string) error {
 	now := time.Now().UTC()
@@ -423,6 +497,143 @@ func (as authAttemptStatements) AuthAttemptChallengeFailed(ctx context.Context, 
 	}
 	challenge.SetFailureCount(uint16(failureCount))
 	challenge.SetLastFailedAt(lastFailedAt)
+	return nil
+}
+
+// IssueSSOState implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, authAttemptID string, check *domain.SSOCallbackCheck) error {
+	now := time.Now().UTC()
+	payloadStr, err := authattempt.MarshalPayloadString(check.Pending)
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso state payload: %w", err)
+	}
+	checkID := check.ID
+	if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+		return err
+	}
+	err = withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
+		deletion := buildStatement(deleteSSOStateStmt,
+			projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback)).statement()
+		if _, err := tx.Update(ctx, deletion); err != nil {
+			return fmt.Errorf("failed to clear the previous sso state: %w", err)
+		}
+		insert := buildStatement(insertSSOStateStmt,
+			projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID, now,
+			encodeSpannerJSONPtr(payloadStr), check.StateHash).statement()
+		if _, err := tx.Update(ctx, insert); err != nil {
+			return fmt.Errorf("failed to insert the sso state: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to issue sso state: %w", err)
+	}
+	check.ID = checkID
+	check.AuthAttemptID = authAttemptID
+	check.IssuedAt = now
+	return nil
+}
+
+// ConsumeSSOState implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash, bindingNonce string) (*domain.SSOCallbackCheck, error) {
+	check := &domain.SSOCallbackCheck{StateHash: stateHash}
+	selection := buildStatement(selectPendingSSOStateStmt,
+		projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback)).statement()
+	var payload spanner.NullJSON
+	var createdAt time.Time
+	var timeToLiveNanos spanner.NullInt64
+	err := as.db.Query(ctx, selection, func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+			return struct{}{}, row.Columns(&check.ID, &check.AuthAttemptID, &payload, &createdAt, &timeToLiveNanos)
+		})
+		return err
+	})
+	if err != nil {
+		var noRow *database.NoRowFoundError
+		if errors.As(err, &noRow) {
+			return nil, domain.ErrSSOStateInvalid()
+		}
+		return nil, fmt.Errorf("failed to read sso state: %w", err)
+	}
+	if raw := nullJSONBytes(payload); len(raw) > 0 {
+		if err := json.Unmarshal(raw, &check.Pending); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal sso state payload: %w", err)
+		}
+	}
+	// The cookie is checked before anything is burned: a caller who knows the
+	// state but not the cookie must not be able to end the user's ceremony.
+	if check.Pending == nil || !check.Pending.MatchesBindingNonce(bindingNonce) {
+		return nil, domain.ErrSSOStateInvalid()
+	}
+	attempt := domain.AuthAttempt{CreatedAt: createdAt}
+	if timeToLiveNanos.Valid {
+		ttl := time.Duration(timeToLiveNanos.Int64)
+		attempt.TimeToLive = &ttl
+	}
+	// The guarded update is the single-use gate: a racing consumer that
+	// already cleared the challenge state leaves zero rows for this one. The
+	// clock is read after the burn, so a consume that stalls on the update
+	// cannot hand back a state that has meanwhile expired.
+	consume := buildStatement(consumeSSOStateStmt,
+		projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback)).statement()
+	n, err := as.db.Update(ctx, consume)
+	if err != nil {
+		return nil, fmt.Errorf("failed to consume sso state: %w", err)
+	}
+	if n == 0 || attempt.IsExpired() {
+		return nil, domain.ErrSSOStateInvalid()
+	}
+	return check, nil
+}
+
+// SetSSOCallbackResult implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) SetSSOCallbackResult(ctx context.Context, projectID, stateHash string, result *domain.SSOCallbackResult) error {
+	payloadStr, err := authattempt.MarshalPayloadString(result)
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso callback result: %w", err)
+	}
+	stmt := buildStatement(setSSOCallbackResultStmt,
+		projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback),
+		encodeSpannerJSONPtr(payloadStr)).statement()
+	n, err := as.db.Update(ctx, stmt)
+	if err != nil {
+		return fmt.Errorf("failed to set sso callback result: %w", err)
+	}
+	if n == 0 {
+		return domain.ErrSSOStateInvalid()
+	}
+	return nil
+}
+
+// DeleteSSOCallback implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error {
+	stmt := buildStatement(deleteSSOCallbackStmt,
+		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID).statement()
+	n, err := as.db.Update(ctx, stmt)
+	if err != nil {
+		return fmt.Errorf("failed to delete sso callback: %w", err)
+	}
+	if n == 0 {
+		return domain.ErrSSOStateInvalid()
+	}
+	return nil
+}
+
+func (as authAttemptStatements) MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error {
+	// The marker replaces the result: the provider's subject and claims go.
+	payload, err := authattempt.MarshalPayloadString(&domain.SSOCallbackResult{CollisionUserID: userID})
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso collision marker: %w", err)
+	}
+	stmt := buildStatement(markSSOCallbackCollisionStmt,
+		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID, encodeSpannerJSONPtr(payload)).statement()
+	n, err := as.db.Update(ctx, stmt)
+	if err != nil {
+		return fmt.Errorf("failed to mark sso callback collision: %w", err)
+	}
+	if n == 0 {
+		return domain.ErrSSOStateInvalid()
+	}
 	return nil
 }
 

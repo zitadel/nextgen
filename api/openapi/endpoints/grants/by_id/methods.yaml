@@ -1,5 +1,6 @@
 get:
   operationId: getGrant
+  x-zitadel-cli: grants get
   summary: Get grant
   description: |
     Loads a grant by `(project_id, id)` that this API manages (user or team
@@ -10,10 +11,14 @@ get:
     `resource_scope_index`; project scope is required on the query (same as
     events). Misses, revoked rows, project-secret setup (`sk_proj`),
     owning-team (`relation=team`) rows, and cross-project ids return 404.
+    `expand=principal` adds envelope fields on `user` or `team` and requires
+    `user.read` and `team.read` in addition to `project.read` for project
+    secrets. A user-bound Console session that already passed the project
+    Check may expand without those scopes.
 
     Accepts either a project secret (`oauth2`) or a user-bound Console
-    session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-    is a follow-up (#1140).
+    session cookie (`nextgenSession`). Cookie-authenticated requests
+    follow the scheme's CSRF rules (`nextgenSession`).
   tags:
     - Grants
   security:
@@ -21,13 +26,19 @@ get:
         - project.read
     - nextgenSession: []
   parameters:
-    - name: id
-      in: path
-      required: true
-      schema:
-        type: string
-      description: Managed assignment id (`asgn_<opaque>`).
+    - $ref: ../../../components/parameters/grant-id.yaml
     - $ref: ../../../components/parameters/project-id.yaml
+    - name: expand
+      in: query
+      required: false
+      description: |
+        Extra principal fields to add onto `user` or `team`. Same enum and
+        `user.read` + `team.read` gate as `POST /grants/query`.
+      schema:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: ../query/grant-expand.yaml
   responses:
     '200':
       description: The grant.
@@ -60,6 +71,7 @@ get:
 
 delete:
   operationId: deleteGrant
+  x-zitadel-cli: grants delete
   summary: Revoke grant
   description: |
     Soft-revokes a grant this API manages and emits `authz.revoked`.
@@ -68,8 +80,8 @@ delete:
     revoked so the unique binding can be reused.
 
     Accepts either a project secret (`oauth2`) or a user-bound Console
-    session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-    is a follow-up (#1140).
+    session cookie (`nextgenSession`). Cookie-authenticated requests
+    follow the scheme's CSRF rules (`nextgenSession`).
   tags:
     - Grants
   security:
@@ -77,12 +89,7 @@ delete:
         - project.write
     - nextgenSession: []
   parameters:
-    - name: id
-      in: path
-      required: true
-      schema:
-        type: string
-      description: Managed assignment id (`asgn_<opaque>`).
+    - $ref: ../../../components/parameters/grant-id.yaml
     - $ref: ../../../components/parameters/project-id.yaml
   responses:
     '204':

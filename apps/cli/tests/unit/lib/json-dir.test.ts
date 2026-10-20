@@ -30,12 +30,9 @@ describe("readJsonDir", () => {
   });
 
   it("preserves unknown / forward-compatible keys", async () => {
-    await writeFile(
-      join(dir, "x.json"),
-      JSON.stringify({ id: "x", "x-custom": "${ENV_VAR}" }),
-    );
+    await writeFile(join(dir, "x.json"), JSON.stringify({ id: "x", "x-custom": "${ENV_VAR}" }));
     const result = await readJsonDir(dir);
-    expect(result[0]["x-custom"]).toBe("${ENV_VAR}");
+    expect(result[0]!["x-custom"]!).toBe("${ENV_VAR}");
   });
 
   it("throws on invalid JSON", async () => {

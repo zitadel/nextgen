@@ -1,0 +1,137 @@
+@import "tailwindcss";
+/* Fumadocs' preset for a shadcn/ui theme: its colours read the standard shadcn
+   names (--background, --sidebar, …), which the console's palette fills in
+   below. */
+@import "fumadocs-ui/css/shadcn.css";
+@import "fumadocs-ui/css/generated/spacious.css";
+@import "fumadocs-ui/css/preset.css";
+@import "fumadocs-openapi/css/preset.css";
+/* The console's palette: the --zl-* variables, dark on :root and light under
+   [data-theme="light"], which the theme switch sets (app/layout.tsx). */
+@import "@zitadel/design-tokens/css/tokens.css";
+
+@theme inline {
+  /* app/layout.tsx loads Arimo and APK Futural through next/font. */
+  --font-sans: var(--font-arimo), var(--zl-font-family-sans);
+  --font-heading: var(--font-apk-futural), var(--font-sans);
+  --font-mono: var(--zl-font-family-mono);
+  --default-font-family: var(--font-sans);
+  --default-mono-font-family: var(--font-mono);
+}
+
+/* The design tokens under the shadcn names, as the console reads them
+   (@zitadel/design-tokens/css/shadcn.css). */
+:root {
+  --background: var(--zl-background);
+  --foreground: var(--zl-foreground);
+  --muted: var(--zl-muted);
+  --muted-foreground: var(--zl-muted-foreground);
+  --popover: var(--zl-popover);
+  --popover-foreground: var(--zl-popover-foreground);
+  --card: var(--zl-card);
+  --card-foreground: var(--zl-card-foreground);
+  --border: var(--zl-border);
+  --primary: var(--zl-primary);
+  --primary-foreground: var(--zl-primary-foreground);
+  --secondary: var(--zl-secondary);
+  --secondary-foreground: var(--zl-secondary-foreground);
+  --accent: var(--zl-accent);
+  --accent-foreground: var(--zl-accent-foreground);
+  --ring: var(--zl-ring);
+  --destructive: var(--zl-destructive);
+  --sidebar: var(--zl-sidebar);
+  --sidebar-foreground: var(--zl-sidebar-foreground);
+  --sidebar-border: var(--zl-sidebar-border);
+  --sidebar-accent: var(--zl-sidebar-accent);
+  --sidebar-accent-foreground: var(--zl-sidebar-accent-foreground);
+  --sidebar-ring: var(--zl-sidebar-ring);
+  --sidebar-primary-foreground: var(--zl-sidebar-primary-foreground);
+
+  /* The callouts' colours the design system has; info and idea stay
+     Fumadocs'. */
+  --color-fd-success: var(--zl-success);
+  --color-fd-warning: var(--zl-warning);
+
+  /* Code in the design system's syntax colours (lib/code-theme.ts), each role
+     aliased as the console aliases it (apps/console/src/styles.css). Only the
+     plain text differs: the console shows JSON and YAML, where it is the
+     punctuation grey; here it is mostly shell and TypeScript, so it is the
+     foreground. */
+  --zl-shiki-foreground: var(--zl-foreground);
+  --zl-shiki-token-keyword: var(--zl-syntax-key);
+  --zl-shiki-token-string: var(--zl-syntax-string);
+  --zl-shiki-token-string-expression: var(--zl-syntax-string);
+  --zl-shiki-token-constant: var(--zl-syntax-number);
+  --zl-shiki-token-comment: var(--zl-syntax-comment);
+  --zl-shiki-token-punctuation: var(--zl-syntax-punctuation);
+}
+
+/* The Spacious layout draws the sidebar on a frame around the page: the whole
+   frame is the sidebar's surface, as the console's is. */
+#fd-spacious-layout {
+  background-color: var(--sidebar);
+}
+
+/* The logo (components/logo.tsx) moves as on the website while the pointer is
+   on it or its link, and is back at rest when it leaves; it never moves on its
+   own. A copy of apps/website/app/globals.css's: change both together. */
+.logo-icon {
+  transform-box: view-box;
+  transform-origin: 63px 63px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:hover > .logo .logo-icon,
+  .logo:hover .logo-icon {
+    animation: logo-spin 5s infinite;
+  }
+
+  a:hover > .logo .logo-letter,
+  .logo:hover .logo-letter {
+    animation: logo-roll 5s infinite both;
+  }
+}
+
+/* The logo's Lottie, 150 frames at 30 a second: the icon turns once in the
+   first 60, each letter rolls down in 30 (its start set in logo.tsx), and the
+   rest of the 5 s is still. */
+@keyframes logo-spin {
+  from {
+    rotate: -360deg;
+    animation-timing-function: cubic-bezier(0.108, 0, 0, 1);
+  }
+
+  40%,
+  to {
+    rotate: 0deg;
+  }
+}
+
+@keyframes logo-roll {
+  from {
+    translate: 0 0;
+    animation-timing-function: cubic-bezier(0.199, 0, 0.121, 1);
+  }
+
+  20%,
+  to {
+    translate: 0 100px;
+  }
+}
+
+/* Headings in the display face, at its one weight: the page's title and the
+   sections of its text. */
+#nd-page > h1,
+.prose :is(h2, h3) {
+  font-family: var(--font-heading);
+  font-weight: 400;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}

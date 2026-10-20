@@ -1,86 +1,103 @@
 # Agent Instructions — `apps/storybook`
 
-The unified component workbench. Read together with the
-[root `AGENTS.md`](../../AGENTS.md) and [`README.md`](README.md).
+The workbench for the login surface: one `@storybook/web-components-vite`
+instance hosting `@zitadel/components`' atoms and orchestrators, the
+orchestrators driven by `@zitadel/api-mock`. Console UI iterates on the console
+dev server instead (ADR 055). Commands and coverage: [`README.md`](README.md).
 
-## What's in here
-
-A single `@storybook/web-components-vite` instance that hosts `@zitadel/components`
-— the Lit atoms and the orchestrators (`<zitadel-login>`, `<zitadel-session>` —
-see `src/session.stories.ts`) — so atoms can be checked against Figma and the
-orchestrators can be driven against `@zitadel/api-mock`. This is the workbench
-for the **login surface only**; console UI iterates on the console dev server
-(ADR 055). It is a dev tool, not a shipped package
-(`private`, no `dist`, `build` is `runInCI: false`), but `storybook:test` runs
-in CI.
+The static build (`dist/`) is the hosted cloud's `storybook` service at
+`/storybook/`: production from `main`, a preview on every branch. Vercel builds
+it with `turbo run build` (repo-root [`vercel.json`](../../vercel.json)).
 
 ## Hard rules
 
-- **One instance, one renderer.** Everything here is a custom element and
-  renders natively. Do not add Storybook Composition, a second Storybook, or a
-  React renderer — that's the pattern this app exists to avoid.
-- **One component, controls for state.** A story is the single component driven
-  by `args`/`argTypes` controls — not a grid of static instances and not one
-  story per state. Use a control (e.g. `previewState`) to flip interaction
-  states. Do not reintroduce hand-rolled "matrix" stories.
-- **One story file per atom, one story in it.** `src/<id>.stories.ts` exports
-  `Default` under an `Atoms/<Name>` title. Don't split an atom across files or
-  add a redundant second (`Playground`) level.
-- **Tokens, not magic values.** Visuals come from `@zitadel/design-tokens`
-  (imported once in `.storybook/preview.ts`). An atom's CSS is owned by
-  `packages/components/src/atoms/zl-<id>.css`; stories never restyle atoms.
-- **Behaviour lives in the source packages; don't duplicate upward.** This app
-  gates render + a11y for every story. Add a `play` function only when no lower
-  layer proves the behaviour — the atoms own toggle/form/focus in
-  `packages/components` specs, so their stories generally carry no `play`.
-- **MSW is orchestrator-only.** The atoms make no requests, so
-  `msw-storybook-addon` is wired on the orchestrator stories (not globally),
-  and those stories are tagged `no-test` to keep network out of the test run.
+- One instance, one renderer: no Storybook Composition, second Storybook or
+  React renderer.
+- One story file per atom (`src/<id>.stories.ts`), exporting one `Default`
+  under `Atoms/<Name>`. States are controls (`args`/`argTypes`, e.g.
+  `previewState`), never extra stories or "matrix" grids.
+- Visuals come from `@zitadel/design-tokens`; an atom's CSS is
+  `packages/components/src/atoms/zl-<id>.css`. Stories never restyle atoms.
+- Add a `play` only when no lower layer can prove the behaviour; atoms prove
+  theirs in `packages/components` specs. This app gates render and a11y.
+- Only orchestrator stories give the one MSW worker handlers
+  (`parameters.msw`), and they are tagged `no-test` to keep the network out of
+  the test run.
+- The build is relocatable: address files relative to the page or Vite's
+  base, never from `/`. The MSW worker follows the base; scoped to `/`, it
+  would intercept the console's and login UI's requests.
+
+## Orchestrator stories
+
+`<zitadel-login>` renders whatever the flow engine returns; here that engine is
+`@zitadel/api-mock`. Group controls with `argTypes.<name>.table.category`:
+**Component** for host props (`purpose`, `variant`, `theme`, `previewState`),
+**Flow engine** for mock overlays applied in `beforeEach` (`branding`, `sso`,
+`passkey`).
+
+- The orchestrator ignores the document's `data-theme`: it paints from the
+  flow's branding (`theme-controller.ts`). A branding with one palette side
+  forces that side, so the `theme` control toggles only with two-sided
+  presets.
+- `layout` comes from the backend and has no element prop. `split` renders
+  only through the legacy `*-template` presets, so never add a `layout`
+  control.
+- `branding` presets (`branding-presets.ts`) are fixtures applied through
+  `applyBranding`; `none` leaves the design-system defaults.
+- `sso` providers derive from `SHIPPED_BRAND_ICON_NAMES`
+  (`orchestrator-shared.ts`), so a glyph added in `@zitadel/components` shows
+  up on its own. Never hard-code a provider list.
+- `sso` and `passkey` stay off by default, so the mock mirrors the shipped
+  flow and the api-mock conformance spec stays green.
+- Keep controls scalar (enums, booleans): args round-trip through the URL, and
+  object controls break shareable links.
+- Never remove the story-id-and-args key on the mock-backed subtree in
+  `.storybook/preview.ts`: without it, a flow driven to `done` leaks into the
+  next story.
+- `passkey-login` stories stub `navigator.credentials` with
+  `freezePasskeyCeremony()` in `beforeEach`. Keep that stub in the workbench;
+  the login element gets no "skip the ceremony" prop.
+- Not storied on purpose: `passkey-setup` / `passkey-upsell` (legacy; the
+  default flow no longer routes through them) and `sso-redirect` (it
+  navigates away).
+- A `play` that fills the password uses `PASSWORD_FIELD`
+  (`x-auth-methods#password`), never `"password"`.
+- After changing a control or preset, load the stories and read the resolved
+  state (host `data-theme`, provider buttons, the step) across branding ×
+  theme × sso. Do not infer it from the code.
 
 ## Recipe: add an atom (Figma → Storybook)
 
-The repeatable flow that built `select`. Each step links the package whose
-scoped `AGENTS.md` owns the rules — read those rather than rediscovering them.
+Each step's package has its own `AGENTS.md`; follow it.
 
-1. **Design.** Pull the frame with the Figma MCP (`get_design_context` /
-   `get_screenshot`); note the states, the WAI-ARIA pattern, and which tokens it
-   uses. A missing value is a new token in `@zitadel/design-tokens` — never a
-   magic value in CSS.
-2. **Icon (only if new).** Add the glyph to
-   `packages/components/src/atoms/zl-icon.ts` (`IconName` union +
-   `SHIPPED_ICON_NAMES` + `ICON_NODES`).
-3. **CSS** (`packages/components`, see its `AGENTS.md`): create
-   `src/atoms/zl-<id>.css` beside the atom — `:host`/slot rules first, then the
-   painted `.zr-<id>` surface. One file; there is no separate host sheet.
-4. **Lit atom** (`packages/components`, see its `AGENTS.md`): create
-   `src/atoms/zl-<id>.ts` — `static formAssociated = true` if it holds a value,
-   import the CSS with `./zl-<id>.css?inline`, and export a manifest. Register:
-   export from `src/atoms/index.ts`, add the manifest to `src/manifests.ts`, and
-   re-export the public API from `src/index.ts`.
-5. **Tests — lowest layer that proves the property** (don't duplicate upward):
-   - `src/atoms/zl-<id>.spec.ts` (jsdom: markup + ARIA).
-   - `src/atoms/zl-<id>.browser.spec.ts` (chromium: form participation,
-     keyboard, focus) — only if it has real-platform behaviour.
-   - Add the tag to `src/manifests.spec.ts` and its events to
-     `src/atoms/event-contract.spec.ts`.
-6. **Story** (`src/<id>.stories.ts`): one `Default` story under an
-   `Atoms/<Name>` title. States are knobs, not extra stories.
-7. **Verify.** Dev loop: `storybook dev -p 6006` (HMR from source). Gate:
-   `moon run components:test` (unit), `moon run storybook:typecheck`, and
-   `moon run storybook:test` (render + a11y + plays in Chromium).
+1. **Design.** Pull the frame with the Figma MCP (`get_design_context`,
+   `get_screenshot`); note states, the WAI-ARIA pattern and tokens. A missing
+   value is a new token in `@zitadel/design-tokens`.
+2. **Icon**, if new: `packages/components/src/atoms/zl-icon.ts` (`IconName`,
+   `SHIPPED_ICON_NAMES`, `ICON_NODES`).
+3. **CSS**: `src/atoms/zl-<id>.css` beside the atom, `:host`/slot rules first,
+   then the painted `.zr-<id>` surface.
+4. **Atom**: `src/atoms/zl-<id>.ts`. An atom that holds a value extends
+   `FormAtom` (`src/internal/form-atom.ts`); never hand-roll
+   `formAssociated`. Import the CSS with `?inline`, export a manifest, export
+   the atom from `src/atoms/index.ts`, add the manifest to `src/manifests.ts`
+   and the public API to `src/index.ts`.
+5. **Tests**, at the lowest layer that proves the property: `zl-<id>.spec.ts`
+   (jsdom: markup, ARIA), `zl-<id>.browser.spec.ts` (Chromium: form, keyboard,
+   focus) only if needed, the tag in `src/manifests.spec.ts` and its events in
+   `src/atoms/event-contract.spec.ts`.
+6. **Story**: `src/<id>.stories.ts`, one `Default` under `Atoms/<Name>`.
+7. **Verify** with `moon run storybook:dev` (HMR from source), then
+   `moon run components:test storybook:typecheck storybook:test`. While
+   iterating, `pnpm --filter @zitadel/components test:unit` is the fast lane.
 
 ## Local checks
 
 ```sh
-moon run storybook:typecheck
-moon run storybook:build
-moon run storybook:test
+moon run storybook:typecheck storybook:build storybook:test
 ```
 
-`storybook:test` (and any `--project browser` Vitest run) launches real Chromium
-and pre-bundles the workspace from source, so the **first** run is slow
-(60–120s+) while later runs are fast on a warm `node_modules/.vite` cache — it is
-not hung. Don't pipe it through `tail` (buffers until EOF) and don't kill-and-
-retry without first clearing strays (`pkill -f vitest; pkill -f chrome-headless-shell`),
-or the next run stalls on `Port … is in use`. See
-[`packages/components/AGENTS.md`](../../packages/components/AGENTS.md#the-browser-project-hangs--it-doesnt-its-cold-start).
+`storybook:test` runs real Chromium and re-bundles its dependencies on every
+start (`optimizeDeps.force`), so every run starts cold. Never pipe it through
+`tail`, and clear strays before a retry; see
+[`packages/components/AGENTS.md`](../../packages/components/AGENTS.md#the-browser-projects-cold-start).

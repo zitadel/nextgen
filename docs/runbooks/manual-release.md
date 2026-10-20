@@ -45,14 +45,28 @@ prose is written manually by maintainers.
 
 | Situation | Workflow | Inputs |
 | --- | --- | --- |
+| The version commit's own run stopped in its preflight, before publishing anything, and the cause is fixed | that `release-publish` run | none: re-run its failed jobs |
 | `main` is still on the generated version commit and the first publish failed before finishing | `release-publish` | `dry_run=true`, then `dry_run=false` |
 | `main` has moved past the generated version commit, or the missing artifact surface is unclear | `release-publish` | `recover_version=<version>` with `dry_run=true`, then `dry_run=false` |
 
+A push run publishes the commit it ran for, so re-running its failed jobs
+publishes the version commit even after `main` has moved past it:
+
+```sh
+gh run rerun <run-id> --repo zitadel/nextgen --failed
+```
+
+Prefer that over `recover_version` when a preflight stopped the run:
+`recover_version` publishes `main`'s head, and refuses while `main` holds
+changesets the version commit did not record. Re-run before the next version
+PR lands. Publishing the older version after it would move the npm pre tag
+(`alpha`) and the container's `:latest` back to it.
+
 Use `release-publish` with `recover_version=<version>` for an already-versioned
-release when any publish-side artifact may be missing. This is the single
-recovery path. It verifies the checked-out `@zitadel/server` version, rebuilds
-release artifacts, runs Changesets publish, pushes containers, and updates the
-draft GitHub Release facts block.
+release when any publish-side artifact may be missing. It verifies the
+checked-out `@zitadel/server` version, rebuilds release artifacts, runs
+Changesets publish, pushes containers, and updates the draft GitHub Release
+facts block.
 `changeset publish` only publishes package versions that are not already
 present on npm, so the same recovery path is safe when npm packages are already
 complete and only Docker needs repair.

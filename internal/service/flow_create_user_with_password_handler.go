@@ -5,21 +5,20 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // FlowCreateUserWithPasswordHandler implements the `create_user` on_success:
 // persist a new user from validated identifier + password fields.
 type FlowCreateUserWithPasswordHandler struct {
-	hasher      crypto.Hasher
+	hashers     ProjectHasherResolver
 	userService UserService
 	schemaStore domain.JSONSchemaStore
 	db          StatementPool
 }
 
 func NewFlowCreateUserHandler(
-	hasher crypto.Hasher,
+	hashers ProjectHasherResolver,
 	userService UserService,
 	schemaStore domain.JSONSchemaStore,
 	db StatementPool,
@@ -27,7 +26,7 @@ func NewFlowCreateUserHandler(
 	return &FlowCreateUserWithPasswordHandler{
 		userService: userService,
 		schemaStore: schemaStore,
-		hasher:      hasher,
+		hashers:     hashers,
 		db:          db,
 	}
 }
@@ -60,7 +59,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 			UserID:    userID,
 			Password:  password,
 		},
-		h.hasher,
+		h.hashers,
 	)
 	// The user just chose this password, so knowledge is proven: record real
 	// user + password factors on the attempt in the same transaction, so the
@@ -77,7 +76,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 	err = h.userService.ApplyActions(ctx, createUserAction, setPasswordAction, recordFactorsAction)
 	if err != nil {
 		if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
-			return domain.FlowOnSuccessResult{StepError: new("user_already_exists")}, nil
+			return domain.FlowOnSuccessResult{StepError: new(domain.FlowStepErrorUserAlreadyExists)}, nil
 		}
 		return domain.FlowOnSuccessResult{}, err
 	}

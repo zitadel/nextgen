@@ -1,0 +1,19 @@
+title: DeploymentCreatedPayload
+type: object
+description: |
+  Allowlisted fields for `deployment.created`. The deployment id is already
+  the event's `entity_id`; the fields here say what went live where.
+properties:
+  release_id:
+    type: string
+  targets:
+    type: array
+    description: The origins the release went live on, sorted.
+    items:
+      type: string
+  reason:
+    type: string
+  message:
+    type: string
+  rollback_to:
+    type: string

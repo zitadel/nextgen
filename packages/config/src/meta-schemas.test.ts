@@ -78,7 +78,7 @@ describe("meta-schemas", () => {
     const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
     const check = ajv.compile(flowSchema?.body as object);
     for (const preset of SETUP_PRESETS) {
-      const flow = getDefaultLoginFlow({ preset, userSchemaUrl: "sch_TEST" });
+      const flow = getDefaultLoginFlow({ preset });
       expect(check(flow), `${preset}: ${JSON.stringify(check.errors)}`).toBe(true);
     }
   });
@@ -124,7 +124,7 @@ describe("meta-schemas", () => {
     const ajv = new Ajv2020({ strict: false });
     const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
     const check = ajv.compile(flowSchema?.body as object);
-    const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+    const flow = getDefaultLoginFlow() as unknown as {
       steps: Array<{
         transitions?: Record<string, { target: string; action?: string | null }>;
       }>;
@@ -141,6 +141,119 @@ describe("meta-schemas", () => {
     expect(check(flow)).toBe(false);
   });
 
+  // Step and transition shapes the engine can never run are rejected by the
+  // dialect too, so an editor flags them before plan does.
+  it("rejects step and transition shapes the engine cannot run", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    const withStep = (step: Record<string, unknown>): object => {
+      const flow = getDefaultLoginFlow() as unknown as {
+        steps: object[];
+      };
+      flow.steps.push({ name: "extra", ...step });
+      return flow;
+    };
+    const provider = "google";
+    const providers = (n: number): string[] => Array.from({ length: n }, (_, i) => `idp-${i}`);
+    const cases: Array<[string, Record<string, unknown>, boolean]> = [
+      ["sso_providers without transitions", { sso_providers: [provider] }, false],
+      [
+        "sso_providers without an sso_authenticated transition",
+        { sso_providers: [provider], transitions: { submit: { target: "extra" } } },
+        false,
+      ],
+      [
+        "sso_providers with an sso_authenticated transition",
+        { sso_providers: [provider], transitions: { sso_authenticated: { target: "extra" } } },
+        true,
+      ],
+      [
+        "twenty sso_providers",
+        { sso_providers: providers(20), transitions: { sso_authenticated: { target: "extra" } } },
+        true,
+      ],
+      [
+        "twenty-one sso_providers",
+        { sso_providers: providers(21), transitions: { sso_authenticated: { target: "extra" } } },
+        false,
+      ],
+      [
+        "terminal step with actions",
+        { complete: "show", actions: [{ name: "submit", kind: "submit" }] },
+        false,
+      ],
+      [
+        "terminal step with transitions",
+        { complete: "show", transitions: { submit: { target: "extra" } } },
+        false,
+      ],
+      ["terminal step with empty lists", { complete: "show", fields: [], actions: [] }, true],
+      ["non-terminal step with nothing", {}, false],
+      ["non-terminal step with only empty lists", { fields: [], actions: [] }, false],
+      [
+        "non-terminal step with only an sso_authenticated transition",
+        { transitions: { sso_authenticated: { target: "extra" } } },
+        true,
+      ],
+      ["non-terminal step with fields", { fields: ["email"] }, true],
+      [
+        "transition with both purpose and action",
+        {
+          fields: ["email"],
+          transitions: { submit: { target: "extra", purpose: "login", action: "switch" } },
+        },
+        false,
+      ],
+      [
+        "transition with purpose and a null action",
+        {
+          fields: ["email"],
+          transitions: { submit: { target: "extra", purpose: "login", action: null } },
+        },
+        true,
+      ],
+      [
+        "sso_authenticated with a purpose",
+        {
+          fields: ["email"],
+          transitions: { sso_authenticated: { target: "extra", purpose: "register" } },
+        },
+        false,
+      ],
+      [
+        "sso_user_not_found with an action",
+        {
+          fields: ["email"],
+          transitions: { sso_user_not_found: { target: "extra", action: "switch" } },
+        },
+        false,
+      ],
+      [
+        "sso outcomes with a null purpose and action",
+        {
+          fields: ["email"],
+          transitions: {
+            sso_authenticated: { target: "extra", purpose: null, action: null },
+            sso_user_not_found: { target: "extra", purpose: null, action: null },
+          },
+        },
+        true,
+      ],
+      [
+        "user_already_exists with a purpose",
+        {
+          fields: ["email"],
+          transitions: { user_already_exists: { target: "extra", purpose: "login" } },
+        },
+        true,
+      ],
+    ];
+    for (const [name, step, valid] of cases) {
+      expect(check(withStep(step)), `${name}: ${JSON.stringify(check.errors)}`).toBe(valid);
+    }
+  });
+
   // The dialect is what an editor validates against, so the property-name
   // rule has to hold in a plain JSON Schema validator, not just in the
   // server's Go one.
@@ -155,6 +268,7 @@ describe("meta-schemas", () => {
     const userSchema = (properties: unknown) => ({
       metaSchema: "https://example.test/user-schema.json",
       kind: "user-schema",
+      objectType: "human-user",
       "x-auth-methods": { password: { enabled: true } },
       properties,
     });
@@ -190,8 +304,12 @@ describe("meta-schemas", () => {
       const file = { $schema: BRANDING_FILE_SCHEMA_REF, ...branding };
       expect(check(file), `${design}: ${JSON.stringify(check.errors)}`).toBe(true);
     }
-    // The two template carriers are mutually exclusive.
-    expect(check({ liquid_template: "x", liquid_template_file: "./login.liquid" })).toBe(false);
+    // The template is inline or a `$file` reference; the old key is unknown.
+    expect(check({ liquid_template: "<p></p>" })).toBe(true);
+    expect(check({ liquid_template: { $file: "./login.liquid" } })).toBe(true);
+    expect(check({ liquid_template: { $file: "" } })).toBe(false);
+    expect(check({ liquid_template: { $file: "./login.liquid", extra: 1 } })).toBe(false);
+    expect(check({ liquid_template_file: "./login.liquid" })).toBe(false);
     // Unknown keys are dialect errors, like the flow dialect.
     expect(check({ not_a_branding_key: true })).toBe(false);
     // Asset URLs are https by default at the dialect level too — editors flag
@@ -200,6 +318,15 @@ describe("meta-schemas", () => {
     expect(check({ logo_url: "http://cdn.example.com/logo.svg" })).toBe(false);
     expect(check({ hero_url: "https://cdn.example.com/hero.png" })).toBe(true);
     expect(check({ hero_url: "HTTPS://cdn.example.com/hero.png" })).toBe(true);
+    expect(check({ logo_url: "https://cdn.example.com:8443/logo.svg" })).toBe(true);
+    expect(
+      check({ theme: { light: { logo_url: "https://cdn.example.com:8443/on-light.svg" } } }),
+    ).toBe(true);
+    expect(
+      check({
+        typography: { font_family: "Inter", font_url: "https://fonts.example.com:8443/css" },
+      }),
+    ).toBe(true);
     // Loopback HTTP is the dev-posture carve-out, mirrored across the zod
     // and Go gates: editors must not flag what plan/apply accept.
     expect(check({ logo_url: "http://localhost:3000/logo.svg" })).toBe(true);
@@ -217,6 +344,24 @@ describe("meta-schemas", () => {
     expect(check({ hero_url: "http://[0:0:0:0:0:0:0:1]/hero.png" })).toBe(false);
     expect(check({ hero_url: "http://[::ffff:127.0.0.1]/hero.png" })).toBe(false);
     expect(check({ hero_url: "http://localhost:65536/hero.png" })).toBe(false);
+    // Userinfo in an asset URL is a credential every visitor's browser sends,
+    // so the dialect rejects it like the zod and Go gates; an `@` in the path
+    // is not userinfo.
+    expect(check({ logo_url: "https://bob:secret@cdn.example.com/logo.svg" })).toBe(false);
+    expect(
+      check({ theme: { dark: { logo_url: "https://bob@cdn.example.com/on-dark.svg" } } }),
+    ).toBe(false);
+    expect(
+      check({
+        typography: { font_family: "Inter", font_url: "https://u:p@fonts.example.com/css" },
+      }),
+    ).toBe(false);
+    expect(check({ logo_url: "https://cdn.example.com/logo@2x.png" })).toBe(true);
+    // A stylesheet alone names no face to render in.
+    expect(check({ typography: { font_url: "https://fonts.example.com/css" } })).toBe(false);
+    expect(
+      check({ typography: { font_family: "Inter", font_url: "https://fonts.example.com/css" } }),
+    ).toBe(true);
   });
 
   it("the branding $schema ref resolves from .zitadel/branding/ into the meta dir", () => {
@@ -229,7 +374,7 @@ describe("meta-schemas", () => {
     const ajv = new Ajv2020({ strict: false });
     const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
     const check = ajv.compile(flowSchema?.body as object);
-    const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+    const flow = getDefaultLoginFlow() as unknown as {
       steps: Array<{ actions?: unknown }>;
     };
     // Old dialect: actions keyed by name instead of an ordered array.
@@ -240,7 +385,7 @@ describe("meta-schemas", () => {
     expect(check(flow)).toBe(false);
 
     const withUnknown = {
-      ...getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }),
+      ...getDefaultLoginFlow(),
       not_a_flow_key: true,
     };
     expect(check(withUnknown)).toBe(false);

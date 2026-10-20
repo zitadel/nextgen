@@ -11,6 +11,14 @@ func (s *Branding) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *BuildReleaseRequest) setDefaults() {
+	{
+		val := bool(false)
+		s.GitDirty.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *CreateFlowRequest) setDefaults() {
 	{
 		val := bool(false)
@@ -40,6 +48,10 @@ func (s *Field) setDefaults() {
 		val := bool(false)
 		s.Required.SetTo(val)
 	}
+	{
+		val := bool(false)
+		s.ReadOnly.SetTo(val)
+	}
 }
 
 // setDefaults set default value of fields.
@@ -51,7 +63,39 @@ func (s *FlowStepAction) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *IdpConnectionOidc) setDefaults() {
+	{
+		val := bool(false)
+		s.IDTokenMapping.SetTo(val)
+	}
+	{
+		val := IdpConnectionOidcTokenEndpointAuthMethod("client_secret_basic")
+		s.TokenEndpointAuthMethod.SetTo(val)
+	}
+	{
+		val := bool(true)
+		s.PkceEnabled.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *IdpConnectionProvisioning) setDefaults() {
+	{
+		val := IdpConnectionProvisioningCreation("auto")
+		s.Creation.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *QueryGrantsRequest) setDefaults() {
+	{
+		val := int(20)
+		s.Limit.SetTo(Limit(val))
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *QueryIdpsRequest) setDefaults() {
 	{
 		val := int(20)
 		s.Limit.SetTo(Limit(val))

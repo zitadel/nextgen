@@ -26,6 +26,13 @@ func battleUserPasswords(t *testing.T, d dialect) {
 			UserID:      userID,
 			EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$fixture",
 		}))
+		// A second password leaves a previous row behind, which the list
+		// must not serve.
+		require.NoError(t, d.stmts.SetUserPassword(t.Context(), &domain.SetUserPassword{
+			ProjectID:   projectID,
+			UserID:      userID,
+			EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$fixture-2",
+		}))
 		listed, err := d.stmts.ListUserPasswords(t.Context(), &database.ListOptions[domain.UserPasswordField]{
 			Filter: database.And(
 				database.Equal(database.Col(domain.UserPasswordFieldProjectID), projectID),

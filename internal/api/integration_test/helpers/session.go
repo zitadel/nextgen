@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"crypto/sha256"
+	"errors"
 	"testing"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureSessionService(t *testing.T) service.SessionService {
+func (h *Harness) EnsureSessionService(t testing.TB) service.SessionService {
 	t.Helper()
 	h.sessionService.mutex.Lock()
 	defer h.sessionService.mutex.Unlock()
@@ -30,7 +31,7 @@ func (h *Harness) EnsureSessionService(t *testing.T) service.SessionService {
 // expires_at while the state filter compares it against the service clock,
 // so a test that needs the session expired must wait until that is
 // observable rather than assume a tiny TTL has already elapsed.
-func (h *Harness) CreateSession(t *testing.T, projectID string, ttl time.Duration) *domain.Session {
+func (h *Harness) CreateSession(t testing.TB, projectID string, ttl time.Duration) *domain.Session {
 	t.Helper()
 	session := &domain.Session{ProjectID: projectID, TimeToLive: ttl}
 	require.NoError(t, h.EnsureServiceDB(t).Statements().CreateSession(t.Context(), session))
@@ -40,26 +41,45 @@ func (h *Harness) CreateSession(t *testing.T, projectID string, ttl time.Duratio
 // CreateActiveSession exchanges a handed-off attempt with a verified user
 // factor, binding the user to the new session. The user must exist:
 // sessions.user_id references users.
-func (h *Harness) CreateActiveSession(t *testing.T, projectID, userID string) *domain.Session {
+//
+// A handoff is valid for one minute, and the Spanner emulator can queue the
+// exchange past it. Only on that answer the helper seeds a fresh attempt, up
+// to three times; a handoff that is actually broken still fails the test.
+// TestClaimHappyPath and the session exchange tests exchange exactly once.
+func (h *Harness) CreateActiveSession(t testing.TB, projectID, userID string) *domain.Session {
 	t.Helper()
 	stmts := h.EnsureServiceDB(t).Statements()
 
-	attempt := &domain.AuthAttempt{
-		ProjectID:      projectID,
-		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
-		Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
+	var err error
+	for range 3 {
+		attempt := &domain.AuthAttempt{
+			ProjectID:      projectID,
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
+			Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
+		}
+		require.NoError(t, stmts.CreateAuthAttempt(t.Context(), attempt))
+
+		plainToken := "handoff_" + RandString(12)
+		sum := sha256.Sum256([]byte(plainToken))
+		attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
+		require.NoError(t, stmts.HandoffAuthAttempt(t.Context(), attempt))
+
+		var session *domain.Session
+		session, err = h.EnsureSessionService(t).Exchange(t.Context(), service.ExchangeInput{
+			ProjectID:    projectID,
+			HandoffToken: plainToken,
+		})
+		if err == nil {
+			return session
+		}
+		// A rejected exchange returns before it deletes the attempt, so the
+		// helper does: a failure must not leave rows in a shared project.
+		require.NoError(t, stmts.DeleteAuthAttemptByID(t.Context(), projectID, attempt.ID))
+		if !errors.Is(err, domain.ErrSessionInvalidHandoffToken()) {
+			break
+		}
+		t.Logf("handoff expired before the exchange (slow database?): %v", err)
 	}
-	require.NoError(t, stmts.CreateAuthAttempt(t.Context(), attempt))
-
-	plainToken := "handoff_" + RandString(12)
-	sum := sha256.Sum256([]byte(plainToken))
-	attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
-	require.NoError(t, stmts.HandoffAuthAttempt(t.Context(), attempt))
-
-	session, err := h.EnsureSessionService(t).Exchange(t.Context(), service.ExchangeInput{
-		ProjectID:    projectID,
-		HandoffToken: plainToken,
-	})
 	require.NoError(t, err)
-	return session
+	return nil
 }

@@ -42,14 +42,15 @@ A user can be in the platform project (a developer/admin) or a customer project 
 
 ## Permission resolution
 
-Permissions are flat `{resource}.{verb}` strings such as `user.read`, `project.write`, and `team_membership.write`. Multi-word resource types use `_` (for example `team_membership`, `flow_definition`), not dot nesting. Scope (which project or team) comes from the resolved grant, not from nesting in the permission name. Parent-resource permissions do not inherit into separately cataloged resources: for example, `project.write` does not imply `branding.write`, `allowed_origin.write`, or `webhook.write`. Bundles may grant those permissions together. The resolver answers: "for this principal, in this resolved scope, is this permission granted?" See [`system-permission-catalog.md`](system-permission-catalog.md) for the full list.
+Permissions are flat `{resource}.{verb}` strings such as `user.read`, `project.write`, and `team_membership.write`. Multi-word resource types use `_` (for example `team_membership`, `flow_definition`), not dot nesting. Scope (which project or team) comes from the resolved grant, not from nesting in the permission name. Parent-resource permissions do not inherit into separately cataloged resources: for example, `project.write` does not imply `branding.write`, `origin.write`, or `webhook.write`. Bundles may grant those permissions together. The resolver answers: "for this principal, in this resolved scope, is this permission granted?" See [`system-permission-catalog.md`](system-permission-catalog.md) for the full list.
 
 > **MVP enforcement.** Path-id management handlers resolve scope via
 > `GetResourceScope` (`resource_scope_index`) **before** `resolver.Check` on
 > coarse `project.{viewer,editor,admin}` (seeded system catalog). Create/list
 > keep an explicit `project_id` and call Check directly. `CreateProject` seeds
-> an `sk_proj` ↔ `project.viewer` assignment so the returned project secret can
-> set up the project. The operator-plane ceiling still requires token scope
+> an `sk_proj` ↔ `project.admin` assignment so the returned project secret can
+> set up the project; roles are monotonic, so `admin` closes to `editor` and
+> `viewer` (ADR 054 §5). The operator-plane ceiling still requires token scope
 > `project.write` (preview/`project.read` remains browser-plane). Fine-grained
 > `{resource}.{verb}` catalog relations land with #420; until then do not
 > assume independently mintable per-resource scopes when configuring clients.

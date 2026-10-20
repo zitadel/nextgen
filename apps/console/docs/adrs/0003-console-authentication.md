@@ -14,7 +14,7 @@
 ADR 0002 shipped the console with **no console-user authentication**: before
 sign-in the browser held no session, and the dev-only Vite proxy injected the
 project-secret bearer — explicitly labelled in
-[`vite.config.mts`](../../vite.config.mts) as _"a temporary pre-login
+[`vite.config.ts`](../../vite.config.ts) as _"a temporary pre-login
 workaround: once the console has a login, a proxy forwards the auth cookie as
 the bearer and the secret is dropped."_ This ADR designs that login.
 
@@ -87,10 +87,26 @@ contract) with a menu whose only entry is **Sign out**
 console-local (bucket 2 of the root AGENTS.md styling rule) — the dark-only
 `<zitadel-session>`/`<zitadel-logout>` pairs are not theme-portable yet.
 
+> **Amendment (2026-10-04):** the root `AGENTS.md` styling rule now names two
+> surfaces, and the login surface themes light and dark. This chrome stays
+> console-local because the console does not compose login-surface elements
+> (root ADR 055).
+
 A data-load `401` now means "session ended mid-use": the shared error
 boundary drops the session cache and redirects to `/login?next=…` instead of
 rendering dead-end copy (the hook ADR 0002 §3 anticipated). `403` stays a
 rendered state — signed in, but no access.
+
+> **Amendment (2026-10-05, #1300):** a page belongs to one person. The first
+> session the page reads names that person for the life of the document, and
+> nothing changes it in place: a session that now belongs to someone else —
+> another tab signed in, or a sign-in on this page after a sign-out — is
+> never adopted, wherever it is noticed (the guard, the 401 boundary's fresh
+> read, or a refused write's re-check, ADR 0002 §3). The page reloads once
+> instead, and the new document starts as whoever is signed in then. A
+> session that is gone drops the cached session, its CSRF token and the reads
+> cached for it, but keeps the person, so the same person signing in again
+> carries on without a reload.
 
 ### 4. The cookie is the embedded Console's human credential
 
@@ -121,23 +137,36 @@ fails those requests closed. No production `/api` shim or secret injection is
 planned. Once ADR 053 lands, the dev proxy drops the secret; the Console client
 does not change.
 
+> **Amendment (2026-09-25, #1300):** the bridge is gone. The management
+> operations the Console uses accept the session cookie and authorize it through
+> the signed-in person's grants on the target project, and the Vite dev proxy no
+> longer injects a project secret — it forwards requests as-is. Dev and the
+> embedded build take the same credential path.
+
 ### 5. Recorded caveats
 
 - **Dark-only widget.** The widget's surface CSS still uses the legacy
   dark-only login tokens (root ADR 014 §5), so the login screen renders the
   dark treatment in both console themes. Accepted for v1; resolves as the login
   atoms migrate onto the shadcn token roles.
+
+  > **Amendment (2026-10-04):** the login atoms use the shared token roles and
+  > theme light and dark; `/login` passes the console's resolved theme to the
+  > widget (`src/routes/login.tsx`).
 - **Full-page reload on sign-in.** The widget's document navigation reboots
   the SPA with the cookie present. Accepted; an `onFlowComplete` +
   `router.navigate` in-SPA handoff is possible later.
 - **Identity project vs protected project.** The login flow runs against the
-  reserved platform project discovered through `runtime.json` (with
-  `VITE_CONSOLE_PROJECT_ID` only as a local-dev override). Data calls may
+  reserved platform project discovered through `runtime.json`, in
+  development as in production (the `VITE_CONSOLE_PROJECT_ID` override was
+  removed in #1345, as asked in #1300). Data calls may
   target any customer project the signed-in principal is authorized to use;
   Console ADR 0004 and root ADR 053 keep those scopes distinct.
 - **Fail-closed session probe.** Any `fetchSession` failure (including a
   backend outage) reads as "not signed in" and lands on the login screen,
-  where the outage surfaces as a widget error.
+  where the outage surfaces as a widget error. A session that belongs to
+  someone else is not a failure: `fetchSession` never answers for it, and the
+  page reloads (§3).
 
 ## Consequences
 
@@ -146,13 +175,14 @@ does not change.
   client only.
 - `AppShell` moves from `__root` to `_authed`; screens keep their URLs
   (pathless layout) and their loaders/boundaries (ADR 0001) untouched.
-- The secret's remaining use is server-side (dev proxy env); the browser
-  bundle still never contains it (ADR 005 holds).
+- The Console uses no project secret at all since 2026-09-25 (#1300) — not in
+  the browser bundle (ADR 005 holds) and not in the dev proxy either; dev
+  tooling uses it only server-side, to seed and grant.
 - **~~Dependency to track~~ resolved 2026-08-12 by withdrawal (ADR 0002):**
   no Go `/api` mount exists or is planned — the deployed console calls the
-  API at the origin root. The deployed management surface now waits on
+  API at the origin root. The deployed management surface waited on
   session-derived target permissions (root ADRs 032/033/053) rather than on a
-  secret-injecting mount.
+  secret-injecting mount; those landed with #1300.
 - Tests: the `_authed` guard is covered by `src/routes/auth-guard.spec.tsx`;
   existing screen specs mock `@/auth/session` and run as signed-in.
 

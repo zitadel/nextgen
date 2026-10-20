@@ -28,12 +28,14 @@ func HashHandoffToken(plain string) []byte {
 	return sum[:]
 }
 
-// ExchangeTTL returns ttl when positive, otherwise SessionAnonymousTTL.
+// ExchangeTTL returns ttl when positive, otherwise SessionDefaultTTL. An
+// exchange ends a sign-in, so the session it leaves must not keep the short
+// lifetime of an anonymous shell.
 func ExchangeTTL(ttl time.Duration) time.Duration {
 	if ttl > 0 {
 		return ttl
 	}
-	return domain.SessionAnonymousTTL
+	return domain.SessionDefaultTTL
 }
 
 // ValidateHandoffAttempt rejects missing, expired, or incomplete handoff state.
@@ -201,6 +203,33 @@ func DecodeAuthChecks(
 			}
 			checks = append(checks, registrationCheck)
 		}
+	case domain.AuthCheckTypeSSO:
+		// Factor only: the sso factor is written directly, never challenged.
+		if !verifiedAt.IsZero() {
+			ssoFactor := &domain.AuthFactorSSO{}
+			ssoFactor.SetLastVerifiedAt(verifiedAt)
+			if len(factor) > 0 {
+				if err := json.Unmarshal(factor, ssoFactor); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal sso auth check factor payload: %w", err)
+				}
+			}
+			checks = append(checks, ssoFactor)
+		}
+	case domain.AuthCheckTypeSSOCallback:
+		// Never a factor: the record carries its result in factor_payload but
+		// last_verified_at stays NULL, so nothing promotes or completes on it.
+		ssoCheck := &domain.SSOCallbackCheck{ID: id, IssuedAt: lastChallengedAt}
+		if !lastChallengedAt.IsZero() && len(challenge) > 0 {
+			if err := json.Unmarshal(challenge, &ssoCheck.Pending); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal sso callback auth check challenge payload: %w", err)
+			}
+		}
+		if len(factor) > 0 {
+			if err := json.Unmarshal(factor, &ssoCheck.Result); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal sso callback auth check factor payload: %w", err)
+			}
+		}
+		checks = append(checks, ssoCheck)
 	default:
 		return nil, fmt.Errorf("unsupported auth check type %v", checkType)
 	}

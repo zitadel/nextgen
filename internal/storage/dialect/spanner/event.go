@@ -151,26 +151,25 @@ func (e eventStatements) GetEventByID(ctx context.Context, projectID, id string)
 
 // ListEvents implements [service.EventStatements].
 func (e eventStatements) ListEvents(ctx context.Context, filter *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, eventQuery, filter, events.Schema); err != nil {
-		return nil, err
-	}
-	var items []*domain.Event
-	err := e.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		items, err = collectRows(iter, e.scanEvent)
-		return err
+	items, nextCursor, err := pagination.Page(filter.Pagination, events.Schema, func(limit uint32) ([]*domain.Event, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, eventQuery, filter, events.Schema); err != nil {
+			return nil, err
+		}
+		var items []*domain.Event
+		err := e.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			items, err = collectRows(iter, e.scanEvent)
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+		return items, nil
 	})
 	if err != nil {
 		return nil, err
-	}
-	var nextCursor []byte
-	if filter.Pagination.Limit > 0 && len(items) == int(filter.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.EventField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  events.Schema.ValuesFrom(items[len(items)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
 	}
 	return &database.ListResult[*domain.Event]{
 		Items:      items,

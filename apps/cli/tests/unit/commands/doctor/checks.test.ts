@@ -22,6 +22,7 @@ import {
 import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
 import { createOrca } from "../../../../src/lib/orca";
 import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
+import { bearerOnlyProxyConf } from "../../../helpers/proxy-conf";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
 import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
 import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
@@ -29,9 +30,10 @@ import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
 const tempDirs: string[] = [];
 
 // Matches the generated `CreateSchemaBody` zod (the `user-schema` branch):
-// required keys are `kind`, `metaSchema`, `x-auth-methods`.
+// required keys are `kind`, `metaSchema`, `objectType`, `x-auth-methods`.
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
+  objectType: "human-user",
   metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
   "x-auth-methods": { passkey: { enabled: true } },
   properties: { email: { type: "string" } },
@@ -41,6 +43,7 @@ const SECRET = {
   project_id: "proj-001",
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
+  primary_origins: [],
   preview_origins: [],
   // Recent, so the claim window reads as open; the closed-window test writes
   // its own stale timestamp.
@@ -74,16 +77,31 @@ async function makeProject(): Promise<string> {
   );
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
   await chmod(join(cwd, ".zitadel/secret"), 0o600);
-  await writeFile(join(cwd, ".gitignore"), [".zitadel/secret", ".env*", "!.env.example"].join("\n"));
+  await writeFile(
+    join(cwd, ".gitignore"),
+    [".zitadel/secret", ".env*", "!.env.example"].join("\n"),
+  );
   await writeFile(
     join(cwd, ".env.example"),
     ["ZITADEL_PROJECT_ID=", "ZITADEL_ENVIRONMENT=", "ZITADEL_ISSUER="].join("\n"),
   );
   await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify(VALID_USER_SCHEMA));
-  await writeFile(join(cwd, "app/login/page.tsx"), `${MANAGED_MARKER}\nexport default function L() {}\n`);
-  await writeFile(join(cwd, "app/register/page.tsx"), `${MANAGED_MARKER}\nexport default function R() {}\n`);
-  await writeFile(join(cwd, "app/profile/page.tsx"), `${MANAGED_MARKER}\nexport default function P() {}\n`);
-  await writeFile(join(cwd, "middleware.ts"), `${MANAGED_MARKER}\nexport function middleware() {}\n`);
+  await writeFile(
+    join(cwd, "app/login/page.tsx"),
+    `${MANAGED_MARKER}\nexport default function L() {}\n`,
+  );
+  await writeFile(
+    join(cwd, "app/register/page.tsx"),
+    `${MANAGED_MARKER}\nexport default function R() {}\n`,
+  );
+  await writeFile(
+    join(cwd, "app/profile/page.tsx"),
+    `${MANAGED_MARKER}\nexport default function P() {}\n`,
+  );
+  await writeFile(
+    join(cwd, "middleware.ts"),
+    `${MANAGED_MARKER}\nexport function middleware() {}\n`,
+  );
   await writeFile(join(cwd, "custom-elements.d.ts"), `${MANAGED_MARKER}\nexport {};\n`);
   return cwd;
 }
@@ -167,6 +185,54 @@ async function makeAngularProject(): Promise<string> {
   await writeFile(join(cwd, "src/app/app.ts"), `${MANAGED_MARKER}\nexport class App {}\n`);
   await writeFile(join(cwd, "src/app/app.html"), `<!-- ${MANAGED_MARKER} -->\n<main></main>\n`);
   await writeFile(join(cwd, "proxy.conf.cjs"), proxyConfTemplate());
+  return cwd;
+}
+
+/**
+ * A Nuxt 4 app as an older setup left it: every page and plugin it wrote is
+ * on disk, and its manifest records both plugins as infrastructure.
+ */
+async function makeOlderNuxtProject(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-checks-nuxt-"));
+  tempDirs.push(cwd);
+  await mkdir(join(cwd, ".zitadel"), { recursive: true });
+  await mkdir(join(cwd, "app/pages"), { recursive: true });
+  await mkdir(join(cwd, "app/plugins"), { recursive: true });
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({
+      name: "demo",
+      dependencies: { nuxt: "^4.1.0", "@zitadel/sdk-nuxt": "latest" },
+    }),
+  );
+  await writeFile(
+    join(cwd, "zitadel.json"),
+    JSON.stringify({
+      project: "proj-001",
+      server: "https://api.zitadel.cloud",
+      framework: { id: "nuxt" },
+      environments: { development: { issuer: "http://localhost:3000" } },
+    }),
+  );
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
+  await chmod(join(cwd, ".zitadel/secret"), 0o600);
+  await writeFile(join(cwd, "nuxt.config.ts"), "export default defineNuxtConfig({});\n");
+  const files: ScaffoldManifest["files"] = {};
+  for (const [path, cls] of [
+    ["app/pages/login.vue", "presentation"],
+    ["app/pages/register.vue", "presentation"],
+    ["app/pages/profile.vue", "presentation"],
+    ["app/plugins/zitadel-components.client.ts", "infrastructure"],
+    ["app/plugins/auth.server.ts", "infrastructure"],
+  ] as const) {
+    const contents = `// ${MANAGED_MARKER}\n`;
+    await writeFile(join(cwd, path), contents);
+    files[path] = { hash: hashScaffoldFile(contents), class: cls };
+  }
+  await writeFile(
+    join(cwd, ".zitadel/state.json"),
+    JSON.stringify({ framework: "nuxt", resources: {}, scaffold: { files } }),
+  );
   return cwd;
 }
 
@@ -365,13 +431,133 @@ describe("DependencyCheck", () => {
 
   it("fails when no @zitadel package is present", async () => {
     const cwd = await makeProject();
-    await writeFile(join(cwd, "package.json"), JSON.stringify({ name: "demo", dependencies: { next: "^15" } }));
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+    );
     expect((await new DependencyCheck().run(ctxFor(cwd))).status).toBe("fail");
+  });
+
+  // The check asks each framework's own patcher which SDK packages it adds, so one row
+  // per framework pins that the doctor names exactly those, the widget SDK included.
+  it.each([
+    ["next", { next: "^16" }, "@zitadel/sdk-next"],
+    ["nuxt", { nuxt: "^4" }, "@zitadel/sdk-nuxt"],
+    ["react", { react: "^19", vite: "^8" }, "@zitadel/sdk-react"],
+    ["vue", { vue: "^3.5", vite: "^8" }, "@zitadel/sdk-vue"],
+    ["solid", { "solid-js": "^1.9", vite: "^8" }, "@zitadel/sdk-solid"],
+    ["svelte", { svelte: "^5", vite: "^8" }, "@zitadel/sdk-svelte"],
+    ["qwik", { "@qwik.dev/core": "^2.0.0-beta.45", vite: "^8" }, "@zitadel/sdk-qwik"],
+    ["angular", { "@angular/core": "^20" }, "@zitadel/sdk-angular"],
+    [
+      "sveltekit",
+      { "@sveltejs/kit": "^2", svelte: "^5" },
+      "@zitadel/sdk-sveltekit, @zitadel/sdk-svelte",
+    ],
+    [
+      "tanstack-start",
+      { react: "^19", "@tanstack/react-start": "^1" },
+      "@zitadel/sdk-tanstack-start",
+    ],
+    [
+      "solid-start",
+      { "solid-js": "^1.9", "@solidjs/start": "^2.0.0" },
+      "@zitadel/sdk-solid-start, @zitadel/sdk-solid",
+    ],
+    [
+      "qwik-router",
+      { "@qwik.dev/core": "^2.0.0-beta.45", "@qwik.dev/router": "^2.0.0-beta.45" },
+      "@zitadel/sdk-qwik-router, @zitadel/sdk-qwik",
+    ],
+  ])("requires the %s SDK package, not just the CLI", async (_framework, dependencies, missing) => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies,
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const outcome = await new DependencyCheck().run(ctxFor(cwd));
+    expect(outcome).toMatchObject({
+      status: "fail",
+      message: `package.json does not declare ${missing}, which the app imports`,
+    });
+  });
+
+  it("fails when the only @zitadel package is not the SDK the app imports", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15" },
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const outcome = await new DependencyCheck().run(ctxFor(cwd));
+    expect(outcome).toMatchObject({
+      status: "fail",
+      message: "package.json does not declare @zitadel/sdk-next, which the app imports",
+    });
+  });
+
+  it("fails a meta-framework app that lacks the widget SDK its pages import", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { "@sveltejs/kit": "^3", svelte: "^5", "@zitadel/sdk-sveltekit": "latest" },
+      }),
+    );
+    const outcome = await new DependencyCheck().run(ctxFor(cwd));
+    expect(outcome.message).toBe(
+      "package.json does not declare @zitadel/sdk-svelte, which the app imports",
+    );
+  });
+
+  it("passes a meta-framework app that declares both of its SDKs", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: {
+          "@sveltejs/kit": "^3",
+          svelte: "^5",
+          "@zitadel/sdk-sveltekit": "latest",
+          "@zitadel/sdk-svelte": "latest",
+        },
+      }),
+    );
+    expect((await new DependencyCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fix re-adds the SDK an app kept only the CLI in place of", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15" },
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const check = new DependencyCheck();
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
   });
 
   it("fix re-adds the SDK dependency via the patcher", async () => {
     const cwd = await makeProject();
-    await writeFile(join(cwd, "package.json"), JSON.stringify({ name: "demo", dependencies: { next: "^15" } }));
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+    );
     const check = new DependencyCheck();
     expect((await check.run(ctxFor(cwd))).status).toBe("fail");
 
@@ -380,9 +566,37 @@ describe("DependencyCheck", () => {
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
   });
 
+  it("fix does not create proxy.ts beside an edited middleware.ts when the SDK is missing", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^16" },
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const editedMiddleware = `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`;
+    await writeFile(join(cwd, "middleware.ts"), editedMiddleware);
+    await writeScaffoldState(cwd, {
+      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
+    });
+
+    await new DependencyCheck().fix(ctxFor(cwd));
+
+    expect(await readFile(join(cwd, "package.json"), "utf8")).toContain("@zitadel/sdk-next");
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toBe(editedMiddleware);
+    await expect(readFile(join(cwd, "proxy.ts"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
   it("fix reclaims proxy.ts for Next 16 projects", async () => {
     const cwd = await makeProject();
-    await writeFile(join(cwd, "package.json"), JSON.stringify({ name: "demo", dependencies: { next: "^16" } }));
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+    );
     await rm(join(cwd, "middleware.ts"));
 
     await new DependencyCheck().fix(ctxFor(cwd));
@@ -734,16 +948,54 @@ describe("ManagedFilesCheck", () => {
     const cwd = await makeAngularProject();
     // Two projects, no defaultProject: the transform throws rather than
     // guessing — the wiring state is unknown, which must surface, not vanish.
-    await writeFile(
-      join(cwd, "angular.json"),
-      JSON.stringify({ projects: { a: {}, b: {} } }),
-    );
+    await writeFile(join(cwd, "angular.json"), JSON.stringify({ projects: { a: {}, b: {} } }));
 
     const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
 
     expect(outcome.status).toBe("warn");
     expect(outcome.message).toContain("unverifiable managed config wiring");
     expect(outcome.message).toContain("angular.json");
+  });
+
+  // Sign-in works without the session-cookie hooks (ADR 073); without them the
+  // Console and the app share one session cookie on localhost.
+  it("warns while the managed proxy lacks the session-cookie hooks, and --fix adds them", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    await writeFile(proxyPath, bearerOnlyProxyConf());
+    const check = new ManagedFilesCheck();
+
+    const outcome = await check.run(ctxFor(cwd));
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain(
+      "unapplied managed config edit(s): proxy.conf.cjs (doctor --fix applies them)",
+    );
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  // The edit leaves a managed proxy it cannot recognize as it is, so that
+  // --fix does not fail; the doctor must not read that as applied.
+  it("warns that the session-cookie hooks need adding by hand to a managed proxy changed since", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    const reformatted = bearerOnlyProxyConf().replace(
+      'configure: (proxy) => proxy.on("proxyReq", setBearer),',
+      "configure: (proxy) => proxy.on('proxyReq', setBearer),",
+    );
+    await writeFile(proxyPath, reformatted);
+    const check = new ManagedFilesCheck();
+
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("unverifiable managed config wiring");
+    expect(outcome.message).toContain("session-cookie hooks (ADR 073) must be added by hand");
+    await check.fix(ctxFor(cwd));
+    expect(await readFile(proxyPath, "utf8")).toBe(reformatted);
   });
 
   it("warns when an unrecognized legacy proxy may still over-forward the project secret", async () => {
@@ -782,7 +1034,10 @@ function setBearer(proxyReq) {
     const middleware = `${MANAGED_MARKER}\nexport function middleware() {}\n`;
     await writeFile(
       join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^16", "@zitadel/sdk-next": "latest" },
+      }),
     );
     await writeScaffoldState(cwd, {
       files: {
@@ -814,7 +1069,10 @@ function setBearer(proxyReq) {
     // unrelated page is missing so --fix has repair work to do.
     await writeFile(
       join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^16", "@zitadel/sdk-next": "latest" },
+      }),
     );
     const editedMiddleware = `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`;
     await writeFile(join(cwd, "middleware.ts"), editedMiddleware);
@@ -861,7 +1119,10 @@ function setBearer(proxyReq) {
     // --fix must not finalize a manifest that records no boundary at all.
     await writeFile(
       join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^16", "@zitadel/sdk-next": "latest" },
+      }),
     );
     await writeFile(
       join(cwd, "middleware.ts"),
@@ -956,7 +1217,10 @@ function setBearer(proxyReq) {
     // then upgraded to Next 16 — the current templates write proxy.ts.
     await writeFile(
       join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^16", "@zitadel/sdk-next": "latest" },
+      }),
     );
     await writeScaffoldState(cwd, {
       files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
@@ -996,6 +1260,35 @@ function setBearer(proxyReq) {
   });
 });
 
+describe("ManagedFilesCheck on a Nuxt app from an older setup", () => {
+  it.each(["app/plugins/auth.server.ts", "app/plugins/zitadel-components.client.ts"])(
+    "drops the retired %s record once the user deleted the file",
+    async (retired) => {
+      const cwd = await makeOlderNuxtProject();
+      await rm(join(cwd, retired));
+      const check = new ManagedFilesCheck();
+      expect((await check.run(ctxFor(cwd))).message).toContain(retired);
+
+      await check.fix(ctxFor(cwd));
+
+      expect((await readScaffoldState(cwd)).files).not.toHaveProperty(retired);
+      expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+    },
+  );
+
+  it.each(["app/plugins/auth.server.ts", "app/plugins/zitadel-components.client.ts"])(
+    "keeps the retired %s record while the file is on disk",
+    async (retired) => {
+      const cwd = await makeOlderNuxtProject();
+      await rm(join(cwd, "app/pages/login.vue"));
+
+      await new ManagedFilesCheck().fix(ctxFor(cwd));
+
+      expect((await readScaffoldState(cwd)).files).toHaveProperty(retired);
+    },
+  );
+});
+
 describe("ProjectMatchCheck", () => {
   it("passes when secret project_id matches config project", async () => {
     const cwd = await makeProject();
@@ -1004,7 +1297,10 @@ describe("ProjectMatchCheck", () => {
 
   it("fails when secret project_id disagrees with config project", async () => {
     const cwd = await makeProject();
-    await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ ...SECRET, project_id: "other" }));
+    await writeFile(
+      join(cwd, ".zitadel/secret"),
+      JSON.stringify({ ...SECRET, project_id: "other" }),
+    );
     await chmod(join(cwd, ".zitadel/secret"), 0o600);
     expect((await new ProjectMatchCheck().run(ctxFor(cwd))).status).toBe("fail");
   });

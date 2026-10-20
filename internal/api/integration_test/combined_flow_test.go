@@ -49,7 +49,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	require.Equal(t, "identifier", flowHeaders.Response.Step.Name)
-	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie)
 
 	const (
 		newEmail = "flip-flow@example.com"
@@ -70,7 +70,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.IsType(t, &api.SubmitFlowStepOK{}, flipResp, helpers.MustMarshal(t, flipResp))
 	flipOK := flipResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "register-identifier", flipOK.Response.Step.Name, "user_not_found must flip to register-identifier")
-	zflow = mustExtractZflow(t, flipOK.SetCookie.Value)
+	zflow = mustExtractZflow(t, flipOK.SetCookie)
 
 	// Complete the register-identifier step. The default schema collects only
 	// email (the minimal use case), so that is all the register step carries.
@@ -87,7 +87,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.IsType(t, &api.SubmitFlowStepOK{}, idResp, helpers.MustMarshal(t, idResp))
 	idOK := idResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "register-password", idOK.Response.Step.Name)
-	zflow = mustExtractZflow(t, idOK.SetCookie.Value)
+	zflow = mustExtractZflow(t, idOK.SetCookie)
 
 	// Submit the password → create_user fires → done + handoff token.
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
@@ -223,13 +223,13 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	require.NoError(t, err)
 	regHeaders := regResp.(*api.FlowResponseHeaders)
 	regID := regHeaders.Response.ID
-	regZflow := mustExtractZflow(t, regHeaders.SetCookie.Value)
+	regZflow := mustExtractZflow(t, regHeaders.SetCookie)
 
 	regIDResp := mustSubmitOK(t, client, regID, regZflow, "submit", api.FlowSubmitRequestFields{
 		"email": jx.Raw(`"` + email + `"`),
 	})
 	require.Equal(t, "register-password", regIDResp.Response.Step.Name)
-	regZflow = mustExtractZflow(t, regIDResp.SetCookie.Value)
+	regZflow = mustExtractZflow(t, regIDResp.SetCookie)
 
 	regDone := mustSubmitOK(t, client, regID, regZflow, "submit", api.FlowSubmitRequestFields{
 		"x-auth-methods#password": jx.Raw(`"` + password + `"`),
@@ -245,22 +245,22 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	loginHeaders := loginResp.(*api.FlowResponseHeaders)
 	flowID := loginHeaders.Response.ID
 	require.Equal(t, "identifier", loginHeaders.Response.Step.Name)
-	zflow := mustExtractZflow(t, loginHeaders.SetCookie.Value)
+	zflow := mustExtractZflow(t, loginHeaders.SetCookie)
 
 	identified := mustSubmitOK(t, client, flowID, zflow, "submit", api.FlowSubmitRequestFields{
 		"email": jx.Raw(`"` + email + `"`),
 	})
 	require.Equal(t, "password", identified.Response.Step.Name)
-	zflow = mustExtractZflow(t, identified.SetCookie.Value)
+	zflow = mustExtractZflow(t, identified.SetCookie)
 
 	// Back to the identifier, then "Sign up" — the purposed navigation.
 	back := mustSubmitOK(t, client, flowID, zflow, "back", nil)
 	require.Equal(t, "identifier", back.Response.Step.Name)
-	zflow = mustExtractZflow(t, back.SetCookie.Value)
+	zflow = mustExtractZflow(t, back.SetCookie)
 
 	toRegister := mustSubmitOK(t, client, flowID, zflow, "register", nil)
 	require.Equal(t, "register-identifier", toRegister.Response.Step.Name)
-	zflow = mustExtractZflow(t, toRegister.SetCookie.Value)
+	zflow = mustExtractZflow(t, toRegister.SetCookie)
 
 	// Cookie-size bound: toggling Sign in / Sign up is an undo, not a push.
 	// The encrypted value length must not grow across toggles.
@@ -271,7 +271,7 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 			action = "register"
 		}
 		toggled := mustSubmitOK(t, client, flowID, zflow, action, nil)
-		zflow = mustExtractZflow(t, toggled.SetCookie.Value)
+		zflow = mustExtractZflow(t, toggled.SetCookie)
 		require.LessOrEqual(t, len(zflow), baseline+64,
 			"toggle %d: purpose toggling must not grow the state cookie", i)
 	}
@@ -285,7 +285,7 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	})
 	require.Equal(t, "password", guarded.Response.Step.Name,
 		"existing email after re-purpose must reach password verification")
-	zflow = mustExtractZflow(t, guarded.SetCookie.Value)
+	zflow = mustExtractZflow(t, guarded.SetCookie)
 
 	// And the rotated attempt verifies the password end to end.
 	done := mustSubmitOK(t, client, flowID, zflow, "submit", api.FlowSubmitRequestFields{
@@ -346,13 +346,13 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	require.NoError(t, err)
 	regHeaders := regResp.(*api.FlowResponseHeaders)
 	regID := regHeaders.Response.ID
-	regZflow := mustExtractZflow(t, regHeaders.SetCookie.Value)
+	regZflow := mustExtractZflow(t, regHeaders.SetCookie)
 
 	regIDResp := mustSubmitOK(t, client, regID, regZflow, "submit", api.FlowSubmitRequestFields{
 		"email": jx.Raw(`"` + email + `"`),
 	})
 	require.Equal(t, "register-password", regIDResp.Response.Step.Name)
-	regZflow = mustExtractZflow(t, regIDResp.SetCookie.Value)
+	regZflow = mustExtractZflow(t, regIDResp.SetCookie)
 
 	regDone := mustSubmitOK(t, client, regID, regZflow, "submit", api.FlowSubmitRequestFields{
 		"x-auth-methods#password": jx.Raw(`"` + password + `"`),
@@ -368,18 +368,18 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	loginHeaders := loginResp.(*api.FlowResponseHeaders)
 	flowID := loginHeaders.Response.ID
 	require.Equal(t, "identifier", loginHeaders.Response.Step.Name)
-	zflow := mustExtractZflow(t, loginHeaders.SetCookie.Value)
+	zflow := mustExtractZflow(t, loginHeaders.SetCookie)
 
 	identified := mustSubmitOK(t, client, flowID, zflow, "submit", api.FlowSubmitRequestFields{
 		"email": jx.Raw(`"` + email + `"`),
 	})
 	require.Equal(t, "password", identified.Response.Step.Name)
-	zflow = mustExtractZflow(t, identified.SetCookie.Value)
+	zflow = mustExtractZflow(t, identified.SetCookie)
 
 	// Back to the identifier — no purpose switch, just the back action.
 	back := mustSubmitOK(t, client, flowID, zflow, "back", nil)
 	require.Equal(t, "identifier", back.Response.Step.Name)
-	zflow = mustExtractZflow(t, back.SetCookie.Value)
+	zflow = mustExtractZflow(t, back.SetCookie)
 
 	// Re-identifying must reach password verification on the rotated
 	// attempt, not die with "The user was already authenticated".
@@ -388,7 +388,7 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	})
 	require.Equal(t, "password", reIdentified.Response.Step.Name,
 		"re-identifying after back must reach password verification")
-	zflow = mustExtractZflow(t, reIdentified.SetCookie.Value)
+	zflow = mustExtractZflow(t, reIdentified.SetCookie)
 
 	// And the rotated attempt verifies the password end to end.
 	done := mustSubmitOK(t, client, flowID, zflow, "submit", api.FlowSubmitRequestFields{

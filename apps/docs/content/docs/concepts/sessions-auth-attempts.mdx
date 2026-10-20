@@ -7,4 +7,12 @@ An auth attempt is an ephemeral state machine for one authentication journey. It
 
 A session is the durable post-auth container. It carries the verified user and factors after an auth attempt succeeds.
 
-The generated OpenAPI reference exposes these resources as endpoint groups. The SDK middleware uses session cookies and JWT verification to protect routes and expose auth state to framework code.
+The generated OpenAPI reference exposes these resources as endpoint groups. The SDK middleware reads the session cookie and validates its token to protect routes and expose auth state to framework code (see [SDK proxy](/docs/concepts/sdk-proxy)).
+
+## Session lifetime
+
+A completed sign-in gives the session a lifetime of 24 hours. The lifetime starts at sign-in, and using the session does not extend it. When it runs out, the session cookie stops working, `GET /sessions/me` answers `401`, and the user signs in again.
+
+A sign-in can ask for a different lifetime with the `ttl` field of `POST /sessions/exchange` (see [Sessions](/docs/reference/api/sessions)), up to the server's maximum of 30 days. On a server you run yourself, `session.default_ttl` sets the default and `session.max_ttl` the maximum (see the [configuration guide](https://github.com/zitadel/nextgen/blob/main/docs/quick-start/configuration.md#sessions)).
+
+An anonymous session, which a client can create before anyone signs in, lasts 10 minutes. When a sign-in completes on it, it gets the full lifetime.

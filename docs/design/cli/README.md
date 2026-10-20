@@ -239,5 +239,11 @@ Guidance is shown only when it helps the user complete or recover from the curre
 ## Detailed designs
 
 - [ADR 035: Environment Releases for Configuration Resources](../../adrs/035-configuration-environments.md) — environments, releases, deployments, promotion and rollback
+- [Flow Engine](../flowengine/flow-engine.md)
+- [Flow Engine — Developer Guide](../flowengine/flow-engine-guide.md)
+- [Flow Engine — Step Response Shape](../flowengine/flow-engine-nodes.md) — capability dicts + Liquid templates + `text_key` localization
+- [Template Security](../flowengine/template-security.md) — invariants the CLI validates on `apply`
+- [User Schema Integration](../flowengine/user-schema.md)
+- [Resource Commands](resource-commands.md) — the imperative `users` / `teams` / `sessions` / `events` / `grants` / `projects` surface and its conventions
 - [CLI source](../../../apps/cli)
-- [CLI agent guidance](../../../apps/cli/SKILLS.md)
+- [CLI agent guidance](../../../apps/cli/skills/zitadel-cli/SKILL.md)

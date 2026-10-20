@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -39,7 +40,7 @@ const createAuthAttemptStmt = `WITH inserted_attempt AS (` +
 
 const deleteAuthAttemptByIDStmt = `DELETE FROM zitadel_nextgen.auth_attempts WHERE project_id = $1 AND id = $2`
 
-const handoffAuthAttemptStmt = `UPDATE zitadel_nextgen.auth_attempts SET handoff_token = $3, handed_off_at = NOW() WHERE project_id = $1 AND id = $2 RETURNING handed_off_at`
+const handoffAuthAttemptStmt = `UPDATE zitadel_nextgen.auth_attempts SET handoff_token = $3, handed_off_at = NOW() WHERE project_id = $1 AND id = $2 AND handed_off_at IS NULL RETURNING handed_off_at`
 
 const setAuthAttemptChallengeStmt = `INSERT INTO zitadel_nextgen.checks` +
 	` (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload)` +
@@ -57,10 +58,52 @@ const setAuthAttemptFactorStmt = `INSERT INTO zitadel_nextgen.checks` +
 	` challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0, last_failed_at = NULL` +
 	` RETURNING id, last_verified_at`
 
+// addAuthAttemptFactorStmt fills only a row without a verified factor. The
+// conflict path locks the row and checks the WHERE against its latest version,
+// so a concurrent writer cannot slip in between. The new id makes a challenge
+// issued before this write stale.
+const addAuthAttemptFactorStmt = `INSERT INTO zitadel_nextgen.checks` +
+	` (project_id, auth_attempt_id, type, id, last_verified_at, factor_payload)` +
+	` VALUES ($1, $2, $3, $4, NOW(), $5::JSONB)` +
+	` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET` +
+	` id = EXCLUDED.id, last_verified_at = NOW(), factor_payload = EXCLUDED.factor_payload,` +
+	` challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0, last_failed_at = NULL` +
+	` WHERE checks.last_verified_at IS NULL` +
+	` RETURNING id, last_verified_at`
+
 const authAttemptChallengeSucceededStmt = `UPDATE zitadel_nextgen.checks` +
 	` SET last_verified_at = NOW(), factor_payload = $4::JSONB, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 	` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND id = $5` +
 	` RETURNING last_verified_at`
+
+const issueSSOStateStmt = `INSERT INTO zitadel_nextgen.checks` +
+	` (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, lookup_hash)` +
+	` VALUES ($1, $2, $3, $4, NOW(), $5::JSONB, $6)` +
+	` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET` +
+	` id = EXCLUDED.id, last_challenged_at = NOW(), challenge_payload = EXCLUDED.challenge_payload,` +
+	` lookup_hash = EXCLUDED.lookup_hash,` +
+	` factor_payload = NULL, last_verified_at = NULL, failure_count = 0, last_failed_at = NULL` +
+	` RETURNING id, last_challenged_at`
+
+const selectPendingSSOStateStmt = `SELECT c.id, c.auth_attempt_id, c.challenge_payload, aa.created_at, aa.time_to_live` +
+	` FROM zitadel_nextgen.checks c` +
+	` JOIN zitadel_nextgen.auth_attempts aa ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id` +
+	` WHERE c.project_id = $1 AND c.lookup_hash = $2 AND c.type = $3 AND c.last_challenged_at IS NOT NULL`
+
+const consumeSSOStateStmt = `UPDATE zitadel_nextgen.checks` +
+	` SET challenge_payload = NULL, last_challenged_at = NULL, factor_payload = NULL` +
+	` WHERE project_id = $1 AND lookup_hash = $2 AND type = $3 AND last_challenged_at IS NOT NULL`
+
+const setSSOCallbackResultStmt = `UPDATE zitadel_nextgen.checks SET factor_payload = $4::JSONB` +
+	` WHERE project_id = $1 AND lookup_hash = $2 AND type = $3 AND last_challenged_at IS NULL` +
+	` AND factor_payload IS NULL`
+
+const deleteSSOCallbackStmt = `DELETE FROM zitadel_nextgen.checks WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND id = $4`
+
+// markSSOCallbackCollisionStmt replaces the parked result with the collision
+// marker alone.
+const markSSOCallbackCollisionStmt = `UPDATE zitadel_nextgen.checks SET factor_payload = $5::JSONB` +
+	` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND id = $4`
 
 const authAttemptChallengeFailedStmt = `UPDATE zitadel_nextgen.checks` +
 	` SET last_failed_at = NOW(), failure_count = failure_count + 1` +
@@ -295,11 +338,27 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 	var handedOffAt time.Time
 	err := as.client.QueryRow(ctx, handoffAuthAttemptStmt,
 		attempt.ProjectID, attempt.ID, attempt.HandoffToken.TokenHash).Scan(&handedOffAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return as.handoffRefused(ctx, attempt, wrapError(err))
+	}
 	if err != nil {
 		return wrapError(err)
 	}
 	attempt.HandedOffAt = &handedOffAt
 	return nil
+}
+
+// handoffRefused explains a handoff that updated no row: the attempt is
+// missing (noRow is returned) or another request already handed it off.
+func (as authAttemptStatements) handoffRefused(ctx context.Context, attempt *domain.AuthAttempt, noRow error) error {
+	_, err := as.GetAuthAttemptByID(ctx, attempt.ProjectID, attempt.ID)
+	if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
+		return noRow
+	}
+	if err != nil {
+		return err
+	}
+	return domain.ErrAuthAttemptAlreadyHandedOff()
 }
 
 // SetAuthAttemptChallenge implements [service.AuthAttemptStatements].
@@ -329,6 +388,19 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 
 // SetAuthAttemptFactor implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	return as.writeAuthAttemptFactor(ctx, setAuthAttemptFactorStmt, projectID, authAttemptID, factor)
+}
+
+// AddAuthAttemptFactor implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) AddAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	id, err := as.writeAuthAttemptFactor(ctx, addAuthAttemptFactorStmt, projectID, authAttemptID, factor)
+	if _, noRow := errors.AsType[*database.NoRowFoundError](err); noRow {
+		return "", database.NewUniqueError("checks", "", err)
+	}
+	return id, err
+}
+
+func (as authAttemptStatements) writeAuthAttemptFactor(ctx context.Context, stmt, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
 	payload, err := authattempt.MarshalPayloadJSON(factor.Payload())
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal factor payload: %w", err)
@@ -339,7 +411,7 @@ func (as authAttemptStatements) SetAuthAttemptFactor(ctx context.Context, projec
 	}
 	var id string
 	var lastVerifiedAt time.Time
-	err = as.client.QueryRow(ctx, setAuthAttemptFactorStmt,
+	err = as.client.QueryRow(ctx, stmt,
 		projectID, authAttemptID, factor.Type(), checkID, payload).
 		Scan(&id, &lastVerifiedAt)
 	if err != nil {
@@ -384,6 +456,115 @@ func (as authAttemptStatements) AuthAttemptChallengeFailed(ctx context.Context, 
 	}
 	challenge.SetLastFailedAt(lastFailedAt)
 	challenge.SetFailureCount(failureCount)
+	return nil
+}
+
+// IssueSSOState implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, authAttemptID string, check *domain.SSOCallbackCheck) error {
+	payload, err := authattempt.MarshalPayloadJSON(check.Pending)
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso state payload: %w", err)
+	}
+	checkID := check.ID
+	if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+		return err
+	}
+	var id string
+	var issuedAt time.Time
+	err = as.client.QueryRow(ctx, issueSSOStateStmt,
+		projectID, authAttemptID, domain.AuthCheckTypeSSOCallback, checkID, payload, check.StateHash).
+		Scan(&id, &issuedAt)
+	if err != nil {
+		return fmt.Errorf("failed to issue sso state: %w", wrapError(err))
+	}
+	check.ID = id
+	check.AuthAttemptID = authAttemptID
+	check.IssuedAt = issuedAt
+	return nil
+}
+
+// ConsumeSSOState implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash, bindingNonce string) (*domain.SSOCallbackCheck, error) {
+	check := &domain.SSOCallbackCheck{StateHash: stateHash}
+	var payload []byte
+	var createdAt time.Time
+	var timeToLive *time.Duration
+	err := as.client.QueryRow(ctx, selectPendingSSOStateStmt,
+		projectID, stateHash, domain.AuthCheckTypeSSOCallback).
+		Scan(&check.ID, &check.AuthAttemptID, &payload, &createdAt, &timeToLive)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrSSOStateInvalid()
+		}
+		return nil, fmt.Errorf("failed to read sso state: %w", wrapError(err))
+	}
+	if len(payload) > 0 {
+		if err := json.Unmarshal(payload, &check.Pending); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal sso state payload: %w", err)
+		}
+	}
+	// The cookie is checked before anything is burned: a caller who knows the
+	// state but not the cookie must not be able to end the user's ceremony.
+	if check.Pending == nil || !check.Pending.MatchesBindingNonce(bindingNonce) {
+		return nil, domain.ErrSSOStateInvalid()
+	}
+	attempt := domain.AuthAttempt{CreatedAt: createdAt, TimeToLive: timeToLive}
+	// The guarded update is the single-use gate: a racing consumer that
+	// already cleared the challenge state leaves zero rows for this one. The
+	// clock is read after the burn, so a consume that stalls on the update
+	// cannot hand back a state that has meanwhile expired.
+	tag, err := as.client.Exec(ctx, consumeSSOStateStmt, projectID, stateHash, domain.AuthCheckTypeSSOCallback)
+	if err != nil {
+		return nil, fmt.Errorf("failed to consume sso state: %w", wrapError(err))
+	}
+	if tag.RowsAffected() == 0 || attempt.IsExpired() {
+		return nil, domain.ErrSSOStateInvalid()
+	}
+	return check, nil
+}
+
+// SetSSOCallbackResult implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) SetSSOCallbackResult(ctx context.Context, projectID, stateHash string, result *domain.SSOCallbackResult) error {
+	payload, err := authattempt.MarshalPayloadJSON(result)
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso callback result: %w", err)
+	}
+	tag, err := as.client.Exec(ctx, setSSOCallbackResultStmt,
+		projectID, stateHash, domain.AuthCheckTypeSSOCallback, payload)
+	if err != nil {
+		return fmt.Errorf("failed to set sso callback result: %w", wrapError(err))
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrSSOStateInvalid()
+	}
+	return nil
+}
+
+// DeleteSSOCallback implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error {
+	tag, err := as.client.Exec(ctx, deleteSSOCallbackStmt, projectID, authAttemptID, domain.AuthCheckTypeSSOCallback, checkID)
+	if err != nil {
+		return fmt.Errorf("failed to delete sso callback: %w", wrapError(err))
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrSSOStateInvalid()
+	}
+	return nil
+}
+
+func (as authAttemptStatements) MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error {
+	// The marker replaces the result: the provider's subject and claims go.
+	payload, err := authattempt.MarshalPayloadJSON(&domain.SSOCallbackResult{CollisionUserID: userID})
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso collision marker: %w", err)
+	}
+	tag, err := as.client.Exec(ctx, markSSOCallbackCollisionStmt, projectID, authAttemptID, domain.AuthCheckTypeSSOCallback, checkID, payload)
+	if err != nil {
+		return fmt.Errorf("failed to mark sso callback collision: %w", wrapError(err))
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrSSOStateInvalid()
+	}
 	return nil
 }
 

@@ -12,6 +12,9 @@
 > *(2026-08-26: `POST /users/query` joins the structured-query contract and
 > replaces `GET /users`. It is the first one with no `project_id` parameter —
 > the users list takes its project from the credential.)*
+> *(2026-09-25: `POST /users/query` gains an optional `project_id`, defaulting
+> to the credential's project, so a Console session can list the users of a
+> project it manages through a grant — #1300.)*
 
 ## Decision
 

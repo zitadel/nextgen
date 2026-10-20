@@ -24,8 +24,9 @@ const (
 	ResourceKindBranding       ResourceKind = "branding"
 	ResourceKindFlowDefinition ResourceKind = "flow_definition"
 	ResourceKindSession        ResourceKind = "session"
-	ResourceKindEnvironment    ResourceKind = "environment"
 	ResourceKindRelease        ResourceKind = "release"
+	ResourceKindIDPConnection  ResourceKind = "idp_connection"
+	ResourceKindDeployment     ResourceKind = "deployment"
 )
 
 func (k ResourceKind) String() string { return string(k) }
@@ -295,10 +296,10 @@ const (
 // NewSKProjProjectSetupAssignment is the grant seeded at CreateProject so the
 // returned full project secret can set up the project via resolver.Check.
 //
-// Relation is project.viewer (not admin): the seeded system catalog closure
-// treats viewer as the assigned relation that satisfies viewer/editor/admin
-// checks (placeholders pending #420). PrincipalID equals the project id so the
-// grant survives secret rotate/claim.
+// Relation is project.admin: the full secret administers its own project, and
+// the seeded system catalog closes admin to editor and viewer (ADR 054 §5), so
+// one row answers every check. PrincipalID equals the project id so the grant
+// survives secret rotate/claim.
 func NewSKProjProjectSetupAssignment(projectID string) *AuthzAssignment {
 	a := &AuthzAssignment{
 		ProjectID:     projectID,
@@ -306,7 +307,7 @@ func NewSKProjProjectSetupAssignment(projectID string) *AuthzAssignment {
 		PrincipalType: AuthzPrincipalTypeSKProj,
 		PrincipalID:   projectID,
 		ObjectType:    "project",
-		Relation:      "viewer",
+		Relation:      "admin",
 	}
 	a.ApplyScope(NewProjectAssignmentScope())
 	return a
@@ -327,6 +328,23 @@ func NewClaimTeamAssignment(projectID, teamID string) *AuthzAssignment {
 		Relation:      "team",
 	}
 	a.ApplyScope(NewProjectAssignmentScope())
+	return a
+}
+
+// NewPersonalTeamOwnerAssignment lets the user a personal team was created for
+// read and rename it: editor scoped to that one team, so it reaches no other
+// resource in the project and cannot delete the team. It stands in for ADR 054
+// §2's team.owner relation, which is not seeded yet.
+func NewPersonalTeamOwnerAssignment(projectID, teamID, userID string) *AuthzAssignment {
+	a := &AuthzAssignment{
+		ProjectID:     projectID,
+		CatalogID:     SystemCatalogID,
+		PrincipalType: AuthzPrincipalTypeUser,
+		PrincipalID:   userID,
+		ObjectType:    "project",
+		Relation:      "editor",
+	}
+	a.ApplyScope(NewTeamAssignmentScope(teamID))
 	return a
 }
 

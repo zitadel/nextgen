@@ -5,6 +5,13 @@ import { fileURLToPath } from "node:url";
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
 import { upsertProductGithubRelease } from "./release-github.mjs";
 import {
+  findPublishBlockers,
+  publishBlockersMessage,
+  readLocalPackages,
+  readPrereleaseTag,
+} from "./release-dist-tags.mjs";
+import { PUBLIC_PACKAGE_DIRS } from "./release-manifest.mjs";
+import {
   detectReleaseAutomation,
   findUnrecordedPendingChangesets,
   readPrereleaseChangesetIds,
@@ -40,6 +47,8 @@ export async function main(args = forwardedArgs()) {
       return await commandPack();
     case "publish":
       return await commandPublish(options);
+    case "check-npm":
+      return await commandCheckNpm();
     case "verify":
       return await commandVerify();
     default:
@@ -59,10 +68,22 @@ async function commandSnapshot(options) {
 
   await run("go", ["mod", "download"], { cwd: repoRoot });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
-  await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
-  await createArchives({ repoRoot, outDir, version: release.version });
-  await packPublicPackages({ repoRoot, outDir, version: release.version });
-  await prepareDockerContext({ repoRoot, outDir, version: release.version });
+  // Three independent lanes over the built binaries, run side by side: each
+  // writes only its own output (the platform packages' bin/ and then npm/,
+  // archives/, docker-context/). Every lane settles before the first failure
+  // is rethrown, so a failing lane never leaves another's processes running.
+  const lanes = await Promise.allSettled([
+    (async () => {
+      await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
+      await packPublicPackages({ repoRoot, outDir, version: release.version });
+    })(),
+    createArchives({ repoRoot, outDir, version: release.version }),
+    prepareDockerContext({ repoRoot, outDir, version: release.version }),
+  ]);
+  const failedLane = lanes.find((lane) => lane.status === "rejected");
+  if (failedLane) {
+    throw failedLane.reason;
+  }
   await writeReleaseMetadata({ repoRoot, outDir, release, gitInfo: info });
 
   if (!options.skipContainer) {
@@ -128,6 +149,7 @@ async function commandPublish(options) {
 
   await assertNoUnrecordedPendingChangesets();
   await assertMainBranch(options, { allowDryRunBypass: !options.recoverVersion });
+  await assertPackagesPublishable();
 
   if (options.dryRun) {
     await commandSnapshot({ skipContainer: true });
@@ -140,7 +162,9 @@ async function commandPublish(options) {
       platforms: CONTAINER_PLATFORMS,
     });
     await upsertProductGithubRelease({ repoRoot, outDir, dryRun: true, log: console.log });
-    console.log("dry run: would publish npm packages, push container images, and update the draft GitHub Release");
+    console.log(
+      "dry run: would publish npm packages, push container images, and update the draft GitHub Release",
+    );
     return;
   }
 
@@ -149,9 +173,37 @@ async function commandPublish(options) {
     cwd: repoRoot,
     env: releasePublishEnv(),
   });
-  await buildContainerImage({ repoRoot, outDir, release, push: true, platforms: CONTAINER_PLATFORMS });
+  await buildContainerImage({
+    repoRoot,
+    outDir,
+    release,
+    push: true,
+    platforms: CONTAINER_PLATFORMS,
+  });
   await commandVerify();
   await upsertProductGithubRelease({ repoRoot, outDir, log: console.log });
+}
+
+// Fails before anything is published when `changeset publish` would publish a
+// package npm has never seen, which trusted publishing cannot create, or would
+// put a package on `latest` instead of the prerelease tag (see
+// release-dist-tags.mjs).
+async function assertPackagesPublishable() {
+  const tag = await readPrereleaseTag(repoRoot);
+  const packages = await readLocalPackages(repoRoot, PUBLIC_PACKAGE_DIRS);
+  const blockers = await findPublishBlockers(packages, tag);
+  if (blockers.unpublished.length > 0 || blockers.prereleaseOnly.length > 0) {
+    throw new Error(publishBlockersMessage(blockers, tag));
+  }
+}
+
+// The publish preflight's npm check, on its own. ci.yml runs it on the version
+// PR and its merge group, so a version that release publish would refuse fails
+// before it lands on main, not after.
+async function commandCheckNpm() {
+  const release = await readServerRelease(repoRoot);
+  await assertPackagesPublishable();
+  console.log(`npm preflight passed for ${release.version}`);
 }
 
 function assertRecoverVersion(release, recoverVersion) {
@@ -168,8 +220,17 @@ async function commandVerify() {
   console.log(`release artifacts verified for ${release.version}`);
 }
 
-function parseOptions(args) {
-  const parsed = { dryRun: false, skipContainer: false, recoverVersion: "", base: "" };
+// RELEASE_SKIP_CONTAINER=1 is --skip-container for CI's turbo job, which
+// cannot pass it after `--`: turbo puts those arguments into the cache key of
+// every task in the run (vercel/turborepo#14770), so the whole release graph
+// would be rebuilt instead of restored.
+function parseOptions(args, env = process.env) {
+  const parsed = {
+    dryRun: false,
+    skipContainer: env.RELEASE_SKIP_CONTAINER === "1",
+    recoverVersion: "",
+    base: "",
+  };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     switch (arg) {
@@ -210,18 +271,22 @@ export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
 }
 
 export function releasePublishEnv(overrides = {}) {
-  return { ...process.env, ...overrides, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" };
+  return { ...process.env, ...overrides };
 }
 
 export function shouldFailManualPublishSkip(options = {}, env = process.env) {
-  return env.GITHUB_EVENT_NAME === "workflow_dispatch" && !options.dryRun && !options.recoverVersion;
+  return (
+    env.GITHUB_EVENT_NAME === "workflow_dispatch" && !options.dryRun && !options.recoverVersion
+  );
 }
 
 async function assertMainBranch(options, { allowDryRunBypass = true } = {}) {
   if ((allowDryRunBypass && options.dryRun) || process.env.GITHUB_REF === "refs/heads/main") {
     return;
   }
-  const branch = (await runCapture("git", ["branch", "--show-current"], { cwd: repoRoot })).stdout.trim();
+  const branch = (
+    await runCapture("git", ["branch", "--show-current"], { cwd: repoRoot })
+  ).stdout.trim();
   if (branch !== "main") {
     throw new Error(`release publish must run from main, got ${branch || "detached HEAD"}`);
   }
@@ -237,11 +302,12 @@ function usage(error) {
     console.error(error);
     console.error("");
   }
-  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|verify> [options]
+  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|check-npm|verify> [options]
 
 Options:
   --dry-run          Do not publish or mutate remote registries.
-  --skip-container   Build release files without building a local Docker image.
+  --skip-container   Build release files without building a local Docker image
+                     (or set RELEASE_SKIP_CONTAINER=1).
   --recover-version <v>
                      Publish recovery target version from release-publish.
   --base <ref>       Base ref for release publish detection.

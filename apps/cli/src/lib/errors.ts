@@ -1,4 +1,4 @@
-import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
+import { ApiError, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -17,7 +17,9 @@ export type ZitadelErrorCode =
   | "E_NOT_FOUND"
   | "E_PORT_IN_USE"
   | "E_VALIDATION"
-  | "E_NOT_IMPLEMENTED";
+  | "E_CREDENTIAL_MISSING"
+  | "E_NOT_IMPLEMENTED"
+  | "E_CANCELLED";
 
 /**
  * Maps each {@link ZitadelErrorCode} to the process exit code the CLI
@@ -35,7 +37,10 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   E_NOT_FOUND: 4,
   E_PORT_IN_USE: 5,
   E_VALIDATION: 3,
+  E_CREDENTIAL_MISSING: 3,
   E_NOT_IMPLEMENTED: 2,
+  // 128 + SIGINT, what a shell reports for a command stopped by Ctrl-C.
+  E_CANCELLED: 130,
 };
 
 /**
@@ -78,9 +83,11 @@ export class ZitadelError extends Error {
 
 /**
  * Normalises any thrown value into a {@link ZitadelError}. Inspection is
- * ordered most-specific-first (already-normalised, then errno/filesystem,
- * network, Zod-like, generic `Error`, then a catch-all) so the most
- * actionable category and hint win. This is the boundary that lets the rest
+ * ordered most-specific-first (already-normalised, HTTP status, then
+ * errno/filesystem, no response, Zod-like, generic `Error`, then a
+ * catch-all) so the most actionable category and hint win. A cancelled
+ * request arrives already normalised, as the `E_CANCELLED` error that
+ * `./interrupt` aborts it with. This is the boundary that lets the rest
  * of the CLI `throw` plain errors yet still produce consistent, categorised
  * output. The original error shape is preserved under `details` for
  * debugging without leaking it into the user-facing message.
@@ -112,7 +119,31 @@ export function toZitadelError(error: unknown): ZitadelError {
         : error.status >= 500
           ? "E_NETWORK"
           : "E_VALIDATION";
-    return new ZitadelError(code, apiErrorMessage(error), { details });
+    // The platform names the fields it rejected, and the message does not
+    // repeat them: `idp.field_immutable` says only "the field is fixed for the
+    // life of the connection", which leaves the reader to guess which of a
+    // connection document's fields it meant. Promoting them to the hint puts
+    // the answer where the failure is read, not only in `--json`. The same
+    // goes for what a refusal says is missing: `idp.endpoints_partial` names
+    // the endpoints a connection left out only in `missing`.
+    const fields = listedInDetails(error.body, "fields");
+    const missing = listedInDetails(error.body, "missing");
+    const hint = [
+      ...(fields.length > 0
+        ? [
+            `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.`,
+          ]
+        : []),
+      ...(missing.length > 0
+        ? [
+            `The server reports ${missing.length === 1 ? "this endpoint" : "these endpoints"} missing: ${missing.join(", ")}.`,
+          ]
+        : []),
+    ].join(" ");
+    return new ZitadelError(code, apiErrorMessage(error), {
+      ...(hint !== "" ? { hint } : {}),
+      details,
+    });
   }
 
   if (isErrnoException(error)) {
@@ -137,10 +168,13 @@ export function toZitadelError(error: unknown): ZitadelError {
     }
   }
 
-  if (isNetworkError(error)) {
-    return new ZitadelError("E_NETWORK", errorMessage(error), {
-      hint: "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
-      details: { original: pickErrorShape(error as Error) },
+  if (error instanceof NetworkError) {
+    return new ZitadelError("E_NETWORK", error.message, {
+      hint:
+        error.reason === "timeout"
+          ? "The server accepted the connection but did not answer in time. Check that it is healthy, then retry."
+          : "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
+      details: { url: error.url, reason: error.reason },
     });
   }
 
@@ -164,6 +198,35 @@ export function toZitadelError(error: unknown): ZitadelError {
  * envelope (`{ code, message, … }`). Its presence proves the request reached
  * a real Zitadel platform API rather than an arbitrary HTTP server.
  */
+/**
+ * The names a platform error envelope lists under `key`, if any: the dotted
+ * field paths it blames (`fields`), or what it reports missing (`missing`).
+ *
+ * The envelope nests them under `details`, and the server wraps its own
+ * `details` map in the response's `details` field, so the names arrive at
+ * `body.details.details.<key>`. Both depths are read: the extra wrapper is
+ * the serialiser's doing rather than part of the contract, and a reader that
+ * insisted on it would go silent the day it goes away.
+ */
+function listedInDetails(body: unknown, key: "fields" | "missing"): string[] {
+  const seen = new Set<string>();
+  let node: unknown = body;
+  for (let depth = 0; depth < 4 && isObject(node); depth += 1) {
+    const listed = (node as Record<string, unknown>)[key];
+    if (Array.isArray(listed)) {
+      for (const name of listed) {
+        if (typeof name === "string" && name !== "") seen.add(name);
+      }
+    }
+    node = (node as { details?: unknown }).details;
+  }
+  return [...seen];
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function isPlatformErrorEnvelope(body: unknown): boolean {
   return (
     typeof body === "object" &&
@@ -176,24 +239,6 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && typeof (error as NodeJS.ErrnoException).code === "string";
 }
 
-function isNetworkError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  if (
-    error.name === "TypeError" &&
-    /fetch failed|network|ECONNREFUSED|ENOTFOUND/i.test(error.message)
-  ) {
-    return true;
-  }
-  const cause = (error as { cause?: unknown }).cause;
-  if (cause && typeof cause === "object" && "code" in cause) {
-    const code = String((cause as { code: unknown }).code);
-    return /^(ECONNREFUSED|ECONNRESET|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|UND_ERR)/i.test(code);
-  }
-  return false;
-}
-
 function isZodLikeError(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -201,6 +246,11 @@ function isZodLikeError(error: unknown): boolean {
     "issues" in error &&
     Array.isArray((error as { issues: unknown }).issues)
   );
+}
+
+/** Whether a caught error is the given `errno` code. */
+export function isErrno(error: unknown, code: string): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }
 
 function errorMessage(error: unknown): string {

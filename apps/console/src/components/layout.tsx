@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 /**
- * Page wrapper: centres content, applies the horizontal margin from the Figma
- * layout spec (24px at lg, 32px at 2xl) and vertical rhythm. Every routed page
+ * Page wrapper: centres content, applies the horizontal margin (24px at lg,
+ * 32px at 2xl) and vertical rhythm. Every routed page
  * renders inside one so the shell's <main> stays padding-free.
  *
  * Do not write Tailwind's built-in centring utility name (the "c" word) anywhere
@@ -12,15 +12,16 @@ import type { ReactNode } from "react";
  * app uses explicit max-w-* + the grid below instead.
  */
 export function Page({ children }: { children: ReactNode }) {
-  return (
-    <div className="mx-auto w-full max-w-[120rem] px-6 py-8 2xl:px-8">{children}</div>
-  );
+  return <div className="mx-auto w-full max-w-[120rem] px-6 py-8 2xl:px-8">{children}</div>;
+}
+
+/** The fixed column every settings screen renders in, centred in the main area. */
+export function SettingsColumn({ children }: { children: ReactNode }) {
+  return <div className="mx-auto w-full max-w-(--zl-container-settings)">{children}</div>;
 }
 
 /**
- * 12-column content grid matching the Figma `layout/*` spec. Prefer
- * `--zl-layout-gutter` when the token pipeline emits it; fall back to 24px
- * (`1.5rem`, spacing-6) until Figma publishes that layout token. Column count
+ * 12-column content grid with a 24px gutter. Column count
  * is hard-coded as `grid-cols-12` because CSS does not allow a `var()` as the
  * `repeat()` count. Collapses to a single column below `md`.
  */
@@ -31,23 +32,17 @@ export function ContentGrid({
   children: ReactNode;
   className?: string;
 }) {
-  return (
-    <div
-      className={`grid grid-cols-1 gap-[var(--zl-layout-gutter,1.5rem)] md:grid-cols-12 ${className}`}
-    >
-      {children}
-    </div>
-  );
+  return <div className={`grid grid-cols-1 gap-6 md:grid-cols-12 ${className}`}>{children}</div>;
 }
 
 /**
  * The page wrapper for a configuration detail screen — the ones that render a
  * single panel card rather than a title row over a table.
  *
- * The frames inset that panel by 24px on every side, and by 16px on the sides
- * in their narrow variant. Shared because the schema and login-flow screens are
- * the same composition and had drifted apart: the schema screen carried 36/32,
- * which matches neither frame. Resource detail screens (users, teams, projects)
- * are a different composition and keep their own measured insets.
+ * The design insets that panel by 24px on every side, and by 16px on the sides
+ * in its narrow variant. Shared because the schema and login-flow screens are
+ * the same composition. Resource detail screens (users, teams, projects)
+ * are a different composition: a title row over cards, drawn by `DetailPage`
+ * and `DetailHeader` in `detail-page.tsx`.
  */
 export const DETAIL_PANEL_PAGE = "px-4 py-6 sm:px-6";

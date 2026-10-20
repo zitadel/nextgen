@@ -1,5 +1,7 @@
 package domain
 
+import "cmp"
+
 // Typed event payloads (deny-by-default allowlists). Keep in sync with
 // docs/design/api/events-catalog.md and OpenAPI Event discriminator schemas.
 
@@ -14,8 +16,22 @@ type RequestAPIPayload struct {
 // ProjectPayload is shared by project.created (full snapshot) and
 // project.updated (delta: only changed fields set).
 type ProjectPayload struct {
-	Name           string   `json:"name,omitempty"`
-	PreviewOrigins []string `json:"preview_origins,omitempty"`
+	Name    string   `json:"name,omitempty"`
+	Origins []Origin `json:"origins,omitempty"`
+	// PasswordHashAlgorithm records a change to the method the project's
+	// passwords are hashed with (ADR 029 §Hashing). It is a pointer so the
+	// delta can tell "not touched" (absent) from "handed back to the deployment
+	// default", which is the empty string: the project then names no algorithm
+	// of its own, which is the same thing the row stores. The cost parameters
+	// stay out of the audit trail -- the algorithm is what a reader is checking,
+	// and the full method is readable from the project.
+	PasswordHashAlgorithm *string `json:"password_hash_algorithm,omitempty"`
+}
+
+// OriginPayload is the allowlisted body for origin.added and origin.removed.
+type OriginPayload struct {
+	Pattern string     `json:"pattern"`
+	Kind    OriginKind `json:"kind"`
 }
 
 // ProjectCreatedPayload is an alias kept for call-site clarity.
@@ -181,12 +197,6 @@ type BrandingPayload struct {
 // BrandingCreatedPayload is an alias for branding.created.
 type BrandingCreatedPayload = BrandingPayload
 
-type EnvironmentPayload struct {
-	Name string `json:"name,omitempty"`
-}
-
-type EnvironmentCreatedPayload = EnvironmentPayload
-
 // ReleasePayload records what a release pinned, so the audit stream answers
 // "what changed" without a join back to the releases table. ContentHash
 // identifies the pinned set; Pointers spell it out.
@@ -237,6 +247,57 @@ func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
 	return payload
 }
 
+// DeploymentPayload records what went live where (ADR 061).
+type DeploymentPayload struct {
+	ReleaseID  string   `json:"release_id,omitempty"`
+	Targets    []string `json:"targets,omitempty"`
+	Reason     string   `json:"reason,omitempty"`
+	Message    string   `json:"message,omitempty"`
+	RollbackTo string   `json:"rollback_to,omitempty"`
+}
+
+type DeploymentCreatedPayload = DeploymentPayload
+
+// DeploymentPayloadSnapshot is the allowlisted create snapshot for deployment
+// events.
+func DeploymentPayloadSnapshot(dep *Deployment) DeploymentPayload {
+	if dep == nil {
+		return DeploymentPayload{}
+	}
+	payload := DeploymentPayload{
+		ReleaseID: dep.ReleaseID,
+		Targets:   dep.Origins(),
+		Reason:    dep.Metadata.Reason.String(),
+	}
+	if dep.Metadata.Message != nil {
+		payload.Message = *dep.Metadata.Message
+	}
+	if dep.Metadata.RollbackTo != nil {
+		payload.RollbackTo = *dep.Metadata.RollbackTo
+	}
+	return payload
+}
+
+// VariableSetPayload is the record of one variable row written: variable.set
+// covers entering and replacing alike, since the write cannot tell them apart
+// and the value would be the only difference. The name is the entity id; the
+// kind is the rest of the row's key, which the envelope has no column for.
+// The secret flag says whether the value is held encrypted. The value itself
+// never appears, plain or as ciphertext: a plain value may be a pasted secret
+// the caller forgot to flag, and the ciphertext names the key that wrote it
+// (ADR 062).
+type VariableSetPayload struct {
+	Kind   string `json:"kind"`
+	Secret bool   `json:"secret"`
+}
+
+// VariableRemovedPayload is the record of one variable row removed. It
+// carries no secret flag: a removal learns nothing about the row it deleted,
+// and reading it first would be a round-trip spent on the audit record alone.
+type VariableRemovedPayload struct {
+	Kind string `json:"kind"`
+}
+
 type AuthzGrantedPayload struct {
 	PrincipalType string `json:"principal_type,omitempty"`
 	PrincipalID   string `json:"principal_id,omitempty"`
@@ -252,4 +313,68 @@ type AuthzRevokedPayload struct {
 type AuthFactorPayload struct {
 	UserID   string `json:"user_id"`
 	FactorID string `json:"factor_id,omitempty"`
+}
+
+// IDPConnectionPayload is shared by idp.created (snapshot) and idp.updated
+// (delta). revision_id is on both: it is the revision the write appended, a
+// secondary id, since entity_id is the connection. The document body stays
+// out, so client_secret references and endpoints never reach the audit trail.
+//
+// Template is a pointer so the delta can tell "unchanged" (absent) from
+// "removed" (the empty string).
+type IDPConnectionPayload struct {
+	Slug        string  `json:"slug,omitempty"`
+	Protocol    string  `json:"protocol,omitempty"`
+	Template    *string `json:"template,omitempty"`
+	DisplayName string  `json:"display_name,omitempty"`
+	RevisionID  string  `json:"revision_id"`
+}
+
+// IDPIdentityLinkCreatedPayload is the create snapshot for
+// idp.identity_link.created. The link id is the event's entity_id; the
+// connection and user ids are secondary ids. The provider's subject is never
+// included: it identifies the person at the provider.
+type IDPIdentityLinkCreatedPayload struct {
+	ConnectionID string `json:"connection_id"`
+	UserID       string `json:"user_id"`
+}
+
+// IDPConnectionPayloadSnapshot is the allowlisted create snapshot for idp.created.
+func IDPConnectionPayloadSnapshot(connection *IDPConnection) (IDPConnectionPayload, error) {
+	doc, err := ParseIDPConnectionDocument(connection.Document)
+	if err != nil {
+		return IDPConnectionPayload{}, err
+	}
+	payload := IDPConnectionPayload{
+		Slug:        connection.Slug,
+		Template:    doc.Template,
+		DisplayName: doc.DisplayName,
+		RevisionID:  connection.RevisionID,
+	}
+	if doc.Protocol != nil {
+		payload.Protocol = *doc.Protocol
+	}
+	return payload, nil
+}
+
+// IDPConnectionPayloadDelta is the idp.updated payload: the new revision id,
+// plus display_name and template when they differ from previous. Slug and
+// protocol are fixed for the life of the connection, so they never change.
+func IDPConnectionPayloadDelta(previous, next *IDPConnection) (IDPConnectionPayload, error) {
+	before, err := ParseIDPConnectionDocument(previous.Document)
+	if err != nil {
+		return IDPConnectionPayload{}, err
+	}
+	after, err := ParseIDPConnectionDocument(next.Document)
+	if err != nil {
+		return IDPConnectionPayload{}, err
+	}
+	payload := IDPConnectionPayload{RevisionID: next.RevisionID}
+	if before.DisplayName != after.DisplayName {
+		payload.DisplayName = after.DisplayName
+	}
+	if !sameString(before.Template, after.Template) {
+		payload.Template = cmp.Or(after.Template, new(""))
+	}
+	return payload, nil
 }

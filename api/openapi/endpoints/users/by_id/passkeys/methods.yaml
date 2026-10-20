@@ -1,19 +1,22 @@
 get:
   operationId: listUserPasskeys
   summary: List user passkeys
+  description: |
+    Returns the passkeys registered for a user, newest first, paginated with a
+    cursor.
+
+    Each passkey carries its id, its name and when it was registered, never the
+    credential itself.
   tags:
     - Users
   parameters:
     - $ref: ../../../../components/parameters/limit.yaml
     - $ref: ../../../../components/parameters/page-token.yaml
-    - name: user_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../../components/schemas/user-id.yaml
+    - $ref: ../../../../components/parameters/user-id.yaml
   security:
     - oauth2:
         - user.read
+    - nextgenSession: []
   responses:
     '200':
       description: The passkeys of a user are returned

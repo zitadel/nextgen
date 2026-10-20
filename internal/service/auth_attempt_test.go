@@ -413,8 +413,167 @@ func TestAuthAttemptService_IssueChallenge(t *testing.T) {
 	})
 }
 
+func TestAuthAttemptService_IssueSSOState(t *testing.T) {
+	input := service.IssueSSOStateInput{
+		ProjectID:            "proj",
+		AttemptID:            "att-1",
+		ProviderSlug:         "google",
+		ConnectionRevisionID: "idpr_1",
+		RedirectURI:          "https://app.example.test/__nextgen/idp/google/callback",
+		ReturnTarget:         "https://app.example.test/login",
+	}
+
+	t.Run("issues the record with an encrypted pkce verifier", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		encrypter := cryptomock.NewMockEncrypter(ctrl)
+		encrypter.EXPECT().Encrypt(gomock.Any()).DoAndReturn(func(plain string) (string, error) { return "enc:" + plain, nil })
+		var issued *domain.SSOCallbackCheck
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}, nil)
+		stmts.EXPECT().IssueSSOState(gomock.Any(), "proj", "att-1", gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, check *domain.SSOCallbackCheck) error {
+			issued = check
+			return nil
+		})
+
+		withPKCE := input
+		withPKCE.PKCEEncrypter = encrypter
+		state, err := newAuthAttemptSvc(ctrl, stmts, nil, nil).IssueSSOState(t.Context(), withPKCE)
+
+		require.NoError(t, err)
+		require.NotNil(t, issued)
+		assert.Same(t, state.Check, issued, "the record handed to storage is the one on the state")
+		assert.NotEmpty(t, state.State)
+		assert.NotEmpty(t, state.PKCEVerifier)
+		assert.Equal(t, domain.HashSecret(state.State), issued.StateHash)
+		assert.Equal(t, &domain.SSOStatePayload{
+			ProviderSlug:          "google",
+			ConnectionRevisionID:  "idpr_1",
+			RedirectURI:           "https://app.example.test/__nextgen/idp/google/callback",
+			BindingNonceHash:      domain.HashSecret(state.BindingNonce),
+			EncryptedPKCEVerifier: "enc:" + state.PKCEVerifier,
+			OIDCNonce:             state.OIDCNonce,
+			ReturnTarget:          "https://app.example.test/login",
+		}, issued.Pending)
+	})
+
+	t.Run("mints no verifier without an encrypter", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		var issued *domain.SSOCallbackCheck
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}, nil)
+		stmts.EXPECT().IssueSSOState(gomock.Any(), "proj", "att-1", gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, check *domain.SSOCallbackCheck) error {
+			issued = check
+			return nil
+		})
+
+		state, err := newAuthAttemptSvc(ctrl, stmts, nil, nil).IssueSSOState(t.Context(), input)
+
+		require.NoError(t, err)
+		assert.Empty(t, state.PKCEVerifier)
+		assert.Empty(t, issued.Pending.EncryptedPKCEVerifier)
+	})
+
+	// The guard is PrepareChallenge, covered in the domain tests; this
+	// shows only that IssueSSOState runs it before minting.
+	t.Run("refuses a handed off attempt before minting", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{
+			ProjectID: "proj", ID: "att-1", HandoffToken: &domain.HandoffToken{},
+		}, nil)
+
+		_, err := newAuthAttemptSvc(ctrl, stmts, nil, nil).IssueSSOState(t.Context(), input)
+
+		require.ErrorIs(t, err, domain.ErrAuthAttemptAlreadyHandedOff())
+	})
+
+	t.Run("passes the storage error through", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		issueErr := errors.New("issue failed")
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}, nil)
+		stmts.EXPECT().IssueSSOState(gomock.Any(), "proj", "att-1", gomock.Any()).Return(issueErr)
+
+		_, err := newAuthAttemptSvc(ctrl, stmts, nil, nil).IssueSSOState(t.Context(), input)
+
+		require.ErrorIs(t, err, issueErr)
+	})
+}
+
+// The ceremony's outcome is audited with its result, under the SSO check.
+func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
+	sessionID := "sess-1"
+	check := &domain.SSOCallbackCheck{ID: "chk-1", StateHash: "state-hash", AuthAttemptID: "att-1"}
+	tests := []struct {
+		name     string
+		result   *domain.SSOCallbackResult
+		writeErr error
+		wantErr  error
+		// eventType is passed in and must be emitted unchanged.
+		eventType domain.EventType
+	}{
+		{
+			name:      "a failed result emits the given event",
+			result:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
+			eventType: domain.EventTypeAuthSSOAuthorizationFailed,
+		},
+		{
+			name:      "a successful result emits the given event",
+			result:    &domain.SSOCallbackResult{Subject: "sub-1"},
+			eventType: domain.EventTypeAuthSSOExchangeSucceeded,
+		},
+		{
+			name:      "a refused write emits nothing",
+			result:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			writeErr:  domain.ErrSSOStateInvalid(),
+			wantErr:   domain.ErrSSOStateInvalid(),
+			eventType: domain.EventTypeAuthSSOExchangeFailed,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			stmts := mocks.NewMockAllStatements(ctrl)
+			stmts.EXPECT().SetSSOCallbackResult(gomock.Any(), "proj", "state-hash", tt.result).Return(tt.writeErr)
+			var gotEvent *domain.Event
+			if tt.writeErr == nil {
+				stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{ProjectID: "proj", ID: "att-1", SessionID: &sessionID}, nil)
+				stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
+					gotEvent = ev
+					return nil
+				})
+			}
+			pool := mocks.NewMockPool(ctrl)
+			statementer := mocks.NewMockStatementer[service.AllStatements](ctrl)
+			pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+					return fn(ctx, statementer)
+				},
+			)
+			statementer.EXPECT().Statements().Return(stmts).AnyTimes()
+			svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil)
+
+			err := svc.SetSSOCallbackResult(t.Context(), "proj", check, tt.result, tt.eventType)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, gotEvent)
+			assert.Equal(t, tt.eventType, gotEvent.EventType)
+			assert.Equal(t, "proj", gotEvent.ProjectID)
+			require.NotNil(t, gotEvent.EntityID)
+			assert.Equal(t, "chk-1", *gotEvent.EntityID)
+			require.NotNil(t, gotEvent.SessionID)
+			assert.Equal(t, sessionID, *gotEvent.SessionID)
+			assert.JSONEq(t, `{"check_id":"chk-1","check_type":"SSOCallback","auth_attempt_id":"att-1"}`, string(gotEvent.Payload))
+		})
+	}
+}
+
 func TestAuthAttemptService_VerifyProof(t *testing.T) {
-	rejectErr := errors.New("user not found")
+	rejectErr := database.NewNoRowFoundError(nil)
 	succeedErr := errors.New("persist succeeded check failed")
 
 	newUserChallengeAttempt := func() *domain.AuthAttempt {
@@ -426,7 +585,16 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		}
 	}
 
-	userProof := service.UserProof{AttributeName: "email", LoginName: "u@example.com"}
+	userProof := service.UserProof{AttributeName: "email", LoginName: "u@example.com", UserSchemaURL: "sch_v2"}
+	// lineage is every revision of the bound schema: users keep the revision
+	// they were created under while the flow runs on the newest one.
+	lineage := []string{"sch_v1", "sch_v2"}
+	expectLineage := func(stmts *mocks.MockAllStatements) {
+		stmts.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj", "sch_v2").Return(&domain.JSONSchema{URL: "sch_v2", ObjectType: new("human-user")}, nil)
+		stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
+			Items: []*domain.JSONSchema{{URL: "sch_v1"}, {URL: "sch_v2"}},
+		}, nil)
+	}
 
 	t.Run("verifies user proof and persists success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -441,7 +609,8 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 			succeededFactor = factor
 			return nil
 		})
-		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
+		expectLineage(stmts)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
@@ -453,6 +622,66 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		require.IsType(t, &domain.AuthFactorUser{}, succeededFactor, "ChallengeSucceeded factor must be *domain.AuthFactorUser")
 		userFactor := succeededFactor.(*domain.AuthFactorUser)
 		assert.Equal(t, "user-1", userFactor.UserID)
+	})
+
+	t.Run("flow path scopes the lookup to the lineage of the bound schema", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		users := mocks.NewMockUserLookup(ctrl)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newUserChallengeAttempt(), nil
+		})
+		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		expectLineage(stmts)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", lineage, []domain.Attribute{{Key: "email", Value: "u@example.com"}}).Return(&domain.User{ID: "user-1"}, nil)
+
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
+		_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: userProof,
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("unknown bound schema is an internal error, not a rejected proof", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		users := mocks.NewMockUserLookup(ctrl)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newUserChallengeAttempt(), nil
+		})
+		// No AuthAttemptChallengeFailed: a server-side inconsistency is not a failed check.
+		stmts.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj", "sch_v2").Return(nil, new(database.NoRowFoundError))
+
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
+		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: userProof,
+		})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrInternal(nil))
+		assert.NotErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
+	})
+
+	t.Run("storage fault on the users read is an internal error, not a rejected proof", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		users := mocks.NewMockUserLookup(ctrl)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newUserChallengeAttempt(), nil
+		})
+		// No AuthAttemptChallengeFailed: a fault on the server's side is not a failed check.
+		expectLineage(stmts)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any(), gomock.Any()).Return(nil, errors.New("connection reset"))
+
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
+		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: userProof,
+		})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrInternal(nil))
+		assert.NotErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
 	})
 
 	t.Run("stale challenge returns error without recording failure", func(t *testing.T) {
@@ -485,7 +714,8 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 			failedChallenge = c
 			return nil
 		})
-		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(nil, rejectErr)
+		expectLineage(stmts)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any(), gomock.Any()).Return(nil, rejectErr)
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
@@ -508,7 +738,8 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string, domain.AuthFactor, string) error {
 			return succeedErr
 		})
-		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
+		expectLineage(stmts)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{

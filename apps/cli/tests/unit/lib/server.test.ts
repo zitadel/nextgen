@@ -5,8 +5,9 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { localRuntimePaths, type RuntimeMetadata } from "../../../src/lib/local-server/runtime";
+import { localRuntimePaths } from "../../../src/lib/local-server/runtime";
 import { DEFAULT_SERVER, resolveServer } from "../../../src/lib/server";
+import { aBinaryRecord } from "../../helpers/runtime-record";
 
 let dir: string;
 let servers: Server[] = [];
@@ -39,7 +40,6 @@ describe("resolveServer", () => {
       cwd: dir,
       env: { ZITADEL_API_BASE: "https://env.example.com" },
       serverFlag: "https://flag.example.com",
-      environment: "production",
     });
     expect(resolved).toEqual({ value: "https://flag.example.com", origin: "flag" });
   });
@@ -53,51 +53,34 @@ describe("resolveServer", () => {
     expect(resolved).toEqual({ value: "https://env.example.com", origin: "env" });
   });
 
-  it("reads the selected environment block from zitadel.json", async () => {
-    await writeConfig({
-      server: "https://top.example.com",
-      environments: {
-        production: { server: "https://prod.example.com" },
-      },
-    });
-    const resolved = await resolveServer({ cwd: dir, env: {}, environment: "production" });
-    expect(resolved).toEqual({ value: "https://prod.example.com", origin: "config-env" });
-  });
-
-  it("falls through to the top-level server when the env block is absent", async () => {
-    await writeConfig({
-      server: "https://top.example.com",
-      environments: { preview: { server: "https://preview.example.com" } },
-    });
-    const resolved = await resolveServer({ cwd: dir, env: {}, environment: "production" });
-    expect(resolved).toEqual({ value: "https://top.example.com", origin: "config-top" });
-  });
-
-  it("uses the top-level server when no environment is provided", async () => {
+  it("uses the top-level server from zitadel.json", async () => {
     await writeConfig({ server: "https://top.example.com" });
     const resolved = await resolveServer({ cwd: dir, env: {} });
     expect(resolved).toEqual({ value: "https://top.example.com", origin: "config-top" });
   });
 
-  it("falls back to DEFAULT_SERVER when the config has no server fields", async () => {
-    await writeConfig({ environments: { production: { other: "value" } } });
-    const resolved = await resolveServer({ cwd: dir, env: {}, environment: "production" });
+  it("ignores a per-environment server block in zitadel.json", async () => {
+    await writeConfig({
+      server: "https://top.example.com",
+      environments: { production: { server: "https://prod.example.com" } },
+    });
+    const resolved = await resolveServer({ cwd: dir, env: {} });
+    expect(resolved).toEqual({ value: "https://top.example.com", origin: "config-top" });
+  });
+
+  it("falls back to DEFAULT_SERVER when the config has no server field", async () => {
+    await writeConfig({ environments: { production: { server: "https://prod.example.com" } } });
+    const resolved = await resolveServer({ cwd: dir, env: {} });
     expect(resolved).toEqual({ value: DEFAULT_SERVER, origin: "default" });
   });
 
-  it("ignores a non-string environment server and falls through to top-level", async () => {
-    await writeConfig({
-      server: "https://top.example.com",
-      environments: { production: { server: 123 } },
-    });
-    const resolved = await resolveServer({ cwd: dir, env: {}, environment: "production" });
-    expect(resolved).toEqual({ value: "https://top.example.com", origin: "config-top" });
-  });
-
-  it("ignores an array-valued environments field", async () => {
-    await writeConfig({ server: "https://top.example.com", environments: ["nope"] });
-    const resolved = await resolveServer({ cwd: dir, env: {}, environment: "production" });
-    expect(resolved).toEqual({ value: "https://top.example.com", origin: "config-top" });
+  it("ignores the environment that used to be the default, `development`", async () => {
+    // Every command without `--environment` once resolved as though it had been
+    // given `development`, so this block silently became the target. Nothing
+    // reads it now, and a project holding one falls through to the default.
+    await writeConfig({ environments: { development: { server: "https://dev.example.com" } } });
+    const resolved = await resolveServer({ cwd: dir, env: {} });
+    expect(resolved).toEqual({ value: DEFAULT_SERVER, origin: "default" });
   });
 
   it("normalises a resolved URL down to its origin", async () => {
@@ -141,20 +124,21 @@ describe("resolveServer", () => {
 
 async function writeLocalRuntime(serverUrl: string): Promise<void> {
   const paths = localRuntimePaths(dir);
-  const metadata: RuntimeMetadata = {
-    schema_version: 1,
-    backend: "docker",
-    container_name: "zitadel-server-test",
-    container_id: "container-1",
-    image: "ghcr.io/zitadel/nextgen:test",
-    port: Number(new URL(serverUrl).port),
-    server_url: serverUrl,
-    data_dir: paths.dataDir,
-    created_at: "2026-06-09T00:00:00.000Z",
-    cli_version: "0.0.0-test",
-  };
   await mkdir(paths.runtimeDir, { recursive: true });
-  await writeFile(paths.runtimeFile, JSON.stringify(metadata), "utf8");
+  await writeFile(
+    paths.runtimeFile,
+    JSON.stringify(
+      aBinaryRecord({
+        pid: process.pid,
+        command: process.execPath,
+        log_path: paths.logFile,
+        port: Number(new URL(serverUrl).port),
+        server_url: serverUrl,
+        data_dir: paths.dataDir,
+      }),
+    ),
+    "utf8",
+  );
 }
 
 async function startHealthServer(): Promise<string> {

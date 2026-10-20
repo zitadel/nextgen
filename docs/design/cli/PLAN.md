@@ -7,15 +7,15 @@
 ## Where the CLI stands
 
 The shipped surface (see [`apps/cli/README.md`](../../../apps/cli/README.md)
-for the generated reference and [`apps/cli/SKILLS.md`](../../../apps/cli/SKILLS.md)
+for the generated reference and [`apps/cli/skills/zitadel-cli/SKILL.md`](../../../apps/cli/skills/zitadel-cli/SKILL.md)
 for the agent contract):
 
 | Area | Shipped commands |
 |---|---|
 | Local runtime | `start`, `stop`, `status`, `logs`, `reset`, `doctor` |
-| Scaffolding | `setup` (8 frameworks: next, nuxt, react, vue, angular, solid, svelte, qwik; wizard asks for the login `--design`), `eject` |
+| Scaffolding | `setup` (8 frameworks: next, nuxt, react, vue, angular, solid, svelte, qwik), `eject` |
 | Config reconciliation | `plan`, `apply` (terraform-shaped: diff → plan → apply) |
-| Resources | `schemas list`, `branding eject` |
+| Resources | `users` (list, get, create, update, delete), `teams` (list, get, create, update, deactivate), `grants` (list, get, create, delete), `idps` (list, get, create), `projects` (list, get, update), `sessions` (list, get, revoke), `events` (list, get); read-only `schemas`, `releases`, `flow-definitions` and `branding`; plus `branding eject` — each resource exposes what its API supports ([resource-commands.md](resource-commands.md), [ADR 064](../../adrs/064-cli-resource-commands.md)) |
 | Ownership | `claim` ([ADR 046](../../adrs/046-claim-lifecycle-v2.md)) — init/status/complete against the server's claim endpoints, team attachment reported in `setup`/`status`/`doctor` |
 
 Three resource kinds reconcile through `plan`/`apply`: **user schemas**
@@ -49,13 +49,13 @@ framework version floors are enforced per
    every label is a `text_key` resolved client-side via the `| t` filter.
    [`packages/config/defaults/default-login.json`](../../../packages/config/defaults/default-login.json)
    is the authority for step shape.
-5. **Liquid templates are referenced, not embedded.** Branding revisions carry
-   `liquid_template_file` references; the CLI inlines on upload. The bundled
+5. **Liquid templates are referenced, not embedded.** Branding descriptors carry
+   a `$file` reference in `liquid_template`; the CLI inlines on upload. The bundled
    master template is
    [`packages/components/src/orchestrator/templates/default.liquid`](../../../packages/components/src/orchestrator/templates/default.liquid);
    the design catalog lives under
    [`packages/config/defaults/branding/`](../../../packages/config/defaults/branding/)
-   (`centered`, `split`, `split-right`, `hero`, `minimal`).
+   (`centered`, `minimal`; the page-layout designs were retired in #1039).
 6. **Templates carry a tenant-attack surface** — validated against the banned
    set before upload; see
    [template-security.md](../flowengine/template-security.md).
@@ -86,6 +86,6 @@ framework version floors are enforced per
 ## Verification
 
 The CLI's behavior contract is enforced by `apps/cli` unit tests
-(`moon run cli:test`), the journey e2e lanes (`apps/cli-journey-e2e`, four
+(`moon run cli:test`), the journey e2e lanes (`e2e/journey`, four
 CI-gated variants: fresh-app, passkey, pre-existing-app, testkit), and the
 doctor drift checks of ADR 042.

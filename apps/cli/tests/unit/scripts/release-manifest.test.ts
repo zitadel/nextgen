@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { supportedPlatforms } from "@zitadel/server/binary";
 import { beforeAll, describe, expect, it } from "vitest";
 
 type ReleasePackage = {
@@ -12,6 +13,7 @@ type ReleasePackage = {
 };
 
 type ReleaseManifestModule = {
+  SERVER_PLATFORM_PACKAGES: Array<{ packageName: string }>;
   PUBLIC_PACKAGE_BUILD_TARGETS: string[];
   PUBLIC_PACKAGE_DIRS: string[];
   PUBLIC_PACKAGE_NAMES: string[];
@@ -28,6 +30,12 @@ beforeAll(async () => {
 });
 
 describe("release manifest", () => {
+  it("releases exactly the platform packages the server resolves its binary from", () => {
+    expect(manifest.SERVER_PLATFORM_PACKAGES.map((entry) => entry.packageName).sort()).toEqual(
+      supportedPlatforms.map((entry) => entry.packageName).sort(),
+    );
+  });
+
   it("matches the Changesets fixed public package group", async () => {
     const config = JSON.parse(await readFile(join(repoRoot, ".changeset/config.json"), "utf8")) as {
       fixed: string[][];

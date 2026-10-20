@@ -1,12 +1,19 @@
 package api
 
 import (
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/ogen-go/ogen/ogenerrors"
+	"github.com/ogen-go/ogen/validate"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -60,7 +67,7 @@ func TestOgenErrorHandlerInvalidSessionCookie(t *testing.T) {
 	t.Parallel()
 	mock := gomock.NewController(t)
 	tokenService := mocks.NewMockTokenService(mock)
-	tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+	tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, domain.ErrInvalidToken())
 
 	srv := newErrorHandlerTestServer(t, tokenService)
 
@@ -81,7 +88,8 @@ func TestOgenErrorHandlerNonCredentialCookieDecodeStays400(t *testing.T) {
 	srv := newErrorHandlerTestServer(t, nil)
 
 	// The _zflow cookie is flow state, not a session credential: its absence
-	// must stay a structural 400, not become a 401.
+	// must stay a structural 400, not become a 401. The details name the
+	// missing parameter.
 	req := httptest.NewRequest(http.MethodPost, "/flow/flow_123/submit", strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -89,7 +97,7 @@ func TestOgenErrorHandlerNonCredentialCookieDecodeStays400(t *testing.T) {
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 	require.JSONEq(t,
-		`{"code":"req.invalid","message":"The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information."}`,
+		`{"code":"req.invalid","message":"The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.","details":{"details":{"fields":["_zflow"]}}}`,
 		rec.Body.String(),
 	)
 }
@@ -174,7 +182,7 @@ func TestOgenErrorHandlerGrantSecurityStaysCredentialNeutral(t *testing.T) {
 				t.Parallel()
 				mock := gomock.NewController(t)
 				tokenService := mocks.NewMockTokenService(mock)
-				tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+				tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, domain.ErrInvalidToken())
 				srv := newErrorHandlerTestServer(t, tokenService)
 
 				tc.req.Header.Set("Content-Type", "application/json")
@@ -210,7 +218,7 @@ func TestOgenErrorHandlerQueryUsersSecurityStaysCredentialNeutral(t *testing.T) 
 		t.Parallel()
 		mock := gomock.NewController(t)
 		tokenService := mocks.NewMockTokenService(mock)
-		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, domain.ErrInvalidToken())
 		srv := newErrorHandlerTestServer(t, tokenService)
 
 		req := httptest.NewRequest(http.MethodPost, "/users/query", strings.NewReader(`{}`))
@@ -224,6 +232,38 @@ func TestOgenErrorHandlerQueryUsersSecurityStaysCredentialNeutral(t *testing.T) 
 	})
 }
 
+// dualSchemeRequests is one request per operation that accepts either the
+// session cookie or a bearer, for the tests pinning that a bad or anonymous
+// cookie on them stays a credential-neutral 401.
+var dualSchemeRequests = []struct {
+	name   string
+	method string
+	path   string
+	body   string
+}{
+	{"grant create", http.MethodPost, "/grants?project_id=proj_1", `{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`},
+	{"grant get", http.MethodGet, "/grants/asgn_1?project_id=proj_1", ""},
+	{"grant delete", http.MethodDelete, "/grants/asgn_1?project_id=proj_1", ""},
+	{"grant query", http.MethodPost, "/grants/query?project_id=proj_1", `{}`},
+	{"users query", http.MethodPost, "/users/query", `{}`},
+	{"teams query", http.MethodPost, "/teams/query?project_id=proj_1", `{}`},
+	{"team get", http.MethodGet, "/teams/team_1", ""},
+	{"user create", http.MethodPost, "/users?project_id=proj_1", `{}`},
+	{"user get", http.MethodGet, "/users/user_1", ""},
+	{"user passkeys", http.MethodGet, "/users/user_1/passkeys", ""},
+	{"user delete", http.MethodDelete, "/users/user_1", ""},
+	{"team create", http.MethodPost, "/teams?project_id=proj_1", `{"name":"x"}`},
+	{"team update", http.MethodPatch, "/teams/team_1", `{"name":"x"}`},
+	{"schemas list", http.MethodGet, "/schemas?project_id=proj_1", ""},
+	{"schema get", http.MethodGet, "/schemas/schema_1?project_id=proj_1", ""},
+	{"flow definitions list", http.MethodGet, "/flow_definitions?project_id=proj_1", ""},
+	{"flow definition get", http.MethodGet, "/flow_definitions/fdef_1?project_id=proj_1", ""},
+	{"branding list", http.MethodGet, "/branding?project_id=proj_1", ""},
+	{"branding get", http.MethodGet, "/branding/brand_1?project_id=proj_1", ""},
+	{"idps query", http.MethodPost, "/idps/query?project_id=proj_1", `{}`},
+	{"idp get", http.MethodGet, "/idps/idp_1?project_id=proj_1", ""},
+}
+
 func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testing.T) {
 	t.Parallel()
 
@@ -234,32 +274,35 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		api.DeleteGrantOperation,
 		api.QueryGrantsOperation,
 		api.QueryUsersOperation,
+		api.QueryTeamsOperation,
+		api.GetTeamOperation,
+		api.CreateUserOperation,
+		api.GetUserByIDOperation,
+		api.DeleteUserByIDOperation,
+		api.CreateTeamOperation,
+		api.UpdateTeamOperation,
+		api.ListSchemasOperation,
+		api.GetSchemaByIdOperation,
+		api.ListFlowDefinitionsOperation,
+		api.GetFlowDefinitionOperation,
+		api.ListBrandingOperation,
+		api.GetBrandingByIdOperation,
+		api.QueryIdpsOperation,
+		api.GetIdpByIdOperation,
 	} {
 		require.False(t, sessionCookieOperations[op], "%s must stay off the session-only 401 rewrite", op)
 	}
 
-	tests := []struct {
-		name   string
-		method string
-		path   string
-		body   string
-	}{
-		{"grant create", http.MethodPost, "/grants?project_id=proj_1", `{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`},
-		{"grant get", http.MethodGet, "/grants/asgn_1?project_id=proj_1", ""},
-		{"grant delete", http.MethodDelete, "/grants/asgn_1?project_id=proj_1", ""},
-		{"grant query", http.MethodPost, "/grants/query?project_id=proj_1", `{}`},
-		{"users query", http.MethodPost, "/users/query", `{}`},
-	}
-	for _, tc := range tests {
+	for _, tc := range dualSchemeRequests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			mock := gomock.NewController(t)
 			tokenService := mocks.NewMockTokenService(mock)
-			tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+			tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, domain.ErrInvalidToken())
 			srv := newErrorHandlerTestServer(t, tokenService)
 
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
-			if tc.method == http.MethodPost {
+			if tc.body != "" {
 				req.Header.Set("Content-Type", "application/json")
 			}
 			req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "garbage"})
@@ -277,19 +320,7 @@ func TestOgenErrorHandlerAnonymousSessionOnDualSchemeStays401(t *testing.T) {
 
 	const want = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
 
-	tests := []struct {
-		name   string
-		method string
-		path   string
-		body   string
-	}{
-		{"grant create", http.MethodPost, "/grants?project_id=proj_1", `{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`},
-		{"grant get", http.MethodGet, "/grants/asgn_1?project_id=proj_1", ""},
-		{"grant delete", http.MethodDelete, "/grants/asgn_1?project_id=proj_1", ""},
-		{"grant query", http.MethodPost, "/grants/query?project_id=proj_1", `{}`},
-		{"users query", http.MethodPost, "/users/query", `{}`},
-	}
-	for _, tc := range tests {
+	for _, tc := range dualSchemeRequests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			token := &domain.Token{
@@ -304,7 +335,7 @@ func TestOgenErrorHandlerAnonymousSessionOnDualSchemeStays401(t *testing.T) {
 			srv := newErrorHandlerTestServer(t, tokenService)
 
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
-			if tc.method == http.MethodPost {
+			if tc.body != "" {
 				req.Header.Set("Content-Type", "application/json")
 			}
 			req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "building"})
@@ -381,4 +412,228 @@ func TestDomainErrorDetails_fullErrorInResponseComposesWithProducerDetails(t *te
 	require.True(t, details.Details.Set)
 	require.JSONEq(t, `{"field":"age"}`, string(details.Details.Value["details"]))
 	require.Contains(t, string(details.Details.Value["parent"]), "json: cannot unmarshal number")
+}
+
+// validationFieldPaths turns ogen's nested validation failures into the dotted
+// paths the decode error names, without any of the leaf error text.
+func TestValidationFieldPaths(t *testing.T) {
+	t.Parallel()
+
+	nested := &validate.Error{Fields: []validate.FieldError{
+		{Name: "idp", Error: &validate.Error{Fields: []validate.FieldError{
+			{Name: "slug", Error: errors.New("pattern mismatch")},
+			{Name: "oidc", Error: &validate.Error{Fields: []validate.FieldError{
+				{Name: "client_secret", Error: errors.New("secret value leaks here")},
+			}}},
+		}}},
+	}}
+	wrapped := &ogenerrors.DecodeRequestError{Err: fmt.Errorf("validate: %w", nested)}
+
+	require.Equal(t, []string{"idp.slug", "idp.oidc.client_secret"}, validationFieldPaths(wrapped))
+	require.Nil(t, validationFieldPaths(&ogenerrors.DecodeRequestError{Err: errors.New("unexpected end of JSON input")}))
+}
+
+// unmappedClientCodes are the codes errorResponse answers with 500 only because
+// no mapper lists them, though they are not server faults: they can be caused
+// by client input or a caller's mistake. A service span keeps status Unset for
+// them. Map such a code to its 4xx when it reaches a handler, then drop it here.
+var unmappedClientCodes = map[string]bool{
+	"att.sso_state_invalid":       true,
+	"auth.csrf_invalid":           true,
+	"claim.session_expired":       true,
+	"claim.session_not_active":    true,
+	"claim.session_wrong_project": true,
+	"enc_key.no_replacement_key":  true,
+	"enc_key.not_found":           true,
+	"idp.endpoint_cleartext":      true,
+	"idp.endpoints_partial":       true,
+	"idp.protocol_block_missing":  true,
+	"idp.scopes_missing_openid":   true,
+	"tkn.invalid":                 true,
+	"tkn.invalid_tknid":           true,
+	"tkn.revoked":                 true,
+	"user.password_invalid":       true,
+}
+
+// serverFaultStatus is the status each server-fault code is answered with.
+// A code missing here is answered with a 500.
+var serverFaultStatus = map[string]int{
+	domain.ErrNotImplemented().Code: http.StatusNotImplemented,
+	domain.ErrUnavailable().Code:    http.StatusServiceUnavailable,
+}
+
+// TestErrorResponse_serverFaultsAre5xx keeps the HTTP status and
+// domain.IsServerFault, which a service span reads, from drifting apart: every
+// code in the generated error catalog that gets a 5xx must be a server fault,
+// or be listed in unmappedClientCodes.
+func TestErrorResponse_serverFaultsAre5xx(t *testing.T) {
+	t.Parallel()
+
+	files, err := filepath.Glob("../../api/openapi/components/schemas/errors/*.yaml")
+	require.NoError(t, err)
+	require.NotEmpty(t, files, "the generated error catalog is missing")
+	constRe := regexp.MustCompile(`(?m)^\s+const: (\S+)$`)
+	for _, file := range files {
+		raw, err := os.ReadFile(file)
+		require.NoError(t, err)
+		m := constRe.FindSubmatch(raw)
+		require.NotNil(t, m, "no code in %s", file)
+		code := string(m[1])
+
+		// The parent carries another server-fault code, so a status read from
+		// the parent instead of the body code fails here.
+		e := domain.Error{Code: code, Parent: domain.ErrUnavailable()}
+		resp := errorResponse(e)
+		is5xx := resp.StatusCode >= http.StatusInternalServerError
+		switch {
+		case domain.IsServerFault(e):
+			require.Equal(t, api.ErrorCode(code), resp.Response.Code)
+			want, ok := serverFaultStatus[code]
+			if !ok {
+				want = http.StatusInternalServerError
+			}
+			require.Equal(t, want, resp.StatusCode, "%s is a server fault answered with the wrong status", code)
+		case unmappedClientCodes[code]:
+			require.True(t, is5xx, "%s is mapped now: remove it from unmappedClientCodes", code)
+		default:
+			require.False(t, is5xx, "%s gets a 5xx: add it to the server faults in internal/domain/error.go, or map it to a 4xx", code)
+		}
+	}
+}
+
+// A security handler that cannot reach a decision (the CSRF request state is
+// missing because WithCSRFRequest is not wired) is a server fault: 500, not
+// the 401 a refused credential gets.
+func TestOgenErrorHandlerSecurityInternalErrorIs500(t *testing.T) {
+	t.Parallel()
+	err := &ogenerrors.SecurityError{
+		Security: "NextgenSession",
+		Err:      domain.ErrInternal(errors.New("WithCSRFRequest is not wired")),
+	}
+	rec := httptest.NewRecorder()
+	OgenErrorHandler(t.Context(), rec, httptest.NewRequest(http.MethodPost, "/teams", nil), err)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.JSONEq(t, `{"code":"internal","message":"An unexpected error occurred."}`, rec.Body.String())
+}
+
+// A credential IntrospectToken refuses is a 401; an introspection that could
+// not reach the token store is a 500. Answering the outage with 401 would tell
+// every SDK its session is dead, and they clear the session cookie on a 401.
+func TestOgenErrorHandlerIntrospectionFailure(t *testing.T) {
+	t.Parallel()
+
+	const (
+		internal          = `{"code":"internal","message":"An unexpected error occurred."}`
+		sessionRefused    = `{"code":"auth.unauthorized","message":"Missing or invalid session token."}`
+		credentialRefused = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
+	)
+	storeDown := domain.ErrInternal(errors.New("connection refused")).WithMessage("failed to read token record")
+
+	for _, tc := range []struct {
+		name       string
+		method     string
+		path       string
+		bearer     bool
+		err        error
+		wantStatus int
+		wantBody   string
+	}{
+		{"session me, token store down", http.MethodGet, "/sessions/me", false, storeDown, http.StatusInternalServerError, internal},
+		{"session me, revoked token", http.MethodGet, "/sessions/me", false, domain.ErrTokenRevoked(), http.StatusUnauthorized, sessionRefused},
+		{"session me, invalid token", http.MethodGet, "/sessions/me", false, domain.ErrInvalidToken(), http.StatusUnauthorized, sessionRefused},
+		{"user me, token store down", http.MethodGet, "/users/me", false, storeDown, http.StatusInternalServerError, internal},
+		{"dual-scheme cookie, token store down", http.MethodGet, "/teams/team_1", false, storeDown, http.StatusInternalServerError, internal},
+		{"dual-scheme cookie, revoked token", http.MethodGet, "/teams/team_1", false, domain.ErrTokenRevoked(), http.StatusUnauthorized, credentialRefused},
+		{"bearer, token store down", http.MethodGet, "/teams/team_1", true, storeDown, http.StatusInternalServerError, internal},
+		{"bearer, revoked token", http.MethodGet, "/teams/team_1", true, domain.ErrTokenRevoked(), http.StatusUnauthorized, credentialRefused},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			mock := gomock.NewController(t)
+			tokenService := mocks.NewMockTokenService(mock)
+			tokenService.EXPECT().IntrospectToken(gomock.Any(), "credential").Return(nil, tc.err)
+			srv := newErrorHandlerTestServer(t, tokenService)
+
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+			if tc.bearer {
+				req.Header.Set("Authorization", "Bearer credential")
+			} else {
+				req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "credential"})
+			}
+			rec := httptest.NewRecorder()
+			srv.ServeHTTP(rec, req)
+
+			require.Equal(t, tc.wantStatus, rec.Code)
+			require.JSONEq(t, tc.wantBody, rec.Body.String())
+		})
+	}
+}
+
+// A credential whose JWE header names a key the server could never have
+// sealed with is refused as a credential (401), never looked up. The key store
+// here fails every lookup the way Postgres does for a kid with a NUL byte
+// (SQLSTATE 22021), so a header that reached the lookup would answer 500 and
+// let an anonymous request make every authenticated endpoint report an outage.
+func TestOgenErrorHandlerMalformedCredentialHeader(t *testing.T) {
+	t.Parallel()
+
+	const (
+		internal          = `{"code":"internal","message":"An unexpected error occurred."}`
+		sessionRefused    = `{"code":"auth.unauthorized","message":"Missing or invalid session token."}`
+		credentialRefused = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
+		mintedKid         = "enc_key_01JAAAAAAAAAAAAAAAAAAAAAAA"
+	)
+
+	for _, tc := range []struct {
+		name       string
+		header     string
+		wantStatus int
+	}{
+		{"nul byte in kid", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"a\u0000b"}`, http.StatusUnauthorized},
+		{"invalid utf-8 in kid", "{\"alg\":\"A256GCMKW\",\"enc\":\"A256GCM\",\"kid\":\"enc_key_\xff\xfe\"}", http.StatusUnauthorized},
+		{"over-long kid", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"enc_key_` + strings.Repeat("A", 4096) + `"}`, http.StatusUnauthorized},
+		{"unknown kid format", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"key-1"}`, http.StatusUnauthorized},
+		{"unsupported enc", `{"alg":"A256GCMKW","enc":"A128CBC-HS256","kid":"` + mintedKid + `"}`, http.StatusUnauthorized},
+		{"unsupported alg", `{"alg":"dir","enc":"A256GCM","kid":"` + mintedKid + `"}`, http.StatusUnauthorized},
+		{"well-formed header, key store down", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"` + mintedKid + `"}`, http.StatusInternalServerError},
+	} {
+		credential := base64.RawURLEncoding.EncodeToString([]byte(tc.header)) + ".key.iv.ciphertext.tag"
+
+		for _, scheme := range []struct {
+			name    string
+			path    string
+			bearer  bool
+			refused string
+		}{
+			{"session me", "/sessions/me", false, sessionRefused},
+			{"bearer", "/teams/team_1", true, credentialRefused},
+		} {
+			t.Run(scheme.name+", "+tc.name, func(t *testing.T) {
+				t.Parallel()
+				mock := gomock.NewController(t)
+				keys := mocks.NewMockKeyService(mock)
+				keys.EXPECT().GetCrypter(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, domain.ErrInternal(errors.New("invalid byte sequence for encoding \"UTF8\": 0x00 (SQLSTATE 22021)"))).
+					AnyTimes()
+				srv := newErrorHandlerTestServer(t, service.NewTokenService(keys, nil))
+
+				req := httptest.NewRequest(http.MethodGet, scheme.path, nil)
+				if scheme.bearer {
+					req.Header.Set("Authorization", "Bearer "+credential)
+				} else {
+					req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: credential})
+				}
+				rec := httptest.NewRecorder()
+				srv.ServeHTTP(rec, req)
+
+				want := scheme.refused
+				if tc.wantStatus == http.StatusInternalServerError {
+					want = internal
+				}
+				require.Equal(t, tc.wantStatus, rec.Code)
+				require.JSONEq(t, want, rec.Body.String())
+			})
+		}
+	}
 }

@@ -42,10 +42,9 @@ func TestGrantService_Create_EventUsesAssignmentProject(t *testing.T) {
 			})
 	})
 	_, err := svc.Create(ctx, service.CreateGrantInput{
-		ProjectID:     "proj_customer",
-		PrincipalType: domain.AuthzPrincipalTypeUser,
-		PrincipalID:   userID,
-		Relation:      "viewer",
+		ProjectID: "proj_customer",
+		UserID:    userID,
+		Relation:  "viewer",
 	})
 	require.NoError(t, err)
 	assertManagedGrantEvent(t, got, domain.EventTypeAuthzGranted, "asgn_test01")

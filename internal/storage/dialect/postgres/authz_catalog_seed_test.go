@@ -71,13 +71,17 @@ WHERE catalog_id = $1 ORDER BY object_type, relation`, domain.SystemCatalogID)
 		require.NoError(t, testPool.pool.QueryRow(ctx, `
 SELECT COUNT(*) FROM zitadel_nextgen.authz_expression_edges
 WHERE catalog_id = $1`, domain.SystemCatalogID).Scan(&edgeCount))
-		assert.Equal(t, 7, edgeCount)
+		// team.member and project.team direct, and direct + one rewrite on each
+		// of viewer (→ editor), editor (→ admin) and admin (TTU on project.team).
+		assert.Equal(t, 8, edgeCount)
 
 		var refCount int
 		require.NoError(t, testPool.pool.QueryRow(ctx, `
 SELECT COUNT(*) FROM zitadel_nextgen.authz_relation_references
 WHERE catalog_id = $1`, domain.SystemCatalogID).Scan(&refCount))
-		assert.Equal(t, 5, refCount)
+		// team.member←user, project.team←team, and user + team#member on each
+		// of viewer, editor and admin.
+		assert.Equal(t, 8, refCount)
 
 		var identityCount int
 		require.NoError(t, testPool.pool.QueryRow(ctx, `
@@ -86,25 +90,32 @@ WHERE catalog_id = $1 AND from_object_type = to_object_type AND from_relation = 
 			domain.SystemCatalogID).Scan(&identityCount))
 		assert.Equal(t, 5, identityCount)
 
-		var viewerImpliesEditor int
-		require.NoError(t, testPool.pool.QueryRow(ctx, `
-SELECT COUNT(*) FROM zitadel_nextgen.authz_relation_closure
+		// Roles are monotonic (ADR 054 §5): admin closes to editor and viewer,
+		// editor to viewer, and nothing closes upward. An exact match of the
+		// non-reflexive project rows pins both directions at once.
+		type implication struct {
+			from, to string
+			depth    int
+		}
+		implRows, err := testPool.pool.Query(ctx, `
+SELECT from_relation, to_relation, depth FROM zitadel_nextgen.authz_relation_closure
 WHERE catalog_id = $1
-  AND from_object_type = 'project' AND from_relation = 'viewer'
-  AND to_object_type = 'project' AND to_relation = 'editor'
-  AND depth = 1`,
-			domain.SystemCatalogID).Scan(&viewerImpliesEditor))
-		assert.Equal(t, 1, viewerImpliesEditor)
-
-		var viewerImpliesAdmin int
-		require.NoError(t, testPool.pool.QueryRow(ctx, `
-SELECT COUNT(*) FROM zitadel_nextgen.authz_relation_closure
-WHERE catalog_id = $1
-  AND from_object_type = 'project' AND from_relation = 'viewer'
-  AND to_object_type = 'project' AND to_relation = 'admin'
-  AND depth = 2`,
-			domain.SystemCatalogID).Scan(&viewerImpliesAdmin))
-		assert.Equal(t, 1, viewerImpliesAdmin)
+  AND from_object_type = 'project' AND to_object_type = 'project'
+  AND from_relation <> to_relation`, domain.SystemCatalogID)
+		require.NoError(t, err)
+		defer implRows.Close()
+		var implications []implication
+		for implRows.Next() {
+			var r implication
+			require.NoError(t, implRows.Scan(&r.from, &r.to, &r.depth))
+			implications = append(implications, r)
+		}
+		require.NoError(t, implRows.Err())
+		assert.ElementsMatch(t, []implication{
+			{"admin", "editor", 1},
+			{"admin", "viewer", 2},
+			{"editor", "viewer", 1},
+		}, implications)
 
 		var bundleCount int
 		require.NoError(t, testPool.pool.QueryRow(ctx, `

@@ -84,6 +84,12 @@ type FlowState struct {
 	// last successful Submit* call; handed off by the API handler at
 	// the OIDC redirect boundary.
 	AuthAttemptID string
+
+	// SSOResolvedCheckID is the id of the last parked SSO callback row the
+	// engine resolved. A render resolves a parked row only when its id differs,
+	// so a reload never resolves the same result twice. The id is re-minted on
+	// every SSO state issue, so a new provider round trip always resolves.
+	SSOResolvedCheckID string `json:",omitempty"`
 }
 
 // FlowPendingChallenge records the server-issued challenge the next

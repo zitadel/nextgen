@@ -44,6 +44,38 @@ func TestSchemaSQLNameAndValuesFrom(t *testing.T) {
 	assert.Equal(t, createdAt, values[1])
 }
 
+func TestSchemaEnsureOrderable(t *testing.T) {
+	t.Parallel()
+	schema := database.NewSchema(map[domain.ProjectField]database.FieldBinding[domain.Project]{
+		domain.ProjectFieldID: {
+			SQLName:  "id",
+			Accessor: func(p *domain.Project) any { return p.ID },
+			Coerce:   database.CoerceString,
+		},
+		// Filter-only computed field: a SQL expression with no accessor, so a
+		// keyset cursor cannot read a value for it. Ordering by it must be
+		// refused, not left to panic during cursor marshaling (#850).
+		domain.ProjectFieldName: {
+			SQLName:  "name IS NOT NULL",
+			Computed: true,
+		},
+	})
+
+	orderable := database.OrderBy[domain.ProjectField]{
+		Columns: []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
+	}
+	require.NoError(t, schema.EnsureOrderable(orderable))
+
+	notOrderable := database.OrderBy[domain.ProjectField]{
+		Columns: []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldName)},
+	}
+	err := schema.EnsureOrderable(notOrderable)
+	var de database.Error
+	require.ErrorAs(t, err, &de)
+	assert.Equal(t, database.ErrFieldNotOrderable(nil).Code, de.Code, "typed not-orderable code")
+	assert.Equal(t, domain.ProjectFieldName, de.Details, "details identify the offending field")
+}
+
 func TestSchemaColumnNullability(t *testing.T) {
 	t.Parallel()
 	schema := database.NewSchema(map[domain.ProjectField]database.FieldBinding[domain.Project]{

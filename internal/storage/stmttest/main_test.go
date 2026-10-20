@@ -17,13 +17,15 @@ import (
 )
 
 type dialectOpener struct {
-	name               string
-	open               func(ctx context.Context) (dbtest.Pool, func(), error)
-	seed               func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error
-	hardDeleteTeam     func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error
-	insertJSONSchemaAt func(ctx context.Context, pool dbtest.Pool, projectID, url string, objectType *string, createdAt time.Time) error
-	schemaNullability  []schematest.ColumnNullability
-	liveNullability    func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error)
+	name                   string
+	open                   func(ctx context.Context) (dbtest.Pool, func(), error)
+	seed                   func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error
+	hardDeleteTeam         func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error
+	insertJSONSchemaAt     func(ctx context.Context, pool dbtest.Pool, projectID, url string, objectType *string, createdAt time.Time) error
+	insertFlowDefinitionAt func(ctx context.Context, pool dbtest.Pool, projectID, id, name string, createdAt time.Time) error
+	insertUserPasswordAt   func(ctx context.Context, pool dbtest.Pool, projectID, id, userID, encodedHash string, createdAt time.Time) error
+	schemaNullability      []schematest.ColumnNullability
+	liveNullability        func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error)
 }
 
 // dialectOpeners is filled by build-tagged register files (postgres, spanner, and/or sqlite).
@@ -35,27 +37,41 @@ func registerDialect(
 	seed func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error,
 	hardDeleteTeam func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error,
 	insertJSONSchemaAt func(ctx context.Context, pool dbtest.Pool, projectID, url string, objectType *string, createdAt time.Time) error,
+	insertFlowDefinitionAt func(ctx context.Context, pool dbtest.Pool, projectID, id, name string, createdAt time.Time) error,
+	insertUserPasswordAt func(ctx context.Context, pool dbtest.Pool, projectID, id, userID, encodedHash string, createdAt time.Time) error,
 	schemaNullability []schematest.ColumnNullability,
 	liveNullability func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error),
 ) {
 	dialectOpeners = append(dialectOpeners, dialectOpener{
 		name: name, open: open, seed: seed, hardDeleteTeam: hardDeleteTeam,
-		insertJSONSchemaAt: insertJSONSchemaAt,
-		schemaNullability:  schemaNullability, liveNullability: liveNullability,
+		insertJSONSchemaAt:     insertJSONSchemaAt,
+		insertFlowDefinitionAt: insertFlowDefinitionAt,
+		insertUserPasswordAt:   insertUserPasswordAt,
+		schemaNullability:      schemaNullability, liveNullability: liveNullability,
 	})
 }
 
 type dialect struct {
-	name             string
-	stmts            service.AllStatements
+	name  string
+	stmts service.AllStatements
+	// pool opens real transactions, for tests that need to hold locks while
+	// a competing statement runs (e.g. the contended-deploy stamp contract).
+	pool             service.Pool
 	seedTiedProjects func(ctx context.Context, ids []string, createdAt time.Time) error
 	hardDeleteTeam   func(ctx context.Context, projectID, teamID string) error
 	// insertJSONSchemaAt writes a json_schemas row at an exact created_at, which
 	// CreateJSONSchema never accepts from a caller: Postgres and Spanner default
 	// the column in the database, SQLite stamps it in Go.
 	insertJSONSchemaAt func(ctx context.Context, projectID, url string, objectType *string, createdAt time.Time) error
-	schemaNullability  []schematest.ColumnNullability
-	liveNullability    func(ctx context.Context) (map[string]map[string]bool, error)
+	// insertFlowDefinitionAt is the flow_definitions equivalent, for the same
+	// reason: tied created_at collisions can only be staged with a raw write.
+	insertFlowDefinitionAt func(ctx context.Context, projectID, id, name string, createdAt time.Time) error
+	// insertUserPasswordAt writes a user_passwords row at an exact created_at,
+	// which SetUserPassword never accepts from a caller: it stages a newest
+	// password the clock has not reached yet.
+	insertUserPasswordAt func(ctx context.Context, projectID, id, userID, encodedHash string, createdAt time.Time) error
+	schemaNullability    []schematest.ColumnNullability
+	liveNullability      func(ctx context.Context) (map[string]map[string]bool, error)
 }
 
 // dialects is populated by TestMain for every registered opener.
@@ -94,10 +110,13 @@ func run(m *testing.M) int {
 		seed := opener.seed
 		hardDeleteTeam := opener.hardDeleteTeam
 		insertJSONSchemaAt := opener.insertJSONSchemaAt
+		insertFlowDefinitionAt := opener.insertFlowDefinitionAt
+		insertUserPasswordAt := opener.insertUserPasswordAt
 		liveNullability := opener.liveNullability
 		dialects = append(dialects, dialect{
 			name:  opener.name,
 			stmts: pool.Statements(),
+			pool:  pool,
 			seedTiedProjects: func(ctx context.Context, ids []string, createdAt time.Time) error {
 				return seed(ctx, pool, ids, createdAt)
 			},
@@ -106,6 +125,12 @@ func run(m *testing.M) int {
 			},
 			insertJSONSchemaAt: func(ctx context.Context, projectID, url string, objectType *string, createdAt time.Time) error {
 				return insertJSONSchemaAt(ctx, pool, projectID, url, objectType, createdAt)
+			},
+			insertFlowDefinitionAt: func(ctx context.Context, projectID, id, name string, createdAt time.Time) error {
+				return insertFlowDefinitionAt(ctx, pool, projectID, id, name, createdAt)
+			},
+			insertUserPasswordAt: func(ctx context.Context, projectID, id, userID, encodedHash string, createdAt time.Time) error {
+				return insertUserPasswordAt(ctx, pool, projectID, id, userID, encodedHash, createdAt)
 			},
 			schemaNullability: opener.schemaNullability,
 			liveNullability: func(ctx context.Context) (map[string]map[string]bool, error) {

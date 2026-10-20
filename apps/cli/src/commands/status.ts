@@ -1,5 +1,4 @@
-import { createZitadelClient } from "@zitadel/api/client";
-
+import { createZitadelClient } from "../lib/api-client";
 import {
   claimAction,
   claimCommand,
@@ -7,16 +6,14 @@ import {
   claimWindowClosedAction,
   type ClaimState,
 } from "../lib/claim-state";
-import { isProcessRunning } from "../lib/local-server/binary";
-import { inspectContainer } from "../lib/local-server/docker";
 import { customizeAndPublishActions, verifyLoginAction } from "../lib/journey-guidance";
 import {
   DEFAULT_LOCAL_SERVER_URL,
-  checkLocalServerHealth,
   readRuntimeMetadata,
   runtimeSummary,
 } from "../lib/local-server/runtime";
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { LocalServer } from "../lib/local-server/server";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
 import {
   hasZitadelConfig,
@@ -37,6 +34,8 @@ import { publicCliCommand } from "../lib/public-cli";
  */
 export default class Status extends BaseCommand {
   static override description = "Summarize the local Zitadel server and project state.";
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 3;
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Status);
@@ -50,18 +49,10 @@ export default class Status extends BaseCommand {
     } else {
       await this.toMeta(flags);
     }
-    let docker: Awaited<ReturnType<typeof inspectContainer>> | undefined;
-    let dockerError: string | undefined;
-    if (runtime?.backend === "docker") {
-      try {
-        docker = await inspectContainer(runtime.container_name);
-      } catch (error) {
-        dockerError = error instanceof Error ? error.message : String(error);
-      }
-    }
-    const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;
-    const processRunning = runtime?.backend === "binary" ? isProcessRunning(runtime.pid) : false;
-    const serverLifecycle = lifecycleForRuntime({ docker, healthy, processRunning, runtime });
+    const server = await LocalServer.at(this.meta.cwd, {
+      cliVersion: this.meta.cliVersion,
+    }).status();
+    const serverLifecycle = server.lifecycle;
 
     const project = await projectStatus(this.meta.cwd);
     const users =
@@ -77,23 +68,12 @@ export default class Status extends BaseCommand {
         title: "Zitadel status.",
         server: {
           lifecycle: serverLifecycle,
-          runtime: runtimeSummary(runtime),
-          docker: {
-            available: dockerError === undefined,
-            error: dockerError,
-            container_exists: docker?.exists ?? false,
-            container_running: docker?.running ?? false,
-          },
-          process:
-            runtime?.backend === "binary"
-              ? {
-                  pid: runtime.pid,
-                  running: processRunning,
-                }
-              : undefined,
+          runtime: runtimeSummary(server.runtime),
+          docker: server.docker,
+          process: server.process,
           health: {
-            healthy,
-            url: runtime?.server_url,
+            healthy: server.healthy,
+            url: server.runtime?.server_url,
           },
         },
         project,
@@ -102,30 +82,6 @@ export default class Status extends BaseCommand {
       },
     });
   }
-}
-
-function lifecycleForRuntime(input: {
-  docker: Awaited<ReturnType<typeof inspectContainer>> | undefined;
-  healthy: boolean;
-  processRunning: boolean;
-  runtime: Awaited<ReturnType<typeof readRuntimeMetadata>>;
-}): string {
-  if (!input.runtime) {
-    return "missing";
-  }
-  if (input.runtime.backend === "binary") {
-    if (input.processRunning && input.healthy) {
-      return "running";
-    }
-    return input.processRunning ? "unhealthy" : "stopped";
-  }
-  if (input.docker?.running && input.healthy) {
-    return "running";
-  }
-  if (input.docker?.exists) {
-    return "unhealthy";
-  }
-  return "stopped";
 }
 
 type ProjectStatus =
@@ -199,7 +155,9 @@ async function detectUserPresence(cwd: string, source: string): Promise<UserPres
       token: secret.project_secret,
     });
     const probe = client
-      .queryUsers({ limit: 1 }, { signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS) })
+      .queryUsers({ limit: 1 }, undefined, {
+        signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS),
+      })
       .then(({ users }): UserPresence => (users.length > 0 ? "some" : "none"))
       .catch((): UserPresence => "unknown");
     // The abort signal alone is not enough: DNS resolution can outlive it

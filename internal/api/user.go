@@ -58,31 +58,37 @@ func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDP
 	return &api.DeleteUserByIDNoContent{}, nil
 }
 
-// QueryUsers is the users list (ADR 031). It carries no project parameter: the
-// credential's home project (oauth2 secret or user-bound session) is the
-// only authority for which project's users are served. The scope check is
-// what keeps a browser-plane preview secret out. Results are newest-first
-// unless the request sorts otherwise.
-func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest) (api.QueryUsersRes, error) {
+// QueryUsers is the users list (ADR 031, #1300 §2), defaulting to the
+// credential's own project. The scope check is what keeps a browser-plane
+// preview secret out. Results are newest-first unless the request sorts
+// otherwise.
+func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest, params api.QueryUsersParams) (api.QueryUsersRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
-	ctx, err := h.requireProjectListAccess(ctx, scopeCtx.ProjectID, userAccess, domain.ResourceKindUser)
+	projectID := string(params.ProjectID.Or(api.ProjectID(scopeCtx.ProjectID)))
+	ctx, projectWide, err := h.requireProjectListAccess(ctx, projectID, userAccess, domain.ResourceKindUser)
 	if err != nil {
 		return nil, err
 	}
 
-	input := mapQueryUsersToService(scopeCtx.ProjectID, req)
+	input := mapQueryUsersToService(projectID, req)
 	// Expanding answers 403 rather than a silently missing property: a caller
 	// could not tell that from "this user has no teams". Filtering on team_id
 	// reads the same memberships by a different route — it answers "who is in
 	// this team", one page at a time — so it takes the same gate.
-	if input.IncludeTeams || filtersOnTeamID(req.Filter) {
-		if err := requireMembershipRead(ctx); err != nil {
+	readsMemberships := input.IncludeTeams || filtersOnTeamID(req.Filter)
+	// A Console session mints no scopes, so the list check's resolver decision
+	// stands in for them (#1300 §4, see userReadsProject). Decided here, for this
+	// list, rather than in the shared ceiling, so another endpoint does not
+	// inherit it by accepting the cookie.
+	sessionReads := projectWide && scopeCtx.PrincipalType == domain.AuthzPrincipalTypeUser
+	if readsMemberships {
+		if err := requireMembershipReadUnless(ctx, sessionReads); err != nil {
 			return nil, err
 		}
 	}
 	// The owner team is a different resource under a different permission, so
 	// it is gated on its own rather than folded into the membership check.
-	if input.IncludeLifecycleOwnerTeam {
+	if input.IncludeLifecycleOwnerTeam && !sessionReads {
 		if err := requireTeamRead(ctx); err != nil {
 			return nil, err
 		}
@@ -180,6 +186,39 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 	return res, nil
 }
 
+func (h *Handler) ListUserIdentityLinks(ctx context.Context, params api.ListUserIdentityLinksParams) (api.ListUserIdentityLinksRes, error) {
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
+	if err != nil {
+		return nil, err
+	}
+
+	links, nextPage, err := h.userService.ListIdentityLinks(ctx, service.ListIdentityLinksInput{
+		ProjectID: projectID,
+		UserID:    string(params.UserID),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := &api.ListUserIdentityLinksResponse{
+		IdentityLinks: make([]api.UserIdentityLink, len(links)),
+	}
+	if nextPage != "" {
+		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(nextPage))
+	}
+	for i, link := range links {
+		res.IdentityLinks[i] = api.UserIdentityLink{
+			ID:           link.ID,
+			ConnectionID: link.ConnectionID,
+			CreatedAt:    link.CreatedAt,
+		}
+	}
+
+	return res, nil
+}
+
 // ListUserTeams serves the user's team roster — the N:N membership list, one
 // page at a time, each entry carrying the team's name so a client renders the
 // page without resolving ids one by one. Lifecycle ownership is a different
@@ -189,8 +228,8 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	if err != nil {
 		return nil, err
 	}
-	// Same permission as the embedded read, or this becomes the way around it.
-	if err := requireMembershipRead(ctx); err != nil {
+	// Same gate as the embedded read, or this becomes the way around it.
+	if err := h.requireMembershipReadIn(ctx, projectID); err != nil {
 		return nil, err
 	}
 
@@ -203,18 +242,39 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	if err != nil {
 		return nil, err
 	}
+	res := userTeamsResponse(teams)
+	return &res, nil
+}
 
-	res := &api.ListUserTeamsResponse{
-		Teams: make([]api.UserTeam, 0, len(teams.Items)),
+func (h *Handler) ListMyTeams(ctx context.Context, params api.ListMyTeamsParams) (api.ListMyTeamsRes, error) {
+	self, err := requireSelf(ctx)
+	if err != nil {
+		return nil, err
 	}
+	teams, err := h.userService.ListUserTeams(ctx, service.ListUserTeamsInput{
+		ProjectID: self.ProjectID(),
+		UserID:    self.UserID(),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &api.ListUserTeamsResponseHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     userTeamsResponse(teams),
+	}, nil
+}
+
+func userTeamsResponse(teams *service.ListUserTeamsOutput) api.ListUserTeamsResponse {
+	res := api.ListUserTeamsResponse{Teams: make([]api.UserTeam, 0, len(teams.Items))}
 	if teams.NextPageToken != "" {
 		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(teams.NextPageToken))
 	}
 	for _, team := range teams.Items {
 		res.Teams = append(res.Teams, apiUserTeam(*team))
 	}
-
-	return res, nil
+	return res
 }
 
 func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams) (api.GetUserByIDRes, error) {
@@ -224,6 +284,10 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 	}
 	var teamID *string
 	if params.TeamID.IsSet() {
+		// team_id answers "is this user an active member of that team".
+		if err := h.requireMembershipReadIn(ctx, projectID); err != nil {
+			return nil, err
+		}
 		teamID = new(string(params.TeamID.Value))
 	}
 
@@ -269,9 +333,9 @@ func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, 
 }
 
 func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest) (api.PatchMyUserRes, error) {
-	sessionToken, ok := sessionTokenFromContext(ctx)
-	if !ok {
-		return nil, domain.ErrSessionTokenInvalid()
+	self, err := requireSelf(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	attributes, err := convertUsingJson[map[string]any](req.Attributes)
@@ -280,8 +344,8 @@ func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest) 
 	}
 
 	user, err := h.userService.PatchMyUser(ctx, service.PatchMyUserInput{
-		SessionToken: sessionToken,
-		Attributes:   *attributes,
+		Self:       self,
+		Attributes: *attributes,
 	})
 	if err != nil {
 		return nil, err
@@ -296,10 +360,9 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 		return nil, err
 	}
 	err = h.userService.SetPassword(ctx, service.SetPasswordInput{
-		ProjectID:                projectID,
-		UserID:                   string(params.UserID),
-		Password:                 req.Password,
-		IsPasswordChangeRequired: req.IsChangeRequired.Value,
+		ProjectID: projectID,
+		UserID:    string(params.UserID),
+		Password:  req.Password,
 	})
 	if err != nil {
 		return nil, err
@@ -309,20 +372,34 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 }
 
 func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
-	sessionToken, ok := sessionTokenFromContext(ctx)
-	if !ok {
-		return nil, domain.ErrSessionTokenInvalid()
-	}
-	input := service.GetMyUserInput{
-		SessionToken: sessionToken,
-	}
-
-	user, err := h.userService.GetMyUser(ctx, input)
+	self, err := requireSelf(ctx)
 	if err != nil {
 		return nil, err
 	}
-
+	user, err := h.userService.GetMyUser(ctx, service.GetMyUserInput{Self: self})
+	if err != nil {
+		return nil, err
+	}
 	return domainUserToApiUser(user)
+}
+
+func (h *Handler) GetMyUserSchema(ctx context.Context) (api.GetMyUserSchemaRes, error) {
+	self, err := requireSelf(ctx)
+	if err != nil {
+		return nil, err
+	}
+	schema, err := h.userService.GetMyUserSchema(ctx, service.GetMyUserInput{Self: self})
+	if err != nil {
+		return nil, err
+	}
+	apiSchema, err := domainSchemaToApiSchema(schema)
+	if err != nil {
+		return nil, err
+	}
+	return &api.SchemaHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     *apiSchema,
+	}, nil
 }
 
 // ------------------ Mappers ---------------
@@ -343,6 +420,21 @@ func userRefToAPI(ref domain.UserRef) api.UserRef {
 	return out
 }
 
+func userMetadataToAPI(user *domain.User) api.UserMetadata {
+	var lifecycleOwnerTeamID api.OptNilString
+	if teamID, ok := user.OwningTeamID(); ok {
+		lifecycleOwnerTeamID.SetTo(teamID)
+	} else {
+		lifecycleOwnerTeamID.SetToNull()
+	}
+	return api.UserMetadata{
+		CreatedAt:            user.Metadata.CreatedAt,
+		UpdatedAt:            user.Metadata.UpdatedAt,
+		Status:               api.UserMetadataStatus(user.Metadata.Status),
+		LifecycleOwnerTeamID: lifecycleOwnerTeamID,
+	}
+}
+
 func domainUserToApiUser(user *domain.User) (*api.User, error) {
 	userData, err := user.Attributes.ToMap()
 	if err != nil {
@@ -354,23 +446,11 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 		return nil, err
 	}
 
-	var lifecycleOwnerTeamID api.OptNilString
-	if teamID, ok := user.OwningTeamID(); ok {
-		lifecycleOwnerTeamID.SetTo(teamID)
-	} else {
-		lifecycleOwnerTeamID.SetToNull()
-	}
-
 	out := &api.User{
 		ID:         api.UserID(user.ID),
 		Schema:     user.SchemaURL,
 		Attributes: *attributes,
-		Metadata: api.UserMetadata{
-			CreatedAt:            user.Metadata.CreatedAt,
-			UpdatedAt:            user.Metadata.UpdatedAt,
-			Status:               api.UserMetadataStatus(user.Metadata.Status),
-			LifecycleOwnerTeamID: lifecycleOwnerTeamID,
-		},
+		Metadata:   userMetadataToAPI(user),
 	}
 
 	// The derived identity of ADR 058 §3a: identifier and identifier_property
@@ -427,7 +507,9 @@ func apiUserTeam(team domain.UserTeam) api.UserTeam {
 
 func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
-	case domain.ErrUserInvalid().Code:
+	case domain.ErrUserInvalid().Code,
+		domain.ErrUserPasswordEmpty().Code,
+		domain.ErrUserPasswordTooLong().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrUserNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)

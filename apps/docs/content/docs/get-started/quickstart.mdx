@@ -7,16 +7,18 @@ Use this path when you want to add Zitadel auth to a local app without a source 
 
 ## Prerequisites
 
-- Node.js 24 or newer.
+- Node.js 24 or newer. When setup creates a new app it checks your Node against the range the framework's CLI publishes before it starts. To create an Angular app, use a Node version the Angular CLI accepts: 22.22.3 or newer 22.x, 24.15.0 or newer 24.x, or 26.x (the Angular CLI publishes `^22.22.3 || ^24.15.0 || >=26.0.0`, but it checks each major on its own, so Node 27 and later are refused). Node 23 and 25 run with a warning. Setup refuses any other Node and names the range. For the other frameworks, setup warns if your Node is outside the range and carries on.
 - A package manager supported by your app.
 - Docker only if you intentionally choose the Docker runtime backend.
 
-## Create or enter an app directory
+## Create an app directory
 
 ```sh
 mkdir myapp
 cd myapp
 ```
+
+Use a new, empty directory. To add Zitadel to an app you already have, follow [Add Zitadel to an existing app](#add-zitadel-to-an-existing-app) instead.
 
 ## Check prerequisites
 
@@ -32,7 +34,9 @@ Before setup, `doctor` checks local runtime prerequisites. After setup, it also 
 npx @zitadel/cli@alpha start
 ```
 
-By default this starts the matching `@zitadel/server` npm binary for the alpha train and stores runtime metadata under `.zitadel/local/runtime.json`. Runtime data is stored under `.zitadel/local/nextgen-data` (SQLite by default — see [Databases](/docs/concepts/databases)).
+By default this starts the matching `@zitadel/server` npm binary for the alpha train and stores runtime metadata under `.zitadel/local/runtime.json`. Runtime data is stored under `.zitadel/local/nextgen-data` (SQLite by default, see [Databases](/docs/concepts/databases)).
+
+`start` also creates a local admin, `admin@zitadel.localhost`, and ends by printing a one-time sign-in link for the management console. It is how you reach the console without a password, and it works once, within a minute. Print a fresh one at any time with `zitadel console`.
 
 ## Scaffold auth
 
@@ -40,11 +44,36 @@ By default this starts the matching `@zitadel/server` npm binary for the alpha t
 npx @zitadel/cli@alpha setup --server local
 ```
 
-In a fresh directory, setup asks which framework to scaffold. Scripted runs should pass `--framework next`, `--framework nuxt`, `--framework react`, `--framework vue`, or `--framework angular`.
+Setup scaffolds a new app into an empty directory. What `start` wrote there, `.zitadel/local/` and the `.gitignore` line that ignores it, doesn't count. In a directory with other files but no app that setup recognizes, setup stops and points at `--force`: pass it only when those files may go, because setup replaces the ones that collide with the new app's (`package.json`, `src/`, and so on).
 
-Setup also asks how users should sign in and scaffolds the matching schema and login flow: `--preset password-first` (the default: email + password, passkey optional during registration) or `--preset passkey-first` (a one-tap passkey up front, with an email + password fallback). The preset only picks the starting point — everything under `.zitadel/` stays editable.
+Run setup in the directory `start` ran in, or one inside it: setup looks there for the local admin, and without it the project is not attached to a team and the console does not list it.
 
-Setup writes the app files, `.env.local`, `zitadel.json`, and `.zitadel/**`, then installs dependencies with the detected package manager unless `--skip-install` is passed.
+When it scaffolds a new app, setup asks which framework to use. Scripted runs pass `--framework` with one of `next`, `nuxt`, `sveltekit`, `solid-start`, `qwik-router`, `tanstack-start`, `react`, `vue`, `angular`, `solid`, `svelte`, or `qwik`. Setup creates the app only once it has asked all its questions, so cancelling one leaves the directory as it was, and `--dry-run` previews setup without creating the app. If setup fails or you cancel it after it has created the app, it removes the app again, so you can run the same command once more.
+
+Setup also asks how users should sign in and scaffolds the matching schema and login flow: `--preset password-first` (the default: email + password) or `--preset passkey-first` (a one-tap passkey up front, with an email + password fallback). The preset only picks the starting point: the schema and login flow it writes to `.zitadel/schemas/` and `.zitadel/flows/` are yours to edit.
+
+Setup writes the app files, `.env.example`, `.env.local` (with the project id and the project secret), `zitadel.json`, and `.zitadel/**`, adds the files that hold secrets to `.gitignore`, then installs dependencies with the detected package manager unless `--skip-install` is passed.
+
+Against a local server, setup by default also attaches the project to the local admin's team and prints `Project owned by admin@zitadel.localhost (team ...)`. The project is owned from the start, so there is nothing to claim: `zitadel claim` reports it as already owned.
+
+## Add Zitadel to an existing app
+
+Commit your work, then run the same commands in the app's directory:
+
+```sh
+npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --server local
+```
+
+- **Next.js and Nuxt:** setup detects the framework and patches the app. Before it creates anything, it stops with `E_CONFLICT` rather than overwrite a file of yours that it would write, such as your own `proxy.ts` or `app/login/page.tsx`. Next.js runs one request boundary, so setup also stops on yours under the other name: on Next 16 it writes `proxy.ts`, and Next refuses to run beside a `middleware.ts`. Move yours aside, rerun setup, and merge it into the file setup writes. If `package.json` names Next.js by a tag such as `latest`, setup can't tell the version and writes `middleware.ts`, so it stops on an existing `proxy.ts`: pin the version the app runs, such as `^16.0.0`, and rerun.
+- **SvelteKit, SolidStart, Qwik Router, and TanStack Start:** setup detects the framework and writes the server hook or middleware (`src/hooks.server.ts`, `src/middleware.ts`, `src/routes/plugin@nextgen.ts`, or `src/start.ts`) plus the landing, login, register, and profile routes.
+- **React, Vue, Angular, Solid, Svelte, and Qwik:** setup writes the app's root component to a fixed path: `src/App.tsx` (React, Solid), `src/App.vue`, `src/App.svelte`, `src/app.tsx` (Qwik), or `src/app/app.ts` (Angular). If your app has a file there, setup stops with `E_CONFLICT` on it, again before creating anything. It also reads the entry that mounts your root component, the script `index.html` loads or Angular's `src/main.ts`, and stops when that mounts one from another file, such as `src/App.jsx` or Angular 17–19's `src/app/app.component.ts`, because your app would never load setup's. Import the root from the path setup writes in that entry, rerun setup, and move what you need from yours into it.
+- **Other apps,** such as a Next.js Pages Router app, a React app without Vite, or an app on a framework older than setup supports (Next.js 15.2.3, Nuxt 4, SvelteKit 2 with Svelte 5, SolidStart 2, Qwik Router and Qwik 2.0.0-beta.45, TanStack Start 1, React 18, Vue 3.2, Angular 17, Solid 1.6, Svelte 5): setup doesn't support them yet and stops without changing anything. Don't pass `--force` there: where setup detects no framework at all, `--force` makes it scaffold a new app over yours.
+
+If you pass `--framework`, name the one your app uses: when setup detects another, it stops with `E_CONFLICT` instead of treating your app as a directory to scaffold into. The files setup writes under `.zitadel/`, such as the default schema and login flow, are checked before it creates the project too, so a conflict leaves nothing behind.
+
+After an `E_CONFLICT`, the error's hint says what to change. For a file at a path setup writes, move it aside and rerun, or rerun with `--force` to let setup replace it and merge your version back from git. `--force` doesn't help with your root component or request boundary at another path, or with a connection under `.zitadel/idps/`, which setup never replaces.
 
 ## Prove the browser flow
 
@@ -62,6 +91,14 @@ register a user -> log out -> log in with the same user -> profile shows signed 
 
 Do not treat a rendered login form as completion. The useful proof is a full register, logout, and login loop in a real browser.
 
+The user you just registered is an end user of your app. The management console is a separate sign-in, as the local admin. The dev server keeps its terminal busy, so open a second terminal in the same directory:
+
+```sh
+npx @zitadel/cli@alpha console
+```
+
+See [Local runtime commands](/docs/cli/local-runtime) for what that link does and how long it lasts.
+
 ## Customize the login
 
 Setup scaffolded editable copies of your user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/` — each folder has a README explaining what you can change. Edit the files, then preview and publish:
@@ -74,6 +111,8 @@ npx @zitadel/cli@alpha apply
 See [Plan and apply](/docs/cli/plan-apply) for a walkthrough that adds a `company` field to registration.
 
 ## Stop or reset
+
+Run these in the directory `start` ran in. Unlike setup, `stop`, `reset`, `status`, `logs`, and `doctor` look for the local runtime only in the current directory, or in the one `--cwd` names. `stop --all` is the exception: it stops every runtime the CLI started on this machine with the default binary backend, wherever it ran.
 
 Stop local Zitadel while keeping runtime data:
 

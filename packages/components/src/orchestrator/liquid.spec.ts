@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { en as fullLocale } from "./locales/en.js";
+import { builtinLocales } from "./locales/index.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 
@@ -51,7 +52,9 @@ describe("LiquidJS engine", () => {
   it("warns once per missing key, and never for fallback-served or empty keys", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      const engine = createLiquidEngine({ locale: { ...locale, "action.back": "Back" } });
+      const engine = createLiquidEngine({
+        locale: { ...locale, "action.back": "Back", "identifier.description": "Email" },
+      });
       // Raw-key miss: warns on first render only.
       engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
       engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
@@ -62,6 +65,7 @@ describe("LiquidJS engine", () => {
       // Served by the injected-key and field-label fallbacks: no warning.
       engine.parseAndRenderSync("{{ key | t }}", { key: "custom-step.action.back" });
       engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.givenName" });
+      engine.parseAndRenderSync("{{ key | t }}", { key: "identifier.description.sso" });
       // Undefined text_key stringifies to "": no warning.
       engine.parseAndRenderSync("{{ key | t }}", { key: undefined });
       expect(warn).toHaveBeenCalledTimes(1);
@@ -93,6 +97,41 @@ describe("LiquidJS engine", () => {
     const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.action.back" });
     expect(result).toBe("custom.action.back");
   });
+
+  it("the | t filter falls back from a step's SSO description to its plain one", () => {
+    // The engine asks for `<step>.description.sso` once the step offers providers
+    // (flow_state_machine.go buildStep); only some steps need their own wording.
+    const engine = createLiquidEngine({ locale: { ...locale, "identifier.description": "Email" } });
+    const result = engine.parseAndRenderSync("{{ key | t }}", {
+      key: "identifier.description.sso",
+    });
+    expect(result).toBe("Email");
+  });
+
+  it("a step's own SSO description wins over its plain one", () => {
+    const engine = createLiquidEngine({
+      locale: {
+        ...locale,
+        "password.description": "Password",
+        "password.description.sso": "Password or provider",
+      },
+    });
+    const result = engine.parseAndRenderSync("{{ key | t }}", { key: "password.description.sso" });
+    expect(result).toBe("Password or provider");
+  });
+
+  it("an SSO description with no plain one shows the plain key, which is the one to add", () => {
+    const engine = createLiquidEngine({ locale });
+    const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.description.sso" });
+    expect(result).toBe("custom.description");
+  });
+
+  it.each(Object.entries(builtinLocales))(
+    "the builtin %s password step has its own wording when it offers providers",
+    (_lang, dictionary) => {
+      expect(dictionary["password.description.sso"]).not.toBe(dictionary["password.description"]);
+    },
+  );
 
   it("the builtin locales ship the generic action.back", () => {
     expect(fullLocale["action.back"]).toBe("Back");
@@ -439,8 +478,18 @@ describe("LiquidJS engine", () => {
   it("renders an email+password step on one card: autocomplete, forgot link, sign-in CTA", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
-      email: { type: "email", text_key: "identifier.field.email", required: true },
-      password: { type: "password", text_key: "identifier.field.password", required: true },
+      email: {
+        type: "email",
+        text_key: "identifier.field.email",
+        autocomplete: "username",
+        required: true,
+      },
+      password: {
+        type: "password",
+        text_key: "identifier.field.password",
+        autocomplete: "current-password",
+        required: true,
+      },
     });
     const a = toArray({
       submit: { text_key: "submit.signin", primary: true },
@@ -461,7 +510,7 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain('autocomplete="email"');
+    expect(result).toContain('autocomplete="username"');
     expect(result).toContain('autocomplete="current-password"');
     expect(result).toContain('forgot-password-action="recover"');
     expect(result).toContain("forgot-password-href");
@@ -503,8 +552,18 @@ describe("LiquidJS engine", () => {
   it("renders sign-in wrong credentials: inline password error, no form alert", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
-      email: { type: "email", text_key: "identifier.field.email", required: true },
-      password: { type: "password", text_key: "identifier.field.password", required: true },
+      email: {
+        type: "email",
+        text_key: "identifier.field.email",
+        autocomplete: "username",
+        required: true,
+      },
+      password: {
+        type: "password",
+        text_key: "identifier.field.password",
+        autocomplete: "current-password",
+        required: true,
+      },
     });
     const a = toArray({
       submit: { text_key: "submit.signin", primary: true },
@@ -532,8 +591,18 @@ describe("LiquidJS engine", () => {
   it("renders sign-in server error: heading + body alert, fields unchanged", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
-      email: { type: "email", text_key: "identifier.field.email", required: true },
-      password: { type: "password", text_key: "identifier.field.password", required: true },
+      email: {
+        type: "email",
+        text_key: "identifier.field.email",
+        autocomplete: "username",
+        required: true,
+      },
+      password: {
+        type: "password",
+        text_key: "identifier.field.password",
+        autocomplete: "current-password",
+        required: true,
+      },
     });
     const a = toArray({
       submit: { text_key: "submit.signin", primary: true },
@@ -554,7 +623,7 @@ describe("LiquidJS engine", () => {
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain('heading="We couldn&#39;t complete your sign in."');
     expect(result).toContain("Please try again in a few minutes");
-    expect(result).toContain('autocomplete="email"');
+    expect(result).toContain('autocomplete="username"');
     expect(result).toContain('autocomplete="current-password"');
     expect(result).not.toContain("Wrong email or password.");
   });
@@ -562,8 +631,18 @@ describe("LiquidJS engine", () => {
   it("renders sign-up field annotations: autocomplete, help, inline email error", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
-      email: { type: "email", text_key: "register.field.email", required: true },
-      password: { type: "password", text_key: "register.field.password", required: true },
+      email: {
+        type: "email",
+        text_key: "register.field.email",
+        autocomplete: "username",
+        required: true,
+      },
+      password: {
+        type: "password",
+        text_key: "register.field.password",
+        autocomplete: "new-password",
+        required: true,
+      },
       dateOfBirth: { type: "date", text_key: "register.field.dateOfBirth", required: true },
     });
     const a = toArray({
@@ -582,7 +661,7 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain('autocomplete="email"');
+    expect(result).toContain('autocomplete="username"');
     expect(result).toContain('autocomplete="new-password"');
     // Password complexity copy and the YYYY-MM-DD date hint were removed: only
     // minLength is enforced server-side, and native <input type="date"> handles
@@ -625,6 +704,95 @@ describe("LiquidJS engine", () => {
  * `FlowFieldValidationErrors.StepError()` in
  * `internal/domain/flow_field_resolver.go`).
  */
+describe("provider names are server data", () => {
+  // The provider list rides in a single-quoted attribute, and a connection
+  // may legitimately be named `O'Reilly`. The JSON filter does not escape
+  // apostrophes, so what keeps the attribute intact is the engine's
+  // `outputEscape: "escape"` — a single global option. This pins it: flip it
+  // off and the attribute closes early and the list is corrupt.
+  it("escapes an apostrophe in a provider name rather than closing the attribute", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const context = {
+      step: { name: "identifier", type: "identifier", texts: { title_key: "identifier.title" } },
+      fields: [],
+      actions: [],
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [{ id: "oreilly", name: "O'Reilly", template: "oidc" }],
+      messages: [],
+      identity: null,
+    };
+
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+
+    const attribute = /providers='([^']*)'/.exec(result);
+    expect(attribute, "the providers attribute closed early").not.toBeNull();
+    expect(attribute?.[1]).toContain("&#39;");
+    // Decoded, it is still the name the server sent — escaping must not
+    // corrupt the value, only the delimiter hazard.
+    expect(JSON.parse(decodeEntities(attribute?.[1] ?? ""))[0].name).toBe("O'Reilly");
+  });
+});
+
+/** Undo the entity escaping the engine applies, as a browser would. */
+function decodeEntities(value: string): string {
+  return (
+    value
+      .replaceAll("&#34;", '"')
+      .replaceAll("&#39;", "'")
+      .replaceAll("&lt;", "<")
+      .replaceAll("&gt;", ">")
+      // Unescape &amp; last: decoding it first could turn "&amp;lt;" into "<"
+      // by re-interpreting the revealed "&" as the start of another entity.
+      .replaceAll("&amp;", "&")
+  );
+}
+
+describe("provider error renders in the alert", () => {
+  const render = (errors: unknown) => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    return engine.renderFileSync(TEMPLATE_NAMES.default, {
+      step: { name: "identifier", type: "identifier", texts: { title_key: "identifier.title" } },
+      fields: [],
+      actions: [],
+      branding: {},
+      loading: false,
+      errors,
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    });
+  };
+
+  it("shows the provider description and a styled link, escaping both", () => {
+    const out = render([
+      {
+        text_key: "error.sso_cancelled",
+        code: "access_denied",
+        detail: "Cancelled at O'Reilly.",
+        uri: "https://provider.example/e?x=1&y=2",
+      },
+    ]);
+    // Slots on `<zl-alert>`, not markup the templates style themselves: the
+    // atom owns the spacing and the muted colour, so a tenant template gets
+    // both without copying them.
+    expect(out).toContain('slot="detail"');
+    expect(out).toContain("Cancelled at O&#39;Reilly.");
+    expect(out).toContain('slot="link"');
+    // The href is attribute-escaped, not raw browser-blue markup.
+    expect(out).toContain("https://provider.example/e?x=1&amp;y=2");
+  });
+
+  it("renders neither row when the error carries no detail or uri", () => {
+    const out = render([{ text_key: "error.invalid_credentials" }]);
+    expect(out).not.toContain('slot="detail"');
+    expect(out).not.toContain('slot="link"');
+  });
+});
+
 describe("localiseFlowErrorKeys", () => {
   const ctx = { locale: fullLocale, stepName: "register" };
 
@@ -706,11 +874,11 @@ describe("localiseFlowErrorKeys", () => {
   });
 
   it("returns null for anything that is not an error.* key payload", () => {
-    // Outcome tokens stay verbatim with the caller.
-    expect(localiseFlowErrorKeys("user_not_found", ctx)).toBeNull();
+    // Any other payload stays verbatim with the caller.
+    expect(localiseFlowErrorKeys("not_a_key", ctx)).toBeNull();
     expect(localiseFlowErrorKeys("", ctx)).toBeNull();
     // A single non-key segment rejects the whole payload.
-    expect(localiseFlowErrorKeys("error.email_required; user_not_found", ctx)).toBeNull();
+    expect(localiseFlowErrorKeys("error.email_required; not_a_key", ctx)).toBeNull();
   });
 
   it("survives a locale without the generic keys via the hardcoded fallback", () => {

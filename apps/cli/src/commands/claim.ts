@@ -1,17 +1,18 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { Flags } from "@oclif/core";
-import { createZitadelClient } from "@zitadel/api/client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
 
+import { createZitadelClient } from "../lib/api-client";
 import { wrapForBox } from "../lib/box";
 import { openInBrowser } from "../lib/browser";
 import { CLAIM_WINDOW_DAYS, isAttached } from "../lib/claim-state";
 import { ZitadelError } from "../lib/errors";
 import { isObject } from "../lib/json";
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { readZitadelSecret, writeZitadelSecret, type ZitadelSecret } from "../lib/project";
+import { reportWarning } from "../lib/warnings";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -73,6 +74,8 @@ export function claimDeadline(input: {
 export default class Claim extends BaseCommand {
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
+  static override group = CommandGroups.project;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %>",
@@ -123,7 +126,8 @@ export default class Claim extends BaseCommand {
         data: {
           title: "Zitadel claim was not started.",
           project_id: secret.project_id,
-          would: "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
+          would:
+            "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
         },
         nextCommands: ["zitadel claim"],
       });
@@ -134,7 +138,7 @@ export default class Claim extends BaseCommand {
       token: secret.project_secret,
     });
 
-    let challenge;
+    let challenge: Awaited<ReturnType<typeof client.initClaim>>;
     try {
       challenge = await client.initClaim(secret.project_id);
     } catch (error) {
@@ -160,7 +164,7 @@ export default class Claim extends BaseCommand {
     // servers legitimately use a console origin different from the API one,
     // so only a loopback API paired with a non-loopback claim page warns.
     if (isLoopbackUrl(this.meta.source) && !isLoopbackUrl(challenge.claim_url)) {
-      consola.warn(
+      reportWarning(
         `The server at ${this.meta.source} advertised a claim page on ${new URL(challenge.claim_url).origin}. ` +
           "If you started that server yourself, set NEXTGEN_SERVER_PUBLIC_BASE to its reachable origin (e.g. http://localhost:8080).",
       );

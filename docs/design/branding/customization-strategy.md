@@ -224,25 +224,25 @@ own the CLI and structure work; #936 owns the first visual loop.
 
 | Surface | Today | First iteration |
 | --- | --- | --- |
-| Branding settings | Host CSS + proposed branding JSON; no Console appearance loop | Console: logo, colors, typography, theme on working embedded components. Preview, validate, publish, restore |
+| Branding settings | Host CSS, and a branding revision published through the CLI or API. The Console shows the revision in use read-only, beside a live login preview and contrast warnings | Console: edit logo, colors, typography, theme on working embedded components. Preview, validate, publish, restore |
 | Project look | Optional `branding.json` via CLI | Same branding resource. One appearance customization applies project-wide across the journeys #936 lists |
 | Surrounding application | Customer-owned | Still customer-owned. Not edited here |
 | Translations | Built-in dictionaries; optional element `locales` | **Different setting** ([#1038](https://github.com/zitadel/nextgen/issues/1038)). Not this iteration |
 
-### Follow-up — stop setup from applying a template
+### Done — setup no longer applies a template
 
 [#1039](https://github.com/zitadel/nextgen/issues/1039) under #678. Not part of #936 (onboarding is out of scope there).
 
-| Surface | Today | Follow-up |
+| Surface | Before #1039 | Now |
 | --- | --- | --- |
-| `zitadel setup --design` / wizard | Writes `.zitadel/branding/login.liquid` and publishes branding revision 1. Generated auth page is still a bare `<zitadel-login>` | Setup embeds the maintained component only. Writes **no** Liquid, publishes **no** branding revision. Optional look pick, if kept, writes **app files** only |
-| Embedder who wants a left pane | Ejects Liquid and edits marketing copy inside the sanitiser | Edits their application |
+| `zitadel setup --design` / wizard | Wrote `.zitadel/branding/login.liquid` and published branding revision 1. Generated auth page was still a bare `<zitadel-login>` | Setup embeds the maintained component only. Writes **no** Liquid, publishes **no** branding revision. The wizard has no look question; `--design` fails with a hint pointing at app-side theming and `branding eject` |
+| Embedder who wants a left pane | Ejected Liquid and edited marketing copy inside the sanitiser | Edits their application. `branding eject --design split\|split-right\|hero` is refused with the same pointer |
 
 ### Later — widget structure
 
 | Surface | Today | Later |
 | --- | --- | --- |
-| `zitadel branding eject --design` | Catalog of five Liquid files that mix page chrome with the form card | Ejects the **widget template** only — bundled default card. No split/hero in this catalog |
+| `zitadel branding eject --design` | ~~Catalog of five Liquid files that mix page chrome with the form card~~ Done in #1039: `centered` (default card) + `minimal` | Ejects the **widget template** only. No split/hero in this catalog |
 | Shared widget structure (disclaimer) | Same eject path, starting files are page layouts | Opt-in `login.liquid` from the default card. Embedded **and** Zitadel-served |
 
 ### Proposed / unset — Zitadel-served page chrome
@@ -332,7 +332,7 @@ round-trip. Leave the host tokens unset and the project branding applies
 unchanged — which is what Zitadel-served login does, because that page is
 not a customer design system of its own.
 
-The same object, three doors — all compile to `--zl-*`:
+The same object, three doors, all compiling to `--zl-*`. The second and third ship. The first, an `appearance` property on the element, is proposed and the element does not have it; its shape below is a sketch:
 
 ```html
 <zitadel-login
@@ -352,34 +352,40 @@ The same object, three doors — all compile to `--zl-*`:
 zitadel-login {
   --zl-radius-md: 0.75rem;
   --zl-radius-xl: 1.25rem;
-  --zl-color-primary: #4F46E5;
-  --zl-font-family: Inter, ui-sans-serif, sans-serif;
+  --zl-primary: #4F46E5;
+  --zl-font-family-sans: Inter, ui-sans-serif, sans-serif;
 }
 ```
 
 ```json
 {
-  "logo_url": "https://cdn.acme.com/logo.svg",
-  "palette": { "primary": "#4F46E5", "on_primary": "#FFFFFF" },
+  "theme": {
+    "mode": "dark",
+    "dark": {
+      "logo_url": "https://cdn.acme.com/logo.svg",
+      "palette": { "primary": "#4F46E5", "on_primary": "#FFFFFF" }
+    }
+  },
   "shape": { "radius": "lg", "density": "regular" },
-  "typography": { "font_family": "Inter, ui-sans-serif, sans-serif" },
-  "theme": { "mode": "dark" }
+  "typography": { "font_family": "Inter, ui-sans-serif, sans-serif" }
 }
 ```
 
 | Knob | Values | Effect |
 | --- | --- | --- |
-| `palette.primary` / `on_primary` | CSS color | CTA, focus ring |
-| `palette.background` / `surface` / `text` / `border` | CSS color | page vs card |
-| `shape.radius` | `none` \| `sm` \| `md` \| `lg` \| `full` | `--zl-radius-*` scale |
-| `shape.density` | `compact` \| `regular` \| `comfortable` | control height + gaps |
-| `typography.font_family` | CSS stack | type (optional heading/mono) |
+| `theme.<side>.palette.primary` / `on_primary` | CSS color | CTA, focus ring |
+| `theme.<side>.palette.background` / `surface` / `text` / `border` | CSS color | page vs card |
+| `shape.radius` | `none` \| `sm` \| `md` \| `lg` \| `full`, or integer pixels | `--zl-radius-*` scale |
+| `shape.density` | `compact` \| `regular` \| `comfortable` | spacing |
+| `typography.font_family` | CSS stack | one face for body and headings |
 | `theme.mode` | `light` \| `dark` \| `auto` | `data-theme` |
-| `logo_url` | HTTPS URL | mark in the widget header |
-| `chrome` | `card` \| `plain` | card on/off (`minimal` without a template) |
+| `theme.<side>.logo_url` | HTTPS URL | mark in the widget header, per side |
+| `chrome` (proposed, not in the contract) | `card` \| `plain` | card on/off (`minimal` without a template) |
 
-A typed `appearance` property on the element is sugar over this shape, not
-a third vocabulary. `theme`, `variant`, `lang`, `locales`, `purpose` stay
+`<side>` is `light` or `dark`. The contract is [`schema.md`](schema.md).
+
+A typed `appearance` property on the element would be sugar over this shape,
+not a third vocabulary. `theme`, `variant`, `lang`, `locales`, `purpose` stay
 page-local element facts. Host CSS still beats the project object.
 
 ### 3. Widget structure
@@ -442,7 +448,7 @@ out of this table.
 | Category | Customer-embedded | Zitadel-served | Shared source of truth |
 | --- | --- | --- | --- |
 | **Page chrome** | App around the component. Not a Zitadel template. | Unset. First served ship is a polished default. `page.liquid` is a later proposal only. | *None shared.* Different documents. |
-| **Widget appearance** | Branding settings: `appearance` / host CSS / `theme`. Optional `branding.json`. Console in #936. | Same object when that milestone reuses branding. | Branding revision when the look must follow the project. |
+| **Widget appearance** | Host CSS / `theme`, and later `appearance`. Optional `branding.json`. Console in #936. | Same object when that milestone reuses branding. | Branding revision when the look must follow the project. |
 | **Widget structure** | Later: opt-in **widget template** from the bundled default. | Same file / later block editor. | `branding.liquid_template` — both models, strict scope, **later**. |
 | **Translations** | `lang` / `locales` on the element. Copy overlays later (ADR 045). | Same translations setting when it ships. | Locale × key overlay resource; element `locales` remains the embedder override. Not the branding-settings screen. |
 | **Behavior** | `.zitadel/flows/*.json` via plan/apply. | Console flow editor. | Flow definition (release-pinned per [ADR 035](../../adrs/035-configuration-environments.md)). |
@@ -511,9 +517,9 @@ these paths is a prerequisite for the others.
    sit between atoms.
 5. Behaviour stays on the flow definition.
 
-Setup is only step 1. Today's `setup --design` that ejects Liquid and
-publishes branding revision 1 is the behavior a **follow-up issue**
-retires; see
+Setup is only step 1. The former `setup --design`, which ejected Liquid
+and published branding revision 1, was retired by
+[#1039](https://github.com/zitadel/nextgen/issues/1039); see
 [What the shipped designs really are](#what-the-shipped-designs-really-are).
 
 ### Zitadel-served
@@ -540,9 +546,11 @@ flows become release-pinned. This strategy does not change that boundary.
 ## What the shipped designs really are
 
 ADR 040 shipped five named Liquid files under
-`packages/config/defaults/branding/*/login.liquid`. `setup --design` and
-`branding eject --design` copy one of them into `.zitadel/branding/` and
-publish it as branding revision 1. The generated auth page is still just
+`packages/config/defaults/branding/*/login.liquid` (the audit below
+predates #1039, which kept only `centered` and `minimal`). `setup --design`
+copied one of them into `.zitadel/branding/` and published it as branding
+revision 1; `branding eject --design` copies one locally for the next
+`apply` to publish. The generated auth page is still just
 `<zitadel-login>` — the "design" never becomes a wrapper. An audit of
 those files:
 
@@ -596,7 +604,7 @@ milestone and not a product requirement yet.
 | **Page template** | Proposed later Liquid document (`page.liquid`) with a `login_widget` hole for Zitadel-served page chrome. **Unset.** Not a requirement. |
 | **Wrapper** | Embedder application code around the widget. Not a Zitadel template. |
 | **Design** | Retired as the setup noun. Historical Liquid starting points; no longer the path to a look. |
-| **Layout** | Wire degrade enum `centered \| split` for an invalid/missing *template*. Not how you get a split page. |
+| **Layout** | Wire enum `centered \| split` on the branding object. The bundled template does not read it. Not how you get a split page. |
 | **Branding** | Project resource for appearance, optional (later) widget template, assets, and copy. Not page chrome. |
 | **Zitadel-served login** | Zitadel presents the page (`/ui/login/` today). Alias: hosted login. Independent of Cloud vs customer-operated server. |
 
@@ -636,10 +644,10 @@ Matches #678's delivery direction, with #936 as the first visual ticket.
 
 | Stage | What customers can do | Ticket |
 | --- | --- | --- |
-| **Now (shipped)** | `setup --design` still ejects widget Liquid; `/ui/login/` is a `page`-variant shell | Behavior to retire from setup, not the destination |
+| **Now (shipped)** | `/ui/login/` is a `page`-variant shell; `branding eject` offers `centered` + `minimal` only | Setup no longer ejects Liquid; split/hero retired from the catalog ([#1039](https://github.com/zitadel/nextgen/issues/1039)) |
 | **First iteration** | Console **branding settings** (appearance) on working embedded components; preview / publish / restore | [#936](https://github.com/zitadel/nextgen/issues/936) |
 | **Translations setting** | Locale × key copy overlays. Different Console setting from branding | [#1038](https://github.com/zitadel/nextgen/issues/1038) |
-| **Follow-up** | Setup embeds the maintained component only. No Liquid, no branding revision 1. `branding eject` stays opt-in for later structure | [#1039](https://github.com/zitadel/nextgen/issues/1039) |
+| **Follow-up (done)** | Setup embeds the maintained component only. No Liquid, no branding revision 1. `branding eject` stays opt-in and offers widget structure only (`centered`, `minimal`) | [#1039](https://github.com/zitadel/nextgen/issues/1039) |
 | **Later** | Widget structure (`login.liquid`) from the default card; shared with Zitadel-served | New issue under #678 |
 | **Zitadel-served login** | Polished standalone page; branding/content reuse; no advanced page chrome required | #678 follow-up |
 | **Zitadel-served customisation** | Define and deliver served-page customisation | #678 follow-up; `page.liquid` only if that work chooses it |

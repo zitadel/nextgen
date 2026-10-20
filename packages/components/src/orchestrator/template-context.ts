@@ -36,6 +36,14 @@ export type FlowError = {
   text_key?: string;
   message?: string;
   /**
+   * Supplementary free text shown below the localized body — the provider's
+   * own `error_description` on a failed external sign-in, which the catalog
+   * cannot localize because it is the vendor's words, not ours.
+   */
+  detail?: string;
+  /** A link about the error (the provider's `error_uri`), rendered when set. */
+  uri?: string;
+  /**
    * Name of the step field this error targets. When set (and the step renders
    * that field), the template routes the error inline under the control via
    * the `fieldError` filter; when absent it renders in the form-level banner

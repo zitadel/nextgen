@@ -27,11 +27,8 @@ type CreateSchemaByURLInput struct {
 
 type ListSchemasInput struct {
 	ProjectID string
-	// IDs narrows the list to the given schema ids. Empty means no id filter.
-	// Not exposed on the wire: it serves in-process batch resolution, such as
-	// the flow-definition expand hydrator.
-	IDs        []string
-	ObjectType string
+	// ObjectTypes narrows the list to any of the given object types.
+	ObjectTypes []string
 	// Kind is nil when the caller did not filter by one. It is a pointer rather
 	// than a zero value because JSONSchemaKindUnknown is a real stored kind, so
 	// it cannot double as "no filter".
@@ -69,49 +66,16 @@ func NewSchemaService(
 }
 
 func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInput) (_ *domain.JSONSchema, err error) {
-	model, err := domain.NewJSONSchema(input.ProjectID, input.Schema)
+	ctx, end := startSpan(ctx, "SchemaService.CreateSchema")
+	defer end(&err)
+
+	model, err := s.prepareSchema(input)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
-	if err != nil {
-		invalid := domain.ErrJSONSchemaInvalid().WithParent(err)
-		if errors.Is(err, domain.ErrSchemaDesignationInvalid) {
-			// The designation rules are semantic and their text is the only
-			// pointer to which rule fired; Parent is never serialized
-			// (ADR 030), so carry the message to the client.
-			invalid = invalid.WithMessage(err.Error())
-		}
-		return nil, invalid
-	}
-
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		stmts := tx.Statements()
-		if err := stmts.CreateJSONSchema(ctx, model); err != nil {
-			if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
-				// Which of the two unique constraints fired is settled after the
-				// transaction ends, by classifyCreateConflict.
-				return err
-			}
-			return domain.ErrInternal(err).WithMessage("failed to create schema in database")
-		}
-
-		// Pass the just-created payload so Resolve does not re-load (or HTTP-refetch
-		// and re-insert) the same URL inside this transaction — Spanner can surface
-		// the duplicate as a commit-time AlreadyExists otherwise.
-		_, err := s.schemaResolver.Resolve(ctx, stmts, input.ProjectID, model.URL, model.Schema)
-		if err != nil {
-			return resolveSchemaError(err)
-		}
-		return audit.Emit(ctx, stmts, audit.EmitSpec{
-			Type:       domain.EventTypeSchemaCreated,
-			Category:   domain.EventCategoryAdmin,
-			ProjectID:  model.ProjectID,
-			EntityType: "json_schema",
-			EntityID:   model.URL,
-			Payload:    domain.SchemaCreatedPayloadSnapshot(model),
-		})
+		return s.createSchema(ctx, tx.Statements(), model)
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {
@@ -124,6 +88,54 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 	}
 
 	return model, nil
+}
+
+// prepareSchema validates and builds the domain model without writing.
+func (s *SchemaService) prepareSchema(input CreateSchemaInput) (*domain.JSONSchema, error) {
+	model, err := domain.NewJSONSchema(input.ProjectID, input.Schema)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.schemaValidator.ValidateAgainstMetaSchema(input.Schema); err != nil {
+		invalid := domain.ErrJSONSchemaInvalid().WithParent(err)
+		if errors.Is(err, domain.ErrSchemaDesignationInvalid) {
+			// The designation rules are semantic and their text is the only
+			// pointer to which rule fired; Parent is never serialized
+			// (ADR 030), so carry the message to the client.
+			invalid = invalid.WithMessage(err.Error())
+		}
+		return nil, invalid
+	}
+	return model, nil
+}
+
+// createSchema inserts a prepared schema and emits its event on stmts.
+// Callers that open their own transaction (CreateSchema, ReleaseService.Build)
+// share this write path.
+func (s *SchemaService) createSchema(ctx context.Context, stmts AllStatements, model *domain.JSONSchema) error {
+	if err := stmts.CreateJSONSchema(ctx, model); err != nil {
+		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
+			// Which of the two unique constraints fired is settled after the
+			// transaction ends, by classifyCreateConflict.
+			return err
+		}
+		return domain.ErrInternal(err).WithMessage("failed to create schema in database")
+	}
+
+	// Pass the just-created payload so Resolve does not re-load (or HTTP-refetch
+	// and re-insert) the same URL inside this transaction — Spanner can surface
+	// the duplicate as a commit-time AlreadyExists otherwise.
+	if _, err := s.schemaResolver.Resolve(ctx, stmts, model.ProjectID, model.URL, model.Schema); err != nil {
+		return resolveSchemaError(err)
+	}
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeSchemaCreated,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  model.ProjectID,
+		EntityType: "json_schema",
+		EntityID:   model.URL,
+		Payload:    domain.SchemaCreatedPayloadSnapshot(model),
+	})
 }
 
 // classifyCreateConflict tells the two unique constraints on json_schemas apart.
@@ -168,14 +180,13 @@ func resolveSchemaError(err error) error {
 	return de
 }
 
-func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchemaByURLInput) (*domain.JSONSchema, error) {
+func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchemaByURLInput) (_ *domain.JSONSchema, err error) {
+	ctx, end := startSpan(ctx, "SchemaService.CreateSchemaByUrl")
+	defer end(&err)
+
 	strURI := input.URL.String()
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		_, err := s.schemaResolver.Resolve(ctx, tx.Statements(), input.ProjectID, strURI, nil)
-		if err != nil {
-			return resolveSchemaError(err)
-		}
-		return nil
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		return s.createSchemaByURL(ctx, tx.Statements(), input.ProjectID, strURI)
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {
@@ -187,7 +198,127 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 	return s.v2Pool.Statements().GetJSONSchemaByID(ctx, input.ProjectID, strURI)
 }
 
-func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
+// createSchemaByURL resolves and stores a schema-url entry on stmts.
+func (s *SchemaService) createSchemaByURL(ctx context.Context, stmts AllStatements, projectID, schemaURL string) error {
+	_, err := s.schemaResolver.Resolve(ctx, stmts, projectID, schemaURL, nil)
+	if err != nil {
+		return resolveSchemaError(err)
+	}
+	return nil
+}
+
+// resolveOrCreateSchema reuses any existing revision of objectType whose
+// document matches (ignoring $id; preferring the newest match), otherwise
+// inserts the prepared model. When schemaURL is set, the project's copy of
+// that URL is reused or fetched.
+func (s *SchemaService) resolveOrCreateSchema(
+	ctx context.Context,
+	stmts AllStatements,
+	projectID string,
+	document []byte,
+	prepared *domain.JSONSchema,
+	schemaURL string,
+) (*domain.JSONSchema, error) {
+	if schemaURL != "" {
+		return s.resolveOrCreateSchemaURL(ctx, stmts, projectID, schemaURL)
+	}
+
+	handle := ""
+	if prepared.ObjectType != nil {
+		handle = *prepared.ObjectType
+	}
+	match, err := matchingSchemaByObjectType(ctx, stmts, projectID, handle, document)
+	if err != nil {
+		return nil, err
+	}
+	if match != nil {
+		return match, nil
+	}
+	if err := s.createSchema(ctx, stmts, prepared); err != nil {
+		return nil, err
+	}
+	return prepared, nil
+}
+
+func (s *SchemaService) resolveOrCreateSchemaURL(
+	ctx context.Context,
+	stmts AllStatements,
+	projectID, schemaURL string,
+) (*domain.JSONSchema, error) {
+	existing, err := stmts.GetJSONSchemaByID(ctx, projectID, schemaURL)
+	if err == nil {
+		return existing, nil
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+		return nil, domain.ErrInternal(err).WithMessage("failed to look up schema by url")
+	}
+	if err := s.createSchemaByURL(ctx, stmts, projectID, schemaURL); err != nil {
+		return nil, err
+	}
+	return stmts.GetJSONSchemaByID(ctx, projectID, schemaURL)
+}
+
+// matchingSchemaByObjectType returns the newest revision of objectType whose
+// document equals want (ignoring $id), or nil when none match.
+func matchingSchemaByObjectType(ctx context.Context, stmts AllStatements, projectID, objectType string, want []byte) (*domain.JSONSchema, error) {
+	if objectType == "" {
+		return nil, nil
+	}
+	result, err := stmts.ListJSONSchemas(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.JSONSchemaField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
+			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
+		),
+		Pagination: database.Page[domain.JSONSchemaField]{
+			Limit: maxHistoricalRevisions,
+			OrderBy: database.OrderBy[domain.JSONSchemaField]{
+				Columns: []database.Column[domain.JSONSchemaField]{
+					database.Col(domain.JSONSchemaFieldCreatedAt),
+					database.Col(domain.JSONSchemaFieldURL),
+				},
+				Direction: database.OrderDesc,
+			},
+		},
+	}, JSONSchemaQueryOptions{})
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list schemas")
+	}
+	for _, item := range result.Items {
+		same, eqErr := domain.JSONEqual(want, item.Schema, "$id")
+		if eqErr != nil {
+			return nil, domain.ErrInternal(eqErr).WithMessage("failed to compare schema documents")
+		}
+		if same {
+			return item, nil
+		}
+	}
+	return nil, nil
+}
+
+func latestSchemaByObjectType(ctx context.Context, stmts AllStatements, projectID, objectType string) (*domain.JSONSchema, error) {
+	if objectType == "" {
+		return nil, nil
+	}
+	result, err := stmts.ListJSONSchemas(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.JSONSchemaField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
+			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
+		),
+		Pagination: database.Page[domain.JSONSchemaField]{Limit: 1},
+	}, JSONSchemaQueryOptions{LatestRevisionPerObjectType: true})
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list schemas")
+	}
+	if len(result.Items) == 0 {
+		return nil, nil
+	}
+	return result.Items[0], nil
+}
+
+func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (_ *domain.JSONSchema, err error) {
+	ctx, end := startSpan(ctx, "SchemaService.GetSchema")
+	defer end(&err)
+
 	schema, err := s.v2Pool.Statements().GetJSONSchemaByID(ctx, projectID, schemaID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -198,24 +329,19 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 	return schema, nil
 }
 
-func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput) (*ListSchemasOutput, error) {
+func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput) (_ *ListSchemasOutput, err error) {
+	ctx, end := startSpan(ctx, "SchemaService.ListSchemas")
+	defer end(&err)
+
 	filters := []database.Filter[domain.JSONSchemaField]{
 		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), input.ProjectID),
 	}
-	// The ids are ORed with each other and ANDed with everything else, so they
-	// narrow the caller's already-authorized rows rather than reaching outside
-	// them: an id from another project matches nothing, like an unknown one.
-	if len(input.IDs) > 0 {
-		ids := make([]database.Filter[domain.JSONSchemaField], len(input.IDs))
-		for i, id := range input.IDs {
-			ids[i] = database.Equal(database.Col(domain.JSONSchemaFieldURL), id)
+	if len(input.ObjectTypes) > 0 {
+		objectTypes := make([]database.Filter[domain.JSONSchemaField], len(input.ObjectTypes))
+		for i, objectType := range input.ObjectTypes {
+			objectTypes[i] = database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType)
 		}
-		filters = append(filters, database.Or(ids...))
-	}
-	if input.ObjectType != "" {
-		filters = append(filters,
-			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), input.ObjectType),
-		)
+		filters = append(filters, database.Or(objectTypes...))
 	}
 	// Schemas persisted without their document being parsed — ingested by URL,
 	// or a $ref target pulled in during resolution (#812) — are stored as

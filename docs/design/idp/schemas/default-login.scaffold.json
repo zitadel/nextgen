@@ -2,7 +2,7 @@
   "$schema": "../meta/flow-definition.json",
   "name": "default-login",
   "status": "active",
-  "user_schema": "${USER_SCHEMA_URL}",
+  "user_schema": "human-user",
   "purposes": {
     "login": "identifier",
     "register": "register"
@@ -41,13 +41,13 @@
           "target": "register",
           "purpose": "register"
         },
-        "callback": {
+        "sso_authenticated": {
           "target": "done"
         },
         "user_already_exists": {
           "target": "sso-conflict"
         },
-        "identity_unknown": {
+        "sso_user_not_found": {
           "target": "register-sso"
         }
       }
@@ -65,9 +65,21 @@
           "text_key": "password.action.signin"
         }
       ],
+      "sso_providers": [
+        "google"
+      ],
       "transitions": {
         "submit": {
           "target": "done"
+        },
+        "sso_authenticated": {
+          "target": "done"
+        },
+        "user_already_exists": {
+          "target": "sso-conflict"
+        },
+        "sso_user_not_found": {
+          "target": "register-sso"
         }
       }
     },
@@ -101,13 +113,13 @@
           "target": "identifier",
           "purpose": "login"
         },
-        "callback": {
+        "sso_authenticated": {
           "target": "done"
         },
         "user_already_exists": {
           "target": "sso-conflict"
         },
-        "identity_unknown": {
+        "sso_user_not_found": {
           "target": "register-sso"
         }
       }
@@ -193,7 +205,7 @@
         "passkey": {
           "target": "done"
         },
-        "callback": {
+        "sso_authenticated": {
           "target": "done"
         },
         "user_already_exists": {
@@ -203,7 +215,7 @@
           "target": "identifier",
           "purpose": "login"
         },
-        "identity_unknown": {
+        "sso_user_not_found": {
           "target": "register-sso"
         }
       }

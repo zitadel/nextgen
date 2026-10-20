@@ -159,11 +159,11 @@ type fakeProjectService struct {
 
 var _ service.ProjectService = (*fakeProjectService)(nil)
 
-func (f *fakeProjectService) Create(context.Context, string, []string, bool) (*domain.Project, error) {
+func (f *fakeProjectService) Create(context.Context, string, []domain.Origin, bool) (*domain.Project, error) {
 	panic("unused")
 }
 
-func (f *fakeProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
+func (f *fakeProjectService) CreateWithID(context.Context, string, string, []domain.Origin, bool) (*domain.Project, error) {
 	panic("unused")
 }
 
@@ -171,7 +171,7 @@ func (f *fakeProjectService) Get(context.Context, string) (*domain.Project, erro
 	panic("unused")
 }
 
-func (f *fakeProjectService) Update(context.Context, string, string) (*domain.Project, error) {
+func (f *fakeProjectService) Update(context.Context, service.UpdateProjectRequest) (*domain.Project, error) {
 	panic("unused")
 }
 
@@ -179,7 +179,19 @@ func (f *fakeProjectService) List(context.Context, service.ListProjectsRequest) 
 	panic("unused")
 }
 
+func (f *fakeProjectService) ListAuthorized(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
+	panic("unused")
+}
+
 func (f *fakeProjectService) Delete(context.Context, string) error {
+	panic("unused")
+}
+
+func (f *fakeProjectService) AddOrigin(context.Context, string, domain.Origin) (*domain.Origin, error) {
+	panic("unused")
+}
+
+func (f *fakeProjectService) RemoveOrigin(context.Context, string, string) error {
 	panic("unused")
 }
 

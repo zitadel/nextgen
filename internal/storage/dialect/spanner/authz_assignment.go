@@ -70,6 +70,14 @@ WHERE project_id = @p1 AND object_type = 'project' AND relation = 'team'
 ORDER BY created_at, id
 LIMIT 1`
 
+	hasActiveOwningTeamGrantStmt = `
+SELECT EXISTS (
+    SELECT 1 FROM authz_assignments
+    WHERE principal_type = 'team' AND principal_id = @p1
+      AND object_type = 'project' AND relation = 'team'
+      AND revoked_at IS NULL
+)`
+
 	listClaimedProjectIDsStmt = `
 SELECT DISTINCT project_id FROM authz_assignments
 WHERE object_type = 'project' AND relation = 'team' AND revoked_at IS NULL
@@ -146,25 +154,23 @@ func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projec
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, listManagedGrantsQuery, filter, authz.AuthzAssignmentSchema, "", "", authz.ManagedGrantListConjunct); err != nil {
-		return nil, err
-	}
-	var assignments []*domain.AuthzAssignment
-	err = s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var qErr error
-		assignments, qErr = collectRows(iter, scanAuthzAssignment)
-		return qErr
+	assignments, nextCursor, err := pagination.Page(filter.Pagination, authz.AuthzAssignmentSchema, func(limit uint32) ([]*domain.AuthzAssignment, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, listManagedGrantsQuery, filter, authz.AuthzAssignmentSchema, "", "", authz.ManagedGrantListConjunct); err != nil {
+			return nil, err
+		}
+		var assignments []*domain.AuthzAssignment
+		err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var qErr error
+			assignments, qErr = collectRows(iter, scanAuthzAssignment)
+			return qErr
+		})
+		return assignments, err
 	})
 	if err != nil {
 		return nil, err
 	}
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		assignments,
-		authz.AuthzAssignmentSchema,
-		filter.Pagination.Limit,
-	)
 	return &database.ListResult[*domain.AuthzAssignment]{
 		Items:      assignments,
 		NextCursor: nextCursor,
@@ -213,6 +219,24 @@ func (s authzAssignmentStatements) GetActiveOwningTeamGrant(ctx context.Context,
 	return assignment, nil
 }
 
+// HasActiveOwningTeamGrant implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) HasActiveOwningTeamGrant(ctx context.Context, teamID string) (bool, error) {
+	var owns bool
+	err := s.db.Query(ctx, buildStatement(hasActiveOwningTeamGrantStmt, teamID).statement(),
+		func(iter *spanner.RowIterator) error {
+			var qErr error
+			owns, qErr = collectOneRow(iter, func(row *spanner.Row) (bool, error) {
+				var found bool
+				return found, row.Columns(&found)
+			})
+			return qErr
+		})
+	if err != nil {
+		return false, wrapError(err)
+	}
+	return owns, nil
+}
+
 // ListClaimedProjectIDs implements [service.AuthzAssignmentStatements].
 func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
 	if limit == 0 {
@@ -234,6 +258,50 @@ func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, af
 		return nil, err
 	}
 	return ids, nil
+}
+
+// ListAuthorizedProjects implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+	projects, nextCursor, err := pagination.Page(page, projectSchema, func(limit uint32) ([]*domain.Project, error) {
+		page := page
+		page.Limit = limit
+		var compiler statementCompiler
+		compiler.WriteString(projectQuery)
+		compiler.WriteString(" WHERE id IN (")
+		authz.WriteAuthorizedProjectIDs(&compiler, spannerAuthzEnv(), homeProjectID, userID)
+		compiler.WriteString(")")
+		keyset, err := cursorFilter(page, projectSchema)
+		if err != nil {
+			return nil, err
+		}
+		if keyset != nil {
+			compiler.WriteString(" AND ")
+			compileFilter(&compiler, keyset, projectSchema)
+		}
+		compileOrderBy(&compiler, page.OrderBy, projectSchema)
+		compileLimit(&compiler, page.Limit)
+
+		scan := newProjectStatements(s.db).scanProject
+		var projects []*domain.Project
+		if err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var qErr error
+			projects, qErr = collectRows(iter, scan)
+			return qErr
+		}); err != nil {
+			return nil, err
+		}
+		return projects, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := newProjectStatements(s.db).hydrateOrigins(ctx, projects...); err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.Project]{
+		Items:      projects,
+		NextCursor: nextCursor,
+	}, nil
 }
 
 // activeUniqueKey is Spanner's stand-in for Postgres's partial unique index on

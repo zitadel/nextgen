@@ -13,6 +13,10 @@
 > **Amends if accepted:** [ADR 046 §4](046-claim-lifecycle-v2.md#4-the-personal-team-is-created-at-registration-not-at-claim)
 > so claim selects an explicitly authorized target team instead of always
 > reusing the claimer's personal team.
+>
+> **Amended 2026-09-21** (§8): deactivating a team that still holds an active
+> owning-team assignment is rejected until ownerless-team recovery exists
+> (zitadel/nextgen#1261).
 
 ## Context
 
@@ -154,14 +158,17 @@ The hierarchy direction is normative:
 admin -> editor -> viewer
 ```
 
-Viewer never implies editor or administrator. The current MVP seed closes in
-the opposite direction and assigns project secrets to `project.viewer` so that
-placeholder closure satisfies administrator checks.
+Viewer never implies editor or administrator. The checked-in PostgreSQL,
+SQLite, and Spanner seed migrations close in this direction, and a project
+secret receives `project.admin`. Earlier MVP seeds closed the opposite way and
+assigned project secrets to `project.viewer`; because this software is still
+alpha, those seeds were corrected in place. No compatibility migration or
+assignment backfill is provided, so a database seeded before the correction
+needs a fresh instance.
 
-This software is still alpha. Correct the checked-in PostgreSQL, SQLite, and
-Spanner seed migrations, constructors, and tests together: a project secret
-receives `project.admin`, and `admin` satisfies `editor` and `viewer`. No
-compatibility migration or assignment backfill is provided.
+Creating a grant is an administrator check. A grant can carry any role up to
+`admin`, so an editor that could mint one could escalate itself, for example
+by granting `admin` to a team it belongs to.
 
 That closure applies to a customer project's own `sk_proj_` secret. The
 reserved platform project mints no secret by default, and platform-homed
@@ -217,11 +224,14 @@ An agency or consultancy uses its own platform-project team as the principal on
 customer-issued grants. A user may belong to several customer or agency access
 teams. Team IDs are stable addressing identifiers.
 
-For v1, the customer-facing collaboration API accepts either a user ID or team
-ID from the platform project. It validates that the supplied principal exists
-and is active without exposing a global directory. Direct grants are useful for
-one-off access; access teams are preferred when several people share the same
-project set or when one membership removal should revoke several derived roles.
+For v1, the customer-facing collaboration API accepts an id **or** a unique
+locator from the platform project: `user_id` / `identifier` for a user, and
+`team_id` / `name` for a team. It resolves that locator to a stored principal
+and validates that the principal exists and is active, without exposing a
+global directory. Storage and `authz.granted` / `authz.revoked` events stay
+`(principal_type, principal_id)`. Direct grants are useful for one-off access;
+access teams are preferred when several people share the same project set or
+when one membership removal should revoke several derived roles.
 
 Both primitives are model commitments from day one: the row shape is identical,
 and the testing obligations cover the direct and team-derived paths regardless
@@ -306,9 +316,9 @@ Put plainly, the assignment says **who has which project role**; the event says
 **who changed that assignment**.
 
 Customer-issued grants need no agency-side request flow in v1. The customer
-names the target user or team ID and remains responsible for granting and
-revoking access. Invitations, approval handshakes, and a discoverable agency
-directory are later product surfaces.
+names the target user or team (by id or unique locator) and remains
+responsible for granting and revoking access. Invitations, approval
+handshakes, and a discoverable agency directory are later product surfaces.
 
 ### 7. Project creation and claim name the target team
 
@@ -354,9 +364,9 @@ owner is **not** rejected: identity-level security actions take effect
 immediately and outrank §1's owner-retention invariant. The team is then left
 without an active owner, and its owned projects show the derived `needs_owner`
 condition below; rejection remains the rule only for ordinary owner removal.
-Deactivating an owning team leaves its projects in the same derived
-`needs_owner` condition for management purposes; this is not a new persisted
-project status. It does not delete projects or create a new owner implicitly.
+Deactivating an owning team is a separate case, amended at the end of this
+section (2026-09-21): while the team still holds an active owning-team
+assignment, the deactivation is rejected.
 
 **Recovery from `needs_owner` is authorized, not deferred.** Ordinarily only an
 active owner may issue `team.owner`, so a team with none would otherwise be
@@ -388,6 +398,21 @@ assignments on the project by default. A later API may accept an explicit retain
 list, but silent retention is unsafe. Project-secret rotation remains governed
 separately; this ADR does not claim that replacing the owner invalidates already
 issued service credentials.
+
+### Amendment (2026-09-21): owning teams cannot be deactivated yet
+
+Until the ownerless-team recovery described above is implemented (tracked in
+zitadel/nextgen#1261), deactivating a team that holds an active owning-team
+assignment is rejected with `team.owns_project`. Ownership must be transferred
+or revoked first. In the API this is `DELETE /teams/{id}`: deletion and
+deactivation are the same operation, the team is tombstoned, not erased.
+
+The derived `needs_owner` condition therefore currently arises only from
+suspending or deactivating the final owner user, which stays allowed.
+zitadel/nextgen#1261 decides whether the rejection is kept once recovery
+exists: team deactivation is an administrative action, not an identity-level
+security action, so keeping it is consistent with the ordinary-owner-removal
+rule above.
 
 ### 9. Project listing returns effective access and its source
 

@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, sep } from "node:path";
 
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { consola } from "consola";
 
 import { ZitadelError } from "../errors";
@@ -9,9 +10,17 @@ import { FLOWS_DIR } from "../flows";
 import { stableStringify } from "../json";
 import { annotateAssetWarnings } from "./asset-probe.js";
 import { validatePlannedFlows } from "./flow-validation.js";
-import type { PlanResourceChange } from "./plan-renderer.js";
-import { readState, removeFromState, updateState } from "./state.js";
+import { validatePlannedSso } from "./sso-validation.js";
+import {
+  isUnsupportedDeletion,
+  type PlanResourceChange,
+  unsupportedDeletionNote,
+  type UnsupportedDeletion,
+} from "./plan-renderer.js";
+import { moveInState, readState, removeFromState, updateState } from "./state.js";
+import { FatalFetchError } from "./types.js";
 import type { FlowRepin, ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
+import { reportWarning } from "../warnings";
 
 /**
  * Compute the sync plan for `cwd` against the state file and (when
@@ -92,8 +101,8 @@ export async function buildSyncPlan(
       }
     }
 
-    for (const content of onDisk.values()) {
-      syncer.validate(content);
+    for (const [absPath, content] of onDisk.entries()) {
+      syncer.validate(content, toStatePath(absPath, cwd));
     }
 
     for (const [filePath, entry] of Object.entries(state.resources)) {
@@ -104,11 +113,25 @@ export async function buildSyncPlan(
         continue;
       }
 
+      if (syncer.deletion === "unsupported") {
+        actions.push({
+          kind: "skip",
+          path: filePath,
+          reason: "unsupported-deletion",
+          syncer,
+          id: entry.id,
+        });
+        continue;
+      }
+
       let oldContent: object | null = null;
       if (fetchOld && syncer.fetch) {
         try {
           oldContent = await syncer.fetch(entry.id);
         } catch (err) {
+          if (err instanceof FatalFetchError) {
+            throw err.reason;
+          }
           consola.debug(`fetch ${syncer.kind} ${entry.id} failed:`, err);
         }
       }
@@ -116,7 +139,7 @@ export async function buildSyncPlan(
     }
 
     for (const [absPath, content] of onDisk.entries()) {
-      const relPath = absPath.slice(cwd.length + 1);
+      const relPath = toStatePath(absPath, cwd);
       scannedContents.set(relPath, content);
       const entry = state.resources[relPath];
       const hash = hashForState(syncer, content);
@@ -216,6 +239,41 @@ export async function buildSyncPlan(
   // server would otherwise enforce mid-apply, after the schema revision
   // already published. Throws E_VALIDATION before any mutation.
   validatePlannedFlows({ actions, scannedContents, stateResources: state.resources });
+  // The rules that read schemas, flows and connections together.
+  await validatePlannedSso({
+    actions,
+    scannedContents,
+    stateResources: state.resources,
+    slugOfKept: async (kept) => {
+      const stored = await readStored(kept.syncer, kept.id);
+      return stored === null ? undefined : kept.syncer.identityOf?.(stored);
+    },
+  });
+
+  // What only the platform can answer, for every file this plan writes. After
+  // the local checks, so a mistake that needs no request is never hidden behind one.
+  for (const action of [...actions]) {
+    if ((action.kind === "create" || action.kind === "update") && action.syncer.preflight) {
+      const old = action.kind === "update" ? await storedBody(action) : null;
+      const existing = await action.syncer.preflight(action.path, action.content, old);
+      if (action.kind === "create" && existing !== undefined) {
+        // The platform already holds this resource, and a removed file the plan
+        // declines to delete is where it used to live: that is a move, not a new
+        // resource, and the removal is no longer a loose end.
+        const declined = actions.find(
+          (other): other is UnsupportedDeletion =>
+            isUnsupportedDeletion(other) &&
+            other.syncer === action.syncer &&
+            other.id === existing.id,
+        );
+        if (declined !== undefined) {
+          action.movedFrom = declined.path;
+          action.oldContent = existing.definition;
+          actions.splice(actions.indexOf(declined), 1);
+        }
+      }
+    }
+  }
 
   // Reachability pre-flight for branding asset URLs. Annotates warnings only:
   // the machine planning is not necessarily the machine rendering the login
@@ -240,6 +298,8 @@ export type SyncLoopResult = {
    * deleted). Feeds the `apply` `--json` `changes` array.
    */
   applied: PlanResourceChange[];
+  /** Removed files whose resource was kept, because it cannot be deleted yet. */
+  unsupported: string[];
 };
 
 /**
@@ -265,7 +325,7 @@ export async function runSyncLoop(
   for (const action of actions) {
     if (action.kind === "create" || action.kind === "update" || action.kind === "revise") {
       for (const warning of action.warnings ?? []) {
-        consola.warn(`${action.path}: ${warning.message}`);
+        reportWarning(`${action.path}: ${warning.message}`);
       }
     }
   }
@@ -328,11 +388,28 @@ export async function runSyncLoop(
         const { id, canonical } = await action.syncer.create(content);
         const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
         const entry: ResourceEntry = { id, hash: await writeBack(action, canonical, fallbackHash) };
-        await updateState(cwd, action.path, entry);
-        consola.info(
-          `Created a new ${action.syncer.kind} on Zitadel from ${action.path} (id ${id})`,
-        );
-        applied.push({ kind: action.syncer.kind, action: "create", file: action.path, id });
+        if (action.movedFrom === undefined) {
+          await updateState(cwd, action.path, entry);
+        } else {
+          await moveInState(cwd, action.movedFrom, action.path, entry);
+        }
+        if (action.movedFrom === undefined) {
+          consola.info(
+            `Created a new ${action.syncer.kind} on Zitadel from ${action.path} (id ${id})`,
+          );
+          applied.push({ kind: action.syncer.kind, action: "create", file: action.path, id });
+        } else {
+          consola.info(
+            `Moved the ${action.syncer.kind} from ${action.movedFrom} to ${action.path} (id ${id})`,
+          );
+          applied.push({
+            kind: action.syncer.kind,
+            action: "move",
+            file: action.path,
+            id,
+            moved_from: action.movedFrom,
+          });
+        }
         break;
       }
       case "revise": {
@@ -377,13 +454,24 @@ export async function runSyncLoop(
           newId && action.repin
             ? await adoptRepin(action.path, action.content, action.repin, newId)
             : action.content;
-        const { canonical } = await action.syncer.update(action.id, content);
+        const { id: landedOn, canonical } = await action.syncer.update(action.id, content);
         const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
+        // The id the write reported, not the one it was given: a write
+        // addressed by document content can land on a different resource than
+        // the tracked one, and state has to follow it or the next plan reads
+        // the resource the file no longer describes.
+        const trackedId = landedOn ?? action.id;
         await updateState(cwd, action.path, {
+          id: trackedId,
           hash: await writeBack(action, canonical, fallbackHash),
         });
         consola.info(`Updated the ${action.syncer.kind} on Zitadel from ${action.path}`);
-        applied.push({ kind: action.syncer.kind, action: "update", file: action.path, id: action.id });
+        applied.push({
+          kind: action.syncer.kind,
+          action: "update",
+          file: action.path,
+          id: trackedId,
+        });
         break;
       }
       case "delete": {
@@ -392,10 +480,18 @@ export async function runSyncLoop(
         consola.info(
           `Deleted the ${action.syncer.kind} on Zitadel because ${action.path} was removed locally`,
         );
-        applied.push({ kind: action.syncer.kind, action: "delete", file: action.path, id: action.id });
+        applied.push({
+          kind: action.syncer.kind,
+          action: "delete",
+          file: action.path,
+          id: action.id,
+        });
         break;
       }
       case "skip": {
+        if (isUnsupportedDeletion(action)) {
+          reportWarning(unsupportedDeletionNote(action));
+        }
         consola.debug(`Skipped ${action.path} (${action.reason})`);
         break;
       }
@@ -413,7 +509,11 @@ export async function runSyncLoop(
     }
   }
 
-  return { filesUpdated: [...new Set(filesUpdated)], applied };
+  return {
+    filesUpdated: [...new Set(filesUpdated)],
+    applied,
+    unsupported: actions.filter(isUnsupportedDeletion).map((action) => action.path),
+  };
 }
 
 /**
@@ -472,11 +572,11 @@ function escapeRegExp(value: string): string {
 /**
  * Reconcile a local file with the server's canonical body. What gets
  * written is the `normalizeWrite` form (strips pure transport noise like
- * the empty `audience` echo; for schemas the canonical body verbatim —
- * spelled-out x-* defaults must survive, or the next apply would publish
- * a revision without them). Equality is judged in the `normalize`
- * comparison form, so the file is rewritten only when it materially
- * differs from live state; hand-formatted files stay untouched otherwise.
+ * the empty `audience` echo; for schemas the canonical body as returned,
+ * with the `x-audit` defaults the server spells out on every property).
+ * Equality is judged in the `normalize` comparison form, so the file is
+ * rewritten only when it materially differs from live state;
+ * hand-formatted files stay untouched otherwise.
  * Returns the state hash of the written form.
  */
 export async function writeBackResource(
@@ -508,6 +608,40 @@ export async function writeBackResource(
   return { hash: hashForState(syncer, writeBody), changed };
 }
 
+/**
+ * The stored body an update is checked against. Unlike a plan's diff, a check
+ * cannot proceed on a body it failed to read, so a failure stops the run; only
+ * a resource gone from the platform reads as nothing stored.
+ */
+async function storedBody(action: Extract<SyncAction, { kind: "update" }>): Promise<object | null> {
+  return action.oldContent ?? (await readStored(action.syncer, action.id));
+}
+
+/**
+ * The project-relative path a file is tracked under: always forward slashes,
+ * which is how state is written, whatever separator the platform uses.
+ */
+export function toStatePath(absolute: string, root: string, separator: string = sep): string {
+  return absolute
+    .slice(root.length + 1)
+    .split(separator)
+    .join("/");
+}
+
+async function readStored(syncer: ResourceSyncer, id: string): Promise<object | null> {
+  try {
+    return (await syncer.fetch?.(id)) ?? null;
+  } catch (err) {
+    if (err instanceof FatalFetchError) {
+      throw err.reason;
+    }
+    if (err instanceof ApiError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
+}
+
 async function fetchOldIfAsked(
   syncer: ResourceSyncer,
   id: string,
@@ -519,6 +653,15 @@ async function fetchOldIfAsked(
   try {
     return await syncer.fetch(id);
   } catch (err) {
+    // A syncer that refused on purpose is not a fetch that merely failed.
+    if (err instanceof FatalFetchError) {
+      throw err.reason;
+    }
+    // Nor is one the developer cancelled with Ctrl-C: previewing offline
+    // instead would carry on after being told to stop.
+    if (err instanceof ZitadelError && err.code === "E_CANCELLED") {
+      throw err;
+    }
     consola.debug(`fetch ${syncer.kind} ${id} failed:`, err);
     return null;
   }
@@ -549,11 +692,14 @@ async function readJsonDir(dirPath: string): Promise<Map<string, object>> {
  * with a non-string one) is skipped: it does not pin a schema revision, so it
  * cannot be affected by one.
  */
-async function readLocalFlowUserSchemas(cwd: string): Promise<Map<string, string>> {
+export async function readLocalFlowUserSchemas(
+  cwd: string,
+  separator: string = sep,
+): Promise<Map<string, string>> {
   const result = new Map<string, string>();
   const flows = await readJsonDir(join(cwd, FLOWS_DIR));
   for (const [absPath, content] of flows.entries()) {
-    const relPath = absPath.slice(cwd.length + 1);
+    const relPath = toStatePath(absPath, cwd, separator);
     if (
       typeof content === "object" &&
       content !== null &&
@@ -594,10 +740,7 @@ export function hashResourceContent(data: object): string {
  * reordering keys or spelling out a meta-schema default does not read as an
  * edit.
  */
-export function hashForState(
-  syncer: Pick<ResourceSyncer, "normalize">,
-  data: object,
-): string {
+export function hashForState(syncer: Pick<ResourceSyncer, "normalize">, data: object): string {
   const normalized = syncer.normalize?.(data) ?? data;
   return createHash("sha256").update(stableStringify(normalized)).digest("hex");
 }

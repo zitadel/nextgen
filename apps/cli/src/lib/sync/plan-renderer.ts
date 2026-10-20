@@ -1,12 +1,8 @@
 import { createHash } from "node:crypto";
 
+import { escapeControlCharacters } from "../api-client";
 import { stableStringify } from "../json";
-import type {
-  ResourceSyncer,
-  SyncAction,
-  SyncActionWarning,
-  SyncPlanSummary,
-} from "./types.js";
+import type { ResourceSyncer, SyncAction, SyncActionWarning, SyncPlanSummary } from "./types.js";
 
 /**
  * Count the non-`skip` actions in a {@link buildSyncPlan} result. Pure; the
@@ -15,13 +11,35 @@ import type {
  */
 export function summarizePlan(actions: ReadonlyArray<SyncAction>): SyncPlanSummary {
   const active = actions.filter((a) => a.kind !== "skip");
+  const moved = (a: SyncAction) => a.kind === "create" && a.movedFrom !== undefined;
   return {
-    creates: active.filter((a) => a.kind === "create").length,
+    creates: active.filter((a) => a.kind === "create" && !moved(a)).length,
     updates: active.filter((a) => a.kind === "update").length,
     revisions: active.filter((a) => a.kind === "revise").length,
     deletes: active.filter((a) => a.kind === "delete").length,
+    moves: active.filter(moved).length,
+    unsupported_deletions: actions.filter(isUnsupportedDeletion).length,
     total: active.length,
   };
+}
+
+/** A removed file whose resource the platform cannot delete yet; planned as a skip. */
+export type UnsupportedDeletion = Extract<
+  SyncAction,
+  { kind: "skip"; reason: "unsupported-deletion" }
+>;
+
+/** Whether an action is a removed file that will be kept on the platform. */
+export function isUnsupportedDeletion(action: SyncAction): action is UnsupportedDeletion {
+  return action.kind === "skip" && action.reason === "unsupported-deletion";
+}
+
+/** What to tell the developer about one removed file, in a plan and in an apply. */
+export function unsupportedDeletionNote(action: UnsupportedDeletion): string {
+  return (
+    `${action.path} was removed, but deleting ${action.syncer.kind} resources is not supported yet (#1013), ` +
+    `so nothing was deleted on the platform. Restore the file if you did not mean to remove it.`
+  );
 }
 
 /**
@@ -36,6 +54,13 @@ export function collectPlanWarnings(
   for (const action of actions) {
     for (const warning of warningsOf(action)) {
       out.push({ path: action.path, rule: warning.rule, message: warning.message });
+    }
+    if (isUnsupportedDeletion(action)) {
+      out.push({
+        path: action.path,
+        rule: "unsupported-deletion",
+        message: unsupportedDeletionNote(action),
+      });
     }
   }
   return out;
@@ -61,10 +86,12 @@ function warningsOf(action: SyncAction): ReadonlyArray<SyncActionWarning> {
  */
 export type PlanResourceChange = {
   kind: ResourceSyncer["kind"];
-  action: "create" | "update" | "revision" | "delete";
+  action: "create" | "update" | "revision" | "delete" | "move";
   file: string;
   id?: string;
   previous_id?: string;
+  /** For a move: the removed file the resource used to be in. */
+  moved_from?: string;
 };
 
 /**
@@ -72,14 +99,21 @@ export type PlanResourceChange = {
  * envelope-ready {@link PlanResourceChange} rows. Pure; the structural
  * counterpart of {@link summarizePlan} — counts and rows always agree.
  */
-export function enumeratePlanResources(
-  actions: ReadonlyArray<SyncAction>,
-): PlanResourceChange[] {
+export function enumeratePlanResources(actions: ReadonlyArray<SyncAction>): PlanResourceChange[] {
   const out: PlanResourceChange[] = [];
   for (const action of actions) {
     switch (action.kind) {
       case "create":
-        out.push({ kind: action.syncer.kind, action: "create", file: action.path });
+        out.push(
+          action.movedFrom === undefined
+            ? { kind: action.syncer.kind, action: "create", file: action.path }
+            : {
+                kind: action.syncer.kind,
+                action: "move",
+                file: action.path,
+                moved_from: action.movedFrom,
+              },
+        );
         break;
       case "update":
         out.push({ kind: action.syncer.kind, action: "update", file: action.path, id: action.id });
@@ -114,12 +148,17 @@ export function enumeratePlanResources(
 export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): string {
   const active = actions.filter((a) => a.kind !== "skip");
 
+  const unsupported = actions.filter(isUnsupportedDeletion);
+  const unsupportedNote = unsupported.map((a) =>
+    paint(`# ${unsupportedDeletionNote(a)}`, A.yellow, tty),
+  );
+
   if (active.length === 0) {
-    return paint(
-      "No changes. Your Zitadel configuration matches the current state.",
-      A.bold,
-      tty,
-    );
+    const headline =
+      unsupported.length === 0
+        ? "No changes. Your Zitadel configuration matches the current state."
+        : `Nothing to apply, but ${unsupported.length} removed file${unsupported.length === 1 ? "" : "s"} cannot be deleted from the platform yet.`;
+    return [paint(headline, A.bold, tty), ...unsupportedNote].join("\n");
   }
 
   const out: string[] = [];
@@ -132,7 +171,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
 
   out.push("");
 
-  const { creates, updates, revisions, deletes } = summarizePlan(actions);
+  const { creates, updates, revisions, deletes, moves } = summarizePlan(actions);
 
   const parts: string[] = [];
   if (creates > 0) {
@@ -143,6 +182,9 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
   }
   if (revisions > 0) {
     parts.push(`${revisions} new revision${revisions === 1 ? "" : "s"}`);
+  }
+  if (moves > 0) {
+    parts.push(`${moves} moved`);
   }
   if (deletes > 0) {
     parts.push(`${deletes} to destroy`);
@@ -161,6 +203,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
     );
   }
 
+  out.push(...unsupportedNote);
   return out.join("\n");
 }
 
@@ -186,13 +229,30 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 const KNOWN_AFTER_APPLY = "(known after apply)";
 
+/**
+ * Quote-escape a string value, then escape whatever could still drive the
+ * terminal. The plan prints what the server stores, and `plan` and `apply`
+ * read it verbatim so the diff and the write-back see the real bytes; this is
+ * where it is made safe to print.
+ */
 function escapeString(s: string): string {
-  return s
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, "\\n")
-    .replace(/\r/g, "\\r")
-    .replace(/\t/g, "\\t");
+  return escapeControlCharacters(
+    s
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\r")
+      .replace(/\t/g, "\\t"),
+  );
+}
+
+/**
+ * A field name as printed: a server-side key is as untrusted as a value.
+ * Backslashes are doubled first, as `sanitizeResponse` does for keys, so a key
+ * holding a raw ESC and one holding the literal text `\x1b` get two labels.
+ */
+function fieldLabel(key: string): string {
+  return escapeControlCharacters(key.replaceAll("\\", "\\\\"), { keepLayout: false });
 }
 
 function fmtPrimitive(v: string | number | boolean | null): string {
@@ -285,11 +345,11 @@ function renderFields(
   const col = (s: string) => paint(s, ansi, ctx.tty);
 
   const keys = Object.keys(obj).sort();
-  const maxLen = keys.reduce((m, k) => Math.max(m, k.length), 0);
+  const maxLen = keys.reduce((m, k) => Math.max(m, fieldLabel(k).length), 0);
 
   for (const key of keys) {
     const val = obj[key];
-    const pk = key.padEnd(maxLen);
+    const pk = fieldLabel(key).padEnd(maxLen);
 
     if (isPrimitive(val)) {
       const formatted = fmtScalar(val);
@@ -410,13 +470,15 @@ function diffLines(oldLines: readonly string[], newLines: readonly string[]): Li
 
 /** Classic LCS-length DP, walked back into an op list. */
 function lcsDiff(a: readonly string[], b: readonly string[]): LineOp[] {
-  const table: number[][] = Array.from({ length: a.length + 1 }, () =>
-    new Array<number>(b.length + 1).fill(0),
-  );
+  const table: number[][] = [];
+  // Reads past the filled edge are the recurrence's base case: an empty suffix, length 0.
+  const cell = (i: number, j: number): number => table[i]?.[j] ?? 0;
+
   for (let i = a.length - 1; i >= 0; i -= 1) {
+    const row = new Array<number>(b.length + 1).fill(0);
+    table[i] = row;
     for (let j = b.length - 1; j >= 0; j -= 1) {
-      table[i][j] =
-        a[i] === b[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+      row[j] = a[i] === b[j] ? cell(i + 1, j + 1) + 1 : Math.max(cell(i + 1, j), cell(i, j + 1));
     }
   }
 
@@ -424,24 +486,23 @@ function lcsDiff(a: readonly string[], b: readonly string[]): LineOp[] {
   let i = 0;
   let j = 0;
   while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) {
-      ops.push({ kind: "same", line: a[i] });
+    const left = a[i];
+    const right = b[j];
+    if (left === undefined || right === undefined) break;
+    if (left === right) {
+      ops.push({ kind: "same", line: left });
       i += 1;
       j += 1;
-    } else if (table[i + 1][j] >= table[i][j + 1]) {
-      ops.push({ kind: "del", line: a[i] });
+    } else if (cell(i + 1, j) >= cell(i, j + 1)) {
+      ops.push({ kind: "del", line: left });
       i += 1;
     } else {
-      ops.push({ kind: "add", line: b[j] });
+      ops.push({ kind: "add", line: right });
       j += 1;
     }
   }
-  for (; i < a.length; i += 1) {
-    ops.push({ kind: "del", line: a[i] });
-  }
-  for (; j < b.length; j += 1) {
-    ops.push({ kind: "add", line: b[j] });
-  }
+  for (const line of a.slice(i)) ops.push({ kind: "del", line });
+  for (const line of b.slice(j)) ops.push({ kind: "add", line });
   return ops;
 }
 
@@ -476,7 +537,8 @@ function renderBlockStringDiff(
   );
   for (const op of changed.slice(0, MAX_BLOCK_DIFF_LINES)) {
     const del = op.kind === "del";
-    lines.push(paint(`${bodyPad}${del ? "-" : "+"} ${op.line}`, del ? A.red : A.green, tty));
+    const line = escapeControlCharacters(op.line);
+    lines.push(paint(`${bodyPad}${del ? "-" : "+"} ${line}`, del ? A.red : A.green, tty));
   }
   const omitted = changed.length - MAX_BLOCK_DIFF_LINES;
   if (omitted > 0) {
@@ -503,14 +565,14 @@ function renderDiff(
   lines: string[],
 ): boolean {
   const allKeys = [...new Set([...Object.keys(oldObj), ...Object.keys(newObj)])].sort();
-  const maxLen = allKeys.reduce((m, k) => Math.max(m, k.length), 0);
+  const maxLen = allKeys.reduce((m, k) => Math.max(m, fieldLabel(k).length), 0);
   const pad = " ".repeat(prefixCol);
   let hasChanges = false;
 
   for (const key of allKeys) {
-    const pk = key.padEnd(maxLen);
-    const hasOld = Object.prototype.hasOwnProperty.call(oldObj, key);
-    const hasNew = Object.prototype.hasOwnProperty.call(newObj, key);
+    const pk = fieldLabel(key).padEnd(maxLen);
+    const hasOld = Object.hasOwn(oldObj, key);
+    const hasNew = Object.hasOwn(newObj, key);
     const oldVal = oldObj[key];
     const newVal = newObj[key];
 
@@ -666,7 +728,35 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
 
   switch (action.kind) {
     case "create": {
-      const header = `${blkPad}# ${action.path} will be created`;
+      if (action.movedFrom !== undefined && action.oldContent !== undefined) {
+        // The platform already holds the resource, so show what changes in it
+        // the way an update does, under a header that says where it came from.
+        const [, ...diff] = renderBlock(
+          {
+            kind: "update",
+            path: action.path,
+            syncer: action.syncer,
+            id: "",
+            content: action.content,
+            hash: action.hash,
+            oldContent: action.oldContent,
+            ...(action.warnings ? { warnings: action.warnings } : {}),
+          },
+          tty,
+        );
+        return [
+          paint(
+            `${blkPad}# ${action.path} will take over the ${action.syncer.kind} that was in ${action.movedFrom}`,
+            A.bold,
+            tty,
+          ),
+          ...diff,
+        ];
+      }
+      const header =
+        action.movedFrom === undefined
+          ? `${blkPad}# ${action.path} will be created`
+          : `${blkPad}# ${action.path} will take over the ${action.syncer.kind} that was in ${action.movedFrom}`;
       const opening = `${blkPad}+ resource "${action.syncer.kind}" "${resourceName(action.path)}" {`;
       lines.push(paint(header, A.bold, tty));
       lines.push(paint(opening, A.green, tty));

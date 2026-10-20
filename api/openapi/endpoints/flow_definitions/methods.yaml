@@ -63,6 +63,7 @@ post:
 
 get:
   operationId: listFlowDefinitions
+  x-zitadel-cli: flow-definitions list
   summary: List flow definitions
   description: |
     Retrieves a list of all flow definitions, newest by creation time first.
@@ -73,15 +74,11 @@ get:
   security:
     - oauth2:
         - flow_definition.read
+    - nextgenSession: []
   parameters:
     - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml
-    - name: project_id
-      in: query
-      description: The project id to filter by.
-      required: true
-      schema:
-        $ref: ../../components/schemas/project-id.yaml
+    - $ref: ../../components/parameters/project-id.yaml
     - name: purpose
       in: query
       required: false
@@ -99,6 +96,25 @@ get:
       schema:
         type: string
         pattern: '^[a-z][a-z0-9-]*$'
+    - name: revisions
+      in: query
+      description: |
+        Which revisions to return. Every revision of a flow shares its
+        `name`, so publishing a definition under an existing `name` generates
+        a new row.
+
+        `all` (the default) returns every revision — the full history an
+        export, an audit or a GitOps diff needs. `latest` returns the newest
+        revision of each `name`, which is one row per flow.
+
+        A `page_token` is bound to the mode it was issued in and is rejected by
+        the other.
+      schema:
+        type: string
+        default: all
+        enum:
+          - all
+          - latest
     - name: expand
       in: query
       required: false

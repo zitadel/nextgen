@@ -79,11 +79,16 @@ img[data-zl-asset-broken] {
 }
 .zl-trustmark__mark:hover {
   text-decoration: underline;
-  text-underline-offset: 4px;
+  text-underline-offset: var(--zl-spacing-1);
 }
-.zl-trustmark__mark:focus-visible {
+/* One focus outline for every link this stylesheet paints. */
+.zl-trustmark__mark:focus-visible,
+.zl-card-nav__link:focus-visible,
+.zl-card-forgot__link:focus-visible {
   outline: var(--zl-focus-width) solid var(--zl-ring);
   outline-offset: var(--zl-focus-offset);
+}
+.zl-trustmark__mark:focus-visible {
   border-radius: var(--zl-radius-sm);
 }
 .zl-trustmark__logotype {
@@ -98,6 +103,18 @@ img[data-zl-asset-broken] {
   width: 100%;
   height: 100%;
 }
+/* Brand mark above the card, from the resolved side's logo. `--zl-logo-scale`
+   is the tenant's `shape.logo_scale`; it multiplies whatever cap is in force so
+   a host override of the cap keeps working underneath it. Bounded the way the
+   split pane's mark is (`img.zl-split__compact`): a tenant asset carries no
+   intrinsic size the layout can trust, and an SVG with only a viewBox stretches
+   to fill whatever box it lands in — which here is the full page width. */
+.zl-card-logo {
+  width: auto;
+  max-width: min(12rem, 60%);
+  max-height: calc(var(--zl-card-logo-max-height, 2.5rem) * var(--zl-logo-scale, 1));
+  object-fit: contain;
+}
 /* Card header typography. Templates slot raw <h1>/<p> elements into
    <zl-card>, which keeps them in the light DOM where this stylesheet can
    reach them — the atom intentionally doesn't dictate typography.
@@ -105,16 +122,6 @@ img[data-zl-asset-broken] {
    `line-height: 1` on the title is the design's, not an oversight: the header
    is a single line whose 6px gap to the description does the separating, so
    leading above the cap height only pads the top of the card. */
-/* Brand mark above the card, from `branding.logo_url`. Bounded the way the
-   split pane's mark is (`img.zl-split__compact`): a tenant asset carries no
-   intrinsic size the layout can trust, and an SVG with only a viewBox stretches
-   to fill whatever box it lands in — which here is the full page width. */
-.zl-card-logo {
-  width: auto;
-  max-width: min(12rem, 60%);
-  max-height: var(--zl-card-logo-max-height, 2.5rem);
-  object-fit: contain;
-}
 .zl-card-title {
   margin: 0;
   font-family: var(--zl-font-family-heading);
@@ -153,6 +160,23 @@ img[data-zl-asset-broken] {
   flex-direction: column;
   gap: var(--zl-spacing-3);
 }
+/* `<zl-passkey>` renders its pending status and cancel button into light DOM. */
+.zl-passkey-pending {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-3);
+}
+/* A terminal step is a heading with no form under it, so the heading is
+   centred in the card rather than left-aligned over fields that are not there.
+   The empty field group is already hidden (see `.zl-field-group:not(:has(*))`),
+   so the card's own region gap is what sits between the heading and the actions
+   — keep it, or the heading ends up flush against the buttons. When a terminal
+   step has no actions either, the empty body region hides itself and no gap
+   remains. */
+.zl-card--terminal .zl-card-title,
+.zl-card--terminal .zl-card-subtitle {
+  text-align: center;
+}
 /* suppress-header: the host asked for the heading block to be visually
    hidden (its page already carries one). Stamped by the orchestrator on the
    shell so it covers user-ejected templates too. Screen-reader-only rather
@@ -190,7 +214,7 @@ img[data-zl-asset-broken] {
   line-height: inherit;
   color: var(--zl-link);
   text-decoration: underline;
-  text-underline-offset: 4px;
+  text-underline-offset: var(--zl-spacing-1);
   cursor: pointer;
 }
 /* The switcher's underline is how the design marks it, so hover lifts the link
@@ -198,14 +222,8 @@ img[data-zl-asset-broken] {
 .zl-card-nav__link:hover {
   color: var(--zl-foreground);
 }
-.zl-card-nav__link:focus-visible {
-  outline: var(--zl-focus-width) solid var(--zl-ring);
-  outline-offset: var(--zl-focus-offset);
-}
-/* Forgot-password is no longer a row of its own: the design sits it on the
-   password field's label row, so `<zl-field>` renders it (see its
-   `forgot-password-*` attributes). These rules remain for templates ejected
-   before that move, which still emit the standalone paragraph. */
+/* Standalone forgot-password row: emitted only by templates ejected before
+   `<zl-field>` carried the link on its label row. */
 .zl-card-forgot {
   margin: 0;
   text-align: right;
@@ -222,7 +240,7 @@ img[data-zl-asset-broken] {
   font-weight: var(--zl-font-weight-normal);
   color: var(--zl-link);
   text-decoration: none;
-  text-underline-offset: 4px;
+  text-underline-offset: var(--zl-spacing-1);
   cursor: pointer;
 }
 /* Matches the field-level affordance in `zl-field.css`: the design draws
@@ -230,13 +248,11 @@ img[data-zl-asset-broken] {
 .zl-card-forgot__link:hover {
   text-decoration: underline;
 }
-.zl-card-forgot__link:focus-visible {
-  outline: var(--zl-focus-width) solid var(--zl-ring);
-  outline-offset: var(--zl-focus-offset);
-}
 /* Split-design chrome (ADR 040 design catalog: `split` / `split-right`).
-   Consumed by the ejectable templates in @zitadel/config under
-   defaults/branding/ — a brand pane beside the form pane, collapsing to
+   Those designs are retired from the eject catalog (#1039) — page layout
+   belongs in the embedding app — but revisions already published from them
+   keep rendering on this chrome (fixtures: orchestrator/__fixtures__/
+   legacy-designs/). A brand pane beside the form pane, collapsing to
    form-only on narrow viewports. */
 .zl-split {
   display: grid;
@@ -281,7 +297,7 @@ img[data-zl-asset-broken] {
    template root for a taller lockup. */
 .zl-split__logo {
   max-width: min(16rem, 60%);
-  max-height: var(--zl-split-logo-max-height, 16rem);
+  max-height: calc(var(--zl-split-logo-max-height, 16rem) * var(--zl-logo-scale, 1));
 }
 /* A tenant who sets both assets stacks them in this one pane, so the two solo
    caps stop being independent — and the pane's own gap and padding are only
@@ -298,7 +314,7 @@ img[data-zl-asset-broken] {
    hero, sets the page height. A visible-but-small hero is the honest
    degradation. */
 .zl-split__logo:has(+ .zl-split__hero) {
-  max-height: var(--zl-split-logo-max-height, 8rem);
+  max-height: calc(var(--zl-split-logo-max-height, 8rem) * var(--zl-logo-scale, 1));
 }
 .zl-split__logo:has(+ .zl-split__hero) + .zl-split__hero {
   max-height: min(
@@ -308,7 +324,7 @@ img[data-zl-asset-broken] {
       calc(
         100vh - 104px - var(--zl-spacing-8) - var(--zl-spacing-8) -
           2.5rem - var(--zl-spacing-6) - var(--zl-spacing-6) -
-          var(--zl-split-logo-max-height, 8rem)
+          calc(var(--zl-split-logo-max-height, 8rem) * var(--zl-logo-scale, 1))
       )
     )
   );
@@ -381,7 +397,7 @@ img[data-zl-asset-broken] {
    Both rules are `img`-qualified so source order (not specificity) decides
    between the logo cap and the hero banner cap. */
 img.zl-split__compact {
-  max-height: 2.5rem;
+  max-height: calc(2.5rem * var(--zl-logo-scale, 1));
 }
 /* hero_url-only tenants: the compact fallback renders the hero image as a
    modest banner instead of vanishing with the brand pane. Same pinned-width +
@@ -456,9 +472,10 @@ zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution ::slotted(*) 
   }
 }
 /* Hero-design landing primitives (`hero`): a token-styled mock landing
-   page inside .zl-split__brand. Consumed by the ejectable hero template in
-   @zitadel/config under defaults/branding/hero/ — tenants edit the copy,
-   the classes keep it on design tokens so palettes and theme mode apply. */
+   page inside .zl-split__brand. Consumed by the retired hero design (#1039;
+   fixture in orchestrator/__fixtures__/legacy-designs/hero.liquid), which
+   already-published revisions still use. The classes keep it on design
+   tokens so palettes and theme mode apply. */
 .zl-hero {
   display: flex;
   flex-direction: column;
@@ -483,7 +500,7 @@ zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution ::slotted(*) 
   letter-spacing: -0.01em;
 }
 .zl-hero__brand-logo {
-  max-height: 1.75rem;
+  max-height: calc(1.75rem * var(--zl-logo-scale, 1));
 }
 .zl-hero__brand-mark {
   display: inline-flex;
@@ -593,3 +610,4 @@ zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution ::slotted(*) 
 :host([variant="page"]) .zl-minimal {
   padding: 52px 16px;
 }
+

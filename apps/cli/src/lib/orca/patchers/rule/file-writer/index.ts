@@ -2,12 +2,7 @@ import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promise
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
-import {
-  isObject,
-  parseJsonObject,
-  setTopLevelJsonKey,
-  stableStringify,
-} from "../../../../json";
+import { isObject, parseJsonObject, setTopLevelJsonKey, stableStringify } from "../../../../json";
 import type { PatchedFile } from "../../types";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./types";
 
@@ -101,7 +96,7 @@ async function applyOp(
       await appendText(abs(opts.cwd, op.path), op.contents, op.ifMissing, opts.dryRun, result);
       break;
     case "merge-env":
-      await mergeEnv(abs(opts.cwd, op.path), op.entries, opts.dryRun, result);
+      await mergeEnv(abs(opts.cwd, op.path), op.entries, op.comment ?? [], opts.dryRun, result);
       break;
     case "merge-json":
       await mergeJson(abs(opts.cwd, op.path), op.patch, opts.dryRun, result);
@@ -135,12 +130,14 @@ async function editFile(
   const candidates = (typeof pathOrPaths === "string" ? [pathOrPaths] : pathOrPaths).map((p) =>
     abs(cwd, p),
   );
-  if (candidates.length === 0) {
+  const [preferred] = candidates;
+  if (preferred === undefined) {
     throw new ZitadelError("E_VALIDATION", "An edit op needs at least one candidate path", {
       hint: "This is an internal patcher error — please report it if you hit it.",
     });
   }
-  let path = candidates[0];
+  // The first candidate is where the file is created when none of them exist.
+  let path = preferred;
   let source: string | undefined;
   let mode: number | undefined;
   for (const candidate of candidates) {
@@ -192,7 +189,7 @@ async function ensureDir(
     existed &&
     mode !== undefined &&
     process.platform !== "win32" &&
-    (pre!.mode & 0o777) !== mode;
+    ((pre?.mode ?? 0) & 0o777) !== mode;
   if (dryRun) {
     if (!existed) {
       record(result, path, "dir", "create");
@@ -284,6 +281,7 @@ async function appendText(
 async function mergeEnv(
   path: string,
   entries: Readonly<Record<string, string>>,
+  comment: ReadonlyArray<string>,
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
@@ -301,7 +299,11 @@ async function mergeEnv(
     return;
   }
 
-  const block = additions.map(([key, value]) => `${key}=${value}`).join("\n");
+  const commentLines = comment.map((line) => `# ${line}`);
+  const [firstCommentLine] = commentLines;
+  const header =
+    firstCommentLine !== undefined && !existing.includes(firstCommentLine) ? commentLines : [];
+  const block = [...header, ...additions.map(([key, value]) => `${key}=${value}`)].join("\n");
   const next = `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${block}\n`;
   const action = raw === undefined ? "create" : "update";
   if (dryRun) {
@@ -374,7 +376,24 @@ async function addDependency(
   const current = parseJsonObject(existing, path);
   const key = op.dev ? "devDependencies" : "dependencies";
   const deps = isObject(current[key]) ? (current[key] as Record<string, unknown>) : {};
-  if (deps[op.name] === op.version) {
+  // A package the app needs at runtime stays in `dependencies`: a dev add never
+  // demotes it, because that would break `--omit=dev` installs.
+  if (
+    op.dev &&
+    isObject(current.dependencies) &&
+    Object.hasOwn(current.dependencies as Record<string, unknown>, op.name)
+  ) {
+    result.filesSkipped.push(path);
+    return;
+  }
+  // Only devDependencies -> dependencies moves. peerDependencies and
+  // optionalDependencies entries are the developer's and are left alone.
+  const other =
+    !op.dev && isObject(current.devDependencies)
+      ? (current.devDependencies as Record<string, unknown>)
+      : undefined;
+  const listedInOther = other !== undefined && Object.hasOwn(other, op.name);
+  if (deps[op.name] === op.version && !listedInOther) {
     result.filesSkipped.push(path);
     return;
   }
@@ -382,12 +401,24 @@ async function addDependency(
   // the document. Every byte outside it — key order, blank lines, inline
   // objects, line endings — stays untouched; the touched map itself is
   // name-sorted, matching what a package manager writes.
-  const contents = setTopLevelJsonKey(
+  let contents = setTopLevelJsonKey(
     existing,
     path,
     key,
     sortByKey({ ...deps, [op.name]: op.version }),
   );
+  // A package listed in both sections is never intended, and some toolchains
+  // refuse it outright (Qwik's starter vite.config.ts throws on start). Move a
+  // devDependencies entry the developer already has into dependencies instead
+  // of duplicating it.
+  if (listedInOther) {
+    contents = setTopLevelJsonKey(
+      contents,
+      path,
+      "devDependencies",
+      Object.fromEntries(Object.entries(other).filter(([name]) => name !== op.name)),
+    );
+  }
   if (dryRun) {
     record(result, path, "file", "update");
     result.depsAdded.push(op.name);
@@ -400,9 +431,7 @@ async function addDependency(
 
 /** Rebuilds an object with lexicographically sorted keys (dependency maps). */
 function sortByKey(value: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
-  );
+  return Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
 }
 
 async function readIfExists(path: string): Promise<string | undefined> {

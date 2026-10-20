@@ -26,7 +26,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 /** Projects whose typecheck is known-vacuous, pending the follow-up fix. */
-const KNOWN_VACUOUS = new Set(["apps/cli", "packages/sdk-core"]);
+const KNOWN_VACUOUS = new Set([]);
 
 function stripJsonComments(text) {
   return text.replace(/^\s*\/\/.*$/gm, "");
@@ -45,6 +45,8 @@ function projectDirs() {
       }
     }
   }
+  // The root-level e2e project is a project itself, not a folder of them.
+  if (existsSync(join("e2e", "moon.yml"))) dirs.push("e2e");
   return dirs;
 }
 

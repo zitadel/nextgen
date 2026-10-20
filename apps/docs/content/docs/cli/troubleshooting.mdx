@@ -5,23 +5,23 @@ description: Common CLI errors and first checks.
 
 ## Local server is not running
 
-If setup or doctor reports `E_LOCAL_SERVER_NOT_RUNNING`, start the local runtime:
+`console` reports `E_LOCAL_SERVER_NOT_RUNNING` when the local runtime is stopped, and so do the commands that call the platform, such as `setup`, `plan`, `apply`, or `variables`, when run with `--server local`. Without the flag, `plan` and `apply` use the server URL setup wrote into `zitadel.json`, so against a stopped local server `apply` fails with `E_NETWORK` (`ECONNREFUSED`) as soon as it has a change to upload, and `plan` still runs but shows no field diff. In each case, start the local runtime again from the directory you first ran `start` in (the one with `.zitadel/local/`):
 
 ```sh
 npx @zitadel/cli@alpha start
 ```
 
-Then retry setup with `--server local`.
+Then retry the command.
 
 ## Port is in use
 
-If the runtime port already has a listener, stop that process, run:
+If `start` or `doctor` reports `E_PORT_IN_USE`, the runtime port already has a listener. If it is a runtime the CLI started earlier with the default binary backend, possibly in another directory, stop all of those (macOS and Linux only):
 
 ```sh
 npx @zitadel/cli@alpha stop --all
 ```
 
-or choose another port:
+`stop --all` does not stop a Docker runtime; run `stop` in the directory that runtime was started from. Otherwise, stop the process that holds the port, or choose another port:
 
 ```sh
 npx @zitadel/cli@alpha start --port 8081

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Code generation reads the OpenAPI source outside the package. The
+    // script holds the `generated-sources` lock (scripts/task-guard.mjs):
+    // the server's generation and its checks rewrite the *-error-response.yaml
+    // files this reads.
+    "generate": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/**/*.yaml"],
+      "outputs": ["src/generated/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["generate"]
+    },
+    "build": {
+      "dependsOn": ["generate"]
+    },
+    "test": {
+      "dependsOn": ["generate"]
+    },
+    // The release builds start after cli:test, which imports this package's
+    // dist at runtime: the clean step must not run while it does (moon: the
+    // `public-dist` mutex). Every other release build depends on this one
+    // through its package edges, so they all wait for cli:test.
+    "build-release": {
+      "dependsOn": ["generate", "@zitadel/cli#test"]
+    }
+  }
+}

@@ -300,7 +300,7 @@ The two mechanisms decided above accommodate this without change.
 
 **Amendment (#851, social login).** When an identity provider returns a subject
 that matches no user and the account cannot be created from the provider
-claims alone, the engine emits a new outcome, `identity_unknown`, rather than
+claims alone, the engine emits a new outcome, `sso_user_not_found`, rather than
 reusing `user_not_found`. The two stay separate because one login
 step can hold both the typed identifier field and the provider buttons, and a
 transition key has a single target. With a shared outcome, a mistyped email and
@@ -309,7 +309,7 @@ different places: the email user needs the register entry step, which collects
 every property from scratch, while the SSO user needs a step that keeps the
 resolved external identity and asks only for the properties the provider did
 not supply. So `user_not_found` keeps its target for the typed identifier, and
-`identity_unknown` targets that collection step. On `identity_unknown` the
+`sso_user_not_found` targets that collection step. On `sso_user_not_found` the
 engine switches `CurrentPurpose` from `login` to `register`, the same switch it
 makes on `user_not_found`. No `user_link_required` outcome is added. Account
 linking is out of scope for #851, and that outcome arrives together with the

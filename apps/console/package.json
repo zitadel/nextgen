@@ -1,22 +1,33 @@
 {
   "name": "@zitadel/console",
   "version": "0.0.1",
+  "engines": {
+    "node": "24.x"
+  },
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
+    "test:all": "pnpm run test",
     "dev:real": "tsx --conditions=@zitadel/source scripts/dev-real.mts",
-    "dev:claim": "tsx --conditions=@zitadel/source scripts/dev-real.mts --claim"
+    "dev:claim": "tsx --conditions=@zitadel/source scripts/dev-real.mts --claim",
+    "lint": "biome check .",
+    "build-release": "vite build"
   },
   "dependencies": {
     "@fontsource/arimo": "catalog:",
     "@tanstack/react-devtools": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-devtools": "catalog:",
+    "@vercel/analytics": "catalog:",
+    "@vercel/speed-insights": "catalog:",
     "@zitadel/api": "workspace:*",
+    "@zitadel/components": "workspace:*",
+    "@zitadel/config": "workspace:*",
     "@zitadel/design-tokens": "workspace:*",
     "@zitadel/sdk-react": "workspace:*",
     "class-variance-authority": "catalog:",
@@ -36,7 +47,6 @@
   "devDependencies": {
     "@tailwindcss/vite": "catalog:",
     "@tanstack/devtools-vite": "catalog:",
-    "@tanstack/eslint-plugin-router": "catalog:",
     "@tanstack/router-plugin": "catalog:",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",

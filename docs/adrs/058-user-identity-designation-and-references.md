@@ -201,9 +201,9 @@ enforcement; oxidel's ADR-016 normalizes all unique values the same way
 
 ### 5. Identifier resolution in auth attempts
 
-The direct-API `IdentifierProof` carries only `login_name`, and its current
-implementation looks the user up with an empty attribute key — it can never
-match. Under this ADR:
+The direct-API `IdentifierProof` carries only `login_name`. Its first
+implementation looked the user up with an empty attribute key, so it could
+never match; it now resolves as below. Under this ADR:
 
 - On the flow path, the identifier field must name the bound schema's
   designated property; resolution is the single-attribute lookup the storage
@@ -226,7 +226,9 @@ match. Under this ADR:
   a non-unique notification `email` on another schema — would collide with a
   legitimate identifier and break its login. This scoping is what makes the
   flow path fully collision-proof: nothing outside the bound schema's
-  designated property can interfere.
+  designated property can interfere. The schema in scope means every revision
+  of the bound schema's objectType, so users created under an older revision
+  keep signing in (#1507).
 - **Designated identifier values are unique across designations.** Writing a
   value into any designated identifier property requires that no other
   designated identifier property in the same resolution scope holds it —

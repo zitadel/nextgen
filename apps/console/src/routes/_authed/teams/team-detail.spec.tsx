@@ -1,29 +1,20 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-
 const TEAM_ID = "team_1";
 const TEAM_URL = `http://localhost/api/teams/${TEAM_ID}`;
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
 
 function team(overrides: Record<string, unknown> = {}) {
   return {
@@ -42,7 +33,7 @@ async function renderDetail() {
     import("../../../router"),
   ]);
   const router = createAppRouter({
-    history: createMemoryHistory({ initialEntries: [`/teams/${TEAM_ID}`] }),
+    history: createMemoryHistory({ initialEntries: [scopedPath(`/teams/${TEAM_ID}`)] }),
   });
   render(<RouterProvider router={router} />);
   return router;

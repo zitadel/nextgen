@@ -381,15 +381,9 @@ func TestValidateFlowDefinition(t *testing.T) {
 							Fields: []domain.Field{
 								"email",
 							},
-							SSOProviders: []domain.FlowSSOProvider{
-								{
-									ID:       "google",
-									Name:     "Google",
-									Template: "google",
-								},
-							},
+							SSOProviders: []string{"google"},
 							Transitions: map[string]domain.FlowStepTransition{
-								"callback": {Target: "done"},
+								"sso_authenticated": {Target: "done"},
 							},
 						},
 						{
@@ -416,14 +410,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 					Steps: []domain.FlowDefinitionStep{
 						{
-							Name: "identify",
-							SSOProviders: []domain.FlowSSOProvider{
-								{
-									ID:       "google",
-									Name:     "Google",
-									Template: "google",
-								},
-							},
+							Name:         "identify",
+							SSOProviders: []string{"google"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"cancel": {Target: "done"},
 							},
@@ -435,7 +423,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrFlowDefinitionInvalid(`step "identify": has sso_providers but is missing transitions.callback`, nil),
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "identify": has sso_providers but is missing transitions.sso_authenticated`, nil),
 		},
 		{
 			name: "invalid with inescapable cycle",
@@ -591,7 +579,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrFlowDefinitionInvalid(`step "doing_nothing" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.callback`, nil),
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "doing_nothing" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.sso_authenticated`, nil),
 		},
 		{
 			name: "invalid flow with missing entry point in steps",
@@ -1068,7 +1056,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)`, nil),
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_authenticated)`, nil),
 		},
 		{
 			name: "invalid flow - duplicate step names",
@@ -1295,6 +1283,69 @@ func TestValidator_FlipTable_SoloLoginNoFlipRequired(t *testing.T) {
 	}
 	_, err := domain.ValidateFlowDefinition(schema, def)
 	require.NoError(t, err)
+}
+
+// The SSO collision shares user_already_exists with the typed one, so there is
+// no separate sso_ key to route.
+func TestValidator_SSOCollisionHasNoOwnOutcome(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := domain.FlowDefinition{
+		ProjectID:     "p",
+		Name:          "solo-login",
+		SchemaVersion: "1.0.0",
+		UserSchema:    "https://tenant.com/schemas/idpw-user.json",
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "credentials",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "credentials",
+				Fields: []domain.Field{"email", "x-auth-methods#password"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit":                  {Target: "done"},
+					"sso_user_already_exists": {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `transition key "sso_user_already_exists" is not an action name or reserved outcome`)
+}
+
+// The engine raises sso_authenticated right after it bound the user, and
+// sso_user_not_found with the provider's claims still parked: a re-purpose
+// would drop that user or those claims, and a cross-flow action cannot carry
+// them. The shared user_already_exists keeps both.
+func TestValidator_SSOOutcomeRejectsPurposeAndAction(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	for _, outcome := range []string{domain.FlowImplicitOutcomeSSOAuthenticated, domain.FlowImplicitOutcomeSSOUserNotFound} {
+		for name, tr := range map[string]domain.FlowStepTransition{
+			"purpose": {Target: "register", Purpose: gu.Ptr(domain.FlowDefinitionPurposeRegister)},
+			"action":  {Target: "other-flow", Action: gu.Ptr(domain.Switch)},
+		} {
+			t.Run(outcome+" with "+name, func(t *testing.T) {
+				def := purposedNavDef(nil)
+				def.Steps[0].Transitions[outcome] = tr
+				_, err := domain.ValidateFlowDefinition(schema, def)
+				require.Error(t, err)
+				assert.Contains(t, errorDetails(t, err), fmt.Sprintf(
+					`step "identifier": transition %q is an sso outcome and cannot declare purpose or action`, outcome))
+			})
+		}
+	}
+	t.Run("user_already_exists with purpose", func(t *testing.T) {
+		def := purposedNavDef(nil)
+		def.Steps[1].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = domain.FlowStepTransition{
+			Target: "identifier", Purpose: gu.Ptr(domain.FlowDefinitionPurposeLogin),
+		}
+		_, err := domain.ValidateFlowDefinition(schema, def)
+		require.NoError(t, err)
+	})
 }
 
 // ---- on_success manifest cross-check ----
@@ -1542,29 +1593,44 @@ func TestValidator_DeclaredBackKindRejected(t *testing.T) {
 	assert.Contains(t, errorDetails(t, err), `action "back" has kind=back, which is engine-injected and cannot be declared`)
 }
 
-// TestValidator_ReservedBackNameRejected guards the action name "back"
-// itself. Even with a non-back kind, an authored action named "back"
-// would collide at render time with the engine-injected back action —
-// the client would see two "back" buttons and route to the customer's
-// kind rather than the injected one.
-func TestValidator_ReservedBackNameRejected(t *testing.T) {
+// TestValidator_ReservedActionNamesRejected guards the action names the
+// engine claims for itself, whatever kind the author gives them. "back"
+// would collide at render time with the engine-injected back action: the
+// client would see two "back" buttons and route to the customer's kind.
+// "sso" is dispatched to the sso path on submission, so an authored action
+// of that name would validate and then fail every submission with
+// flow.invalid_action. The outcome names are routed by the engine alone;
+// a submission naming one is refused, so an action of that name could
+// never be taken.
+func TestValidator_ReservedActionNamesRejected(t *testing.T) {
 	schema := mustSchema(t, userSchemaIDAndPassword)
-	def := domain.FlowDefinition{
-		ProjectID: "p", Name: "f", SchemaVersion: "1",
-		UserSchema: "https://tenant.com/schemas/idpw-user.json",
-		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
-		Steps: []domain.FlowDefinitionStep{
-			{
-				Name: "step", Fields: []domain.Field{"email"},
-				Actions:     []domain.FlowStepAction{{Name: "back", Kind: domain.FlowActionKindNavigate}},
-				Transitions: map[string]domain.FlowStepTransition{"back": {Target: "done"}},
-			},
-			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
-		},
+	for name, reason := range map[string]string{
+		"back":                "engine-injected back navigation",
+		"sso":                 "sso submissions",
+		"user_not_found":      "flow outcomes",
+		"user_already_exists": "flow outcomes",
+		"sso_user_not_found":  "flow outcomes",
+		"sso_authenticated":   "flow outcomes",
+	} {
+		t.Run(name, func(t *testing.T) {
+			def := domain.FlowDefinition{
+				ProjectID: "p", Name: "f", SchemaVersion: "1",
+				UserSchema: "https://tenant.com/schemas/idpw-user.json",
+				Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
+				Steps: []domain.FlowDefinitionStep{
+					{
+						Name: "step", Fields: []domain.Field{"email"},
+						Actions:     []domain.FlowStepAction{{Name: name, Kind: domain.FlowActionKindNavigate}},
+						Transitions: map[string]domain.FlowStepTransition{name: {Target: "done"}},
+					},
+					{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+				},
+			}
+			_, err := domain.ValidateFlowDefinition(schema, def)
+			require.Error(t, err)
+			assert.Contains(t, errorDetails(t, err), fmt.Sprintf("action name %q is reserved for %s", name, reason))
+		})
 	}
-	_, err := domain.ValidateFlowDefinition(schema, def)
-	require.Error(t, err)
-	assert.Contains(t, errorDetails(t, err), `action name "back" is reserved for engine-injected back navigation`)
 }
 
 func TestValidator_MissingRequiredUserSchemaFields(t *testing.T) {

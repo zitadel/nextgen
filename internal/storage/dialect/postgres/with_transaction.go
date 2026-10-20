@@ -10,8 +10,9 @@ import (
 // withTransaction runs fn in a transaction when client can Begin.
 // *pgxpool.Pool → new tx; pgx.Tx → savepoint (joins outer service Transaction).
 // If client is not a beginner, runs fn on client as-is.
+// The check looks through [tracedExecutor]; fn gets a traced tx.
 func withTransaction(ctx context.Context, client queryExecutor, fn func(ctx context.Context, tx queryExecutor) error) (err error) {
-	beginner, ok := client.(interface {
+	beginner, ok := untraced(client).(interface {
 		Begin(ctx context.Context) (pgx.Tx, error)
 	})
 	if !ok {
@@ -32,5 +33,5 @@ func withTransaction(ctx context.Context, client queryExecutor, fn func(ctx cont
 		}
 		err = tx.Commit(ctx)
 	}()
-	return fn(ctx, tx)
+	return fn(ctx, traced(tx))
 }

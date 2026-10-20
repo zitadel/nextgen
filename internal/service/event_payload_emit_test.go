@@ -17,13 +17,14 @@ import (
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 )
 
-func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
+func TestProjectCreate_EventPayloadIncludesOrigins(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	masterKey := cryptomock.NewMockCrypter(ctrl)
 	keyService := servicemocks.NewMockKeyService(ctrl)
 	keyService.EXPECT().GetMasterKeyCrypter(gomock.Any()).Return(masterKey, nil).AnyTimes()
+	expectKeySavesThroughStatements(keyService)
 	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
@@ -54,17 +55,16 @@ func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
 	statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 	statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 	statements.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any())
-	statements.EXPECT().CreateEnvironment(gomock.Any(), gomock.Any()).Times(len(domain.DefaultEnvironmentNames))
 	statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 	statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)
 	require.NoError(t, err)
-	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService)
+	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t), domain.DefaultSharedHosts)
 
 	ctx := middleware.WithRequestIDContext(t.Context(), "req_create")
-	got, err := svc.Create(ctx, "Acme", []string{"*.vercel.app"}, true)
+	got, err := svc.Create(ctx, "Acme", []domain.Origin{{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview}}, true)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 
@@ -85,7 +85,7 @@ func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
 	var payload domain.ProjectPayload
 	require.NoError(t, json.Unmarshal(created.Payload, &payload))
 	assert.Equal(t, "Acme", payload.Name)
-	assert.Equal(t, []string{"*.vercel.app"}, payload.PreviewOrigins)
+	assert.Equal(t, []domain.Origin{{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview}}, payload.Origins)
 }
 
 func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
@@ -95,6 +95,7 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 	masterKey := cryptomock.NewMockCrypter(ctrl)
 	keyService := servicemocks.NewMockKeyService(ctrl)
 	keyService.EXPECT().GetMasterKeyCrypter(gomock.Any()).Return(masterKey, nil).AnyTimes()
+	expectKeySavesThroughStatements(keyService)
 	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
@@ -117,16 +118,100 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)
 	require.NoError(t, err)
-	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService)
+	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t), domain.DefaultSharedHosts)
 
-	_, err = svc.Update(t.Context(), "proj_1", "renamed")
+	_, err = svc.Update(t.Context(), service.UpdateProjectRequest{ID: "proj_1", Name: new("renamed")})
 	require.NoError(t, err)
 	require.NotNil(t, gotEvent)
 	assert.Equal(t, domain.EventTypeProjectUpdated, gotEvent.EventType)
 	var payload domain.ProjectPayload
 	require.NoError(t, json.Unmarshal(gotEvent.Payload, &payload))
 	assert.Equal(t, "renamed", payload.Name)
-	assert.Nil(t, payload.PreviewOrigins)
+	assert.Nil(t, payload.Origins)
+	assert.Nil(t, payload.PasswordHashAlgorithm, "a rename says nothing about hashing")
+}
+
+// Changing how a project hashes passwords is a security decision, so the audit
+// trail has to say which method it moved to -- and, when a project stops
+// choosing, that it moved back to the deployment's.
+func TestProjectUpdated_PayloadCarriesPasswordHashAlgorithm(t *testing.T) {
+	t.Parallel()
+
+	newService := func(t *testing.T, gotEvent **domain.Event) service.ProjectService {
+		t.Helper()
+		ctrl := gomock.NewController(t)
+		pool := servicemocks.NewMockPool(ctrl)
+		keyService := servicemocks.NewMockKeyService(ctrl)
+		statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+		statements := servicemocks.NewMockAllStatements(ctrl)
+		pool.EXPECT().Statements().Return(statements).AnyTimes()
+		pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(ctx context.Context, tx func(context.Context, service.Statementer[service.AllStatements]) error) error {
+				return tx(ctx, statementer)
+			},
+		).AnyTimes()
+		statementer.EXPECT().Statements().Return(statements).AnyTimes()
+		statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").
+			Return(&domain.Project{ID: "proj_1", Name: "kept"}, nil)
+		statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, ev *domain.Event) error {
+				*gotEvent = ev
+				return nil
+			},
+		)
+
+		const baseURL = "https://example.com/api/schemas"
+		schemaValidator, err := domain.NewSchemaValidator(baseURL)
+		require.NoError(t, err)
+		return service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t), domain.DefaultSharedHosts)
+	}
+
+	payloadOf := func(t *testing.T, event *domain.Event) domain.ProjectPayload {
+		t.Helper()
+		require.NotNil(t, event)
+		var payload domain.ProjectPayload
+		require.NoError(t, json.Unmarshal(event.Payload, &payload))
+		return payload
+	}
+
+	t.Run("names the method a project moved to", func(t *testing.T) {
+		t.Parallel()
+
+		var gotEvent *domain.Event
+		svc := newService(t, &gotEvent)
+		policy, err := domain.NewPasswordHashPolicy("bcrypt", map[string]any{"cost": 12})
+		require.NoError(t, err)
+
+		_, err = svc.Update(t.Context(), service.UpdateProjectRequest{
+			ID:                 "proj_1",
+			PasswordHashPolicy: &policy,
+		})
+		require.NoError(t, err)
+
+		payload := payloadOf(t, gotEvent)
+		require.NotNil(t, payload.PasswordHashAlgorithm)
+		assert.Equal(t, "bcrypt", *payload.PasswordHashAlgorithm)
+		assert.Empty(t, payload.Name, "the delta carries only what the request named")
+	})
+
+	t.Run("records a project handing hashing back to the deployment", func(t *testing.T) {
+		t.Parallel()
+
+		var gotEvent *domain.Event
+		svc := newService(t, &gotEvent)
+		var cleared *domain.PasswordHashPolicy
+
+		_, err := svc.Update(t.Context(), service.UpdateProjectRequest{
+			ID:                 "proj_1",
+			PasswordHashPolicy: &cleared,
+		})
+		require.NoError(t, err)
+
+		payload := payloadOf(t, gotEvent)
+		require.NotNil(t, payload.PasswordHashAlgorithm, "clearing is a change, not a silence")
+		assert.Empty(t, *payload.PasswordHashAlgorithm)
+	})
 }
 
 func TestAuthAttempt_CheckPayloadIncludesAttemptID(t *testing.T) {
@@ -278,6 +363,71 @@ func TestCreateUserAction_EventPayloadAttributeKeys(t *testing.T) {
 	assert.NotContains(t, string(gotEvent.Payload), `"user_id"`)
 }
 
+func TestPatchUserAction_EventPayloadAttributeKeys(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+
+	schemaURL := "https://example.test/schema.json"
+	schemaJSON := []byte(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id": "https://example.test/schema.json",
+		"type": "object",
+		"properties": {
+			"email": {"type": "string", "format": "email", "x-unique": "project", "x-audit": true},
+			"givenName": {"type": "string"}
+		}
+	}`)
+	stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&domain.User{
+			ProjectID:  "proj_1",
+			ID:         "user_1",
+			SchemaURL:  schemaURL,
+			Attributes: domain.Attributes{{Key: "givenName", Value: "Alice"}},
+		}, nil)
+	stmts.EXPECT().GetUserUniqueAttributeScopes(gomock.Any(), "proj_1", "user_1").
+		Return(map[domain.AttributeKey]string{}, nil)
+	schemaStore.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", schemaURL).
+		Return(&domain.JSONSchema{ProjectID: "proj_1", URL: schemaURL, Schema: schemaJSON}, nil)
+
+	action := service.NewPatchUserAction(service.PatchUserInput{
+		ProjectID: "proj_1",
+		UserID:    "user_1",
+		Attributes: map[string]any{
+			"email":     "alice@example.com",
+			"givenName": "Alice",
+		},
+	}, service.NewPool(pool), schemaStore)
+	require.NoError(t, action.Prepare(t.Context()))
+
+	var gotEvent *domain.Event
+	stmts.EXPECT().PatchUser(gomock.Any(), gomock.Any()).Return(nil)
+	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, ev *domain.Event) error {
+			gotEvent = ev
+			return nil
+		},
+	)
+
+	require.NoError(t, action.Apply(t.Context(), stmts))
+	require.NotNil(t, gotEvent)
+	assert.Equal(t, domain.EventTypeUserUpdated, gotEvent.EventType)
+	assert.Equal(t, "user_1", *gotEvent.EntityID)
+
+	var payload domain.UserUpdatedPayload
+	require.NoError(t, json.Unmarshal(gotEvent.Payload, &payload))
+	assert.Equal(t, []string{"email", "givenName"}, payload.AttributeKeys)
+	require.NotNil(t, payload.Attributes)
+	assert.Equal(t, "alice@example.com", payload.Attributes["email"])
+	_, hasGiven := payload.Attributes["givenName"]
+	assert.False(t, hasGiven, "non-x-audit values must be omitted")
+	assert.NotContains(t, string(gotEvent.Payload), `"user_id"`)
+}
+
 func TestSetPasswordAction_UsesPasswordRowID(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)
@@ -288,7 +438,7 @@ func TestSetPasswordAction_UsesPasswordRowID(t *testing.T) {
 		ProjectID: "proj_1",
 		UserID:    "user_1",
 		Password:  "s3cret",
-	}, hasher)
+	}, service.FixedProjectHasherResolver{Hasher: hasher})
 	require.NoError(t, action.Prepare(t.Context()))
 
 	stmts := servicemocks.NewMockAllStatements(ctrl)
@@ -377,6 +527,7 @@ func TestProjectCreate_SchemaCreatedPayloadCarriesKind(t *testing.T) {
 	masterKey := cryptomock.NewMockCrypter(ctrl)
 	keyService := servicemocks.NewMockKeyService(ctrl)
 	keyService.EXPECT().GetMasterKeyCrypter(gomock.Any()).Return(masterKey, nil).AnyTimes()
+	expectKeySavesThroughStatements(keyService)
 	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
@@ -407,14 +558,13 @@ func TestProjectCreate_SchemaCreatedPayloadCarriesKind(t *testing.T) {
 	statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 	statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 	statements.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any())
-	statements.EXPECT().CreateEnvironment(gomock.Any(), gomock.Any()).Times(len(domain.DefaultEnvironmentNames))
 	statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 	statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)
 	require.NoError(t, err)
-	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService)
+	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t), domain.DefaultSharedHosts)
 
 	_, err = svc.Create(middleware.WithRequestIDContext(t.Context(), "req_kind"), "Acme", nil, true)
 	require.NoError(t, err)

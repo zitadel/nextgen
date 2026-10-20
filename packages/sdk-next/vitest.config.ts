@@ -1,7 +1,10 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
+import { baseTest } from "../../vitest.shared.mjs";
+
 export default defineConfig({
+  cacheDir: ".vitest",
   resolve: {
     alias: {
       // auth.ts imports "server-only", whose default entry throws to keep
@@ -13,7 +16,8 @@ export default defineConfig({
     },
   },
   test: {
+    ...baseTest,
+    name: "@zitadel/sdk-next",
     environment: "jsdom",
-    globals: true,
   },
 });

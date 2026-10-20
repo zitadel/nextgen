@@ -8,7 +8,14 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 
 import type { MockHandle } from "./handlers.js";
-import { applyBranding, clearBranding, PASSWORD_FIELD, setupMockHandlers } from "./index.js";
+import {
+  applyBranding,
+  applyPasskey,
+  clearBranding,
+  clearPasskey,
+  PASSWORD_FIELD,
+  setupMockHandlers,
+} from "./index.js";
 
 const PROJECT_ID = "proj_demo";
 
@@ -47,6 +54,9 @@ beforeEach(() => {
   server.use(...mock.handlers);
   mock.reset();
   clearBranding();
+  // The passkey offer is a module-level overlay like branding; clear it so a
+  // test that enables it cannot leak the action into the next test's flow.
+  clearPasskey();
 });
 
 afterEach(() => {
@@ -149,16 +159,56 @@ describe("setupMockHandlers", () => {
     expect(done.handoff_token).toBeTruthy();
   });
 
-  test("redirects to SSO when sso_provider_id is set", async () => {
+  test("redirects to SSO on the reserved action", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const submit = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "sso",
+      fields: {},
+      sso_provider_id: "google",
+      return_target: "http://localhost/login",
+    });
+    expect(submit.step.name).toBe("sso-redirect");
+    expect(submit.step.redirect_url).toBeTruthy();
+  });
+
+  /**
+   * The engine requires `return_target` on an sso submission, so the mock
+   * must not hand back a redirect to a caller that omits it.
+   */
+  test("refuses an sso submission without return_target", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    await expect(
+      submitFlowStep(start.id, {
+        session_token: start.session_token,
+        action: "sso",
+        fields: {},
+        sso_provider_id: "google",
+      }),
+    ).rejects.toMatchObject({ status: 400, body: { code: "req.invalid" } });
+    // A refused submission is still a request the caller made.
+    const captured = mock.getCaptured();
+    expect(captured[captured.length - 1]).toMatchObject({
+      kind: "submitFlowStep",
+      body: { action: "sso", sso_provider_id: "google" },
+    });
+  });
+
+  /**
+   * A provider id on an ordinary submit is a malformed request, not a choice
+   * of provider. The engine reserves `action: "sso"` for that, so the mock
+   * must not accept the looser shape and hand back a pass the engine would
+   * not give.
+   */
+  test("ignores a provider id on an ordinary submit", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     const submit = await submitFlowStep(start.id, {
       session_token: start.session_token,
       action: "submit",
-      fields: {},
+      fields: { email: "ada@example.test" },
       sso_provider_id: "google",
     });
-    expect(submit.step.name).toBe("sso-redirect");
-    expect(submit.step.redirect_url).toBeTruthy();
+    expect(submit.step.name).toBe("password");
   });
 
   /**
@@ -356,5 +406,418 @@ describe("setupMockHandlers", () => {
       expect(start.step.name).toBe("register");
       expect(start.step.actions?.find((a) => a.kind === "back")).toBeUndefined();
     });
+  });
+});
+
+/**
+ * The provider round trip over HTTP, not just through the machine.
+ *
+ * The first cut of these states had no render case, so both fell through to
+ * `identifierStep` and the endpoint answered the wrong step while the machine
+ * was in the right one. Walking them through the handler is what catches that.
+ */
+describe("setupMockHandlers — the provider round trip", () => {
+  const RETURN_TARGET = "http://localhost/login?flow=flow_mock";
+
+  async function toProvider(
+    purpose: "login" | "register" = "login",
+  ): Promise<{ id: string; sessionToken: string }> {
+    const start = await createFlow({ purpose, project_id: PROJECT_ID });
+    const redirect = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "sso",
+      fields: {},
+      sso_provider_id: "google",
+      return_target: RETURN_TARGET,
+    });
+    expect(redirect.step.name).toBe("sso-redirect");
+    expect(redirect.step.redirect_url).toBeTruthy();
+    return { id: start.id, sessionToken: redirect.session_token as string };
+  }
+
+  /** The provider's redirect to the callback, as the browser would make it. */
+  function callback(query: Record<string, string>, path = "/__nextgen/idp/callback") {
+    return fetch(`http://localhost${path}?${new URLSearchParams(query)}`, { redirect: "manual" });
+  }
+
+  /**
+   * Return through the callback with a code, follow its 303 the way the
+   * orchestrator does (`GET /flow/{id}` from `?flow=`), and answer that step.
+   */
+  async function viaCallback(id: string, claims: { email: string }) {
+    const res = await callback({ state: "s", code: "c", ...claims });
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe(RETURN_TARGET);
+    return getFlowStep(id);
+  }
+
+  test("the callback answers 303 to the return target the sso submission recorded", async () => {
+    await toProvider();
+
+    const res = await callback({ state: "s", code: "c" });
+
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe(RETURN_TARGET);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  test("the callback is also served where an SDK proxy forwards it", async () => {
+    // The proxy strips its `/__nextgen` prefix before forwarding.
+    const { id } = await toProvider();
+
+    const res = await callback(
+      { state: "s", code: "c", email: "ada@example.test" },
+      "/idp/callback",
+    );
+
+    expect(res.status).toBe(303);
+    expect((await getFlowStep(id)).step.name).toBe("register-sso");
+  });
+
+  test("a declined sign-in shows error.sso_cancelled on the step it started from", async () => {
+    const { id } = await toProvider();
+
+    const res = await callback({ state: "s", error: "access_denied" });
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe(RETURN_TARGET);
+
+    const back = await getFlowStep(id);
+    expect(back.step.name).toBe("identifier");
+    expect(back.step.error).toBe("error.sso_cancelled");
+    // Shown once, as the engine's replay guard does: a reload is clean.
+    expect((await getFlowStep(id)).step.error).toBeUndefined();
+  });
+
+  test("any other provider error shows error.sso_failed", async () => {
+    const { id } = await toProvider("register");
+
+    await callback({ state: "s", error: "server_error" });
+
+    const back = await getFlowStep(id);
+    expect(back.step.name).toBe("register");
+    expect(back.step.error).toBe("error.sso_failed");
+  });
+
+  test("a return with neither a code nor an error fails like the engine's", async () => {
+    const { id } = await toProvider();
+
+    await callback({ state: "s" });
+
+    expect((await getFlowStep(id)).step.error).toBe("error.sso_failed");
+  });
+
+  test("a callback with no sign-in pending gets the error page, not a redirect", async () => {
+    await createFlow({ purpose: "login", project_id: PROJECT_ID });
+
+    const res = await callback({ state: "s", code: "c" });
+
+    expect(res.status).toBe(400);
+    expect(res.headers.get("content-type")).toContain("text/html");
+  });
+
+  test("the callback is single-use", async () => {
+    await toProvider();
+    await callback({ state: "s", code: "c" });
+
+    expect((await callback({ state: "s", code: "c" })).status).toBe(400);
+  });
+
+  /** An sso submission straight over HTTP, so the test controls the headers. */
+  async function submitSso(returnTarget: string, headers: Record<string, string> = {}) {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    return fetch(`http://localhost/flow/${start.id}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({
+        session_token: start.session_token,
+        action: "sso",
+        fields: {},
+        sso_provider_id: "google",
+        return_target: returnTarget,
+      }),
+    });
+  }
+
+  // The callback redirects to this value, and the mock is publicly deployed:
+  // a foreign target would turn it into an open redirect. The engine binds the
+  // target to the request origin the same way (`internal/api/flow.go`).
+  test.each([
+    ["on another origin", "https://evil.example/phish"],
+    ["carrying userinfo", "http://localhost@evil.example/"],
+    ["not a URL", "/login?flow=flow_mock"],
+  ])("refuses a return target %s", async (_case, target) => {
+    const res = await submitSso(target);
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe("req.invalid");
+  });
+
+  // The same targets the server refuses (`internal/httputil/redirect.go`); the
+  // full list is in redirect-target.spec.ts. These cover the ones that are on
+  // the request origin, so the origin check alone lets them through.
+  test.each([
+    ["a path that starts with two slashes", "http://localhost//evil.example/login"],
+    ["a backslash in the path", "http://localhost/\\evil.example"],
+    ["an encoded slash first", "http://localhost/%2Fevil.example"],
+    ["a tab in the path", "http://localhost/\t/evil.example"],
+    ["a dot segment before two slashes", "http://localhost/%2e//evil.example"],
+  ])("refuses a return target on the origin with %s", async (_case, target) => {
+    const res = await submitSso(target);
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("req.invalid");
+    expect(body.message).toContain("not a valid redirect target");
+  });
+
+  test("refuses an empty return target as not a redirect target", async () => {
+    const res = await submitSso("");
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { message: string }).message).toContain("it is empty");
+  });
+
+  test("answers the callback with the return target as the server stores it", async () => {
+    expect((await submitSso("HTTP://localhost/50%off")).status).toBe(200);
+
+    const res = await callback({ state: "s", code: "c" });
+
+    // The scheme is folded and the stray percent sign written as an escape.
+    expect(res.headers.get("location")).toBe("http://localhost/50%25off");
+  });
+
+  test("binds the return target to the Origin header over the request host", async () => {
+    // A browser names the page's origin; the request host is the fallback.
+    expect((await submitSso(RETURN_TARGET, { Origin: "http://app.example" })).status).toBe(400);
+    expect(
+      (await submitSso("http://app.example/login", { Origin: "http://app.example" })).status,
+    ).toBe(200);
+  });
+
+  test("the submit handler takes no callback action", async () => {
+    const { id, sessionToken } = await toProvider();
+
+    const refused = await fetch(`http://localhost/flow/${id}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_token: sessionToken,
+        action: "callback",
+        fields: { email: "ada@example.test" },
+      }),
+    });
+
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { code: string }).code).toBe("flow.invalid_action");
+  });
+
+  test("a first-time identity lands on register-sso, not the identifier", async () => {
+    const { id } = await toProvider();
+
+    const back = await viaCallback(id, { email: "ada@example.test" });
+
+    expect(back.step.name).toBe("register-sso");
+    expect(back.step.fields?.map((f) => f.name)).toEqual(["given_name", "family_name"]);
+    expect(back.step.actions?.some((a) => a.name === "submit")).toBe(true);
+  });
+
+  test("registering through the provider signs in, and the next visit goes straight through", async () => {
+    const first = await toProvider();
+    const collect = await viaCallback(first.id, { email: "grace@example.test" });
+    const created = await submitFlowStep(first.id, {
+      session_token: collect.session_token,
+      action: "submit",
+      fields: { given_name: "Grace", family_name: "Hopper" },
+    });
+    expect(created.step.name).toBe("done");
+
+    // Same email, same provider: the link exists now, so this is a sign-in.
+    const second = await toProvider();
+    const returning = await viaCallback(second.id, { email: "grace@example.test" });
+
+    expect(returning.step.name).toBe("done");
+  });
+
+  test("the mock's password-account fixture reaches sso-conflict too", async () => {
+    // `exists@example.com` is how the mock represents an email that already
+    // has a password account. Reading only enrolled credentials missed it, so
+    // the collision branch was unreachable for the fixture most callers use.
+    const { id } = await toProvider();
+
+    const back = await viaCallback(id, { email: "exists@example.com" });
+
+    expect(back.step.name).toBe("sso-conflict");
+    // Keyed like the real step, so a password submit the orchestrator
+    // builds from it is one the server accepts.
+    expect(back.step.fields?.map((f) => f.name)).toEqual([PASSWORD_FIELD]);
+  });
+
+  test("an email that already has a passkey account reaches sso-conflict", async () => {
+    // The account exists, so the provider must not mint a second one for it.
+    mock.registerCredential("held@example.test", "cred-held");
+    const { id } = await toProvider();
+
+    const back = await viaCallback(id, { email: "held@example.test" });
+
+    expect(back.step.name).toBe("sso-conflict");
+    expect(back.step.actions?.some((a) => a.kind === "passkey")).toBe(true);
+    expect(back.step.actions?.some((a) => a.name === "sign_in")).toBe(true);
+  });
+
+  test("reset forgets the links, so a clean mock sees a first-time identity", async () => {
+    const first = await toProvider();
+    const collect = await viaCallback(first.id, { email: "reset@example.test" });
+    await submitFlowStep(first.id, {
+      session_token: collect.session_token,
+      action: "submit",
+      fields: { given_name: "A", family_name: "B" },
+    });
+
+    mock.reset();
+
+    const after = await toProvider();
+    const back = await viaCallback(after.id, { email: "reset@example.test" });
+    expect(back.step.name).toBe("register-sso");
+  });
+});
+
+/**
+ * `returnFromProvider` stands in for the leg of the round trip a page cannot
+ * make in-process, so what matters is that it lands where the wire does. Each
+ * case here is the in-process twin of a round trip above.
+ */
+describe("returnFromProvider", () => {
+  test("leaves a first-time identity on register-sso, ready to resume", async () => {
+    const id = mock.returnFromProvider({ provider: "google", email: "ada@example.test" });
+
+    const resumed = await getFlowStep(id);
+    expect(resumed.step.name).toBe("register-sso");
+    expect(resumed.step.fields?.map((f) => f.name)).toEqual(["given_name", "family_name"]);
+  });
+
+  test("leaves an email that already has an account on the conflict step", async () => {
+    const id = mock.returnFromProvider({ provider: "google", email: "exists@example.com" });
+
+    const resumed = await getFlowStep(id);
+    expect(resumed.step.name).toBe("sso-conflict");
+  });
+
+  test("resolves the branch the same way the wire does", async () => {
+    // Register through the provider in-process, then come back the same way:
+    // the link now exists, so this is a sign-in rather than a registration.
+    const first = mock.returnFromProvider({ provider: "google", email: "grace@example.test" });
+    const collect = await getFlowStep(first);
+    await submitFlowStep(first, {
+      session_token: collect.session_token,
+      action: "submit",
+      fields: { given_name: "Grace", family_name: "Hopper" },
+    });
+
+    const second = mock.returnFromProvider({ provider: "google", email: "grace@example.test" });
+    expect((await getFlowStep(second)).step.name).toBe("done");
+  });
+
+  test("goes back to the step it started from with the provider's error", async () => {
+    const id = mock.returnFromProvider({
+      provider: "google",
+      email: "ada@example.test",
+      error: "access_denied",
+    });
+
+    const resumed = await getFlowStep(id);
+    expect(resumed.step.name).toBe("identifier");
+    expect(resumed.step.error).toBe("error.sso_cancelled");
+  });
+});
+
+describe("passkey overlay", () => {
+  test("is off by default: the identifier step offers no passkey action", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    expect(start.step.name).toBe("identifier");
+    expect(start.step.actions?.some((a) => a.name === "passkey")).toBe(false);
+  });
+
+  test("applyPasskey adds exactly one identifier action and routes to passkey-login", async () => {
+    applyPasskey(true);
+
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    expect(start.step.name).toBe("identifier");
+    const offered = (start.step.actions ?? []).filter((a) => a.name === "passkey");
+    expect(offered).toHaveLength(1);
+    expect(offered[0]?.kind).toBe("passkey");
+
+    // A re-render must not accumulate a second copy (the overlay is idempotent).
+    const reread = await getFlowStep(start.id);
+    expect((reread.step.actions ?? []).filter((a) => a.name === "passkey")).toHaveLength(1);
+
+    // Choosing it reaches the dedicated passkey-login step with its WebAuthn
+    // challenge — the journey the Storybook PasskeyLogin story drives.
+    const login = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "passkey",
+      fields: { email: "alice@acme.com" },
+    });
+    expect(login.step.name).toBe("passkey-login");
+    expect(login.step.challenge?.method).toBe("passkey");
+  });
+
+  test("the password step also offers passkey and routes to passkey-login", async () => {
+    applyPasskey(true);
+
+    // Reach the password step: a known email whose account has a password.
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const password = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "alice@acme.com" },
+    });
+    expect(password.step.name).toBe("password");
+
+    // The overlay adds exactly one passkey action, with the password step's key.
+    const offered = (password.step.actions ?? []).filter((a) => a.name === "passkey");
+    expect(offered).toHaveLength(1);
+    expect(offered[0]?.kind).toBe("passkey");
+    expect(offered[0]?.text_key).toBe("password.action.passkey");
+
+    // Choosing it drives the flow to the dedicated passkey-login step.
+    const login = await submitFlowStep(password.id, {
+      session_token: password.session_token,
+      action: "passkey",
+    });
+    expect(login.step.name).toBe("passkey-login");
+    expect(login.step.challenge?.method).toBe("passkey");
+  });
+
+  test("the passkey action survives a password credential-error response", async () => {
+    applyPasskey(true);
+
+    // Reach the password step, then submit a wrong password so the handler's
+    // credential-error branch returns the password step directly.
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const password = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "wrong@example.com" },
+    });
+    expect(password.step.name).toBe("password");
+    const errored = await submitFlowStep(password.id, {
+      session_token: password.session_token,
+      action: "submit",
+      fields: { [PASSWORD_FIELD]: "hunter2" },
+    });
+
+    // Error response is still the password step, and the overlay must not drop
+    // the passkey action just because the submission failed.
+    expect(errored.step.name).toBe("password");
+    expect(errored.step.error).toBe("error.invalid_credentials");
+    expect((errored.step.actions ?? []).filter((a) => a.name === "passkey")).toHaveLength(1);
+  });
+
+  test("clearPasskey removes the action again", async () => {
+    applyPasskey(true);
+    clearPasskey();
+
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    expect(start.step.actions?.some((a) => a.name === "passkey")).toBe(false);
   });
 });

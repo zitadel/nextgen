@@ -41,6 +41,9 @@
   --color-success: var(--zl-success);
   --color-link: var(--zl-link);
   --color-warning: var(--zl-warning);
+  --color-provider: var(--zl-provider);
+  --color-provider-border: var(--zl-provider-border);
+  --color-provider-foreground: var(--zl-provider-foreground);
 
   --radius-sm: var(--zl-radius-sm);
   --radius-xs: var(--zl-radius-xs);

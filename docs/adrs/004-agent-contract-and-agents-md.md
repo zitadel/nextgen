@@ -6,9 +6,9 @@
 
 ## Decision
 
-`apps/cli/SKILLS.md` is the canonical CLI agent guidance. The CLI package does
+`apps/cli/skills/zitadel-cli/SKILL.md` is the canonical CLI agent guidance. The CLI package does
 not ship multiple tool-specific mirrors; agents and humans should point to
-`SKILLS.md`.
+`SKILL.md`.
 
 Agents should call `zitadel <command> --non-interactive --json`, parse the JSON envelope, and prefer `next_commands` over prose hints.
 
@@ -18,7 +18,7 @@ The CLI is part of the product surface for AI coding agents. Agents need stable 
 
 ## Consequences
 
-- `apps/cli/SKILLS.md` is the source of truth for agent invocation rules;
+- `apps/cli/skills/zitadel-cli/SKILL.md` is the source of truth for agent invocation rules;
   `zitadel commands --json` and command help expose runtime command metadata.
 - Golden-path commands are marked supported.
 - Half-built surfaces stay callable only when marked experimental.

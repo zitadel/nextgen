@@ -8,7 +8,11 @@ import { access, rm } from "node:fs/promises";
 
 import { writeHandshake } from "./handshake";
 import { startLocalZitadel } from "./index";
-import { parseSupervisorConfig, requireHandshakePath, SUPERVISOR_CONFIG_ENV } from "./orchestration";
+import {
+  parseSupervisorConfig,
+  requireHandshakePath,
+  SUPERVISOR_CONFIG_ENV,
+} from "./orchestration";
 import type { LocalZitadel } from "./types";
 
 const LOG = "[zitadel-testing]";
@@ -30,7 +34,6 @@ async function main(): Promise<void> {
 
   // Signal handlers close over this binding before the asynchronous boot
   // assigns it.
-  // oxlint-disable-next-line prefer-const
   let zitadel: LocalZitadel | undefined;
   let signalled = false;
   let finishing: Promise<void> | undefined;

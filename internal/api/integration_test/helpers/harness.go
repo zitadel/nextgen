@@ -21,9 +21,13 @@ type Harness struct {
 
 	DB *service.DB
 
+	// serverLog collects what the server under test logs; tests assert above
+	// all what it must not contain (see Harness.ServerLog).
+	serverLog serverLog
+
 	httpClient      dependency[*http.Client]
 	testServer      dependency[*httptest.Server]
-	hasher          dependency[*crypto.PasswapHasher]
+	hasherFactory   dependency[*crypto.HasherFactory]
 	masterKeys      dependency[*domain.MasterKeys]
 	secretGenerator dependency[secrets.Generator]
 	joseSigner      dependency[jose.Signer]
@@ -44,10 +48,11 @@ type Harness struct {
 	flowStateMachine      dependency[*domain.FlowStateMachineRuntime]
 	teamService           dependency[*service.TeamService]
 	brandingService       dependency[*service.BrandingService]
-	environmentService    dependency[*service.EnvironmentService]
 	releaseService        dependency[service.ReleaseService]
+	idpConnectionService  dependency[service.IDPConnectionService]
 	eventService          dependency[*service.EventService]
 	keyService            dependency[service.KeyService]
+	variableService       dependency[service.VariableService]
 	tokenService          dependency[service.TokenService]
 
 	schemaStore     dependency[domain.JSONSchemaStore]

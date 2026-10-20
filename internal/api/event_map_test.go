@@ -47,6 +47,37 @@ func TestEventToAPI_UserCreated(t *testing.T) {
 	assert.Equal(t, []string{"email"}, v.Payload.AttributeKeys)
 }
 
+func TestEventToAPI_UserUpdated(t *testing.T) {
+	t.Parallel()
+	actor := domain.EventActorTypeHuman
+	entityType := "user"
+	entityID := "user_1"
+	payload, err := json.Marshal(domain.UserUpdatedPayload{AttributeKeys: []string{"givenName"}})
+	require.NoError(t, err)
+
+	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	got, err := eventToAPI(&domain.Event{
+		ID:             "evt_upd",
+		ProjectID:      "proj_1",
+		EventType:      domain.EventTypeUserUpdated,
+		Category:       domain.EventCategoryEntity,
+		OccurredAt:     now,
+		CreatedAt:      now,
+		ActorType:      &actor,
+		EntityType:     &entityType,
+		EntityID:       &entityID,
+		ClientID:       "app_1",
+		DelegationType: "direct",
+		Payload:        payload,
+	})
+	require.NoError(t, err)
+	require.Equal(t, api.UserUpdatedEventEvent, got.Type)
+	v, ok := got.GetUserUpdatedEvent()
+	require.True(t, ok)
+	assert.Equal(t, "evt_upd", v.ID)
+	assert.Equal(t, []string{"givenName"}, v.Payload.AttributeKeys)
+}
+
 func TestEventToAPI_EmptyPayload(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)

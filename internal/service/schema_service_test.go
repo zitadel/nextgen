@@ -216,9 +216,9 @@ func TestSchemaService_ListSchemas(t *testing.T) {
 		},
 		{
 			name:  "object type filter applied",
-			input: service.ListSchemasInput{ProjectID: "proj_a", ObjectType: "human-user"},
+			input: service.ListSchemasInput{ProjectID: "proj_a", ObjectTypes: []string{"human-user"}},
 			wantOpts: listSchemasOpts(20, "",
-				database.Equal(database.Col(domain.JSONSchemaFieldObjectType), "human-user"),
+				database.Or(database.Equal(database.Col(domain.JSONSchemaFieldObjectType), "human-user")),
 			),
 			result: &database.ListResult[*domain.JSONSchema]{},
 		},

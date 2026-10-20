@@ -1,11 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Link2, Workflow } from "lucide-react";
 
+import { api } from "@/api/zitadel";
+import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
+import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { DETAIL_PANEL_PAGE } from "@/components/layout";
-import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
+import { EYEBROW, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   Table,
@@ -23,12 +25,13 @@ import {
   stepActionNames,
   stepFieldNames,
 } from "@/lib/flow-definition";
+import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { schemaDisplayName } from "@/lib/schema";
 
-import { api } from "../../../api/zitadel";
-
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
-  loader: async ({ params }) => {
+  staticData: { scope: "project" },
+  loaderDeps: projectScopeDeps,
+  loader: async ({ params, deps }) => {
     const entry = await api.getFlowDefinition(params.definitionId);
     // Structurally the list's `flow_definition`; orval renames per operation.
     const definition: FlowDefinition = entry.flow_definition;
@@ -36,20 +39,30 @@ export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")(
       definition,
       createdAt: entry.created_at,
       // No `expand` on this endpoint, so the badge costs a second call.
-      schemaName: await resolveSchemaName(definition.user_schema),
-      schemaId: definition.user_schema,
+      ...(await resolveSchema(definition.user_schema, requireProjectScope(deps.project))),
     };
   },
   component: FlowDefinitionDetail,
 });
 
-async function resolveSchemaName(id: string | undefined): Promise<string | undefined> {
-  if (!id) return undefined;
+/** The newest revision of the schema the flow names by `objectType`. */
+async function resolveSchema(
+  objectType: string | undefined,
+  projectId: string,
+): Promise<{ schemaName?: string; schemaId?: string }> {
+  if (!objectType) return {};
   try {
-    const body = await api.getSchemaById(id);
-    return schemaDisplayName(body.schema, id);
+    const page = await api.listSchemas({
+      project_id: projectId,
+      object_type: objectType,
+      revisions: "latest",
+      limit: 1,
+    });
+    const latest = page.schemas[0];
+    if (!latest) return {};
+    return { schemaName: schemaDisplayName(latest.schema, objectType), schemaId: latest.id };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -61,19 +74,11 @@ function FlowDefinitionDetail() {
 
   return (
     <div className={DETAIL_PANEL_PAGE}>
-      <Card className="gap-4 border-foreground/10 px-6 py-5 shadow-xs">
+      <DetailPanel>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           {/* Stacks below `sm` so a long schema name cannot squeeze the title. */}
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <span
-                aria-hidden
-                className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted"
-              >
-                <Workflow className="size-4 text-foreground" />
-              </span>
-              <h1 className="truncate font-serif text-lg leading-6 text-foreground">{name}</h1>
-            </div>
+            <PanelTitle icon={Workflow} title={name} />
             {schemaName && schemaId && (
               <Link to="/schemas/$schemaId" params={{ schemaId }} className="w-fit shrink-0">
                 <Badge variant="outline" className="h-5 gap-1 hover:bg-accent">
@@ -84,14 +89,12 @@ function FlowDefinitionDetail() {
             )}
           </div>
 
-          {/* The frame draws a third value, `EXPIRES AT`; nothing backs it. */}
-          <Card className="gap-0 rounded-md py-0 shadow-xs">
-            <CardContent className="flex flex-col px-5 py-3.5 sm:flex-row sm:flex-wrap sm:items-start">
-              <MetaValue label="Flow ID" value={definitionId} copyable />
-              <MetaRule />
-              <MetaValue label="Created" value={formatDate(createdAt)} />
-            </CardContent>
-          </Card>
+          {/* The design draws a third value, `EXPIRES AT`; nothing backs it. */}
+          <MetaCard>
+            <MetaValue label="Flow ID" value={definitionId} copyable />
+            <MetaRule />
+            <MetaValue label="Created" value={formatDate(createdAt)} />
+          </MetaCard>
         </div>
 
         <Separator />
@@ -124,7 +127,7 @@ function FlowDefinitionDetail() {
         </section>
 
         <DocumentViewer document={definition} noun="definition" />
-      </Card>
+      </DetailPanel>
     </div>
   );
 }
@@ -143,7 +146,8 @@ function StepRow({ step }: { step: FlowStep }) {
   );
 }
 
-const HEAD_CELL =
-  "h-auto px-0 py-3 font-serif text-xs font-normal tracking-[0.72px] text-muted-foreground uppercase";
-// `whitespace-normal`: a register step's field list outruns a third of the panel.
-const BODY_CELL = "px-0 py-3 text-sm whitespace-normal";
+const HEAD_CELL = PANEL_HEAD_CELL;
+// `whitespace-normal`: a register step's field list outruns a third of the
+// panel. `wrap-anywhere` as well: a field path like `x-auth-methods#password`
+// has no break point, and on a phone a third of the panel is narrower than it.
+const BODY_CELL = `${PANEL_BODY_CELL} whitespace-normal wrap-anywhere`;

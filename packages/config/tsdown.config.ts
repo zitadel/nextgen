@@ -2,21 +2,25 @@ import { defineConfig } from "tsdown";
 
 export default defineConfig({
   entry: {
+    "branding-contrast": "src/branding-contrast.ts",
+    "css-color": "src/css-color.ts",
     "branding-url": "src/branding-url.ts",
     index: "src/index.ts",
     defaults: "src/defaults.ts",
+    "idp/index": "src/idp/index.ts",
     "meta-schemas": "src/meta-schemas.ts",
     normalize: "src/normalize.ts",
     schemas: "src/schemas.ts",
     template: "src/template.ts",
-    validate: "src/validate.ts",
+    validate: "src/validation/index.ts",
   },
   outDir: "dist",
   format: ["esm"],
+  failOnWarn: true,
   tsconfig: "tsconfig.lib.json",
   dts: true,
   sourcemap: true,
   clean: true,
   target: "es2022",
-  external: ["@zitadel/api"],
+  deps: { neverBundle: ["@zitadel/api"] },
 });

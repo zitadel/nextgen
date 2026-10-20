@@ -1,0 +1,9 @@
+type: string
+description: |
+  Field to filter or sort identity provider connections by:
+  - `slug`: unique within the project. `equals` returns the newest revision
+    of that connection
+  - `created_at`: RFC3339 timestamp
+enum:
+  - slug
+  - created_at

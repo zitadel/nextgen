@@ -1,12 +1,14 @@
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { Orca } from "../../../../src/lib/orca";
+import { ZitadelError } from "../../../../src/lib/errors";
+import { inspectScaffoldTarget, Orca } from "../../../../src/lib/orca";
 import type { Detector } from "../../../../src/lib/orca";
 import { detectors } from "../../../../src/lib/orca/detectors";
+import { DEFAULT_DEV_PORT } from "../../../../src/lib/orca/detectors/port";
 import { patchers } from "../../../../src/lib/orca/patchers";
 import { scaffolders } from "../../../../src/lib/orca/scaffolders";
 import type { Scaffolder } from "../../../../src/lib/orca/scaffolders/types";
@@ -86,10 +88,14 @@ describe("Orca selection", () => {
     expect(orca.availableFrameworks().map((choice) => choice.id)).toEqual([
       "next",
       "nuxt",
+      "tanstack-start",
       "react",
       "vue",
+      "solid-start",
       "solid",
+      "sveltekit",
       "svelte",
+      "qwik-router",
       "qwik",
       "angular",
     ]);
@@ -126,6 +132,29 @@ describe("Orca detection", () => {
     });
   });
 
+  // Not detected would read as a directory to scaffold into, and setup's
+  // --force would then scaffold a new app over this one.
+  it("refuses a requested framework other than the app's own", async () => {
+    await expect(orca.detect(await nextProject(), "react")).rejects.toMatchObject({
+      code: "E_CONFLICT",
+      message: "Setup detects Next.js here, not React (Vite)",
+      hint: expect.stringContaining("--framework next"),
+      details: { requested: "react", detected: "next" },
+    });
+  });
+
+  it("reports an app it recognises but does not support, whatever was requested", async () => {
+    const pagesRouter = await tmp();
+    await writeFile(
+      join(pagesRouter, "package.json"),
+      JSON.stringify({ dependencies: { next: "^15" } }),
+    );
+
+    await expect(orca.detect(pagesRouter, "react")).rejects.toMatchObject({
+      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+    });
+  });
+
   it("tryDetect returns undefined instead of throwing", async () => {
     expect(await orca.tryDetect(await tmp())).toBeUndefined();
     expect(await orca.tryDetect(await nextProject())).toMatchObject({ id: "next" });
@@ -135,20 +164,29 @@ describe("Orca detection", () => {
     expect(await orca.isFreshScaffoldTarget(await tmp())).toBe(true);
   });
 
-  it("allows .gitignore in a fresh scaffold target", async () => {
-    const cwd = await tmp();
-    await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
-
-    expect(await orca.isFreshScaffoldTarget(cwd)).toBe(true);
-  });
-
-  it("allows runtime-only .zitadel/local state in a fresh scaffold target", async () => {
+  it("treats a directory holding only what start leaves as fresh", async () => {
     const cwd = await tmp();
     await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
     await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/local/runtime.json"), "{}");
 
     expect(await orca.isFreshScaffoldTarget(cwd)).toBe(true);
+
+    // After `reset`, the runtime is gone and its parent may stay behind empty.
+    await rm(join(cwd, ".zitadel/local"), { recursive: true });
+    expect(await orca.isFreshScaffoldTarget(cwd)).toBe(true);
+  });
+
+  it("treats a .gitignore with rules of its own as not fresh, and names only it", async () => {
+    const cwd = await tmp();
+    await writeFile(join(cwd, ".gitignore"), "node_modules\n.zitadel/local/\n");
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+
+    await expect(inspectScaffoldTarget(cwd)).resolves.toEqual({
+      scaffoldable: false,
+      reason: "Directory is not empty (contains .gitignore).",
+      entries: [".gitignore", ".zitadel"],
+    });
   });
 
   it("rejects project state and arbitrary files as fresh scaffold targets", async () => {
@@ -172,6 +210,9 @@ describe("Orca.scaffold", () => {
   // re-detect) without spawning a real project generator.
   const fakeDetector: Detector = {
     framework: "fake",
+    displayName: "Fake",
+    versionPackage: "fake",
+    versionFloor: "1",
     async detect(cwd) {
       try {
         await readFile(join(cwd, "package.json"), "utf8");
@@ -197,7 +238,7 @@ describe("Orca.scaffold", () => {
     await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
   });
 
-  it("scaffolds in place while preserving runtime-only .zitadel/local state", async () => {
+  it("without force, scaffolds beside the runtime start left and restores it", async () => {
     const cwd = await tmpPackageSafe();
     await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
     await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
@@ -206,6 +247,8 @@ describe("Orca.scaffold", () => {
     const guardedScaffolder: Scaffolder = {
       ...fakeScaffolder,
       async scaffold(scaffoldCwd) {
+        // The stash emptied the directory so the underlying generator sees a
+        // clean slate.
         await expect(stat(join(scaffoldCwd, ".zitadel"))).rejects.toMatchObject({
           code: "ENOENT",
         });
@@ -220,13 +263,61 @@ describe("Orca.scaffold", () => {
 
     await expect(guardedOrca.scaffold(cwd, "fake")).resolves.toMatchObject({ id: "fake" });
     await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
+    // Untouched by the scaffold, so restored verbatim.
     await expect(readFile(join(cwd, ".zitadel/local/runtime.json"), "utf8")).resolves.toContain(
       "localhost",
     );
+    // The scaffold created its own .gitignore, so its content is kept — but the
+    // stashed ignore rules are merged back in, so `.zitadel/local/` (which keeps
+    // the restored local admin credential out of git) is not silently dropped.
     await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toBe(
       "node_modules\n.zitadel/local/\n",
     );
-    await expect(stat(join(cwd, "myapp"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("with force, scaffolds into a non-empty dir and restores what it did not create", async () => {
+    const cwd = await tmpPackageSafe();
+    await writeFile(join(cwd, "notes.txt"), "mine");
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+
+    await expect(fakeOrca.scaffold(cwd, "fake", true)).resolves.toMatchObject({ id: "fake" });
+    await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
+    await expect(readFile(join(cwd, "notes.txt"), "utf8")).resolves.toBe("mine");
+    await expect(stat(join(cwd, ".zitadel/local"))).resolves.toBeTruthy();
+  });
+
+  it("with force, a failed scaffold rolls back and restores the originals", async () => {
+    const cwd = await tmpPackageSafe();
+    await writeFile(join(cwd, "keep.txt"), "original");
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/local/runtime.json"), '{"server_url":"http://localhost"}');
+
+    const throwingScaffolder: Scaffolder = {
+      ...fakeScaffolder,
+      async scaffold(scaffoldCwd) {
+        // Write a partial file (even colliding with an original name) then fail.
+        await writeFile(join(scaffoldCwd, "keep.txt"), "partial garbage");
+        await writeFile(join(scaffoldCwd, "half-written.txt"), "junk");
+        throw new ZitadelError("E_VALIDATION", "boom");
+      },
+    };
+    const guardedOrca = new Orca([fakeDetector], [throwingScaffolder], []);
+
+    await expect(guardedOrca.scaffold(cwd, "fake", true)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+    // Originals are intact and the partial scaffold output is gone.
+    await expect(readFile(join(cwd, "keep.txt"), "utf8")).resolves.toBe("original");
+    await expect(readFile(join(cwd, ".zitadel/local/runtime.json"), "utf8")).resolves.toContain(
+      "localhost",
+    );
+    await expect(stat(join(cwd, "half-written.txt"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("refuses a non-empty directory without force", async () => {
+    const cwd = await tmpPackageSafe();
+    await writeFile(join(cwd, ".gitignore"), "x\n");
+    await expect(fakeOrca.scaffold(cwd, "fake")).rejects.toMatchObject({ code: "E_CONFLICT" });
   });
 
   it("throws E_CONFLICT when the directory already contains a project", async () => {
@@ -250,11 +341,158 @@ describe("Orca.scaffold", () => {
       hint: expect.stringContaining("lowercase npm-package-safe"),
       details: expect.objectContaining({
         name: expect.stringContaining("Zitadel-Orca-Bad"),
-        validation_errors: expect.arrayContaining([
-          "name can no longer contain capital letters",
-        ]),
+        validation_errors: expect.arrayContaining(["name can no longer contain capital letters"]),
       }),
     });
     expect(scaffold).not.toHaveBeenCalled();
+  });
+
+  it("removes what a failed scaffold left in an empty directory", async () => {
+    const cwd = await tmpPackageSafe();
+    const failingOrca = new Orca(
+      [fakeDetector],
+      [
+        {
+          ...fakeScaffolder,
+          async scaffold(scaffoldCwd) {
+            await writeFile(join(scaffoldCwd, "half-written.txt"), "junk");
+            throw new ZitadelError("E_VALIDATION", "boom");
+          },
+        },
+      ],
+      [],
+    );
+
+    await expect(failingOrca.scaffold(cwd, "fake")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+    await expect(readdir(cwd)).resolves.toEqual([]);
+  });
+
+  describe("undoably", () => {
+    /** A scaffold that writes its own `.gitignore` and `package.json`, as the generators do. */
+    const generatorOrca = new Orca(
+      [fakeDetector],
+      [
+        {
+          ...fakeScaffolder,
+          async scaffold(scaffoldCwd) {
+            await writeFile(join(scaffoldCwd, ".gitignore"), "node_modules\n");
+            await writeFile(join(scaffoldCwd, "package.json"), "{}");
+          },
+        },
+      ],
+      [],
+    );
+
+    it("puts back what start left, without what was written after the scaffold", async () => {
+      const cwd = await tmpPackageSafe();
+      await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
+      await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+      await writeFile(join(cwd, ".zitadel/local/runtime.json"), "{}");
+      const scaffold = await generatorOrca.scaffoldUndoably(cwd, "fake");
+      await writeFile(join(cwd, "zitadel.json"), "{}");
+      await writeFile(join(cwd, ".zitadel/secret"), "{}");
+
+      await scaffold.undo();
+
+      await expect(readdir(cwd)).resolves.toEqual([".gitignore", ".zitadel"]);
+      await expect(readdir(join(cwd, ".zitadel"))).resolves.toEqual(["local"]);
+      await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toBe(".zitadel/local/\n");
+      await expect(readFile(join(cwd, ".zitadel/local/runtime.json"), "utf8")).resolves.toBe("{}");
+    });
+
+    it("puts back the files the scaffold replaced with force", async () => {
+      const cwd = await tmpPackageSafe();
+      await writeFile(join(cwd, "package.json"), "mine");
+      await writeFile(join(cwd, "notes.txt"), "mine");
+      const scaffold = await generatorOrca.scaffoldUndoably(cwd, "fake", true);
+
+      await scaffold.undo();
+
+      await expect(readdir(cwd)).resolves.toEqual(["notes.txt", "package.json"]);
+      await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("mine");
+    });
+
+    it("leaves nothing beside the directory once undone", async () => {
+      const cwd = await tmpPackageSafe();
+      await writeFile(join(cwd, "package.json"), "mine");
+      const scaffold = await generatorOrca.scaffoldUndoably(cwd, "fake", true);
+
+      await scaffold.undo();
+
+      await expect(readdir(dirname(cwd))).resolves.toEqual([basename(cwd)]);
+    });
+
+    it("keeps the new app, and nothing beside the directory, once kept", async () => {
+      const cwd = await tmpPackageSafe();
+      await writeFile(join(cwd, "package.json"), "mine");
+      const scaffold = await generatorOrca.scaffoldUndoably(cwd, "fake", true);
+
+      await scaffold.keep();
+
+      await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
+      await expect(readdir(dirname(cwd))).resolves.toEqual([basename(cwd)]);
+    });
+
+    it("undoes a scaffold whose app it cannot detect", async () => {
+      const cwd = await tmpPackageSafe();
+      await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
+      const undetectableOrca = new Orca(
+        [fakeDetector],
+        [
+          {
+            ...fakeScaffolder,
+            async scaffold(scaffoldCwd) {
+              await writeFile(join(scaffoldCwd, "index.html"), "<p>not an app</p>");
+            },
+          },
+        ],
+        [],
+      );
+
+      await expect(undetectableOrca.scaffoldUndoably(cwd, "fake")).rejects.toMatchObject({
+        code: "E_FRAMEWORK_NOT_DETECTED",
+      });
+      await expect(readdir(cwd)).resolves.toEqual([".gitignore"]);
+    });
+  });
+});
+
+describe("Orca.planScaffold", () => {
+  it("describes the new app without touching the directory", async () => {
+    const cwd = await tmpPackageSafe();
+
+    await expect(orca.planScaffold(cwd, "next")).resolves.toEqual({
+      framework: "next",
+      devPort: DEFAULT_DEV_PORT,
+    });
+    await expect(readdir(cwd)).resolves.toEqual([]);
+  });
+
+  it("offers the dev port a .env file in the directory declares", async () => {
+    const cwd = await tmpPackageSafe();
+    await writeFile(join(cwd, ".env.local"), "PORT=4321\n");
+
+    await expect(orca.planScaffold(cwd, "next")).resolves.toMatchObject({ devPort: 4321 });
+  });
+
+  it("refuses a directory name npm does not accept", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "zitadel-orca-invalid-"));
+    dirs.push(parent);
+    const cwd = join(parent, "Zitadel-Orca-Bad");
+    await mkdir(cwd);
+
+    await expect(orca.planScaffold(cwd, "next")).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("refuses a framework it could create but not integrate", async () => {
+    const cwd = await tmpPackageSafe();
+    const withoutPatchers = new Orca(detectors, scaffolders, []);
+
+    await expect(withoutPatchers.planScaffold(cwd, "next")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: 'No patcher supports "next"',
+    });
   });
 });

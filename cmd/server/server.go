@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -24,6 +25,8 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel/log"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
@@ -31,11 +34,13 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
+	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/service"
@@ -45,6 +50,7 @@ import (
 	_ "github.com/zitadel/nextgen/internal/storage/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
 	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 // flagDisableMasterKeyGeneration is the command-line half of
@@ -139,7 +145,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	slog.Info("building server")
 
-	metrics, err := zotel.NewOtelMetrics(ctx, zotel.MetricsConfig{
+	telemetry, err := zotel.NewOtelMetrics(ctx, zotel.MetricsConfig{
 		ServiceName:     cfg.Instrumentation.ServiceName,
 		TraceIdFraction: cfg.Instrumentation.Trace.Fraction,
 		TraceExporter:   cfg.Instrumentation.Trace.Exporter,
@@ -149,9 +155,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	if err != nil {
 		return fmt.Errorf("failed to create otel metrics: %w", err)
 	}
-	sfs.Add(metrics.Shutdown)
+	sfs.Add(telemetry.Shutdown)
 
-	setUpLogging(cfg.Instrumentation.Log, metrics.LoggerProvider())
+	setUpLogging(cfg.Instrumentation.Log, telemetry.LoggerProvider())
 
 	pool, err := startDatabase(ctx, cfg, applyMigrations)
 	if err != nil {
@@ -169,10 +175,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
 
-	passwordHasher, err := cfg.PasswordHasher.NewHasher()
+	hasherFactory, err := cfg.PasswordHasher.NewHasherFactory()
 	if err != nil {
 		return fmt.Errorf("failed to build password hasher: %w", err)
 	}
+	passwordHasher := hasherFactory.Default()
 
 	// ── Repositories ─────────────────
 	serviceDBPool := service.NewPool(pool.(service.Pool))
@@ -212,7 +219,19 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	userRefs := service.StatementsUserRefResolver{Pool: serviceDBPool}
 
 	// ── Services ─────────────────────
-	keyService := service.NewKeyService(serviceDBPool, *masterKey)
+	// Whether anything is exported stays the existing instrumentation.metric
+	// config's decision: with no exporter the provider is a no-op and the
+	// instruments cost nothing.
+	cacheMeter := metrics.WithMeterProvider(telemetry.MeterProvider())
+	crypterCache, err := cache.NewMeteredLRU[service.CrypterCacheKey, op.Crypto](cache.NameCrypter, cfg.Keys.CrypterLRUCacheSize, cacheMeter)
+	if err != nil {
+		return fmt.Errorf("failed to build crypter cache: %w", err)
+	}
+	signingKeyCache, err := cache.NewMeteredLRU[service.SigningKeyCacheKey, domain.SigningKey](cache.NameSigningKey, cfg.Keys.SigningKeyLRUCacheSize, cacheMeter)
+	if err != nil {
+		return fmt.Errorf("failed to build signing key cache: %w", err)
+	}
+	keyService := service.NewKeyService(serviceDBPool, *masterKey, crypterCache, signingKeyCache)
 
 	authAttemptSvc := service.NewAuthAttemptService(
 		serviceDBPool,
@@ -229,6 +248,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		builtinPublicBase.String(),
 		schemaValidator,
 		keyService,
+		hasherFactory,
+		cfg.Origins.SharedHosts,
 	)
 
 	// Bootstrap runs here rather than straight after the migrations because it
@@ -248,7 +269,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		serviceDBPool,
-		schemaService,
 		schemaValidator,
 		nil,
 	)
@@ -263,13 +283,21 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
-	environmentService := service.NewEnvironmentService(serviceDBPool)
-	releaseService := service.NewReleaseService(serviceDBPool)
+	variableService := service.NewVariableService(serviceDBPool, keyService)
+	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
+	releaseService := service.NewReleaseService(
+		serviceDBPool,
+		schemaService,
+		flowDefinitionSvc,
+		brandingService,
+		idpConnectionService,
+	)
 	eventService := service.NewEventService(serviceDBPool)
+	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	userService := service.NewUserService(
 		serviceDBPool,
 		schemaStore,
-		passwordHasher,
+		projectHashers,
 		userRefs,
 	)
 
@@ -289,7 +317,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	fields := domain.NewSchemaFieldResolver()
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore)
 	createUserHandler := service.NewFlowCreateUserHandler(
-		passwordHasher,
+		projectHashers,
 		userService,
 		schemaStore,
 		serviceDBPool,
@@ -300,8 +328,12 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		fields,
 		createUserHandler,
 		flowAuth,
+		service.NewFlowSSOProviderResolver(idpConnectionService),
+		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers),
+		service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
 		time.Now,
 	)
+	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
 
 	flowService := service.NewFlowService(serviceDBPool, stateMachine)
 	tokenService := service.NewTokenService(keyService, serviceDBPool)
@@ -354,31 +386,27 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			flowDefinitionSvc,
 			teamService,
 			brandingService,
-			environmentService,
 			releaseService,
+			idpConnectionService,
 			eventService,
 			tokenService,
 			keyService,
 			claimService,
 			grantService,
+			variableService,
 			serviceDBPool,
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
 		).WithPersonalTeamEnsurer(personalTeams),
 		api.NewSecurityHandler(tokenService),
-		oasapi.WithMiddleware(
-			middleware.AddOperationIdToContext(),
-			// logging is done at net/http level
-		),
-		oasapi.WithMeterProvider(metrics.MeterProvider()),
-		oasapi.WithTracerProvider(metrics.TracerProvider()),
-		oasapi.WithErrorHandler(api.OgenErrorHandler))
+		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider())...)
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
 	}
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
+		api.NewIDPCallbackHandler(ssoCallback),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf)
 	if err != nil {
@@ -460,7 +488,24 @@ func consoleBaseURL(publicBase, consolePath string) (string, error) {
 // environment, which is what a command-line flag has to do.
 type configOverride func(*viper.Viper)
 
+// loadConfig reads the configuration the server serves with: readConfig's,
+// plus the master keys, one generated when none is configured and
+// generation is on.
 func loadConfig(configPath string, overrides ...configOverride) (Config, error) {
+	cfg, err := readConfig(configPath, overrides...)
+	if err != nil {
+		return Config{}, err
+	}
+	if err := ensureServerMasterKey(&cfg.Server); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
+}
+
+// readConfig reads and validates the configuration without touching the
+// master keys, which only serving needs: `migrate` reads its configuration
+// here, so it neither requires a master key nor generates one.
+func readConfig(configPath string, overrides ...configOverride) (Config, error) {
 	v := viper.NewWithOptions(viper.ExperimentalBindStruct())
 	v.SetEnvPrefix("NEXTGEN")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -499,6 +544,15 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 		crypto.HashNamePHPass,
 		crypto.HashNameDrupal7,
 	})
+	// The limits bound what a stored hash may cost: too cheap and it is not
+	// protecting anything, too dear and reading one back is a denial of service.
+	// They apply to hashes arriving from an import and to a hashing method a
+	// project picks for itself (ADR 029 §Hashing) -- the deployment says what is
+	// acceptable, a project chooses inside it. An algorithm left at zero here
+	// accepts nothing, which is why every algorithm with a verifier a project
+	// may hash with carries a range. Each spans passwap's recommended
+	// parameters: bcrypt 12, argon2id t=3/m=64MiB/p=4, scrypt ln=15,
+	// pbkdf2 290k rounds, sha2 5k rounds.
 	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
 		Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
 		Argon2: crypto.Argon2LimitsConfig{
@@ -506,8 +560,20 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 			MinMemory: 8 * 1024, MaxMemory: 512 * 1024,
 			MinThreads: 1, MaxThreads: 16,
 		},
+		Scrypt: crypto.ScryptLimitsConfig{
+			MinLN: 12, MaxLN: 20,
+			MinR: 8, MaxR: 8,
+			MinP: 1, MaxP: 4,
+		},
+		PBKDF2: crypto.PBKDF2LimitsConfig{MinRounds: 100_000, MaxRounds: 5_000_000},
+		Sha2: crypto.Sha2LimitsConfig{
+			MinSha256Rounds: 5_000, MaxSha256Rounds: 1_000_000,
+			MinSha512Rounds: 5_000, MaxSha512Rounds: 1_000_000,
+		},
 	})
-	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
+	v.SetDefault("schema.lru_cache_size", 1000) // todo: temp, review
+	v.SetDefault("keys.crypter_lru_cache_size", 1000)
+	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
 	v.SetDefault("schema.resolve_timeout", domain.DefaultJSONSchemaResolveTimeout)
 	// Egress policy for user-injectable URLs (ADR 061). The deny list
@@ -520,7 +586,12 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("httpclient.allow_https_downgrade", false)
 	v.SetDefault("httpclient.deny_list", httputil.DefaultDenyList)
 	v.SetDefault("httpclient.allow_list", []string{})
-	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
+	// origins.shared_hosts is not SetDefault'd: viper merges map defaults with
+	// overrides, which would break replace-defaults. Nil after unmarshal means
+	// "use DefaultSharedHosts"; an explicit empty map disables the checks.
+	// default_ttl is the lifetime of a signed-in session, not of the
+	// anonymous shell POST /sessions mints (domain.SessionAnonymousTTL).
+	v.SetDefault("session.default_ttl", domain.SessionDefaultTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 	// Empty means "the deployment's first-created non-platform project is the
 	// default" (Console ADR 0004 §2; the built-in platform row is skipped by
@@ -590,12 +661,16 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 		// reaching non-string slice fields such as []zlog.Stream.
 		mapstructure.StringToTimeDurationHookFunc(),
 		stringToWeakSliceHookFunc(","),
+		stringToRegexpHookFunc(),
 		// Lets enum types generated by enumer (zlog.Level, zlog.Stream,
 		// instrumentation.LogFormat, ...) decode from their documented string
 		// names via the encoding.TextUnmarshaler they already implement.
 		mapstructure.TextUnmarshallerHookFunc(),
 	))); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
+	}
+	if cfg.Origins.SharedHosts == nil {
+		cfg.Origins.SharedHosts = domain.DefaultSharedHosts
 	}
 	// Create the data dir configuration actually selected, not the default
 	// computed above — an explicit empty data_dir still means the default.
@@ -605,11 +680,10 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	if err := ensureServerDataDir(cfg.Server.DataDir); err != nil {
 		return Config{}, err
 	}
-	if err := ensureServerMasterKey(&cfg.Server); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
-
-	return cfg, cfg.Validate()
+	return cfg, nil
 }
 
 // stringToWeakSliceHookFunc splits a string into a slice on sep, without
@@ -630,6 +704,18 @@ func stringToWeakSliceHookFunc(sep string) mapstructure.DecodeHookFunc {
 	}
 }
 
+// stringToRegexpHookFunc compiles string config values into *regexp.Regexp
+// (including map values of that type). Bad patterns fail config load.
+func stringToRegexpHookFunc() mapstructure.DecodeHookFunc {
+	regexpPtr := reflect.TypeOf((*regexp.Regexp)(nil))
+	return func(f reflect.Type, t reflect.Type, data any) (any, error) {
+		if f.Kind() != reflect.String || t != regexpPtr {
+			return data, nil
+		}
+		return regexp.Compile(data.(string))
+	}
+}
+
 // mustBindEnv panics on viper's documented "this can't fail in
 // normal use" BindEnv error path. Keeps the env wiring readable
 // without sprinkling error handling at every binding.
@@ -641,7 +727,21 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
+// apiServerOptions are the options of the ogen API server that buildHTTPMux
+// mounts, shared with the test of that chain.
+func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider) []oasapi.ServerOption {
+	return []oasapi.ServerOption{
+		oasapi.WithMiddleware(
+			middleware.AddOperationIdToContext(),
+			// logging is done at net/http level
+		),
+		oasapi.WithMeterProvider(meterProvider),
+		oasapi.WithTracerProvider(api.NewOgenTracerProvider(tracerProvider)),
+		oasapi.WithErrorHandler(api.OgenErrorHandler),
+	}
+}
+
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	if cfg.LoginEnabled {
@@ -679,16 +779,27 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
 	}
 
-	mux.Handle("/",
-		middleware.Chain(apiHandler,
+	chain := func(h http.Handler, redactQuery ...string) http.Handler {
+		return middleware.Chain(h,
 			func(next http.Handler) http.Handler { return middleware.WithRequestContextMiddleware(reqIdGen, next) },
-			middleware.WithLogging,
+			func(next http.Handler) http.Handler { return middleware.WithLogging(next, redactQuery...) },
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
+			api.WithCSRFRequest,
 			func(next http.Handler) http.Handler { return audit.WithRequestEventMiddleware(requestEvents, next) },
-		),
-	)
+		)
+	}
+	// The same chain: the callback reads its cookie by the request scheme
+	// (WithRequestHostMiddleware). Its code is a credential and its state is
+	// single-use, so the request log hides both: a log line must not be able
+	// to replay a sign-in. Both spellings serve one handler: the prefixed path
+	// arrives when the instance is the browser origin, the stripped one through
+	// a scaffolded app's SDK proxy.
+	callback := chain(idpCallbackHandler, "code", "state")
+	mux.Handle(api.IDPCallbackPattern, callback)
+	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
+	mux.Handle("/", chain(apiHandler))
 	return mux, nil
 }
 

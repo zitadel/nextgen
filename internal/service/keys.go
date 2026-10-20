@@ -5,18 +5,24 @@ import (
 	"errors"
 
 	"github.com/go-jose/go-jose/v4"
+	"github.com/zitadel/nextgen/internal/cache"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ---- Interface -------------------------------------------------------------
 
 type KeyService interface {
+	SaveEncryptionKey(ctx context.Context, stmts AllStatements, key *domain.EncryptionKey) error
 	GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*domain.EncryptionKey, error)
 	GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Crypto, error)
 	GetProjectEncryptionKey(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (*domain.EncryptionKey, error)
 	GetProjectCrypter(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (op.Crypto, error)
+	SaveSigningKey(ctx context.Context, stmts AllStatements, key *domain.SigningKey) error
 	GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (*domain.SigningKey, error)
 	GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (jose.Signer, error)
 	GetMasterKeyCrypter(ctx context.Context) (op.Crypto, error)
@@ -26,21 +32,59 @@ type KeyService interface {
 // ---- Implementation -------------------------------------------------------------
 
 type keyService struct {
-	db         *DB
-	masterKeys domain.MasterKeys
+	db              *DB
+	masterKeys      domain.MasterKeys
+	crypterCache    cache.Cache[CrypterCacheKey, op.Crypto]
+	signingKeyCache cache.Cache[SigningKeyCacheKey, domain.SigningKey]
 }
 
 func NewKeyService(
 	db *DB,
 	masterKeys domain.MasterKeys,
+	crypterCache cache.Cache[CrypterCacheKey, op.Crypto],
+	signingKeyCache cache.Cache[SigningKeyCacheKey, domain.SigningKey],
 ) KeyService {
 	return &keyService{
-		db:         db,
-		masterKeys: masterKeys,
+		db:              db,
+		masterKeys:      masterKeys,
+		crypterCache:    crypterCache,
+		signingKeyCache: signingKeyCache,
 	}
 }
 
-func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*domain.EncryptionKey, error) {
+type CrypterCacheKey struct {
+	KeyID     string
+	Algorithm jose.ContentEncryption
+}
+
+type SigningKeyCacheKey struct {
+	ProjectID string
+	Purpose   domain.SigningKeyPurpose
+}
+
+// ------------------------------------------------------
+// ENCRYPTION KEYS
+// ------------------------------------------------------
+
+func (s *keyService) SaveEncryptionKey(ctx context.Context, stmts AllStatements, key *domain.EncryptionKey) (err error) {
+	ctx, end := startSpan(ctx, "KeyService.SaveEncryptionKey")
+	defer end(&err)
+
+	if err := stmts.CreateEncryptionKey(ctx, key); err != nil {
+		if mapped := mapStorageError(err); mapped != err {
+			return mapped
+		}
+		return domain.ErrInternal(err).
+			WithMessage("failed to create encryption key in the database").
+			WithDetails(map[string]any{"purpose": key.Purpose})
+	}
+	return nil
+}
+
+func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (_ *domain.EncryptionKey, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetEncryptionKey")
+	defer end(&err)
+
 	key, err := s.db.Statements().GetEncryptionKey(ctx, database.And(
 		database.Equal(database.Col(domain.EncryptionKeyFieldID), keyID),
 		database.Equal(database.Col(domain.EncryptionKeyFieldAlgorithm), algorithm),
@@ -54,12 +98,21 @@ func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorit
 	return key, nil
 }
 
-// GetCrypter fetches the encryption key for the given ID from the database,
-// decrypts it and creates an op.Crypto from it.
+// GetCrypter returns the crypter for the given key id, reading the key and
+// unwrapping it only on a cache miss.
 //
-// If the encryption key to decrypt the requested key exists in the database,
-// it is recursively fetched.
-func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Crypto, error) {
+// This is the per-request path: every authenticated request decrypts its bearer
+// credential through here, so a hit has to cost neither a read nor an unwrap.
+func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (_ op.Crypto, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetCrypter")
+	defer end(&err)
+
+	crypter, ok := s.crypterCache.Get(CrypterCacheKey{KeyID: keyID, Algorithm: algorithm})
+	setCacheHit(ctx, ok)
+	if ok {
+		return crypter, nil
+	}
+
 	key, err := s.GetEncryptionKey(ctx, keyID, algorithm)
 	if err != nil {
 		return nil, err
@@ -67,7 +120,10 @@ func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jos
 	return s.getCrypterOfKey(ctx, key)
 }
 
-func (s *keyService) GetProjectEncryptionKey(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (*domain.EncryptionKey, error) {
+func (s *keyService) GetProjectEncryptionKey(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (_ *domain.EncryptionKey, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetProjectEncryptionKey")
+	defer end(&err)
+
 	key, err := s.db.Statements().GetEncryptionKey(ctx, database.And(
 		database.Equal(database.Col(domain.EncryptionKeyFieldProjectID), projectID),
 		database.Equal(database.Col(domain.EncryptionKeyFieldState), domain.KeyStateActive),
@@ -82,14 +138,36 @@ func (s *keyService) GetProjectEncryptionKey(ctx context.Context, projectID stri
 	return key, nil
 }
 
-func (s *keyService) GetProjectCrypter(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (op.Crypto, error) {
+func (s *keyService) GetProjectCrypter(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (_ op.Crypto, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetProjectCrypter")
+	defer end(&err)
+
 	key, err := s.GetProjectEncryptionKey(ctx, projectID, purpose)
 	if err != nil {
 		return nil, err
 	}
+	crypter, ok := s.crypterCache.Get(CrypterCacheKey{KeyID: key.ID, Algorithm: key.Algorithm})
+	setCacheHit(ctx, ok)
+	if ok {
+		return crypter, nil
+	}
 	return s.getCrypterOfKey(ctx, key)
 }
 
+// setCacheHit records on the span in ctx whether the crypter cache answered.
+// Only on a recording span: building the attribute allocates, and this runs on
+// every request.
+func setCacheHit(ctx context.Context, hit bool) {
+	if span := trace.SpanFromContext(ctx); span.IsRecording() {
+		span.SetAttributes(attribute.Bool("cache.hit", hit))
+	}
+}
+
+// getCrypterOfKey unwraps key and caches the result. It deliberately does not
+// consult the cache: every caller has already looked this key up and missed, so
+// a second lookup here would record a second miss for one request -- and a
+// fourth for a key wrapped by a project KEK, which resolves through here twice.
+// The hit rate this cache exists to report would understate itself.
 func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.EncryptionKey) (op.Crypto, error) {
 	jweHeader, err := domain.DecodeJWEHeader(key.Key)
 	if err != nil {
@@ -97,22 +175,67 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 	}
 
 	// A key wrapped directly by a master key carries that master key's ID; every
-	// other key is wrapped by the project KEK and resolved recursively below.
+	// other key is wrapped by the project KEK and resolved recursively.
+	//
+	// Both arms resolve the wrapping key and then fall through to the one unwrap
+	// and the one Add below. Returning early from either would leave that key
+	// uncached, and the master key arm is the expensive one -- unwrapping under
+	// it is the RSA private-key operation this cache exists to avoid.
+	var kek crypto.Crypter
+	kind := "project"
 	if masterKey := s.masterKeys.GetByKeyID(jweHeader.KeyID); masterKey != nil {
-		return key.Crypter(masterKey)
+		kek, kind = masterKey, "master"
+	} else {
+		// A database read and a recursion, both of which the cache above spares
+		// every caller after the first.
+		resolved, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
+		if err != nil {
+			return nil, err
+		}
+		kek = resolved
 	}
 
-	// This call does a database call to fetch the key with the given id and
-	// recurses. This can be a performance hit. Maybe caching or a better
-	// database query is required in the future?
-	kek, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
+	// kind "master" is the RSA unwrap under a master key, "project" the
+	// unwrap under a project KEK.
+	unwrapCtx, end := startSpan(ctx, "KeyService.unwrapKey")
+	trace.SpanFromContext(unwrapCtx).SetAttributes(attribute.String("key.kind", kind))
+	crypter, err := key.Crypter(kek)
+	end(&err)
 	if err != nil {
 		return nil, err
 	}
-	return key.Crypter(kek)
+
+	s.crypterCache.Add(CrypterCacheKey{KeyID: key.ID, Algorithm: key.Algorithm}, crypter)
+	return crypter, nil
 }
 
-func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (*domain.SigningKey, error) {
+// ------------------------------------------------------
+// SIGNING KEYS
+// ------------------------------------------------------
+
+func (s *keyService) SaveSigningKey(ctx context.Context, stmts AllStatements, key *domain.SigningKey) (err error) {
+	ctx, end := startSpan(ctx, "KeyService.SaveSigningKey")
+	defer end(&err)
+
+	if err := stmts.CreateSigningKey(ctx, key); err != nil {
+		if mapped := mapStorageError(err); mapped != err {
+			return mapped
+		}
+		return domain.ErrInternal(err).
+			WithMessage("failed to create signing key in the database").
+			WithDetails(map[string]any{"purpose": key.Purpose})
+	}
+	return nil
+}
+
+func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (_ *domain.SigningKey, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetProjectSigningKey")
+	defer end(&err)
+
+	if key, ok := s.signingKeyCache.Get(SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}); ok {
+		return new(key), nil
+	}
+
 	key, err := s.db.Statements().GetSigningKey(ctx, database.And(
 		database.Equal(database.Col(domain.SigningKeyFieldProjectID), projectID),
 		database.Equal(database.Col(domain.SigningKeyFieldState), domain.KeyStateActive),
@@ -124,10 +247,15 @@ func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string,
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get signing key from the database")
 	}
+
+	s.signingKeyCache.Add(SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}, *key)
 	return key, nil
 }
 
-func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (jose.Signer, error) {
+func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (_ jose.Signer, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetProjectSigner")
+	defer end(&err)
+
 	key, err := s.GetProjectSigningKey(ctx, projectID, purpose)
 	if err != nil {
 		return nil, err
@@ -144,11 +272,21 @@ func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, pur
 	return key.Signer(kek)
 }
 
-func (s *keyService) GetMasterKeyCrypter(context.Context) (op.Crypto, error) {
+// ------------------------------------------------------
+// MASTER KEYS
+// ------------------------------------------------------
+
+func (s *keyService) GetMasterKeyCrypter(ctx context.Context) (_ op.Crypto, err error) {
+	_, end := startSpan(ctx, "KeyService.GetMasterKeyCrypter")
+	defer end(&err)
+
 	return s.masterKeys, nil
 }
 
-func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) error {
+func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) (err error) {
+	ctx, end := startSpan(ctx, "KeyService.MigrateToLatestMasterKey")
+	defer end(&err)
+
 	opts := &database.ListOptions[domain.EncryptionKeyField]{
 		Pagination: database.Page[domain.EncryptionKeyField]{
 			Limit: 100,

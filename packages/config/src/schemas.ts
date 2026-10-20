@@ -1,29 +1,40 @@
 import {
   CreateBrandingBody,
   CreateFlowDefinitionBody,
+  CreateIdpBody,
   CreateSchemaBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { z } from "zod";
 
-import {
-  isBrandingColor,
-  isBrandingFontFamily,
-  MAX_BRANDING_URL_LENGTH,
-} from "./branding-css.js";
+import { isBrandingColor, isBrandingFontFamily, MAX_BRANDING_URL_BYTES } from "./branding-css.js";
 import { isCanonicalLoopbackHttpUrl } from "./branding-url.js";
 
 export const schemaConfigSchema = CreateSchemaBody;
 export const flowConfigSchema = CreateFlowDefinitionBody.shape.flow_definition;
 export const createFlowDefinitionRequestSchema = CreateFlowDefinitionBody;
 
+/**
+ * One `.zitadel/idps/<slug>.json` body: the connection document `POST /idps`
+ * carries under `idp`. The generated Zod enforces the contract the meta-schema
+ * states, including that `client_secret` is a `${{ NAME }}` reference and
+ * never a literal.
+ */
+export const idpConnectionConfigSchema = CreateIdpBody.shape.idp;
+
 /** The wire shape of a branding revision (`POST /branding` request body). */
 export const brandingWireSchema = CreateBrandingBody;
 
 /**
- * The local `.zitadel/branding/*.json` dialect: the wire shape plus
- * `liquid_template_file`, a descriptor-relative path the CLI inlines into
- * `liquid_template` when publishing. Exactly one of the two template carriers
- * may be present (the meta-schema `branding.json` mirrors this).
+ * `{ "$file": "<path>" }`, which a `.zitadel/` file may hold in place of a
+ * string field the OpenAPI YAML marks `x-local: file`. The path is relative to
+ * the file holding it; the CLI inlines the content before publishing.
+ */
+export const localFileReferenceSchema = z.strictObject({ $file: z.string().min(1) });
+
+/**
+ * The local `.zitadel/branding/*.json` dialect: the wire shape, where
+ * `liquid_template` may also be a `$file` reference to the sibling `.liquid`
+ * template (the meta-schema `branding.json` mirrors this).
  */
 export const brandingConfigSchema = z
   .strictObject({
@@ -38,15 +49,11 @@ export const brandingConfigSchema = z
     logo_url: z.string().optional(),
     hero_url: z.string().optional(),
     $schema: z.string().optional(),
-    liquid_template_file: z.string().min(1).optional(),
+    liquid_template: z
+      .union([CreateBrandingBody.shape.liquid_template.unwrap(), localFileReferenceSchema])
+      .optional(),
   })
   .superRefine((value, ctx) => {
-    if (value.liquid_template !== undefined && value.liquid_template_file !== undefined) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Use either liquid_template_file or an inline liquid_template, not both.",
-      });
-    }
     // A stylesheet alone names no face to render in, so the server rejects the
     // pair as a pair (validateBrandingFontURL in
     // internal/domain/branding_validator.go). plan has to agree, or apply
@@ -74,7 +81,10 @@ export const brandingConfigSchema = z
     // in internal/domain/branding_css.go).
     validateBrandingPalette(value.theme?.light?.palette, "theme.light", ctx);
     validateBrandingPalette(value.theme?.dark?.palette, "theme.dark", ctx);
-    if (value.typography?.font_family !== undefined && !isBrandingFontFamily(value.typography.font_family)) {
+    if (
+      value.typography?.font_family !== undefined &&
+      !isBrandingFontFamily(value.typography.font_family)
+    ) {
       ctx.addIssue({
         code: "custom",
         message:
@@ -117,10 +127,12 @@ function validateBrandingAssetUrl(
   if (value === undefined || value === "") {
     return;
   }
-  if (value.length > MAX_BRANDING_URL_LENGTH) {
+  // The server counts bytes (validateBrandingAssetURL), so a URL with
+  // non-ASCII characters can be short in characters and still too long.
+  if (new TextEncoder().encode(value).length > MAX_BRANDING_URL_BYTES) {
     ctx.addIssue({
       code: "custom",
-      message: `${field} must be at most ${MAX_BRANDING_URL_LENGTH} characters.`,
+      message: `${field} must be at most ${MAX_BRANDING_URL_BYTES} bytes.`,
     });
     return;
   }
@@ -158,13 +170,22 @@ function validateBrandingAssetUrl(
   // than an image, so it stays https everywhere. Check the raw URL so WHATWG
   // normalisation cannot make plan accept a host spelling that the Go save
   // gate rejects.
-  if (options.loopback !== false && parsed.protocol === "http:" && isCanonicalLoopbackHttpUrl(value)) {
+  if (
+    options.loopback !== false &&
+    parsed.protocol === "http:" &&
+    isCanonicalLoopbackHttpUrl(value)
+  ) {
     return;
   }
   if (parsed.protocol !== "https:" || parsed.host === "") {
+    // Worded as the server words it (validateBrandingFontURL,
+    // validateBrandingAssetURL): only a field with the carve-out mentions it.
     ctx.addIssue({
       code: "custom",
-      message: `${field} must be an absolute https URL (http is allowed for canonical loopback development hosts only).`,
+      message:
+        options.loopback === false
+          ? `${field} must be an absolute https URL.`
+          : `${field} must be an absolute https URL (http is allowed for canonical loopback development hosts only).`,
     });
   }
 }

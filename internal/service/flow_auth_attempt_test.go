@@ -29,6 +29,19 @@ type fakeAuthAttempts struct {
 	handoffErr       error
 	getByIDProjectID string
 	getByIDAttemptID string
+	issueSSOStateIn  service.IssueSSOStateInput
+	issueSSOState    *domain.SSOState
+	issueSSOStateErr error
+	consumeState     string
+	consumeNonce     string
+	consumeCheck     *domain.SSOCallbackCheck
+	consumeErr       error
+	setResultCheck   *domain.SSOCallbackCheck
+	setResult        *domain.SSOCallbackResult
+	setResultEvent   domain.EventType
+	// setResultErrs answers SetSSOCallbackResult calls in order; a call past
+	// the end succeeds.
+	setResultErrs []error
 }
 
 func (f *fakeAuthAttempts) Create(_ context.Context, in service.CreateAuthAttemptInput) (*domain.AuthAttempt, error) {
@@ -54,6 +67,26 @@ func (f *fakeAuthAttempts) VerifyProof(_ context.Context, in service.VerifyProof
 func (f *fakeAuthAttempts) Handoff(_ context.Context, in service.HandoffInput) (*domain.AuthAttempt, error) {
 	f.handoffIn = in
 	return f.handoffAttempt, f.handoffErr
+}
+
+func (f *fakeAuthAttempts) IssueSSOState(_ context.Context, in service.IssueSSOStateInput) (*domain.SSOState, error) {
+	f.issueSSOStateIn = in
+	return f.issueSSOState, f.issueSSOStateErr
+}
+
+func (f *fakeAuthAttempts) ConsumeSSOState(_ context.Context, _, state, bindingNonce string) (*domain.SSOCallbackCheck, error) {
+	f.consumeState, f.consumeNonce = state, bindingNonce
+	return f.consumeCheck, f.consumeErr
+}
+
+func (f *fakeAuthAttempts) SetSSOCallbackResult(_ context.Context, _ string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) error {
+	f.setResultCheck, f.setResult, f.setResultEvent = check, result, eventType
+	if len(f.setResultErrs) == 0 {
+		return nil
+	}
+	err := f.setResultErrs[0]
+	f.setResultErrs = f.setResultErrs[1:]
+	return err
 }
 
 func (f *fakeAuthAttempts) BeginPasskeyEnrollment(context.Context, service.BeginPasskeyEnrollmentInput) (*service.BeginPasskeyEnrollmentOutput, error) {
@@ -111,6 +144,7 @@ func TestFlowAuthAttemptAdapter_SubmitIdentifier_HappyPath(t *testing.T) {
 		AttemptID:     "att-1",
 		AttributeName: "email",
 		Value:         "alice@example.com",
+		UserSchemaURL: "sch_human",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "user-1", userID)
@@ -124,6 +158,7 @@ func TestFlowAuthAttemptAdapter_SubmitIdentifier_HappyPath(t *testing.T) {
 	proof := fake.verifyIn.Proof.(service.UserProof)
 	assert.Equal(t, "email", proof.AttributeName)
 	assert.Equal(t, "alice@example.com", proof.LoginName)
+	assert.Equal(t, "sch_human", proof.UserSchemaURL)
 }
 
 func TestFlowAuthAttemptAdapter_SubmitIdentifier_ProofRejectedSurfaces(t *testing.T) {

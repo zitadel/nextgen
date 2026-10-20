@@ -40,8 +40,7 @@ function hasExchangeOnlyGuard(source: string): boolean {
   const safeBodyRanges: Array<Readonly<{ start: number; end: number }>> = [];
   const ifBlock = /if\s*\(([\s\S]*?)\)\s*\{([\s\S]*?)\}/g;
   for (const match of source.matchAll(ifBlock)) {
-    const condition = match[1];
-    const body = match[2];
+    const [whole = "", condition = "", body = ""] = match;
     if (
       !/proxyReq\s*\.\s*method\s*===\s*["']POST["']/i.test(condition) ||
       !/pathname\s*===\s*["']\/sessions\/exchange["']/i.test(condition) ||
@@ -51,7 +50,7 @@ function hasExchangeOnlyGuard(source: string): boolean {
       continue;
     }
 
-    const bodyOffset = match[0].lastIndexOf(body);
+    const bodyOffset = whole.lastIndexOf(body);
     const start = match.index + bodyOffset;
     safeBodyRanges.push({ start, end: start + body.length });
   }

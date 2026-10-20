@@ -74,7 +74,7 @@ func TestFlowDefinitionStatements_CRUD(t *testing.T) {
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), project.ID),
 			database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), domain.FlowDefinitionPurposeLogin.String()),
 		),
-	})
+	}, service.FlowDefinitionQueryOptions{})
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, def.ID, listed.Items[0].ID)

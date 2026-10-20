@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 
-import { defineConfig, type Plugin } from "tsdown";
+import { defineConfig, type TsdownPlugin } from "tsdown";
 
 /**
  * Rolldown plugin that turns `.liquid` files into default-exported strings.
  * Mirrors what Vite does natively so `import tpl from "./file.liquid"` works
  * in both dev (Vite) and production (tsdown/rolldown) builds.
  */
-function liquidRaw(): Plugin {
+function liquidRaw(): TsdownPlugin {
   return {
     name: "liquid-raw",
     load(id) {
@@ -57,11 +57,18 @@ export default defineConfig([
       index: "src/index.ts",
       "atoms/index": "src/atoms/index.ts",
       manifests: "src/manifests.ts",
+      events: "src/events.ts",
       "tokens/index": "src/tokens/index.ts",
       "orchestrator/index": "src/orchestrator/index.ts",
+      // Not a public subpath. As its own entry it stays a separate file that
+      // the entries import ahead of the chunks that load `lit`; inlined, it
+      // would land below the hoisted `import "lit"` and run too late (see
+      // src/internal/lit-dev-mode.ts).
+      "internal/lit-dev-mode": "src/internal/lit-dev-mode.ts",
     },
     outDir: "dist",
     format: ["esm"],
+    failOnWarn: true,
     tsconfig: "tsconfig.lib.json",
     dts: true,
     sourcemap: true,
@@ -69,18 +76,20 @@ export default defineConfig([
     // into the outDir: the file is a hand-authored ambient
     // `declare module "react"` block, which the dts bundler must not process
     // (see src/jsx.d.ts).
-    copy: ["src/jsx.d.ts"],
-    // The tsc-emitted project-reference outputs now live in `out-tsc/lib`
-    // (tsconfig.lib.json outDir), so build and typecheck no longer share
-    // files. `clean: false` stays for a different reason: `clean: true`
-    // would also wipe the sibling standalone.mjs while the two build
-    // entries in this config race each other. tsdown still overwrites its
-    // own outputs on each rebuild — stale files just accumulate harmlessly
-    // until a full `git clean`.
-    clean: false,
+    copy: [
+      "src/jsx.d.ts",
+      // The retired split/hero designs (#1039), exported as
+      // `./legacy-designs/*` for Storybook, which shows them for review.
+      { from: "src/orchestrator/__fixtures__/legacy-designs", to: "dist" },
+    ],
+    // The first entry cleans dist; the standalone entry below keeps
+    // `clean: false` so it appends standalone.mjs instead of wiping this one.
+    clean: true,
     target: "es2022",
-    external: [...THIRD_PARTY, "@zitadel/api-mock"],
-    noExternal: INLINE_INTERNAL,
+    deps: {
+      neverBundle: [...THIRD_PARTY, "@zitadel/api-mock"],
+      alwaysBundle: INLINE_INTERNAL,
+    },
   },
 
   /**
@@ -100,6 +109,7 @@ export default defineConfig([
     entry: { standalone: "src/index.ts" },
     outDir: "dist",
     format: ["esm"],
+    failOnWarn: true,
     platform: "browser",
     // `platform: "browser"` would otherwise emit `standalone.js`; force `.mjs`
     // so the `unpkg`/`jsdelivr`/`./standalone` paths in package.json still match.
@@ -109,7 +119,9 @@ export default defineConfig([
     sourcemap: false,
     clean: false,
     target: "es2022",
-    external: ["@zitadel/api-mock"],
-    noExternal: [...INLINE_INTERNAL, ...INLINE_STANDALONE_ONLY, ...THIRD_PARTY],
+    deps: {
+      neverBundle: ["@zitadel/api-mock"],
+      alwaysBundle: [...INLINE_INTERNAL, ...INLINE_STANDALONE_ONLY, ...THIRD_PARTY],
+    },
   },
 ]);

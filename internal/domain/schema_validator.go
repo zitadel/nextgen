@@ -33,12 +33,14 @@ type KnownSchemaKind string
 const (
 	SchemaKindUser           KnownSchemaKind = "user"
 	SchemaKindFlowDefinition KnownSchemaKind = "flow-definition"
+	SchemaKindIDPConnection  KnownSchemaKind = "idp-connection"
 )
 
 // todo: handling multiple versions of the meta-schemas, e.g. "flow-definition-v1.2.3.json" or "flow-definition/1.2.3/schema.json"?
 var schemaKindFilenames = map[KnownSchemaKind]string{
 	SchemaKindUser:           "user-schema.json",
 	SchemaKindFlowDefinition: "flow-definition.json",
+	SchemaKindIDPConnection:  "idp-connection.json",
 }
 
 // SchemaValidator validates a tenant schema document against the
@@ -171,22 +173,28 @@ func (v *SchemaValidator) LatestSchemaURI(kind KnownSchemaKind) (string, error) 
 // a loc → msg map. loc segments are joined with "/" (e.g. "/required/x-auth-methods").
 func FlattenValidationErrors(err error) map[string]string {
 	out := make(map[string]string)
-	var ves *types.ValidationErrors
-	var ve *types.ValidationError
-	switch {
-	case errors.As(err, &ves):
-		for _, e := range ves.Errs {
-			out[validationLocString(e)] = e.Msg
-		}
-	case errors.As(err, &ve):
-		out[validationLocString(ve)] = ve.Msg
+	for _, e := range ValidationFailures(err) {
+		out[ValidationLocation(e)] = e.Msg
 	}
 	return out
 }
 
-// validationLocString formats the error location as a string.
+// ValidationFailures returns the schema validation errors err wraps.
+func ValidationFailures(err error) []*types.ValidationError {
+	var ves *types.ValidationErrors
+	var ve *types.ValidationError
+	switch {
+	case errors.As(err, &ves):
+		return ves.Errs
+	case errors.As(err, &ve):
+		return []*types.ValidationError{ve}
+	}
+	return nil
+}
+
+// ValidationLocation formats the error location as a string.
 // If the location is empty, it returns "/". Otherwise, it joins the segments with "/" and prefixes with "/".
-func validationLocString(ve *types.ValidationError) string {
+func ValidationLocation(ve *types.ValidationError) string {
 	if ve.Loc == nil || len(*ve.Loc) == 0 {
 		return "/"
 	}

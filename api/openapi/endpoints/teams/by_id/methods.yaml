@@ -1,19 +1,17 @@
 get:
   operationId: getTeam
+  x-zitadel-cli: teams get
   summary: Get team
   description: |
     Returns a Team by its id.
   tags:
     - Teams
   parameters:
-    - name: team_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/team-id.yaml
+    - $ref: ../../../components/parameters/team-id-path.yaml
   security:
     - oauth2:
         - team.read
+    - nextgenSession: []
   responses:
     '200':
       description: The team.
@@ -42,6 +40,7 @@ get:
 
 delete:
   operationId: deleteTeam
+  x-zitadel-cli: teams deactivate
   summary: Delete team
   description: |
     Deactivates the team.
@@ -52,14 +51,15 @@ delete:
 
     The request is idempotent. Deleting a team that is already deactivated
     or doesn't exist succeeds without changing anything.
+
+    A team that still owns a project is refused with `409
+    team.owns_project`: deactivating it would leave the project owned by a
+    dead team and so unmanageable. No endpoint releases that ownership yet,
+    so such a team cannot currently be deactivated through the API.
   tags:
     - Teams
   parameters:
-    - name: team_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/team-id.yaml
+    - $ref: ../../../components/parameters/team-id-path.yaml
   security:
     - oauth2:
         - team.delete
@@ -86,6 +86,12 @@ delete:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
+    '409':
+      description: The team still owns a project and cannot be deactivated.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
     default:
       description: Unexpected error response.
       content:
@@ -95,20 +101,18 @@ delete:
 
 patch:
   operationId: updateTeam
+  x-zitadel-cli: teams update
   summary: Update team
   description: |
     Update team. Only active teams can be updated.
   tags:
     - Teams
   parameters:
-    - name: team_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/team-id.yaml
+    - $ref: ../../../components/parameters/team-id-path.yaml
   security:
     - oauth2:
         - team.write
+    - nextgenSession: []
   requestBody:
     description: Update team request.
     required: true

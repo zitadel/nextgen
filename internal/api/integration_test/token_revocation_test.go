@@ -162,6 +162,7 @@ func TestProjectSecretIsRevocable(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.CreateProjectResponse{}, created, helpers.MustMarshal(t, created))
 	project := created.(*api.CreateProjectResponse)
+	harness.CleanupProject(t, project.ID)
 
 	// The issued secret authenticates the operator plane.
 	operator, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)

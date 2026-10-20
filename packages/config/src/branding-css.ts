@@ -10,7 +10,8 @@
 
 export const MAX_BRANDING_COLOR_LENGTH = 128;
 export const MAX_BRANDING_FONT_FAMILY_LENGTH = 256;
-export const MAX_BRANDING_URL_LENGTH = 2048;
+/** Asset URL cap in UTF-8 bytes, like the server's `MaxBrandingURLBytes`. */
+export const MAX_BRANDING_URL_BYTES = 2048;
 
 const HEX_COLOR = /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 

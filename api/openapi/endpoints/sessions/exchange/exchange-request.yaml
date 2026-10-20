@@ -7,7 +7,8 @@ properties:
     type: string
     description: |
       The one-time handoff token minted by `POST /auth_attempts/{id}/handoff`.
-      Single-use — replaying it after a successful exchange returns `410 Gone`.
+      Single-use — replaying it after a successful exchange returns `400` with
+      `sess.invalid_handoff_token`, the same answer as an unknown or expired token.
     example: handoff_abc123def456xyz
   ttl:
     type: string

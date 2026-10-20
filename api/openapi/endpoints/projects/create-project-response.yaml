@@ -4,7 +4,7 @@ required:
   - name
   - project_secret
   - preview_secret
-  - preview_origins
+  - origins
   - created_at
 properties:
   id:
@@ -21,12 +21,14 @@ properties:
     type: string
     description: |
       Secret which can be used for previewing and testing the project.
-  preview_origins:
+  origins:
     type: array
     items:
-      type: string
+      $ref: project-origin.yaml
     description: |
-      Origins which are allowed for previewing and testing the project.
+      The project's origins. An empty list means every origin is admitted
+      until the first pattern is added. Loopback origins are admitted without
+      a pattern.
   created_at:
     type: string
     format: date-time

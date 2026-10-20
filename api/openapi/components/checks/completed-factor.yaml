@@ -20,6 +20,7 @@ properties:
       - `identifier`: includes user_id
       - `password`: no additional data
       - `passkey`: includes credential details and verification flags
+      - `sso`: no additional data
     oneOf:
       - $ref: ./identifier-factor-payload.yaml
       - $ref: ./password-factor-payload.yaml

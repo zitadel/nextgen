@@ -1,5 +1,6 @@
 get:
   operationId: getFlowDefinition
+  x-zitadel-cli: flow-definitions get
   summary: Get a flow definition by id
   description: Get a flow definition by id
   tags:
@@ -7,6 +8,7 @@ get:
   security:
     - oauth2:
         - flow_definition.read
+    - nextgenSession: []
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
   responses:

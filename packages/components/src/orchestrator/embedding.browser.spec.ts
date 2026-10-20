@@ -5,12 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 
 import "./zitadel-login.js";
-import heroTemplate from "../../../config/defaults/branding/hero/login.liquid";
-import minimalTemplate from "../../../config/defaults/branding/minimal/login.liquid";
-import splitRightTemplate from "../../../config/defaults/branding/split-right/login.liquid";
-// Raw import via the liquidRaw Vite plugin — @zitadel/config/defaults reads
-// files with node:fs at call time, which cannot run inside Chromium.
-import splitTemplate from "../../../config/defaults/branding/split/login.liquid";
+import minimalTemplate from "@zitadel/config/defaults/branding/minimal/login.liquid";
+// Raw imports via the liquidRaw Vite plugin — @zitadel/config/defaults reads
+// files with node:fs at call time, which cannot run inside Chromium. The
+// split/hero designs are retired (#1039); their fixtures stand in for
+// revisions published before that, which must keep rendering.
+import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
+import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
+import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
 import type { ZitadelLogin } from "./zitadel-login.js";
 
 /**
@@ -221,7 +223,7 @@ const heroBrokenLogoStep: CreateFlow201 = {
 
 /** The shipped minimal design: fields straight on the page, no card. The
  * wire `layout` enum is `centered | split` (ADR 040) — richer designs ride
- * in `liquid_template` and declare the layout they degrade to. */
+ * in `liquid_template`, and the shipped ones carry `centered`. */
 const minimalStep: CreateFlow201 = {
   ...identifierStep,
   branding: {
@@ -252,7 +254,11 @@ function installFlowFetchStub(responses: readonly CreateFlow201[]): { restore: (
   });
   const original = globalThis.fetch;
   globalThis.fetch = fetchStub as unknown as typeof fetch;
-  return { restore: () => void (globalThis.fetch = original) };
+  return {
+    restore: () => {
+      globalThis.fetch = original;
+    },
+  };
 }
 
 function centerX(element: Element): number {
@@ -393,6 +399,16 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(getComputedStyle(element).backgroundColor).not.toBe(TRANSPARENT);
     expect(document.getElementById("zl-default-font-link")).not.toBeNull();
     const field = element.shadowRoot?.querySelector("zl-field");
+    await waitFor(() => (element.shadowRoot?.activeElement === field ? field : null));
+    expect(element.shadowRoot?.activeElement).toBe(field);
+  });
+
+  it("variant=page keeps its initial focus when mounted in a preview state", async () => {
+    const element = await mount(identifierStep, (el) => {
+      el.variant = "page";
+      el.previewState = "validation_error";
+    });
+    const field = await waitFor(() => element.shadowRoot?.querySelector("zl-field[invalid]"));
     await waitFor(() => (element.shadowRoot?.activeElement === field ? field : null));
     expect(element.shadowRoot?.activeElement).toBe(field);
   });
@@ -550,9 +566,9 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     const mark = element.shadowRoot?.querySelector(".zl-attribution") as HTMLElement;
     expect(mark.closest(".zl-split__form")).toBeTruthy();
     expect(mark.getAttribute("slot")).toBeNull();
-    expect(
-      Math.round(mark.getBoundingClientRect().top - card.getBoundingClientRect().bottom),
-    ).toBe(24);
+    expect(Math.round(mark.getBoundingClientRect().top - card.getBoundingClientRect().bottom)).toBe(
+      24,
+    );
   });
 
   it("a split template with no anchor still slots the trustmark into the shell footer", async () => {

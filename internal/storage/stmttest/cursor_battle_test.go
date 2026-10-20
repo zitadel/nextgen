@@ -5,7 +5,6 @@ package stmttest
 import (
 	"cmp"
 	"context"
-	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -19,6 +18,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/idpconnection"
 	"github.com/zitadel/nextgen/internal/storage/release"
 )
 
@@ -68,12 +68,19 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("teams", func(t *testing.T) { battleTeams(t, d) })
 		t.Run("grants", func(t *testing.T) { battleGrants(t, d) })
 		t.Run("grants_expires_at", func(t *testing.T) { battleGrantsExpiresAt(t, d) })
+		t.Run("authorized_projects", func(t *testing.T) { battleAuthorizedProjects(t, d) })
 		t.Run("users", func(t *testing.T) { battleUsers(t, d) })
 		t.Run("tokens", func(t *testing.T) { battleTokens(t, d) })
 		t.Run("sessions", func(t *testing.T) { battleSessions(t, d) })
 		t.Run("brandings", func(t *testing.T) { battleBrandings(t, d) })
-		t.Run("environments", func(t *testing.T) { battleEnvironments(t, d) })
 		t.Run("releases", func(t *testing.T) { battleReleases(t, d) })
+		t.Run("deployments", func(t *testing.T) { battleDeployments(t, d) })
+		t.Run("deployments_origin", func(t *testing.T) { battleDeploymentsOfOrigin(t, d) })
+		t.Run("deployments_live", func(t *testing.T) { battleLiveDeployments(t, d) })
+		t.Run("previews", func(t *testing.T) { battlePreviews(t, d) })
+		t.Run("idp_connections", func(t *testing.T) { battleIDPConnections(t, d) })
+		t.Run("idp_connection_revisions", func(t *testing.T) { battleIDPConnectionRevisions(t, d) })
+		t.Run("idp_identity_links", func(t *testing.T) { battleIDPIdentityLinks(t, d) })
 		t.Run("flow_definitions", func(t *testing.T) { battleFlowDefinitions(t, d) })
 		t.Run("json_schemas", func(t *testing.T) { battleJSONSchemas(t, d) })
 		t.Run("json_schemas_latest", func(t *testing.T) { battleJSONSchemasLatest(t, d) })
@@ -84,7 +91,63 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("user_totps", func(t *testing.T) { battleUserTOTPs(t, d) })
 		t.Run("user_passkeys", func(t *testing.T) { battleUserPasskeys(t, d) })
 		t.Run("user_recovery_codes", func(t *testing.T) { battleUserRecoveryCodes(t, d) })
+		t.Run("origins", func(t *testing.T) { battleOrigins(t, d) })
 	})
+}
+
+// battleOrigins pages ListOrigins across several projects that share the same
+// pattern. Without project_id in the default keyset, tied (created_at, pattern)
+// rows from different projects would be skipped on resume.
+func battleOrigins(t *testing.T, d dialect) {
+	t.Helper()
+	prefix := uniqueProjectID(t)
+	pattern := "https://battle.example.com"
+	projectIDs := make([]string, 0, 5)
+	for i := range 5 {
+		id := prefix + "-" + string(rune('a'+i))
+		p := newTestProject(id)
+		require.NoError(t, d.stmts.CreateProject(t.Context(), p))
+		t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), id) })
+		inserted, err := d.stmts.InsertOrigin(t.Context(), id, domain.Origin{
+			Pattern: pattern,
+			Kind:    domain.OriginKindPrimary,
+		})
+		require.NoError(t, err)
+		require.True(t, inserted)
+		projectIDs = append(projectIDs, id)
+	}
+	filters := make([]database.Filter[domain.OriginField], 0, len(projectIDs))
+	for _, id := range projectIDs {
+		filters = append(filters, database.Equal(database.Col(domain.OriginFieldProjectID), id))
+	}
+	filter := database.Or(filters...)
+	orderAsc := database.OrderBy[domain.OriginField]{
+		Columns: []database.Column[domain.OriginField]{
+			database.Col(domain.OriginFieldCreatedAt),
+			database.Col(domain.OriginFieldPattern),
+			database.Col(domain.OriginFieldProjectID),
+		},
+		Direction: database.OrderAsc,
+	}
+	originKey := func(o *domain.Origin) string { return o.ProjectID + "|" + o.Pattern }
+	baseline, err := d.stmts.ListOrigins(t.Context(), &database.ListOptions[domain.OriginField]{
+		Filter: filter,
+		Pagination: database.Page[domain.OriginField]{
+			Limit:   uint32(len(projectIDs)),
+			OrderBy: orderAsc,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, baseline.Items, len(projectIDs))
+	want := make([]string, 0, len(baseline.Items))
+	for _, o := range baseline.Items {
+		want = append(want, originKey(o))
+	}
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.OriginField]) (*database.ListResult[*domain.Origin], error) {
+		return d.stmts.ListOrigins(t.Context(), &database.ListOptions[domain.OriginField]{
+			Filter: filter, Pagination: page,
+		})
+	}, originKey, 2)
 }
 
 func battleProjects(t *testing.T, d dialect) {
@@ -156,6 +219,21 @@ func battleGrants(t *testing.T, d dialect) {
 			Pagination: page,
 		})
 	}, func(a *domain.AuthzAssignment) string { return a.ID }, 2)
+}
+
+func battleAuthorizedProjects(t *testing.T, d dialect) {
+	t.Helper()
+	u := seedAuthorizedUser(t, d.stmts)
+	want := make([]string, 0, 5)
+	for range 5 {
+		customer := ensureProject(t, d.stmts)
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), domain.NewClaimTeamAssignment(customer, u.teamID)))
+		want = append(want, customer)
+	}
+	slices.Sort(want)
+	drainIncarnation(t, want, authorizedProjectsOrderAsc, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+		return d.stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, page)
+	}, func(p *domain.Project) string { return p.ID }, 2)
 }
 
 // battleGrantsExpiresAt pages a mix of nil and set expires_at values sorted by
@@ -344,52 +422,6 @@ func battleBrandings(t *testing.T, d dialect) {
 	})
 }
 
-func battleEnvironments(t *testing.T, d dialect) {
-	t.Helper()
-	projectID := ensureEnvironmentProject(t, d.stmts)
-	// Five names, not the three seeded ones: drainIncarnation needs more rows
-	// than the emission limit so the last page is short. Created out of order
-	// and collected in name order, because that is the order the list returns.
-	names := []string{"staging", "dev", "sandbox", "prod", "preview"}
-	byName := make(map[string]string, len(names))
-	for _, name := range names {
-		byName[name] = createEnvironment(t, d.stmts, projectID, name).ID
-	}
-	want := make([]string, 0, len(names))
-	for _, name := range slices.Sorted(maps.Keys(byName)) {
-		want = append(want, byName[name])
-	}
-	filter := database.Equal(database.Col(domain.EnvironmentFieldProjectID), projectID)
-	orderAsc := database.OrderBy[domain.EnvironmentField]{
-		Columns:   []database.Column[domain.EnvironmentField]{database.Col(domain.EnvironmentFieldName)},
-		Direction: database.OrderAsc,
-	}
-	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error) {
-		return d.stmts.ListEnvironments(unfilteredListCtx(t), &database.ListOptions[domain.EnvironmentField]{
-			Filter: filter, Pagination: page,
-		})
-	}, func(e *domain.Environment) string { return e.ID }, 2)
-
-	t.Run("name_order_helper", func(t *testing.T) {
-		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.Environment], error) {
-			return d.stmts.ListEnvironments(unfilteredListCtx(t), &database.ListOptions[domain.EnvironmentField]{
-				Filter: database.Equal(database.Col(domain.EnvironmentFieldProjectID), projectID),
-				Pagination: database.Page[domain.EnvironmentField]{
-					Limit:  2,
-					Cursor: cursor,
-					OrderBy: database.OrderBy[domain.EnvironmentField]{
-						Columns: []database.Column[domain.EnvironmentField]{
-							database.Col(domain.EnvironmentFieldName),
-						},
-						Direction: database.OrderAsc,
-					},
-				},
-			})
-		}, func(e *domain.Environment) string { return e.ID })
-		assertDrainMatch(t, want, got)
-	})
-}
-
 func battleFlowDefinitions(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureProject(t, d.stmts)
@@ -410,7 +442,7 @@ func battleFlowDefinitions(t *testing.T, d dialect) {
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
 		return d.stmts.ListFlowDefinitions(unfilteredListCtx(t), &database.ListOptions[domain.FlowDefinitionField]{
 			Filter: filter, Pagination: page,
-		})
+		}, service.FlowDefinitionQueryOptions{})
 	}, func(def *domain.FlowDefinition) string { return def.ID }, 2)
 
 	t.Run("default_order", func(t *testing.T) {
@@ -418,7 +450,7 @@ func battleFlowDefinitions(t *testing.T, d dialect) {
 			return d.stmts.ListFlowDefinitions(unfilteredListCtx(t), &database.ListOptions[domain.FlowDefinitionField]{
 				Filter:     filter,
 				Pagination: database.Page[domain.FlowDefinitionField]{Limit: 2, Cursor: cursor},
-			})
+			}, service.FlowDefinitionQueryOptions{})
 		}, func(def *domain.FlowDefinition) string { return def.ID })
 		assertDrainMatch(t, want, got)
 	})
@@ -662,4 +694,129 @@ func battleReleases(t *testing.T, d dialect) {
 		}, func(r *domain.Release) string { return r.ID })
 		assertDrainMatch(t, want, got)
 	})
+}
+
+// battleIDPConnections works like battleJSONSchemasLatest: the list joins each
+// connection to its revisions and keeps only the newest, and a page boundary is
+// where that and the keyset predicate can fall out of step. Every connection
+// here has a superseded revision, so a stale or missing row shows the break.
+func battleIDPConnections(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	suffix := uniqueSuffix(t)
+	created := make([]*domain.IDPConnection, 0, 5)
+	for i := range 5 {
+		slug := "battle-" + suffix + "-" + string(rune('a'+i))
+		entity := createIDPConnection(t, d.stmts, projectID, slug, idpConnectionDocument("https://v1.example.com"))
+		entity.Document = idpConnectionDocument("https://v2.example.com")
+		require.NoError(t, d.stmts.ReviseIDPConnection(t.Context(), entity))
+		created = append(created, entity)
+	}
+	want := idpConnectionIDsInDefaultOrder(created)
+
+	filter := database.Equal(database.Col(domain.IDPConnectionFieldProjectID), projectID)
+	orderAsc := database.OrderBy[domain.IDPConnectionField]{
+		Columns: []database.Column[domain.IDPConnectionField]{
+			database.Col(domain.IDPConnectionFieldCreatedAt),
+			database.Col(domain.IDPConnectionFieldID),
+		},
+		Direction: database.OrderAsc,
+	}
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
+		return d.stmts.ListIDPConnections(unfilteredListCtx(t), &database.ListOptions[domain.IDPConnectionField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(c *domain.IDPConnection) string { return c.ID }, 2)
+
+	// Slug is the other column the contract lets a caller sort on, and unlike
+	// created_at it is a single key with no tiebreaker.
+	t.Run("slug_order", func(t *testing.T) {
+		bySlug := slices.SortedFunc(slices.Values(created), func(a, b *domain.IDPConnection) int {
+			return strings.Compare(a.Slug, b.Slug)
+		})
+		wantBySlug := make([]string, 0, len(bySlug))
+		for _, entity := range bySlug {
+			wantBySlug = append(wantBySlug, entity.ID)
+		}
+		orderSlugAsc := database.OrderBy[domain.IDPConnectionField]{
+			Columns:   []database.Column[domain.IDPConnectionField]{database.Col(domain.IDPConnectionFieldSlug)},
+			Direction: database.OrderAsc,
+		}
+		drainIncarnation(t, wantBySlug, orderSlugAsc, func(page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
+			return d.stmts.ListIDPConnections(unfilteredListCtx(t), &database.ListOptions[domain.IDPConnectionField]{
+				Filter: filter, Pagination: page,
+			})
+		}, func(c *domain.IDPConnection) string { return c.ID }, 2)
+	})
+}
+
+// battleIDPConnectionRevisions pages one connection's history: the same join
+// without the newest-revision filter, where the keyset sits on the revision row
+// and the identity columns come from the connection. Each row's id is a
+// revision id.
+func battleIDPConnectionRevisions(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	entity := createIDPConnection(t, d.stmts, projectID, "battle-rev-"+uniqueSuffix(t), idpConnectionDocument("https://v1.example.com"))
+	revisions := []domain.IDPConnection{*entity}
+	for i := range 5 {
+		entity.Document = idpConnectionDocument("https://v" + string(rune('a'+i)) + ".example.com")
+		require.NoError(t, d.stmts.ReviseIDPConnection(t.Context(), entity))
+		revisions = append(revisions, *entity)
+	}
+	want := idpRevisionIDsOldestFirst(revisions)
+
+	// The drain walks both directions, so this reuses the newest-first key and
+	// only flips the direction.
+	orderAsc := idpconnection.RevisionsNewestFirst()
+	orderAsc.Direction = database.OrderAsc
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
+		return d.stmts.ListIDPConnectionRevisions(unfilteredListCtx(t), projectID, entity.ID, page)
+	}, func(c *domain.IDPConnection) string { return c.RevisionID }, 2)
+}
+
+// battleIDPIdentityLinks drains one user's links in the service's order,
+// created_at then id. Another user's link on the same connection is seeded too,
+// so the exact drain also pins that the user filter keeps it out.
+func battleIDPIdentityLinks(t *testing.T, d dialect) {
+	t.Helper()
+	f := newIDPIdentityLinkFixture(t, d.stmts)
+	links := make([]*domain.IDPIdentityLink, 0, 5)
+	for i := range 5 {
+		link := f.link("subject-" + string(rune('a'+i)))
+		require.NoError(t, d.stmts.CreateIDPIdentityLink(t.Context(), link))
+		links = append(links, link)
+	}
+	stranger := f.link("subject-stranger")
+	stranger.UserID = createLinkUser(t, d.stmts, f.projectID, f.schemaURL, "stranger")
+	require.NoError(t, d.stmts.CreateIDPIdentityLink(t.Context(), stranger))
+
+	// Links created in the same instant tie on created_at, so the expected
+	// order comes from the stored values rather than the insert order.
+	slices.SortFunc(links, func(a, b *domain.IDPIdentityLink) int {
+		if c := a.CreatedAt.Compare(b.CreatedAt); c != 0 {
+			return c
+		}
+		return strings.Compare(a.ID, b.ID)
+	})
+	want := make([]string, len(links))
+	for i, link := range links {
+		want[i] = link.ID
+	}
+	filter := database.And(
+		database.Equal(database.Col(domain.IDPIdentityLinkFieldProjectID), f.projectID),
+		database.Equal(database.Col(domain.IDPIdentityLinkFieldUserID), f.userID),
+	)
+	orderAsc := database.OrderBy[domain.IDPIdentityLinkField]{
+		Columns: []database.Column[domain.IDPIdentityLinkField]{
+			database.Col(domain.IDPIdentityLinkFieldCreatedAt),
+			database.Col(domain.IDPIdentityLinkFieldID),
+		},
+		Direction: database.OrderAsc,
+	}
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.IDPIdentityLinkField]) (*database.ListResult[*domain.IDPIdentityLink], error) {
+		return d.stmts.ListIDPIdentityLinks(t.Context(), &database.ListOptions[domain.IDPIdentityLinkField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(link *domain.IDPIdentityLink) string { return link.ID }, 2)
 }

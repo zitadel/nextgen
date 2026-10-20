@@ -67,6 +67,7 @@ func TestSessionStatements_ExchangeUpgradesSessionInPlace(t *testing.T) {
 		require.NoError(t, d.stmts.CreateSession(t.Context(), session))
 		require.NotEmpty(t, session.ID)
 		require.Equal(t, domain.SessionStateBuilding, session.State())
+		assert.Equal(t, domain.SessionAnonymousTTL, session.TimeToLive)
 		sessionID := session.ID
 		t.Cleanup(func() {
 			_ = d.stmts.DeleteSessionByID(context.Background(), projectID, sessionID)
@@ -99,6 +100,15 @@ func TestSessionStatements_ExchangeUpgradesSessionInPlace(t *testing.T) {
 		assert.NotEmpty(t, got.Factors, "verified factors promoted onto the upgraded session")
 		require.NotNil(t, got.UserAgent, "user agent persisted through exchange")
 		assert.Equal(t, "203.0.113.9", got.UserAgent.IP)
+
+		// The upgrade drops the shell's short lifetime for the exchange's, and
+		// the rotated session token expires with the session, not the shell.
+		assert.Equal(t, time.Hour, got.TimeToLive)
+		assert.WithinDuration(t, got.UpdatedAt.Add(time.Hour), got.ExpiresAt, 2*time.Second)
+		token, err := d.stmts.GetTokenByID(t.Context(), projectID, got.TokenID)
+		require.NoError(t, err)
+		require.NotNil(t, token.ExpiresAt)
+		assert.WithinDuration(t, got.ExpiresAt, *token.ExpiresAt, 2*time.Second)
 	})
 }
 
@@ -288,6 +298,44 @@ func TestSessionStatements_List_LimitBoundsSessions(t *testing.T) {
 		// Exact order, not ElementsMatch: the ORDER BY after the joins is
 		// otherwise unfenced.
 		assert.Equal(t, want, got, "pages must return every session exactly once, in ID order")
+	})
+}
+
+// Ordering by a filter-only computed field (has_verified_factors is a
+// correlated EXISTS with no accessor) must be refused with a typed error, not
+// crash during cursor marshaling (#850).
+func TestSessionStatements_List_RejectsOrderByFilterOnlyField(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _ := ensureUserTestProject(t, d.stmts)
+
+		list := func(cursor []byte) error {
+			_, err := d.stmts.ListSessions(t.Context(), &database.ListOptions[domain.SessionField]{
+				Filter: database.Equal(database.Col(domain.SessionFieldProjectID), projectID),
+				Pagination: database.Page[domain.SessionField]{
+					Limit:  10,
+					Cursor: cursor,
+					OrderBy: database.OrderBy[domain.SessionField]{
+						Columns: []database.Column[domain.SessionField]{
+							database.Col(domain.SessionFieldHasVerifiedFactors),
+						},
+					},
+				},
+			})
+			return err
+		}
+
+		// Runs before cursor decode, so a bad cursor cannot hide the error behind db.invalid_cursor.
+		for name, cursor := range map[string][]byte{
+			"no cursor":        nil,
+			"malformed cursor": []byte("not-a-real-cursor"),
+		} {
+			t.Run(name, func(t *testing.T) {
+				var de database.Error
+				require.ErrorAs(t, list(cursor), &de)
+				assert.Equal(t, database.ErrFieldNotOrderable(nil).Code, de.Code, "typed not-orderable code")
+				assert.Equal(t, domain.SessionFieldHasVerifiedFactors, de.Details, "details identify the offending field")
+			})
+		}
 	})
 }
 

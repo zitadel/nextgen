@@ -43,7 +43,7 @@ func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefini
 }
 
 func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
-	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), flowDefinitionAccess, domain.ResourceKindFlowDefinition)
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), flowDefinitionAccess, domain.ResourceKindFlowDefinition)
 	if err != nil {
 		return nil, err
 	}
@@ -69,43 +69,44 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 	return resp, nil
 }
 
-// expandUserSchemas embeds each listed flow definition's user schema
-// (ADR 059: hydrate, never join — one batched query keyed on the page's
-// distinct schema ids, after the flow query ran, so ordering and page
-// tokens stay untouched).
+// expandUserSchemas embeds each listed flow definition's user schema: the
+// newest revision of the objectType it names (ADR 059: hydrate, never join —
+// one batched query keyed on the page's distinct object types, after the flow
+// query ran, so ordering and page tokens stay untouched).
 //
 // The schema kind gets its own authz stamp first: the flow-definition list
 // consumed the one-shot Allow skip, and reading schemas embedded must gate
 // exactly like reading them at GET /schemas (a caller without schema read
 // access gets an error, not a silently missing property).
 func (h Handler) expandUserSchemas(ctx context.Context, projectID string, definitions []api.FlowDefinitionResponse) error {
-	ctx, err := h.requireProjectListAccess(ctx, projectID, schemaAccess, domain.ResourceKindSchema)
+	ctx, _, err := h.requireProjectListAccess(ctx, projectID, schemaAccess, domain.ResourceKindSchema)
 	if err != nil {
 		return err
 	}
 
 	seen := make(map[string]struct{}, len(definitions))
-	ids := make([]string, 0, len(definitions))
+	objectTypes := make([]string, 0, len(definitions))
 	for _, def := range definitions {
-		id := def.FlowDefinition.UserSchema
-		if _, dup := seen[id]; dup || id == "" {
+		objectType := def.FlowDefinition.UserSchema
+		if _, dup := seen[objectType]; dup || objectType == "" {
 			continue
 		}
-		seen[id] = struct{}{}
-		ids = append(ids, id)
+		seen[objectType] = struct{}{}
+		objectTypes = append(objectTypes, objectType)
 	}
 
-	byID := make(map[string]*api.Schema, len(ids))
-	if len(ids) > 0 {
+	byObjectType := make(map[string]*api.Schema, len(objectTypes))
+	if len(objectTypes) > 0 {
 		// One batched query suffices: the generated validation caps the flow
 		// page at the shared list maximum (limit defaults to 20, tops out at
 		// 100), so a page can never reference more distinct schemas than one
 		// schema query of the same maximum returns. If either cap ever moves
 		// independently, chunk this loop instead.
 		schemas, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
-			ProjectID: projectID,
-			IDs:       ids,
-			Limit:     len(ids),
+			ProjectID:                   projectID,
+			ObjectTypes:                 objectTypes,
+			LatestRevisionPerObjectType: true,
+			Limit:                       len(objectTypes),
 		})
 		if err != nil {
 			return err
@@ -115,12 +116,12 @@ func (h Handler) expandUserSchemas(ctx context.Context, projectID string, defini
 			if err != nil {
 				return err
 			}
-			byID[schema.URL] = apiSchema
+			byObjectType[*schema.ObjectType] = apiSchema
 		}
 	}
 
 	for i := range definitions {
-		if schema, ok := byID[definitions[i].FlowDefinition.UserSchema]; ok {
+		if schema, ok := byObjectType[definitions[i].FlowDefinition.UserSchema]; ok {
 			definitions[i].UserSchema.SetTo(*schema)
 		} else {
 			definitions[i].UserSchema.SetToNull()
@@ -206,17 +207,8 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Fl
 			s.Gates = gates
 		}
 
-		// sso providers
-		ssoProviders := make([]domain.FlowSSOProvider, 0, len(step.GetSSOProviders()))
-		for _, ssoProvider := range step.GetSSOProviders() {
-			s := domain.FlowSSOProvider{
-				ID:       ssoProvider.GetID(),
-				Name:     ssoProvider.GetName(),
-				Template: ssoProvider.GetTemplate(),
-			}
-			ssoProviders = append(ssoProviders, s)
-		}
-		s.SSOProviders = ssoProviders
+		// sso providers: connection slugs, stored as given
+		s.SSOProviders = slices.Clone(step.GetSSOProviders())
 
 		// transitions
 		if step.GetTransitions().IsSet() {
@@ -272,7 +264,8 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Fl
 
 func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListFlowDefinitionsRequest {
 	req := service.ListFlowDefinitionsRequest{
-		ProjectID: string(params.ProjectID),
+		ProjectID:             string(params.ProjectID),
+		LatestRevisionPerName: params.Revisions.Value == api.ListFlowDefinitionsRevisionsLatest,
 	}
 	purpose, ok := params.Purpose.Get()
 	if ok {
@@ -336,8 +329,6 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 		actions := mapActionsToAPI(step.Actions)
 		// gates
 		gates := mapGatesToAPI(step.Gates)
-		// sso providers
-		ssoProviders := mapSSOProvidersToAPI(step.SSOProviders)
 		// transitions
 		transitions := mapTransitionsToAPI(step.Transitions)
 
@@ -353,7 +344,7 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 				Value: gates,
 				Set:   gates != nil,
 			},
-			SSOProviders: ssoProviders,
+			SSOProviders: nilIfEmpty(step.SSOProviders),
 			Transitions: api.OptFlowDefinitionStepTransitions{
 				Value: transitions,
 				Set:   transitions != nil,
@@ -436,21 +427,6 @@ func mapTransitionsToAPI(domainTransitions map[string]domain.FlowStepTransition)
 		}
 	}
 	return transitions
-}
-
-func mapSSOProvidersToAPI(domainSSOProviders []domain.FlowSSOProvider) []api.SSOProvider {
-	if len(domainSSOProviders) == 0 {
-		return nil
-	}
-	ssoProviders := make([]api.SSOProvider, 0, len(domainSSOProviders))
-	for _, ssoProvider := range domainSSOProviders {
-		ssoProviders = append(ssoProviders, api.SSOProvider{
-			ID:       ssoProvider.ID,
-			Name:     ssoProvider.Name,
-			Template: ssoProvider.Template,
-		})
-	}
-	return ssoProviders
 }
 
 func mapGatesToAPI(domainGates map[string]domain.FlowStepGate) map[string]api.Gate {

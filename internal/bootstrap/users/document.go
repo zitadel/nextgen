@@ -25,8 +25,7 @@ type Header struct {
 
 // PasswordAuthenticator is the only supported authenticator for bootstrap import.
 type PasswordAuthenticator struct {
-	EncodedHash    string `json:"encoded_hash"`
-	ChangeRequired bool   `json:"change_required"`
+	EncodedHash string `json:"encoded_hash"`
 }
 
 const (

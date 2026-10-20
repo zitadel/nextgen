@@ -8,17 +8,17 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserWithPasswordHandler {
+func (h *Harness) EnsureCreateUserHandler(t testing.TB) *service.FlowCreateUserWithPasswordHandler {
 	t.Helper()
 	return service.NewFlowCreateUserHandler(
-		h.EnsureHasher(t),
+		h.EnsureProjectHashers(t),
 		h.EnsureUserService(t),
 		h.EnsureSchemaStore(t),
 		h.EnsureServiceDB(t),
 	)
 }
 
-func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
+func (h *Harness) EnsureFlowService(t testing.TB) service.FlowService {
 	t.Helper()
 	h.flowService.mutex.Lock()
 	defer h.flowService.mutex.Unlock()
@@ -32,7 +32,7 @@ func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 	return h.flowService.value
 }
 
-func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineRuntime {
+func (h *Harness) EnsureFlowStateMachine(t testing.TB) *domain.FlowStateMachineRuntime {
 	t.Helper()
 	h.flowStateMachine.mutex.Lock()
 	defer h.flowStateMachine.mutex.Unlock()
@@ -46,6 +46,9 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			fields,
 			h.EnsureCreateUserHandler(t),
 			authAdapter,
+			service.NewFlowSSOProviderResolver(h.EnsureIDPConnectionService(t)),
+			service.NewFlowSSOIdentityResolver(h.EnsureServiceDB(t), h.EnsureIDPConnectionService(t), h.EnsureUserService(t), h.EnsureSchemaStore(t), h.EnsureProjectHashers(t)),
+			service.NewFlowSSORedirectIssuer(h.EnsureIDPConnectionService(t), h.EnsureAuthAttemptService(t), h.EnsureKeyService(t), h.EnsureVariableService(t), h.EnsureHttpClient(t)),
 			time.Now,
 		)
 	}

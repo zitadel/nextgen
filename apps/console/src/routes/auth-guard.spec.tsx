@@ -1,13 +1,14 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { makeTestSession } from "../auth/session.fixture";
+import { makeTestSession } from "@/test/session.fixture";
 import { createAppRouter } from "../router";
+import { _resetRuntimeForTesting, _setRuntimeForTesting } from "../runtime/runtime";
 import { THEME_STORAGE_KEY } from "../theme";
+import { server } from "@/test/msw";
 
 /**
  * Console authentication guard (Console ADR 0003): the `_authed` pathless
@@ -35,12 +36,14 @@ vi.mock("@/auth/session", async (importOriginal) => {
 vi.mock("@zitadel/sdk-react", () => ({
   ZitadelLogin: (props: {
     postSignInUrl?: string;
+    forcePostSignInUrl?: boolean;
     theme?: string;
     project?: { projectId?: string };
   }) => (
     <div
       data-testid="zitadel-login"
       data-post-sign-in-url={props.postSignInUrl}
+      data-force-post-sign-in-url={props.forcePostSignInUrl ? "" : undefined}
       data-project-id={props.project?.projectId}
       data-widget-theme={props.theme}
     />
@@ -50,13 +53,19 @@ vi.mock("@zitadel/sdk-react", () => ({
 /**
  * The redirect target below is a real screen with a loader, so the guard tests
  * need its data call answered — an empty list is enough to prove the redirect
- * landed. A path pattern rather than an absolute URL: this spec imports the
- * router statically, so `api/zitadel.ts` binds its base before any `stubEnv`.
+ * landed.
  */
-const server = setupServer(http.get("*/api/schemas", () => HttpResponse.json({ schemas: [] })));
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterAll(() => server.close());
+// `/` lands on Teams and the redirect test asks for `/schemas`; both are
+// project-scoped, so the guard selects the visitor's only project.
+beforeEach(() =>
+  server.use(
+    http.post("*/api/teams/query", () => HttpResponse.json({ teams: [] })),
+    http.get("*/api/schemas", () => HttpResponse.json({ schemas: [] })),
+    http.get("*/api/users/me/projects", () =>
+      HttpResponse.json({ projects: [{ id: "proj_test", name: "Test" }] }),
+    ),
+  ),
+);
 
 async function renderAt(path: string) {
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
@@ -68,13 +77,12 @@ beforeEach(() => {
   fetchSession.mockReset();
   signOut.mockClear();
   // The login screen renders the widget only when a project id resolves
-  // (ADR 0004 §§2–3); pin the dev override so guard tests exercise the widget
-  // path. The no-project test below clears it.
-  vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_test");
+  // (ADR 0004 §§2–3); name one in the runtime document so guard tests exercise
+  // the widget path. The no-project test below clears it.
+  _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_test" });
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
   localStorage.removeItem(THEME_STORAGE_KEY);
 });
 
@@ -84,14 +92,29 @@ describe("authentication guard", () => {
     const router = await renderAt("/users");
 
     expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/login");
-    expect(router.state.location.search).toEqual({ next: "/users" });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/login"));
+    expect(router.state.resolvedLocation?.search).toEqual({ next: "/users" });
     // The widget's post-sign-in target carries the requested path, and the
     // widget receives a `project` HANDLE (not discrete attribute props):
     // the element property is the only config source that outranks the
     // app-wide configureZitadel() call, whose project id is empty.
     expect(screen.getByTestId("zitadel-login")).toHaveAttribute("data-post-sign-in-url", "/users");
     expect(screen.getByTestId("zitadel-login")).toHaveAttribute("data-project-id", "proj_test");
+  });
+
+  /**
+   * The widget returns to the page's `?next=` by default, but the console's
+   * `next` is router-relative: followed as a document path it would land
+   * outside the deployment prefix. The post-sign-in URL already joins it with
+   * the prefix, so the widget must go there instead.
+   */
+  it("keeps the widget on the post-sign-in URL rather than the page's ?next=", async () => {
+    fetchSession.mockResolvedValue(null);
+    await renderAt("/users");
+
+    expect(await screen.findByTestId("zitadel-login")).toHaveAttribute(
+      "data-force-post-sign-in-url",
+    );
   });
 
   /**
@@ -114,7 +137,7 @@ describe("authentication guard", () => {
     const router = await renderAt("/");
 
     await screen.findByTestId("zitadel-login");
-    expect(router.state.location.search).toEqual({});
+    await waitFor(() => expect(router.state.resolvedLocation?.search).toEqual({}));
   });
 
   it("redirects a signed-in visitor away from /login to the requested path", async () => {
@@ -122,7 +145,25 @@ describe("authentication guard", () => {
     const router = await renderAt("/login?next=/schemas");
 
     expect(await screen.findByRole("heading", { name: "User schemas" })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/schemas");
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/schemas"));
+  });
+
+  it("keeps the requested path's query when it redirects a signed-in visitor", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    // Not the visitor's only project, which the guard would select by itself:
+    // this one can only come from `next`.
+    server.use(
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
+    );
+    const router = await renderAt(
+      `/login?next=${encodeURIComponent("/schemas?project=proj_other")}`,
+    );
+
+    expect(await screen.findByRole("heading", { name: "User schemas" })).toBeInTheDocument();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/schemas"));
+    expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_other" });
   });
 
   it("drops unsafe ?next= values instead of following them", async () => {
@@ -135,8 +176,27 @@ describe("authentication guard", () => {
     );
   });
 
+  /**
+   * Each of these starts with a single `/` and still ends on `//evil.example`:
+   * the browser reads `\` as `/`, drops tabs, and collapses dot segments. The
+   * dev server has no deployment prefix, so the widget would send the browser
+   * to `next` just as it stands.
+   */
+  it.each(["/%5Cevil.example", "/%09/evil.example", "/.//evil.example"])(
+    "drops ?next=%s, which the browser reads as //evil.example",
+    async (next) => {
+      fetchSession.mockResolvedValue(null);
+      await renderAt(`/login?next=${next}`);
+
+      expect(await screen.findByTestId("zitadel-login")).toHaveAttribute(
+        "data-post-sign-in-url",
+        "/",
+      );
+    },
+  );
+
   it("shows the setup hint instead of the widget while no project exists", async () => {
-    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
+    _resetRuntimeForTesting();
     fetchSession.mockResolvedValue(null);
     await renderAt("/");
 
@@ -156,6 +216,6 @@ describe("authentication guard", () => {
 
     expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
     expect(signOut).toHaveBeenCalledOnce();
-    expect(router.state.location.pathname).toBe("/login");
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/login"));
   });
 });

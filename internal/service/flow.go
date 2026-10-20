@@ -40,6 +40,9 @@ type SubmitFlowRequest struct {
 	Fields        map[string]any
 	GateProofs    map[string]string
 	SSOProviderID *string
+	// SSOReturn is the browser-side context of an external sign-in the API
+	// derived from the request. Set on an sso submission.
+	SSOReturn *domain.FlowSSOReturn
 	// ChallengeResponse carries the client's answer to a pending ceremony
 	// (e.g. a passkey assertion). Nil unless the step issued a challenge.
 	ChallengeResponse *domain.FlowChallengeResponse
@@ -86,7 +89,10 @@ type flowService struct {
 
 var _ FlowService = (*flowService)(nil)
 
-func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
+func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *domain.FlowDefinition, err error) {
+	ctx, end := startSpan(ctx, "FlowService.Resolve")
+	defer end(&err)
+
 	if req.Name != nil {
 		return s.resolveByName(ctx, req)
 	}
@@ -105,7 +111,7 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 
 	result, err := s.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(filters...),
-	})
+	}, FlowDefinitionQueryOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +150,7 @@ func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequ
 
 	result, err := s.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(filters...),
-	})
+	}, FlowDefinitionQueryOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +218,10 @@ func (s *flowService) resolveFlowSession(ctx context.Context, req StartFlowReque
 	return session.ID, nil
 }
 
-func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.FlowStepResult, error) {
+func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (_ domain.FlowStepResult, err error) {
+	ctx, end := startSpan(ctx, "FlowService.Start")
+	defer end(&err)
+
 	if req.Definition == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
 	}
@@ -220,6 +229,14 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 	// front so it maps to 400 rather than silently producing an unlinked flow.
 	if req.SessionID != nil && *req.SessionID == "" {
 		return domain.FlowStepResult{}, domain.ErrRequestInvalid().WithMessage("session_id must not be empty")
+	}
+
+	// The definition names its schema by objectType, but the flow and the users
+	// it creates are validated against one revision, pinned here at start.
+	userSchema, schemaErr := resolveUserSchema(ctx, s.v2Pool.Statements(), req.Definition.ProjectID, req.Definition.UserSchema)
+	if schemaErr != nil {
+		return domain.FlowStepResult{}, domain.ErrInternal(schemaErr).WithMessage(
+			fmt.Sprintf("failed to resolve user schema %q of flow definition %s", req.Definition.UserSchema, req.Definition.ID))
 	}
 
 	sessionID, err := s.resolveFlowSession(ctx, req)
@@ -240,7 +257,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 		Purpose:       req.Purpose,
 		Session:       domain.FlowSessionRef{ID: sessionID},
 		RedirectURI:   req.RedirectURI,
-		UserSchemaURL: req.Definition.UserSchema,
+		UserSchemaURL: userSchema.URL,
 	}
 	if req.AuthRequestID != nil {
 		in.AuthRequest = &domain.FlowAuthRequestRef{ID: *req.AuthRequestID}
@@ -255,7 +272,10 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
-func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain.FlowStepResult, error) {
+func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (_ domain.FlowStepResult, err error) {
+	ctx, end := startSpan(ctx, "FlowService.Submit")
+	defer end(&err)
+
 	if req.State == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: submit without state")
 	}
@@ -263,6 +283,16 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain
 	def, err := s.v2Pool.Statements().GetFlowDefinitionByID(ctx, req.State.ProjectID, req.State.DefinitionID)
 	if err != nil {
 		return domain.FlowStepResult{}, err
+	}
+	// A dead attempt fails every submission that reaches it, so the flow
+	// restarts here, as a render does. A handoff racing this read still ends
+	// in att.already_handed_off.
+	attempt, err := s.v2Pool.Statements().GetAuthAttemptByID(ctx, req.State.ProjectID, req.State.AuthAttemptID)
+	if err != nil {
+		return domain.FlowStepResult{}, fmt.Errorf("flow service: read auth attempt: %w", err)
+	}
+	if attempt.IsExpired() || attempt.IsHandedOff() {
+		return domain.FlowStepResult{}, domain.ErrFlowRestartRequired()
 	}
 	in := domain.FlowSubmitInput{
 		Action:            req.Action,
@@ -274,6 +304,7 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain
 	if req.SSOProviderID != nil {
 		in.SSOProvider = &domain.FlowSSOProviderRef{ID: *req.SSOProviderID}
 	}
+	in.SSOReturn = req.SSOReturn
 	result, err := s.stateMachine.Process(ctx, def, req.State, in)
 	if err != nil {
 		return domain.FlowStepResult{}, err
@@ -283,10 +314,14 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain
 		Step:                  result.Step,
 		HandoffToken:          result.HandoffToken,
 		HandoffTokenExpiresAt: result.HandoffTokenExpiresAt,
+		SSOBindingNonce:       result.SSOBindingNonce,
 	}, nil
 }
 
-func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (domain.FlowStepResult, error) {
+func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (_ domain.FlowStepResult, err error) {
+	ctx, end := startSpan(ctx, "FlowService.GetStep")
+	defer end(&err)
+
 	if req.State == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: get step without state")
 	}
@@ -298,7 +333,13 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (doma
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
-	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
+	return domain.FlowStepResult{
+		State:                 result.State,
+		Step:                  result.Step,
+		HandoffToken:          result.HandoffToken,
+		HandoffTokenExpiresAt: result.HandoffTokenExpiresAt,
+		Reseal:                result.Reseal,
+	}, nil
 }
 
 func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {

@@ -32,13 +32,17 @@ const DISABLED_VALUES = new Set(["", "0", "false", "off", "no"]);
  * several explicit signals turns it off, in precedence order.
  *
  * 1. `--no-telemetry` on the command line — the most explicit, per-invocation.
- * 2. An automated test run (`VITEST`/`NODE_ENV=test`) — never emit synthetic
- *    traffic or pay the shutdown flush; spawned CLI subprocesses inherit it.
- * 3. `DO_NOT_TRACK` — the cross-tool standard (https://consoledonottrack.com);
+ * 2. `DO_NOT_TRACK` — the cross-tool standard (https://consoledonottrack.com);
  *    any value other than `0`/empty disables.
- * 4. `ZITADEL_TELEMETRY` set to a falsey token (`0`/`false`/`off`/`no`).
+ * 3. `ZITADEL_TELEMETRY` set to a falsey token (`0`/`false`/`off`/`no`).
+ * 4. An automated test run (`VITEST`/`NODE_ENV=test`) — never emit synthetic
+ *    traffic or pay the shutdown flush; spawned CLI subprocesses inherit it.
  * 5. No ingestion token configured for the active channel — nothing to send to,
  *    so telemetry is inert regardless of consent.
+ *
+ * The user's own choices (1–3) come first so `reason` reports them even in a
+ * test shell: the user agent reads it to decide whether to describe the
+ * user's environment.
  *
  * Consent being enabled does not by itself send anything; the caller still
  * builds the client lazily and fails open on any transport error.
@@ -46,10 +50,6 @@ const DISABLED_VALUES = new Set(["", "0", "false", "off", "no"]);
 export function resolveConsent(input: ConsentInput): Consent {
   if (input.flag === false) {
     return { enabled: false, reason: "flag-opt-out" };
-  }
-
-  if (input.env.VITEST || input.env.NODE_ENV === "test") {
-    return { enabled: false, reason: "test-runner" };
   }
 
   const doNotTrack = input.env.DO_NOT_TRACK?.trim();
@@ -60,6 +60,10 @@ export function resolveConsent(input: ConsentInput): Consent {
   const explicit = input.env.ZITADEL_TELEMETRY?.trim().toLowerCase();
   if (explicit !== undefined && DISABLED_VALUES.has(explicit)) {
     return { enabled: false, reason: "env-opt-out" };
+  }
+
+  if (input.env.VITEST || input.env.NODE_ENV === "test") {
+    return { enabled: false, reason: "test-runner" };
   }
 
   const token = resolveTelemetryToken(input.env);

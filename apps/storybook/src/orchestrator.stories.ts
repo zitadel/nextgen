@@ -1,74 +1,37 @@
-import type { Meta, StoryObj } from "@storybook/web-components-vite";
-import { applyBranding, clearBranding, setupMockHandlers } from "@zitadel/api-mock";
+import type { StoryObj } from "@storybook/web-components-vite";
+import { PASSWORD_FIELD } from "@zitadel/api-mock";
 import { html } from "lit";
-import { initialize, mswLoader } from "msw-storybook-addon";
-import "@zitadel/components";
-import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
 
-// MSW lives only on the orchestrator (the atoms make no requests), so the
-// worker starts lazily here rather than globally in preview.ts.
-initialize({ onUnhandledRequest: "bypass" });
+import {
+  fill,
+  mock,
+  orchestratorArgTypes,
+  orchestratorBeforeEach,
+  orchestratorDefaultArgs,
+  orchestratorRender,
+  submit,
+  waitFor,
+  type OrchestratorArgs,
+} from "./orchestrator-shared.js";
 
-/**
- * The `<zitadel-login>` orchestrator renders whatever the Flow API returns for
- * the current step. Here that API is mocked by `@zitadel/api-mock` (an xstate
- * flow machine + orval-typed fixtures), wired through `msw-storybook-addon`.
- *
- * One component, knobs for the rest:
- * - `purpose` switches the flow (Sign in -> email, then the credential on its
- *   own step; Sign up -> email, given name, family name, date of birth), so the
- *   rendered fields change without a separate component.
- * - `branding` swaps the tenant payload the mock overlays on every response.
- *
- * Interactive fixture emails (typed live in the rendered form):
- * - `wrong@example.com` -> inline "Wrong email or password." on the password
- *   step (credential failures surface there, not on the identifier)
- * - `server@example.com` -> form alert on the password step
- * - `exists@example.com` -> inline "account already exists" on Sign up
- * - any other email -> happy path to signed-in
- *
- * Excluded from the Storybook test run (`no-test`): the orchestrator drives
- * real network + the MSW worker; its behaviour is covered by the
- * `@zitadel/components` orchestrator specs.
- */
-interface OrchestratorArgs {
-  purpose: "login" | "register";
-  branding: BrandingPresetId;
-}
-
-const mock = setupMockHandlers();
-
-const meta: Meta<OrchestratorArgs> = {
+// Written out rather than spread from the shared base: Storybook reads a CSF
+// default export statically, so a spread of an imported object silently loses
+// everything but `title` -- no `msw` handlers and, worse, no `beforeEach`, so
+// the branding overlay never ran and the `branding` knob did nothing on a cold
+// load. It only looked like it worked when another group had already set the
+// overlay as module state. The values still come from one place.
+export default {
   title: "Orchestrator/Login",
   tags: ["no-test"],
-  loaders: [mswLoader],
   parameters: {
     layout: "fullscreen",
     msw: { handlers: mock.handlers },
   },
-  args: { purpose: "login", branding: "centered" },
-  argTypes: {
-    purpose: {
-      control: "inline-radio",
-      options: ["login", "register"],
-      description: "Flow purpose — which step (and fields) the mock returns.",
-    },
-    branding: {
-      control: "select",
-      options: Object.keys(brandingPresets),
-      description: "Tenant branding the mock overlays on every response.",
-    },
-  },
-  beforeEach: ({ args }) => {
-    mock.reset();
-    clearBranding();
-    applyBranding(brandingPresets[args.branding]);
-  },
-  render: ({ purpose }) =>
-    html`<zitadel-login variant="page" .purpose=${purpose}></zitadel-login>`,
+  args: orchestratorDefaultArgs,
+  argTypes: orchestratorArgTypes,
+  beforeEach: orchestratorBeforeEach,
+  render: orchestratorRender,
 };
-
-export default meta;
 type Story = StoryObj<OrchestratorArgs>;
 
 /**
@@ -104,3 +67,91 @@ export const SignUp: Story = { args: { purpose: "register" } };
 
 /** Same flow, split-layout tenant branding. */
 export const SplitBranding: Story = { args: { branding: "split" } };
+
+/**
+ * The second step of an ordinary sign-in, where the credential is asked for.
+ * The identifier collects the email on its own, so this step is only ever
+ * reached by submitting one — the story does that rather than faking a step,
+ * which keeps the mock's flow the same one a visitor drives.
+ */
+export const PasswordStep: Story = {
+  play: async ({ canvasElement }) => {
+    await fill(canvasElement, "email", "ada@example.com");
+    await submit(canvasElement);
+    await waitFor(() =>
+      canvasElement
+        .querySelector("zitadel-login")
+        ?.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`),
+    );
+  },
+};
+
+/**
+ * Sign-up, second step: set a password — the sibling of `PasswordStep` on the
+ * register path. Reached by completing the sign-up details, the way a visitor
+ * does, rather than faking the step.
+ */
+export const RegisterPasswordStep: Story = {
+  args: { purpose: "register" },
+  play: async ({ canvasElement }) => {
+    await fill(canvasElement, "email", "ada@example.com");
+    await fill(canvasElement, "given_name", "Ada");
+    await fill(canvasElement, "family_name", "Lovelace");
+    await submit(canvasElement);
+    // register-password collapses the sign-up fields to a single password
+    // field (whose name is the schema pointer, not "password").
+    await waitFor(
+      () =>
+        canvasElement.querySelector("zitadel-login")?.shadowRoot?.querySelectorAll("zl-field")
+          .length === 1,
+    );
+  },
+};
+
+/**
+ * Recover (forgot-password) step, reached from the identifier's "Forgot
+ * password?" link. The step has no fields of its own, so the play waits for the
+ * email field to disappear once the recover screen renders.
+ */
+export const RecoverStep: Story = {
+  play: async ({ canvasElement }) => {
+    const login = canvasElement.querySelector("zitadel-login");
+    // The recover affordance is a `navigate` action rendered as an anchor with a
+    // stable `data-action`; match on that, not its localized label (the
+    // orchestrator translates action text from `navigator.language`, so a
+    // text match would time out in a non-English browser).
+    const link = await waitFor(() => login?.shadowRoot?.querySelector('[data-action="recover"]'));
+    (link as HTMLElement).click();
+    await waitFor(
+      () =>
+        login?.shadowRoot != null &&
+        login.shadowRoot.querySelector('zl-field[name="email"]') == null &&
+        login.shadowRoot.querySelector("form") != null,
+    );
+  },
+};
+
+/**
+ * The terminal "you're signed in" step (`complete: "show"`), reached by walking
+ * a full sign-in. A hosted surface with a `post-sign-in-url` would redirect
+ * instead; without one the completion screen stays put.
+ */
+export const SignedIn: Story = {
+  play: async ({ canvasElement }) => {
+    await fill(canvasElement, "email", "ada@example.com");
+    await submit(canvasElement);
+    await waitFor(() =>
+      canvasElement
+        .querySelector("zitadel-login")
+        ?.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`),
+    );
+    await fill(canvasElement, PASSWORD_FIELD, "hunter2password");
+    await submit(canvasElement);
+    await waitFor(() => {
+      const sr = canvasElement.querySelector("zitadel-login")?.shadowRoot;
+      return (
+        sr != null && sr.querySelector("zl-field") == null && sr.querySelector("zl-button") != null
+      );
+    });
+  },
+};

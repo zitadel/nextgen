@@ -103,6 +103,34 @@ func TestWriteCheckAuthzBindOrder(t *testing.T) {
 	assert.GreaterOrEqual(t, homeBinds, 2, "home must bind in both the allowed arm and the foothold arm")
 }
 
+// The membership test must stay the correlated EXISTS, spelled exactly like
+// this. An `IN (SELECT e.set_id …)` rewrite is semantically identical and passes
+// every behavioural suite, but it sent the Spanner emulator's planner
+// pathological on the management-list predicate and timed the lane out. Pin the
+// text so the next refactor has to argue with a red test rather than with CI.
+func TestWriteUserMembershipInTeamStaysACorrelatedExists(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), domain.AuthzCheckParams{
+		CatalogID:              "cat_sys_1",
+		ProjectID:              "proj_customer",
+		PrincipalHomeProjectID: "proj_platform",
+		PrincipalType:          domain.AuthzPrincipalTypeUser,
+		PrincipalID:            "user_a",
+		ObjectType:             "project",
+		Relation:               "viewer",
+	})
+	assert.Contains(t, w.b.String(), `EXISTS (
+        SELECT 1
+        FROM zitadel_nextgen.authz_membership_edges e
+        WHERE e.project_id = ?
+          AND e.set_type = 'team'
+          AND e.set_id = a.principal_id
+          AND e.member_type = 'user'
+          AND e.member_id = ?
+    )`)
+}
+
 func TestWriteActiveSystemCatalogID(t *testing.T) {
 	t.Parallel()
 	var w recordingWriter

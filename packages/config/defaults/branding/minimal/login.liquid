@@ -31,21 +31,14 @@
         {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
         ></zl-select>
       {% else %}
-        {% assign autocomplete_val = '' %}
-        {% if f.name == 'email' %}
-          {% assign autocomplete_val = 'email' %}
-        {% elsif f.type == 'password' and step.name contains 'register' %}
-          {% assign autocomplete_val = 'new-password' %}
-        {% elsif f.type == 'password' %}
-          {% assign autocomplete_val = 'current-password' %}
-        {% endif %}
         <zl-field
           name="{{ f.name }}"
           data-testid="zitadel-field-{{ f.name | testid }}"
           label="{{ f.text_key | t }}"
           type="{{ f.type }}"
           value="{{ f.value }}"
-          {% if autocomplete_val != '' %}autocomplete="{{ autocomplete_val }}"{% endif %}
+          {% if f.autocomplete %}autocomplete="{{ f.autocomplete }}"{% endif %}
+          {% if f.read_only %}readonly{% endif %}
           {% if f.required %}required{% endif %}
           {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
           {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
@@ -65,6 +58,9 @@
           {% assign alert_body = err.text_key | alertBody %}
           <zl-alert data-zl-step-error{% if alert_heading != "" %} heading="{{ alert_heading | t }}"{% endif %}>
             {% if alert_body != "" %}{{ alert_body | t }}{% elsif err.text_key %}{{ err.text_key | t }}{% else %}{{ err.message }}{% endif %}
+            {% comment %} A provider error carries its own words and a link; show both when present. {% endcomment %}
+            {%- if err.detail %}<span slot="detail">{{ err.detail }}</span>{% endif -%}
+            {%- if err.uri %}<a slot="link" href="{{ err.uri }}" target="_blank" rel="noopener noreferrer">{{ "error.more_info" | t }}</a>{% endif -%}
           </zl-alert>
         {% endif %}
       {% endfor %}
@@ -97,6 +93,21 @@
         ></zl-button>
       {% endif %}
     {% endfor %}
+
+    {% comment %}
+      Identity providers the step offers, below the primary action: the
+      password path stays the default and this is the alternative, which is
+      also the order the divider reads in. The atom renders nothing when the
+      step carries no providers, so this costs a shipped flow nothing.
+    {% endcomment %}
+    {% if sso_providers and sso_providers.size > 0 %}
+      <zl-sso-providers
+        data-testid="zitadel-sso-providers"
+        providers='{{ sso_providers | json }}'
+        label-format="{{ 'sso.continue_with' | t }}"
+        {% if loading %}disabled{% endif %}
+      ></zl-sso-providers>
+    {% endif %}
 
     {% for a in actions %}
       {% unless a.primary or a.kind == 'back' or a.name == 'passkey' or a.name == 'register' or a.name == 'sign_in' or a.name == 'recover' %}
@@ -136,7 +147,17 @@
     {% assign sign_in = actions | where: "name", "sign_in" | first %}
     {% if sign_in %}
       <p class="zl-card-nav">
-        {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ 'register.action.sign_in.link' | t }}</a>
+        {% comment %}
+          The register step's row reads "Already have an account? Sign in".
+          Any other step that offers `sign_in` — the SSO conflict screen, which
+          has just told the user they have one — carries its own copy, so the
+          lead is dropped and the action's own text is used.
+        {% endcomment %}
+        {% if sign_in.text_key == 'register.action.sign_in.link' %}
+          {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ 'register.action.sign_in.link' | t }}</a>
+        {% else %}
+          <a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ sign_in.text_key | t }}</a>
+        {% endif %}
       </p>
     {% endif %}
     </div>

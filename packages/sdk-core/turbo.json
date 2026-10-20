@@ -1,0 +1,43 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // contract.spec.ts imports @zitadel/components/events from its dist.
+    "typecheck": {
+      "dependsOn": ["@zitadel/components#build"]
+    },
+    "build": {
+      "dependsOn": ["@zitadel/api#build"]
+    },
+    "build-release": {
+      "dependsOn": ["@zitadel/api#build-release"]
+    },
+    // contract.spec.ts reads these SDK specs to check their copied
+    // SERVER_RENDER_CASES tables and standard-attribute test titles and bodies for drift,
+    // and every SDK's manifest and docs and the demo apps' manifests and sources
+    // to check that apps go through their SDK.
+    "test": {
+      "dependsOn": ["@zitadel/components#build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/sdk-react/src/index.spec.tsx",
+        "$TURBO_ROOT$/packages/sdk-vue/src/components.spec.ts",
+        "$TURBO_ROOT$/packages/sdk-angular/src/lib/components.spec.ts",
+        "$TURBO_ROOT$/packages/sdk-svelte/src/index.spec.ts",
+        "$TURBO_ROOT$/packages/sdk-svelte/src/index.ssr.spec.ts",
+        "$TURBO_ROOT$/packages/sdk-solid/src/index.spec.tsx",
+        "$TURBO_ROOT$/packages/sdk-solid/src/index.ssr.spec.tsx",
+        "$TURBO_ROOT$/packages/sdk-qwik/src/index.spec.tsx",
+        "$TURBO_ROOT$/packages/sdk-qwik/src/index.ssr.spec.tsx",
+        "$TURBO_ROOT$/packages/sdk-*/src/__tests__/*.test.ts",
+        "$TURBO_ROOT$/packages/sdk-*/src/__tests__/*/*.test.ts",
+        "$TURBO_ROOT$/packages/sdk-*/package.json",
+        "$TURBO_ROOT$/packages/sdk-*/README.md",
+        "$TURBO_ROOT$/packages/sdk-*/skills/**/SKILL.md",
+        "$TURBO_ROOT$/apps/demo-*/package.json",
+        "$TURBO_ROOT$/apps/demo-*/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,vue,svelte,astro}",
+        "!$TURBO_ROOT$/apps/demo-*/**/node_modules/**"
+      ]
+    }
+  }
+}

@@ -5,7 +5,7 @@
 
 An Identity Provider (IdP) connection is a tenant-owned configuration file that
 defines how Zitadel interacts with external authentication providers (such as
-Google or GitHub). This document defines the schema, validation rules, runtime behavior, and
+Google or a company's own OIDC provider). OIDC is the only protocol. This document defines the schema, validation rules, runtime behavior, and
 lifecycle of these connection files.
 
 **Note on vocabulary:**  
@@ -37,7 +37,7 @@ schemas and flow steps.
 | Files under `.zitadel/idps/` | Maintains consistent GitOps surface area.                                                                                                                                                                                                                                                                              |
 | Based on Zitadel-defined JSON Schema | Same pattern as `flow-definition.json`                                                                                                                                                                                                                                                                                 |
 | Validation | Schema checks single-file rules; a separate validator handles cross-file rules.                                                                                                                                                                                                                                        |
-| Protocol details live in a nested `oidc` / `oauth2` block | New protocols add a block instead of restructuring committed files                                                                                                                                                                                                                                                     |
+| Protocol details live in a nested `oidc` block | OIDC is the only protocol. A new protocol adds a block instead of restructuring committed files                                                                                                                                                                                                                       |
 | `slug` is the identity | User schemas and flow definitions reference connections by slug, so revisions never invalidate references                                                                                                                                                                                                              |
 | `template` names the catalog entry | The field reads as a scaffold-source pointer; behavior comes only from the protocol blocks ([area 4](4-cli-provider-setup.md#catalog-schema)).                                                                                                                                                                         |
 | Revisioned on the server | In-flight attempts, rollback, and audit need immutable revisions. The CLI syncer is `mutable: true, revisioned: false`, like the flow syncer (`ResourceSyncer`, `apps/cli/src/lib/sync/types.ts`): the server mints each revision under the stable connection id ([area 4](4-cli-provider-setup.md#preview-and-apply)) |
@@ -47,62 +47,43 @@ schemas and flow steps.
 
 ## Vendor knowledge is data
 
-### Context
 zitadel/zitadel implements each vendor as a Go package, and most of that code is
 configuration written in Go: issuers, endpoints, forced scopes, claim mappings.
-Across its vendors only three things are behaviour rather than data: 
-- GitHub fetches `/user/emails` when the profile email is private and retains the
-`primary && verified` address
-- Apple signs its own client secret (an ES256 JWT
-with a one-hour expiry, so an implementation caches and refreshes)
+Here that knowledge is data: the area 4 catalog carries it, and a connection
+file states it.
+The engine implements a protocol, OIDC, not a set of vendors.
+
+Across zitadel/zitadel's vendors only a few things are behaviour rather than
+data:
+- GitHub fetches `/user/emails` when the profile email is private and retains
+  the `primary && verified` address.
+- Apple signs its own client secret (an ES256 JWT with a one-hour expiry, so an
+  implementation caches and refreshes).
 - Apple uses `response_mode=form_post`, which turns the callback into a POST.
 
-### Proposal
-So the proposal is: **configuration for everything data-shaped, named strategies
-for the rest.**
-
-Some providers require custom actions during sign-in, called **strategies**.
-The server implements the logic for each strategy and maintains it in a
-**registry**, which is a mapping of unique names to their specific implementations.
-A connection activates one of these extra steps simply by referencing its
-registry name (e.g., `"supplementary_fetch": "github_primary_email"`).
-While standard configuration fields handle static data, only a named strategy
-can introduce new execution steps.
-If a connection doesn't select a strategy, it defaults to the standard protocol
-flow.
-
-While this mechanism is built for general use, Epic 851 introduces just
-`supplementary_fetch` to support GitHub.
-Currently, `github_primary_email` is its only entry, as GitHub is the only
-provider in this release requiring a custom action.
-Google’s setup, by contrast, is entirely data-driven.
-When Apple is integrated later, its signed secret will introduce a second slot
-(`secret_strategy`).
-
-**Two rules keep this mechanism predictable:**
-
-**Registry entries carry strict contracts:** A strategy explicitly declares its supported protocols, required scopes, emitted claims, and verified claims (e.g., `github_primary_email` requires the `oauth2` protocol and `user:email` scope to emit and verify an `email` claim).
-The JSON schema enforces the name, protocol, and scope parts of these contracts
-via closed enums and conditional checks, so typos and unshipped strategies fail
-at validation.
-The verified-claims part cannot be expressed that way, since it compares
-each `verified_claims` key against the contract of the selected strategy; the
-server covers it as [Invalid Strategy Pointer](#validator-rules).
-Adding a new strategy is a non-breaking change.
-
-**Strategies are the definitive authority:** If selected, a strategy always runs
-and replaces same-named claims from userinfo or the `id_token`, so
-`verified_claims: {"email": "$supplementary_fetch"}` always resolves, at the
-cost of one request per login.
+None of these is in this release.
+An earlier draft added named server-side strategies (a registry of
+implementations a connection selects by name, starting with a
+`supplementary_fetch` for GitHub's email) together with an `oauth2` protocol
+block.
+Both were removed: GitHub speaks OAuth 2.0 only, so it is not connectable, and
+with no OAuth 2.0 provider nothing needs a strategy.
+Removing the block is a breaking change ([Forward Compatibility](#forward-compatibility)):
+`oauth2` connections stored by earlier alpha releases are not migrated. The
+engine refuses one at sign-in, and the author recreates it as `oidc` or deletes
+it.
+A provider that needs behaviour beyond the OIDC ceremony returns as an additive
+schema change once it is scoped; Apple's signed secret is listed under
+[Deferred and Cut Fields](#deferred-and-cut-fields).
 
 ## Example
 
 Setup scaffolds one file per selected provider:
-[`google.json`](schemas/google.json) (OIDC, discovery supplies the endpoints)
-and [`github.json`](schemas/github.json) (OAuth2, no discovery, endpoints
-explicit).
-The connections contain env var references, they never include secret values. They both carry a
-`claim_mapping` generated from the active user schema.
+[`google.json`](schemas/google.json) is the Google one (OIDC, discovery
+supplies the endpoints).
+A connection contains `${{ NAME }}` variable references and never includes
+secret values. It carries a `claim_mapping` generated from the active user
+schema.
 
 Tracking is handled by `state.json` (`ResourceEntry`: `id`, `hash`, `name`,
 `status`, `previousId`), with `scaffoldedFrom` proposed as an addition; see
@@ -118,27 +99,21 @@ How to read the schema:
   identity (`slug`, `protocol`, `template`, `display_name`), resolution
   (`subject_claim`, `claim_mapping`, `verified_claims`), and trust
   (`provisioning.creation`).
-  Protocol-specific plumbing is isolated inside nested blocks.
+  Protocol-specific plumbing is isolated inside a nested block.
 - **Protocol Selection:** The `protocol` field dictates the active block.
-  Using `if protocol == "oidc"` requires the `oidc` block and explicitly forbids
-  `oauth2`.
+  Its enum is `["oidc"]`, and `protocol == "oidc"` requires the `oidc` block.
+  A new protocol would add an enum value and a block of its own.
 - **Precise Error Messages:** The schema uses `if`/`then` conditionals rather
   than `oneOf`.
   While `oneOf` throws generic "all arms failed" errors, `if`/`then` pinpoints
   the exact issue (e.g., `/oidc must have required property 'client_id'`).
-- **Intentional Duplication:** The two protocol blocks duplicate nine shared
-  fields.
-  Factoring them out would require `unevaluatedProperties`, which many
-  third-party validators do not support.
-  Since a connection file only ever contains one block, this duplication is
-  safer and more compatible.
 - **Scope Enforcement:** In the OIDC block, `scopes` must contain `openid`
   (enforced via `required` and `contains`, as JSON Schema `default` values do
   not inject data).
   Without `openid`, it is not a valid OIDC connection.
-- **Subject Claims:** The `subject_claim` field is optional for OIDC (the spec
-  guarantees `sub`, though overrides exist for pairwise IDs like Entra) but
-  strictly required for OAuth2.
+- **Subject Claims:** The `subject_claim` field is optional and defaults to
+  `sub`, which the spec guarantees; override it where `sub` is pairwise, such
+  as Entra's `oid`.
 - **Strict Secrets:** Literal secrets cannot be committed.
   Because `client_secret` accepts only a whole-value `${{ NAME }}` reference,
   pasting a raw secret triggers an immediate validation error.
@@ -150,22 +125,27 @@ How to read the schema:
   The engine copies `display_name` and `template` onto the rendered step's
   provider entry, so the flow definition lists only slugs
   ([area 2](2-auth-method-selection.md#rendering-from-the-connection)).
-- **TLS Required:** Every endpoint URL (`issuer`, `jwks_uri`, and the endpoints
-  in both blocks) carries a `pattern` requiring `https://`, with an exception
+- **TLS Required:** Every endpoint URL (`issuer` and the endpoints in the
+  `oidc` block) carries a `pattern` requiring `https://`, with an exception
   for local development (`http://localhost` and `http://127.0.0.1`).
   OIDC requires TLS on these endpoints, and every one of them handles codes,
   tokens, or key material; `format: "uri"` alone is an annotation and would not
   reject an `http://` URL.
-- **PKCE and claim source:** Both protocol blocks carry `pkce_enabled` (default
+- **PKCE and claim source:** The `oidc` block carries `pkce_enabled` (default
   `true`; set `false` only for a provider whose token endpoint rejects the
   parameters).
   The challenge method is not configurable, the engine always uses `S256`
   ([The `state` Record](3-social-login-flow.md#the-state-record)).
-  The OIDC block adds `id_token_mapping` (default `false`), which reads claims
+  It also carries `id_token_mapping` (default `false`), which reads claims
   from the `id_token` instead of `userinfo`.
+- **Endpoints, all or nothing:** The `oidc` block names no endpoints, and
+  discovery from the `issuer` fills them, or it names every one:
+  `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and
+  `userinfo_endpoint` unless `id_token_mapping` is `true`.
+  A block that sets some but not all is refused
+  ([Partial Endpoint Block](#validator-rules)).
 - **Future-Proof Terminology:** "Claim" is used as a protocol-neutral term for
-  any provider assertion (whether OIDC claims, OAuth2 userinfo, or future SAML
-  attributes), ensuring root field names remain stable as new protocols are
+  any provider assertion (whether OIDC claims or future SAML attributes), ensuring root field names remain stable as new protocols are
   added.
 
 ### Provisioning
@@ -178,7 +158,7 @@ This design names the states instead.
 
 | `creation` | Legacy bits | Unknown subject                                                                                                                                                                                                                                                                                                                                                                  |
 | :--- | :--- |:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `disabled` | allowed=false, auto=false | The provider signs in existing users only. An unknown subject is an error on the step the user started from; the step re-renders with the error and the user picks another signin method. `identity_unknown` is not raised as its target is the collection step, which only applies to providers that may create users ([area 3](3-social-login-flow.md#the-three-outcomes)).    |
+| `disabled` | allowed=false, auto=false | The provider signs in existing users only. An unknown subject is an error on the step the user started from; the step re-renders with the error and the user picks another signin method. `sso_user_not_found` is not raised as its target is the collection step, which only applies to providers that may create users ([area 3](3-social-login-flow.md#the-three-outcomes)).  |
 | `auto` (default) | allowed=true, auto=true | The user is created automatically when claim mapping resolves all the required user fields. Otherwise the collection step is shown for manual creation, prefilled with the known fields from claim mapping.                                                                                                                                                                      |
 
 In the case of `auto`, the user is not created if a required `x-unique` property arrives as unverified. 
@@ -260,13 +240,6 @@ into the external provider's claim names (values):
   properties names "the claim name for this property, if applicable"
   (`user-property.json`), the outgoing side; it does not conflict with this
   incoming mapping.
-- **Catalog Data Caveat:** GitHub exposes no given/family name split; its `name`
-  claim is the full display name.
-  The catalog claim table still maps `givenName: "name"` as the pragmatic
-  default, which puts a full name into `givenName`.
-  Tenants wanting precise name semantics drop that mapping, and the user
-  supplies the value at the collection step.
-  `familyName` has no GitHub source and is never mapped.
 - **Validation vs. Runtime Safety:** Unknown-target checks run at plan, against
   every referencing schema; the CLI reads the working tree, and the server
   validates during flow definition creation and update.
@@ -278,39 +251,25 @@ into the external provider's claim names (values):
   next plan or flow definition write.
 
 The `verified_claims` field is the companion map for verification state,
-offering three value forms:
+offering two value forms:
 
 | Value | Meaning | Exists because |
 | :--- | :--- | :--- |
 | `"email_verified"` | Read this claim. | OIDC providers assert verification in a specific claim. |
 | `true` | Trust this provider unconditionally. | Entra-style stated trust requires it. |
-| `"$supplementary_fetch"` | The selected fetch strategy verifies it. | GitHub verification relies on a `primary && verified` fetch result, not a single claim. |
 
-A `$`-prefixed value acts as a pointer to the strategy field of the same name in
-the protocol block.
-For instance, `"$supplementary_fetch"` defers to whatever the
-`supplementary_fetch` field selects.
-The strategy's backend contract (its server-side definition) must declare in
-its registry entry that it verifies the claim that the `verified_claims` key
-maps to (see [Invalid Strategy Pointer](#validator-rules)).
-If the pointer does not select a strategy, or the strategy cannot verify that
-claim, the server rejects the connection.
-
-All `$` values are reserved.
-Only `$supplementary_fetch` exists, so any other `$` string is a schema error.
+All `$`-prefixed values are reserved for future verification sources, so the
+schema refuses any string starting with `$`.
 A typo in a plain claim name fails silently (claim names are provider-controlled
-and unchecked at plan time); a typo in a `$` value fails hard.
+and unchecked at plan time).
 One slip is out of reach of the schema: `"true"` in quotes is a claim name, not
 the boolean, so the engine looks for a claim named `true`, finds none, and
 evaluates the property as unverified on every attempt.
 Any string is a valid claim name, so the schema cannot reject it; the validator
 warns on the literal `"true"` and `"false"` instead.
 
-The list of allowable pointers will grow only when a new claim-verifying
-strategy *slot* is added, requiring just one `const` per slot, making it a
-non-breaking change.
-Introducing new strategies to an existing slot requires no schema changes,
-because the pointer references the field name, not the specific strategy.
+A future source would take a `$`-prefixed form; admitting one relaxes the
+schema, so it is a non-breaking change.
 
 ## Linking Safety
 
@@ -322,7 +281,7 @@ inherit to avoid security flaws:
 
 - **Email linking requires verified claims:** Auto-linking accounts based on
   unverified emails is an account takeover risk.
-  OAuth2 `userinfo` lacks verification semantics, and some OIDC providers allow
+  Plain OAuth 2.0 `userinfo` lacks verification semantics, and some OIDC providers allow
   tenant admins to set arbitrary emails (such as the nOAuth attack against
   Entra).
   Therefore, auto-linking by email must strictly require verified-email
@@ -390,24 +349,24 @@ provisional (see [Open points](#open-points)).
 | :--- | :--- |:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Slug Uniqueness** | Error | `slug` must be unique across all `.zitadel/idps/` files.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **Slug Modification** | Error | Cannot change the `slug` on a state-tracked file. A true rename requires creating a new one (see [Lifecycle](#connection-lifecycle)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| **Identity-Critical Revision** | Error | An identity field changed on a state-tracked connection. For `oidc` these are `protocol`, `subject_claim`, and `issuer`; for `oauth2` they are `protocol`, `subject_claim`, `token_endpoint`, and `userinfo_endpoint`. Identity links key on the connection id, so the edit would hand existing accounts to whoever holds the same subjects at the new authority. Like slug, these fields are fixed for the life of a connection; a real change is a new connection (see [Lifecycle](#connection-lifecycle)). OIDC endpoint overrides (`jwks_uri`, `token_endpoint`, `userinfo_endpoint`) may be added, changed, or removed. The `issuer` pins the authority on its own, because the `id_token` must carry it as `iss` and discovery must return it ([area 3](3-social-login-flow.md#callback-processing)), so an override is a repair, not a change of who answers for a subject. State records a content hash, not field values (`ResourceEntry`, `apps/cli/src/lib/sync/types.ts`), so the CLI can name the changed field only by fetching the stored revision; the server's refusal on revise is the authoritative one.                                                                                                                                                  |
+| **Identity-Critical Revision** | Error | An identity field changed on a state-tracked connection: `protocol`, `subject_claim`, or `oidc.issuer`. Identity links key on the connection id, so the edit would hand existing accounts to whoever holds the same subjects at the new authority. Like slug, these fields are fixed for the life of a connection; a real change is a new connection (see [Lifecycle](#connection-lifecycle)). The explicit OIDC endpoints are not identity fields: a revision may change them, or switch between naming them all and leaving them to discovery, as long as the block stays all or nothing ([Partial Endpoint Block](#validator-rules)). The `issuer` pins the authority on its own, because the `id_token` must carry it as `iss` and discovery must return it ([area 3](3-social-login-flow.md#callback-processing)), so an endpoint change is a repair, not a change of who answers for a subject. State records a content hash, not field values (`ResourceEntry`, `apps/cli/src/lib/sync/types.ts`), so the CLI can name the changed field only by fetching the stored revision; the server's refusal on revise is the authoritative one.                                                                                                                                                  |
 | **File Move** | *Handled* | An orphaned state entry paired with a new file using the same `slug` is treated as a file move. State is rekeyed, and the platform is not touched.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **Orphaned Mapping Target** | Error | A `claim_mapping` target is unknown to *every* referencing schema (assumes at least one schema references the connection). This typically indicates a typo.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **Missing Mapping Target** | Warning | A `claim_mapping` target is missing from *some* referencing schemas. This is permitted because a connection can legitimately map a superset of fields.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | **Orphaned Verification Key** | Error | A `verified_claims` key is unknown to *every* referencing schema. A typo here means the claim will silently never verify.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | **Unreferenced Typo Guard** | Warning | The connection is not referenced by any schema, and a mapping target or verification key is unknown to *every* schema in the working tree.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | **Missing `x-verify` Method** | Warning | A `verified_claims` key points to a property that lacks an `x-verify` method (verification with nowhere to land). Activates when `x-verify` returns (see the dependency note under [Linking Safety](#linking-safety)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| **Invalid Strategy Pointer** | Error | `"$supplementary_fetch"` with no strategy selected, or a strategy that does not verify the mapped claim. The key is a property name and the contract lists claim names, so the check maps the key through `claim_mapping` first: with `github_primary_email`, `emailAddress` → `email` passes and `givenName` → `name` fails. A key with no `claim_mapping` entry cannot resolve and is an error. Server-side only: the contracts live in the server's registry, so the CLI does not run this check at plan and the error surfaces at apply.                                                                                                                                                                                                |
 | **Literal `"true"` Source** | Warning | A `verified_claims` source is the quoted string `"true"` or `"false"`. Any string is a valid claim name, so the schema cannot reject it, but the engine would look for a claim by that name, find none, and evaluate the property as unverified on every attempt. The boolean `true` is the trust-the-provider form. |
 | **Inert Connection** | Warning | The connection is referenced by zero schemas. No flow can offer it, making it completely inert.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **Impossible Registration** | Warning | A flow registration step offers this provider, but `creation` is `disabled`. The user will never be able to sign up: an unknown subject is an error on the step, and `identity_unknown` is not raised ([Provisioning](#provisioning)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Impossible Registration** | Warning | A flow registration step offers this provider, but `creation` is `disabled`. The user will never be able to sign up: an unknown subject is an error on the step, and `sso_user_not_found` is not raised ([Provisioning](#provisioning)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | **Impossible Auto-Creation (Data)** | Warning | `creation` is `auto`, but a referencing schema requires a property that the `claim_mapping` does not target. Every sign-in will stop to collect the missing data.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **Impossible Auto-Creation (Verification)** | Warning | `creation` is `auto`, but a referencing schema requires an `x-unique` property (851) or an `x-verify` property (when `x-verify` returns) that lacks a `verified_claims` entry. Absent entries evaluate as unverified, so the auto-creation condition can never pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **Mutable Subject Claim** | Warning | Using a mutable claim like `email`, `login`, `preferred_username`, `username`, or `name` as the `subject_claim` introduces an account-hijacking risk: if the external provider ever reassigns that value to a new person, the new user will silently inherit the original holder's account. To prevent this, the catalog safely defaults to scaffolding immutable identifiers, such as Google's `sub` or GitHub's `id`. Furthermore, because the `subject_claim` is permanently fixed for the lifecycle of the connection, the system will explicitly warn the developer prior to the first apply if a potentially reassignable claim is configured.                                                                                      |
-| **Missing Env Vars** | Error / Warning | Referenced environment variables are missing from the local environment. Interactive journeys and the test command's local env check raise `E_CREDENTIAL_MISSING` as an error (the developer is present to fix it). That check only confirms the variables are set; the live credential probe against the provider is deferred ([README](README.md#scope-for-851)). Batch `plan` only warns, so one IdP file cannot force secrets into every CI pipeline; the authoritative presence check belongs to release-to-environment time, once the secret store exists ([#534](https://github.com/zitadel/nextgen/issues/534)) (see [Upstream Security Pushback](#upstream-security-pushback)). Shipped `assertEnvRefs` hard-fails `plan` for schemas and flows today, so the batch relaxation is a deliberate change.                                                                                                                                                                                            |
+| **Mutable Subject Claim** | Warning | Using a mutable claim like `email`, `login`, `preferred_username`, `username`, or `name` as the `subject_claim` introduces an account-hijacking risk: if the external provider ever reassigns that value to a new person, the new user will silently inherit the original holder's account. To prevent this, the catalog safely defaults to scaffolding immutable identifiers, such as Google's `sub`. Furthermore, because the `subject_claim` is permanently fixed for the lifecycle of the connection, the system will explicitly warn the developer prior to the first apply if a potentially reassignable claim is configured.                                                                                      |
+| **Missing Variables** | Error / Warning | A `${{ NAME }}` reference has no variable behind it. Interactive journeys and the test command's local env check raise `E_CREDENTIAL_MISSING` as an error (the developer is present to fix it). That check only confirms the variables are set; the live credential probe against the provider is deferred ([README](README.md#scope-for-851)). `plan` and `apply` raise it too, for a connection they are about to write, naming the variable and the file; a connection that is unchanged is not re-checked, so one IdP file cannot force secrets into every CI pipeline that only reads. The authoritative presence check for the rest belongs to release-to-environment time ([ADR 062](../../adrs/062-per-environment-variables-and-secrets.md) §9, [#534](https://github.com/zitadel/nextgen/issues/534)) (see [Upstream Security Pushback](#upstream-security-pushback)). Shipped `assertEnvRefs` hard-fails `plan` for schemas and flows today.                                                                                                                                                                                            |
 | **Literal Secret** | Error | A hardcoded `client_secret` is present (returns a friendly error message, though the schema strictly rejects it anyway).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **Reserved Authorize Parameter** | Error | A `static_authorize_parameters` key names an engine-owned protocol parameter (`client_id`, `redirect_uri`, `response_type`, `scope`, `state`, `nonce`, `code_challenge`, `code_challenge_method`) or one the engine reserves (`response_mode`, `request`, `request_uri`: the callback accepts the query response mode only, and the engine composes the request itself), or a credential (`client_secret`, `client_assertion`). A config override of `state` or `nonce` would silently defeat CSRF and token binding, and a credential here would be committed to source control and appended to the public authorize URL. The schema's `propertyNames` already rejects the keys; this rule restates the failure with a friendly message. |
 | **Cleartext Endpoint** | Error | An endpoint URL (`issuer`, `jwks_uri`, `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`) is not `https://`. The schema `pattern` already rejects it, with a `http://localhost` / `http://127.0.0.1` exception for local development.                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **Partial Endpoint Block** | Error | An `oidc` block sets some endpoints but not all. If none of `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `userinfo_endpoint` is set, discovery fills them. Otherwise `authorization_endpoint`, `jwks_uri`, and `token_endpoint` are required, plus `userinfo_endpoint` unless `id_token_mapping` is `true`. Setting `userinfo_endpoint` alone under `id_token_mapping` still sets an endpoint and is refused. The CLI checks it at `plan`, so the error surfaces before anything is applied; the server runs the engine's connection parse at create and revise, after the schema, and refuses the document with `400 idp.endpoints_partial`, whose details list the missing endpoints. |
 
 ## Immutability and Revisions
 
@@ -429,8 +388,8 @@ This design serves three critical purposes:
   tracking exactly who changed a client ID, and when).
 
 *Note:* Rotating a secret does not create a new revision because the
-configuration file only stores the environment variable name, not the secret's
-value.
+configuration file only stores the reference, not the secret's value. Rotation
+is a `PATCH /variables` against the environment holding it.
 (Flow definitions become immutable revisions too in
 [#530](https://github.com/zitadel/nextgen/issues/530), correlated by name rather than
 under an outer id).
@@ -490,9 +449,13 @@ steps (`sso_providers`), always reference connections by their `slug`
       Therefore, these fields are fixed for life.
       The validator and server will explicitly refuse such edits as an
       **Identity-Critical Revision**.
-      For OIDC the `issuer` alone names the authority, so the endpoint
-      overrides stay editable; adding a `jwks_uri` when a provider's discovery
-      document breaks is a repair on the same connection.
+      The `issuer` alone names the authority, so the explicit endpoints stay
+      editable and a broken discovery document is repaired on the same
+      connection.
+      The repair names every endpoint, not just the broken one: a block that
+      sets some endpoints but not all is a
+      [Partial Endpoint Block](#validator-rules), so adding only a `jwks_uri`
+      to a discovery-based connection is refused.
     - **Authority Migrations:** A true authority change requires creating a new
       connection with a new ID, and users must sign up again under it.
       Preserving links across an authority change is not included in this
@@ -505,66 +468,103 @@ Everything else forms the mutable revision body.
 | Fields | On a state-tracked connection |
 | :--- | :--- |
 | `slug` | **Fixed.** A rename requires creating a new connection ([Slug Modification](#validator-rules)). |
-| `protocol`, `subject_claim`, and the authority: `issuer` for `oidc`, `token_endpoint` and `userinfo_endpoint` for `oauth2` | **Fixed.** These define *who* a subject is; altering them requires a new connection ([Identity-Critical Revision](#validator-rules)). |
-| `client_id`, `client_secret`, `scopes`, `static_authorize_parameters`, `token_endpoint_auth_method`, `pkce_enabled`, `id_token_mapping`, `authorization_endpoint`, the OIDC overrides `jwks_uri`, `token_endpoint`, and `userinfo_endpoint`, `supplementary_fetch`, `claim_mapping`, `verified_claims`, `provisioning`, `display_name`, `template` | **New revision.** Safely mutates the configuration. <br><br>*(Note: Generating a new OAuth app/`client_id` at the same authority safely retains the subjects because Google's `sub` and GitHub's `id` are global to the user account. Providers issuing pairwise subjects, computed per sector, so a new app under a different redirect host gets new subjects, turn this into orphaned links and duplicate users; that is a custom-provider question).* |
+| `protocol`, `subject_claim`, and the authority `oidc.issuer` | **Fixed.** These define *who* a subject is; altering them requires a new connection ([Identity-Critical Revision](#validator-rules)). |
+| `client_id`, `client_secret`, `scopes`, `static_authorize_parameters`, `token_endpoint_auth_method`, `pkce_enabled`, `id_token_mapping`, the explicit endpoints `authorization_endpoint`, `jwks_uri`, `token_endpoint`, and `userinfo_endpoint` (all or none), `claim_mapping`, `verified_claims`, `provisioning`, `display_name`, `template` | **New revision.** Safely mutates the configuration. <br><br>*(Note: Generating a new OAuth app/`client_id` at the same authority safely retains the subjects because Google's `sub` is global to the user account. Providers issuing pairwise subjects, computed per sector, so a new app under a different redirect host gets new subjects, turn this into orphaned links and duplicate users; that is a custom-provider question).* |
 ## Secrets and Environments
 
-**What is currently implemented:** The file convention.
-Files store `${{ NAME }}` references (e.g.,
-`"client_secret": "${{ GOOGLE_CLIENT_SECRET }}"`), scaffolding
-automatically gitignores `.env*` files, and file bodies are uploaded verbatim.
-Rejecting a literal secret is new in this design
-([Literal Secret](#validator-rules)).
+Both halves of a connection's credential are variables
+([ADR 062](../../adrs/062-per-environment-variables-and-secrets.md)): the file
+carries `"client_secret": "${{ ACME_CLIENT_SECRET }}"` and, where the project
+registers a separate OAuth client per environment,
+`"client_id": "${{ ACME_CLIENT_ID }}"`. The connection is stored and read back
+holding those references — nothing resolves on the write path, and the domain
+object carries them too (ADR 062 §9); the engine resolves against the
+environment serving the request, at the point of use.
 
-**What is missing:** Everything after the file upload.
-There is currently no secret store, resolution step, or rotation path designed.
-The nearest specification,
-[`configuration-surface.md`](../platform/configuration-surface.md), explicitly
-defers the secret-store design.
+**Not by substituting the whole connection.** There is no single "when needed"
+here: `client_id` is wanted at `authorize`, `client_id` and `client_secret` at
+`callback`. Resolving the whole document at `authorize` would decrypt a
+credential that step never uses and hand it to code with no reason to hold it.
+Each step fetches the names it needs (ADR 062 §7 and §9,
+`GetDecryptedVariables`),
+which costs the same — one query plus one key lookup — and keeps the cleartext
+secret out of anything the `authorize` step carries or logs.
 
-This document outlines the strict constraints that any future secret lifecycle
-design must satisfy:
+This is the pattern the section below was written to constrain, now decided.
+The constraints it set are the reason the decision looks the way it does, so
+they are kept rather than deleted:
 
-| Ruled Out Approach | Reason |
-| :--- | :--- |
-| **Client-side resolution** (uploading the resolved value in the document) | Every immutable revision would permanently embed the secret. Leaks could never be scrubbed, rollbacks would reactivate revoked secrets, and plan diffs would expose secret material in Git and CI logs. |
-| **Server-side OS resolution** (server reads from its own environment) | This only works for self-hosted setups. In a multi-tenant system, operators would be forced to inject every tenant's secrets into the core engine configuration. |
+| Ruled Out Approach | Reason | How ADR 062 avoids it |
+| :--- | :--- | :--- |
+| **Client-side resolution** (uploading the resolved value in the document) | Every immutable revision would permanently embed the secret. Leaks could never be scrubbed, rollbacks would reactivate revoked secrets, and plan diffs would expose secret material in Git and CI logs. | Substitution happens in the engine when a document is served, never before upload. The revision holds the reference. |
+| **Server-side OS resolution** (server reads from its own environment) | This only works for self-hosted setups. In a multi-tenant system, operators would be forced to inject every tenant's secrets into the core engine configuration. | Variables are project data, stored per project and encrypted with that project's own key (ADR 029), not process environment. |
 
-**The Surviving Pattern:** The configuration file stores the variable name, the
-value is delivered out of band, and the engine joins them at runtime.
-This allows secrets to be rotated via a store write without publishing a new
-config revision, and it keeps values safely outside the release boundary.
-The store and its API are undesigned, so this stays an open question, not a
-decision.
+**The surviving pattern, as built:** the configuration file stores the
+reference, the value is written separately through `PATCH /variables`, and the
+engine joins them at serve time. A secret is rotated by a store write, with no
+new config revision, and the value stays outside the release boundary — which
+is what lets one release be promoted between environments unchanged (ADR 035).
 
 **Strict Invariant:** Secret resolution must never happen upstream of anything
-that is diffed, hashed, committed, or printed.
+that is diffed, hashed, committed, or printed. ADR 062 §7 holds it: reads return
+ciphertext, and decryption happens only during substitution.
+
+### What ADR 062 settled
+
+- **A secret is referenceable only as the whole value.** `"a8f3c1-${{ TAIL }}"`
+  is refused (`var.secret_not_whole_value`), because the literal text around a
+  placeholder would be rendered into the resolved credential — a credential
+  nobody entered, frozen into an immutable revision. The connection schema
+  encodes this in `client_secret`'s pattern.
+- **No `client_id_env` twin.** ADR 062 rejected a second field beside every
+  referencing field: the schema would double and a value could only be
+  referenced where someone anticipated it. `client_id` takes a literal or a
+  reference in the one field, which is what the open challenge below asked for.
+- **Secrets are write-only over the API.** A read answers `{"secret": true}`,
+  never a value. That meets the write-only requirement in the pushback below,
+  for the API surface at least.
+- **Encryption minimums.** Per-project envelope keys, and decryption resolved by
+  the key named in the value's own JWE header, so a stored secret survives the
+  first rotation of the project's key (ADR 062 §7, ADR 029).
 
 ### Open Challenges
 
-- **Rotation:** Rotation is a critical emergency path.
-  Because change detection hashes the file body, a "rotate-then-apply" action
-  would silently skip execution ("no change") during an incident.
-  The secret value never appears in the file, so a successful apply and a
-  rotation the engine never received look identical.
-  The final design needs a mechanism to positively confirm that the engine holds
-  the new secret value.
-- **Per-environment non-secrets:** Values like `client_id` differ between
-  environments (e.g., dev vs. prod).
-  While `${VAR}` syntax exists, resolution does not.
-  Because a release deploys the exact same file revision to every environment,
-  these variables cannot be resolved directly into the file.
-  The reference must reach the engine and resolve against the environment there.
-  To support single-environment projects natively, the configuration field
-  accepts either a literal string or `${VAR}` syntax without requiring a
-  separate `client_id_env` field.
+- **Rotation confirmation:** Rotation is a critical emergency path. Because
+  change detection hashes the file body, a "rotate-then-apply" action would
+  silently skip execution ("no change") during an incident. The secret value
+  never appears in the file, so a successful apply and a rotation the engine
+  never received look identical.
+
+  ADR 062 narrows this rather than closing it: the rotation is now a `PATCH
+  /variables` whose success or failure the caller sees directly, so the write is
+  confirmed at the moment it happens. What is still missing is a way to confirm
+  after the fact *which* value a serving environment currently holds — a read
+  would answer `{"secret": true}` and nothing more.
+- **Per-environment values do not fall back.** ADR 062 §4 gives the project and
+  each environment separate owners with no inheritance, so a `client_id` that is
+  the same everywhere still has to be entered on every environment that serves
+  the connection; entering it once on the project does not reach them. Nothing
+  keeps those copies in step. Whether the "set it once" case gets an answer is
+  open in ADR 062 §10.
+- **Presence at deploy time:** a reference nothing was entered for is left
+  standing (ADR 062 §2), which is right for the substitution pass and wrong for
+  a deploy. Validating a release against a target environment before it goes
+  live is open in ADR 062 §10 and belongs with deployments (ADR 035).
 
 ### Upstream Security Pushback
 
-Before the deferred secret-store specification is finalized, the following
-architectural constraints must be addressed:
+These are the constraints raised against the then-deferred secret-store
+specification. ADR 062 answers the first and third; the second stays open, and
+its own bullet says where it now belongs.
 
-- **Write-only production stores:** The proposed "read-back" store, where
+- **Write-only production stores** — *met on the API surface.* A secret reads
+  back as `{"secret": true}` and never as a value, so no client credential can
+  fetch production secret material. The remaining gap is not the API but the
+  resolved document: substitution puts decrypted secrets into a served document
+  with nothing marking which values they are (ADR 062 §10). The original
+  objection follows.
+
+  The proposed "read-back" store, where
   teammates authenticate and fetch per-environment secrets
   ([`configuration-surface.md`](../platform/configuration-surface.md)), is an
   anti-pattern until its blast radius can be quantified.
@@ -572,22 +572,31 @@ architectural constraints must be addressed:
   without saying what a read is authorized against.
   Production values must be writable by the deployment identity, readable
   exclusively by the engine, and never fetchable by local developer setups.
-- **Scoping the presence check:** Requiring secret validation before a plan
+- **Scoping the presence check** — *still open, and now located.* ADR 062 §2
+  leaves an unresolved reference standing rather than failing, so nothing forces
+  secrets into an unrelated CI pipeline; §9 puts the strict check at
+  release-to-environment time, which is where this asked for it. The original
+  objection follows.
+
+  Requiring secret validation before a plan
   runs means one file carrying a secret reference makes every CI pipeline that
   runs `plan` demand secrets, even for unrelated PRs.
   The plan phase should only issue warnings.
   A local presence check is only meaningful where the local environment is the
-  engine's, because the CLI uploads the variable name and never the value.
-  Strict presence checks should be answered at release-to-environment time,
-  once the secret store exists ([#534](https://github.com/zitadel/nextgen/issues/534)).
+  engine's, because the CLI uploads the reference and never the value.
+  Strict presence checks should be answered at release-to-environment time
+  ([#534](https://github.com/zitadel/nextgen/issues/534)).
   Until then, a missing secret is first seen when a sign-in reaches the token
   exchange.
-  The validator rules adopt this split: `E_CREDENTIAL_MISSING` stays an error
-  inside interactive journeys and the test command's local env check, and
-  batch `plan` warns.
-- **Encryption minimums:** Stating "encrypted at rest" is insufficient.
-  The architecture must guarantee per-tenant envelope keys, engine-only
-  decryption, and a strictly write-only external API surface.
+  The validator rules adopt this split: `E_CREDENTIAL_MISSING` is an error
+  for a connection `plan` or `apply` is about to write, and a connection that
+  has not changed is not re-checked, so a pipeline that only reads need not hold
+  the secret.
+- **Encryption minimums** — *met.* Stating "encrypted at rest" is insufficient;
+  the architecture must guarantee per-tenant envelope keys, engine-only
+  decryption, and a strictly write-only external API surface. ADR 062 §7 gives
+  all three: the project's own `secret` key under ADR 029 envelope encryption,
+  decryption only inside substitution, and an API that never returns a value.
 
 ## Forward Compatibility
 
@@ -625,9 +634,9 @@ Behaviors this design relies on but does not implement.
 | `is_auto_update` must never silently overwrite a verified property with an unverified value. | [`3-social-login-flow.md`](3-social-login-flow.md) / Engine |
 | Strict linking coverage rules must be enforced when the feature returns. | Deferred account-linking journey |
 | Slug-to-revision resolution must be securely recorded during release-bundle construction. | [#545](https://github.com/zitadel/nextgen/issues/545) bundle constructor, under the [#529](https://github.com/zitadel/nextgen/issues/529) releases epic |
-| The API surface must support `get-by-slug` and strictly enforce uniqueness on creation. | Server CRUD API |
+| The API resolves a slug through the query endpoint (`POST /idps/query` with a `slug` `equals` filter) and strictly enforces uniqueness on creation. There is no get-by-slug endpoint. | Server CRUD API |
 | A unique, revision-stable connection id must be established to safely maintain user identity links. | Server CRUD API + Deletion semantics |
-| The identity fields (`protocol`, `subject_claim`, `issuer`, `jwks_uri`, `token_endpoint`, `userinfo_endpoint`) belong to the connection, not the revision: a revise whose body changes one is refused, as a slug change is. Hand-authored API writes bypass the CLI check. | Server CRUD API |
+| The identity fields (`protocol`, `subject_claim`, `oidc.issuer`) belong to the connection, not the revision: a revise whose body changes one is refused with `400 idp.field_immutable`. The slug is not compared: it selects the connection, so a body with an existing slug appends a revision and a body with a new slug creates a new connection. The explicit OIDC endpoints stay revisable, all or none (`idp.endpoints_partial`). Hand-authored API writes bypass the CLI check. | Server CRUD API |
 | A resolved client-secret value must be obtainable during the token exchange step. | Deferred secret-store spec (production); the development-runtime env join is [#851](https://github.com/zitadel/nextgen/issues/851) execution work (see [Open Points](#open-points)) |
 | A presence check for each referenced secret, per environment, at release deployment. | Secret-store design ([#534](https://github.com/zitadel/nextgen/issues/534)), under the [#529](https://github.com/zitadel/nextgen/issues/529) releases epic |
 | The server must validate every connection body against `idp-connection.json` at create and revise, before a revision is stored. Client-side validation does not cover hand-authored API writes (ADR 035 keeps direct CRUD first-class), and revisions are immutable, so a stored literal secret could never be scrubbed. | Server CRUD API |
@@ -639,23 +648,31 @@ Behaviors this design relies on but does not implement.
   which shipped default generated a file, the merge base for upgrading
   scaffolded defaults later.
   Record it now; it cannot be reconstructed afterwards.
-- **The secret lifecycle:** The actual mechanics of the secret lifecycle (the
-  store, the set-surface, the engine join, and rotation) are owned by the
-  deferred secret-store specification.
-  This document only contributes the structural constraints and the security
-  pushback outlined in the section above.
-  That ownership covers production.
-  Development cannot wait for the spec: the local runtime gets the CLI process
-  environment plus two fixed server variables
-  ([`binary.ts`](../../../apps/cli/src/lib/local-server/binary.ts)) or two fixed
+- **The secret lifecycle:** The store, its write surface, the engine join and
+  rotation are decided by
+  [ADR 062](../../adrs/062-per-environment-variables-and-secrets.md): variables
+  per project and environment, `PATCH /variables` to write, substitution at
+  serve time, rotation as a store write. This document contributes the
+  structural constraints and the security pushback in the section above, which
+  is what that decision had to satisfy.
+
+  What remains is the CLI join, and it is a real gap rather than a naming one.
+  Credential capture still ends in `.env.local`: the local runtime gets the CLI
+  process environment plus two fixed server variables
+  ([`internal/binary-launcher.ts`](../../../apps/cli/src/lib/local-server/internal/binary-launcher.ts)) or two fixed
   docker `--env` values
-  ([`docker.ts`](../../../apps/cli/src/lib/local-server/docker.ts)); nothing
-  loads `.env.local`, and `plan` checks env refs against `process.env` alone, so
-  no configured provider can complete a token exchange.
-  Wiring the development join is
+  ([`internal/docker-launcher.ts`](../../../apps/cli/src/lib/local-server/internal/docker-launcher.ts)); nothing
+  loads `.env.local`, and `plan` checks references against `process.env` alone,
+  so no configured provider can complete a token exchange. ADR 062 is explicit
+  that these are **not** operating-system environment variables, so the capture
+  step should write the value through `PATCH /variables` against the environment
+  being configured, and `plan` should check references against that project
+  rather than against the shell. Wiring it is
   [#851](https://github.com/zitadel/nextgen/issues/851) execution work, under
   the same never-upstream invariant; area 4 owns it
-  ([Dependencies](4-cli-provider-setup.md#dependencies)).
+  ([Dependencies](4-cli-provider-setup.md#dependencies)) and
+  [4-cli-provider-setup.md](4-cli-provider-setup.md) still describes the
+  `.env.example` / `.env.local` journey.
 - **Imperative runtime disable:** A way to disable an IdP imperatively at
   runtime is still needed (e.g., `zitadel idp disable google --env prod`).
   This mechanism must be per-environment, execute in seconds, and remain immune
@@ -707,10 +724,9 @@ Behaviors this design relies on but does not implement.
   The claim is never found, so the property stays unmapped, and a typo'd
   `verified_claims` source evaluates as unverified on every attempt.
   The knowledge to catch this already exists.
-  The area 4 catalog carries each vendor's claim table, and strategy registry
-  entries declare their emitted claims.
+  The area 4 catalog carries each vendor's claim table.
   Promoting that knowledge to a small claims schema per catalog entry would let
-  the plan warn on a claim name `google` or `github` is not known to emit.
+  the plan warn on a claim name `google` is not known to emit.
   A warning, not an error, because extra scopes can unlock claims the catalog
   does not list.
   Custom providers have no catalog entry and keep today's unchecked behavior.

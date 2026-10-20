@@ -14,7 +14,10 @@ import (
 const (
 	createReleaseStmt = `INSERT INTO releases (project_id, id, content_hash, pointers, metadata, created_at)` +
 		` VALUES (?, ?, ?, ?, ?, ?) RETURNING created_at`
-	releaseQuery = `SELECT project_id, id, content_hash, pointers, metadata, created_at FROM releases`
+	releaseQuery      = `SELECT project_id, id, content_hash, pointers, metadata, created_at, revoked_at FROM releases`
+	revokeReleaseStmt = `UPDATE releases SET revoked_at = COALESCE(revoked_at, ?)` +
+		` WHERE project_id = ? AND id = ?` +
+		` RETURNING project_id, id, content_hash, pointers, metadata, created_at, revoked_at`
 )
 
 type releaseStatements struct{ statement }
@@ -90,10 +93,15 @@ func (rs releaseStatements) getOne(ctx context.Context, filter database.Filter[d
 	return item, nil
 }
 
-// ListReleases implements [service.ReleaseStatements].
-func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error) {
+// GetReleasesByIDs implements [service.ReleaseStatements].
+func (rs releaseStatements) GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
 	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, releaseQuery, filter, release.Schema, "releases", "id"); err != nil {
+	if err := compileRead(&compiler, releaseQuery, &database.ListOptions[domain.ReleaseField]{
+		Filter: release.ByIDs(projectID, ids),
+	}, release.Schema); err != nil {
 		return nil, err
 	}
 	rows, err := rs.client.Query(ctx, compiler.String(), compiler.args...)
@@ -105,13 +113,46 @@ func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.L
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		items,
-		release.Schema,
-		filter.Pagination.Limit,
-	)
+	return items, nil
+}
+
+// ListReleases implements [service.ReleaseStatements].
+func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error) {
+	items, nextCursor, err := pagination.Page(filter.Pagination, release.Schema, func(limit uint32) ([]*domain.Release, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, releaseQuery, filter, release.Schema, "releases", "id"); err != nil {
+			return nil, err
+		}
+		rows, err := rs.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		items, err := collectRows(rows, scanRelease)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return items, nil
+	})
+	if err != nil {
+		return nil, err
+	}
 	return &database.ListResult[*domain.Release]{Items: items, NextCursor: nextCursor}, nil
+}
+
+// RevokeRelease implements [service.ReleaseStatements].
+func (rs releaseStatements) RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error) {
+	rows, err := rs.client.Query(ctx, revokeReleaseStmt, nowUnixNano(), projectID, id)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	item, err := collectExactlyOneRow(rows, scanRelease)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return item, nil
 }
 
 func scanRelease(rows *sql.Rows) (*domain.Release, error) {
@@ -120,6 +161,7 @@ func scanRelease(rows *sql.Rows) (*domain.Release, error) {
 		pointers    sql.NullString
 		metadata    sql.NullString
 		createdNano int64
+		revokedNano sql.NullInt64
 	)
 	if err := rows.Scan(
 		&scanned.ProjectID,
@@ -128,6 +170,7 @@ func scanRelease(rows *sql.Rows) (*domain.Release, error) {
 		&pointers,
 		&metadata,
 		&createdNano,
+		&revokedNano,
 	); err != nil {
 		return nil, err
 	}
@@ -138,6 +181,9 @@ func scanRelease(rows *sql.Rows) (*domain.Release, error) {
 		scanned.Metadata = []byte(metadata.String)
 	}
 	scanned.CreatedAt = timeFromUnixNano(createdNano)
+	if revokedNano.Valid {
+		scanned.RevokedAt = new(timeFromUnixNano(revokedNano.Int64))
+	}
 	return release.ToDomain(scanned)
 }
 

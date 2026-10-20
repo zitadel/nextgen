@@ -1,0 +1,34 @@
+get:
+  operationId: getMySessionCsrfToken
+  summary: Get my session's CSRF token
+  description: |
+    Returns the session-bound token for cross-site request forgery protection
+    (ADR 053 §5). Browser code sends it in the `X-Zitadel-CSRF` header on the
+    state-changing requests the session cookie authenticates that require it
+    — see the `nextgenSession` scheme. It authorizes nothing on its own: the
+    HttpOnly cookie is still the credential, and a cross-site page cannot
+    read this response. It stays the same for the life of the session, so a
+    client fetches it once per session.
+  tags:
+    - Sessions
+  security:
+    - nextgenSession: []
+  responses:
+    '200':
+      description: The session's CSRF token.
+      headers:
+        Cache-Control:
+          $ref: ../../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: csrf-token-response.yaml
+    '401':
+      description: Missing or invalid session token.
+      headers:
+        Cache-Control:
+          $ref: ../../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/auth-unauthorized.yaml

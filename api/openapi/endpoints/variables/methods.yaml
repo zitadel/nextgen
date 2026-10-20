@@ -1,0 +1,86 @@
+get:
+  operationId: getVariables
+  x-zitadel-cli: variables list
+  summary: Get variables
+  description: |
+    Returns the project's variables, keyed by name, each with its value per
+    kind. With `kind`, only that kind's values are returned.
+
+    Secret values are not returned. A secret appears as `{"secret": true}`,
+    which says a value is held without disclosing it.
+  tags:
+    - Variables
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/variable-kind.yaml
+  security:
+    - oauth2:
+        - variable.read
+  responses:
+    '200':
+      description: The variables were retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: variables-by-kind.yaml
+    default:
+      $ref: getVariables-error-response.yaml
+
+patch:
+  operationId: updateVariables
+  x-zitadel-cli: variables set
+  summary: Update variables
+  description: |
+    Enters, replaces and removes the project's variables for the requested
+    kind. Names not in the body are untouched. Existing deployments keep the
+    values they froze.
+
+    Without `kind`, a plain value is written for both kinds. A secret is
+    written for `primary` only and removes the name's `preview` value, so a
+    preview never keeps a plaintext copy; set a preview secret with
+    `kind=preview`. `null` removes the name from both.
+
+    A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
+    stores the value encrypted under the project's active `secret` key, after
+    which it can be referenced but not read back. `null` removes the name
+    (RFC 7386), which is how several variables are removed in one request;
+    removing a name the project does not hold is a no-op rather than an error.
+
+    The body is applied whole or not at all, so a rejected request leaves the
+    project's variables exactly as they were. Writing the same name twice
+    replaces the value rather than duplicating it, which makes a retry safe.
+  tags:
+    - Variables
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/variable-kind.yaml
+  security:
+    - oauth2:
+        - variable.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: update-variables-request.yaml
+        examples:
+          set:
+            summary: Enter a value and a secret, and remove a name
+            value:
+              GOOGLE_CLIENT_ID: 1234567890-abc.apps.googleusercontent.com
+              GOOGLE_CLIENT_SECRET:
+                value: GOCSPX-example
+                secret: true
+              SESSION_TTL: 3600
+              LEGACY_CALLBACK_URL: null
+  responses:
+    '200':
+      description: |
+        The variables were written. The body is the project's variables read
+        back, so it also carries whatever the write did not touch.
+      content:
+        application/json:
+          schema:
+            $ref: variables-by-kind.yaml
+    default:
+      $ref: updateVariables-error-response.yaml

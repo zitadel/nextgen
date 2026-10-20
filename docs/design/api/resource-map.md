@@ -19,7 +19,8 @@ A project is a tenant / deployment. One project is reserved as the **platform pr
 /projects/{id}
 /projects/{id}/domains
 /projects/{id}/features
-/projects/{id}/allowed_origins
+/projects/{id}/origins
+/projects/{id}/origins/remove
 /projects/{id}/signing_keys
 /projects/{id}/api_keys
 /projects/{id}/webhooks
@@ -86,8 +87,11 @@ Users live inside projects. A user in the platform project is a developer/admin;
 
 ```http
 /users/{id}
+/users/{id}/identity_links      # provider accounts a sign-in linked to the user
 /me                             # resolves to the calling user
 /me/memberships                 # every team_membership the caller holds
+/users/me/schema                # the schema the caller's own record is validated against
+/users/me/teams                 # the caller's own team roster
 ```
 
 Create takes an explicit scope; the list derives it from the credential:
@@ -98,8 +102,7 @@ POST /users/query               # structured filters + cursor pagination (ADR 03
 ```
 
 There is no `GET /users`, matching projects and teams. `POST /users/query`
-takes no `project_id` either, unlike the other query endpoints: the users list
-is bound to the token's own project by construction.
+takes an optional `project_id`, defaulting to the credential's project (#1300).
 
 `DELETE /users/{id}` deactivates/tombstones the user, revokes sessions, tokens,
 and credentials, and deactivates memberships. Teams and resources the user

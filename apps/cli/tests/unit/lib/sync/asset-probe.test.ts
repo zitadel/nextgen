@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
+import { Agent } from "undici";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -13,6 +14,7 @@ import {
 import { buildSyncPlan } from "../../../../src/lib/sync/loop";
 import { collectPlanWarnings } from "../../../../src/lib/sync/plan-renderer";
 import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
+import { userAgentInterceptor } from "../../../../src/lib/user-agent";
 
 const { lookupMock } = vi.hoisted(() => ({ lookupMock: vi.fn() }));
 vi.mock("node:dns/promises", () => ({ lookup: lookupMock }));
@@ -75,7 +77,7 @@ function reviseBranding(content: object): SyncAction[] {
 
 function warningsOf(actions: SyncAction[]): ReadonlyArray<{ rule: string; message: string }> {
   const action = actions[0];
-  return action.kind === "revise" ? (action.warnings ?? []) : [];
+  return action!.kind === "revise" ? (action!.warnings ?? []) : [];
 }
 
 describe("annotateAssetWarnings", () => {
@@ -92,6 +94,26 @@ describe("annotateAssetWarnings", () => {
     expect(warningsOf(actions)).toEqual([]);
   });
 
+  // MSW answers above the dispatcher, so assert the wiring rather than the
+  // header: the probe's private agent bypasses the global dispatcher and
+  // would otherwise send Node's bare `node` user agent.
+  it("identifies the CLI to asset hosts", async () => {
+    const compose = vi.spyOn(Agent.prototype, "compose");
+    try {
+      server.use(
+        http.head("https://cdn.example.com/logo.svg", () =>
+          HttpResponse.text("", { headers: { "content-type": "image/svg+xml" } }),
+        ),
+      );
+
+      await annotateAssetWarnings(reviseBranding({ logo_url: "https://cdn.example.com/logo.svg" }));
+
+      expect(compose).toHaveBeenCalledWith(userAgentInterceptor);
+    } finally {
+      compose.mockRestore();
+    }
+  });
+
   // The Elina case: the URL clears the CLI's zod gate and the server's save
   // gate, then renders as a 0×0 <img> with nothing logged anywhere.
   it("warns when the asset 404s", async () => {
@@ -103,9 +125,9 @@ describe("annotateAssetWarnings", () => {
     await annotateAssetWarnings(actions);
 
     expect(warningsOf(actions)).toHaveLength(1);
-    expect(warningsOf(actions)[0].rule).toBe("warn/asset-unreachable");
-    expect(warningsOf(actions)[0].message).toContain("logo_url https://cdn.example.com/logo.svg");
-    expect(warningsOf(actions)[0].message).toContain("HTTP 404");
+    expect(warningsOf!(actions)[0]!.rule).toBe("warn/asset-unreachable");
+    expect(warningsOf!(actions)[0]!.message).toContain("logo_url https://cdn.example.com/logo.svg");
+    expect(warningsOf!(actions)[0]!.message).toContain("HTTP 404");
   });
 
   it("warns when the host cannot be reached at all", async () => {
@@ -114,11 +136,11 @@ describe("annotateAssetWarnings", () => {
 
     await annotateAssetWarnings(actions);
 
-    expect(warningsOf(actions)[0].rule).toBe("warn/asset-unreachable");
-    expect(warningsOf(actions)[0].message).toContain("could not be reached");
+    expect(warningsOf!(actions)[0]!.rule).toBe("warn/asset-unreachable");
+    expect(warningsOf!(actions)[0]!.message).toContain("could not be reached");
     // The probe host is not necessarily the render host, so the warning has
     // to name its own escape hatch.
-    expect(warningsOf(actions)[0].message).toContain("ZITADEL_SKIP_ASSET_PROBE");
+    expect(warningsOf!(actions)[0]!.message).toContain("ZITADEL_SKIP_ASSET_PROBE");
   });
 
   it("warns when the URL serves a page instead of an image", async () => {
@@ -131,8 +153,8 @@ describe("annotateAssetWarnings", () => {
 
     await annotateAssetWarnings(actions);
 
-    expect(warningsOf(actions)[0].rule).toBe("warn/asset-content-type");
-    expect(warningsOf(actions)[0].message).toContain('content-type "text/html"');
+    expect(warningsOf!(actions)[0]!.rule).toBe("warn/asset-content-type");
+    expect(warningsOf!(actions)[0]!.message).toContain('content-type "text/html"');
   });
 
   it("warns when a successful response is explicitly bodyless", async () => {
@@ -143,8 +165,8 @@ describe("annotateAssetWarnings", () => {
 
     await annotateAssetWarnings(actions);
 
-    expect(warningsOf(actions)[0].rule).toBe("warn/asset-unreachable");
-    expect(warningsOf(actions)[0].message).toContain("HTTP 204 with no representation");
+    expect(warningsOf!(actions)[0]!.rule).toBe("warn/asset-unreachable");
+    expect(warningsOf!(actions)[0]!.message).toContain("HTTP 204 with no representation");
   });
 
   it("stays quiet when the origin refuses HEAD — that says nothing about the asset", async () => {
@@ -241,7 +263,7 @@ describe("annotateAssetWarnings", () => {
 
   it("ignores descriptors without asset URLs and non-branding resources", async () => {
     const actions: SyncAction[] = [
-      ...reviseBranding({ layout: "split", liquid_template_file: "./login.liquid" }),
+      ...reviseBranding({ layout: "split", liquid_template: { $file: "./login.liquid" } }),
       {
         kind: "create",
         path: ".zitadel/flows/default.json",
@@ -254,7 +276,7 @@ describe("annotateAssetWarnings", () => {
     await annotateAssetWarnings(actions);
 
     expect(warningsOf(actions)).toEqual([]);
-    expect(actions[1].kind === "create" && actions[1].warnings).toBeUndefined();
+    expect(actions[1]!.kind === "create" && actions[1]!.warnings).toBeUndefined();
   });
 
   it("keeps warnings an earlier pass already attached", async () => {

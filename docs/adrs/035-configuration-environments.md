@@ -3,6 +3,7 @@
 > **Status:** Accepted
 > **Date:** 2026-07-07
 > **Context:** Multi-environment lifecycle for source-controlled configuration
+> **Amended by:** [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md) (fixed `id` plus `revision_id` on every revisioned resource; a pointer pins `revision_id`)
 
 ## Status quo
 
@@ -75,6 +76,8 @@ For example, release `rel_01KX3RG8A7F0N9WD3P2E4YM5C1` might contain:
 | app       | `name` = `web`               | `app_01KWJC2B78ZQ…`        |
 | policy    | `name` = `password`          | `pol_01KWHF3XY6RN…`        |
 
+> Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): the Revision column is the revision's `revision_id`, and the idp handle is `slug`, not `name`.
+
 The "handle" is the field each resource kind uses as its stable identifier across revisions. For example, schemas use `objectType`.
 
 Each release also records **audit metadata** — who created it, when, and from what source:
@@ -140,6 +143,8 @@ The canonical resource. A release is project-scoped and immutable; these endpoin
 | `POST /releases`               | Assemble a release from existing revision ids. Payload is a list of `(kind, handle, revision_id)` tuples. No new revisions minted. Validates handle references and templates. |
 | `GET /releases`                | List releases in the project, newest first. Each entry carries audit metadata; pointer tuples are omitted (fetch via `GET /releases/{release_id}`).                         |
 | `GET /releases/{release_id}`   | Read one release: audit metadata (`message`, `git_sha`, `created_at`, `created_by`) and the list of `(kind, handle, revision_id)` tuples it pins. Does **not** embed resource content — callers that need content resolve each `revision_id` via per-kind reads (`GET /schemas/{id}`, `GET /flow_definitions/{id}`, …). |
+
+> Amended by [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md): a pinned revision is fetched through `GET /<kind>/revisions/{revision_id}`, since get-by-id returns the newest revision.
 
 A release owns pointers and audit metadata, not content. Per-kind endpoints stay the single source of truth for resource bytes; a release is the immutable snapshot of *which* revisions belong together. Consumers that need content (e.g. `zitadel status` diffing against local, or a UI rendering a release preview) resolve each pointer themselves. This keeps releases lightweight and avoids duplicating resource storage.
 
@@ -553,3 +558,58 @@ above already shows. Handle resolution is per kind, not a shared column read.
 
 The illustrative table is otherwise unchanged; this fixes the name the wire
 uses, not the model.
+
+## Amendment (2026-09-11): deployments are a root-level resource
+
+The endpoint tables above nest deployments under their environment:
+`POST /environments/{env}/deployments`, `GET /environments/{env}/deployments`,
+`GET /environments/{env}/deployments/{id}`.
+
+The shipped surface is flat instead:
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /deployments` | Create a deployment. The target environment is named in the body (`environment`), alongside `release_id`, `reason`, `source_environment?` and `expected_current_deployment_id?`. |
+| `GET /deployments` | List deployments newest first, optionally filtered to one environment via `environment_name`. Filtered, the first row is that environment's current deployment. |
+| `GET /deployments/{deployment_id}` | Read one deployment by its opaque id, scoped to `project_id` like every other flat read. |
+
+A deployment carries a globally-unique `dep_…` id, so under the locked
+flat-by-ID rule in
+[`url-architecture.md`](../design/api/url-architecture.md) it is a top-level
+resource, not a nested one. This also matches the shipped shape of its
+neighbors — `/releases`, `/branding` and `/variables` are all root-level and
+project-scoped — where nothing nests under `/environments/{name}` at all.
+
+Environment names remain the wire address (in the body and the list filter)
+and are resolved to ids once, at creation; the stored record carries
+`environment_id` and `source_environment_id`. The semantics in the tables
+above — payload fields, `409` on a failed `expected_current_deployment_id`
+check, newest-first ordering — are unchanged; this amendment moves the paths,
+not the model. `rolled_back_from` was dropped from the payload by #532.
+
+## Amendment (2026-10-08): environments are removed; a deployment targets origins
+
+The environment entity this ADR introduced under [Environments](#environments)
+is withdrawn by the spike behind #1389
+([PR #1427](https://github.com/zitadel/nextgen/pull/1427)) and
+[ADR 068](068-project-is-the-data-boundary.md). What stands from this ADR is
+the release: an immutable bundle of resource revisions, idempotent on content,
+with its audit metadata. What changes is where a release runs.
+
+- A deployment targets origins: the project default, the hostnames the
+  project allows, or a preview URL. There is no environments resource, and
+  nothing on a deployment names one.
+- Which release serves a request follows from the origin the request comes
+  from.
+- `promote` has no server surface: it is `deploy` against another project
+  with a content-digest assertion. `releases create` and `status` are
+  withdrawn from the CLI; `deploy`, `preview`, `deployment list` and
+  `deployment rollback` replace the loop described under [CLI](#cli).
+
+Of the items this ADR left [out of scope](#out-of-scope), lifecycle has no
+subject, data isolation is ADR 068, per-environment values stay with
+[ADR 062](062-per-environment-variables-and-secrets.md) and #1566, and the
+rest are settled in the spike's design documents.
+
+The amendments of 2026-09-02 and 2026-09-11 above still apply to releases.
+What they say about environments goes with the entity.

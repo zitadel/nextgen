@@ -4,11 +4,18 @@
  * barrel side-effect-registers the elements.
  */
 
+import "../internal/lit-dev-mode.js";
+
 import "./zitadel-login.js";
 import "./zitadel-logout.js";
 import "./zitadel-session.js";
 
-export { ZitadelLogin } from "./zitadel-login.js";
+export {
+  LOGIN_PREVIEW_STATES,
+  ZitadelLogin,
+  loginPreviewStatesFor,
+  type LoginPreviewState,
+} from "./zitadel-login.js";
 export { ZitadelLogout } from "./zitadel-logout.js";
 export { ZitadelSession } from "./zitadel-session.js";
 export {
@@ -42,14 +49,17 @@ export {
   type BrandingValidationContext,
   type BrandingValidationResult,
 } from "./branding-validator.js";
+export { publishedSides, resolveLogoUrl } from "./branding.js";
 export type {
   Branding,
-  BrandingAssets,
   BrandingAttribution,
   BrandingPalette,
   BrandingShape,
   BrandingTheme,
+  BrandingThemeSide,
   BrandingTypography,
   FlowLayout,
+  PublishedSides,
+  ResolvableSide,
 } from "./branding.js";
 export type { FlowError, FlowIdentity, FlowMessage, LiquidContext } from "./template-context.js";

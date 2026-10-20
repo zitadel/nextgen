@@ -77,17 +77,24 @@ The Vite development proxy may temporarily inject a project-secret bearer
 until the session-derived management path is implemented. That is a
 development compatibility mechanism, not the embedded deployment contract.
 
-The diagram below is the shape as revised in 2026-08-12 (see the note under
-it): one rule, two same-origin paths, and no browser-held secret on either.
+> **Amendment (2026-09-25, #1300):** the bridge is gone. The management
+> operations the Console uses accept the session cookie and authorize it through
+> the signed-in person's grants on the target project, and the Vite dev proxy no
+> longer injects a project secret — it forwards requests as-is. Dev and the
+> embedded build take the same credential path.
+
+The diagram below is the current shape (revised 2026-08-12, and 2026-09-25 for
+the amendment above): one rule, two same-origin paths, no browser-held secret
+on either, and no credential added by the dev proxy.
 
 ```mermaid
 flowchart LR
   browser["Console SPA (browser)\nno secret"]
-  proxy["Vite dev server /api\ninjects sk_proj_... bearer"]
+  proxy["Vite dev server /api\nstrips the prefix, adds nothing"]
   apiHandler["ogen API handler\n(Go binary, origin root)"]
 
-  browser -->|"dev: /api/... , no Authorization"| proxy
-  proxy -->|"+ Authorization: Bearer sk_proj_..."| apiHandler
+  browser -->|"dev: /api/... , session cookie"| proxy
+  proxy -->|"/... , session cookie"| apiHandler
   browser -->|"prod: /... , publishable key + session cookie"| apiHandler
 ```
 
@@ -116,7 +123,7 @@ elsewhere — components authenticated by the platform send no client token (see
 > mux that mounts only `/ui/login`, `/ui/console`, `/console/runtime.json`,
 > and `/`, so every call 404'd and `/ui/console/` rendered
 > "POST /api/flow returned 404". It survived because no test lane served the
-> console the way the Go binary does — closed by `console-e2e:e2e-embedded`.
+> console the way the Go binary does — closed by `e2e:console-embedded`.
 
 ### 2. Reuse `configureZitadel()` + `getApi()`, not a bespoke `src/api/client.ts`
 
@@ -128,8 +135,9 @@ instead of writing its own fetch wrapper:
 import { configureZitadel, getApi } from "@zitadel/api/config";
 
 const project = configureZitadel({
-  proxyPath: import.meta.env.VITE_CONSOLE_API_BASE ?? "/api", // same-origin API base
-  projectId: import.meta.env.VITE_CONSOLE_PROJECT_ID ?? "",
+  // Same-origin API base: the dev proxy path, or the origin root when embedded.
+  proxyPath: import.meta.env.VITE_CONSOLE_API_BASE || (import.meta.env.DEV ? "/api" : ""),
+  projectId: "", // learnt at boot from /console/runtime.json (Console ADR 0004 §3)
 });
 
 export const api = getApi(project);
@@ -152,16 +160,28 @@ responsibilities are deliberately narrow:
 - **No client token for management** — the app-wide client sets no bearer;
   `customFetch` leaves the `Authorization` header alone when no token is
   configured. The browser's HttpOnly first-party cookie is the management
-  credential in the embedded topology; the dev proxy temporarily supplies a
-  project-secret bearer until that path lands. The login screen's per-element
+  credential, in the embedded topology and behind the dev proxy alike (#1300).
+  The login screen's per-element
   handle is the one exception: it carries the runtime-discovered publishable
   key from ADR 036.
+- **CSRF header** — on state-changing requests `customFetch` sends the
+  session's CSRF token in `X-Zitadel-CSRF` (root ADR 053 §5). The console reads
+  it from `GET /sessions/me/csrf` once per session and keeps it in memory; it
+  is not a credential on its own. The cookie it is bound to can change in
+  another tab, so a write refused with `403 auth.csrf_invalid` makes the console
+  read the session again. Still the same person: it loads a fresh token and the
+  write is retried once with it. Someone else, or nobody: the write is not
+  retried, so it never runs as another person, and the page starts over. The
+  page's person is fixed by its first session for the life of the document,
+  even across a lost session: a session that later belongs to someone else is
+  never adopted in place, wherever it is noticed — the page reloads, once.
 - **Error mapping** — non-2xx throws `ApiError`; loaders let it propagate to
   the route `errorComponent`. `ApiError.status` drives status-specific copy
   (e.g. a `401`/`403` "you don't have access" surface once auth lands).
 
-The console does **not** add token storage, refresh, or retry logic. The
-first-party session credential is browser-managed and not script-readable.
+_Amended 2026-10-02:_ the console keeps no credential. The session cookie is
+browser-managed and not script-readable; the only value the console holds is
+the CSRF token above, which authorizes nothing without that cookie.
 
 ### 4. Dev story keeps the same shape as production
 
@@ -181,10 +201,10 @@ that follows from who serves the console:
   script-readable bearer:
 
 ```ts
-// vite.config.mts (dev only) — illustrative
+// vite.config.ts (dev only) — illustrative
 server: {
   proxy: {
-    // Vite proxy injects the project-secret bearer, then forwards to the Go API
+    // Vite proxy strips the /api prefix and forwards to the Go API; no credential
     "/api": { target: "http://localhost:8080", changeOrigin: true },
   },
 },
@@ -192,12 +212,12 @@ server: {
 
 So dev and prod differ only in whether a proxy sits in front of the API, never
 in whether the browser holds a secret — it never does. The base resolves in
-`src/api/zitadel.ts` as `VITE_CONSOLE_API_BASE ?? (DEV ? "/api" : "")`: the
+`src/api/zitadel.ts` as `VITE_CONSOLE_API_BASE || (DEV ? "/api" : "")`: the
 env var is the escape hatch for a deployment that mounts the API elsewhere,
 `/api` is the dev-proxy path, and root is what the embedded build talks to.
 `vite preview` deliberately proxies nothing, so it cannot be mistaken for the
 production path — which also means it cannot _prove_ it; that job belongs to
-the embedded lane (`console-e2e:e2e-embedded`), which serves the console from
+the embedded lane (`e2e:console-embedded`), which serves the console from
 the Go binary.
 
 ### 5. Console-user authentication uses the existing slot
@@ -248,8 +268,10 @@ and ADR 053 amends it; cite 053, not 046, for the CSRF contract.
   and the session cookie. The lesson worth keeping is the second half — a
   recorded cross-surface dependency needs a _test_ that fails while it is
   open, not only a note.
-- **Management calls are fail-closed until the cookie is authorized.** The
-  dev proxy's secret is what carries `user.read` and friends today; the
+- **~~Management calls are fail-closed until the cookie is authorized.~~
+  Resolved 2026-09-25 (#1300):** the management operations accept the session
+  cookie and the dev proxy's secret is gone. As recorded at the time: the
+  dev proxy's secret carried `user.read` and friends; the
   publishable key is deliberately refused for them (`internal/api/user.go`).
   Root ADRs 032/033/053's session-derived target permissions make the embedded
   Console's list screens work without a proxy.

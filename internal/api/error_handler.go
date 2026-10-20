@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/ogenerrors"
+	"github.com/ogen-go/ogen/validate"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -98,10 +100,11 @@ func createFullErrDetailsDetailsMap(err error) any {
 }
 
 func errorResponse(err error) *api.ErrorDetailsStatusCode {
-	var e domain.Error
-	if !errors.As(err, &e) {
-		return internalErrorResponse(err)
+	if domain.IsServerFault(err) {
+		return serverFaultResponse(err)
 	}
+	var e domain.Error
+	errors.As(err, &e)
 	switch {
 	case e.Code == domain.ErrAuthUnauthorized(nil).Code:
 		return errorResponseWithStatusCode(http.StatusUnauthorized, e)
@@ -121,8 +124,16 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return environmentErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixRelease.ErrorCodePrefix("")):
 		return releaseErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixIDPConnection.ErrorCodePrefix("")):
+		return idpErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixDeployment.ErrorCodePrefix("")):
+		return deploymentErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixOrigin.ErrorCodePrefix("")):
+		return originErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixEvent.ErrorCodePrefix("")):
 		return eventErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixVariable.ErrorCodePrefix("")):
+		return variableErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixUser.ErrorCodePrefix("")):
 		return userErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixTeam.ErrorCodePrefix("")):
@@ -134,12 +145,26 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	case strings.HasPrefix(e.Code, domain.PrefixClaimChallenge.ErrorCodePrefix("")),
 		strings.HasPrefix(e.Code, domain.PrefixClaim.ErrorCodePrefix("")):
 		return claimErrorResponse(e)
-	case e.Code == domain.ErrNotImplemented().Code:
-		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
-	case e.Code == domain.ErrUnavailable().Code:
-		return errorResponseWithStatusCode(http.StatusServiceUnavailable, e)
 	case e.Code == domain.ErrRequestInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, e)
+	default:
+		return internalErrorResponse(err)
+	}
+}
+
+// serverFaultResponse answers a [domain.IsServerFault] error: 501 for a
+// feature that is not implemented, 503 for a transient failure worth retrying,
+// and 500 for everything else. Only the outermost domain error counts, the
+// one whose code the body carries: an internal error that wraps an
+// unavailable one is a 500.
+func serverFaultResponse(err error) *api.ErrorDetailsStatusCode {
+	var e domain.Error
+	errors.As(err, &e)
+	switch e.Code {
+	case domain.ErrNotImplemented().Code:
+		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
+	case domain.ErrUnavailable().Code:
+		return errorResponseWithStatusCode(http.StatusServiceUnavailable, err)
 	default:
 		return internalErrorResponse(err)
 	}
@@ -162,13 +187,30 @@ func internalErrorResponse(err error) *api.ErrorDetailsStatusCode {
 // OgenErrorHandler is a custom ogen ErrorHandler that maps ogen's structural
 // errors (decode, validate, security) into the ErrorDetails wire format so all
 // error responses are consistent regardless of where the error originates.
-func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request, err error) {
+func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Request, err error) {
 	var (
 		status  int
 		details api.ErrorDetails
 	)
 
 	switch {
+	case isSecurityInternalError(err):
+		// The security handler could not decide (CSRF request state missing, or
+		// the token store unreachable while introspecting the credential): a
+		// server fault, not a refused credential. The client gets the generic
+		// internal answer; the cause goes to the log, where a wiring mistake
+		// that makes every cookie request fail has to be findable.
+		// Logged as a domain.Error too, so its parent (the actual cause) is kept.
+		var cause domain.Error
+		_ = errors.As(err, &cause)
+		slog.ErrorContext(ctx, "security handler could not reach a decision", "error", err, "cause", cause)
+		status = http.StatusInternalServerError
+		details = domainErrorDetails(domain.ErrInternal(nil))
+
+	case isCSRFError(err):
+		status = http.StatusForbidden
+		details = domainErrorDetails(domain.ErrAuthCSRFInvalid())
+
 	case isSecurityError(err):
 		status = http.StatusUnauthorized
 		details = securityErrorDetails(err)
@@ -176,8 +218,13 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 	case isDecodeError(err):
 		status = http.StatusBadRequest
 		// Use the stable domain message — do not echo ogen/framework
-		// decode text into the client envelope (ADR 030).
-		details = domainErrorDetails(domain.ErrRequestInvalid())
+		// decode text into the client envelope (ADR 030). The field paths
+		// ogen's validation rejected do go into details.
+		invalid := domain.ErrRequestInvalid()
+		if fields := validationFieldPaths(err); len(fields) > 0 {
+			invalid = invalid.WithDetails(map[string][]string{"fields": fields})
+		}
+		details = domainErrorDetails(invalid)
 
 	default:
 		resp := errorResponse(err)
@@ -191,6 +238,28 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 	if err == nil {
 		_, _ = w.Write(data)
 	}
+}
+
+// Codes compared on every error response, read once: building a domain.Error
+// captures its origin.
+var (
+	csrfInvalidCode = domain.ErrAuthCSRFInvalid().Code
+	internalCode    = domain.ErrInternal(nil).Code
+)
+
+// isCSRFError reports a session-cookie request refused by the CSRF checks. It
+// arrives wrapped in ogen's SecurityError, but it is a refusal of an
+// authenticated caller, not a missing credential: 403, not 401.
+func isCSRFError(err error) bool {
+	var e domain.Error
+	return errors.As(err, &e) && e.Code == csrfInvalidCode
+}
+
+// isSecurityInternalError reports a security handler that failed to reach a
+// decision, as opposed to one that refused the credential.
+func isSecurityInternalError(err error) bool {
+	var e domain.Error
+	return isSecurityError(err) && errors.As(err, &e) && e.Code == internalCode
 }
 
 func isSecurityError(err error) bool {
@@ -207,6 +276,38 @@ func securityErrorDetails(err error) api.ErrorDetails {
 		unauthorized = unauthorized.WithMessage(sessionUnauthorizedMessage)
 	}
 	return domainErrorDetails(unauthorized)
+}
+
+// validationFieldPaths returns the dotted paths of the fields ogen's request
+// validation rejected, or nil when decoding failed for another reason, such as
+// malformed JSON. Only the names are returned: a leaf error can quote the
+// rejected value. For map-typed fields (for example claim_mapping,
+// verified_claims, static_authorize_parameters) the generated validator names
+// an entry by the client's own key, so a path like idp.claim_mapping.<key>
+// echoes client input as a name, never a value or decoder text, which ADR 030
+// allows.
+func validationFieldPaths(err error) []string {
+	var verr *validate.Error
+	if !errors.As(err, &verr) {
+		return nil
+	}
+	return appendFieldPaths(nil, "", verr)
+}
+
+func appendFieldPaths(paths []string, prefix string, verr *validate.Error) []string {
+	for _, field := range verr.Fields {
+		path := field.Name
+		if prefix != "" {
+			path = prefix + "." + field.Name
+		}
+		var nested *validate.Error
+		if errors.As(field.Error, &nested) {
+			paths = appendFieldPaths(paths, path, nested)
+			continue
+		}
+		paths = append(paths, path)
+	}
+	return paths
 }
 
 func isDecodeError(err error) bool {

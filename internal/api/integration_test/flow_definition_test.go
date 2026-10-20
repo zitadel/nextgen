@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -57,6 +58,8 @@ func TestCreateFlowDefinition(t *testing.T) {
 	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 
 	userSchemaURI := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
+	// The objectType that schema declares, which a definition stores.
+	const userSchemaObjectType = "example-user"
 
 	unknownUserSchemaURI := "https://some-tenant.com/schemas/unknown-user-schema.yaml"
 
@@ -84,7 +87,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 				ProjectID: project.ID,
 				FlowDefinition: api.FlowDefinition{
 					Name:       "login-flow",
-					UserSchema: userSchemaURI,
+					UserSchema: userSchemaObjectType,
 					Purposes:   map[string]string{"login": "step_1"},
 					Audience: api.OptFlowAudience{
 						Value: api.FlowAudience{
@@ -95,6 +98,28 @@ func TestCreateFlowDefinition(t *testing.T) {
 					},
 					Steps:  validSteps(),
 					Status: api.FlowDefinitionStatusActive,
+				},
+			},
+		},
+		{
+			name: "user schema named by objectType",
+			req:  newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("handle-flow", userSchemaObjectType)),
+			wantResp: &api.FlowDefinitionResponse{
+				ProjectID:      project.ID,
+				FlowDefinition: newFlowDefinitionFixture("handle-flow", userSchemaObjectType),
+			},
+		},
+		{
+			name: "unknown user schema objectType",
+			req:  newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow-3", "unknown-user")),
+			wantResp: &api.ErrorDetails{
+				Code:    "flowdef.invalid",
+				Message: "flow definition: invalid",
+				Details: api.OptErrorDetailsDetails{
+					Value: api.ErrorDetailsDetails{
+						"details": jx.Raw(`"user schema \"unknown-user\" not found"`),
+					},
+					Set: true,
 				},
 			},
 		},
@@ -117,7 +142,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 			req:  newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("existing-flow", userSchemaURI)),
 			wantResp: &api.FlowDefinitionResponse{
 				ProjectID:      project.ID,
-				FlowDefinition: newFlowDefinitionFixture("existing-flow", userSchemaURI),
+				FlowDefinition: newFlowDefinitionFixture("existing-flow", userSchemaObjectType),
 			},
 		},
 		{
@@ -586,18 +611,14 @@ func TestListFlowDefinitionsPagination(t *testing.T) {
 
 			gotIDs = append(gotIDs, page.FlowDefinitions[0].ID)
 			token, ok := page.NextPageToken.Get()
-			require.True(t, ok, "a full page carries a cursor")
+			if len(gotIDs) == totalFlowDefinitions {
+				assert.False(t, ok, "the final page carries no cursor (#849)")
+				break
+			}
+			require.True(t, ok, "a non-final full page carries a cursor")
 			pageToken = api.NewOptPageToken(token)
 		}
 		assert.Equal(t, wantIDs, gotIDs, "paging must cover the list in order, each row exactly once")
-
-		// fetch the last page (with no next token)
-		past := listFlowDefinitions(t, api.ListFlowDefinitionsParams{
-			Limit:     api.NewOptLimit(1),
-			PageToken: pageToken,
-		})
-		assert.Empty(t, past.FlowDefinitions)
-		assert.False(t, past.NextPageToken.IsSet())
 	})
 
 	t.Run("malformed page token", func(t *testing.T) {
@@ -608,6 +629,130 @@ func TestListFlowDefinitionsPagination(t *testing.T) {
 		require.NoError(t, err)
 		// The operation declares its own 400, so the client hands back a bare
 		// ErrorDetails: the decoded variant is what carries the status here.
+		require.IsType(t, &api.ErrorDetails{}, res, helpers.MustMarshal(t, res))
+		errRes := res.(*api.ErrorDetails)
+		invalid := domain.ErrRequestInvalid()
+		assert.Equal(t, api.ErrorCode(invalid.Code), errRes.Code)
+		assert.Equal(t, invalid.Message, errRes.Message)
+	})
+}
+
+// GET /flow_definitions answers two cardinalities from one endpoint, mirroring
+// GET /schemas (#923): `all` is the revision history, `latest` is one row per
+// flow. Which one is being asked for is a parameter of its own, so both stay
+// reachable with or without a name filter.
+func TestListFlowDefinitionsRevisions(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	userSchemaURI := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	createRevision := func(t *testing.T, name string) string {
+		t.Helper()
+		resp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+			ProjectID: api.ProjectID(project.ID),
+			FlowDefinition: api.FlowDefinition{
+				Name:       name,
+				Status:     "active",
+				UserSchema: userSchemaURI,
+				Purposes:   map[string]string{"login": "step_1"},
+				Steps:      validSteps(),
+			},
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.FlowDefinitionResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.FlowDefinitionResponse).ID
+	}
+
+	loginV1 := createRevision(t, "revisions-login")
+	loginV2 := createRevision(t, "revisions-login")
+	registerV1 := createRevision(t, "revisions-register")
+
+	list := func(t *testing.T, params api.ListFlowDefinitionsParams) *api.FlowDefinitionListResponse {
+		t.Helper()
+		params.ProjectID = api.ProjectID(project.ID)
+		res, err := client.ListFlowDefinitions(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.FlowDefinitionListResponse{}, res, helpers.MustMarshal(t, res))
+		return res.(*api.FlowDefinitionListResponse)
+	}
+	ids := func(resp *api.FlowDefinitionListResponse) []string {
+		out := make([]string, 0, len(resp.FlowDefinitions))
+		for _, item := range resp.FlowDefinitions {
+			out = append(out, item.ID)
+		}
+		return out
+	}
+
+	latestParam := api.NewOptListFlowDefinitionsRevisions(api.ListFlowDefinitionsRevisionsLatest)
+
+	t.Run("all is the default and keeps every revision", func(t *testing.T) {
+		got := ids(list(t, api.ListFlowDefinitionsParams{Name: api.NewOptString("revisions-login")}))
+		assert.Equal(t, []string{loginV2, loginV1}, got, "newest first")
+
+		explicit := ids(list(t, api.ListFlowDefinitionsParams{
+			Name:      api.NewOptString("revisions-login"),
+			Revisions: api.NewOptListFlowDefinitionsRevisions(api.ListFlowDefinitionsRevisionsAll),
+		}))
+		assert.Equal(t, got, explicit, "the default and the explicit value are the same request")
+	})
+
+	t.Run("latest keeps one revision per name", func(t *testing.T) {
+		got := ids(list(t, api.ListFlowDefinitionsParams{Revisions: latestParam}))
+		assert.Contains(t, got, loginV2)
+		assert.Contains(t, got, registerV1)
+		assert.NotContains(t, got, loginV1, "a superseded revision is not current")
+	})
+
+	t.Run("latest narrows to one row when a name is given", func(t *testing.T) {
+		got := ids(list(t, api.ListFlowDefinitionsParams{
+			Name:      api.NewOptString("revisions-login"),
+			Revisions: latestParam,
+		}))
+		assert.Equal(t, []string{loginV2}, got)
+	})
+
+	t.Run("paging latest visits each flow exactly once", func(t *testing.T) {
+		var got []string
+		var pageToken api.OptPageToken
+		for pages := 0; ; pages++ {
+			require.Less(t, pages, 20, "paging did not terminate")
+			page := list(t, api.ListFlowDefinitionsParams{
+				Revisions: latestParam,
+				Limit:     api.NewOptLimit(1),
+				PageToken: pageToken,
+			})
+			got = append(got, ids(page)...)
+			token, ok := page.NextPageToken.Get()
+			if !ok {
+				break
+			}
+			pageToken = api.NewOptPageToken(token)
+		}
+		assert.Equal(t, 1, countOccurrences(got, loginV2))
+		assert.Equal(t, 1, countOccurrences(got, registerV1))
+		assert.Zero(t, countOccurrences(got, loginV1))
+	})
+
+	// Both modes sort by the same columns, so the keyset predicate alone cannot
+	// tell that the row set underneath it changed. The token carries the mode.
+	t.Run("a token from the other mode is rejected", func(t *testing.T) {
+		first := list(t, api.ListFlowDefinitionsParams{Limit: api.NewOptLimit(1)})
+		token, ok := first.NextPageToken.Get()
+		require.True(t, ok, "a full page carries a cursor")
+
+		res, err := client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
+			ProjectID: api.ProjectID(project.ID),
+			Revisions: latestParam,
+			Limit:     api.NewOptLimit(1),
+			PageToken: api.NewOptPageToken(token),
+		})
+		require.NoError(t, err)
 		require.IsType(t, &api.ErrorDetails{}, res, helpers.MustMarshal(t, res))
 		errRes := res.(*api.ErrorDetails)
 		invalid := domain.ErrRequestInvalid()
@@ -968,4 +1113,47 @@ func TestListFlowDefinitionsExpandUserSchema(t *testing.T) {
 		assert.NotEqual(t, first.FlowDefinitions[0].ID, second.FlowDefinitions[0].ID)
 		require.True(t, second.FlowDefinitions[0].UserSchema.Set, helpers.MustMarshal(t, second))
 	})
+}
+
+// TestFlowDefinitionFollowsSchemaRevisions covers a flow naming its user
+// schema by objectType: it runs against the newest revision.
+func TestFlowDefinitionFollowsSchemaRevisions(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	base := harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema
+	harness.CreateUserSchema(t, project, base)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	created, err := client.CreateFlowDefinition(t.Context(),
+		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("revision-flow", "example-user")))
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionResponse{}, created, helpers.MustMarshal(t, created))
+	flowID := created.(*api.FlowDefinitionResponse).ID
+
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal([]byte(base), &doc))
+	doc["$id"] = "https://example.com/schemas/example-user-v2.json"
+	doc["properties"].(map[string]any)["nickname"] = map[string]any{"type": "string"}
+	v2doc, err := json.Marshal(doc)
+	require.NoError(t, err)
+	v2 := harness.CreateUserSchema(t, project, string(v2doc))
+
+	res, err := client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
+		ProjectID: api.ProjectID(project.ID),
+		Name:      api.NewOptString("revision-flow"),
+		Expand:    []api.FlowDefinitionExpand{api.FlowDefinitionExpandUserSchema},
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionListResponse{}, res, helpers.MustMarshal(t, res))
+	list := res.(*api.FlowDefinitionListResponse).FlowDefinitions
+	require.Len(t, list, 1)
+	assert.Equal(t, flowID, list[0].ID)
+	assert.Equal(t, "example-user", list[0].FlowDefinition.UserSchema)
+	require.True(t, list[0].UserSchema.Set, helpers.MustMarshal(t, &list[0]))
+	assert.Equal(t, v2, list[0].UserSchema.Value.ID, "the newest revision")
 }

@@ -4,8 +4,9 @@ import type { RequestOptions } from "node:https";
 import { BlockList, isIP } from "node:net";
 
 import { consola } from "consola";
-import { Agent } from "undici";
+import { Agent, type Dispatcher } from "undici";
 
+import { userAgentInterceptor } from "../user-agent";
 import type { SyncAction, SyncActionWarning } from "./types.js";
 
 /**
@@ -320,14 +321,16 @@ async function requestHead(url: URL, signal: AbortSignal): Promise<HeadResponse>
     );
   };
 
-  const dispatcher = new Agent({ connect: { lookup: safeLookup } });
+  // A private agent bypasses the global dispatcher, so it composes the user
+  // agent itself.
+  const dispatcher = new Agent({ connect: { lookup: safeLookup } }).compose(userAgentInterceptor);
   try {
     const response = await fetch(url, {
       method: "HEAD",
       redirect: "manual",
       signal,
       dispatcher,
-    } as RequestInit & { dispatcher: Agent });
+    } as RequestInit & { dispatcher: Dispatcher });
     return {
       status: response.status,
       location: response.headers.get("location") ?? undefined,

@@ -35,7 +35,9 @@ describe("design-tokens public surface", () => {
     const keys: string[] = [];
     collectKeys("", tokens, keys);
     const referencing = keys.filter((key) => {
-      const value = key.split(".").reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], tokens);
+      const value = key
+        .split(".")
+        .reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], tokens);
       return typeof value === "string" && value.includes("var(");
     });
     expect(referencing).toEqual([]);
@@ -56,6 +58,7 @@ describe("design-tokens public surface", () => {
         "breakpoint.xs",
         "container.authCard",
         "container.page",
+        "container.settings",
         "focus.offset",
         "focus.width",
         "font.family.heading",
@@ -74,6 +77,7 @@ describe("design-tokens public surface", () => {
         "gradient.lavenderStart",
         "gradient.neutralStart",
         "gradient.purpleStart",
+        "gradient.red",
         "gradient.redStart",
         "gradient.roseStart",
         "motion.duration.base",
@@ -190,6 +194,9 @@ describe("design-tokens public surface", () => {
         "theme.popoverForeground",
         "theme.primary",
         "theme.primaryForeground",
+        "theme.provider",
+        "theme.provider-border",
+        "theme.provider-foreground",
         "theme.ring",
         "theme.ringOffset",
         "theme.ringOutline",

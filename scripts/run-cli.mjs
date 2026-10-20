@@ -9,10 +9,11 @@ import {
   localRegistryPort,
   prepareLocalRegistry,
   stopLocalRegistry,
-} from "../apps/cli-journey-e2e/scripts/local-registry.mjs";
+} from "../e2e/journey/scripts/local-registry.mjs";
 import { buildLocalRuntimeImage, LOCAL_RUNTIME_IMAGE } from "./build-local-runtime-image.mjs";
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
 import { readServerBuildMetadata } from "./server-build.mjs";
+import { runnerCommand, runnerLabel } from "./task-runner.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const cliBin = join(repoRoot, "apps/cli/bin/run.js");
@@ -240,20 +241,23 @@ function wrapperRun({ jsonMode, runCaptureFn, runFn, stderr }) {
 }
 
 export function buildCli({ env = process.env } = {}) {
-  return runMoonToStderr(["run", "cli:build"], "moon run cli:build", env);
+  return runTargetsToStderr(["cli:build"], env);
 }
 
 export async function buildLocalServerBinary({ env = process.env } = {}) {
-  // server:build deps console:build and login-ui:build, so one invocation
-  // produces the fully embedded binary in graph order.
-  await runMoonToStderr(["run", "server:build"], "moon run server:build", env);
+  // server:build depends on console:build and login-ui:build, so one
+  // invocation produces the fully embedded binary in graph order.
+  await runTargetsToStderr(["server:build"], env);
   const metadata = await readServerBuildMetadata(localServerMetadata);
   return { path: localServerBinary, version: metadata.version };
 }
 
-function runMoonToStderr(args, label, env = process.env) {
+// The task runner's own output goes to stderr: stdout is the CLI's JSON envelope.
+function runTargetsToStderr(targets, env = process.env) {
+  const { command, args } = runnerCommand(targets, env);
+  const label = runnerLabel(targets, env);
   return new Promise((resolve, reject) => {
-    const child = spawn("moon", args, {
+    const child = spawn(command, args, {
       cwd: repoRoot,
       env,
       stdio: ["ignore", "pipe", "pipe"],

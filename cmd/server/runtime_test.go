@@ -3,6 +3,7 @@ package server
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/httputil"
 )
 
@@ -432,10 +434,57 @@ func TestLoadConfigHTTPClientDefaultsAndEnvOverride(t *testing.T) {
 	assert.Equal(t, []string{"localhost", "127.0.0.0/8"}, cfg.HTTPClient.AllowList,
 		"comma-separated env override must split into entries")
 	assert.Equal(t, 30*time.Second, cfg.Schema.ResolveTimeout)
+	assertSharedHostsEqual(t, domain.DefaultSharedHosts, cfg.Origins.SharedHosts)
 
 	client, err := cfg.HTTPClient.NewClient()
 	require.NoError(t, err)
 	require.NotNil(t, client)
+}
+
+func TestLoadConfigOriginsSharedHostsReplace(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, []byte(`
+origins:
+  shared_hosts:
+    pages.dev: '^\*\.[^*]+\.pages\.dev$'
+`), 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	require.Len(t, cfg.Origins.SharedHosts, 1,
+		"origins.shared_hosts replaces the default map rather than merging")
+	require.Contains(t, cfg.Origins.SharedHosts, "pages.dev")
+	assert.Equal(t, domain.DefaultSharedHostPatterns["pages.dev"], cfg.Origins.SharedHosts["pages.dev"].String())
+}
+
+func TestLoadConfigOriginsSharedHostsBadRegexp(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, []byte(`
+origins:
+  shared_hosts:
+    bad.host: '['
+`), 0o600))
+
+	_, err := loadConfig(configPath)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "decode config")
+}
+
+func assertSharedHostsEqual(t *testing.T, want, got map[string]*regexp.Regexp) {
+	t.Helper()
+	require.Equal(t, len(want), len(got))
+	for host, pattern := range want {
+		gotPattern, ok := got[host]
+		require.True(t, ok, "missing shared host %q", host)
+		require.NotNil(t, gotPattern)
+		assert.Equal(t, pattern.String(), gotPattern.String(), host)
+	}
 }
 
 func TestLoadConfigRejectsMalformedDenyListEntry(t *testing.T) {

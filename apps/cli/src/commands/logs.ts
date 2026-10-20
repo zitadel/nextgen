@@ -1,15 +1,16 @@
 import { Flags } from "@oclif/core";
 
 import { ZitadelError } from "../lib/errors";
-import { binaryLogs, followBinaryLogs } from "../lib/local-server/binary";
-import { containerLogs, followContainerLogs } from "../lib/local-server/docker";
 import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "../lib/local-server/runtime";
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { LocalServer } from "../lib/local-server/server";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
 import { publicCliCommand } from "../lib/public-cli";
 
 export default class Logs extends BaseCommand {
   static override description = "Show local Zitadel server logs.";
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 4;
   static override flags = {
     follow: Flags.boolean({ description: "Follow logs." }),
     tail: Flags.integer({ description: "Number of lines to show.", default: 200 }),
@@ -38,27 +39,21 @@ export default class Logs extends BaseCommand {
       });
     }
 
+    const server = LocalServer.at(this.meta.cwd, { cliVersion: this.meta.cliVersion });
     if (flags.follow) {
       if (this.jsonEnabled()) {
         throw new ZitadelError("E_VALIDATION", "Cannot stream logs with --json", {
           hint: "Run without --json, or omit --follow.",
         });
       }
-      if (runtime.backend === "binary") {
-        await followBinaryLogs(runtime.log_path, tail);
-      } else {
-        await followContainerLogs(runtime.container_name, tail);
-      }
+      await server.logs({ tail, follow: true });
       return this.emit({
         status: "ok",
         data: { title: "Stopped following local Zitadel logs." },
       });
     }
 
-    const logs =
-      runtime.backend === "binary"
-        ? await binaryLogs(runtime.log_path, tail)
-        : await containerLogs(runtime.container_name, tail);
+    const { logs } = await server.logs({ tail });
     return this.emit({
       status: "ok",
       pretty: logs.trimEnd(),

@@ -7,18 +7,18 @@
  *    loopback HTTP while the component itself renders on a loopback HTTP
  *    origin.
  * 2. `layout` is in the documented enum.
- * 3. `liquid_template` shape checks happen elsewhere (security pipeline runs
- *    server-side; structural validator is deferred until the full atom set
- *    lands).
+ * 3. `liquid_template` is not checked here. The server and the CLI check it on
+ *    publish; the component renders it and falls back to the bundled default
+ *    when it throws.
  *
- * Failures are non-fatal: we collect issues, log a dev-build warning, and
+ * Failures are non-fatal: we collect issues, log a console warning, and
  * return a sanitised payload with the offending fields stripped (set to
  * `undefined`) so the orchestrator falls back to the bundled defaults.
  */
 import { CreateFlow201BrandingLayout } from "@zitadel/api/generated/model";
 import { isCanonicalLoopbackHttpUrl } from "@zitadel/config/branding-url";
 
-import type { Branding } from "./branding.js";
+import type { Branding, BrandingThemeSide } from "./branding.js";
 
 const VALID_LAYOUTS = new Set<string>(Object.values(CreateFlow201BrandingLayout));
 
@@ -58,15 +58,34 @@ export function validateBranding(
     };
   }
   out.hero_url = sanitiseUrl(out.hero_url, "hero_url", issues, { allowed: allowLoopbackHttp });
-  if (out.assets) {
-    out.assets = {
-      logo_dark: sanitiseUrl(out.assets.logo_dark, "assets.logo_dark", issues),
-      favicon: sanitiseUrl(out.assets.favicon, "assets.favicon", issues),
-      background_image: sanitiseUrl(out.assets.background_image, "assets.background_image", issues),
+  if (out.theme?.light || out.theme?.dark) {
+    out.theme = {
+      ...out.theme,
+      ...sanitiseSideLogo(out.theme.light, "light", issues, allowLoopbackHttp),
+      ...sanitiseSideLogo(out.theme.dark, "dark", issues, allowLoopbackHttp),
     };
   }
 
   return { branding: out, issues };
+}
+
+// A side's mark is sanitised on the same terms as the top-level one: it is the
+// same kind of asset, and a development revision points both at loopback.
+function sanitiseSideLogo(
+  side: BrandingThemeSide | undefined,
+  name: "light" | "dark",
+  issues: string[],
+  allowLoopbackHttp: boolean,
+): Partial<Record<"light" | "dark", BrandingThemeSide>> {
+  if (!side) return {};
+  return {
+    [name]: {
+      ...side,
+      logo_url: sanitiseUrl(side.logo_url, `theme.${name}.logo_url`, issues, {
+        allowed: allowLoopbackHttp,
+      }),
+    },
+  };
 }
 
 function sanitiseUrl(

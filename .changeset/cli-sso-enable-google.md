@@ -1,0 +1,6 @@
+---
+"@zitadel/cli": minor
+"@zitadel/config": minor
+---
+
+Add social sign-in to the CLI. `zitadel sso enable --provider google` configures an identity provider on an existing Project: it says what to register with the vendor and at which redirect URI, takes the client id and secret, writes `.zitadel/idps/<slug>.json`, enables `sso` on the user schema, and adds the provider button plus the steps and routes a provider round trip needs to every login flow that runs against that schema. The client secret is never a flag — it is prompted for, or piped in on stdin for a scripted run — and never written to disk: only its `${{ NAME }}` reference reaches the connection file, and the value is published to the Project as an encrypted variable, which is where the engine resolves it from. `zitadel setup` asks the same question during onboarding, so a Project can start with Google rather than adding it afterwards, with `--sso` and `--sso-client-id` for scripted runs. Everything so far is local: publishing the connection needs identity provider support on the server, which is not in this release, so `apply` cannot upload a connection file yet and deleting one is not supported either. Enable the provider once that support ships.

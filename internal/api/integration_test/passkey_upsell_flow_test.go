@@ -62,7 +62,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	require.Equal(t, "register", flowHeaders.Response.Step.Name)
-	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie)
 
 	const (
 		newEmail = "passkey-upsell@example.com"
@@ -83,7 +83,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	require.IsType(t, &api.SubmitFlowStepOK{}, regResp, helpers.MustMarshal(t, regResp))
 	regOK := regResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "register-password", regOK.Response.Step.Name)
-	zflow = mustExtractZflow(t, regOK.SetCookie.Value)
+	zflow = mustExtractZflow(t, regOK.SetCookie)
 
 	// register-password → passkey-upsell (create_user fires here)
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
@@ -100,7 +100,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	pwOK := pwResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "passkey-upsell", pwOK.Response.Step.Name,
 		"after create_user the session must be threaded into the passkey-upsell step")
-	zflow = mustExtractZflow(t, pwOK.SetCookie.Value)
+	zflow = mustExtractZflow(t, pwOK.SetCookie)
 
 	// User is now in the DB (create_user fired).
 	users := harness.EnsureUserFixture(t)
@@ -118,7 +118,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, issueResp, helpers.MustMarshal(t, issueResp))
 	issueOK := issueResp.(*api.SubmitFlowStepOK)
-	zflow = mustExtractZflow(t, issueOK.SetCookie.Value)
+	zflow = mustExtractZflow(t, issueOK.SetCookie)
 
 	require.True(t, issueOK.Response.Step.Challenge.Set, "expected challenge on passkey_register issue")
 	challenge := issueOK.Response.Step.Challenge.Value
@@ -201,7 +201,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
-	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie)
 
 	const (
 		newEmail = "passkey-skip@example.com"
@@ -217,7 +217,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, regResp, helpers.MustMarshal(t, regResp))
 	regOK := regResp.(*api.SubmitFlowStepOK)
-	zflow = mustExtractZflow(t, regOK.SetCookie.Value)
+	zflow = mustExtractZflow(t, regOK.SetCookie)
 
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
@@ -229,7 +229,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
 	pwOK := pwResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "passkey-upsell", pwOK.Response.Step.Name)
-	zflow = mustExtractZflow(t, pwOK.SetCookie.Value)
+	zflow = mustExtractZflow(t, pwOK.SetCookie)
 
 	skipResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "skip",

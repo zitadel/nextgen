@@ -10,8 +10,8 @@ import (
 var reservedOutcomes = map[string]struct{}{
 	"user_not_found":      {},
 	"user_already_exists": {},
-	"identity_unknown":    {},
-	"callback":            {},
+	"sso_user_not_found":  {},
+	"sso_authenticated":   {},
 }
 
 type PivotingTarget struct {
@@ -264,22 +264,30 @@ func validateSteps(steps []FlowDefinitionStep) error {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: action name %q is reserved for engine-injected back navigation", step.Name, a.Name), nil)
 			}
+			if a.Name == FlowActionSSO {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: action name %q is reserved for sso submissions", step.Name, a.Name), nil)
+			}
+			if _, ok := reservedOutcomes[a.Name]; ok {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: action name %q is reserved for flow outcomes", step.Name, a.Name), nil)
+			}
 			actionNames[a.Name] = struct{}{}
 		}
 
 		// a non-terminal step must do something
-		_, hasCallback := step.Transitions["callback"]
+		_, hasSSOAuthenticated := step.Transitions[FlowImplicitOutcomeSSOAuthenticated]
 		if len(step.Fields) == 0 && len(step.Actions) == 0 && len(step.SSOProviders) == 0 &&
-			len(step.Gates) == 0 && !hasCallback {
+			len(step.Gates) == 0 && !hasSSOAuthenticated {
 			return ErrFlowDefinitionInvalid(fmt.Sprintf(
-				"step %q is non-terminal but has no fields, actions, sso_providers, gates, or transitions.callback", step.Name), nil)
+				"step %q is non-terminal but has no fields, actions, sso_providers, gates, or transitions.sso_authenticated", step.Name), nil)
 		}
 
-		// when sso_providers is non-empty, transitions.callback must be defined
+		// when sso_providers is non-empty, transitions.sso_authenticated must be defined
 		if len(step.SSOProviders) > 0 {
-			if !hasCallback {
+			if !hasSSOAuthenticated {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: has sso_providers but is missing transitions.callback", step.Name), nil)
+					"step %q: has sso_providers but is missing transitions.sso_authenticated", step.Name), nil)
 			}
 		}
 
@@ -292,12 +300,19 @@ func validateSteps(steps []FlowDefinitionStep) error {
 		}
 
 		// every transition key must be an action name or a reserved outcome
-		for transitionKey := range step.Transitions {
+		for transitionKey, t := range step.Transitions {
 			_, isAction := actionNames[transitionKey]
 			_, isReserved := reservedOutcomes[transitionKey]
 			if !isAction && !isReserved {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: transition key %q is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)", step.Name, transitionKey), nil)
+					"step %q: transition key %q is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_authenticated)", step.Name, transitionKey), nil)
+			}
+			// the sso outcomes carry a bound user or parked claims, which a
+			// re-purpose would drop and another flow cannot receive
+			isSSOOutcome := transitionKey == FlowImplicitOutcomeSSOAuthenticated || transitionKey == FlowImplicitOutcomeSSOUserNotFound
+			if isSSOOutcome && (t.Purpose != nil || t.Action != nil) {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: transition %q is an sso outcome and cannot declare purpose or action", step.Name, transitionKey), nil)
 			}
 		}
 
@@ -522,7 +537,7 @@ func validateFlipTableCoverage(def FlowDefinition) error {
 }
 
 // purposeFlipTargets mirrors the identifier half of the engine's flip
-// table. Kept separate so the validator stays pure. identity_unknown also
+// table. Kept separate so the validator stays pure. sso_user_not_found also
 // flips login → register but comes only from SSO resolution, so it is
 // left out here: requiring it on every combined entry step would reject
 // the shipped default flow. A rule on steps carrying sso_providers is

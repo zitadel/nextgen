@@ -16,6 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -85,8 +86,9 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 
 	resp := h.buildFlowResponse(ctx, result, false)
 	return &api.FlowResponseHeaders{
-		SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
-		Response:  resp,
+		SetCookie:    []string{flowSetCookie(ctx, cookieValue, false)},
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     resp,
 	}, nil
 }
 
@@ -149,10 +151,12 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	} else if h, ok := requestOriginFromContext(ctx); ok {
 		originStr = h
 	}
+	requestOrigin := ""
 	if originStr != "" {
 		originURL, err := url.Parse(originStr)
 		if err == nil {
 			if rp := passkeyRPFromOrigin(*originURL); rp != nil {
+				requestOrigin = originURL.Scheme + "://" + originURL.Host
 				project, err := h.projectService.Get(ctx, state.ProjectID)
 				if err != nil {
 					// A project lookup failing mid-submit is a server-side
@@ -167,31 +171,79 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 			}
 		}
 	}
+	// An external sign-in is bound to the request origin: the provider sends
+	// the browser back to its callback route, and the page the browser then
+	// returns to must be on it. For a browser the origin header is not
+	// writable, so a page on one origin cannot aim the return at another.
+	// A non-browser client chooses both values, and until projects declare
+	// their origins the guards that hold then are the provider's registered
+	// redirect URI and the Strict flow cookie.
+	// Only the action selects the branch: a provider id on another action
+	// goes through to the engine, which refuses it as an invalid action.
+	if req.Action == domain.FlowActionSSO {
+		if requestOrigin == "" {
+			return nil, domain.ErrRequestInvalid().WithMessage("an sso submission needs a request origin")
+		}
+		rawTarget, ok := req.ReturnTarget.Get()
+		if !ok {
+			return nil, domain.ErrRequestInvalid().WithMessage("return_target is required for action sso")
+		}
+		// Parsed here, not by the generated decoder: a request-URI parse
+		// leaves a fragment in the path, and a hash-routed page needs it
+		// back as a fragment. ParseRedirectTarget is the one place that
+		// decides whether a caller-supplied URL is safe to send a browser to.
+		returnTarget, err := httputil.ParseRedirectTarget(rawTarget)
+		if err != nil {
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is %v", rawTarget, err))
+		}
+		// The target is a page on the origin that sent this request. The
+		// scheme and host are always set once it parses, so a relative target
+		// never gets this far.
+		if !strings.EqualFold(returnTarget.Scheme+"://"+returnTarget.Host, requestOrigin) {
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not on the request origin %q", rawTarget, requestOrigin))
+		}
+		// The engine refuses a missing provider or one the step does not
+		// offer, so the URI is never issued for a slug outside the flow.
+		slug, _ := req.SSOProviderID.Get()
+		submitReq.SSOReturn = &domain.FlowSSOReturn{
+			RedirectURI:  requestOrigin + IDPCallbackPath(slug),
+			ReturnTarget: returnTarget.String(),
+		}
+	}
 
 	result, err := h.flowService.Submit(ctx, submitReq)
 	if err != nil {
 		return nil, normalizeFlowError(err)
 	}
 
+	terminal := result.Step != nil && result.Step.Complete != nil
+	flowResp := h.buildFlowResponse(ctx, result, terminal)
+
 	cookieValue, err := h.sealState(ctx, result.State)
 	if err != nil {
 		return nil, err
 	}
 
-	terminal := result.Step != nil && result.Step.Complete != nil
-	flowResp := h.buildFlowResponse(ctx, result, terminal)
-
 	// Validation error: state machine keeps the user on the step with Error set.
 	if result.Step != nil && result.Step.Error != nil {
 		return &api.SubmitFlowStepBadRequest{
-			SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
-			Response:  flowResp,
+			SetCookie:    []string{flowSetCookie(ctx, cookieValue, false)},
+			CacheControl: api.NewOptString(sessionStateCacheControl),
+			Response:     flowResp,
 		}, nil
 	}
 
+	// _zflow stays first: the generated client reads only the first
+	// Set-Cookie line. The redirect step adds the binding cookie the callback
+	// checks.
+	cookies := []string{flowSetCookie(ctx, cookieValue, terminal)}
+	if result.SSOBindingNonce != "" {
+		cookies = append(cookies, ssoBindingSetCookie(ctx, result.SSOBindingNonce))
+	}
 	return &api.SubmitFlowStepOK{
-		SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, terminal)),
-		Response:  flowResp,
+		SetCookie:    cookies,
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     flowResp,
 	}, nil
 }
 
@@ -207,14 +259,36 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 
 	result, err := h.flowService.GetStep(ctx, service.GetFlowStepRequest{State: state})
 	if err != nil {
-		return nil, err
+		return mapFlowGetError(normalizeFlowError(err))
 	}
-	if result.Step != nil && result.Step.Complete != nil {
+	// A render can complete the flow (a parked SSO identity resolved into a
+	// sign-in), and then it carries the handoff token. Without one, the flow
+	// was already complete before this request.
+	terminal := result.Step != nil && result.Step.Complete != nil
+	if terminal && result.HandoffToken == "" {
 		return mapFlowGetError(domain.ErrFlowCompleted())
 	}
 
-	resp := h.buildFlowResponse(ctx, result, false)
-	return &resp, nil
+	// Only a render that resolved a parked SSO identity is re-sealed: the
+	// cookie carries no version, so a reload re-sealing it could land after a
+	// submit and roll it back. A terminal render only clears the cookie, so a
+	// failing seal cannot cost the client its committed handoff.
+	var setCookie []string
+	switch {
+	case terminal:
+		setCookie = []string{flowSetCookie(ctx, "", true)}
+	case result.Reseal:
+		cookieValue, err := h.sealState(ctx, result.State)
+		if err != nil {
+			return nil, err
+		}
+		setCookie = []string{flowSetCookie(ctx, cookieValue, false)}
+	}
+	return &api.FlowResponseHeaders{
+		SetCookie:    setCookie,
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     h.buildFlowResponse(ctx, result, terminal),
+	}, nil
 }
 
 func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState, error) {
@@ -222,7 +296,7 @@ func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState,
 		return nil, domain.ErrFlowCookieInvalid()
 	}
 
-	header, err := domain.DecodeJWEHeader(raw)
+	header, err := domain.DecodeStoredKeyJWEHeader(raw)
 	if err != nil {
 		return nil, domain.ErrFlowCookieInvalid()
 	}
@@ -318,6 +392,9 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 		Actions: toFlowStepActions(step.Actions),
 		Gates:   api.FlowStepGates{},
 	}
+	if len(step.SSOProviders) > 0 {
+		out.SSOProviders = toFlowStepSSOProviders(step.SSOProviders)
+	}
 	if step.Error != nil {
 		out.Error = api.NewOptNilString(*step.Error)
 	}
@@ -331,6 +408,12 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 	}
 	if step.Challenge != nil {
 		out.Challenge = api.NewOptFlowStepChallenge(toFlowStepChallenge(*step.Challenge))
+	}
+	if step.Identifier != nil {
+		out.Identifier = api.NewOptFlowStepIdentifier(api.FlowStepIdentifier{
+			Value:        step.Identifier.Value,
+			Autocomplete: step.Identifier.Autocomplete,
+		})
 	}
 	return out
 }
@@ -360,26 +443,35 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 	return out
 }
 
-// validateOriginAgainstProject returns an error if the origin is not in the
-// project's PreviewOrigins allowlist. An empty allowlist means allow all
-// (development/test mode).
+// validateOriginAgainstProject returns an error if the origin is not admitted
+// for the project. An empty allowlist means allow all (development/test mode).
+// Loopback hosts are admitted without a stored pattern. Only primary patterns
+// admit requests; preview patterns bound which URLs a preview deploy may
+// register and do not authorize Origin headers by themselves.
 //
-// Matching is deliberately exact — no loopback aliasing between localhost,
-// 127.0.0.1, and [::1]. The WebAuthn RP ID derives from the origin hostname
-// (passkeyRPFromOrigin), so a passkey registered under one loopback spelling
-// can never assert under another; aliasing here would replace this clear 400
-// with a confusing "no passkey found" during the ceremony.
+// Primary matching is exact — no aliasing between localhost, 127.0.0.1, and
+// [::1] for stored patterns. The WebAuthn RP ID derives from the origin
+// hostname (passkeyRPFromOrigin), so a passkey registered under one loopback
+// spelling can never assert under another.
 func validateOriginAgainstProject(originStr string, project *domain.Project) error {
-	if len(project.PreviewOrigins) == 0 {
+	if len(project.Origins) == 0 {
 		return nil
 	}
-	for _, allowed := range project.PreviewOrigins {
-		if allowed == originStr {
+	if u, err := url.Parse(originStr); err == nil && isLoopbackHost(u.Hostname()) {
+		return nil
+	}
+	patterns := make([]string, 0, len(project.Origins))
+	for _, allowed := range project.Origins {
+		if allowed.Kind != domain.OriginKindPrimary {
+			continue
+		}
+		if allowed.Pattern == originStr {
 			return nil
 		}
+		patterns = append(patterns, allowed.Pattern)
 	}
 	return fmt.Errorf("origin %q is not allowed for this project (allowed: %s)",
-		originStr, strings.Join(project.PreviewOrigins, ", "))
+		originStr, strings.Join(patterns, ", "))
 }
 
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,
@@ -421,8 +513,14 @@ func toFlowField(f domain.FlowField) api.Field {
 		TextKey:  f.TextKey,
 		Required: api.NewOptBool(f.Required),
 	}
+	if f.Autocomplete != "" {
+		out.Autocomplete = api.NewOptString(f.Autocomplete)
+	}
 	if f.Value != nil {
 		out.Value = jx.Raw(jsonQuoted(*f.Value))
+	}
+	if f.ReadOnly {
+		out.ReadOnly = api.NewOptBool(true)
 	}
 	if v := toFlowFieldValidation(f.Validation); v != nil {
 		out.Validation = api.NewOptFieldValidation(*v)
@@ -473,6 +571,14 @@ func toFlowStepActions(actions []domain.FlowAction) []api.FlowStepAction {
 			TextKey: api.NewOptString(a.TextKey),
 			Primary: api.NewOptBool(a.Primary),
 		}
+	}
+	return out
+}
+
+func toFlowStepSSOProviders(providers []domain.FlowSSOProvider) []api.SSOProvider {
+	out := make([]api.SSOProvider, len(providers))
+	for i, p := range providers {
+		out[i] = api.SSOProvider{ID: p.ID, Name: p.Name, Template: p.Template}
 	}
 	return out
 }
@@ -539,6 +645,7 @@ var (
 	codeFlowSessionConflict = domain.ErrFlowSessionConflict().Code
 	codeFlowUnsupported     = domain.ErrFlowUnsupported().Code
 	codeFlowInvalidPurpose  = domain.ErrFlowInvalidPurpose().Code
+	codeFlowRestartRequired = domain.ErrFlowRestartRequired().Code
 )
 
 func flowErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
@@ -549,7 +656,7 @@ func flowErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case codeFlowCompleted:
 		return errorResponseWithStatusCode(http.StatusGone, err)
-	case codeFlowSessionConflict:
+	case codeFlowSessionConflict, codeFlowRestartRequired:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case codeFlowInvalidAction, codeFlowUnsupported, codeFlowInvalidPurpose:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
@@ -589,6 +696,7 @@ func normalizeFlowError(err error) error {
 		domain.ErrFlowSessionConflict(),
 		domain.ErrFlowUnsupported(),
 		domain.ErrFlowInvalidPurpose(),
+		domain.ErrFlowRestartRequired(),
 	} {
 		if errors.Is(err, sentinel) {
 			return sentinel
@@ -605,6 +713,9 @@ func mapFlowGetError(err error) (api.GetFlowStepRes, error) {
 	case errors.Is(err, domain.ErrFlowCompleted()):
 		gone := api.GetFlowStepGone(domainErrorDetails(domain.ErrFlowCompleted()))
 		return &gone, nil
+	case errors.Is(err, domain.ErrFlowRestartRequired()):
+		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrFlowRestartRequired()))
+		return &conflict, nil
 	}
 	return nil, err
 }
@@ -631,6 +742,7 @@ var (
 	codeFlowDefinitionNotFound        = domain.ErrFlowDefinitionNotFound().Code
 	codeFlowDefinitionPurposeMismatch = domain.ErrFlowDefinitionPurposeMismatch().Code
 	codeFlowDefinitionInvalid         = domain.ErrFlowDefinitionInvalid(nil, nil).Code
+	codeFlowDefinitionRevisionTaken   = domain.ErrFlowDefinitionRevisionConflict().Code
 	codeMissingFlowDefinitionID       = domain.ErrMissingFlowDefinitionID().Code
 	codeMissingProjectID              = domain.ErrMissingProjectID().Code
 	codeFlowDefinitionDenied          = domain.ErrFlowDefinitionPermissionDenied().Code
@@ -646,6 +758,8 @@ func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case codeFlowDefinitionInvalid:
 		return errorResponseWithDetails(err, http.StatusBadRequest)
+	case codeFlowDefinitionRevisionTaken:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case codeFlowDefinitionDenied:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:

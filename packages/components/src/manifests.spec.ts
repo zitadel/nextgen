@@ -16,6 +16,7 @@ describe("manifest registry", () => {
         "zl-passkey",
         "zl-pill",
         "zl-select",
+        "zl-sso-providers",
       ].sort(),
     );
   });
@@ -59,6 +60,7 @@ describe("manifest registry", () => {
         "data-testid",
         "autocomplete",
         "required",
+        "readonly",
         "pattern",
         "success",
         "forgot-password-href",
@@ -67,7 +69,15 @@ describe("manifest registry", () => {
       ]),
     );
     expect(field?.parts).toEqual(
-      expect.arrayContaining(["root", "label", "label-row", "forgot-link", "input", "error", "trailing-icon"]),
+      expect.arrayContaining([
+        "root",
+        "label",
+        "label-row",
+        "forgot-link",
+        "input",
+        "error",
+        "trailing-icon",
+      ]),
     );
     expect(field?.slots).toEqual(expect.arrayContaining(["prefix", "suffix", "help"]));
     expect(field?.events).toContain("zl-input");

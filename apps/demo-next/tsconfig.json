@@ -1,20 +1,11 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "composite": false,
-    "declaration": false,
-    "declarationMap": false,
-    "emitDeclarationOnly": false,
-    "baseUrl": ".",
-    "jsx": "preserve",
-    "lib": ["ES2022", "DOM"],
-    "plugins": [{ "name": "next" }],
-    "experimentalDecorators": true,
-    "useDefineForClassFields": false,
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  },
-  "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "extends": "./tsconfig.spec.json",
+  // Next reads this file and expects its generated route types listed here.
+  "include": [
+    "next-env.d.ts",
+    "next.config.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".next/types/**/*.ts"
+  ]
 }

@@ -6,7 +6,9 @@ import { type ReactNode, useEffect, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-import { fetchSession, invalidateSessionCache } from "../auth/session";
+import { fetchSession, invalidateSessionCache } from "@/auth/session";
+import { describeError } from "@/lib/api-error";
+import { routerRelativeHref } from "@/lib/base-path";
 
 const STATE_ROW = "flex items-center justify-center gap-2 text-muted-foreground";
 
@@ -47,9 +49,9 @@ export function PendingState() {
  * - **Session gone** — the cookie expired or was revoked mid-use: drop the
  *   cached session and redirect to the login screen with the current path in
  *   `?next=`, instead of rendering copy the user cannot act on.
- * - **Session alive** — the user is signed in but the console's operator-plane
- *   credential is missing or invalid (in dev: the proxy's
- *   `CONSOLE_PROJECT_SECRET`). Redirecting would bounce straight back and
+ * - **Session alive** — `GET /sessions/me` still answers, but the server
+ *   refused this request's session (an operation that does not accept the
+ *   Console session, for instance). Redirecting would bounce straight back and
  *   loop, so this renders an honest error state instead.
  *
  * 403 stays a rendered state — signed in, but no access.
@@ -72,12 +74,9 @@ export function ErrorState({ error }: ErrorComponentProps) {
       }
       setSessionAlive(false);
       const { pathname, searchStr } = router.state.location;
-      const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-      const href = `${pathname}${searchStr}`;
-      const next = base && href.startsWith(base) ? href.slice(base.length) : href;
       void router.navigate({
         to: "/login",
-        search: { next: next === "/" ? undefined : next },
+        search: { next: routerRelativeHref(`${pathname}${searchStr}`) },
       });
     });
     return () => {
@@ -93,9 +92,9 @@ export function ErrorState({ error }: ErrorComponentProps) {
             <AlertCircle aria-hidden />
             <AlertTitle>Console API not authorized</AlertTitle>
             <AlertDescription>
-              You are signed in, but the console&apos;s API requests are not authorized. In
-              development, check that the dev proxy&apos;s <code>CONSOLE_PROJECT_SECRET</code> is
-              set and belongs to the current project (ADR 0003 §4).
+              You are signed in, but the server did not accept your session for this request.
+              Signing out and in again may help; if it persists, this screen calls an operation the
+              console session cannot use yet.
             </AlertDescription>
           </Alert>
         </StatePage>
@@ -111,7 +110,7 @@ export function ErrorState({ error }: ErrorComponentProps) {
     );
   }
 
-  const { heading, message } = describeError(error);
+  const { heading, message } = describeBoundaryError(error);
   return (
     <StatePage>
       <Alert variant="destructive">
@@ -138,21 +137,24 @@ export function NotFoundState() {
   );
 }
 
-function describeError(error: unknown): { heading: string; message: string } {
+function describeBoundaryError(error: unknown): { heading: string; message: string } {
   if (error instanceof ApiError) {
     if (error.status === 403) {
       return {
         heading: "Not authorized",
-        message: "You are signed in, but this account does not have access to this resource.",
+        message: describeError(
+          error,
+          "You are signed in, but this account does not have access to this resource.",
+        ),
       };
     }
     return {
       heading: `Request failed (${error.status})`,
-      message: error.message,
+      message: describeError(error, "The server could not complete this request."),
     };
   }
   return {
     heading: "Something went wrong",
-    message: error instanceof Error ? error.message : "An unexpected error occurred.",
+    message: describeError(error, "An unexpected error occurred."),
   };
 }

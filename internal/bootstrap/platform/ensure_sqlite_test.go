@@ -11,10 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
+	"github.com/zitadel/nextgen/internal/cache"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dbtest"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 const testSchemaBase = "https://example.com/api/schemas"
@@ -36,8 +39,28 @@ func newTestProjects(t *testing.T, pool *service.DB) (service.ProjectService, se
 	schemaValidator, err := domain.NewSchemaValidator(testSchemaBase)
 	require.NoError(t, err)
 
-	keys := service.NewKeyService(pool, *masterKeys)
-	return service.NewProjectService(pool, testSchemaBase, schemaValidator, keys), keys
+	// bcrypt at cost 10, bounded 10..16: this test is about Ensure, not about
+	// hashing, but the project service needs the deployment's hashing
+	// configuration to answer whether a project may pick a method of its own.
+	hashers, err := (&crypto.HashConfig{
+		Verifiers: []crypto.HashName{crypto.HashNameBcrypt},
+		Hasher: crypto.HasherConfig{
+			Algorithm: crypto.HashNameBcrypt,
+			Params:    map[string]any{"cost": 10},
+		},
+		Limits: crypto.HashLimitsConfig{
+			Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
+		},
+	}).NewHasherFactory()
+	require.NoError(t, err)
+
+	crypters, err := cache.NewMeteredLRU[service.CrypterCacheKey, op.Crypto](cache.NameCrypter, 64)
+	require.NoError(t, err)
+	signingKeys, err := cache.NewMeteredLRU[service.SigningKeyCacheKey, domain.SigningKey](cache.NameSigningKey, 64)
+	require.NoError(t, err)
+
+	keys := service.NewKeyService(pool, *masterKeys, crypters, signingKeys)
+	return service.NewProjectService(pool, testSchemaBase, schemaValidator, keys, hashers, domain.DefaultSharedHosts), keys
 }
 
 // TestEnsureSQLiteIdempotent proves the DB-backed idempotency the issue
@@ -101,16 +124,18 @@ func TestEnsureSQLiteSeedsAUsableProject(t *testing.T) {
 		assert.NoError(t, err, "missing or unusable %s encryption key", purpose)
 	}
 
-	// The user schema registrations validate against, read by the exact URL the
-	// seeded login flow will reference.
-	userSchemaURL := schemas.DefaultHumanUserSchemaURL(testSchemaBase)
-	_, err = pool.Statements().GetJSONSchemaByID(ctx, projectID, userSchemaURL)
-	assert.NoError(t, err, "a project with no user schema cannot register anyone")
+	// The user schema registrations validate against.
+	userSchema, err := pool.Statements().GetJSONSchemaByID(ctx, projectID, schemas.DefaultHumanUserSchemaURL(testSchemaBase))
+	require.NoError(t, err, "a project with no user schema cannot register anyone")
+
+	// The platform variant, not the default (its shape is pinned in
+	// platform_schema_test.go).
+	assert.Equal(t, []string{schemas.PlatformDisplayNameProperty}, domain.DesignatedDisplay(userSchema.Schema))
 
 	// The login flows the registration walks through. Their ids are minted at
 	// insert, so this counts them against the same defaults the seeding builds
 	// from rather than looking one up by a hand-copied id.
-	wantFlows, err := flow_definitions.DefaultLoginFlowDefinitions(testSchemaBase, projectID, userSchemaURL)
+	wantFlows, err := flow_definitions.DefaultLoginFlowDefinitions(testSchemaBase, projectID)
 	require.NoError(t, err)
 	require.NotEmpty(t, wantFlows, "the defaults themselves must define a login flow")
 
@@ -118,7 +143,7 @@ func TestEnsureSQLiteSeedsAUsableProject(t *testing.T) {
 		service.WithAuthzListUnrestricted(ctx),
 		&database.ListOptions[domain.FlowDefinitionField]{
 			Filter: database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
-		})
+		}, service.FlowDefinitionQueryOptions{})
 	require.NoError(t, err)
 	assert.Len(t, flows.Items, len(wantFlows), "a project with no login flow cannot serve a sign-in")
 }

@@ -1,9 +1,11 @@
 import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import type { BrandingDesign } from "@zitadel/config/defaults";
 import pc from "picocolors";
+import semver from "semver";
 
+import { detectors } from "../../lib/orca/detectors";
+import type { Detector } from "../../lib/orca/detectors/types";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
 
 /**
@@ -102,8 +104,9 @@ export async function detectProjectFacts(cwd: string, frameworkId: string): Prom
     };
     const depPkg = depFromFramework(frameworkId);
     const range = pj.dependencies?.[depPkg] ?? pj.devDependencies?.[depPkg];
-    if (range) {
-      facts.frameworkVersion = stripRange(range);
+    const version = range ? stripRange(range) : undefined;
+    if (version) {
+      facts.frameworkVersion = version;
     }
   } catch {
     // Missing or unreadable package.json — version stays undefined; the
@@ -132,66 +135,33 @@ async function fileExists(p: string): Promise<boolean> {
   }
 }
 
+function detectorFor(framework: string): Detector | undefined {
+  return detectors.find((detector) => detector.framework === framework);
+}
+
 function depFromFramework(framework: string): string {
-  switch (framework) {
-    case "next":
-      return "next";
-    case "nuxt":
-      return "nuxt";
-    default:
-      return framework;
-  }
+  return detectorFor(framework)?.versionPackage ?? framework;
 }
 
 function prettyFramework(framework: string): string {
-  switch (framework) {
-    case "next":
-      return "Next.js";
-    case "nuxt":
-      return "Nuxt";
-    default:
-      return framework;
-  }
+  return detectorFor(framework)?.displayName ?? framework;
 }
 
-/** Strips `^`/`~`/`>=`/`v` prefixes from an npm range so the version reads cleanly in the summary. */
-function stripRange(range: string): string {
-  const trimmed = range.replace(/^([\^~]|>=?|v)/, "").trim();
-  // Take the first dotted segment so multi-range strings (`^15.0.0 || ^14.0.0`)
-  // collapse to a single readable version in the report.
-  const first = trimmed.split(/\s+/)[0];
-  return first ?? trimmed;
+/**
+ * Reduces a declared npm range to the version the summary shows: the lowest
+ * version it admits (`semver.minVersion`), so `^15.0.0`, `>= 15.0.0`,
+ * `=15.0.0`, `^15.0.0 || ^14.0.0` all read `15.0.0` and `20.1.x` reads
+ * `20.1.0`. Returns `undefined` when the spec is not a valid semver range
+ * (`catalog:`, `workspace:*`, `file:`, git URLs, dist-tags such as `latest`) or
+ * names no version (`*`), because printing that as the framework version would
+ * be wrong.
+ */
+function stripRange(range: string): string | undefined {
+  if (!/\d/.test(range) || semver.validRange(range) === null) return undefined;
+  return semver.minVersion(range)?.version;
 }
 
 /** Returns just the file name from a relative path, for the `→ filename` secondary detail in PACKAGE rows. */
 export function fileNameOf(p: string): string {
   return basename(p);
-}
-
-/**
- * Layout caveats for the chosen login design, shown to humans after the
- * summary box and carried in the JSON envelope's `warnings`.
- *
- * The split family's brand pane is keyed to the **login's own container**
- * width — a `@container (max-width: 48rem)` query on the widget's mount, not
- * a viewport media query. Above that the pane renders; below it the pane is
- * `display: none` and the compact brand mark takes its place — and the split
- * template only emits that mark when `branding.json` names `logo_url` or
- * `hero_url`, so without one the narrow layout loses the branding entirely.
- *
- * Independent of posture, because the container query is: a full-page login
- * hits the same collapse on a phone that an embedded card hits in a sidebar.
- * Gating on `widget` would have been a guess about the container, and a wrong
- * one in both directions — the wrapper setup scaffolds for a widget is
- * full-width (the pane renders there), and a page-posture login on a phone is
- * exactly the narrow case the advice is for. `hero` stays quiet: its compact
- * fallback is editable text, so a narrow container never leaves it blank.
- */
-export function designWarnings(design?: BrandingDesign): string[] {
-  if (design !== "split" && design !== "split-right") {
-    return [];
-  }
-  return [
-    `The ${design} design shows its brand pane only when the login's container is wide; a narrow container — a card-width embed, or any phone-width viewport — collapses it to the compact brand mark. Set logo_url (or hero_url) in .zitadel/branding/branding.json so that mark isn't empty.`,
-  ];
 }

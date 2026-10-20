@@ -12,7 +12,7 @@
  */
 import type { CreateFlow201, CreateFlow201Step } from "@zitadel/api/generated/model";
 
-import { signHandoffToken } from "../crypto.js";
+import { signHandoffToken, toBase64url } from "../crypto.js";
 import type { StoredCredential } from "../lib/authn/index.js";
 
 /**
@@ -63,7 +63,7 @@ export type StepFixtureInput = {
  * browser's keychain from conflating credentials belonging to different users.
  */
 function emailToUserHandle(email: string): string {
-  return Buffer.from(email).toString("base64url");
+  return toBase64url(new TextEncoder().encode(email));
 }
 
 /**
@@ -82,6 +82,18 @@ function wrap(
     step,
     ...extras,
   };
+}
+
+/**
+ * `step.identifier` for a step that collects the password on its own: the
+ * address captured earlier, or nothing when the step was reached without one
+ * (an SSO flow that skipped the identifier step). Which steps carry it is the
+ * caller's business — only {@link passwordStep} and
+ * {@link registerPasswordStep} ask.
+ */
+function collectedIdentifier(input: StepFixtureInput): CreateFlow201Step["identifier"] | undefined {
+  if (!input.capturedEmail) return undefined;
+  return { value: input.capturedEmail, autocomplete: "username" };
 }
 
 /**
@@ -110,6 +122,7 @@ export function identifierStep(input: StepFixtureInput): CreateFlow201 {
         name: "email",
         type: "email",
         text_key: "identifier.field.email",
+        autocomplete: "username",
         required: true,
       },
     ],
@@ -132,6 +145,7 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
         name: "email",
         type: "email",
         text_key: "register.field.email",
+        autocomplete: "username",
         required: true,
       },
       {
@@ -194,10 +208,12 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
         name: PASSWORD_FIELD,
         type: "password",
         text_key: "register-password.field.password",
+        autocomplete: "new-password",
         required: true,
         validation: { min_length: 8 },
       },
     ],
+    identifier: collectedIdentifier(input),
     actions: [
       {
         name: "submit",
@@ -233,9 +249,11 @@ export function passwordStep(input: StepFixtureInput): CreateFlow201 {
         name: PASSWORD_FIELD,
         type: "password",
         text_key: "password.field.password",
+        autocomplete: "current-password",
         required: true,
       },
     ],
+    identifier: collectedIdentifier(input),
     actions: [
       { name: "submit", kind: "submit", text_key: "password.action.signin", primary: true },
       { name: "back", kind: "back", text_key: "action.back" },
@@ -387,6 +405,67 @@ export function ssoRedirectStep(input: StepFixtureInput & { redirectUrl?: string
     actions: [],
     gates: {},
     redirect_url: input.redirectUrl ?? "https://idp.mock.invalid/authorize",
+  });
+}
+
+/**
+ * A new external identity, collecting what the provider did not supply.
+ *
+ * The provider returns an email, so the field this asks for is the name the
+ * schema wants and Google's claim does not always carry. Its submit is the
+ * flow's `create_user_with_sso`; `sign_in` goes back rather than registering.
+ */
+export function registerSsoStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "register-sso",
+    texts: { title_key: "register-sso.title", description_key: "register-sso.description" },
+    fields: [
+      { name: "given_name", type: "text", text_key: "register.field.givenName", required: true },
+      { name: "family_name", type: "text", text_key: "register.field.familyName", required: true },
+    ],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "register-sso.action.submit", primary: true },
+      { name: "sign_in", kind: "navigate", text_key: "register.action.sign_in.link" },
+    ],
+    gates: {},
+  });
+}
+
+/**
+ * The provider's email already has an account here.
+ *
+ * It offers the methods that prove the user owns that account rather than
+ * minting a second one for the same email. The password field and the passkey
+ * action are both present in the mock: the real step offers only what the
+ * schema enables, which is the tenant's schema to decide and not something the
+ * fixture can know.
+ *
+ * The mock does not model the step's error and back behaviour: the real step
+ * re-renders with `error.invalid_credentials` for a wrong password and
+ * `error.sign_in_first` when no account is bound, and the engine injects a
+ * `back` action when the step has a predecessor. The mock's machine signs in
+ * on every password submit, and a `back` submit falls through to `done` too.
+ */
+export function ssoConflictStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "sso-conflict",
+    texts: { title_key: "sso-conflict.title", description_key: "sso-conflict.description" },
+    fields: [
+      {
+        name: PASSWORD_FIELD,
+        type: "password",
+        text_key: "sso-conflict.field.password",
+        autocomplete: "current-password",
+        required: true,
+        validation: { min_length: 8 },
+      },
+    ],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "sso-conflict.action.submit", primary: true },
+      { name: "passkey", kind: "passkey", text_key: "sso-conflict.action.passkey" },
+      { name: "sign_in", kind: "navigate", text_key: "sso-conflict.action.sign_in" },
+    ],
+    gates: {},
   });
 }
 

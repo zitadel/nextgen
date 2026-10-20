@@ -42,6 +42,9 @@ export type ZitadelSecret = {
   project_id: string;
   project_secret: string;
   preview_secret: string;
+  /** Exact primary origin patterns that admit requests. */
+  primary_origins: string[];
+  /** Preview origin patterns that bound which preview URLs may register. */
   preview_origins: string[];
   created_at: string;
   /**
@@ -93,6 +96,15 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
       typeof secret.preview_secret !== "string" ||
       !Array.isArray(secret.preview_origins)
     ) {
+      throw new Error(".zitadel/secret is missing required fields");
+    }
+    // primary_origins was added with kinded origins; older secrets only have
+    // preview_origins. Treat a missing array as empty so doctor --fix can
+    // still rebuild from the rest of the file.
+    if (secret.primary_origins === undefined) {
+      secret.primary_origins = [];
+    }
+    if (!Array.isArray(secret.primary_origins)) {
       throw new Error(".zitadel/secret is missing required fields");
     }
     return secret as ZitadelSecret;
@@ -161,11 +173,8 @@ export function readUseCase(config: Record<string, unknown>): string | undefined
  * Reads the top-level `server` origin from a parsed `zitadel.json`, falling
  * back to {@link DEFAULT_SERVER} when the key is absent.
  *
- * Top-level only, unlike `resolveServer`, which prefers the selected
- * environment's `server` before falling back here. That is the point: an
- * environment override says where one invocation should talk, not where the
- * project lives. No practical difference today, since setup always writes a
- * concrete top-level `server`.
+ * Top-level only: `zitadel.json` holds no other server, and setup always writes
+ * a concrete one.
  *
  * This is the server the project actually lives on, which is not always the one
  * a command is talking to: `doctor` pins its own source to the local runtime URL

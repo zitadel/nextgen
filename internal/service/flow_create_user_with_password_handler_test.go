@@ -52,8 +52,8 @@ func newPasswordHandlerFixture(t *testing.T) *passwordHandlerFixture {
 	svcPool := service.NewPool(v2Pool)
 	stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&database.ListResult[*domain.JSONSchema]{}, nil).AnyTimes()
-	userService := service.NewUserService(svcPool, schemaStore, hasher, service.StatementsUserRefResolver{Pool: svcPool})
-	handler := service.NewFlowCreateUserHandler(hasher, userService, schemaStore, v2Pool)
+	userService := service.NewUserService(svcPool, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}, service.StatementsUserRefResolver{Pool: svcPool})
+	handler := service.NewFlowCreateUserHandler(service.FixedProjectHasherResolver{Hasher: hasher}, userService, schemaStore, v2Pool)
 
 	return &passwordHandlerFixture{
 		handler:     handler,
@@ -139,6 +139,47 @@ func TestFlowCreateUserWithPassword_PreMintsSharedUserID(t *testing.T) {
 	assert.Equal(t, "user_premint01", userFactor.UserID)
 	_, ok = recordedFactors[1].(*domain.AuthFactorPassword)
 	require.True(t, ok, "second recorded factor must be the password factor")
+}
+
+func TestFlowCreateUserWithPassword_TakenValueShowsStepError(t *testing.T) {
+	f := newPasswordHandlerFixture(t)
+
+	f.stmts.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_premint01", nil)
+	f.schemaStore.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
+		Return(&domain.JSONSchema{
+			ProjectID: "proj_1",
+			URL:       "https://example.test/schema.json",
+			Schema:    []byte(passwordHandlerTestSchema),
+		}, nil)
+	f.hasher.EXPECT().Hash("s3cret").Return("hash-s3cret", nil)
+	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).
+		Return(database.NewUniqueError("users", "users_email_key", nil))
+	f.v2Pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, v2TestTx{stmts: f.stmts})
+		})
+
+	out, err := f.handler.Handle(t.Context(), domain.FlowOnSuccessInput{
+		ProjectID:     "proj_1",
+		UserSchemaURL: "https://example.test/schema.json",
+		State: &domain.FlowState{
+			ProjectID:     "proj_1",
+			AuthAttemptID: "att-1",
+			FlowProgress: domain.FlowProgress{
+				CollectedData: domain.CollectedFlowData{
+					UserData: map[string]any{"email": "alice@example.com"},
+					AuthMethods: domain.CollectedAuthMethodData{
+						Password: "s3cret",
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, out.StepError)
+	assert.Equal(t, domain.FlowStepErrorUserAlreadyExists, *out.StepError)
+	assert.Empty(t, out.UserID)
 }
 
 func TestFlowCreateUserWithPassword_MissingPasswordIsIntegrityError(t *testing.T) {

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"reflect"
 	"time"
 )
 
@@ -23,9 +24,9 @@ func ErrBrandingPermissionDenied() Error {
 	return newError(PrefixBranding.ErrorCodePrefix("permission_denied"), "branding: requires an operator-grade token bound to the project (project.write or a branding.* scope)", nil, nil)
 }
 
-// Branding layout presets understood by the bundled login template. The wire
-// enum is defined in api/openapi/components/flows/branding.yaml; richer
-// designs are delivered as Liquid templates, not new enum values (ADR 040).
+// Branding layout presets a revision may declare. The wire enum is defined in
+// api/openapi/components/flows/branding.yaml; designs are delivered as Liquid
+// templates, not new enum values (ADR 040).
 const (
 	BrandingLayoutCentered = "centered"
 	BrandingLayoutSplit    = "split"
@@ -117,6 +118,21 @@ type Branding struct {
 	Typography     BrandingTypography
 	Shape          BrandingShape
 	CreatedAt      time.Time
+}
+
+// Equal reports whether b and other carry the same author-facing content.
+// Identity fields (project, revision id, timestamps) are ignored.
+func (b *Branding) Equal(other *Branding) bool {
+	if b == nil || other == nil {
+		return b == other
+	}
+	return b.Layout == other.Layout &&
+		b.LiquidTemplate == other.LiquidTemplate &&
+		b.LogoURL == other.LogoURL &&
+		b.HeroURL == other.HeroURL &&
+		reflect.DeepEqual(b.Theme, other.Theme) &&
+		reflect.DeepEqual(b.Typography, other.Typography) &&
+		reflect.DeepEqual(b.Shape, other.Shape)
 }
 
 // BrandingTheme names the sides a revision publishes. An absent side is never

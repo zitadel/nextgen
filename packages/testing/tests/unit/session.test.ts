@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { connectZitadel } from "../../src/index";
+import { connectZitadel, SESSION_COOKIE_NAME, sessionCookieName } from "../../src/index";
 import type { InstanceHandle } from "../../src/types";
 
 const BASE = "http://zitadel-testing.invalid";
@@ -184,16 +184,30 @@ describe("seedSession", () => {
       ),
     );
     const zitadel = connectZitadel({ ...handle, appOrigin: undefined });
-    await expect(zitadel.seedSession()).rejects.toThrow(
-      /No Origin header was sent.*appOrigins/s,
-    );
+    await expect(zitadel.seedSession()).rejects.toThrow(/No Origin header was sent.*appOrigins/s);
   });
 
   it("caps the number of flow steps instead of looping", async () => {
-    server.use(
-      http.post(`${BASE}/flow/:id/submit`, () => HttpResponse.json(identifierStep)),
-    );
+    server.use(http.post(`${BASE}/flow/:id/submit`, () => HttpResponse.json(identifierStep)));
     const zitadel = connectZitadel(handle);
     await expect(zitadel.seedSession()).rejects.toThrow(/did not complete within 6 steps/);
+  });
+});
+
+describe("session cookie names", () => {
+  // A direct call to the server uses the server's name, and so does an SPA
+  // whose dev proxy knows no project.
+  it("names the server's session cookie", () => {
+    expect(SESSION_COOKIE_NAME).toBe("__nextgen_session");
+  });
+
+  // A server SDK keeps the session under its project's name (ADR 073), as
+  // `sessionCookieName` in @zitadel/sdk-core spells it.
+  it.each([
+    ["proj_01K7ZD3E", "__nextgen_session_proj_01K7ZD3E"],
+    ["proj_3f2b6c1e-8a4d", "__nextgen_session_proj_3f2b6c1e-8a4d"],
+    ["a b;c=ü", "__nextgen_session_a%20b%3Bc%3D%C3%BC"],
+  ])("names a server-SDK app's session cookie after its project %s", (projectId, name) => {
+    expect(sessionCookieName(projectId)).toBe(name);
   });
 });

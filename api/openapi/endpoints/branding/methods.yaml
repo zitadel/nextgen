@@ -45,6 +45,7 @@ post:
 
 get:
   operationId: listBranding
+  x-zitadel-cli: branding list
   summary: List branding revisions
   description: |
     Lists branding revisions for the project, newest first, capped at the
@@ -59,6 +60,7 @@ get:
   security:
     - oauth2:
         - branding.read
+    - nextgenSession: []
   responses:
     '200':
       description: Branding revisions were retrieved successfully.

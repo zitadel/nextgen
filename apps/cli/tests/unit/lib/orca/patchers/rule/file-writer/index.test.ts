@@ -240,6 +240,28 @@ describe("scaffold - merge-env", () => {
     expect(text).toContain("BAZ=3");
   });
 
+  it("writes the comment above the entries once, and not again on a later merge", async () => {
+    const op = {
+      kind: "merge-env" as const,
+      path: ".env.local",
+      comment: ["Any NEXTGEN_* variable here configures the local server.", "Second line."],
+      entries: { FOO: "1" },
+    };
+    await scaffold(plan(op), { cwd: dir, dryRun: false, force: false });
+    expect(await readFile(join(dir, ".env.local"), "utf8")).toBe(
+      "# Any NEXTGEN_* variable here configures the local server.\n# Second line.\nFOO=1\n",
+    );
+
+    await scaffold(plan({ ...op, entries: { BAR: "2" } }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    const text = await readFile(join(dir, ".env.local"), "utf8");
+    expect(text.match(/# Any NEXTGEN_/g)).toHaveLength(1);
+    expect(text).toContain("BAR=2");
+  });
+
   it("skips when every key is already present", async () => {
     await writeFile(join(dir, ".env.local"), "FOO=1\n");
     const result = await scaffold(
@@ -336,6 +358,13 @@ describe("scaffold - append-gitignore", () => {
   });
 });
 
+async function readPackageJson(): Promise<Record<string, Record<string, string>>> {
+  return JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as Record<
+    string,
+    Record<string, string>
+  >;
+}
+
 describe("scaffold - add-dep", () => {
   it("adds a dependency to package.json and records it in depsAdded", async () => {
     await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo" }));
@@ -360,8 +389,88 @@ describe("scaffold - add-dep", () => {
     const parsed = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as {
       devDependencies: Record<string, string>;
     };
-    expect(parsed.devDependencies["typescript"]).toBe("5.0.0");
+    expect(parsed.devDependencies.typescript).toBe("5.0.0");
   });
+
+  // A package in both sections is never intended; Qwik's starter vite.config.ts
+  // throws on start when it sees one.
+  it("moves a devDependencies entry into dependencies instead of duplicating it", async () => {
+    await writeFile(
+      join(dir, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        devDependencies: { "@zitadel/sdk-qwik": "^1.0.0", other: "1.0.0" },
+      }),
+    );
+
+    await scaffold(plan({ kind: "add-dep", name: "@zitadel/sdk-qwik", version: "alpha" }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+
+    const parsed = await readPackageJson();
+    expect({ dependencies: parsed.dependencies, devDependencies: parsed.devDependencies }).toEqual({
+      dependencies: { "@zitadel/sdk-qwik": "alpha" },
+      devDependencies: { other: "1.0.0" },
+    });
+  });
+
+  it("moves an entry already at the requested version out of devDependencies", async () => {
+    await writeFile(
+      join(dir, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { "@zitadel/sdk-qwik": "alpha" },
+        devDependencies: { "@zitadel/sdk-qwik": "alpha" },
+      }),
+    );
+
+    await scaffold(plan({ kind: "add-dep", name: "@zitadel/sdk-qwik", version: "alpha" }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+
+    expect((await readPackageJson()).devDependencies).toEqual({});
+  });
+
+  it("keeps a runtime dependency in dependencies when a dev add arrives", async () => {
+    const original = JSON.stringify({
+      name: "demo",
+      dependencies: { "@zitadel/sdk-qwik": "^1.0.0", other: "1.0.0" },
+    });
+    await writeFile(join(dir, "package.json"), original);
+
+    await scaffold(
+      plan({ kind: "add-dep", name: "@zitadel/sdk-qwik", version: "alpha", dev: true }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+
+    expect(await readFile(join(dir, "package.json"), "utf8")).toBe(original);
+  });
+
+  it.each(["peerDependencies", "optionalDependencies"] as const)(
+    "leaves a %s entry alone when adding the dependency",
+    async (section) => {
+      await writeFile(
+        join(dir, "package.json"),
+        JSON.stringify({ name: "demo", [section]: { "@zitadel/sdk-qwik": "^1.0.0" } }),
+      );
+
+      await scaffold(plan({ kind: "add-dep", name: "@zitadel/sdk-qwik", version: "alpha" }), {
+        cwd: dir,
+        dryRun: false,
+        force: false,
+      });
+
+      const parsed = await readPackageJson();
+      expect({ [section]: parsed[section], dependencies: parsed.dependencies }).toEqual({
+        [section]: { "@zitadel/sdk-qwik": "^1.0.0" },
+        dependencies: { "@zitadel/sdk-qwik": "alpha" },
+      });
+    },
+  );
 
   it("skips when the dependency is already at the requested version", async () => {
     await writeFile(

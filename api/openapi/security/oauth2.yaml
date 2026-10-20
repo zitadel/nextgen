@@ -23,18 +23,23 @@ flows:
       project.write: Permission to create and manage projects
       branding.read: Permission to read branding revisions
       branding.write: Permission to publish branding revisions
+      idp.read: Permission to read identity provider connections
+      idp.write: Permission to create and revise identity provider connections
       release.read: Permission to read project configuration releases
-      release.write: Permission to create project configuration releases
-      environment.read: Permission to read project environments
+      release.write: Permission to create and revoke project configuration releases
+      deployment.read: Permission to read deployments
+      deployment.write: Permission to create deployments (deploy, roll back)
       events.read: Permission to list and get project audit events
+      variable.read: Permission to read project variables (a secret's value is never returned)
+      variable.write: Permission to create and manage project variables and secrets
       domain.read: Permission to read project domains (reserved; endpoints not yet available)
       domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)
       domain.delete: Permission to delete project domains (reserved; endpoints not yet available)
       feature.read: Permission to read project feature configuration (reserved; endpoints not yet available)
       feature.write: Permission to change project feature configuration (reserved; endpoints not yet available)
-      allowed_origin.read: Permission to read allowed origins (reserved; endpoints not yet available)
-      allowed_origin.write: Permission to create and manage allowed origins (reserved; endpoints not yet available)
-      allowed_origin.delete: Permission to delete allowed origins (reserved; endpoints not yet available)
+      origin.read: Permission to read project origins
+      origin.write: Permission to add project origins
+      origin.delete: Permission to remove project origins
       signing_key.create: Permission to create signing keys (reserved; endpoints not yet available)
       signing_key.read: Permission to read signing keys (reserved; endpoints not yet available)
       signing_key.delete: Permission to delete signing keys (reserved; endpoints not yet available)
@@ -66,18 +71,23 @@ flows:
       project.write: Permission to create and manage projects
       branding.read: Permission to read branding revisions
       branding.write: Permission to publish branding revisions
+      idp.read: Permission to read identity provider connections
+      idp.write: Permission to create and revise identity provider connections
       release.read: Permission to read project configuration releases
-      release.write: Permission to create project configuration releases
-      environment.read: Permission to read project environments
+      release.write: Permission to create and revoke project configuration releases
+      deployment.read: Permission to read deployments
+      deployment.write: Permission to create deployments (deploy, roll back)
       events.read: Permission to list and get project audit events
+      variable.read: Permission to read project variables (a secret's value is never returned)
+      variable.write: Permission to create and manage project variables and secrets
       domain.read: Permission to read project domains (reserved; endpoints not yet available)
       domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)
       domain.delete: Permission to delete project domains (reserved; endpoints not yet available)
       feature.read: Permission to read project feature configuration (reserved; endpoints not yet available)
       feature.write: Permission to change project feature configuration (reserved; endpoints not yet available)
-      allowed_origin.read: Permission to read allowed origins (reserved; endpoints not yet available)
-      allowed_origin.write: Permission to create and manage allowed origins (reserved; endpoints not yet available)
-      allowed_origin.delete: Permission to delete allowed origins (reserved; endpoints not yet available)
+      origin.read: Permission to read project origins
+      origin.write: Permission to add project origins
+      origin.delete: Permission to remove project origins
       signing_key.create: Permission to create signing keys (reserved; endpoints not yet available)
       signing_key.read: Permission to read signing keys (reserved; endpoints not yet available)
       signing_key.delete: Permission to delete signing keys (reserved; endpoints not yet available)

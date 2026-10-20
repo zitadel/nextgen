@@ -1,13 +1,13 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "files": [],
-  "include": [],
-  "references": [
-    {
-      "path": "./tsconfig.lib.json"
-    },
-    {
-      "path": "./tsconfig.spec.json"
-    }
+  "extends": "./tsconfig.spec.json",
+  "include": [
+    "*.config.mts",
+    "*.config.ts",
+    "scripts/**/*.ts",
+    "src/**/*.json",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
   ]
 }

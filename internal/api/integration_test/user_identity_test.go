@@ -31,6 +31,7 @@ func TestUserResponses_CarryDerivedIdentity(t *testing.T) {
 		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
 		"$id": "https://identity-envelope.example.com/schemas/human-user.json",
 		"kind": "user-schema",
+		"objectType": "identity-envelope-user",
 		"type": "object",
 		"x-identifier": "email",
 		"x-display": ["givenName", "familyName"],
@@ -70,7 +71,7 @@ func TestUserResponses_CarryDerivedIdentity(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	t.Run("query rows carry each schema's own resolution", func(t *testing.T) {
-		res, err := client.QueryUsers(t.Context(), &api.QueryUsersRequest{})
+		res, err := client.QueryUsers(t.Context(), &api.QueryUsersRequest{}, api.QueryUsersParams{})
 		require.NoError(t, err)
 		page, ok := res.(*api.QueryUsersResponse)
 		require.True(t, ok, helpers.MustMarshal(t, res))

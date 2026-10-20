@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -12,7 +13,7 @@ import (
 	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
 )
 
-func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaURL string) ([]*domain.FlowDefinition, error) {
+func DefaultLoginFlowDefinitions(serverURL string, projectID string) ([]*domain.FlowDefinition, error) {
 	bss := [][]byte{configdefaults.DefaultLoginFlowDefinition()}
 
 	defs := make([]*domain.FlowDefinition, len(bss))
@@ -20,7 +21,6 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaU
 	for i, bs := range bss {
 		jscontent := string(bs)
 		jscontent = strings.ReplaceAll(jscontent, "${SERVER_URL}", serverURL)
-		jscontent = strings.ReplaceAll(jscontent, "${USER_SCHEMA_URL}", userSchemaURL)
 		jscontent = fmt.Sprintf(
 			`{"project_id":%q,"schema_uri":%q,"flow_definition":%s}`,
 			projectID,
@@ -120,7 +120,7 @@ func convertSteps(steps []api.FlowDefinitionStep) ([]domain.FlowDefinitionStep, 
 			Fields:       domain.FieldsFromStrings(step.GetFields()),
 			Actions:      actions,
 			Gates:        gates,
-			SSOProviders: convertStepSSOProviders(step.GetSSOProviders()),
+			SSOProviders: slices.Clone(step.GetSSOProviders()),
 			OnSuccess:    onSuccess,
 			Complete:     complete,
 			Transitions:  transitions,
@@ -206,18 +206,6 @@ func convertOnSuccess(success api.OptFlowDefinitionStepOnSuccess) (*domain.FlowO
 		return nil, err
 	}
 	return &ret, nil
-}
-
-func convertStepSSOProviders(providers []api.SSOProvider) []domain.FlowSSOProvider {
-	ret := make([]domain.FlowSSOProvider, len(providers))
-	for i, ssoProvider := range providers {
-		ret[i] = domain.FlowSSOProvider{
-			ID:       ssoProvider.GetID(),
-			Name:     ssoProvider.GetName(),
-			Template: ssoProvider.GetTemplate(),
-		}
-	}
-	return ret
 }
 
 func convertStepGates(gates api.OptFlowDefinitionStepGates) (map[string]domain.FlowStepGate, error) {

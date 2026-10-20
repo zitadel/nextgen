@@ -1,5 +1,219 @@
 # @zitadel/config
 
+## 1.0.0-alpha.27
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@1.0.0-alpha.27
+
+## 1.0.0-alpha.26
+
+### Minor Changes
+
+- [#1698](https://github.com/zitadel/nextgen/pull/1698) [`c98df9c`](https://github.com/zitadel/nextgen/commit/c98df9c779cac941333ad7a6b361fcbde04cca7e) Thanks [@mridang](https://github.com/mridang)! - Add a custom OpenID Connect provider to the CLI. `zitadel sso enable --provider custom` takes a connection name (`--slug`), a sign-in button name (`--display-name`), an `--issuer` and optional `--scopes` (`openid` required, defaulting to `openid profile email`), and writes `.zitadel/idps/<slug>.json`, enables it on the user schema and adds it to every login flow, as it does for Google. The connection is identified by its slug rather than its issuer, so a Project can hold several connections to one issuer; a name already used for a connection to a different issuer is refused. `zitadel setup` offers the same as "another OpenID Connect provider", with `--sso custom` and `--sso-slug`, `--sso-display-name`, `--sso-issuer` and `--sso-scopes` for scripted runs. The connection maps the standard OpenID Connect claims the schema defines and trusts `email` only when the provider reports `email_verified`; other mappings are made by editing the file. Adding a second provider after `apply` no longer reports the conflict and registration steps as hand-edited because the platform filled in their empty `gates` and `sso_providers`. `@zitadel/config/idp` no longer exports `ISSUER_REQUIREMENT` or `isSupportedIssuer`; use `parseIssuer`, which returns the issuer or why it is refused. `idpProvider` and `IDP_PROVIDERS` now cover only the catalog's own providers, `IdpProvider.template` is `string | undefined` because a custom connection names no template, and `selectionSlug` is gone in favour of `providerOf(selection).slug`.
+
+- [#1703](https://github.com/zitadel/nextgen/pull/1703) [`3f55e42`](https://github.com/zitadel/nextgen/commit/3f55e42ec5a86f2a335b39639414faa2864e292c) Thanks [@mridang](https://github.com/mridang)! - `zitadel plan` and `zitadel apply` now check the SSO configuration across files before anything is sent, and stop with one error that names the file, the steps and the name at fault, and what to change. It reports what the plan touches and the files those reference, so an older mistake in an unrelated file does not stop an edit. It catches a step that offers a provider its user schema does not list, or when SSO is off; a schema that lists a provider with no connection file; a step that offers providers but does not route every outcome (a `user_already_exists` route that carries an action does not count); a claim mapping that fills nothing the schema defines; a mapping or `verified_claims` key that names a property no schema has (a top-level name, not a dotted path); and a `verified_claims` key with no `claim_mapping` row. Two connection files with the same slug or the same project variable stop `plan` and `apply` too, as part of that check. A connection that cannot create users needs only `sso_authenticated` routed and no claim mapping. `@zitadel/config/validate` is now one validation library: `validateFlowDefinition` for a single flow and its schema, and the new `validateProject` for the whole working tree, with every rule named once in a typed registry. `FlowValidationRuleId` is now `FlowRuleId`; the old name stays as a deprecated alias.
+
+  Connection files are held to the platform too, and these checks are not turned off by `ZITADEL_SKIP_FLOW_VALIDATION`, which switches off flow validation and the cross-file check above. A `client_id` or `client_secret` that names a project variable must find it: a missing one fails with `E_CREDENTIAL_MISSING`, a client secret that is not a secret variable, a client id that is a secret one, or one variable for both is refused. Editing the `slug`, `protocol`, `oidc.issuer`, the OAuth2 endpoints or `subject_claim` of a connection that was already applied (an absent OIDC `subject_claim` reads as `sub`) is refused with the field and file named. `plan` stops when the project's variables or an edited connection's stored copy cannot be read, instead of skipping the checks.
+
+  A removed connection file is reported apart from the changes, because the platform cannot delete it yet: `plan --json` and `apply --json` carry `unsupported_deletions` (a count, with the files in `unsupported_deletion_files` on `apply`), the headline no longer says "no changes", and `apply` no longer says everything is in sync. A renamed connection file is planned and reported as a move (`move` in `changes`, with `moved_from`), shown as a diff against the stored connection.
+
+- [#1683](https://github.com/zitadel/nextgen/pull/1683) [`28f70b1`](https://github.com/zitadel/nextgen/commit/28f70b141709d1fb398a50b91c63ffa7e35e3553) Thanks [@vitorbari](https://github.com/vitorbari)! - A flow definition names its user schema by `objectType` and runs against the project's newest revision of it. `POST /flow_definitions` still accepts a schema id and stores the `objectType` it names, so reading a definition back returns the `objectType`.
+
+  The default login flows name `human-user`, and `getDefaultLoginFlow` no longer takes `userSchemaUrl`. `zitadel sso enable` finds a flow that names its schema by `objectType`, and the console links a flow to the revision it runs against.
+
+- [#1809](https://github.com/zitadel/nextgen/pull/1809) [`4a4132f`](https://github.com/zitadel/nextgen/commit/4a4132fd2dc13f3a833a7aa0ab1dd35ef9b8fd6b) Thanks [@wim07101993](https://github.com/wim07101993)! - Identity provider connections are OIDC only. The `oauth2` protocol is removed
+  from the connection schema and the API, together with the `supplementary_fetch`
+  strategy and the `"$supplementary_fetch"` value in `verified_claims`. The
+  engine never served either, so such a connection showed a sign-in button that
+  could not work.
+
+  Breaking for stored data: the server's next start deletes every `oauth2`
+  connection stored by an earlier release, with its revisions and identity links.
+
+  `POST /idps` now refuses, at create and at revise, an OIDC connection the engine
+  could not start a sign-in with: an `oidc` block that sets an endpoint without
+  the others fails with `400 idp.endpoints_partial`, and the error details list
+  the missing endpoints. Set no endpoint and let discovery fill them, or set
+  `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `userinfo_endpoint`
+  (`userinfo_endpoint` may be left out when `id_token_mapping` is on). Nothing is
+  stored, and a revise leaves the current revision unchanged. `zitadel plan`
+  reports the same problem before anything is applied, and `zitadel apply` names
+  the missing endpoints when the server refuses one.
+
+- [#1734](https://github.com/zitadel/nextgen/pull/1734) [`70dae57`](https://github.com/zitadel/nextgen/commit/70dae57fd8b4256a6be18f69deb633676f25b923) Thanks [@vitorbari](https://github.com/vitorbari)! - A user schema must declare `objectType`. `POST /schemas` refuses one without it, and the shipped user-schema meta-schema requires it.
+
+### Patch Changes
+
+- [#1756](https://github.com/zitadel/nextgen/pull/1756) [`c3e8fa4`](https://github.com/zitadel/nextgen/commit/c3e8fa47306d9f286d07303fea977e3f6d910d7d) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel plan` now rejects an `http` `typography.font_url` with the message `zitadel apply` gets from the server: `typography.font_url must be an absolute https URL`. It no longer adds that http is allowed for loopback development hosts, which holds for logo and hero URLs but never for a font stylesheet.
+
+- [#1730](https://github.com/zitadel/nextgen/pull/1730) [`717ae39`](https://github.com/zitadel/nextgen/commit/717ae39f47a1f27383e0f4e09d2d32125d5d8f57) Thanks [@fforootd](https://github.com/fforootd)! - The branding README that `zitadel branding eject` writes into `.zitadel/branding/` no longer says that every sign-in page `zitadel setup` generates loads `typography.font_url`. Setup generates page-variant sign-in pages, which load it, only when it creates a Next.js or Nuxt app itself; everywhere else the login runs as a widget, and your page loads the font.
+
+- [#1756](https://github.com/zitadel/nextgen/pull/1756) [`c3e8fa4`](https://github.com/zitadel/nextgen/commit/c3e8fa47306d9f286d07303fea977e3f6d910d7d) Thanks [@fforootd](https://github.com/fforootd)! - The flows README that `zitadel setup` writes into `.zitadel/flows/` now calls each file a flow definition, and the one `<zitadel-login>` runs without `flowName` the project default, as the `zitadel flow-definitions` commands and the `@zitadel/components` README do. Its advice for keeping the current project default reads the same as the `zitadel plan` warning.
+
+- [#1730](https://github.com/zitadel/nextgen/pull/1730) [`717ae39`](https://github.com/zitadel/nextgen/commit/717ae39f47a1f27383e0f4e09d2d32125d5d8f57) Thanks [@fforootd](https://github.com/fforootd)! - The flows README that `zitadel setup` writes into `.zitadel/flows/` no longer suggests selecting a flow in the login widget by its `audience`. `<zitadel-login>` sends no app or team hint, so it runs the flow named by `flowName`, or else the newest active revision without an `audience` that serves the requested purpose; an `audience` only keeps a flow out of that default, and a scoped flow is still served when no unscoped flow serves the purpose. If you scoped a flow so the widget would pick it, pass its `name` as `flowName` instead. The README also says that older revisions stay active, so an `audience` added after a flow was applied without one doesn't take that earlier revision out of the default.
+
+- [#2052](https://github.com/zitadel/nextgen/pull/2052) [`e49233f`](https://github.com/zitadel/nextgen/commit/e49233fd536fd1504242ff458a19af55d4d2a09e) Thanks [@IAM-marco](https://github.com/IAM-marco)! - A login flow submission now must name an action the current step declares. Any other name, including an empty one and the outcome names `user_not_found`, `user_already_exists`, `sso_user_not_found` and `sso_authenticated`, is refused with 400 `flow.invalid_action` before the identifier is checked. Before, a client could send an outcome name as the action and take the route the step keeps for that outcome, for example reaching the end of the flow without proving a sign-in factor. Flow definitions, and the `@zitadel/config` validator, now reject a step action named after one of these outcomes; rename such an action before you apply the definition.
+
+- Updated dependencies [[`17f56de`](https://github.com/zitadel/nextgen/commit/17f56de60ea40128898b6142d93a22c6fc6f2acd), [`c3e8fa4`](https://github.com/zitadel/nextgen/commit/c3e8fa47306d9f286d07303fea977e3f6d910d7d), [`b4886f9`](https://github.com/zitadel/nextgen/commit/b4886f98de362ef6e80cb5e49a38e97daa2288b0), [`4a4132f`](https://github.com/zitadel/nextgen/commit/4a4132fd2dc13f3a833a7aa0ab1dd35ef9b8fd6b), [`44abdb8`](https://github.com/zitadel/nextgen/commit/44abdb8e827ce34d7aae8d620d43904b3142baf9), [`36fbcb4`](https://github.com/zitadel/nextgen/commit/36fbcb4e5383a0d6764efc44e9ac6da4e5c8d596), [`c205f49`](https://github.com/zitadel/nextgen/commit/c205f49fa0c6c0ea44407da6776cdb6e5dcfdfc9), [`8182584`](https://github.com/zitadel/nextgen/commit/8182584001fe2115851022e8f92e696db52ee8be)]:
+  - @zitadel/api@1.0.0-alpha.26
+
+## 1.0.0-alpha.25
+
+### Minor Changes
+
+- [#1281](https://github.com/zitadel/nextgen/pull/1281) [`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d) Thanks [@mridang](https://github.com/mridang)! - Add social sign-in to the CLI. `zitadel sso enable --provider google` configures an identity provider on an existing Project: it says what to register with the vendor and at which redirect URI, takes the client id and secret, writes `.zitadel/idps/<slug>.json`, enables `sso` on the user schema, and adds the provider button plus the steps and routes a provider round trip needs to every login flow that runs against that schema. The client secret is never a flag — it is prompted for, or piped in on stdin for a scripted run — and never written to disk: only its `${{ NAME }}` reference reaches the connection file, and the value is published to the Project as an encrypted variable, which is where the engine resolves it from. `zitadel setup` asks the same question during onboarding, so a Project can start with Google rather than adding it afterwards, with `--sso` and `--sso-client-id` for scripted runs. Everything so far is local: publishing the connection needs identity provider support on the server, which is not in this release, so `apply` cannot upload a connection file yet and deleting one is not supported either. Enable the provider once that support ships.
+
+- [#1287](https://github.com/zitadel/nextgen/pull/1287) [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b) Thanks [@mridang](https://github.com/mridang)! - Render the identity providers a login step offers. A new `<zl-sso-providers>` atom draws one button per entry in the step's `sso_providers`, choosing one submits the reserved `sso` action with that connection's id, and the orchestrator follows the `redirect_url` the engine answers with — a new `zitadel-flow-redirect` event, kept separate from `zitadel-flow-complete` because nobody is signed in yet and the flow resumes when the provider returns. Every SDK forwards it, as `onFlowRedirect` in React, Solid and Svelte, `flowRedirect` in Vue and Angular, and `onFlowRedirect$` in Qwik. The atom is driven entirely by the step's data: a mark is looked up by the connection's `template` (Google ships one), and a template without one still gets a working button rather than a wrong logo, which is what a tenant's own OIDC connection will always look like. Copy for the provider buttons and for the `register-sso` and `sso-conflict` steps is added to every builtin locale, and `applySsoProviders()` in the mock API package lets a test or playground offer providers the way a project that ran `zitadel sso enable` does. The shipped `centered` and `minimal` designs carry the provider block; the retired split and hero designs ([#1039](https://github.com/zitadel/nextgen/issues/1039)) do not, so a tenant still on a revision published from one of those sees no provider buttons until it moves to `centered` or `minimal`.
+
+- [#1281](https://github.com/zitadel/nextgen/pull/1281) [`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d) Thanks [@mridang](https://github.com/mridang)! - A flow step's `on_success` accepts `create_user_with_sso` alongside `create_user`, so a login flow that registers a user from an external identity can be authored, validated and stored. The engine handler is not wired yet: a step that reaches it fails with a flow integrity error naming the mutation rather than creating anything, and no flow can reach it while SSO submissions are refused.
+
+- [#1365](https://github.com/zitadel/nextgen/pull/1365) [`6aca9bb`](https://github.com/zitadel/nextgen/commit/6aca9bb9afcb6e2b33f9e5e5cf5af6c1319d4fe1) Thanks [@grvijayan](https://github.com/grvijayan)! - A flow step offers at most 20 `sso_providers`. The flow definition API and
+  the editor schema both reject a longer list. The render reads the step's
+  whole slug set in one lookup instead of one per slug; the rendered step is
+  unchanged.
+
+  **Breaking:** creating a flow definition whose step lists more than 20
+  provider slugs now fails with a 400. No shipped flow comes near the bound.
+
+- [#1392](https://github.com/zitadel/nextgen/pull/1392) [`77369ca`](https://github.com/zitadel/nextgen/commit/77369ca215600478d8f56740406ce9f52cf09d00) Thanks [@vitorbari](https://github.com/vitorbari)! - Password managers and browser autofill now work across the sign-in and
+  registration screens, including the two-step layouts where the password is
+  asked for on its own.
+  - The login reads the `autocomplete` token the server sends for each field
+    instead of guessing from the field or step name, so a renamed identifier
+    property or a renamed step gets the right token.
+  - A step that asks for the password alone now carries the identifier collected
+    earlier, hidden in the same form, so a manager saves the two as one
+    credential and offers to fill them together next time.
+
+  Ejected templates pick this up by replacing their `autocomplete` guesswork with
+  the field's own `autocomplete` value; the hidden identifier needs no template
+  change.
+
+- [#1371](https://github.com/zitadel/nextgen/pull/1371) [`0269f56`](https://github.com/zitadel/nextgen/commit/0269f56e8299584b20e5815cf9b8d3c84ae65010) Thanks [@IAM-marco](https://github.com/IAM-marco)! - The flow definition schema and plan-time validation use the renamed SSO outcomes: `sso_authenticated` (was `callback`, required on a step that offers `sso_providers`) and `sso_user_not_found` (was `identity_unknown`). Rename these transition keys in your flow definitions. `user_already_exists` keeps its name: the SSO collision shares it with the typed one. Plan-time validation now refuses `purpose` or `action` on the `sso_authenticated` and `sso_user_not_found` transitions.
+
+### Patch Changes
+
+- [#1402](https://github.com/zitadel/nextgen/pull/1402) [`c363d18`](https://github.com/zitadel/nextgen/commit/c363d1809bf2b8032178ea04e031d50cc365f71b) Thanks [@grvijayan](https://github.com/grvijayan)! - Flow definition validation now refuses an action named `sso`, on the server
+  and in `@zitadel/config`. The engine treats a submission with that action as
+  an external sign-in, so a navigate action of that name validated and then
+  failed every submission with `flow.invalid_action`. An sso submission on an
+  attempt that is already handed off answers `409` with
+  `att.already_handed_off` instead of `500`.
+
+- [#1403](https://github.com/zitadel/nextgen/pull/1403) [`b44b907`](https://github.com/zitadel/nextgen/commit/b44b907bd50fd244440999b8386a79d132b58f1c) Thanks [@grvijayan](https://github.com/grvijayan)! - The ejected `centered` branding design matches the bundled default template
+  again: the card carries `zl-card--terminal` on a terminal step, so the success
+  screen's heading is centred like in the login the components package ships.
+- Updated dependencies [[`3937a77`](https://github.com/zitadel/nextgen/commit/3937a7724380c0e59ff039e946053945a8e6475d), [`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d), [`6aca9bb`](https://github.com/zitadel/nextgen/commit/6aca9bb9afcb6e2b33f9e5e5cf5af6c1319d4fe1), [`6821cc6`](https://github.com/zitadel/nextgen/commit/6821cc62356ef75cce936907d203470f35cd1a9a), [`7897a77`](https://github.com/zitadel/nextgen/commit/7897a77cd7963591827bf1427574f0bb0b2df827), [`faccf02`](https://github.com/zitadel/nextgen/commit/faccf02136ff713718e103b18d4128e5a665d02e), [`790ce8e`](https://github.com/zitadel/nextgen/commit/790ce8eb90ba043574f5822216e88de89b5767c9), [`b208b0c`](https://github.com/zitadel/nextgen/commit/b208b0c7635b7c146c0fa7294ead08c92eba6cd2), [`0269f56`](https://github.com/zitadel/nextgen/commit/0269f56e8299584b20e5815cf9b8d3c84ae65010)]:
+  - @zitadel/api@1.0.0-alpha.25
+
+## 1.0.0-alpha.24
+
+### Minor Changes
+
+- [#1297](https://github.com/zitadel/nextgen/pull/1297) [`7165d73`](https://github.com/zitadel/nextgen/commit/7165d73f8d13f8f4aac94858ee5e918b5700c773) Thanks [@peintnermax](https://github.com/peintnermax)! - Setup no longer applies a login template, and the template catalog keeps
+  only widget structure.
+  - `zitadel setup` drops the "How should the login look?" question and the
+    `--design` flag; passing `--design` now fails with `E_VALIDATION` and a
+    hint pointing at app-side theming and `branding eject`. It embeds the
+    maintained login component (a starting page for a new app, a drop-in for an
+    existing one), writes nothing under `.zitadel/branding/`, and publishes no
+    branding revision. The JSON envelope
+    drops `data.design`, the summary drops the "Login design" row, and the next
+    actions point at theming the component from your app, with
+    `branding eject` as the opt-in for owning its template.
+  - `zitadel branding eject --design` now offers `centered` (the default card)
+    and `minimal` (the same form without card chrome). `split`, `split-right`
+    and `hero` are removed: they were page layout around the same card, which
+    belongs in your application, and asking for one fails with `E_VALIDATION`
+    and a hint saying so. `BRANDING_DESIGNS` in `@zitadel/config`
+    shrinks accordingly.
+  - Revisions already published from `split`, `split-right` or `hero` keep
+    rendering; the login still ships their chrome. The API reference for
+    `Branding.layout` no longer lists the retired designs.
+
+### Patch Changes
+
+- [#1332](https://github.com/zitadel/nextgen/pull/1332) [`6524178`](https://github.com/zitadel/nextgen/commit/6524178cc74251da3d454451fdef45063fabce86) Thanks [@bastionstack](https://github.com/bastionstack)! - The `README.md` that `zitadel branding eject` writes into `.zitadel/branding/` now describes `branding.json` as it behaves: `layout` is not read by the shipped login template, fonts are set with `typography.font_family` and `typography.font_url`, `zitadel plan` probes `logo_url` and `hero_url`, `{% mandatory_gates %}` restores missing required fields and the primary action, and the "Secured with Zitadel" mark is always shown and can be placed with an anchor in the template. The `layout`, `hero_url`, `typography.font_url` and `theme` descriptions in the API reference and editor schema say the same, as does the `zitadel plan` error for a missing `{% mandatory_gates %}` tag.
+
+- Updated dependencies [[`91b1eb6`](https://github.com/zitadel/nextgen/commit/91b1eb653fc00633cf64e9d93c9edf73e3687933), [`4bea70a`](https://github.com/zitadel/nextgen/commit/4bea70a7244b44e62476e6dd2dc6b8e4a7bd1a45), [`e61c854`](https://github.com/zitadel/nextgen/commit/e61c8545f06ce9ebe25e7f2e0d344cb6f8efb0d0), [`f2e81dd`](https://github.com/zitadel/nextgen/commit/f2e81dd84af7e47c06c084365dea983ee59a305b)]:
+  - @zitadel/api@1.0.0-alpha.24
+
+## 1.0.0-alpha.23
+
+### Minor Changes
+
+- [#1218](https://github.com/zitadel/nextgen/pull/1218) [`40025fe`](https://github.com/zitadel/nextgen/commit/40025feb3d9a7154db7d1348043248dbd42f5d6c) Thanks [@bastionstack](https://github.com/bastionstack)! - Shared contrast rules for branding palettes.
+
+  `@zitadel/config/branding-contrast` names the pairs a login surface puts next to each other, the ratio each has to reach, and measures a palette against them — a shared rule for whatever comes to enforce or display it. Warnings only: a failing pair never blocks saving or publishing. Thresholds are WCAG 2.2 AA, 4.5:1 for text and 3:1 for the outline of a control. `contrastIssues()` returns one entry per failing pair per side, keyed by a stable pair id.
+
+  `@zitadel/config/css-color` resolves the colour forms a palette accepts to sRGB. Every form the contract stores is measurable: named colours, hex with alpha, `rgb`, `hsl`, `hwb`, `lab`, `lch`, `oklab`, `oklch`, `color()`, and `color-mix()` including its percentage and hue-interpolation rules. `currentColor` resolves against the colour the caller says it inherits, which for a palette is the side's own text.
+
+  Translucent values are composited before measuring, since the ratio depends on what a value sits on. A pair whose backdrop is unknowable — a translucent page background, with the host application behind it — is reported as unchecked rather than passed.
+
+- [#1224](https://github.com/zitadel/nextgen/pull/1224) [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9) Thanks [@mridang](https://github.com/mridang)! - A branding descriptor now points at its login template with `"liquid_template": { "$file": "./login.liquid" }` instead of a separate `liquid_template_file` key. The CLI replaces any `$file` reference with the file's content before publishing and writes the published value back into the file afterwards. `branding eject` and `setup --design` scaffold the new form, and a descriptor that still carries `liquid_template_file` fails `zitadel plan` with a hint showing the replacement.
+
+- [#1179](https://github.com/zitadel/nextgen/pull/1179) [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71) Thanks [@vitorbari](https://github.com/vitorbari)! - An embedded widget no longer injects the tenant font stylesheet into the
+  embedding application's document. The widget applies `typography.font_family`
+  and leaves loading the face to the page around it; a Zitadel-served page still
+  injects, because it owns its own document.
+
+  `typography.scale` and `shape.logo_scale` no longer declare a schema `default`,
+  so an omitted key stays omitted through decoding rather than being persisted as
+  an explicit `1`.
+
+  `zitadel plan` now applies the server's URL rules to `typography.font_url` and
+  rejects credentials in any branding URL, so a value that would fail on publish
+  fails locally first.
+
+- [#1179](https://github.com/zitadel/nextgen/pull/1179) [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71) Thanks [@vitorbari](https://github.com/vitorbari)! - Branding revisions carry login appearance.
+
+  `theme` publishes complete `light` and `dark` sides, each with its own logo and
+  semantic palette; neither side inherits from the other, and a side that is not
+  published is never resolved. `typography` names one face for body and headings
+  plus the stylesheet that loads it. `shape` carries a corner radius — a preset
+  name or a pixel value — along with density and a logo scale.
+
+  `font_url` becomes writable and moves onto `typography`, beside the family it
+  loads. It is stored, not injected: an embedded widget applies the family and
+  relies on the embedding page having loaded the face.
+
+  Appearance values are held to an allowlist, because the widget writes them into
+  a CSS declaration. A colour must be hex, a colour name, or a colour function; a
+  font stack must be identifiers or quoted names. `url()` and `var()` are
+  rejected, asset URLs may not carry credentials, and colours, font stacks and
+  URLs all have length caps. The contract states the same shapes as a JSON Schema
+  `pattern`, so generated clients reject them too.
+
+  Revisions published before these fields existed keep working and use the
+  maintained defaults.
+
+- [#1224](https://github.com/zitadel/nextgen/pull/1224) [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9) Thanks [@mridang](https://github.com/mridang)! - The branding and flow definition editor schemas now flag what the server rejects: asset URLs that carry `user:password@`, `typography.font_url` without `typography.font_family`, a terminal step that also collects or acts, a step that does nothing, `sso_providers` without a `callback` transition, and a transition that sets both `purpose` and `action`. The API client's Zod schemas reject credentials in branding asset URLs, and `zitadel plan` measures asset URL length in bytes, as the server does.
+
+- [#1260](https://github.com/zitadel/nextgen/pull/1260) [`6c3f4a3`](https://github.com/zitadel/nextgen/commit/6c3f4a35e6466e9335ebb00b9943902faef8f2f8) Thanks [@mridang](https://github.com/mridang)! - A flow step now names the identity providers it offers by connection slug: `"sso_providers": ["google"]` instead of `[{ "id": "google", "name": "Google", "template": "google" }]`. The connection under `.zitadel/idps/` owns the display name and template, so renaming a provider there reaches every step without editing the flow. The flow definition API, the editor schema and stored revisions all take the slug list together, and revisions stored with the object form still load, each object read as its `id`. The step the login page receives is unchanged and still carries `{id, name, template}` objects.
+
+  **Breaking:** creating a flow definition with `sso_providers` objects now fails with a 400, and a definition read back lists slugs instead of objects. Send the connection slug in place of each object. No shipped flow uses `sso_providers` and the engine does not act on it yet, so nothing that works today stops working.
+
+- [#1156](https://github.com/zitadel/nextgen/pull/1156) [`84d1c4b`](https://github.com/zitadel/nextgen/commit/84d1c4b7dc636dc4439c0ee7a21eee8ecad44f36) Thanks [@grvijayan](https://github.com/grvijayan)! - Social login gets its configuration contracts. `zitadel setup` now copies two more dialect files into `.zitadel/meta/`: `idp-connection.json`, the schema for a provider connection file, and `sso-auth-method.json`, the shape of the `sso` slot in a user schema. A user schema with `sso.enabled: true` must now list the connection slugs its users may sign in with under `sso.providers`, and a disabled slot must not carry the list. In a flow definition, `identity_unknown` is a reserved transition outcome that switches a login flow to register when a provider returns an unknown user.
+
+- [#1224](https://github.com/zitadel/nextgen/pull/1224) [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9) Thanks [@mridang](https://github.com/mridang)! - A property in a user schema may carry a `$schema` keyword with any URI again. The user meta-schema no longer pins it to the JSON Schema 2020-12 draft URL, which the document already declares at its top level.
+
+### Patch Changes
+
+- [#1116](https://github.com/zitadel/nextgen/pull/1116) [`f118796`](https://github.com/zitadel/nextgen/commit/f118796f01af9e90be00f3313f1f9fc5ab407b4b) Thanks [@grvijayan](https://github.com/grvijayan)! - Flow definitions sync as revisions. An edited flow file plans as a `revise` and `apply` publishes a new immutable revision instead of updating in place. A schema revise re-publishes the flows pinned to it with the new `user_schema` in the same run. Removing a flow file no longer deletes the flow on the platform; `apply` fails with `E_NOT_IMPLEMENTED` instead.
+
+- [#1217](https://github.com/zitadel/nextgen/pull/1217) [`205cef5`](https://github.com/zitadel/nextgen/commit/205cef525ee26250b652ee40f0b35622dc05caea) Thanks [@grvijayan](https://github.com/grvijayan)! - The identity provider connection endpoints are now part of the API contract, and the generated clients carry them.
+
+  `POST /idps` creates or revises a connection document. If the slug does not already exist, a new connection is created. If a connection with that slug already exists, a revision is created. `POST /idps/query` pages through a project's connections. `GET /idps/{id}` reads one connection at its newest revision. `GET /idps/{id}/revisions` lists a connection's revisions newest first. `GET /idps/revisions/{revision_id}` reads one revision.
+
+  The request and response bodies mirror the `idp-connection.json` schema, so a connection is typed the same way in a client as it is in a `.zitadel/idps/<slug>.json` file.
+
+  No handler ships yet. Until the handlers ship, calling one of these endpoints returns 500 with the `internal` code.
+
+- Updated dependencies [[`3a10eb6`](https://github.com/zitadel/nextgen/commit/3a10eb61dd7e597ccd5b62d8a39453fb7645673e), [`f8c5a24`](https://github.com/zitadel/nextgen/commit/f8c5a24aa87015e722f2f6ecfb276b839d46f4de), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9), [`583a8ed`](https://github.com/zitadel/nextgen/commit/583a8ed0c6142539539eb6e082de8dbfe11a3246), [`6c3f4a3`](https://github.com/zitadel/nextgen/commit/6c3f4a35e6466e9335ebb00b9943902faef8f2f8), [`205cef5`](https://github.com/zitadel/nextgen/commit/205cef525ee26250b652ee40f0b35622dc05caea), [`85fb5ab`](https://github.com/zitadel/nextgen/commit/85fb5abc1edd8699b86898e57d31c4938a6228a5), [`8fc4472`](https://github.com/zitadel/nextgen/commit/8fc44720d0b93f6d5450bff85cb8ed984712156a), [`b70e520`](https://github.com/zitadel/nextgen/commit/b70e52035b433e7c3293c54be43352bb59e78dc2), [`ce3c67c`](https://github.com/zitadel/nextgen/commit/ce3c67c10b7ef7f20a30335fedb07325b6146cad)]:
+  - @zitadel/api@1.0.0-alpha.23
+
 ## 1.0.0-alpha.22
 
 ### Minor Changes

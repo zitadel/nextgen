@@ -150,6 +150,15 @@ CREATE INDEX idx_flow_definitions_project_status ON flow_definitions (project_id
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+-- Revisions of one flow share its name and are ordered by created_at, so at
+-- most one may carry a given timestamp: a collision has no determinate winner
+-- and must fail loudly instead. The index is also the seek the latest-revision
+-- anti-join in ListFlowDefinitions uses.
+CREATE UNIQUE INDEX idx_flow_definitions_name_revision
+    ON flow_definitions (project_id, name, created_at);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
 CREATE TABLE auth_attempts (
     project_id      TEXT    NOT NULL,
     id              TEXT    NOT NULL,
@@ -272,6 +281,10 @@ CREATE TABLE checks (
     failure_count       INTEGER NOT NULL DEFAULT (0),
     challenge_payload   TEXT,
     factor_payload      TEXT,
+    -- Hash of a secret a caller presents to find this row when it holds no
+    -- other identifier (the SSO callback carries only the state). The row id
+    -- stays dialect-minted (ADR 047).
+    lookup_hash         TEXT,
     PRIMARY KEY (project_id, id),
     CONSTRAINT chk_checks_id CHECK (id <> ''),
     CONSTRAINT fk_checks_auth_attempt
@@ -290,6 +303,11 @@ CREATE UNIQUE INDEX idx_checks_auth_attempt_type
 
 -- +goose StatementBegin
 CREATE INDEX idx_checks_session ON checks (project_id, session_id);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE UNIQUE INDEX idx_checks_lookup_hash
+    ON checks (project_id, lookup_hash) WHERE lookup_hash IS NOT NULL;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -624,6 +642,9 @@ DROP INDEX IF EXISTS idx_auth_attempts_handoff_token;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS auth_attempts;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_flow_definitions_name_revision;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_flow_definitions_project_status;

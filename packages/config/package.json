@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "1.0.0-alpha.22",
+  "version": "1.0.0-alpha.27",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
@@ -33,6 +33,11 @@
       "types": "./dist/defaults.d.mts",
       "import": "./dist/defaults.mjs"
     },
+    "./idp": {
+      "@zitadel/source": "./src/idp/index.ts",
+      "types": "./dist/idp/index.d.mts",
+      "import": "./dist/idp/index.mjs"
+    },
     "./schemas": {
       "@zitadel/source": "./src/schemas.ts",
       "types": "./dist/schemas.d.mts",
@@ -43,13 +48,23 @@
       "types": "./dist/branding-url.d.mts",
       "import": "./dist/branding-url.mjs"
     },
+    "./branding-contrast": {
+      "@zitadel/source": "./src/branding-contrast.ts",
+      "types": "./dist/branding-contrast.d.mts",
+      "import": "./dist/branding-contrast.mjs"
+    },
+    "./css-color": {
+      "@zitadel/source": "./src/css-color.ts",
+      "types": "./dist/css-color.d.mts",
+      "import": "./dist/css-color.mjs"
+    },
     "./normalize": {
       "@zitadel/source": "./src/normalize.ts",
       "types": "./dist/normalize.d.mts",
       "import": "./dist/normalize.mjs"
     },
     "./validate": {
-      "@zitadel/source": "./src/validate.ts",
+      "@zitadel/source": "./src/validation/index.ts",
       "types": "./dist/validate.d.mts",
       "import": "./dist/validate.mjs"
     },
@@ -65,27 +80,38 @@
     },
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
+    "./defaults/branding/*": "./defaults/branding/*",
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "sync-schemas": "node scripts/sync-meta-schemas.mjs",
-    "build": "node scripts/sync-meta-schemas.mjs && tsdown",
-    "typecheck": "node scripts/sync-meta-schemas.mjs && tsc --build tsconfig.json",
-    "test": "node scripts/sync-meta-schemas.mjs && vitest run --passWithNoTests",
-    "lint": "oxlint ."
+    "sync-schemas": "node ../../scripts/task-guard.mjs --mutex generated-sources -- node scripts/sync-meta-schemas.mjs",
+    "prebuild": "node --run sync-schemas",
+    "build": "tsdown",
+    "pretypecheck": "node --run sync-schemas",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
+    "pretest": "node --run sync-schemas",
+    "test": "vitest run",
+    "test:all": "pnpm run test",
+    "lint": "biome check .",
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
+    "culori": "catalog:",
     "liquidjs": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/culori": "catalog:",
+    "@types/node": "catalog:",
     "ajv": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

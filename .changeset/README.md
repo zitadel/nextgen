@@ -32,7 +32,7 @@ Skip a changeset **only** when the change is *exclusively*:
 - tests (`*_test.go`, `*.spec.ts`, …)
 - generated mocks or fixtures
 - repo-only docs or comments (`docs/`, `AGENTS.md` anywhere, READMEs of
-  private/unpublished workspaces). A `README.md` or `SKILLS.md` under a
+  private/unpublished workspaces). A `README.md` or `SKILL.md` under a
   **published package root** ships in the npm tarball and is product — it
   needs a changeset, and content copied into customer projects
   (`packages/config/defaults/README-*.md`) definitely does. The guards
@@ -113,10 +113,13 @@ from Go paths, so judge those from the table.
 
 The repo is in changesets prerelease mode, tag `alpha` (`.changeset/pre.json`):
 
-- `changeset version` cuts `0.1.0-alpha.N`; consumed changesets are recorded in
+- `changeset version` cuts `1.0.0-alpha.N`; consumed changesets are recorded in
   `pre.json`, pending ones stay in the tree.
 - The fixed group versions together; `changeset publish` uses the `alpha` npm
-  dist-tag.
+  dist-tag, except for a package whose every version on npm is an `alpha`
+  prerelease: that one goes to `latest`. `release publish` stops before
+  publishing such a package and prints the one-time fix
+  (`scripts/release-dist-tags.mjs`).
 
 Leave alpha for a stable `latest` release:
 
@@ -139,10 +142,18 @@ rationale: [ADR 002](../docs/adrs/002-multi-package-release-strategy.md)
 Publishing uses **npm trusted publishing (OIDC)** — there is no `NPM_TOKEN`. Once
 per public package, a maintainer adds a trusted publisher on npmjs.com (Settings →
 Trusted Publishing): provider GitHub Actions, repo `zitadel/nextgen`, workflow
-`release-publish.yml`. The package must exist on npm first (publish `0.0.x` by
-hand if needed). The release job runs on Depot, which npm treats as self-hosted;
-keep `NPM_CONFIG_PROVENANCE=false` until npm provenance is supported for that
-runner environment or the publish job moves to GitHub-hosted runners.
+`release-publish.yml`; with npm 11.15 or later, `npm trust github` does the same
+from a terminal. The package must exist on npm first (publish `0.0.x` by
+hand if needed); `release publish` stops before publishing a public package that
+npm has never seen and prints the placeholder publish and the `npm trust` command
+to run. That check asks the npm registry before the dry-run branch, so an offline
+`release publish --dry-run` fails closed; this is intended. The version PR's
+`full-pr` runs the same check (`node scripts/release.mjs check-npm`), so a new
+public package fails the version PR instead of landing a version on `main` that
+cannot be published. The release job runs on
+Depot, which npm treats as self-hosted; keep `PNPM_CONFIG_PROVENANCE=false` (pnpm 12 ignores `NPM_CONFIG_PROVENANCE`) until npm
+provenance is supported for that runner environment or the publish job moves to
+GitHub-hosted runners.
 
 Each public package must declare its license and ship a `LICENSE` file before its
 first publish — see [LICENSING.md](../LICENSING.md).

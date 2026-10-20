@@ -143,26 +143,25 @@ func (e eventStatements) GetEventByID(ctx context.Context, projectID, id string)
 
 // ListEvents implements [service.EventStatements].
 func (e eventStatements) ListEvents(ctx context.Context, filter *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, eventQuery, filter, events.Schema); err != nil {
-		return nil, err
-	}
-	rows, err := e.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	defer rows.Close()
-	items, err := collectRows(rows, scanEvent)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	var nextCursor []byte
-	if filter.Pagination.Limit > 0 && len(items) == int(filter.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.EventField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  events.Schema.ValuesFrom(items[len(items)-1], filter.Pagination.OrderBy.Columns),
+	items, nextCursor, err := pagination.Page(filter.Pagination, events.Schema, func(limit uint32) ([]*domain.Event, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, eventQuery, filter, events.Schema); err != nil {
+			return nil, err
 		}
-		nextCursor = cursor.Marshal()
+		rows, err := e.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		items, err := collectRows(rows, scanEvent)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return items, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return &database.ListResult[*domain.Event]{
 		Items:      items,

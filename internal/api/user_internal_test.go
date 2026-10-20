@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -83,7 +82,7 @@ func TestQueryUsers_SessionCaller(t *testing.T) {
 	t.Run("lists credential home", func(t *testing.T) {
 		users := &stubQueryUsersService{}
 		h := queryUsersHandler(t, true, true, users)
-		resp, err := h.QueryUsers(userCtx, &api.QueryUsersRequest{})
+		resp, err := h.QueryUsers(userCtx, &api.QueryUsersRequest{}, api.QueryUsersParams{})
 		if err != nil {
 			t.Fatalf("session list: %v", err)
 		}
@@ -95,55 +94,79 @@ func TestQueryUsers_SessionCaller(t *testing.T) {
 		}
 	})
 
+	t.Run("project_id names the target instead of the home project", func(t *testing.T) {
+		users := &stubQueryUsersService{}
+		h := queryUsersHandler(t, true, true, users)
+		_, err := h.QueryUsers(userCtx, &api.QueryUsersRequest{}, api.QueryUsersParams{
+			ProjectID: api.NewOptProjectID("proj_target"),
+		})
+		if err != nil {
+			t.Fatalf("session list: %v", err)
+		}
+		if len(users.listProjectIDs) != 1 || users.listProjectIDs[0] != "proj_target" {
+			t.Fatalf("ListUsers projects = %v, want [proj_target]", users.listProjectIDs)
+		}
+	})
+
 	t.Run("no foothold is not found", func(t *testing.T) {
 		users := &stubQueryUsersService{}
 		h := queryUsersHandler(t, false, false, users)
-		_, err := h.QueryUsers(userCtx, &api.QueryUsersRequest{})
+		_, err := h.QueryUsers(userCtx, &api.QueryUsersRequest{}, api.QueryUsersParams{})
 		assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 		if len(users.listProjectIDs) != 0 {
 			t.Fatalf("ListUsers must not run before Check, got %v", users.listProjectIDs)
 		}
 	})
 
-	t.Run("expand and membership filter still need read scopes", func(t *testing.T) {
+	// #1300 §4: a session mints no scopes, so the list check's resolver answer
+	// stands in for them. Project-wide read (Allow) expands and filters.
+	t.Run("expand and membership filter pass for a session that reads the project", func(t *testing.T) {
 		tests := []struct {
 			name string
 			req  *api.QueryUsersRequest
-			want string
 		}{
-			{
-				name: "expand teams",
-				req:  &api.QueryUsersRequest{Expand: []api.UserExpand{api.UserExpandTeams}},
-				want: "team_membership.read",
-			},
-			{
-				name: "team_id filter",
-				req: &api.QueryUsersRequest{Filter: []api.QueryUsersRequestFilterItem{{
-					Field: api.UserFilterFieldTeamID,
-				}}},
-				want: "team_membership.read",
-			},
-			{
-				name: "expand owner team",
-				req:  &api.QueryUsersRequest{Expand: []api.UserExpand{api.UserExpandLifecycleOwnerTeam}},
-				want: "team.read",
-			},
+			{"expand teams", &api.QueryUsersRequest{Expand: []api.UserExpand{api.UserExpandTeams}}},
+			{"team_id filter", &api.QueryUsersRequest{Filter: []api.QueryUsersRequestFilterItem{{
+				Field: api.UserFilterFieldTeamID,
+			}}}},
+			{"expand owner team", &api.QueryUsersRequest{Expand: []api.UserExpand{api.UserExpandLifecycleOwnerTeam}}},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				users := &stubQueryUsersService{}
 				h := queryUsersHandler(t, true, true, users)
-				_, err := h.QueryUsers(userCtx, tt.req)
+				if _, err := h.QueryUsers(userCtx, tt.req, api.QueryUsersParams{}); err != nil {
+					t.Fatalf("QueryUsers: %v", err)
+				}
+				if len(users.listProjectIDs) != 1 {
+					t.Fatalf("ListUsers must run once, got %v", users.listProjectIDs)
+				}
+			})
+		}
+	})
+
+	// A foothold short of project-wide read (Forbidden: a team- or
+	// resource-scoped grant) still lists, through the partial filter, but does
+	// not expand or filter on team_id: 403 user.permission_denied.
+	t.Run("expand and membership filter are refused on a partial foothold", func(t *testing.T) {
+		tests := []struct {
+			name string
+			req  *api.QueryUsersRequest
+		}{
+			{"expand teams", &api.QueryUsersRequest{Expand: []api.UserExpand{api.UserExpandTeams}}},
+			{"team_id filter", &api.QueryUsersRequest{Filter: []api.QueryUsersRequestFilterItem{{
+				Field: api.UserFilterFieldTeamID,
+			}}}},
+			{"expand owner team", &api.QueryUsersRequest{Expand: []api.UserExpand{api.UserExpandLifecycleOwnerTeam}}},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				users := &stubQueryUsersService{}
+				h := queryUsersHandler(t, false, true, users)
+				_, err := h.QueryUsers(userCtx, tt.req, api.QueryUsersParams{})
 				assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
-				var de domain.Error
-				if !errors.As(err, &de) {
-					t.Fatalf("error is not a domain.Error: %v", err)
-				}
-				if !strings.Contains(de.Message, tt.want) {
-					t.Fatalf("message %q does not name %q", de.Message, tt.want)
-				}
 				if len(users.listProjectIDs) != 0 {
-					t.Fatalf("ListUsers must not run after expand/filter deny, got %v", users.listProjectIDs)
+					t.Fatalf("ListUsers must not run on a refused expansion, got %v", users.listProjectIDs)
 				}
 			})
 		}
@@ -187,6 +210,9 @@ func (s *stubQueryUsersService) ListUsers(_ context.Context, input service.ListU
 func (s *stubQueryUsersService) ListPasskeys(context.Context, service.ListPasskeysInput) ([]*domain.UserPasskey, string, error) {
 	return nil, "", errors.New("unexpected ListPasskeys")
 }
+func (s *stubQueryUsersService) ListIdentityLinks(context.Context, service.ListIdentityLinksInput) ([]*domain.IDPIdentityLink, string, error) {
+	return nil, "", errors.New("unexpected ListIdentityLinks")
+}
 func (s *stubQueryUsersService) ListUserTeams(context.Context, service.ListUserTeamsInput) (*service.ListUserTeamsOutput, error) {
 	return nil, errors.New("unexpected ListUserTeams")
 }
@@ -202,6 +228,10 @@ func (s *stubQueryUsersService) GetMyUser(context.Context, service.GetMyUserInpu
 func (s *stubQueryUsersService) PatchUser(context.Context, service.PatchUserInput) (*domain.User, error) {
 	return nil, errors.New("unexpected PatchUser")
 }
+func (s *stubQueryUsersService) GetMyUserSchema(context.Context, service.GetMyUserInput) (*domain.JSONSchema, error) {
+	return nil, errors.New("unexpected GetMyUserSchema")
+}
+
 func (s *stubQueryUsersService) PatchMyUser(context.Context, service.PatchMyUserInput) (*domain.User, error) {
 	return nil, errors.New("unexpected PatchMyUser")
 }

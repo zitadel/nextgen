@@ -2,11 +2,17 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+
+import { cancel, isCancel, select } from "@clack/prompts";
 
 import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 
+import BrandingEject from "../../../src/commands/branding/eject";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
 
@@ -58,7 +64,7 @@ describe("branding eject", () => {
     ) as Record<string, unknown>;
     expect(descriptor.$schema).toBe("../meta/branding.json");
     expect(descriptor.layout).toBe("centered");
-    expect(descriptor.liquid_template_file).toBe("./login.liquid");
+    expect(descriptor.liquid_template).toEqual({ $file: "./login.liquid" });
 
     const template = await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8");
     expect(template).toBe(getDefaultBrandingConfig("centered").template);
@@ -77,20 +83,46 @@ describe("branding eject", () => {
     expect(meta).not.toMatch(/`zitadel /);
   });
 
-  it("--design split writes the split template and layout", async () => {
+  it("--design minimal writes the card-less template on the centered layout", async () => {
     const cwd = await makeProject();
 
-    const res = await eject(cwd, "--design", "split");
+    const res = await eject(cwd, "--design", "minimal");
     expect(res.exitCode, res.stderr).toBe(0);
 
     const descriptor = JSON.parse(
       await readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8"),
     ) as Record<string, unknown>;
-    expect(descriptor.layout).toBe("split");
+    expect(descriptor.layout).toBe("centered");
 
     const template = await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8");
-    expect(template).toBe(getDefaultBrandingConfig("split").template);
-    expect(template).toContain('class="zl-split"');
+    expect(template).toBe(getDefaultBrandingConfig("minimal").template);
+    expect(template).not.toContain("<zl-card");
+  });
+
+  it("refuses page-layout designs with a pointer to the app (#1039)", async () => {
+    // split, split-right and hero were page chrome around the default card;
+    // that layout belongs in the embedding app, not the widget template.
+    for (const design of ["split", "split-right", "hero"]) {
+      const cwd = await makeProject();
+      const res = await eject(cwd, "--design", design);
+      expect(res.exitCode, design).toBe(3);
+      const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+      expect(json.code, design).toBe("E_VALIDATION");
+      expect(json.message, design).toContain(`The ${design} design was retired`);
+      expect(json.hint, design).toContain("<zitadel-login>");
+      expect(json.hint, design).toContain("centered, minimal");
+      await expect(readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).rejects.toThrow();
+    }
+  });
+
+  it("rejects an unknown design and lists the catalog", async () => {
+    const cwd = await makeProject();
+    const res = await eject(cwd, "--design", "nope");
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain('"nope"');
+    expect(json.hint).toBe("Pick one of: centered, minimal.");
   });
 
   it("refuses to overwrite existing files without --force", async () => {
@@ -120,5 +152,39 @@ describe("branding eject", () => {
     const res = await eject(cwd);
     expect(res.exitCode).not.toBe(0);
     expect(res.stdout + res.stderr).toContain("not a Zitadel project");
+  });
+});
+
+describe("branding eject asked on a terminal", () => {
+  // The built CLI bundles its own prompts, so a prompt can only be answered
+  // by running the command from source, where `input` is the one module asked.
+  const ejecting = (cwd: string) => asTerminal(() => BrandingEject.run(["--cwd", cwd]));
+
+  afterEach(() => {
+    vi.mocked(select).mockReset();
+    vi.mocked(isCancel).mockReset();
+    vi.mocked(isCancel).mockReturnValue(false);
+  });
+
+  it("scaffolds the design that was chosen", async () => {
+    const cwd = await makeProject();
+    vi.mocked(select).mockResolvedValueOnce("minimal" as never);
+
+    await ejecting(cwd);
+
+    expect(await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).toBe(
+      getDefaultBrandingConfig("minimal").template,
+    );
+  });
+
+  it("fails, scaffolding nothing, on Ctrl-C", async () => {
+    const cwd = await makeProject();
+    vi.mocked(isCancel).mockReturnValue(true);
+    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
+
+    await expect(ejecting(cwd)).rejects.toThrow();
+
+    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+    await expect(readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8")).rejects.toThrow();
   });
 });

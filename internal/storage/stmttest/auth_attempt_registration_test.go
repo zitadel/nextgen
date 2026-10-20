@@ -11,6 +11,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func createBareAttempt(t *testing.T, stmts service.AllStatements, projectID string) *domain.AuthAttempt {
@@ -214,6 +215,86 @@ func TestAuthAttemptStatements_SetAuthAttemptFactor(t *testing.T) {
 			// The pending challenge and its failure bookkeeping are gone.
 			_, stillChallenged := got.ChallengeByType(domain.AuthCheckTypeUser)
 			assert.False(t, stillChallenged)
+		})
+	})
+}
+
+func TestAuthAttemptStatements_AddAuthAttemptFactorRefusesSecond(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		boundUser := func(t *testing.T, projectID, attemptID string) string {
+			t.Helper()
+			got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attemptID)
+			require.NoError(t, err)
+			factor, ok := domain.CheckAs[*domain.AuthFactorUser](got, domain.AuthCheckTypeUser)
+			require.True(t, ok)
+			return factor.UserID
+		}
+
+		t.Run("refuses_a_second_factor", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			attempt := createBareAttempt(t, d.stmts, projectID)
+
+			checkID, err := d.stmts.AddAuthAttemptFactor(t.Context(), projectID, attempt.ID, &domain.AuthFactorUser{UserID: "user-1"})
+			require.NoError(t, err)
+			assert.NotEmpty(t, checkID)
+
+			_, err = d.stmts.AddAuthAttemptFactor(t.Context(), projectID, attempt.ID, &domain.AuthFactorUser{UserID: "user-2"})
+			var unique *database.UniqueError
+			require.ErrorAs(t, err, &unique)
+			assert.Equal(t, "user-1", boundUser(t, projectID, attempt.ID))
+		})
+
+		t.Run("fills_a_pending_challenge", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			attempt := createBareAttempt(t, d.stmts, projectID)
+			challenge := &domain.AuthChallengeUser{}
+			require.NoError(t, d.stmts.SetAuthAttemptChallenge(t.Context(), projectID, attempt.ID, challenge))
+			require.NoError(t, d.stmts.AuthAttemptChallengeFailed(t.Context(), projectID, attempt.ID, challenge))
+
+			_, err := d.stmts.AddAuthAttemptFactor(t.Context(), projectID, attempt.ID, &domain.AuthFactorUser{UserID: "user-1"})
+			require.NoError(t, err)
+
+			assert.Equal(t, "user-1", boundUser(t, projectID, attempt.ID))
+			got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+			require.NoError(t, err)
+			_, stillChallenged := got.ChallengeByType(domain.AuthCheckTypeUser)
+			assert.False(t, stillChallenged)
+		})
+
+		// A verified factor without a payload (password) is still verified.
+		t.Run("refuses_a_payload_less_verified_factor", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			attempt := createBareAttempt(t, d.stmts, projectID)
+			stored := &domain.AuthFactorPassword{}
+			_, err := d.stmts.SetAuthAttemptFactor(t.Context(), projectID, attempt.ID, stored)
+			require.NoError(t, err)
+
+			_, err = d.stmts.AddAuthAttemptFactor(t.Context(), projectID, attempt.ID, &domain.AuthFactorPassword{})
+			var unique *database.UniqueError
+			require.ErrorAs(t, err, &unique)
+
+			got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+			require.NoError(t, err)
+			factor, ok := domain.CheckAs[*domain.AuthFactorPassword](got, domain.AuthCheckTypePassword)
+			require.True(t, ok)
+			assert.True(t, factor.GetLastVerifiedAt().Equal(stored.GetLastVerifiedAt()), "the stored factor is untouched")
+		})
+
+		t.Run("invalidates_an_earlier_challenge", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			attempt := createBareAttempt(t, d.stmts, projectID)
+			challenge := &domain.AuthChallengeUser{}
+			require.NoError(t, d.stmts.SetAuthAttemptChallenge(t.Context(), projectID, attempt.ID, challenge))
+
+			_, err := d.stmts.AddAuthAttemptFactor(t.Context(), projectID, attempt.ID, &domain.AuthFactorUser{UserID: "user-1"})
+			require.NoError(t, err)
+
+			// The identifier submission that issued the challenge finishes after
+			// the bind: it must not rebind the attempt to its own user.
+			err = d.stmts.AuthAttemptChallengeSucceeded(t.Context(), projectID, attempt.ID,
+				&domain.AuthFactorUser{UserID: "user-2"}, challenge.GetID())
+			require.ErrorIs(t, err, domain.ErrAuthAttemptStaleChallenge())
+			assert.Equal(t, "user-1", boundUser(t, projectID, attempt.ID))
 		})
 	})
 }

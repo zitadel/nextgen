@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { userEvent } from "vitest/browser";
 
 import "./zl-field.js";
 import type { ZlField } from "./zl-field.js";
@@ -31,9 +32,7 @@ describe("<zl-field> form participation (chromium)", () => {
   }
 
   it("contributes its value to the enclosing FormData", async () => {
-    const { form, field } = mount(
-      `<form><zl-field name="email" type="email"></zl-field></form>`,
-    );
+    const { form, field } = mount(`<form><zl-field name="email" type="email"></zl-field></form>`);
     await field.updateComplete;
     field.value = "alice@acme.com";
     await field.updateComplete;
@@ -41,9 +40,7 @@ describe("<zl-field> form participation (chromium)", () => {
   });
 
   it("flags valueMissing when required and empty", async () => {
-    const { form, field } = mount(
-      `<form><zl-field name="email" required></zl-field></form>`,
-    );
+    const { form, field } = mount(`<form><zl-field name="email" required></zl-field></form>`);
     await field.updateComplete;
     expect(form.checkValidity()).toBe(false);
     field.value = "alice@acme.com";
@@ -52,25 +49,50 @@ describe("<zl-field> form participation (chromium)", () => {
   });
 
   it("forwards a custom error message via setValidity", async () => {
-    const { form, field } = mount(
-      `<form><zl-field name="email" value="x"></zl-field></form>`,
-    );
+    const { form, field } = mount(`<form><zl-field name="email" value="x"></zl-field></form>`);
     await field.updateComplete;
     field.error = "That email is already registered.";
     await field.updateComplete;
     expect(form.checkValidity()).toBe(false);
   });
 
-  it("clears its value when the host form is reset", async () => {
-    const { form, field } = mount(
-      `<form><zl-field name="email" value="seed"></zl-field></form>`,
-    );
+  it("restores its initial value when the host form is reset", async () => {
+    const { form, field } = mount(`<form><zl-field name="email" value="seed"></zl-field></form>`);
     await field.updateComplete;
     field.value = "alice@acme.com";
     await field.updateComplete;
     form.reset();
     await field.updateComplete;
-    expect(field.value).toBe("");
+    expect(field.value).toBe("seed");
+  });
+
+  it("clears text written straight into the native input when the form is reset", async () => {
+    // A password manager can fill the native input without an input event, so
+    // the host's `value` never learns about it. Reset goes through the native
+    // control, so the text goes with it either way.
+    const { form, field } = mount(`<form><zl-field name="email"></zl-field></form>`);
+    await field.updateComplete;
+    const native = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    native.value = "bob@example.com";
+    form.reset();
+    await field.updateComplete;
+    expect(native.value).toBe("");
+    expect(new FormData(form).get("email")).toBe("");
+  });
+
+  it("is disabled by an enclosing fieldset", async () => {
+    const { form, field } = mount(
+      `<form><fieldset disabled><zl-field name="email" value="x"></zl-field></fieldset></form>`,
+    );
+    await field.updateComplete;
+    const native = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    expect(native.disabled).toBe(true);
+    expect(new FormData(form).get("email")).toBeNull();
+
+    (form.querySelector("fieldset") as HTMLFieldSetElement).disabled = false;
+    await field.updateComplete;
+    expect(native.disabled).toBe(false);
+    expect(new FormData(form).get("email")).toBe("x");
   });
 
   it("submits the owning form when Enter is pressed inside the input", async () => {
@@ -118,23 +140,32 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(submitted).toBe(0);
   });
 
-  it("normalises the auth-method credential name in the input testid", async () => {
-    const { field } = mount(
-      `<form><zl-field name="x-auth-methods#password" type="password" data-testid="zitadel-field-password"></zl-field></form>`,
-    );
-    await field.updateComplete;
-    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
-    // The hook is method-named; the form key stays raw.
-    expect(input.getAttribute("data-testid")).toBe("zitadel-input-password");
-    expect(input.getAttribute("name")).toBe("x-auth-methods#password");
-  });
-
   it("delegates focus from the host to the inner input", async () => {
     const { field } = mount(`<form><zl-field name="email"></zl-field></form>`);
     await field.updateComplete;
     field.focus();
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
     expect(field.shadowRoot?.activeElement).toBe(input);
+  });
+
+  it("submits a read-only value with the form", async () => {
+    const { form, field } = mount(
+      `<form><zl-field name="email" value="alice@acme.com" readonly></zl-field></form>`,
+    );
+    await field.updateComplete;
+    expect(new FormData(form).get("email")).toBe("alice@acme.com");
+  });
+
+  it("keeps the clear button out of the tab order but still clickable", async () => {
+    const { field } = mount(`<form><zl-field name="email" value="a@b.c"></zl-field></form>`);
+    await field.updateComplete;
+    const button = field.shadowRoot?.querySelector(
+      'button[part="trailing-action"]',
+    ) as HTMLButtonElement;
+    expect(button).toBeTruthy();
+    expect(button.tabIndex).toBe(-1);
+    button.click();
+    expect(field.value).toBe("");
   });
 
   it("syncs native input/change events with host value and FormData", async () => {
@@ -173,5 +204,150 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(hostInputEvent).toBeInstanceOf(InputEvent);
     expect((hostInputEvent as InputEvent).data).toBe("m");
     expect((hostInputEvent as InputEvent).inputType).toBe("insertText");
+  });
+});
+
+describe("<zl-field> password toggle (chromium)", () => {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  async function mountRevealed(markup: string): Promise<{
+    form: HTMLFormElement;
+    field: ZlField;
+    input: HTMLInputElement;
+  }> {
+    host.innerHTML = markup;
+    const form = host.querySelector("form") as HTMLFormElement;
+    const field = host.querySelector("zl-field") as ZlField;
+    field.passwordToggle = true;
+    await field.updateComplete;
+    field.shadowRoot?.querySelector<HTMLButtonElement>('[part~="password-toggle"]')?.click();
+    await field.updateComplete;
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    expect(input.type).toBe("text");
+    return { form, field, input };
+  }
+
+  it("keeps focus and the caret where they were across a real click", async () => {
+    host.innerHTML = `<zl-field name="pw" type="password" value="hunter2"></zl-field>`;
+    const field = host.querySelector("zl-field") as ZlField;
+    field.passwordToggle = true;
+    await field.updateComplete;
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    const button = () =>
+      field.shadowRoot?.querySelector<HTMLButtonElement>(
+        '[part~="password-toggle"]',
+      ) as HTMLButtonElement;
+    input.focus();
+    input.setSelectionRange(4, 4);
+    let blurred = false;
+    input.addEventListener("blur", () => {
+      blurred = true;
+    });
+
+    await userEvent.click(button());
+    await field.updateComplete;
+    expect(input.type).toBe("text");
+    expect(field.shadowRoot?.activeElement).toBe(input);
+    expect([input.selectionStart, input.selectionEnd]).toEqual([4, 4]);
+
+    // A selection survives too, and so does the way back.
+    input.setSelectionRange(1, 5);
+    await userEvent.click(button());
+    await field.updateComplete;
+    expect(input.type).toBe("password");
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 5]);
+    expect(blurred).toBe(false);
+  });
+
+  it("is reachable with Tab and toggles from the keyboard without submitting", async () => {
+    host.innerHTML = `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`;
+    const form = host.querySelector("form") as HTMLFormElement;
+    const field = host.querySelector("zl-field") as ZlField;
+    field.passwordToggle = true;
+    await field.updateComplete;
+    let submitted = 0;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitted += 1;
+    });
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    const button = () =>
+      field.shadowRoot?.querySelector<HTMLButtonElement>(
+        '[part~="password-toggle"]',
+      ) as HTMLButtonElement;
+
+    input.focus();
+    await userEvent.tab();
+    expect(field.shadowRoot?.activeElement).toBe(button());
+
+    await userEvent.keyboard(" ");
+    await field.updateComplete;
+    expect(input.type).toBe("text");
+    expect(button().getAttribute("aria-pressed")).toBe("true");
+    // Focus stays on the button, so the new state is what a screen reader hears next.
+    expect(field.shadowRoot?.activeElement).toBe(button());
+
+    await userEvent.keyboard("{Enter}");
+    await field.updateComplete;
+    expect(input.type).toBe("password");
+    expect(submitted).toBe(0);
+  });
+
+  it("hides the value when the owning form is reset", async () => {
+    const { form, field, input } = await mountRevealed(
+      `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`,
+    );
+    form.reset();
+    await field.updateComplete;
+    expect(input.type).toBe("password");
+  });
+
+  it("hides the value before any submit listener runs", async () => {
+    const { form, input } = await mountRevealed(
+      `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`,
+    );
+    let typeAtSubmit = "";
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      typeAtSubmit = input.type;
+    });
+    // The path a submit button and Enter both take; no await in between.
+    form.requestSubmit();
+    expect(typeAtSubmit).toBe("password");
+  });
+
+  it("stops listening once the field leaves its form", async () => {
+    const { form, field, input } = await mountRevealed(
+      `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`,
+    );
+    host.appendChild(field);
+    form.addEventListener("submit", (event) => event.preventDefault());
+    form.requestSubmit();
+    expect(input.type).toBe("text");
+  });
+
+  it("never leaves the value revealed when a suffix takes the toggle's place", async () => {
+    const { field, input } = await mountRevealed(
+      `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`,
+    );
+    const suffix = document.createElement("span");
+    suffix.slot = "suffix";
+    suffix.textContent = "kg";
+    field.appendChild(suffix);
+    await new Promise((resolve) => setTimeout(resolve));
+    await field.updateComplete;
+    expect(input.type).toBe("password");
+    expect(field.shadowRoot?.querySelector('[part~="password-toggle"]')).toBeNull();
+    // Edge's own reveal must stay available when ours is not drawn.
+    expect(field.shadowRoot?.querySelector(".zr-field__wrap--toggle")).toBeNull();
   });
 });

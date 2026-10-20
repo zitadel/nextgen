@@ -36,6 +36,16 @@ export interface ZitadelFlowCompleteDetail {
   readonly handoff_token_expires_at?: string;
 }
 
+/**
+ * Payload of the `zitadel-flow-redirect` event — the widget is handing the
+ * browser to an identity provider. Distinct from `zitadel-flow-complete`:
+ * nobody is signed in yet, and the flow resumes when the provider returns.
+ */
+export interface ZitadelFlowRedirectDetail {
+  readonly redirect_url: string;
+  readonly step: CreateFlow201Step;
+}
+
 /** Payload of the `zitadel-flow-error` event. */
 export interface ZitadelFlowErrorDetail {
   readonly message: string;
@@ -64,6 +74,7 @@ export interface ZitadelLoginEventMap {
   "zitadel-flow-step": ZitadelFlowStepDetail;
   "zitadel-flow-input": ZitadelFlowInputDetail;
   "zitadel-flow-complete": ZitadelFlowCompleteDetail;
+  "zitadel-flow-redirect": ZitadelFlowRedirectDetail;
   "zitadel-flow-error": ZitadelFlowErrorDetail;
 }
 
@@ -91,6 +102,7 @@ export const ZITADEL_LOGIN_EVENT_HANDLERS = {
   "zitadel-flow-step": "onFlowStep",
   "zitadel-flow-input": "onFlowInput",
   "zitadel-flow-complete": "onFlowComplete",
+  "zitadel-flow-redirect": "onFlowRedirect",
   "zitadel-flow-error": "onFlowError",
 } as const satisfies Record<keyof ZitadelLoginEventMap, `on${string}`>;
 
@@ -149,6 +161,12 @@ export interface ZitadelLoginConfig {
    * @default false
    */
   readonly suppressHeader?: boolean;
+  /**
+   * Hide the show/hide button on password fields. The button is shown by
+   * default, as NIST SP 800-63B recommends.
+   * @default false
+   */
+  readonly suppressPasswordToggle?: boolean;
   /** Flow purpose. @default "login" */
   readonly purpose?: CreateFlowBodyPurpose;
   /**
@@ -156,8 +174,26 @@ export interface ZitadelLoginConfig {
    * the flow file). Omit to run the project's default flow for the purpose.
    */
   readonly flowName?: string;
-  /** Where to navigate after a completed sign-in. */
+  /**
+   * Where to navigate after a completed sign-in. When the page's `next` query
+   * parameter names a path on the same origin, the widget returns there
+   * instead: the server SDKs' middleware sends a signed-out request for a
+   * protected route to the login page with `?next=<path>`.
+   */
   readonly postSignInUrl?: string;
+  /**
+   * Go to {@link postSignInUrl} even when the page's `next` query parameter
+   * names a path, for a page that uses `next` for something of its own.
+   * @default false
+   */
+  readonly forcePostSignInUrl?: boolean;
+  /**
+   * An existing flow's id to resume instead of starting a new flow, for
+   * example one kept across a reload. Unset or `null` falls back to the `flow` query
+   * parameter a provider callback brings back; an id that no longer resolves
+   * starts a new flow.
+   */
+  readonly resumeFlowId?: string | null;
   /**
    * Copy overrides merged over the builtin locale dictionaries, keyed by
    * primary language subtag. Each dictionary may be partial — the widget
@@ -263,3 +299,130 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig & ZitadelLogoutHandlers;
 
 /** Full prop set for a `ZitadelSession` wrapper (config + plain-callback handlers). */
 export type ZitadelSessionProps = ZitadelSessionConfig & ZitadelSessionHandlers;
+
+/* ───────────────────────  Standard element attributes  ───────────────────────
+ * The one definition of which props a wrapper hands to the widget element
+ * besides its own, shared by every SPA SDK except Angular (whose component tag
+ * already carries them). The set and every widget prop are disjoint, which the
+ * contract spec checks, so a wrapper can pass the result to the element without
+ * a widget prop ever being shadowed.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/** The names every framework applies to an element itself, so none of them takes a prefix. */
+const NATIVE_NAMES = ["class", "className", "style"] as const;
+type NativeName = (typeof NATIVE_NAMES)[number];
+
+const STANDARD_NAMES = [
+  ...NATIVE_NAMES,
+  "id",
+  "title",
+  "slot",
+  "hidden",
+  "role",
+  "tabindex",
+  "tabIndex",
+] as const;
+
+/**
+ * The name of a standard HTML attribute: the fixed ones (`className` and
+ * `tabIndex` are the spellings React and Qwik use), `data-*` and `aria-*`.
+ * Matching is exact and case-sensitive.
+ */
+export type StandardAttributeName =
+  | (typeof STANDARD_NAMES)[number]
+  | `data-${string}`
+  | `aria-${string}`;
+
+/**
+ * The standard attributes among the props `Props`, each name with `Prefix`
+ * before it, except the native names. Every value keeps the type it has in
+ * `Props`.
+ */
+export type StandardAttributes<Props extends object, Prefix extends string = ""> = {
+  [Name in keyof Props & StandardAttributeName as Name extends NativeName
+    ? Name
+    : `${Prefix}${Name}`]?: Props[Name];
+};
+
+/**
+ * What a wrapper's props type adds to the widget's own: the standard attributes
+ * of the framework's element attributes type `Attributes`, and nothing else, so
+ * no prop the type accepts is dropped.
+ */
+export type StandardAttributeProps<Attributes extends object> = Pick<
+  Attributes,
+  Extract<keyof Attributes, StandardAttributeName>
+>;
+
+/**
+ * Whether `name` is the name of a standard HTML attribute (see
+ * {@link StandardAttributeName}). A wrapper that needs to keep such a name away
+ * from a property binding of its own asks this rather than listing the names.
+ */
+export function isStandardAttributeName(name: string): name is StandardAttributeName {
+  return (
+    STANDARD_NAMES.some((standard) => standard === name) ||
+    (name.startsWith("data-") && name.length > "data-".length) ||
+    (name.startsWith("aria-") && name.length > "aria-".length)
+  );
+}
+
+const isEnumerated = (name: string): boolean =>
+  name.startsWith("aria-") || name.startsWith("data-");
+
+// Only a boolean attribute is absent when false; `aria-hidden="false"` and `data-open="false"` mean something.
+const isOmitted = (name: string, value: unknown): boolean =>
+  value == null || (value === false && !isEnumerated(name));
+
+/**
+ * The standard HTML attributes among the given props: `class`, `style`, `id`,
+ * `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`. A widget
+ * element takes these as plain DOM attributes, so a wrapper passes the result to
+ * the element. Anything else is left out, so no stray prop can reach the
+ * widget's configuration. A value of `undefined` or `null` is left out, and so
+ * is `false` except for `aria-*` and `data-*`, which render as the string
+ * `"false"`. A framework that needs the names marked (Solid writes `attr:id` as
+ * an attribute) passes the `prefix` to put before each name except the native
+ * ones (`class`, `className` and `style`).
+ */
+export function standardAttributes<Props extends object, Prefix extends string = "">(
+  props: Props,
+  prefix?: Prefix,
+): StandardAttributes<Props, Prefix>;
+// The one place the record is typed loosely: the overload above is the type callers get.
+export function standardAttributes(props: object, prefix = ""): Record<string, unknown> {
+  const record: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(props)) {
+    if (isStandardAttributeName(name) && !isOmitted(name, value)) {
+      const native = NATIVE_NAMES.some((nativeName) => nativeName === name);
+      // An `aria-*` or `data-*` boolean is written out, since not every framework renders `false`.
+      record[native ? name : `${prefix}${name}`] =
+        typeof value === "boolean" && isEnumerated(name) ? String(value) : value;
+    }
+  }
+  return record;
+}
+
+/* ───────────────────────────────  Widget names  ───────────────────────────────
+ * The widgets and the tag names of their elements, defined once.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/** Every widget name, for code that loops over the widgets. */
+export const widgetNames = ["login", "logout", "session"] as const;
+
+/** The name of a widget. */
+export type WidgetName = (typeof widgetNames)[number];
+
+/**
+ * The tag names of the widget elements. The elements register under these
+ * names, and every SDK wrapper, spec and guard reads them from here rather than
+ * spelling them out. The type ties each tag to its widget name.
+ */
+export const widgetTags = {
+  login: "zitadel-login",
+  logout: "zitadel-logout",
+  session: "zitadel-session",
+} as const satisfies Record<WidgetName, `zitadel-${WidgetName}`>;
+
+/** One of the widget element tag names. */
+export type WidgetTag = (typeof widgetTags)[WidgetName];

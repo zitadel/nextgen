@@ -6,11 +6,15 @@ import (
 
 type statements struct {
 	projectStatements
+	originStatements
 	flowDefinitionStatements
 	cryptoKeyStatements
 	jsonSchemaStatements
-	environmentStatements
 	releaseStatements
+	idpConnectionStatements
+	idpIdentityLinkStatements
+	deploymentStatements
+	previewStatements
 	teamStatements
 	teamMembershipStatements
 	tokenStatements
@@ -22,6 +26,8 @@ type statements struct {
 	userPasskeyStatements
 	userRecoveryCodesStatements
 	brandingStatements
+	variableStatements
+	variableSetStatements
 	claimStatements
 	resourceScopeStatements
 	authzAssignmentStatements
@@ -39,13 +45,18 @@ func (s statements) Statements() service.AllStatements {
 func (s statements) IsStatements() {}
 
 func newStatements(db queryExecutor) statements {
+	db = traced(db)
 	return statements{
 		projectStatements:             newProjectStatements(db),
+		originStatements:              newOriginStatements(db),
 		flowDefinitionStatements:      newFlowDefinitionStatements(db),
 		cryptoKeyStatements:           newCryptoKeyStatements(db),
 		jsonSchemaStatements:          newJSONSchemaStatements(db),
-		environmentStatements:         newEnvironmentStatements(db),
 		releaseStatements:             newReleaseStatements(db),
+		idpConnectionStatements:       newIDPConnectionStatements(db),
+		idpIdentityLinkStatements:     newIDPIdentityLinkStatements(db),
+		deploymentStatements:          newDeploymentStatements(db),
+		previewStatements:             newPreviewStatements(db),
 		teamStatements:                newTeamStatements(db),
 		teamMembershipStatements:      newTeamMembershipStatements(db),
 		tokenStatements:               newTokenStatements(db),
@@ -57,6 +68,8 @@ func newStatements(db queryExecutor) statements {
 		userPasskeyStatements:         newUserPasskeyStatements(db),
 		userRecoveryCodesStatements:   newUserRecoveryCodesStatements(db),
 		brandingStatements:            newBrandingStatements(db),
+		variableStatements:            newVariableStatements(db),
+		variableSetStatements:         newVariableSetStatements(db),
 		claimStatements:               newClaimStatements(db),
 		resourceScopeStatements:       newResourceScopeStatements(db),
 		authzAssignmentStatements:     newAuthzAssignmentStatements(db),

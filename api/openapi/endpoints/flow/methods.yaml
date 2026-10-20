@@ -28,6 +28,8 @@ post:
       headers:
         Set-Cookie:
           $ref: ../../components/headers/set-cookie-flow.yaml
+        Cache-Control:
+          $ref: ../../components/headers/cache-control-private-no-store.yaml
       content:
         application/json:
           schema:
