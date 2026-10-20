@@ -54,6 +54,59 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Pr
   throw new Error("waitFor timed out");
 }
 
+type Reachable = string | number | boolean | symbol | bigint | object | null | undefined;
+
+/**
+ * What a script holding `start` can read by walking its members: own
+ * properties and the accessors on its class chain, through plain objects, and
+ * stopping at any DOM node. Returns the paths that lead to a shadow root and
+ * the paths that lead to a string containing `secret`.
+ */
+function reachableFrom(start: object, secret: string): { roots: string[]; strings: string[] } {
+  const roots: string[] = [];
+  const strings: string[] = [];
+  const seen = new WeakSet<object>();
+
+  const keysOf = (value: object): (string | symbol)[] => {
+    const keys = new Set(Reflect.ownKeys(value));
+    const stop = value === start ? HTMLElement.prototype : Object.prototype;
+    for (let proto = Object.getPrototypeOf(value); proto && proto !== stop; ) {
+      for (const key of Reflect.ownKeys(proto)) keys.add(key);
+      proto = Object.getPrototypeOf(proto);
+    }
+    return [...keys];
+  };
+
+  const visit = (value: Reachable, path: string, depth: number): void => {
+    if (typeof value === "string") {
+      if (value.includes(secret)) strings.push(path);
+      return;
+    }
+    if (typeof value !== "object" || value === null || depth > 6) return;
+    if (value instanceof ShadowRoot) {
+      roots.push(path);
+      return;
+    }
+    if (seen.has(value)) return;
+    seen.add(value);
+    if (value instanceof Node && value !== start) return;
+    for (const key of keysOf(value)) {
+      if (key === "constructor") continue;
+      let next: Reachable;
+      try {
+        next = Reflect.get(value, key);
+      } catch {
+        continue;
+      }
+      if (typeof next === "function") continue;
+      visit(next, path === "" ? String(key) : `${path}.${String(key)}`, depth + 1);
+    }
+  };
+
+  visit(start, "", 0);
+  return { roots, strings };
+}
+
 describe("closed shadow roots", () => {
   let host: HTMLDivElement;
   let bodies: string[];
@@ -165,19 +218,59 @@ describe("closed shadow roots", () => {
     expect(keys).toEqual(["a", "b"]);
   });
 
-  // A limitation, pinned so a Lit upgrade that changes it forces the README's
-  // "Shadow roots" section to be revisited. Lit keeps the part it renders
-  // into on the element, and that part's parent is the root.
-  it("still lets a script that walks the element's own properties reach the root", async () => {
-    const login = await mountLogin();
-    const holder = Reflect.ownKeys(login)
-      .map((key) => Reflect.get(login, key))
-      .find(
-        (value) =>
-          typeof value === "object" && Reflect.get(value ?? {}, "parentNode") instanceof ShadowRoot,
-      );
+  // The known limitations, pinned with expected-true assertions so the
+  // README's "Shadow roots" section and these tests cannot drift apart. None of
+  // them is hidden: they live in Lit and the platform.
+  describe("known limitations: a script on the page, at any time, still reaches the root", () => {
+    it("through the public renderRoot Lit sets on the element", async () => {
+      const login = await mountLogin();
+      expect(login.renderRoot).toBeInstanceOf(ShadowRoot);
+    });
 
-    expect(Reflect.get(holder ?? {}, "parentNode")).toBeInstanceOf(ShadowRoot);
+    it.each(["zitadel-login", "zitadel-session", "zitadel-logout"])(
+      "through attachInternals() on <%s>, which never attaches its own",
+      async (tag) => {
+        configureZitadel({
+          proxyPath: "/__nextgen",
+          projectId: "test-project",
+          url: "http://localhost:4000",
+        });
+        const element = document.createElement(tag);
+        host.appendChild(element);
+        if ("updateComplete" in element) await element.updateComplete;
+        expect(element.attachInternals().shadowRoot).toBeInstanceOf(ShadowRoot);
+      },
+    );
+
+    it("through the part Lit renders into, found by walking the element's own properties", async () => {
+      const login = await mountLogin();
+      const { roots } = reachableFrom(login, "no-secret");
+      expect(roots).toContain("renderRoot");
+      expect(roots.some((path) => path.split(".").some((key) => key.startsWith("_$")))).toBe(true);
+    });
+
+    it("through the ElementInternals a form atom keeps on itself", async () => {
+      const field = document.createElement("zl-field");
+      host.appendChild(field);
+      await field.updateComplete;
+      expect(reachableFrom(field, "no-secret").roots).toContain("internals.shadowRoot");
+    });
+  });
+
+  it("reaches no typed secret by walking the login host, beyond the root itself", async () => {
+    const login = await mountLogin();
+    login.focus();
+    await userEvent.keyboard("alice@acme.com{Tab}hunter2");
+
+    const { roots, strings } = reachableFrom(login, "hunter2");
+
+    // Every path to a root is the host's own member (`renderRoot` from Lit,
+    // `ownRoot` from ZlElement) or the part under Lit's `_$...`.
+    const own = ["renderRoot", "ownRoot"];
+    expect(roots.filter((path) => !own.includes(path) && !path.includes("_$"))).toEqual([]);
+    // `formValues` is the host's cache of what was typed; the secret-leak
+    // change removes it, and this exclusion goes with it.
+    expect(strings.filter((path) => !path.startsWith("formValues"))).toEqual([]);
   });
 
   it("still signs in: typing, Tab and Enter reach the flow through the closed roots", async () => {
