@@ -52,6 +52,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The queue squashes a version PR onto the PRs queued ahead of it, and
+      # while it waits GitHub refuses release-publish's refresh of
+      # changeset-release/main. A changeset one of those PRs adds would land
+      # unrecorded in .changeset/pre.json, and release-publish's preflight
+      # would then refuse to publish the version. Running that preflight here
+      # drops the stale version PR from the queue instead; release-publish
+      # refreshes it once the PRs ahead land. Any other merge group skips.
+      - name: Check a queued version PR is current
+        if: ${{ github.event_name == 'merge_group' }}
+        env:
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+        run: node scripts/release-automation.mjs publish --base "$BASE_SHA"
+
       # The postgres lane (server:test-postgres) starts its databases through
       # testcontainers, and every package of the lane waits while the first
       # one pulls the image: 6-8 s on Depot's microVMs, 11-12 s on its EC2
@@ -287,6 +300,16 @@ jobs:
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: env -u CI -u GITHUB_ACTIONS moon run release:version
+
+      # npm trusted publishing cannot create a package, so release publish
+      # stops a version that includes a public package npm has never seen, or
+      # one with only prereleases of the pre tag (scripts/release-dist-tags.mjs).
+      # It used to find out only after the version commit was on main (run
+      # 39324183811). Asking npm here fails the version PR and its merge group
+      # instead, with the one-time commands that fix it.
+      - name: Check npm can publish the version PR's packages
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: node scripts/release.mjs check-npm
 
       - name: Pack version PR artifacts
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}

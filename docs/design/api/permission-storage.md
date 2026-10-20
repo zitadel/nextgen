@@ -192,9 +192,14 @@ CREATE TABLE zitadel_nextgen.resource_scope_index (
 CREATE INDEX idx_resource_scope_index_project
     ON zitadel_nextgen.resource_scope_index (project_id);
 
-CREATE INDEX idx_resource_scope_index_kind_project
-    ON zitadel_nextgen.resource_scope_index (resource_kind, project_id);
+-- By-id lookup across projects (GetResourceScope).
+CREATE INDEX idx_resource_scope_index_resource
+    ON zitadel_nextgen.resource_scope_index (resource_id);
 ```
+
+The primary key serves lookups by kind and project. A separate
+`(resource_kind, project_id)` index repeated its leading columns and was
+dropped (Postgres migration 000034).
 
 **Dual-write contract:** every globally addressable create/update/delete
 (project, team, user, schema, branding, flow_definition, session, …) updates

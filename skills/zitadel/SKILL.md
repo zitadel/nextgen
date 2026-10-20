@@ -5,7 +5,8 @@ description: >-
   any Zitadel task — it routes to the right skill: the `zitadel` CLI for creating
   projects, scaffolding, config, deploys, and the local server, and the
   per-framework SDK skills for integrating the auth UI into a Next.js, React,
-  Angular, Nuxt, Vue, Solid, Svelte, or Qwik app. Also use to answer questions
+  Angular, Nuxt, Vue, Solid, Svelte, Qwik, SvelteKit, SolidStart, Qwik Router, or
+  TanStack Start app. Also use to answer questions
   about Zitadel — its concepts, configuration, CLI, SDKs, or API — from the
   official docs. Use whenever the user mentions Zitadel, adding
   login/registration/sessions, or authentication in their app.
@@ -35,6 +36,10 @@ that way to get the CLI and per-framework skills alongside this router.
   - Solid → **`zitadel-sdk-solid`**
   - Svelte → **`zitadel-sdk-svelte`**
   - Qwik → **`zitadel-sdk-qwik`**
+  - SvelteKit → **`zitadel-sdk-sveltekit`**
+  - SolidStart → **`zitadel-sdk-solid-start`**
+  - Qwik Router → **`zitadel-sdk-qwik-router`**
+  - TanStack Start → **`zitadel-sdk-tanstack-start`**
 
 - **Embed, theme, or drive the `<zitadel-login>` web component directly** → use
   **`zitadel-components`**.
@@ -44,7 +49,7 @@ that way to get the CLI and per-framework skills alongside this router.
 The CLI can **scaffold** a fresh app for every framework above, but it can only
 **integrate (patch) an existing project for Next.js**. For an existing app in any
 other framework, the CLI cannot wire it up on its own — reach for that framework's
-SDK skill and add auth by hand: install `@zitadel/sdk-<framework>`, configure it,
+SDK skill and add auth by hand: install `@zitadel/sdk-<framework>@alpha`, configure it,
 add the provider/guard/routes, and drop in the login component. That SDK skill is
 the authoritative path for the existing-app case.
 

@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 
+/** The demo's project (`apps/demo-next`). */
+const DEMO_PROJECT_ID = process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "proj_demo";
+
 /**
  * Embedded sign-in happy path. Proves the boundary that Vitest cannot:
  *
@@ -7,8 +10,9 @@ import { expect, test } from "@playwright/test";
  * 2. Form interactions reach the orchestrator across atom shadow roots.
  * 3. The terminal step's internal `POST /sessions/exchange` traverses the
  *    Next.js `/__nextgen` proxy and the api-mock RS256 verification.
- * 4. `__nextgen_session` is set on the demo origin and `<zitadel-login>`'s
- *    full-page navigation lands on the protected `/admin` route.
+ * 4. The demo project's session cookie is set on the demo origin, and
+ *    `<zitadel-login>`'s full-page navigation lands on the protected `/admin`
+ *    route.
  * 5. `nextgenMiddleware` validates the opaque session cookie via
  *    `GET /sessions/me` and the client-side `SessionDetails` component
  *    fetches the email through the `/__nextgen` proxy.
@@ -42,7 +46,8 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
   await expect(page.getByText("Session details")).toBeVisible();
 
   const sessionCookie = (await page.context().cookies()).find(
-    (c) => c.name === "__nextgen_session",
+    // The SDK keeps the session under the project's name (ADR 073).
+    (c) => c.name === `__nextgen_session_${DEMO_PROJECT_ID}`,
   );
   expect(sessionCookie?.value).toBeTruthy();
   expect(sessionCookie?.httpOnly).toBe(true);

@@ -5,7 +5,10 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { failureAdvice } from "../../../src/commands/doctor";
+import { publicCliCommand } from "../../../src/lib/public-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
+import { nextPort } from "../../helpers/ports";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
@@ -23,7 +26,7 @@ const VALID_USER_SCHEMA = {
 
 async function doctor(cwd: string, extra: string[] = []) {
   const fake = await fakeDocker();
-  const port = await freePort();
+  const port = nextPort();
   return runCliForTest(
     [
       "doctor",
@@ -387,6 +390,66 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     expect(json.hint).toContain(json.next_commands?.[0]);
   });
 
+  // `zitadel start` tells developers to run setup in the directory it ran in,
+  // or one inside it; doctor must check that server, not the default port.
+  describe("in an app inside the directory a local server was started in", () => {
+    async function appUnderStartedServer(): Promise<{ app: string; port: number }> {
+      const parent = await mkdtemp(join(tmpdir(), "zitadel-doctor-parent-"));
+      tempDirs.push(parent);
+      const serverUrl = await startHealthServer();
+      const port = Number(new URL(serverUrl).port);
+      await mkdir(join(parent, ".zitadel/local"), { recursive: true });
+      await writeFile(
+        join(parent, ".zitadel/local/runtime.json"),
+        JSON.stringify({
+          schema_version: 1,
+          backend: "binary",
+          port,
+          server_url: serverUrl,
+          data_dir: join(parent, ".zitadel/local/nextgen-data"),
+          created_at: new Date().toISOString(),
+          cli_version: "0.0.0",
+          pid: 999_999,
+          command: "zitadel-server",
+          log_path: join(parent, ".zitadel/local/server.log"),
+          server_package: "@zitadel/server",
+          server_version: "0.0.0",
+        }),
+      );
+      const app = join(parent, "app");
+      await mkdir(app);
+      return { app, port };
+    }
+
+    async function doctorWithoutPort(cwd: string) {
+      const fake = await fakeDocker();
+      return runCliForTest(
+        ["doctor", "--cwd", cwd, "--json", "--server", "https://api.zitadel.cloud"],
+        { PATH: `${fake.binDir}:${process.env.PATH ?? ""}`, DOCKER_LOG: fake.logPath },
+      );
+    }
+
+    it("checks that server's port", async () => {
+      const { app, port } = await appUnderStartedServer();
+
+      const res = await doctorWithoutPort(app);
+
+      expect((parseJson(res.stdout) as { data: { port: number } }).data.port).toBe(port);
+    });
+
+    it("reports that server healthy", async () => {
+      const { app } = await appUnderStartedServer();
+
+      const res = await doctorWithoutPort(app);
+
+      const checks = (parseJson(res.stdout) as { data: { checks: Check[] } }).data.checks;
+      expect(checks.find((check) => check.name === "runtime")).toMatchObject({
+        status: "pass",
+        message: expect.stringContaining("is healthy"),
+      });
+    });
+  });
+
   it("fails the project-match check when secret and config disagree", async () => {
     const cwd = await makeHealthyProject();
     await writeFile(
@@ -581,13 +644,32 @@ async function startHealthServer(): Promise<string> {
   return `http://127.0.0.1:${String(address.port)}`;
 }
 
-async function freePort(): Promise<number> {
-  const server = createServer();
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
-  const address = server.address();
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  if (!address || typeof address === "string") {
-    throw new Error("free port probe did not expose a TCP address");
-  }
-  return address.port;
-}
+describe("failureAdvice for a runtime found in a parent directory", () => {
+  const failed = [{ name: "runtime", status: "fail" as const, message: "not healthy" }];
+
+  it.each([
+    ["a Windows path with a space", "C:\\work\\my app"],
+    ["a Windows path with an apostrophe", "C:\\work\\it's"],
+    ["a POSIX path with a space", "/home/dev/my app"],
+  ])("hands over %s as arguments, not as commands", (_name, dir) => {
+    const advice = failureAdvice(failed, "image", 8080, "1.0.0", dir);
+
+    expect(advice.nextCommands).toEqual([]);
+    expect(advice.suggestedArgs).toEqual([
+      ["start", "--cwd", dir],
+      ["reset", "--force", "--cwd", dir],
+    ]);
+    expect(advice.hint).toContain("details.suggested_args");
+    expect(advice.hint).toContain(dir);
+    expect(advice.hint).toContain("--json");
+  });
+
+  it("writes the commands out for a path that needs no quoting", () => {
+    const advice = failureAdvice(failed, "image", 8080, "1.0.0", "/home/dev/app");
+
+    expect(advice.nextCommands).toEqual([
+      publicCliCommand("start --cwd /home/dev/app", "1.0.0"),
+      publicCliCommand("reset --force --cwd /home/dev/app", "1.0.0"),
+    ]);
+  });
+});

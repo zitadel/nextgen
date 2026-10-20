@@ -37,7 +37,9 @@ const letters = [
   { id: "l", d: "M477.46 20.93L477.46 100.44L489.5 100.44L489.5 20.93L477.46 20.93Z" },
 ];
 
-export function Logo({ className }: { className?: string }) {
+// `id` prefixes the ids of the clip path and the letters, so the header's logo
+// and the footer's stay apart.
+export function Logo({ className, id: prefix = "logo" }: { className?: string; id?: string }) {
   return (
     <svg
       viewBox="0 0 495 122"
@@ -47,18 +49,18 @@ export function Logo({ className }: { className?: string }) {
       className={`logo ${className ?? ""}`}
     >
       <defs>
-        <clipPath id="logo-window">
+        <clipPath id={`${prefix}-window`}>
           <rect x="129.2" y="16.99" width="398.88" height="88.48" />
         </clipPath>
       </defs>
       <path className="logo-icon" d={icon} />
-      <g clipPath="url(#logo-window)">
+      <g clipPath={`url(#${prefix}-window)`}>
         {letters.map(({ id, d }, index) => (
           // One after another, a sixth of a second apart: 5 of the
           // Lottie's 30 frames a second.
           <g key={id} className="logo-letter" style={{ animationDelay: `${index / 6}s` }}>
-            <path id={`logo-${id}`} d={d} />
-            <use href={`#logo-${id}`} y={-100} />
+            <path id={`${prefix}-${id}`} d={d} />
+            <use href={`#${prefix}-${id}`} y={-100} />
           </g>
         ))}
       </g>

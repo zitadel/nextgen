@@ -256,6 +256,12 @@ describe("DockerLauncher", () => {
       await expect(DockerLauncher.remove("zitadel-server-test")).resolves.toBe(false);
     });
 
+    it("removes nothing, and does not fail, where Docker is not installed", async () => {
+      dockerIsNotInstalled();
+
+      await expect(DockerLauncher.remove("zitadel-server-test")).resolves.toBe(false);
+    });
+
     it("reads the end of the container's log", async () => {
       const calls = fakeDocker({ existing: { running: true } });
 
@@ -276,6 +282,17 @@ describe("DockerLauncher", () => {
     });
   });
 });
+
+/** Fails each `docker` the code spawns the way Node does when there is none on `PATH`. */
+function dockerIsNotInstalled(): void {
+  vi.mocked(spawn).mockImplementation((() => {
+    const child = new EventEmitter();
+    queueMicrotask(() =>
+      child.emit("error", Object.assign(new Error("spawn docker ENOENT"), { code: "ENOENT" })),
+    );
+    return child;
+  }) as unknown as typeof spawn);
+}
 
 type DockerCall = { command: string; args: string[]; env: NodeJS.ProcessEnv };
 
