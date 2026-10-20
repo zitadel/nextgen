@@ -18882,6 +18882,7 @@ func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
 func (*ErrorDetails) listMyTeamsRes()          {}
+func (*ErrorDetails) revokeMySessionRes()      {}
 func (*ErrorDetails) submitFlowStepRes()       {}
 
 // Additional error-specific context.
@@ -28725,6 +28726,186 @@ func (s GetLiveOK) Read(p []byte) (n int, err error) {
 
 func (*GetLiveOK) getLiveRes() {}
 
+// GetMySessionCsrfTokenErrorResponse represents sum type.
+type GetMySessionCsrfTokenErrorResponse struct {
+	Type                GetMySessionCsrfTokenErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessNotFound        SessNotFound
+	SessProjectMismatch SessProjectMismatch
+}
+
+// GetMySessionCsrfTokenErrorResponseType is oneOf type of GetMySessionCsrfTokenErrorResponse.
+type GetMySessionCsrfTokenErrorResponseType string
+
+// Possible values for GetMySessionCsrfTokenErrorResponseType.
+const (
+	AuthUnauthorizedGetMySessionCsrfTokenErrorResponse    GetMySessionCsrfTokenErrorResponseType = "auth.unauthorized"
+	InternalGetMySessionCsrfTokenErrorResponse            GetMySessionCsrfTokenErrorResponseType = "internal"
+	ReqInvalidGetMySessionCsrfTokenErrorResponse          GetMySessionCsrfTokenErrorResponseType = "req.invalid"
+	SessNotFoundGetMySessionCsrfTokenErrorResponse        GetMySessionCsrfTokenErrorResponseType = "sess.not_found"
+	SessProjectMismatchGetMySessionCsrfTokenErrorResponse GetMySessionCsrfTokenErrorResponseType = "sess.project_mismatch"
+)
+
+// IsAuthUnauthorized reports whether GetMySessionCsrfTokenErrorResponse is AuthUnauthorized.
+func (s GetMySessionCsrfTokenErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetMySessionCsrfTokenErrorResponse
+}
+
+// IsInternal reports whether GetMySessionCsrfTokenErrorResponse is Internal.
+func (s GetMySessionCsrfTokenErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetMySessionCsrfTokenErrorResponse
+}
+
+// IsReqInvalid reports whether GetMySessionCsrfTokenErrorResponse is ReqInvalid.
+func (s GetMySessionCsrfTokenErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetMySessionCsrfTokenErrorResponse
+}
+
+// IsSessNotFound reports whether GetMySessionCsrfTokenErrorResponse is SessNotFound.
+func (s GetMySessionCsrfTokenErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundGetMySessionCsrfTokenErrorResponse
+}
+
+// IsSessProjectMismatch reports whether GetMySessionCsrfTokenErrorResponse is SessProjectMismatch.
+func (s GetMySessionCsrfTokenErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchGetMySessionCsrfTokenErrorResponse
+}
+
+// SetAuthUnauthorized sets GetMySessionCsrfTokenErrorResponse to AuthUnauthorized.
+func (s *GetMySessionCsrfTokenErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetMySessionCsrfTokenErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetMySessionCsrfTokenErrorResponse is AuthUnauthorized.
+func (s GetMySessionCsrfTokenErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetMySessionCsrfTokenErrorResponse(v AuthUnauthorized) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetMySessionCsrfTokenErrorResponse to Internal.
+func (s *GetMySessionCsrfTokenErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetMySessionCsrfTokenErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetMySessionCsrfTokenErrorResponse is Internal.
+func (s GetMySessionCsrfTokenErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from Internal.
+func NewInternalGetMySessionCsrfTokenErrorResponse(v Internal) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetMySessionCsrfTokenErrorResponse to ReqInvalid.
+func (s *GetMySessionCsrfTokenErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetMySessionCsrfTokenErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetMySessionCsrfTokenErrorResponse is ReqInvalid.
+func (s GetMySessionCsrfTokenErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from ReqInvalid.
+func NewReqInvalidGetMySessionCsrfTokenErrorResponse(v ReqInvalid) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessNotFound sets GetMySessionCsrfTokenErrorResponse to SessNotFound.
+func (s *GetMySessionCsrfTokenErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundGetMySessionCsrfTokenErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if GetMySessionCsrfTokenErrorResponse is SessNotFound.
+func (s GetMySessionCsrfTokenErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from SessNotFound.
+func NewSessNotFoundGetMySessionCsrfTokenErrorResponse(v SessNotFound) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetSessNotFound(v)
+	return s
+}
+
+// SetSessProjectMismatch sets GetMySessionCsrfTokenErrorResponse to SessProjectMismatch.
+func (s *GetMySessionCsrfTokenErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchGetMySessionCsrfTokenErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if GetMySessionCsrfTokenErrorResponse is SessProjectMismatch.
+func (s GetMySessionCsrfTokenErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchGetMySessionCsrfTokenErrorResponse(v SessProjectMismatch) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// GetMySessionCsrfTokenErrorResponseStatusCode wraps GetMySessionCsrfTokenErrorResponse with StatusCode.
+type GetMySessionCsrfTokenErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetMySessionCsrfTokenErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetMySessionCsrfTokenErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetMySessionCsrfTokenErrorResponseStatusCode) GetResponse() GetMySessionCsrfTokenErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetMySessionCsrfTokenErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetMySessionCsrfTokenErrorResponseStatusCode) SetResponse(val GetMySessionCsrfTokenErrorResponse) {
+	s.Response = val
+}
+
+func (*GetMySessionCsrfTokenErrorResponseStatusCode) getMySessionCsrfTokenRes() {}
+
 // GetMySessionErrorResponse represents sum type.
 type GetMySessionErrorResponse struct {
 	Type                GetMySessionErrorResponseType // switch on this field
@@ -28907,11 +29088,12 @@ func (*GetMySessionErrorResponseStatusCode) getMySessionRes() {}
 
 // GetMyUserErrorResponse represents sum type.
 type GetMyUserErrorResponse struct {
-	Type             GetMyUserErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
-	UserNotFound     UserNotFound
+	Type                GetMyUserErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
 }
 
 // GetMyUserErrorResponseType is oneOf type of GetMyUserErrorResponse.
@@ -28919,10 +29101,11 @@ type GetMyUserErrorResponseType string
 
 // Possible values for GetMyUserErrorResponseType.
 const (
-	AuthUnauthorizedGetMyUserErrorResponse GetMyUserErrorResponseType = "auth.unauthorized"
-	InternalGetMyUserErrorResponse         GetMyUserErrorResponseType = "internal"
-	ReqInvalidGetMyUserErrorResponse       GetMyUserErrorResponseType = "req.invalid"
-	UserNotFoundGetMyUserErrorResponse     GetMyUserErrorResponseType = "user.not_found"
+	AuthUnauthorizedGetMyUserErrorResponse    GetMyUserErrorResponseType = "auth.unauthorized"
+	InternalGetMyUserErrorResponse            GetMyUserErrorResponseType = "internal"
+	ReqInvalidGetMyUserErrorResponse          GetMyUserErrorResponseType = "req.invalid"
+	SessProjectMismatchGetMyUserErrorResponse GetMyUserErrorResponseType = "sess.project_mismatch"
+	UserNotFoundGetMyUserErrorResponse        GetMyUserErrorResponseType = "user.not_found"
 )
 
 // IsAuthUnauthorized reports whether GetMyUserErrorResponse is AuthUnauthorized.
@@ -28936,6 +29119,11 @@ func (s GetMyUserErrorResponse) IsInternal() bool { return s.Type == InternalGet
 // IsReqInvalid reports whether GetMyUserErrorResponse is ReqInvalid.
 func (s GetMyUserErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetMyUserErrorResponse
+}
+
+// IsSessProjectMismatch reports whether GetMyUserErrorResponse is SessProjectMismatch.
+func (s GetMyUserErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchGetMyUserErrorResponse
 }
 
 // IsUserNotFound reports whether GetMyUserErrorResponse is UserNotFound.
@@ -29003,6 +29191,27 @@ func (s GetMyUserErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetMyUserErrorResponse(v ReqInvalid) GetMyUserErrorResponse {
 	var s GetMyUserErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets GetMyUserErrorResponse to SessProjectMismatch.
+func (s *GetMyUserErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchGetMyUserErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if GetMyUserErrorResponse is SessProjectMismatch.
+func (s GetMyUserErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchGetMyUserErrorResponse returns new GetMyUserErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchGetMyUserErrorResponse(v SessProjectMismatch) GetMyUserErrorResponse {
+	var s GetMyUserErrorResponse
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
@@ -35661,10 +35870,11 @@ func (*ListMyProjectsBadRequest) listMyProjectsRes() {}
 
 // ListMyProjectsErrorResponse represents sum type.
 type ListMyProjectsErrorResponse struct {
-	Type             ListMyProjectsErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
+	Type                ListMyProjectsErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
 }
 
 // ListMyProjectsErrorResponseType is oneOf type of ListMyProjectsErrorResponse.
@@ -35672,9 +35882,10 @@ type ListMyProjectsErrorResponseType string
 
 // Possible values for ListMyProjectsErrorResponseType.
 const (
-	AuthUnauthorizedListMyProjectsErrorResponse ListMyProjectsErrorResponseType = "auth.unauthorized"
-	InternalListMyProjectsErrorResponse         ListMyProjectsErrorResponseType = "internal"
-	ReqInvalidListMyProjectsErrorResponse       ListMyProjectsErrorResponseType = "req.invalid"
+	AuthUnauthorizedListMyProjectsErrorResponse    ListMyProjectsErrorResponseType = "auth.unauthorized"
+	InternalListMyProjectsErrorResponse            ListMyProjectsErrorResponseType = "internal"
+	ReqInvalidListMyProjectsErrorResponse          ListMyProjectsErrorResponseType = "req.invalid"
+	SessProjectMismatchListMyProjectsErrorResponse ListMyProjectsErrorResponseType = "sess.project_mismatch"
 )
 
 // IsAuthUnauthorized reports whether ListMyProjectsErrorResponse is AuthUnauthorized.
@@ -35690,6 +35901,11 @@ func (s ListMyProjectsErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether ListMyProjectsErrorResponse is ReqInvalid.
 func (s ListMyProjectsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListMyProjectsErrorResponse
+}
+
+// IsSessProjectMismatch reports whether ListMyProjectsErrorResponse is SessProjectMismatch.
+func (s ListMyProjectsErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchListMyProjectsErrorResponse
 }
 
 // SetAuthUnauthorized sets ListMyProjectsErrorResponse to AuthUnauthorized.
@@ -35752,6 +35968,27 @@ func (s ListMyProjectsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListMyProjectsErrorResponse(v ReqInvalid) ListMyProjectsErrorResponse {
 	var s ListMyProjectsErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets ListMyProjectsErrorResponse to SessProjectMismatch.
+func (s *ListMyProjectsErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchListMyProjectsErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if ListMyProjectsErrorResponse is SessProjectMismatch.
+func (s ListMyProjectsErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchListMyProjectsErrorResponse(v SessProjectMismatch) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
@@ -54954,16 +55191,17 @@ func (*PatchMyUserConflict) patchMyUserRes() {}
 
 // PatchMyUserErrorResponse represents sum type.
 type PatchMyUserErrorResponse struct {
-	Type              PatchMyUserErrorResponseType // switch on this field
-	AuthCsrfInvalid   AuthCsrfInvalid
-	AuthUnauthorized  AuthUnauthorized
-	EvtInvalid        EvtInvalid
-	Internal          Internal
-	ReqInvalid        ReqInvalid
-	UserAlreadyExists UserAlreadyExists
-	UserConflict      UserConflict
-	UserInvalid       UserInvalid
-	UserNotFound      UserNotFound
+	Type                PatchMyUserErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserAlreadyExists   UserAlreadyExists
+	UserConflict        UserConflict
+	UserInvalid         UserInvalid
+	UserNotFound        UserNotFound
 }
 
 // PatchMyUserErrorResponseType is oneOf type of PatchMyUserErrorResponse.
@@ -54971,15 +55209,16 @@ type PatchMyUserErrorResponseType string
 
 // Possible values for PatchMyUserErrorResponseType.
 const (
-	AuthCsrfInvalidPatchMyUserErrorResponse   PatchMyUserErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "auth.unauthorized"
-	EvtInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "evt.invalid"
-	InternalPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "internal"
-	ReqInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "req.invalid"
-	UserAlreadyExistsPatchMyUserErrorResponse PatchMyUserErrorResponseType = "user.already_exists"
-	UserConflictPatchMyUserErrorResponse      PatchMyUserErrorResponseType = "user.conflict"
-	UserInvalidPatchMyUserErrorResponse       PatchMyUserErrorResponseType = "user.invalid"
-	UserNotFoundPatchMyUserErrorResponse      PatchMyUserErrorResponseType = "user.not_found"
+	AuthCsrfInvalidPatchMyUserErrorResponse     PatchMyUserErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedPatchMyUserErrorResponse    PatchMyUserErrorResponseType = "auth.unauthorized"
+	EvtInvalidPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "evt.invalid"
+	InternalPatchMyUserErrorResponse            PatchMyUserErrorResponseType = "internal"
+	ReqInvalidPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "req.invalid"
+	SessProjectMismatchPatchMyUserErrorResponse PatchMyUserErrorResponseType = "sess.project_mismatch"
+	UserAlreadyExistsPatchMyUserErrorResponse   PatchMyUserErrorResponseType = "user.already_exists"
+	UserConflictPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "user.conflict"
+	UserInvalidPatchMyUserErrorResponse         PatchMyUserErrorResponseType = "user.invalid"
+	UserNotFoundPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "user.not_found"
 )
 
 // IsAuthCsrfInvalid reports whether PatchMyUserErrorResponse is AuthCsrfInvalid.
@@ -55005,6 +55244,11 @@ func (s PatchMyUserErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether PatchMyUserErrorResponse is ReqInvalid.
 func (s PatchMyUserErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidPatchMyUserErrorResponse
+}
+
+// IsSessProjectMismatch reports whether PatchMyUserErrorResponse is SessProjectMismatch.
+func (s PatchMyUserErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchPatchMyUserErrorResponse
 }
 
 // IsUserAlreadyExists reports whether PatchMyUserErrorResponse is UserAlreadyExists.
@@ -55132,6 +55376,27 @@ func NewReqInvalidPatchMyUserErrorResponse(v ReqInvalid) PatchMyUserErrorRespons
 	return s
 }
 
+// SetSessProjectMismatch sets PatchMyUserErrorResponse to SessProjectMismatch.
+func (s *PatchMyUserErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchPatchMyUserErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if PatchMyUserErrorResponse is SessProjectMismatch.
+func (s PatchMyUserErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchPatchMyUserErrorResponse(v SessProjectMismatch) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
 // SetUserAlreadyExists sets PatchMyUserErrorResponse to UserAlreadyExists.
 func (s *PatchMyUserErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
 	s.Type = UserAlreadyExistsPatchMyUserErrorResponse
@@ -55243,6 +55508,10 @@ func (s *PatchMyUserErrorResponseStatusCode) SetResponse(val PatchMyUserErrorRes
 }
 
 func (*PatchMyUserErrorResponseStatusCode) patchMyUserRes() {}
+
+type PatchMyUserForbidden ErrorDetails
+
+func (*PatchMyUserForbidden) patchMyUserRes() {}
 
 // A partial update of the caller's own attributes, merged into the current
 // state: an omitted key stays untouched, an object merges recursively,
@@ -63470,13 +63739,14 @@ func (*RequestApiDef) requestApiRes() {}
 
 // RevokeMySessionErrorResponse represents sum type.
 type RevokeMySessionErrorResponse struct {
-	Type             RevokeMySessionErrorResponseType // switch on this field
-	AuthCsrfInvalid  AuthCsrfInvalid
-	AuthUnauthorized AuthUnauthorized
-	EvtInvalid       EvtInvalid
-	Internal         Internal
-	ReqInvalid       ReqInvalid
-	SessNotFound     SessNotFound
+	Type                RevokeMySessionErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessNotFound        SessNotFound
+	SessProjectMismatch SessProjectMismatch
 }
 
 // RevokeMySessionErrorResponseType is oneOf type of RevokeMySessionErrorResponse.
@@ -63484,12 +63754,13 @@ type RevokeMySessionErrorResponseType string
 
 // Possible values for RevokeMySessionErrorResponseType.
 const (
-	AuthCsrfInvalidRevokeMySessionErrorResponse  RevokeMySessionErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedRevokeMySessionErrorResponse RevokeMySessionErrorResponseType = "auth.unauthorized"
-	EvtInvalidRevokeMySessionErrorResponse       RevokeMySessionErrorResponseType = "evt.invalid"
-	InternalRevokeMySessionErrorResponse         RevokeMySessionErrorResponseType = "internal"
-	ReqInvalidRevokeMySessionErrorResponse       RevokeMySessionErrorResponseType = "req.invalid"
-	SessNotFoundRevokeMySessionErrorResponse     RevokeMySessionErrorResponseType = "sess.not_found"
+	AuthCsrfInvalidRevokeMySessionErrorResponse     RevokeMySessionErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedRevokeMySessionErrorResponse    RevokeMySessionErrorResponseType = "auth.unauthorized"
+	EvtInvalidRevokeMySessionErrorResponse          RevokeMySessionErrorResponseType = "evt.invalid"
+	InternalRevokeMySessionErrorResponse            RevokeMySessionErrorResponseType = "internal"
+	ReqInvalidRevokeMySessionErrorResponse          RevokeMySessionErrorResponseType = "req.invalid"
+	SessNotFoundRevokeMySessionErrorResponse        RevokeMySessionErrorResponseType = "sess.not_found"
+	SessProjectMismatchRevokeMySessionErrorResponse RevokeMySessionErrorResponseType = "sess.project_mismatch"
 )
 
 // IsAuthCsrfInvalid reports whether RevokeMySessionErrorResponse is AuthCsrfInvalid.
@@ -63520,6 +63791,11 @@ func (s RevokeMySessionErrorResponse) IsReqInvalid() bool {
 // IsSessNotFound reports whether RevokeMySessionErrorResponse is SessNotFound.
 func (s RevokeMySessionErrorResponse) IsSessNotFound() bool {
 	return s.Type == SessNotFoundRevokeMySessionErrorResponse
+}
+
+// IsSessProjectMismatch reports whether RevokeMySessionErrorResponse is SessProjectMismatch.
+func (s RevokeMySessionErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchRevokeMySessionErrorResponse
 }
 
 // SetAuthCsrfInvalid sets RevokeMySessionErrorResponse to AuthCsrfInvalid.
@@ -63645,6 +63921,27 @@ func (s RevokeMySessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool
 func NewSessNotFoundRevokeMySessionErrorResponse(v SessNotFound) RevokeMySessionErrorResponse {
 	var s RevokeMySessionErrorResponse
 	s.SetSessNotFound(v)
+	return s
+}
+
+// SetSessProjectMismatch sets RevokeMySessionErrorResponse to SessProjectMismatch.
+func (s *RevokeMySessionErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchRevokeMySessionErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if RevokeMySessionErrorResponse is SessProjectMismatch.
+func (s RevokeMySessionErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchRevokeMySessionErrorResponse returns new RevokeMySessionErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchRevokeMySessionErrorResponse(v SessProjectMismatch) RevokeMySessionErrorResponse {
+	var s RevokeMySessionErrorResponse
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
@@ -66107,6 +66404,9 @@ func (s *SessProjectMismatch) SetDetails(val OptSessProjectMismatchDetails) {
 	s.Details = val
 }
 
+func (*SessProjectMismatch) getMyUserRes()      {}
+func (*SessProjectMismatch) listMyProjectsRes() {}
+
 // Additional error-specific context.
 type SessProjectMismatchDetails map[string]jx.Raw
 
@@ -66145,7 +66445,8 @@ func (s *SessProjectMismatchHeaders) SetResponse(val SessProjectMismatch) {
 	s.Response = val
 }
 
-func (*SessProjectMismatchHeaders) getMySessionRes() {}
+func (*SessProjectMismatchHeaders) getMySessionCsrfTokenRes() {}
+func (*SessProjectMismatchHeaders) getMySessionRes()          {}
 
 // Merged schema.
 // Ref: #

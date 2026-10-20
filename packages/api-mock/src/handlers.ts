@@ -534,11 +534,17 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       return getExchangeHandoffResponseMock();
     }),
     // The session endpoints `<zitadel-session>` and `<zitadel-logout>` read on
-    // mount. In-process there is no session cookie to present, so both answer
-    // the contract's 401 for a signed-out browser.
+    // mount and on sign-out. In-process there is no session cookie to present,
+    // so all of them answer the contract's 401 for a signed-out browser.
     http.get("*/sessions/me", () =>
       HttpResponse.json(
         { code: "auth.unauthorized", message: "Missing or invalid session token." },
+        { status: 401, headers: { "Cache-Control": "private, no-store" } },
+      ),
+    ),
+    http.get("*/sessions/me/csrf", () =>
+      HttpResponse.json(
+        { code: "auth.unauthorized", message: "no session cookie" },
         { status: 401, headers: { "Cache-Control": "private, no-store" } },
       ),
     ),

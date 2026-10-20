@@ -3,25 +3,37 @@
    (packages/components/src/orchestrator/templates/layout-chrome.css) gives
    the card's title, subtitle, field group, actions and register line, and its
    "Secured with" trustmark. Everything reads the --zl-* properties set on
-   .preview, so the brand row visitor's choices reach every part. */
+   .preview, so the brand step visitor's choices reach every part. */
 
+/* The page fills its browser frame, the card centered on a faint dot grid of
+   its own foreground, so the ground reads as a page and not as a void. */
 .preview {
   display: flex;
+  flex: 1;
   /* About a one-field card's height, so the frame holds its place while the
      atoms load. */
-  min-height: 28rem;
+  min-height: 26rem;
   align-items: center;
   justify-content: center;
-  padding: 2.5rem 1.25rem;
+  padding: 2rem 1.25rem;
   /* The fallbacks hold until the atoms and their tokens have loaded. */
-  background: var(--zl-background, #050505);
+  background-color: var(--zl-background, #050505);
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--zl-foreground, #fafafa) 9%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 1rem 1rem;
+  background-position: center;
   color: var(--zl-foreground, #fafafa);
   font-family: var(--zl-font-family-sans, inherit);
+  transition:
+    background-color 300ms ease,
+    color 300ms ease;
 }
 
-/* The screens of a step in one place, before under after: the stack takes
-   the taller one's height, and each starts at its top, so the switch adds or
-   removes a field where it would appear. */
+/* Every screen of a step in one place, each with its trustmark under it: the
+   stack takes the tallest one's height, and each starts at its top, so
+   switching or walking adds or removes a field where it would appear. */
 .stack {
   display: grid;
   width: 100%;
@@ -35,11 +47,20 @@
   flex-direction: column;
   align-items: center;
   gap: 1.25rem;
-  transition: opacity 400ms ease;
+  transition:
+    opacity 300ms ease,
+    translate 300ms ease;
 }
 
 .layer[data-shown="false"] {
   opacity: 0;
+  translate: 0 0.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layer {
+    transition: none;
+  }
 }
 
 .preview :global(.zl-card-title) {

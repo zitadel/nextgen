@@ -29,9 +29,6 @@ export default defineConfig({
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
       edgeProject({
-        // The server middleware runs on edge Nitro presets, so its canonical tests
-        // must run in the edge VM too, which has no `node:` modules and no socket.
-        include: ["src/__tests__/server/middleware.test.ts"],
         alias,
         // h3 depends on `node-mock-http` for its Node adapter, which Nitro's edge
         // presets polyfill with unenv; nothing of ours reaches a Node built-in.

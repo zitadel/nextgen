@@ -1044,7 +1044,7 @@ func TestPatchMyUser(t *testing.T) {
 			"attributes": map[string]any{"nickname": "Myself"},
 		}))))
 
-		resp, err := client.PatchMyUser(t.Context(), patch)
+		resp, err := client.PatchMyUser(t.Context(), patch, api.PatchMyUserParams{})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 		assert.Equal(t, "Myself", userProp(t, *resp.(*api.User), "nickname"))
@@ -1231,7 +1231,7 @@ func TestGetMyUser(t *testing.T) {
 		// GET USER USING TOKEN
 
 		client.SetSessionToken(sessionToken)
-		resp, err := client.GetMyUser(t.Context())
+		resp, err := client.GetMyUser(t.Context(), api.GetMyUserParams{})
 		assert.NoError(t, err)
 
 		assert.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
@@ -1265,6 +1265,92 @@ func TestGetMyUser(t *testing.T) {
 		assert.Equal(t, "auth.unauthorized", answer.Code)
 		assert.Equal(t, "Missing or invalid session token.", answer.Message)
 	})
+}
+
+// TestMyUser_HoldsTheSessionToTheNamedProject pins project-bound calls on the
+// session's user: with project_id, a live session of another project on the
+// same server is refused with 403 sess.project_mismatch by the user read, its
+// patch and the list of its projects alike, and the refused patch changes
+// nothing. Its own project is served as before.
+func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
+	t.Parallel()
+
+	projects := harness.EnsureProjectService(t)
+	project, err := projects.Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	// Nothing is read from it: it only has to be a project the session does not
+	// belong to.
+	otherProject, err := projects.Create(t.Context(), helpers.ProjectName(), nil, false)
+	require.NoError(t, err)
+
+	userService := harness.EnsureUserService(t)
+	user, err := userService.CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID:  project.ID,
+		SchemaURL:  test_data.UserSchemaURL,
+		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testmyuserproject@example.com"),
+	})
+	require.NoError(t, err)
+	const password = "fake-password"
+	require.NoError(t, userService.SetPassword(t.Context(), service.SetPasswordInput{
+		ProjectID: project.ID,
+		UserID:    user.ID,
+		Password:  password,
+	}))
+	session, err := helpers.CreateSessionUsingPassword(t,
+		harness.EnsureAuthAttemptService(t),
+		harness.EnsureSessionService(t),
+		project.ID,
+		user.StringAttribute("email"),
+		password,
+	)
+	require.NoError(t, err)
+	tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	sessionToken, err := session.Token(tokenCrypter)
+	require.NoError(t, err)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetSessionToken(sessionToken)
+
+	own := api.NewOptProjectID(api.ProjectID(project.ID))
+	other := api.NewOptProjectID(api.ProjectID(otherProject.ID))
+	nickname := func(value string) *api.PatchMyUserRequest {
+		patch := &api.PatchMyUserRequest{}
+		require.NoError(t, patch.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{
+			"attributes": map[string]any{"nickname": value},
+		}))))
+		return patch
+	}
+
+	read, err := client.GetMyUser(t.Context(), api.GetMyUserParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, read, helpers.MustMarshal(t, read))
+	assert.Equal(t, "sess.project_mismatch", read.(*api.SessProjectMismatch).Code)
+
+	patched, err := client.PatchMyUser(t.Context(), nickname("Intruder"), api.PatchMyUserParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.PatchMyUserForbidden{}, patched, helpers.MustMarshal(t, patched))
+	assert.Equal(t, api.ErrorCode("sess.project_mismatch"), patched.(*api.PatchMyUserForbidden).Code)
+
+	listed, err := client.ListMyProjects(t.Context(), api.ListMyProjectsParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, listed, helpers.MustMarshal(t, listed))
+	assert.Equal(t, "sess.project_mismatch", listed.(*api.SessProjectMismatch).Code)
+
+	read, err = client.GetMyUser(t.Context(), api.GetMyUserParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.User{}, read, helpers.MustMarshal(t, read))
+	assert.Equal(t, api.UserID(user.ID), read.(*api.User).ID)
+	assert.NotContains(t, read.(*api.User).Attributes, "nickname", "the refused patch changed nothing")
+
+	patched, err = client.PatchMyUser(t.Context(), nickname("Myself"), api.PatchMyUserParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.User{}, patched, helpers.MustMarshal(t, patched))
+	assert.Equal(t, "Myself", userProp(t, *patched.(*api.User), "nickname"))
+
+	listed, err = client.ListMyProjects(t.Context(), api.ListMyProjectsParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListMyProjectsResponseHeaders{}, listed, helpers.MustMarshal(t, listed))
 }
 
 func TestListPasskeys(t *testing.T) {
