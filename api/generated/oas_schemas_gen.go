@@ -23834,7 +23834,10 @@ func (s *FlowStepGates) init() FlowStepGates {
 // `texts.description_key` is the place for that.
 type FlowStepIdentifier struct {
 	// The identifier the user supplied. Use it as the input's
-	// `value`, verbatim.
+	// `value`, verbatim. After an identity provider's sign-in
+	// collided with an existing account, it is the address that
+	// provider verified; an address the provider did not verify is
+	// not sent unless the user typed it.
 	Value string `json:"value"`
 	// Value for the input's HTML `autocomplete` attribute, used
 	// verbatim. `username` is the token that pairs an identifier
