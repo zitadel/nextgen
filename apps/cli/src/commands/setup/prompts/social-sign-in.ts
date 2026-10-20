@@ -168,7 +168,12 @@ export class SocialSignInPrompt implements SetupPrompt {
         claimsOrRefuse(applyRequest(seeded, given), "");
       }
       const claims =
-        given !== undefined && asksForClaims(given) ? given : await askClaims(seeded, ctx.input);
+        given !== undefined && asksForClaims(given)
+          ? given
+          : // A box like the one above it, not a log line inside the wizard's frame.
+            await askClaims(seeded, ctx.input, ([title, ...lines]) =>
+              note(lines.join("\n"), title?.replace(/:$/, "")),
+            );
 
       const clientId = await ctx.input({
         kind: "text",

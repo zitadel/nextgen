@@ -23,14 +23,17 @@ import {
 
 type Verification = "none" | "claim" | "trust";
 
+/** How the wizard shows a block of lines: as a log message unless the caller has a frame of its own. */
+export type SayLines = (lines: readonly string[]) => void;
+
+const sayAsLog: SayLines = (lines) => {
+  consola.info(`${lines[0]}\n  ${lines.slice(1).join("\n  ")}`);
+};
+
 /** What the developer is told before being asked for more: what is mapped already. */
-function announceDefaults(state: MappingState): void {
+function announceDefaults(state: MappingState, say: SayLines): void {
   const lines = describeMapping(state);
-  consola.info(
-    lines.length === 0
-      ? "No claims are mapped to the user schema yet."
-      : `Claims mapped to the user schema:\n  ${lines.join("\n  ")}`,
-  );
+  say(["Claims mapped to the user schema:", ...(lines.length === 0 ? ["(none yet)"] : lines)]);
 }
 
 /**
@@ -47,8 +50,12 @@ function announceDefaults(state: MappingState): void {
  * carried, so both ways of asking meet in the same place. Interactive only:
  * the caller never runs it when nobody can answer.
  */
-export async function askClaims(state: MappingState, ask: Asker): Promise<ClaimRequest> {
-  announceDefaults(state);
+export async function askClaims(
+  state: MappingState,
+  ask: Asker,
+  say: SayLines = sayAsLog,
+): Promise<ClaimRequest> {
+  announceDefaults(state, say);
   const entries: ClaimEntry[] = [];
   const verified: VerifiedEntry[] = [];
   const scopes: string[] = [];
@@ -155,7 +162,7 @@ export async function askClaims(state: MappingState, ask: Asker): Promise<ClaimR
         verified.push({ attribute, source });
       }
     }
-    announceDefaults(current);
+    announceDefaults(current, say);
   }
   return { entries, verified: [...verified], scopes: [...new Set(scopes)] };
 }

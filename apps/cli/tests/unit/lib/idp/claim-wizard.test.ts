@@ -89,6 +89,19 @@ describe("askClaims", () => {
     expect(hints).toContain("string, required, unique, replaces email");
   });
 
+  it("hands the mapping to the caller's own renderer when it has one", async () => {
+    const { ask } = scripted([false]);
+    const shown: (readonly string[])[] = [];
+
+    await askClaims(state(), ask, (lines) => shown.push(lines));
+
+    expect(shown[0]).toEqual([
+      "Claims mapped to the user schema:",
+      "email ← email (verified by email_verified)",
+      "givenName ← given_name",
+    ]);
+  });
+
   it("maps a claim the person names to a property they choose", async () => {
     const { ask } = scripted([true, "badge_number", "string", "badge", "", false]);
 
