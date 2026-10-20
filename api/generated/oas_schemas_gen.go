@@ -23864,7 +23864,11 @@ type FlowSubmitRequest struct {
 	SessionToken OptString `json:"session_token"`
 	// Which action to take. Must be a key from the step's `actions` dictionary:
 	// - A regular action (e.g., "submit", "register", "back")
-	// - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`).
+	// - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`)
+	// A name the current step does not declare is refused with 400
+	// (`flow.invalid_action`). That includes the outcome names the engine
+	// routes on its own (`user_not_found`, `user_already_exists`,
+	// `sso_user_not_found`, `sso_authenticated`), which are never actions.
 	Action string `json:"action"`
 	// User input values. Keys match field names from the step's `fields` dictionary.
 	Fields OptFlowSubmitRequestFields `json:"fields"`
@@ -28720,11 +28724,12 @@ func (*GetLiveOK) getLiveRes() {}
 
 // GetMySessionErrorResponse represents sum type.
 type GetMySessionErrorResponse struct {
-	Type             GetMySessionErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
-	SessNotFound     SessNotFound
+	Type                GetMySessionErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessNotFound        SessNotFound
+	SessProjectMismatch SessProjectMismatch
 }
 
 // GetMySessionErrorResponseType is oneOf type of GetMySessionErrorResponse.
@@ -28732,10 +28737,11 @@ type GetMySessionErrorResponseType string
 
 // Possible values for GetMySessionErrorResponseType.
 const (
-	AuthUnauthorizedGetMySessionErrorResponse GetMySessionErrorResponseType = "auth.unauthorized"
-	InternalGetMySessionErrorResponse         GetMySessionErrorResponseType = "internal"
-	ReqInvalidGetMySessionErrorResponse       GetMySessionErrorResponseType = "req.invalid"
-	SessNotFoundGetMySessionErrorResponse     GetMySessionErrorResponseType = "sess.not_found"
+	AuthUnauthorizedGetMySessionErrorResponse    GetMySessionErrorResponseType = "auth.unauthorized"
+	InternalGetMySessionErrorResponse            GetMySessionErrorResponseType = "internal"
+	ReqInvalidGetMySessionErrorResponse          GetMySessionErrorResponseType = "req.invalid"
+	SessNotFoundGetMySessionErrorResponse        GetMySessionErrorResponseType = "sess.not_found"
+	SessProjectMismatchGetMySessionErrorResponse GetMySessionErrorResponseType = "sess.project_mismatch"
 )
 
 // IsAuthUnauthorized reports whether GetMySessionErrorResponse is AuthUnauthorized.
@@ -28756,6 +28762,11 @@ func (s GetMySessionErrorResponse) IsReqInvalid() bool {
 // IsSessNotFound reports whether GetMySessionErrorResponse is SessNotFound.
 func (s GetMySessionErrorResponse) IsSessNotFound() bool {
 	return s.Type == SessNotFoundGetMySessionErrorResponse
+}
+
+// IsSessProjectMismatch reports whether GetMySessionErrorResponse is SessProjectMismatch.
+func (s GetMySessionErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchGetMySessionErrorResponse
 }
 
 // SetAuthUnauthorized sets GetMySessionErrorResponse to AuthUnauthorized.
@@ -28839,6 +28850,27 @@ func (s GetMySessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
 func NewSessNotFoundGetMySessionErrorResponse(v SessNotFound) GetMySessionErrorResponse {
 	var s GetMySessionErrorResponse
 	s.SetSessNotFound(v)
+	return s
+}
+
+// SetSessProjectMismatch sets GetMySessionErrorResponse to SessProjectMismatch.
+func (s *GetMySessionErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchGetMySessionErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if GetMySessionErrorResponse is SessProjectMismatch.
+func (s GetMySessionErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchGetMySessionErrorResponse returns new GetMySessionErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchGetMySessionErrorResponse(v SessProjectMismatch) GetMySessionErrorResponse {
+	var s GetMySessionErrorResponse
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
@@ -50322,6 +50354,52 @@ func (o OptSessPermissionDeniedDetails) Or(d SessPermissionDeniedDetails) SessPe
 	return d
 }
 
+// NewOptSessProjectMismatchDetails returns new OptSessProjectMismatchDetails with value set to v.
+func NewOptSessProjectMismatchDetails(v SessProjectMismatchDetails) OptSessProjectMismatchDetails {
+	return OptSessProjectMismatchDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessProjectMismatchDetails is optional SessProjectMismatchDetails.
+type OptSessProjectMismatchDetails struct {
+	Value SessProjectMismatchDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSessProjectMismatchDetails was set.
+func (o OptSessProjectMismatchDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessProjectMismatchDetails) Reset() {
+	var v SessProjectMismatchDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessProjectMismatchDetails) SetTo(v SessProjectMismatchDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessProjectMismatchDetails) Get() (v SessProjectMismatchDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessProjectMismatchDetails) Or(d SessProjectMismatchDetails) SessProjectMismatchDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSessTokenCreationFailedDetails returns new OptSessTokenCreationFailedDetails with value set to v.
 func NewOptSessTokenCreationFailedDetails(v SessTokenCreationFailedDetails) OptSessTokenCreationFailedDetails {
 	return OptSessTokenCreationFailedDetails{
@@ -65719,6 +65797,87 @@ func (s *SessPermissionDeniedDetails) init() SessPermissionDeniedDetails {
 	}
 	return m
 }
+
+// Merged schema.
+// Ref: #
+type SessProjectMismatch struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSessProjectMismatchDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SessProjectMismatch) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SessProjectMismatch) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SessProjectMismatch) GetDetails() OptSessProjectMismatchDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SessProjectMismatch) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SessProjectMismatch) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SessProjectMismatch) SetDetails(val OptSessProjectMismatchDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SessProjectMismatchDetails map[string]jx.Raw
+
+func (s *SessProjectMismatchDetails) init() SessProjectMismatchDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// SessProjectMismatchHeaders wraps SessProjectMismatch with response headers.
+type SessProjectMismatchHeaders struct {
+	CacheControl OptString
+	Response     SessProjectMismatch
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *SessProjectMismatchHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *SessProjectMismatchHeaders) GetResponse() SessProjectMismatch {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *SessProjectMismatchHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SessProjectMismatchHeaders) SetResponse(val SessProjectMismatch) {
+	s.Response = val
+}
+
+func (*SessProjectMismatchHeaders) getMySessionRes() {}
 
 // Merged schema.
 // Ref: #

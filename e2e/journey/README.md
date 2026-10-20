@@ -9,7 +9,7 @@ repo, runs the customer local CLI flow through `npx`, starts the generated apps,
 and verifies that real users can register, log out, and log in again across
 every supported framework: the SPA families (React, Vue, Angular, Solid,
 Svelte, Qwik) and the meta-frameworks (Next, Nuxt, SvelteKit, TanStack Start,
-SolidStart, Qwik City). `scripts/frameworks.mjs` is the authoritative list.
+SolidStart, Qwik Router). `scripts/frameworks.mjs` is the authoritative list.
 
 ## Local runner
 
@@ -48,7 +48,7 @@ moon run e2e:journey -- --tarballs-dir dist/release/<version>/npm
 ```
 
 - `--framework <id>` runs one framework (any id in `frameworkIds` in
-  `scripts/frameworks.mjs`, e.g. `next`, `sveltekit`, `qwik-city`) instead of
+  `scripts/frameworks.mjs`, e.g. `next`, `sveltekit`, `qwik-router`) instead of
   the full matrix.
 - `--suite frameworks|testkit` selects the lane: `frameworks` (default) runs
   the scaffold journey matrix; `testkit` runs the `@zitadel/testing` consumer
@@ -111,7 +111,7 @@ its CLI steps in `timings.json` in the lane's work dir, which the runner reads.
 ## CI gate
 
 The required PR CI job runs the framework matrix against the default binary
-runtime. The matrix skips SvelteKit, TanStack Start, SolidStart and Qwik City
+runtime. The matrix skips SvelteKit, TanStack Start, SolidStart and Qwik Router
 (`ciExcludedFrameworkIds` in `scripts/frameworks.mjs`): their scaffolders track
 upstream `create-*@latest` releases, so a red lane could come from outside the PR.
 They stay registered and run by hand with `--framework`. It does not use public Zitadel packages or GHCR images; it publishes

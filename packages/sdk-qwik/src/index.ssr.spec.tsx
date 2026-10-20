@@ -2,6 +2,7 @@ import { renderToString } from "@qwik.dev/core/server";
 import { describe, expect, it } from "vitest";
 
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
+import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
 
 const project = {
   projectId: "proj-test",
@@ -23,14 +24,17 @@ async function serverAttributes(
   const open = new RegExp(`<${tag}(\\s[^>]*)?>`).exec(html);
   expect(open, `<${tag}> missing from server HTML`).not.toBeNull();
   return Object.fromEntries(
-    [...(open?.[1] ?? "").matchAll(/([a-z][\w-]*)(?:="([^"]*)")?/g)].map((m) => [m[1], m[2] ?? ""]),
+    [...(open?.[1] ?? "").matchAll(/([a-z][\w-]*)(?:="([^"]*)")?/gi)].map((m) => [
+      m[1]?.toLowerCase(),
+      m[2] ?? "",
+    ]),
   );
 }
 
 describe("server-rendered widget config", () => {
   it("emits the login config in the server HTML", async () => {
     const attrs = await serverAttributes(
-      "zitadel-login",
+      widgetTags.login,
       <ZitadelLogin
         project={project}
         purpose="register"
@@ -64,11 +68,11 @@ describe("server-rendered widget config", () => {
 
   it("serializes an explicit empty proxy path as the root", async () => {
     const withHandle = await serverAttributes(
-      "zitadel-login",
+      widgetTags.login,
       <ZitadelLogin project={{ projectId: "proj-test", proxyPath: "" }} />,
     );
     const discrete = await serverAttributes(
-      "zitadel-login",
+      widgetTags.login,
       <ZitadelLogin projectId="proj-test" proxyPath="" />,
     );
 
@@ -77,7 +81,7 @@ describe("server-rendered widget config", () => {
   });
 
   it("omits the resume handle and the flags when they are unset", async () => {
-    const attrs = await serverAttributes("zitadel-login", <ZitadelLogin project={project} />);
+    const attrs = await serverAttributes(widgetTags.login, <ZitadelLogin project={project} />);
 
     expect(attrs).not.toHaveProperty("resume-flow-id");
     expect(attrs).not.toHaveProperty("suppress-header");
@@ -86,7 +90,7 @@ describe("server-rendered widget config", () => {
 
   it("omits a null resume handle", async () => {
     const attrs = await serverAttributes(
-      "zitadel-login",
+      widgetTags.login,
       <ZitadelLogin project={project} resumeFlowId={null} />,
     );
 
@@ -95,7 +99,7 @@ describe("server-rendered widget config", () => {
 
   it("emits the logout config in the server HTML", async () => {
     const attrs = await serverAttributes(
-      "zitadel-logout",
+      widgetTags.logout,
       <ZitadelLogout project={project} postSignOutUrl="/login" theme="dark" />,
     );
 
@@ -110,7 +114,7 @@ describe("server-rendered widget config", () => {
 
   it("emits the session config in the server HTML", async () => {
     const attrs = await serverAttributes(
-      "zitadel-session",
+      widgetTags.session,
       <ZitadelSession
         project={project}
         postSignOutUrl="/login"
@@ -136,7 +140,7 @@ describe("server-rendered widget config", () => {
   });
 
   it("leaves heading and logoutLabel to the widget's own defaults when unset", async () => {
-    const attrs = await serverAttributes("zitadel-session", <ZitadelSession project={project} />);
+    const attrs = await serverAttributes(widgetTags.session, <ZitadelSession project={project} />);
 
     expect(attrs).not.toHaveProperty("heading");
     expect(attrs).not.toHaveProperty("logout-label");
@@ -144,7 +148,7 @@ describe("server-rendered widget config", () => {
 
   it("emits the discrete project id and proxy path", async () => {
     const attrs = await serverAttributes(
-      "zitadel-login",
+      widgetTags.login,
       <ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />,
     );
 
@@ -155,3 +159,53 @@ describe("server-rendered widget config", () => {
     });
   });
 });
+
+/** The attributes on the widget's element in the markup a server would send. */
+async function renderAttributes(
+  widget: WidgetName,
+  props: Readonly<Record<string, unknown>>,
+): Promise<Record<string, string>> {
+  const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
+  const { tabindex, ...rest } = props;
+  return serverAttributes(
+    widgetTags[widget],
+    <Widget {...rest} {...(typeof tabindex === "string" ? { tabIndex: Number(tabindex) } : {})} />,
+  );
+}
+
+// standard-attributes-server:begin
+describe.each(widgetNames)("%s server-rendered standard attributes", (widget) => {
+  it("puts the standard attributes into the server markup", async () => {
+    const attributes = await renderAttributes(widget, {
+      id: "probe",
+      title: "probe",
+      slot: "probe",
+      role: "region",
+      tabindex: "3",
+      "data-testid": "probe",
+      "aria-label": "probe",
+    });
+    expect(attributes).toMatchObject({
+      id: "probe",
+      title: "probe",
+      slot: "probe",
+      role: "region",
+      tabindex: "3",
+      "data-testid": "probe",
+      "aria-label": "probe",
+    });
+  });
+
+  it("leaves props outside the standard set out of the server markup", async () => {
+    const attributes = await renderAttributes(widget, {
+      srcdoc: "probe",
+      onclick: "probe",
+      part: "probe",
+      dir: "probe",
+    });
+    for (const name of ["srcdoc", "onclick", "part", "dir"]) {
+      expect(attributes).not.toHaveProperty(name);
+    }
+  });
+});
+// standard-attributes-server:end

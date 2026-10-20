@@ -28,12 +28,14 @@ func HashHandoffToken(plain string) []byte {
 	return sum[:]
 }
 
-// ExchangeTTL returns ttl when positive, otherwise SessionAnonymousTTL.
+// ExchangeTTL returns ttl when positive, otherwise SessionDefaultTTL. An
+// exchange ends a sign-in, so the session it leaves must not keep the short
+// lifetime of an anonymous shell.
 func ExchangeTTL(ttl time.Duration) time.Duration {
 	if ttl > 0 {
 		return ttl
 	}
-	return domain.SessionAnonymousTTL
+	return domain.SessionDefaultTTL
 }
 
 // ValidateHandoffAttempt rejects missing, expired, or incomplete handoff state.

@@ -23,7 +23,6 @@ export default defineNuxtConfig({
     },
   },
   runtimeConfig: {
-    zitadelUrl: process.env.ZITADEL_URL ?? "http://localhost:8080",
     public: {
       nextgenProxyPath: "/__nextgen",
       zitadelProjectId: process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID ?? "proj_demo",
