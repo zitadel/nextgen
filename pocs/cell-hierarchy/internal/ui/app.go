@@ -82,6 +82,16 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /create/app", a.handleCreateAppForm)
 	mux.HandleFunc("GET /cells/{label}", a.handleCellDetail)
 	mux.HandleFunc("GET /projects/{id}", a.handleProjectDetail)
+	mux.HandleFunc("POST /projects/{id}/users", a.handleProjectCreateUser)
+	mux.HandleFunc("POST /projects/{id}/users/delete", a.handleProjectDeleteUser)
+	mux.HandleFunc("POST /projects/{id}/teams", a.handleProjectCreateTeam)
+	mux.HandleFunc("POST /projects/{id}/teams/delete", a.handleProjectDeleteTeam)
+	mux.HandleFunc("POST /projects/{id}/apps", a.handleProjectCreateApp)
+	mux.HandleFunc("POST /projects/{id}/apps/delete", a.handleProjectDeleteApp)
+	mux.HandleFunc("POST /projects/{id}/groups", a.handleProjectCreateGroup)
+	mux.HandleFunc("POST /projects/{id}/groups/delete", a.handleProjectDeleteGroup)
+	mux.HandleFunc("POST /projects/{id}/tuples", a.handleProjectCreateTuple)
+	mux.HandleFunc("POST /projects/{id}/tuples/tombstone", a.handleProjectTombstoneTuple)
 	mux.HandleFunc("GET /scenarios", a.handleScenarios)
 	mux.HandleFunc("POST /scenarios/create-user", a.handleScenarioCreateUser)
 	mux.HandleFunc("POST /scenarios/lookup", a.handleScenarioLookup)
@@ -226,19 +236,23 @@ type projectDetail struct {
 	Lookup    []lookupRow
 	Apps      []cell.AppView
 	Teams     []cell.TeamView
+	Groups    []cell.GroupView
 	Tuples    []cell.TupleView
 	Interests []cell.InterestView
+	FlashOK   string
+	FlashErr  string
 	Error     string
 }
 
 type userRow struct {
-	ID        string  `json:"id"`
-	ProjectID string  `json:"project_id"`
-	Email     string  `json:"email"`
-	Epoch     int     `json:"epoch"`
-	Blocked   bool    `json:"blocked"`
-	DeletedAt *string `json:"deleted_at,omitempty"`
-	CreatedAt string  `json:"created_at"`
+	ID                   string  `json:"id"`
+	ProjectID            string  `json:"project_id"`
+	Email                string  `json:"email"`
+	Epoch                int     `json:"epoch"`
+	Blocked              bool    `json:"blocked"`
+	DeletedAt            *string `json:"deleted_at,omitempty"`
+	LifecycleOwnerTeamID string  `json:"lifecycle_owner_team_id,omitempty"`
+	CreatedAt            string  `json:"created_at"`
 }
 
 type lookupRow struct {
@@ -359,11 +373,14 @@ func (a *App) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
-	detail := &projectDetail{}
+	detail := &projectDetail{
+		FlashOK:  r.URL.Query().Get("ok"),
+		FlashErr: r.URL.Query().Get("err"),
+	}
 	hostURL, proj, err := a.findProject(ctx, id)
 	if err != nil {
 		detail.Error = err.Error()
-		a.render(w, "project", pageData{Title: "Project " + id, Project: detail})
+		a.render(w, "project", pageData{Title: "Project " + id, Project: detail, Trace: a.copyTrace()})
 		return
 	}
 	detail.Project = proj
@@ -372,6 +389,7 @@ func (a *App) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
 		Lookup    []lookupRow         `json:"lookup"`
 		Apps      []cell.AppView      `json:"apps"`
 		Teams     []cell.TeamView     `json:"teams"`
+		Groups    []cell.GroupView    `json:"groups"`
 		Tuples    []cell.TupleView    `json:"tuples"`
 		Interests []cell.InterestView `json:"interests"`
 	}
@@ -382,6 +400,7 @@ func (a *App) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
 		detail.Lookup = raw.Lookup
 		detail.Apps = raw.Apps
 		detail.Teams = raw.Teams
+		detail.Groups = raw.Groups
 		detail.Tuples = raw.Tuples
 		detail.Interests = raw.Interests
 	}

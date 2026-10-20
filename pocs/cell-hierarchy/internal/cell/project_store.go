@@ -40,13 +40,14 @@ type Project struct {
 }
 
 type User struct {
-	ID        string
-	ProjectID string
-	Email     string
-	Epoch     int
-	Blocked   bool
-	DeletedAt *time.Time
-	CreatedAt time.Time
+	ID                   string
+	ProjectID            string
+	Email                string
+	Epoch                int
+	Blocked              bool
+	DeletedAt            *time.Time
+	LifecycleOwnerTeamID string // empty = project-managed
+	CreatedAt            time.Time
 }
 
 type LookupEntry struct {
@@ -201,9 +202,12 @@ func (s *Store) CreateUser(u User) error {
 	if u.DeletedAt != nil {
 		deleted = u.DeletedAt.UTC().Format(time.RFC3339Nano)
 	}
+	teamID := strings.TrimSpace(u.LifecycleOwnerTeamID)
 	_, err := s.db.Exec(
-		`INSERT INTO users(id, project_id, email, created_at, epoch, blocked, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		u.ID, u.ProjectID, NormalizeKey(u.Email), u.CreatedAt.UTC().Format(time.RFC3339Nano), epoch, blocked, deleted,
+		`INSERT INTO users(id, project_id, email, created_at, epoch, blocked, deleted_at, lifecycle_owner_team_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.ID, u.ProjectID, NormalizeKey(u.Email), u.CreatedAt.UTC().Format(time.RFC3339Nano),
+		epoch, blocked, deleted, teamID,
 	)
 	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
 		return ErrUserExists

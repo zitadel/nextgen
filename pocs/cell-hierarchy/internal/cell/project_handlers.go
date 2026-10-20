@@ -31,20 +31,22 @@ type ProjectView struct {
 }
 
 type UserView struct {
-	ID        string  `json:"id"`
-	ProjectID string  `json:"project_id"`
-	Email     string  `json:"email"`
-	Epoch     int     `json:"epoch"`
-	Blocked   bool    `json:"blocked"`
-	DeletedAt *string `json:"deleted_at,omitempty"`
-	CreatedAt string  `json:"created_at"`
+	ID                   string  `json:"id"`
+	ProjectID            string  `json:"project_id"`
+	Email                string  `json:"email"`
+	Epoch                int     `json:"epoch"`
+	Blocked              bool    `json:"blocked"`
+	DeletedAt            *string `json:"deleted_at,omitempty"`
+	LifecycleOwnerTeamID string  `json:"lifecycle_owner_team_id,omitempty"`
+	CreatedAt            string  `json:"created_at"`
 }
 
 func userView(u User) UserView {
 	v := UserView{
 		ID: u.ID, ProjectID: u.ProjectID, Email: u.Email,
 		Epoch: u.Epoch, Blocked: u.Blocked,
-		CreatedAt: u.CreatedAt.UTC().Format(time.RFC3339Nano),
+		LifecycleOwnerTeamID: u.LifecycleOwnerTeamID,
+		CreatedAt:            u.CreatedAt.UTC().Format(time.RFC3339Nano),
 	}
 	if v.Epoch <= 0 {
 		v.Epoch = DefaultUserEpoch
@@ -264,6 +266,11 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	groups, err := s.Store.ListGroups(id)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	interests, err := s.Store.ListInterestsForProject(id)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -290,6 +297,10 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 	for _, t := range teams {
 		tev = append(tev, teamView(t))
 	}
+	gv := make([]GroupView, 0, len(groups))
+	for _, g := range groups {
+		gv = append(gv, groupView(g))
+	}
 	iv := make([]InterestView, 0, len(interests))
 	for _, i := range interests {
 		iv = append(iv, interestView(i))
@@ -300,6 +311,7 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 		"lookup":    lv,
 		"apps":      av,
 		"teams":     tev,
+		"groups":    gv,
 		"tuples":    tv,
 		"interests": iv,
 	})
@@ -357,8 +369,9 @@ func (s *Server) handleAttachProject(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var req struct {
-		Email      string `json:"email"`
-		DeferFloat bool   `json:"defer_float"`
+		Email                string `json:"email"`
+		DeferFloat           bool   `json:"defer_float"`
+		LifecycleOwnerTeamID string `json:"lifecycle_owner_team_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid_json")
@@ -378,6 +391,17 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	teamID := strings.TrimSpace(req.LifecycleOwnerTeamID)
+	if teamID != "" {
+		if _, err := s.Store.GetTeam(p.ID, teamID); err != nil {
+			if errors.Is(err, ErrTeamNotFound) {
+				writeErr(w, http.StatusBadRequest, "lifecycle_owner_team_not_in_project")
+				return
+			}
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
 	meta, err := s.Store.GetMeta()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -389,7 +413,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := s.Now()
-	u := User{ID: uid, ProjectID: p.ID, Email: key, CreatedAt: now}
+	u := User{ID: uid, ProjectID: p.ID, Email: key, LifecycleOwnerTeamID: teamID, CreatedAt: now}
 	if err := s.Store.CreateUser(u); err != nil {
 		if errors.Is(err, ErrUserExists) {
 			writeErr(w, http.StatusConflict, err.Error())

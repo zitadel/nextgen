@@ -127,22 +127,21 @@ func (c *PeerClient) AttachProject(ctx context.Context, cellURL, projectID strin
 }
 
 type CreateUserResponse struct {
-	User struct {
-		ID        string `json:"id"`
-		ProjectID string `json:"project_id"`
-		Email     string `json:"email"`
-		CreatedAt string `json:"created_at"`
-	} `json:"user"`
+	User  UserView   `json:"user"`
 	Trace []TraceHop `json:"trace"`
 	Error string     `json:"error"`
 }
 
 func (c *PeerClient) CreateUser(ctx context.Context, cellURL, projectID, email string, deferFloat bool) (CreateUserResponse, error) {
-	var out CreateUserResponse
-	err := c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/users", map[string]any{
+	return c.CreateUserBody(ctx, cellURL, projectID, map[string]any{
 		"email":       email,
 		"defer_float": deferFloat,
-	}, "", &out)
+	})
+}
+
+func (c *PeerClient) CreateUserBody(ctx context.Context, cellURL, projectID string, body map[string]any) (CreateUserResponse, error) {
+	var out CreateUserResponse
+	err := c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/users", body, "", &out)
 	return out, err
 }
 
@@ -312,6 +311,10 @@ func (c *PeerClient) CreateApp(ctx context.Context, cellURL, projectID string, b
 	return out, err
 }
 
+func (c *PeerClient) DeleteApp(ctx context.Context, cellURL, projectID, appID string) error {
+	return c.doJSON(ctx, http.MethodDelete, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/apps/"+appID, nil, "", nil)
+}
+
 func (c *PeerClient) ListTeams(ctx context.Context, cellURL, projectID string) ([]TeamView, error) {
 	var out struct {
 		Teams []TeamView `json:"teams"`
@@ -324,6 +327,28 @@ func (c *PeerClient) CreateTeam(ctx context.Context, cellURL, projectID string, 
 	var out TeamView
 	err := c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/teams", body, "", &out)
 	return out, err
+}
+
+func (c *PeerClient) DeleteTeam(ctx context.Context, cellURL, projectID, teamID string) error {
+	return c.doJSON(ctx, http.MethodDelete, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/teams/"+teamID, nil, "", nil)
+}
+
+func (c *PeerClient) ListGroups(ctx context.Context, cellURL, projectID string) ([]GroupView, error) {
+	var out struct {
+		Groups []GroupView `json:"groups"`
+	}
+	err := c.doJSON(ctx, http.MethodGet, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/groups", nil, "", &out)
+	return out.Groups, err
+}
+
+func (c *PeerClient) CreateGroup(ctx context.Context, cellURL, projectID string, body map[string]any) (GroupView, error) {
+	var out GroupView
+	err := c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/groups", body, "", &out)
+	return out, err
+}
+
+func (c *PeerClient) DeleteGroup(ctx context.Context, cellURL, projectID, groupID string) error {
+	return c.doJSON(ctx, http.MethodDelete, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/groups/"+groupID, nil, "", nil)
 }
 
 func (c *PeerClient) ListApps(ctx context.Context, cellURL, projectID string) ([]AppView, error) {
@@ -340,6 +365,19 @@ func (c *PeerClient) ListTuples(ctx context.Context, cellURL, projectID string) 
 	}
 	err := c.doJSON(ctx, http.MethodGet, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/tuples", nil, "", &out)
 	return out.Tuples, err
+}
+
+func (c *PeerClient) TombstoneTuple(ctx context.Context, cellURL, projectID, tupleID string) (TombstoneTupleResponse, error) {
+	var out TombstoneTupleResponse
+	err := c.doJSONAllowError(ctx, http.MethodPost,
+		NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/tuples/"+tupleID+"/tombstone",
+		map[string]any{}, &out)
+	return out, err
+}
+
+func (c *PeerClient) UnregisterInterestByTuple(ctx context.Context, homeCellURL, tupleID string) error {
+	return c.doJSON(ctx, http.MethodDelete,
+		NormalizeURL(homeCellURL)+"/v1/interests/by-tuple/"+tupleID, nil, "", nil)
 }
 
 func (c *PeerClient) ListInterests(ctx context.Context, cellURL string, homeProjectID string) ([]InterestView, error) {

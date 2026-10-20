@@ -82,8 +82,11 @@ func (s *Server) registerGrantRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /v1/projects/{id}/apps/{appId}", s.handleDeleteApp)
 	mux.HandleFunc("GET /v1/projects/{id}/tuples", s.handleListTuples)
 	mux.HandleFunc("POST /v1/projects/{id}/tuples", s.handleCreateTuple)
+	mux.HandleFunc("DELETE /v1/projects/{id}/tuples/{tupleId}", s.handleTombstoneTuple)
+	mux.HandleFunc("POST /v1/projects/{id}/tuples/{tupleId}/tombstone", s.handleTombstoneTuple)
 	mux.HandleFunc("GET /v1/interests", s.handleListInterests)
 	mux.HandleFunc("POST /v1/interests", s.handleRegisterInterest)
+	mux.HandleFunc("DELETE /v1/interests/by-tuple/{tupleId}", s.handleUnregisterInterestByTuple)
 }
 
 func (s *Server) handleListApps(w http.ResponseWriter, r *http.Request) {
@@ -171,11 +174,14 @@ func (s *Server) handleDeleteApp(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
 	appID := r.PathValue("appId")
 	if err := s.Store.DeleteApp(projectID, appID); err != nil {
-		if errors.Is(err, ErrAppNotFound) {
+		switch {
+		case errors.Is(err, ErrAppNotFound):
 			writeErr(w, http.StatusNotFound, err.Error())
-			return
+		case errors.Is(err, ErrAppHasActiveTuples):
+			writeErr(w, http.StatusConflict, err.Error())
+		default:
+			writeErr(w, http.StatusInternalServerError, err.Error())
 		}
-		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -265,6 +271,19 @@ func (s *Server) handleCreateTuple(w http.ResponseWriter, r *http.Request) {
 		if homeProjectID == "" || homeCellURL == "" {
 			writeErr(w, http.StatusBadRequest, "group_subject_home_required")
 			return
+		}
+		// Same-project group subjects must match a first-class group row.
+		// Remote groups (cross-site demos) may omit a local row when home differs.
+		sameProject := homeProjectID == p.ID
+		if sameProject {
+			if _, err := s.Store.GetGroupByName(p.ID, key); err != nil {
+				if errors.Is(err, ErrGroupNotFound) {
+					writeErr(w, http.StatusBadRequest, ErrGroupSubjectMiss.Error())
+					return
+				}
+				writeErr(w, http.StatusInternalServerError, err.Error())
+				return
+			}
 		}
 		// Groups are not user principals — never register interests.
 		req.SkipInterest = true
@@ -372,6 +391,100 @@ func (s *Server) handleCreateTuple(w http.ResponseWriter, r *http.Request) {
 		"tuple": tupleView(t),
 		"trace": trace,
 	})
+}
+
+type TombstoneTupleResponse struct {
+	Tuple            TupleView  `json:"tuple"`
+	Trace            []TraceHop `json:"trace"`
+	InterestRemoved  bool       `json:"interest_removed,omitempty"`
+	AlreadyTombstone bool       `json:"already_tombstoned,omitempty"`
+}
+
+// handleTombstoneTuple marks a grant tombstoned (row stays listed) and unregisters
+// interest on the principal's home cell when the subject is a user.
+func (s *Server) handleTombstoneTuple(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+	tupleID := r.PathValue("tupleId")
+	if _, err := s.Store.GetProject(projectID); err != nil {
+		if errors.Is(err, ErrProjectNotFound) {
+			writeErr(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	t, err := s.Store.GetTuple(tupleID)
+	if err != nil {
+		if errors.Is(err, ErrTupleNotFound) {
+			writeErr(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if t.ProjectID != projectID {
+		writeErr(w, http.StatusNotFound, ErrTupleNotFound.Error())
+		return
+	}
+	meta, err := s.Store.GetMeta()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	var trace []TraceHop
+	already := t.IsTombstoned()
+	if !already {
+		start := time.Now()
+		if err := s.Store.TombstoneTupleByID(tupleID, s.Now()); err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		trace = append(trace, TraceHop{
+			Cell: meta.URL, Method: "tombstone tuple",
+			Ms: time.Since(start).Milliseconds(), Result: "tombstoned",
+		})
+		t, _ = s.Store.GetTuple(tupleID)
+	} else {
+		trace = append(trace, TraceHop{
+			Cell: meta.URL, Method: "tombstone tuple", Result: "already_tombstoned",
+		})
+	}
+
+	interestRemoved := false
+	if t.IsUserSubject() && t.HomeCellURL != "" {
+		start := time.Now()
+		err := s.Peer.UnregisterInterestByTuple(r.Context(), t.HomeCellURL, tupleID)
+		hop := TraceHop{
+			Cell: t.HomeCellURL, Method: "DELETE /v1/interests/by-tuple/" + tupleID,
+			Ms: time.Since(start).Milliseconds(),
+		}
+		if err != nil {
+			hop.Result = "error: " + err.Error()
+		} else {
+			hop.Result = "unregistered"
+			interestRemoved = true
+		}
+		trace = append(trace, hop)
+	}
+
+	writeJSON(w, http.StatusOK, TombstoneTupleResponse{
+		Tuple: tupleView(t), Trace: trace,
+		InterestRemoved: interestRemoved, AlreadyTombstone: already,
+	})
+}
+
+func (s *Server) handleUnregisterInterestByTuple(w http.ResponseWriter, r *http.Request) {
+	tupleID := r.PathValue("tupleId")
+	if strings.TrimSpace(tupleID) == "" {
+		writeErr(w, http.StatusBadRequest, "tuple_id_required")
+		return
+	}
+	n, err := s.Store.DeleteInterestByTupleID(tupleID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "removed": n})
 }
 
 func (s *Server) handleListInterests(w http.ResponseWriter, r *http.Request) {

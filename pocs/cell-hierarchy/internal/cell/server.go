@@ -57,6 +57,7 @@ func (s *Server) Handler() http.Handler {
 	s.registerProjectRoutes(mux)
 	s.registerGrantRoutes(mux)
 	s.registerTeamRoutes(mux)
+	s.registerGroupRoutes(mux)
 	s.registerAuthRoutes(mux)
 	s.registerFGARoutes(mux)
 	s.registerLifecycleRoutes(mux)

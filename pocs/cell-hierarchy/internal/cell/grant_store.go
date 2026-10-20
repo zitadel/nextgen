@@ -22,6 +22,7 @@ var (
 	ErrInvalidSubjectKind = errors.New("invalid_subject_kind")
 	ErrMaxDepthExceeded   = errors.New("max_depth_exceeded")
 	ErrExpandCycle        = errors.New("expand_cycle")
+	ErrAppHasActiveTuples = errors.New("app_has_active_tuples")
 )
 
 const (
@@ -208,15 +209,35 @@ func (s *Store) ListApps(projectID string) ([]App, error) {
 }
 
 func (s *Store) DeleteApp(projectID, id string) error {
+	a, err := s.GetApp(projectID, id)
+	if err != nil {
+		return err
+	}
+	obj := fmt.Sprintf("app:%s", a.Name)
+	n, err := s.CountActiveTuplesReferencingObject(projectID, obj)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return ErrAppHasActiveTuples
+	}
 	res, err := s.db.Exec(`DELETE FROM apps WHERE project_id = ? AND id = ?`, projectID, id)
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
 		return ErrAppNotFound
 	}
 	return nil
+}
+
+func (s *Store) DeleteInterestByTupleID(tupleID string) (int64, error) {
+	res, err := s.db.Exec(`DELETE FROM interests WHERE tuple_id = ?`, strings.TrimSpace(tupleID))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 func NormalizeSubjectKind(kind string) (string, error) {

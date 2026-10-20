@@ -27,6 +27,26 @@ func teamView(t Team) TeamView {
 func (s *Server) registerTeamRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/projects/{id}/teams", s.handleListTeams)
 	mux.HandleFunc("POST /v1/projects/{id}/teams", s.handleCreateTeam)
+	mux.HandleFunc("DELETE /v1/projects/{id}/teams/{teamId}", s.handleDeleteTeam)
+}
+
+func (s *Server) handleDeleteTeam(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+	teamID := r.PathValue("teamId")
+	if err := s.Store.DeleteTeam(projectID, teamID); err != nil {
+		switch {
+		case errors.Is(err, ErrTeamNotFound):
+			writeErr(w, http.StatusNotFound, err.Error())
+		case errors.Is(err, ErrTeamHasUsers):
+			writeErr(w, http.StatusConflict, err.Error())
+		case errors.Is(err, ErrTeamHasChildren):
+			writeErr(w, http.StatusConflict, err.Error())
+		default:
+			writeErr(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleListTeams(w http.ResponseWriter, r *http.Request) {

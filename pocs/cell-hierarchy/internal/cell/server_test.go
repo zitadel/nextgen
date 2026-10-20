@@ -256,6 +256,19 @@ func getJSON(t *testing.T, ts *httptest.Server, path string) *http.Response {
 	return res
 }
 
+func deleteJSON(t *testing.T, ts *httptest.Server, path string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodDelete, ts.URL+path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
 func decode(t *testing.T, res *http.Response, v any) {
 	t.Helper()
 	if err := json.NewDecoder(res.Body).Decode(v); err != nil {

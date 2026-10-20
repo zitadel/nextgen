@@ -13,6 +13,8 @@ var (
 	ErrInvalidTeamName   = errors.New("invalid_team_name")
 	ErrParentTeamMiss    = errors.New("parent_team_not_found")
 	ErrParentTeamProject = errors.New("parent_team_wrong_project")
+	ErrTeamHasUsers      = errors.New("team_has_users")
+	ErrTeamHasChildren   = errors.New("team_has_children")
 )
 
 type Team struct {
@@ -104,4 +106,54 @@ func (s *Store) ListTeams(projectID string) ([]Team, error) {
 		out = append(out, t)
 	}
 	return out, rows.Err()
+}
+
+func (s *Store) CountUsersOnTeam(projectID, teamID string) (int, error) {
+	var n int
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM users
+		 WHERE project_id = ? AND lifecycle_owner_team_id = ?
+		   AND (deleted_at IS NULL OR deleted_at = '')`,
+		projectID, strings.TrimSpace(teamID),
+	).Scan(&n)
+	return n, err
+}
+
+func (s *Store) CountChildTeams(projectID, teamID string) (int, error) {
+	var n int
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM teams WHERE project_id = ? AND parent_team_id = ?`,
+		projectID, strings.TrimSpace(teamID),
+	).Scan(&n)
+	return n, err
+}
+
+// DeleteTeam removes a team when no users reference it and it has no child teams.
+func (s *Store) DeleteTeam(projectID, id string) error {
+	if _, err := s.GetTeam(projectID, id); err != nil {
+		return err
+	}
+	nUsers, err := s.CountUsersOnTeam(projectID, id)
+	if err != nil {
+		return err
+	}
+	if nUsers > 0 {
+		return ErrTeamHasUsers
+	}
+	nChildren, err := s.CountChildTeams(projectID, id)
+	if err != nil {
+		return err
+	}
+	if nChildren > 0 {
+		return ErrTeamHasChildren
+	}
+	res, err := s.db.Exec(`DELETE FROM teams WHERE project_id = ? AND id = ?`, projectID, id)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrTeamNotFound
+	}
+	return nil
 }

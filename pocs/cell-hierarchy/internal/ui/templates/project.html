@@ -11,10 +11,11 @@
     body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
     header { display:flex; gap:1rem; align-items:center; padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--panel); }
     header a { color:var(--muted); text-decoration:none; margin-right:0.75rem; }
-    main { padding:1.25rem; max-width:960px; margin:0 auto; }
+    main { padding:1.25rem; max-width:1100px; margin:0 auto; }
     .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:1rem; }
     .muted { color:var(--muted); font-size:0.875rem; }
-    .flash-err { color:var(--bad); }
+    .flash-ok { color:var(--ok); margin:0 0 0.75rem; }
+    .flash-err { color:var(--bad); margin:0 0 0.75rem; }
     .badge { display:inline-block; font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:4px; border:1px solid var(--border); color:var(--muted); margin-left:0.35rem; }
     .badge.lookup { color:var(--ok); border-color:var(--ok); }
     .badge.local { color:var(--accent); border-color:var(--accent); }
@@ -22,18 +23,28 @@
     .badge.tombstone { color:var(--muted); border-color:var(--muted); text-decoration:line-through; }
     tr.tombstoned td { opacity:0.55; text-decoration:line-through; }
     table { width:100%; border-collapse:collapse; }
-    th, td { text-align:left; padding:0.4rem 0.5rem; border-bottom:1px solid var(--border); font-size:0.9rem; }
+    th, td { text-align:left; padding:0.4rem 0.5rem; border-bottom:1px solid var(--border); font-size:0.9rem; vertical-align:middle; }
     code { font-size:0.8rem; color:var(--muted); }
+    form.inline { display:inline; }
+    form.row { display:flex; flex-wrap:wrap; gap:0.5rem; align-items:end; margin-top:0.75rem; }
+    form.row label { display:flex; flex-direction:column; gap:0.2rem; font-size:0.75rem; color:var(--muted); }
+    input, select, button { font:inherit; padding:0.35rem 0.5rem; border-radius:4px; border:1px solid var(--border); background:#121820; color:var(--text); }
+    button { cursor:pointer; background:#243041; }
+    button.danger { color:var(--bad); }
+    .hint { font-size:0.8rem; color:var(--muted); margin:0.35rem 0 0; }
+    table.trace th, table.trace td { font-size:0.8rem; }
   </style>
 </head>
 <body>
   <header>
     <strong>cell hierarchy</strong>
-    <nav><a href="/">Tree</a><a href="/workspaces/acme">Workspace</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
+    <nav><a href="/">Tree</a><a href="/workspaces/acme">Workspace</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a><a href="/trace">Trace</a></nav>
   </header>
   <main>
     <h1>{{.Title}}</h1>
     {{with .Project}}
+      {{if .FlashOK}}<p class="flash-ok">{{.FlashOK}}</p>{{end}}
+      {{if .FlashErr}}<p class="flash-err">{{.FlashErr}}</p>{{end}}
       {{if .Error}}<p class="flash-err">{{.Error}}</p>{{end}}
       <div class="panel">
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Project</h2>
@@ -45,22 +56,32 @@
         </p>
         <p class="muted">id={{.Project.ID}} · host={{.Project.HostCellURL}}</p>
         <p class="muted">parent_project_id={{.Project.ParentProjectID}} · parent_cell_url={{.Project.ParentCellURL}}</p>
+        <p class="hint">Day-to-day resource CRUD lives on this page. Create site/attach stays on <a href="/create">/create</a>. Nextgen projects have no parent tree (platform claim is separate); POC <code>parent_project</code> is lookup-only and optional until attach.</p>
       </div>
+
       <div class="panel">
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Users</h2>
         {{if .Users}}
         <table>
-          <thead><tr><th>Email</th><th>Epoch</th><th>Status</th><th>ID</th><th>Created</th></tr></thead>
+          <thead><tr><th>Email</th><th>Lifecycle team</th><th>Epoch</th><th>Status</th><th></th></tr></thead>
           <tbody>
           {{range .Users}}
             <tr>
               <td>{{.Email}}</td>
+              <td class="muted">{{if .LifecycleOwnerTeamID}}{{.LifecycleOwnerTeamID}}{{else}}project-managed{{end}}</td>
               <td>{{.Epoch}}</td>
               <td class="muted">
                 {{if .DeletedAt}}deleted{{else if .Blocked}}blocked{{else}}active{{end}}
               </td>
-              <td><code>{{.ID}}</code></td>
-              <td class="muted">{{.CreatedAt}}</td>
+              <td>
+                {{if not .DeletedAt}}
+                <form class="inline" method="post" action="/projects/{{$.Project.Project.ID}}/users/delete">
+                  <input type="hidden" name="host_cell_url" value="{{$.Project.Project.HostCellURL}}"/>
+                  <input type="hidden" name="email" value="{{.Email}}"/>
+                  <button type="submit" class="danger">Delete</button>
+                </form>
+                {{end}}
+              </td>
             </tr>
           {{end}}
           </tbody>
@@ -68,47 +89,126 @@
         {{else}}
         <p class="muted">No users on this project.</p>
         {{end}}
+        <form class="row" method="post" action="/projects/{{.Project.ID}}/users">
+          <input type="hidden" name="host_cell_url" value="{{.Project.HostCellURL}}"/>
+          <label>Email <input name="email" type="email" required placeholder="user@example.com"/></label>
+          <label>Lifecycle team
+            <select name="lifecycle_owner_team_id">
+              <option value="">— project-managed —</option>
+              {{range .Teams}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+            </select>
+          </label>
+          <button type="submit">Add user</button>
+        </form>
       </div>
+
       <div class="panel">
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Teams</h2>
         {{if .Teams}}
         <table>
-          <thead><tr><th>Name</th><th>ID</th><th>Parent</th><th>Created</th></tr></thead>
+          <thead><tr><th>Name</th><th>ID</th><th>Parent</th><th></th></tr></thead>
           <tbody>
           {{range .Teams}}
             <tr>
               <td>{{.Name}}</td>
               <td><code>{{.ID}}</code></td>
               <td class="muted">{{if .ParentTeamID}}{{.ParentTeamID}}{{else}}—{{end}}</td>
-              <td class="muted">{{.CreatedAt}}</td>
+              <td>
+                <form class="inline" method="post" action="/projects/{{$.Project.Project.ID}}/teams/delete">
+                  <input type="hidden" name="host_cell_url" value="{{$.Project.Project.HostCellURL}}"/>
+                  <input type="hidden" name="team_id" value="{{.ID}}"/>
+                  <button type="submit" class="danger">Delete</button>
+                </form>
+              </td>
             </tr>
           {{end}}
           </tbody>
         </table>
         {{else}}
-        <p class="muted">No teams on this project. Create one via <a href="/create">Create</a>.</p>
+        <p class="muted">No teams on this project.</p>
         {{end}}
+        <form class="row" method="post" action="/projects/{{.Project.ID}}/teams">
+          <input type="hidden" name="host_cell_url" value="{{.Project.HostCellURL}}"/>
+          <label>Name <input name="name" required placeholder="Engineering"/></label>
+          <label>Parent team
+            <select name="parent_team_id">
+              <option value="">— none —</option>
+              {{range .Teams}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+            </select>
+          </label>
+          <button type="submit">Add team</button>
+        </form>
       </div>
+
+      <div class="panel">
+        <h2 style="font-size:1rem;margin:0 0 0.5rem">Groups</h2>
+        {{if .Groups}}
+        <table>
+          <thead><tr><th>Name</th><th>ID</th><th>Object key</th><th></th></tr></thead>
+          <tbody>
+          {{range .Groups}}
+            <tr>
+              <td>{{.Name}}</td>
+              <td><code>{{.ID}}</code></td>
+              <td><code>group:{{.Name}}</code></td>
+              <td>
+                <form class="inline" method="post" action="/projects/{{$.Project.Project.ID}}/groups/delete">
+                  <input type="hidden" name="host_cell_url" value="{{$.Project.Project.HostCellURL}}"/>
+                  <input type="hidden" name="group_id" value="{{.ID}}"/>
+                  <button type="submit" class="danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No first-class groups yet.</p>
+        {{end}}
+        <form class="row" method="post" action="/projects/{{.Project.ID}}/groups">
+          <input type="hidden" name="host_cell_url" value="{{.Project.HostCellURL}}"/>
+          <label>Name <input name="name" required placeholder="A"/></label>
+          <button type="submit">Add group</button>
+        </form>
+      </div>
+
       <div class="panel">
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Apps</h2>
         {{if .Apps}}
         <table>
-          <thead><tr><th>Name</th><th>ID</th><th>Created</th></tr></thead>
+          <thead><tr><th>Name</th><th>ID</th><th></th></tr></thead>
           <tbody>
           {{range .Apps}}
-            <tr><td>{{.Name}}</td><td><code>{{.ID}}</code></td><td class="muted">{{.CreatedAt}}</td></tr>
+            <tr>
+              <td>{{.Name}}</td>
+              <td><code>{{.ID}}</code></td>
+              <td>
+                <form class="inline" method="post" action="/projects/{{$.Project.Project.ID}}/apps/delete">
+                  <input type="hidden" name="host_cell_url" value="{{$.Project.Project.HostCellURL}}"/>
+                  <input type="hidden" name="app_id" value="{{.ID}}"/>
+                  <button type="submit" class="danger">Delete</button>
+                </form>
+              </td>
+            </tr>
           {{end}}
           </tbody>
         </table>
         {{else}}
         <p class="muted">No apps on this project.</p>
         {{end}}
+        <form class="row" method="post" action="/projects/{{.Project.ID}}/apps">
+          <input type="hidden" name="host_cell_url" value="{{.Project.HostCellURL}}"/>
+          <label>Name <input name="name" required placeholder="chat"/></label>
+          <button type="submit">Add app</button>
+        </form>
+        <p class="hint">Delete is blocked while active tuples reference <code>app:{name}</code>.</p>
       </div>
+
       <div class="panel">
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Tuples (grants)</h2>
         {{if .Tuples}}
         <table>
-          <thead><tr><th>Object</th><th>Relation</th><th>Kind</th><th>Subject</th><th>Home</th><th>Status</th></tr></thead>
+          <thead><tr><th>Object</th><th>Relation</th><th>Kind</th><th>Subject</th><th>Home</th><th>Status</th><th></th></tr></thead>
           <tbody>
           {{range .Tuples}}
             <tr{{if .Tombstoned}} class="tombstoned"{{end}}>
@@ -118,6 +218,15 @@
               <td><code>{{.Subject}}</code></td>
               <td class="muted">{{.HomeProjectID}}</td>
               <td>{{if .Tombstoned}}<span class="badge tombstone">tombstone</span>{{else}}<span class="muted">active</span>{{end}}</td>
+              <td>
+                {{if not .Tombstoned}}
+                <form class="inline" method="post" action="/projects/{{$.Project.Project.ID}}/tuples/tombstone">
+                  <input type="hidden" name="host_cell_url" value="{{$.Project.Project.HostCellURL}}"/>
+                  <input type="hidden" name="tuple_id" value="{{.ID}}"/>
+                  <button type="submit" class="danger">Tombstone</button>
+                </form>
+                {{end}}
+              </td>
             </tr>
           {{end}}
           </tbody>
@@ -125,7 +234,38 @@
         {{else}}
         <p class="muted">No tuples on this project.</p>
         {{end}}
+        <form class="row" method="post" action="/projects/{{.Project.ID}}/tuples">
+          <input type="hidden" name="host_cell_url" value="{{.Project.HostCellURL}}"/>
+          <label>Object
+            <select name="object">
+              <option value="">— select —</option>
+              {{range .Apps}}<option value="app:{{.Name}}">app:{{.Name}}</option>{{end}}
+              {{range .Groups}}<option value="group:{{.Name}}">group:{{.Name}}</option>{{end}}
+            </select>
+          </label>
+          <label>Or free-text object <input name="object_override" placeholder="app:chat"/></label>
+          <label>Relation <input name="relation" value="viewer" placeholder="viewer / member"/></label>
+          <label>Subject kind
+            <select name="subject_kind">
+              <option value="user">user</option>
+              <option value="group">group</option>
+            </select>
+          </label>
+          <label>Subject (user)
+            <select name="subject">
+              <option value="">— user / group / foreign key —</option>
+              {{range .Users}}{{if not .DeletedAt}}<option value="{{.Email}}">{{.Email}}</option>{{end}}{{end}}
+              {{range .Groups}}<option value="{{.Name}}">group {{.Name}}</option>{{end}}
+            </select>
+          </label>
+          <label>Or subject key <input name="subject_key" placeholder="foreign@example.com or group name"/></label>
+          <label>Home project (remote group) <input name="home_project_id" placeholder="optional"/></label>
+          <label>Home cell URL (remote) <input name="home_cell_url" placeholder="optional"/></label>
+          <button type="submit">Add tuple</button>
+        </form>
+        <p class="hint">Foreign users resolve via lookup walk. Local group subjects must match a group on this project; remote groups need home_project + home_cell.</p>
       </div>
+
       <div class="panel">
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Interests (home of principals)</h2>
         <p class="muted">Interests registered when another cell grants a principal whose home is this project. <strong>Why this matters:</strong> when this principal is deleted, home pushes <code>user.deleted</code> here → subscriber tombstones the grant (row stays visible with a tombstone badge; auth/FGA ignore it).</p>
@@ -148,6 +288,7 @@
         <p class="muted">No interests for this home project.</p>
         {{end}}
       </div>
+
       <div class="panel">
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Lookup table (this cell)</h2>
         <p class="muted">Provenance: <span class="badge local">local</span> created here · <span class="badge child">from child &lt;id&gt;</span> floated from a child project.</p>
@@ -178,6 +319,11 @@
         {{end}}
       </div>
     {{end}}
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Global Trace</h2>
+      {{template "trace" .}}
+    </div>
   </main>
 </body>
 </html>

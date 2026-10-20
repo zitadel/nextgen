@@ -57,13 +57,27 @@ cd pocs/cell-hierarchy
 
 Bootstrap: joins (all leaves → platform) then `scripts/bootstrap-projects.sh` (platform + `acme-fra`, users, `chat`, Phase 5 group chain).
 
+## Project overview CRUD
+
+Day-to-day resource management lives on **`/projects/{id}`** (prefer that over `/create`). Forms post back to the same page with `?ok=` / `?err=` flash. Mutations append to Global Trace.
+
+| Resource | Add | Remove |
+|---|---|---|
+| Users | email + optional lifecycle team (empty = project-managed) | delete → existing tombstone/interest fan-out |
+| Teams | name + optional parent team | blocked if users or child teams remain |
+| Groups | name (first-class; `UNIQUE(project_id,name)`) | blocked while active tuples reference `group:{name}` as object or group subject |
+| Apps | name | blocked while active tuples reference `app:{name}` |
+| Tuples | object (app/group select or free-text), relation, subject user/group | tombstone by id (row stays; unregister interest on home for user subjects) |
+
+Nextgen projects have no parent tree (platform claim is separate). POC `parent_project` is **lookup-only** and optional until attach.
+
 ## Create / Expand (C UI)
 
 | Form | Behavior |
 |---|---|
 | **Create site** | Workspace id (default `acme`), site id/name, **cell** (required), parent default `platform`. Creates project on that cell + attach. |
 | **Expand site** | Pick source site, new cell, optional new id (defaults e.g. `acme-iowa` for us-1), copy `chat` checkbox. Sibling project + attach + apps. |
-| Team / App | Unchanged: teams and apps under a project. |
+| Team / App | Also available on project overview; `/create` kept for site bootstrap. |
 
 ## Global login discovery
 
@@ -124,6 +138,12 @@ Join, projects/attach/users/float/lookup, apps/tuples/interests, token/JWKS/auth
 | `POST` | `/v1/admin/enable-parent` | Alias of the above |
 | Project create | `workspace_id` | Site workspace metadata |
 | Lookup entries | `source`, `via_project` | Provenance |
+| `POST` | `/v1/projects/{id}/users` | `lifecycle_owner_team_id` optional |
+| `DELETE` | `/v1/projects/{id}/teams/{teamId}` | Reject if users/children |
+| `GET/POST` | `/v1/projects/{id}/groups` | First-class groups |
+| `DELETE` | `/v1/projects/{id}/groups/{groupId}` | Reject if active tuples |
+| `DELETE` / `POST …/tombstone` | `/v1/projects/{id}/tuples/{tupleId}` | Tombstone grant + unregister interest |
+| `DELETE` | `/v1/interests/by-tuple/{tupleId}` | Home-side interest cleanup |
 
 ## Tests
 

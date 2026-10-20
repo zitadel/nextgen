@@ -80,7 +80,13 @@ func (s *Store) migrateLifecycle() error {
 		return err
 	}
 	// Epoch already added in migrateAuth; ensure again for clean trees.
-	return s.ensureColumn("users", "epoch", "INTEGER NOT NULL DEFAULT 1")
+	if err := s.ensureColumn("users", "epoch", "INTEGER NOT NULL DEFAULT 1"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn("users", "lifecycle_owner_team_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	return s.migrateGroups()
 }
 
 func scanUser(scanner interface {
@@ -91,7 +97,8 @@ func scanUser(scanner interface {
 	var epoch sql.NullInt64
 	var blocked sql.NullInt64
 	var deletedAt sql.NullString
-	err := scanner.Scan(&u.ID, &u.ProjectID, &u.Email, &created, &epoch, &blocked, &deletedAt)
+	var teamID sql.NullString
+	err := scanner.Scan(&u.ID, &u.ProjectID, &u.Email, &created, &epoch, &blocked, &deletedAt, &teamID)
 	if err != nil {
 		return User{}, err
 	}
@@ -112,10 +119,13 @@ func scanUser(scanner interface {
 		}
 		u.DeletedAt = &t
 	}
+	if teamID.Valid {
+		u.LifecycleOwnerTeamID = teamID.String
+	}
 	return u, nil
 }
 
-const userSelectCols = `id, project_id, email, created_at, epoch, blocked, deleted_at`
+const userSelectCols = `id, project_id, email, created_at, epoch, blocked, deleted_at, COALESCE(lifecycle_owner_team_id, '')`
 
 // GetUser returns the user row including lifecycle fields.
 func (s *Store) GetUser(projectID, email string) (User, error) {
