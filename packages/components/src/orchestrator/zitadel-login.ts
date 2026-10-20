@@ -161,14 +161,6 @@ function apiErrorCode(error: unknown): string {
     : "";
 }
 
-const SECRET_AUTOCOMPLETE = ["current-password", "new-password", "one-time-code"];
-
-function isSecretField(field: { type?: string; autocomplete?: string } | undefined): boolean {
-  if (!field) return false;
-  const tokens = (field.autocomplete ?? "").toLowerCase().split(/\s+/);
-  return field.type === "password" || tokens.some((t) => SECRET_AUTOCOMPLETE.includes(t));
-}
-
 @customElement("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
@@ -1292,7 +1284,13 @@ export class ZitadelLogin extends ZitadelSurface {
     // The widget never broadcasts a password or one-time-code value through its
     // own events. It cannot hide the input from other scripts on the same page.
     const field = this.response?.step.fields?.find((f) => f.name === name);
-    if (isSecretField(field)) return;
+    const tokens = (field?.autocomplete ?? "").toLowerCase().split(/\s+/);
+    const isSecret =
+      field?.type === "password" ||
+      tokens.some((token) => ["current-password", "new-password", "one-time-code"].includes(token));
+    if (isSecret) {
+      return;
+    }
     emit(this, "zitadel-flow-input", { name, value });
   };
 
