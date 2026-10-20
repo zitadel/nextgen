@@ -1,39 +1,42 @@
-import { Fragment, type ReactNode } from "react";
-import { LINE_COPY } from "../command-block";
+"use client";
+
+import { Fragment, type ReactNode, useEffect, useRef } from "react";
+import { CommandLine } from "../command-line";
 import { CopyButton } from "../copy-button";
-import { GradientBorder, TITLE_BAR, WindowDots } from "../gradient-border";
+import { BAR_BUTTON, WINDOW_BODY, WINDOW_FOOTER, WINDOW_INSET, Window } from "../window";
 import type { Artifact, FileLine, FlowStep } from "./types";
 
-/** Green and red lines on tinted rows. */
+/** Green and red lines on tinted rows, edge to edge, a bar at their start. */
 const LINE_CLASSES: Record<FileLine["type"], string> = {
   context: "text-text-secondary",
-  added: "bg-[rgba(34,197,94,0.08)] text-[#86efac]",
-  removed: "bg-[rgba(248,113,113,0.08)] text-[#f87171]",
+  added: "bg-diff-added-surface text-diff-added shadow-[inset_2px_0_0_var(--color-diff-added)]",
+  removed:
+    "bg-diff-removed-surface text-diff-removed shadow-[inset_2px_0_0_var(--color-diff-removed)]",
 };
 
 const LINE_MARKS: Record<FileLine["type"], string> = { context: " ", added: "+", removed: "-" };
 
-/**
- * Lines added or removed together read as one block: only its first line
- * rounds its top and only its last its bottom, so no seam runs between them.
- */
-function runCorners(lines: FileLine[], index: number): string {
-  const type = lines[index]?.type;
-  if (!type || type === "context") {
-    return "";
-  }
-  const first = lines[index - 1]?.type !== type;
-  const last = lines[index + 1]?.type !== type;
-  return `${first ? "rounded-t" : ""} ${last ? "rounded-b" : ""}`;
-}
+// A diff's tinted row, edge to edge, its text on the body's padding.
+const BLEED = "-mx-5 px-5 md:-mx-6 md:px-6";
 
 /**
- * The steps of the flow, before or after the change, as pills with arrows. A
- * step that takes over a removed step's field shows it, in the diff's green.
+ * The steps of the flow, before or after the change, as pills with arrows;
+ * `current` is the one the login beside shows. A step that takes over a
+ * removed step's field shows it, in the diff's green.
  */
-function FlowSteps({ steps, after }: { steps: FlowStep[]; after: boolean }) {
+function FlowSteps({
+  steps,
+  after,
+  current,
+}: {
+  steps: FlowStep[];
+  after: boolean;
+  current?: number;
+}) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-border-secondary border-b px-5 py-3 md:px-6">
+    <div
+      className={`flex flex-wrap items-center gap-2 border-window-border border-b py-3 ${WINDOW_INSET}`}
+    >
       <span className="mr-1 w-12 font-semibold text-[0.6875rem] text-text-muted leading-4">
         {after ? "After" : "Before"}
       </span>
@@ -57,9 +60,16 @@ function FlowSteps({ steps, after }: { steps: FlowStep[]; after: boolean }) {
                 />
               </svg>
             )}
-            <span className="rounded-md border border-border-secondary bg-surface-black-secondary px-2.5 py-1 font-mono text-text-primary text-xs leading-4">
+            <span
+              aria-current={index === current ? "step" : undefined}
+              className={`rounded-md border px-2.5 py-1 font-mono text-xs leading-4 transition-colors duration-300 ${
+                index === current
+                  ? "border-text-accent/60 bg-text-accent/10 text-text-primary"
+                  : "border-window-border bg-tint/[0.03] text-text-secondary"
+              }`}
+            >
               {name}
-              {adds && <span className="text-[#86efac]"> + {adds}</span>}
+              {adds && <span className="text-diff-added"> + {adds}</span>}
             </span>
           </Fragment>
         );
@@ -68,53 +78,102 @@ function FlowSteps({ steps, after }: { steps: FlowStep[]; after: boolean }) {
   );
 }
 
+/** The next command's button: runs it and prints its output. */
+function RunButton({ command, onRun }: { command: string; onRun: () => void }) {
+  return (
+    <button
+      type="button"
+      data-run
+      onClick={onRun}
+      aria-label={`Run ${command}`}
+      className={`run-hint ${BAR_BUTTON} bg-text-accent/15 text-text-accent hover:bg-text-accent/25`}
+    >
+      <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3" fill="currentColor">
+        <path d="M5 3.5v9a.5.5 0 0 0 .77.42l7-4.5a.5.5 0 0 0 0-.84l-7-4.5A.5.5 0 0 0 5 3.5Z" />
+      </svg>
+      Run
+    </button>
+  );
+}
+
 /**
- * A row's changed files as an editor card (zitadel/new-website's FileCard):
- * the diff with its added and removed lines; above it a strip that shows what
- * the change means, the flow's steps or the controls of the brand playground;
- * below it the commands that publish the change, each with its line of output.
- * `showResult` picks the flow's steps before or after; `copyText` adds a copy
- * button to the title bar.
+ * A step's changed files as an editor window (zitadel/new-website's
+ * FileCard): the diff with its added and removed lines; above it a strip that
+ * shows what the change means, the flow's steps or the brand playground's
+ * controls; below it the commands that publish the change. `ran` of them have
+ * run and show their output, `running` is printing; `onRun` runs the next one.
+ * `showResult` picks the flow's steps before or after, `current` the one the
+ * login shows; `copy` adds a button to the title bar that copies its `text`,
+ * named by its `label`. A Run button goes away as its command runs, so the
+ * keyboard's focus waits on the commands meanwhile and then moves on to the
+ * next Run.
  */
 export function FileCard({
   artifact,
   showResult,
+  current,
   strip,
-  copyText,
+  copy,
+  ran = artifact.commands?.length ?? 0,
+  running,
+  onRun,
 }: {
   artifact: Artifact;
   showResult: boolean;
+  current?: number;
   strip?: ReactNode;
-  copyText?: string;
+  copy?: { text: string; label: string };
+  ran?: number;
+  running?: number;
+  onRun?: (index: number) => void;
 }) {
   const [first] = artifact.files;
-  const { graph } = artifact;
+  const { graph, commands = [] } = artifact;
+  const commandsRef = useRef<HTMLDivElement>(null);
+  // A Run was pressed: once its command has run, focus the next Run.
+  const refocus = useRef(false);
+
+  useEffect(() => {
+    if (!refocus.current || running !== undefined) {
+      return;
+    }
+    refocus.current = false;
+    // Only if the focus still waits on the commands: a visitor who moved on
+    // meanwhile, or pressed Before, keeps the control they chose.
+    if (document.activeElement === commandsRef.current) {
+      commandsRef.current?.querySelector<HTMLElement>("[data-run]")?.focus();
+    }
+  }, [ran, running]);
 
   return (
-    <GradientBorder className="overflow-hidden">
-      <div className={`${TITLE_BAR} gap-3 pr-3 pl-5`}>
-        <WindowDots />
-        <span className="min-w-0 flex-1 truncate font-mono text-text-secondary text-xs leading-4">
+    <Window
+      className="h-full"
+      title={
+        <span className="truncate">
           {first?.path}
           {artifact.files.length > 1 && (
-            <span className="text-text-muted"> +{artifact.files.length - 1}</span>
+            <span className="text-text-muted/70"> +{artifact.files.length - 1}</span>
           )}
         </span>
-        {copyText && <CopyButton text={copyText} label="the stylesheet" withLabel />}
-      </div>
-
+      }
+      end={copy && <CopyButton text={copy.text} label={copy.label} withLabel />}
+    >
       {strip}
       {!strip && graph && (
-        <FlowSteps steps={showResult ? graph.after : graph.before} after={showResult} />
+        <FlowSteps
+          steps={showResult ? graph.after : graph.before}
+          after={showResult}
+          current={current}
+        />
       )}
 
       {/* Whole-pixel line heights: a fraction leaves a hairline between the
           tinted rows of a block. */}
-      <div className="px-5 py-4 font-mono text-xs leading-5 md:px-6 md:py-5 md:text-[0.8125rem] md:leading-[1.375rem]">
+      <div className={`flex-1 md:leading-[1.375rem] ${WINDOW_BODY}`}>
         {artifact.files.map((file, fileIndex) => (
           <div key={file.path} className={fileIndex > 0 ? "mt-4" : undefined}>
             {artifact.files.length > 1 && (
-              <div className="mb-1 font-mono text-[0.6875rem] text-text-muted leading-4">
+              <div className="mb-1.5 font-mono text-[0.6875rem] text-text-muted leading-4">
                 {file.path}
               </div>
             )}
@@ -122,9 +181,9 @@ export function FileCard({
               <div
                 // biome-ignore lint/suspicious/noArrayIndexKey: the lines of a fixed diff, never reordered
                 key={index}
-                className={`-mx-2 flex gap-2 px-2 ${runCorners(file.lines, index)} ${LINE_CLASSES[line.type]}`}
+                className={`flex gap-3 ${BLEED} ${LINE_CLASSES[line.type]}`}
               >
-                <span aria-hidden="true" className="w-3 shrink-0 select-none text-right opacity-70">
+                <span aria-hidden="true" className="w-2 shrink-0 select-none opacity-60">
                   {LINE_MARKS[line.type]}
                 </span>
                 <span className="whitespace-pre-wrap break-words">{line.text || " "}</span>
@@ -134,24 +193,48 @@ export function FileCard({
         ))}
       </div>
 
-      {artifact.commands && artifact.commands.length > 0 && (
-        <div className="flex flex-col gap-1 border-border-secondary border-t px-5 py-3 font-mono text-xs leading-5 md:px-6 md:text-[0.8125rem]">
-          {artifact.commands.map(({ command, output }) => (
+      {commands.length > 0 && (
+        <div
+          ref={commandsRef}
+          tabIndex={-1}
+          className={`flex flex-col gap-1.5 py-3 font-mono text-xs leading-5 md:text-[0.8125rem] ${WINDOW_FOOTER} ${WINDOW_INSET}`}
+        >
+          {commands.map(({ command, output }, index) => (
             <div key={command} className="flex flex-col">
-              <div className="group -mx-2 flex items-start gap-2 rounded px-2 transition-colors hover:bg-surface-black-secondary">
-                <span className="flex-1 whitespace-pre-wrap break-words text-text-primary">
-                  <span className="select-none text-text-accent">$ </span>
-                  {command}
-                </span>
-                <CopyButton text={command} label="the command" className={LINE_COPY} />
-              </div>
+              <CommandLine
+                command={command}
+                end={
+                  onRun &&
+                  index === ran &&
+                  running === undefined && (
+                    <RunButton
+                      command={command}
+                      onRun={() => {
+                        refocus.current = true;
+                        commandsRef.current?.focus();
+                        onRun(index);
+                      }}
+                    />
+                  )
+                }
+              />
+              {/* The output holds its place before it prints, so nothing moves. */}
               {output && (
-                <div className="whitespace-pre-wrap break-words text-text-secondary">{output}</div>
+                <div
+                  className={`relative whitespace-pre-wrap break-words ${index < ran ? "text-text-secondary" : "invisible"}`}
+                >
+                  {output}
+                  {running === index && (
+                    <span className="visible absolute inset-0 text-text-muted">
+                      <span aria-hidden="true" className="spinner" /> Running…
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           ))}
         </div>
       )}
-    </GradientBorder>
+    </Window>
   );
 }

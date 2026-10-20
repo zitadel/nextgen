@@ -27,6 +27,7 @@ func (h *Harness) EnsureFlowService(t testing.TB) service.FlowService {
 		h.flowService.value = service.NewFlowService(
 			h.EnsureServiceDB(t),
 			h.EnsureFlowStateMachine(t),
+			BuiltinSchemaBases(),
 		)
 	}
 	return h.flowService.value

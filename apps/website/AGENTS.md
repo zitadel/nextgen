@@ -4,14 +4,14 @@ The hosted cloud's front page at `/`. Shared app rules:
 [`apps/AGENTS.md`](../AGENTS.md).
 
 - The page says the benefit, then proves it, and nothing else: the hero with
-  the commands, then the showcase's steps. Feature lists, ways in and roadmaps
-  belong on the docs and zitadel.com.
+  the commands, then the showcase's steps, ending on the quickstart. Feature
+  lists, ways in and roadmaps belong on the docs and zitadel.com.
 - It ports `zitadel/new-website`'s narrative redesign
   (`docs/narrative-ia-proposal.md` on that repo's
   `claude/zitadel-narrative-redesign-377a49` branch) and follows that repo's
   `apps/website` (Next.js App Router, Tailwind 4, its `packages/theme`), so
   components move over unchanged. Keep the website's names in
-  `app/globals.css` (`bg-background`, `text-foreground`, `accent-strong`).
+  `app/globals.css` (`bg-background`, `text-foreground`, `text-accent`).
 - It does not use `@zitadel/design-tokens`; only the login previews paint with
   them, on the login's own atoms.
 
@@ -20,7 +20,7 @@ The hosted cloud's front page at `/`. Shared app rules:
 - Load every face through `next/font/local` from `app/fonts/`, never
   `next/font/google`: its build-time download has failed builds.
 - Each file is the latin subset Google Fonts serves `next/font/google`, byte
-  for byte. Keep each SIL OFL licence (`*-OFL.txt`) beside its file. APK
+  for byte. Keep each SIL OFL license (`*-OFL.txt`) beside its file. APK
   Futural is licensed, not open.
 - To update one, take the file under `/* latin */` from the stylesheet served
   to `next/font/google`'s user agent (Azeret Mono's family is
@@ -33,32 +33,27 @@ The hosted cloud's front page at `/`. Shared app rules:
 
 - `apps/docs/app/fonts/` holds the same Arimo file; update both.
 
-## The hero animation
+## The theme
 
-- `app/hero.avif` is the new website's Lottie hero (`public/cms/homepage-hero-opt.json`
-  there, frames only, no vectors) as an animated AVIF;
-  `app/hero-still.webp`, its first frame, stands in for reduced motion and
-  browsers without AVIF. Rebuild it from the extracted frames:
-
-  ```sh
-  ffmpeg -framerate 30 -i %03d.webp -c:v libsvtav1 -crf 34 -preset 4 -pix_fmt yuv420p -f avif hero.avif
-  ```
-
-- When the hero's content changes height, change the `33.5rem` that `.stage`
-  (`app/globals.css`) reserves for it.
+- Dark and light share one set of names in `app/globals.css`: add a color as
+  a token with a value on both sides, never a `white`/`black` literal.
+- `app/theme.ts` sets `data-theme` before the first paint, from the header
+  toggle's choice or the system's; the login previews follow it.
 
 ## The logo and the favicons
 
 - `app/logo.tsx` is the website's animated logo as inline SVG, its motion as
-  CSS keyframes in `app/globals.css`. It plays only while hovered, never for
-  reduced motion; give each copy its own `id`.
+  CSS keyframes in `app/globals.css`. A hover plays it once to the end, and
+  with `autoplay` it also plays now and then by itself (the header's and the
+  footer's); never for reduced motion. Give each copy its own `id`.
 - `apps/docs/components/logo.tsx` is a copy; change the copies together.
 - `public/favicons/` and `public/favicon.ico` are the cloud's favicons: the
   console, the login UI and the docs link the same set, so a change here
   reaches them. A single `/favicon.ico` cannot replace the light/dark set.
 - `layout.tsx` imports the share image (`app/og.jpg`) and sets no
   `metadataBase`: on Vercel, Next makes its URL absolute with the deployment's
-  host.
+  host. Render it from `scripts/og.html` at 1200×630 as a JPEG (quality 88),
+  and change both when the hero's title, line or commands change.
 
 ## The commands and the showcase
 
@@ -77,7 +72,10 @@ The hosted cloud's front page at `/`. Shared app rules:
   its changes.
 - The atoms load through one dynamic import once the first preview nears the
   viewport. `brand-tokens.ts` sets their `--zl-*` base layer from the
-  package's `tokens` and `cssVars`; JSX types are in `app/zl-elements.d.ts`.
+  package's `tokens` and `cssVars`, the light side from its `tokensCss`; JSX
+  types are in `app/zl-elements.d.ts`.
+- Every window is `app/window.tsx` and every command line
+  `app/command-line.tsx`; colors come from the `@theme` in `app/globals.css`.
 - Next resolves `@zitadel/components` to its `dist/`, so `build` and `dev`
   depend on `components:build` in moon and in turbo.
 

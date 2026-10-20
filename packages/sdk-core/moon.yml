@@ -9,8 +9,10 @@ dependsOn:
 tasks:
   typecheck:
     deps:
-      # contract.spec.ts imports @zitadel/components/events from its dist.
+      # contract.spec.ts imports @zitadel/components/events from its dist, and
+      # the edge specs import this package's built dist.
       - "components:build"
+      - "build"
 
   build:
     deps:
@@ -33,8 +35,10 @@ tasks:
 
   test:
     deps:
-      # contract.spec.ts imports @zitadel/components/events from its dist.
+      # contract.spec.ts imports @zitadel/components/events from its dist, and
+      # the edge specs import this package's built dist.
       - "components:build"
+      - "build"
     inputs:
       - "**/*"
       # contract.spec.ts reads these SDK specs to check their copied

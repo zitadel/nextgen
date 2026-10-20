@@ -10,7 +10,7 @@ dependsOn:
 tasks:
   typecheck:
     deps:
-      # client.edge.test.ts imports this package's built dist.
+      # the edge tests import this package's built dist.
       - "build"
 
   build:

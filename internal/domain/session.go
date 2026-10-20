@@ -45,10 +45,11 @@ func ErrSessionPermissionDenied() Error {
 	return newError(PrefixSession.ErrorCodePrefix("permission_denied"), "session: requires a session scope bound to the project", nil, nil)
 }
 
-// ErrSessionProjectMismatch answers a read of the caller's own session that
-// names a project the session does not belong to. The session itself is fine:
-// it is a live session of another project, so it signs no one in to the named
-// one, and the caller must not treat its cookie as dead.
+// ErrSessionProjectMismatch answers a request on the caller's own session (its
+// read, its CSRF token, sign-out) that names a project the session does not
+// belong to. The session itself is fine: it is a live session of another
+// project, so it signs no one in to the named one, and the caller must not treat
+// its cookie as dead.
 func ErrSessionProjectMismatch() Error {
 	return newError("sess.project_mismatch", "The session belongs to a different project.", nil, nil)
 }

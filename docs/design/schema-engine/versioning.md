@@ -86,11 +86,12 @@ the first breaking Meta-Schema change actually lands.
 ### Published copies
 
 The built-in Meta-Schemas are named by URL under the server's
-`schema.builtin_public_base`, and the hosted cloud publishes them there:
-`https://preview.zitadel.com/schemas/v1/user-schema.json` answers with the
-document whose `$id` it is ([cloud runbook](../../runbooks/cloud.md#built-in-schemas)).
-The URL carries no version beyond `v1`, so it names every server version's
-copy at once.
+`schema.builtin_public_base`, `https://zitadel.com/schemas/v1`, and the hosted
+cloud publishes them under the same path: its `/schemas/v1/user-schema.json`
+answers with the document whose `$id` is
+`https://zitadel.com/schemas/v1/user-schema.json`
+([cloud runbook](../../runbooks/cloud.md#built-in-schemas)). The URL carries
+no version beyond `v1`, so it names every server version's copy at once.
 
 - **Through alpha, `/schemas/v1/` serves main's latest.** The documents change
   with every deployment under URLs that stay. A local server, a branch or an
