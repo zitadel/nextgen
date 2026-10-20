@@ -151,17 +151,17 @@ test("discards the draft when cancelled", async ({ page, zitadel, seed }) => {
   // Nothing was created, and reopening starts clean.
   await expect(page.getByText(email)).toHaveCount(0);
   await page.getByRole("button", { name: "Add", exact: true }).click();
-  // Read before any pick: picking a schema clears the values itself. With one
-  // schema the fields mount empty, with several none mount until a pick, and a
-  // kept draft would show in either case.
-  await expect(drawer.getByRole("combobox", { name: "User Schema" })).not.toHaveAttribute(
-    "aria-disabled",
-    "true",
-  );
-  const values = await drawer
-    .locator("input")
-    .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value));
-  expect(values).not.toContain(email);
+  // Read before any pick: picking a schema clears the values itself. Parallel
+  // specs decide how many schemas the drawer offers. With several, a discarded
+  // draft leaves none picked; with one, the drawer picks it again and its
+  // fields start empty. A kept draft fails either check.
+  const picker = drawer.getByRole("combobox", { name: "User Schema" });
+  await expect(picker).not.toHaveAttribute("aria-disabled", "true");
+  if ((await picker.textContent())?.includes("Select schema")) {
+    await expect(drawer.getByLabel("Email")).toHaveCount(0);
+  } else {
+    await expect(drawer.getByLabel("Email")).toHaveValue("");
+  }
 });
 
 test("closes from the header without creating anything", async ({ page, zitadel, seed }) => {

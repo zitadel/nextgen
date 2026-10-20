@@ -9,10 +9,10 @@ import { signIn } from "../support/sign-in";
 /**
  * The user detail screen's schema revision link against a real instance.
  *
- * The unit specs cover what the link renders and where it points. What only a
- * live backend proves is that a schema id that is a `$id` URL survives the
- * router as an encoded path param: the schema screen reads it back from the
- * server and renders that schema. The seeded schema has a plain `sch_*` id, so
+ * The unit specs cover what the link renders and where it points, and the
+ * router's encoding of the id is client-only. What only a live backend proves
+ * is that the dev proxy and the API route accept a `$id` URL id, `%2F` and
+ * all, and return that schema. The seeded schema has a plain `sch_*` id, so
  * the test writes its own schema with a `$id` and puts the subject on it.
  */
 

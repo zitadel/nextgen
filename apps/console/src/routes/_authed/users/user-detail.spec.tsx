@@ -159,6 +159,22 @@ describe("user detail", () => {
     expect(panel.queryByRole("link")).not.toBeInTheDocument();
   });
 
+  it("says a readable schema has no attributes to show, rather than that it failed", async () => {
+    stub();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({ id: "sch_business", schema: { title: "Business", properties: {} } }),
+      ),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    expect(
+      await panel.findByText("This schema defines no attributes that can be shown."),
+    ).toBeInTheDocument();
+    expect(panel.queryByText(/could not be read/)).not.toBeInTheDocument();
+  });
+
   it("does not rank the revision as latest or outdated", async () => {
     // A user's revision is shown as a fact; no marker says how it compares.
     stub();

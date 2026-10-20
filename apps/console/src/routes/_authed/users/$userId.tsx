@@ -173,7 +173,9 @@ function UserDetail() {
             </div>
             {fields.length === 0 ? (
               <p className="text-muted-foreground px-6 pb-5 text-sm">
-                This user&rsquo;s schema could not be read, so its attributes cannot be labelled.
+                {schema
+                  ? "This schema defines no attributes that can be shown."
+                  : "This user’s schema could not be read, so its attributes cannot be labelled."}
               </p>
             ) : (
               <FieldGroup className="gap-4 px-6 pb-5">
