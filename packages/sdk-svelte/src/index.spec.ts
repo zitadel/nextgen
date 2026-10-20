@@ -480,6 +480,11 @@ describe("hydrating a server-rendered login", () => {
     const host = document.createElement("div");
     document.body.appendChild(host);
     host.innerHTML = await serverMarkup({ project: globalProject, resumeFlowId: "flow_123" });
+    const rendered = host.querySelector(widgetTags.login);
+    expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
+    const firstStep = new Promise((resolve) =>
+      rendered?.addEventListener("zitadel-flow-step", resolve, { once: true }),
+    );
 
     const app = hydrate(ZitadelLogin, {
       target: host,
@@ -490,6 +495,10 @@ describe("hydrating a server-rendered login", () => {
     const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
     expect(first.method).toBe("GET");
     expect(first.url).toContain("flow_123");
+    expect(host.querySelector(widgetTags.login)).toBe(rendered);
+    await firstStep;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetched).toHaveBeenCalledTimes(1);
     await unmount(app);
     host.remove();
   });

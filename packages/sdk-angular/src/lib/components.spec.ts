@@ -365,9 +365,15 @@ describe("hydrating a server-rendered login", () => {
     const template = `<zitadel-auth-login resumeFlowId="flow_123" />`;
     const fetched = vi.spyOn(globalThis, "fetch");
     const html = await serverRender(template, [ZitadelLoginComponent]);
-    document.body.innerHTML = html
+    const host = document.body;
+    host.innerHTML = html
       .slice(html.indexOf("<body"), html.indexOf("</body>"))
       .replace(/^<body[^>]*>/, "");
+    const rendered = host.querySelector(widgetTags.login);
+    expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
+    const firstStep = new Promise((resolve) =>
+      rendered?.addEventListener("zitadel-flow-step", resolve, { once: true }),
+    );
 
     @Component({
       selector: "app-root",
@@ -382,6 +388,10 @@ describe("hydrating a server-rendered login", () => {
     const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
     expect(first.method).toBe("GET");
     expect(first.url).toContain("flow_123");
+    expect(host.querySelector(widgetTags.login)).toBe(rendered);
+    await firstStep;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetched).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -293,13 +293,18 @@ describe("hydrating a server-rendered login", () => {
       proxyPath: "https://flow.test.invalid",
     });
     const fetched = vi.spyOn(globalThis, "fetch");
-    const host = document.createElement("div");
-    document.body.appendChild(host);
     const app = () =>
       createSSRApp({
         render: () => h(ZitadelLogin, { project: globalProject, resumeFlowId: "flow_123" }),
       });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
     host.innerHTML = await renderToString(app());
+    const rendered = host.querySelector(widgetTags.login);
+    expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
+    const firstStep = new Promise((resolve) =>
+      rendered?.addEventListener("zitadel-flow-step", resolve, { once: true }),
+    );
 
     app().mount(host);
 
@@ -307,6 +312,10 @@ describe("hydrating a server-rendered login", () => {
     const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
     expect(first.method).toBe("GET");
     expect(first.url).toContain("flow_123");
+    expect(host.querySelector(widgetTags.login)).toBe(rendered);
+    await firstStep;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetched).toHaveBeenCalledTimes(1);
     host.remove();
   });
 });
