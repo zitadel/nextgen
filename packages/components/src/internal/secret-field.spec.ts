@@ -4,9 +4,9 @@ import { isDisclosable } from "./secret-field.js";
 
 describe("isDisclosable", () => {
   it.each([
-    ["an email field", { type: "email" }],
     ["an email field that is the username", { type: "email", autocomplete: "username" }],
-    ["a tel field", { type: "tel" }],
+    ["an email field that is an email", { type: "email", autocomplete: "email" }],
+    ["a tel field that is a phone number", { type: "tel", autocomplete: "tel" }],
     ["a text field that is the username", { type: "text", autocomplete: "username" }],
     ["a text field that is an email", { type: "text", autocomplete: "email" }],
     ["a text field that is a phone number", { type: "text", autocomplete: "tel" }],
@@ -17,19 +17,30 @@ describe("isDisclosable", () => {
     ["a text field that is a nickname", { type: "text", autocomplete: "nickname" }],
     ["a sectioned username", { type: "text", autocomplete: "section-login username" }],
     ["an upper-case username token", { type: "text", autocomplete: "USERNAME" }],
+    ["a username separated by a non-breaking space", { type: "text", autocomplete: "x username" }],
   ])("discloses %s", (_label, field) => {
     expect(isDisclosable(field)).toBe(true);
   });
 
   it.each([
     ["no definition at all", undefined],
+    ["an email field with no autocomplete", { type: "email" }],
+    ["a tel field with no autocomplete, like a numeric PIN", { type: "tel" }],
+    ["a text field with no autocomplete, like a PIN", { type: "text" }],
+    ["a text field with an unrelated autocomplete", { type: "text", autocomplete: "off" }],
+    ["a text field with an empty autocomplete", { type: "text", autocomplete: "" }],
     ["a password field", { type: "password" }],
     [
       "a password field that claims to be the username",
       { type: "password", autocomplete: "username" },
     ],
-    ["a text field with no autocomplete, like a PIN", { type: "text" }],
-    ["a text field with an unrelated autocomplete", { type: "text", autocomplete: "off" }],
+    ["a number field", { type: "number", autocomplete: "username" }],
+    ["a url field", { type: "url", autocomplete: "username" }],
+    ["a date field", { type: "date", autocomplete: "username" }],
+    ["a hidden field", { type: "hidden", autocomplete: "username" }],
+    ["a checkbox field", { type: "checkbox", autocomplete: "username" }],
+    ["a select field", { type: "select", autocomplete: "username" }],
+    ["a field with no type", { autocomplete: "username" }],
     ["a text field holding a one-time code", { type: "text", autocomplete: "one-time-code" }],
     [
       "a text field holding a sectioned one-time code",
@@ -47,13 +58,31 @@ describe("isDisclosable", () => {
       "a username that is also a one-time code",
       { type: "text", autocomplete: "username one-time-code" },
     ],
-    ["a number field", { type: "number" }],
-    ["a url field", { type: "url" }],
-    ["a date field", { type: "date" }],
-    ["a hidden field", { type: "hidden" }],
-    ["a checkbox field", { type: "checkbox" }],
-    ["a select field", { type: "select" }],
-    ["a field with no type", { autocomplete: "username" }],
+    ["a username next to a card security code", { type: "text", autocomplete: "username cc-csc" }],
+    ["a card number next to a username", { type: "text", autocomplete: "cc-number username" }],
+    ["an email field holding a card number", { type: "email", autocomplete: "cc-number" }],
+    [
+      "an email field holding a card number and an email",
+      { type: "email", autocomplete: "email cc-exp" },
+    ],
+    [
+      "a username next to a transaction amount",
+      { type: "text", autocomplete: "username transaction-amount" },
+    ],
+    ["a username next to a birthday", { type: "text", autocomplete: "username bday" }],
+    ["a username next to a birth year", { type: "text", autocomplete: "username bday-year" }],
+    [
+      "a new password followed by a zero-width space",
+      { type: "text", autocomplete: "username new-password​" },
+    ],
+    [
+      "a new password split by a zero-width joiner",
+      { type: "text", autocomplete: "username new-pass‍word" },
+    ],
+    [
+      "a new password after a non-breaking space",
+      { type: "text", autocomplete: "username new-password" },
+    ],
   ])("keeps %s secret", (_label, field) => {
     expect(isDisclosable(field)).toBe(false);
   });

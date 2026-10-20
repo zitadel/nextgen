@@ -295,13 +295,14 @@ submit.
 page can read it. Its detail is `{ name, secret: false, value }` for an
 identifier field and `{ name, secret: true }`, with no `value` at all, for every
 other field: a password, a code, a PIN, a field the step does not define. A
-field is an identifier when its step definition has the type `email` or `tel`,
-or the type `text` with an `autocomplete` of `username`, `email`, `tel`, `name`,
-`given-name`, `additional-name`, `family-name` or `nickname`; an `autocomplete`
-of `current-password`, `new-password` or `one-time-code` always makes it secret.
+field is an identifier when its step definition has the type `text`, `email` or
+`tel` and an `autocomplete` of `username`, `email`, `tel`, `name`, `given-name`,
+`additional-name`, `family-name` or `nickname`; the type alone never qualifies,
+and a sensitive token beside it (`current-password`, `new-password`,
+`one-time-code`, `bday*`, `cc-*`, `transaction-*`) makes it secret.
 The name is never consulted. `ZitadelFlowInputEventDetail` types the detail.
-The atoms' internal `zl-input` and `zl-passkey-result` events are not composed,
-so they never leave the widget, and the `input` event a field re-publishes
+The atoms' internal `zl-input`, `zl-change` and `zl-passkey-result` events are
+not composed, so they never leave the widget, and the `input` event a field re-publishes
 carries no `data` for a secret field.
 
 This keeps the widget's own events clean; it does not make the widget opaque to
@@ -350,7 +351,7 @@ state, restores on form reset, and forwards Enter to `form.requestSubmit()`.
 | `label` | `string` | Visible label (rendered above) |
 | `aria-label` | `string` | Accessible name for the input when there is no `label` |
 | `type` | `'text' \| 'email' \| 'password' \| ...` | Native input type |
-| `value` | `string` | Two-way bound; emits `zl-input` |
+| `value` | `string` | Two-way bound; emits `zl-input`, which is not composed and so stays inside the widget's shadow tree |
 | `placeholder`, `autocomplete`, `pattern` | `string` | Forwarded |
 | `required`, `disabled`, `invalid` | `boolean` | |
 | `error` | `string` | Custom validity message |

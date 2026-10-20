@@ -158,6 +158,30 @@ describe("<zl-select> markup", () => {
     expect(changes).toEqual([{ name: "country", value: "us" }]);
   });
 
+  it("keeps zl-change inside the widget, capture phase included", async () => {
+    const root = host.attachShadow({ mode: "open" });
+    const el = document.createElement("zl-select");
+    el.name = "country";
+    el.options = OPTIONS;
+    root.appendChild(el);
+    await el.updateComplete;
+    const seenByPage: string[] = [];
+    for (const target of [window, document]) {
+      for (const capture of [true, false]) {
+        target.addEventListener("zl-change", () => seenByPage.push("change"), capture);
+      }
+    }
+    const own: string[] = [];
+    el.addEventListener("zl-change", () => own.push("change"));
+    const select = native(el);
+
+    select.value = "us";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+
+    expect(own).toEqual(["change"]);
+    expect(seenByPage).toEqual([]);
+  });
+
   it("lets the user clear back to the empty option", async () => {
     const el = await mount({ name: "country", value: "us" });
     el.value = "";

@@ -73,7 +73,7 @@ and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM.
 
 Events that cross the shadow boundary must never carry secret values. An event
 that carries a field value or a credential and is only for the widget itself
-(`zl-input`, `zl-passkey-result`) is emitted `{ composed: false }`, so no page
+(`zl-input`, `zl-change`, `zl-passkey-result`) is emitted `{ composed: false }`, so no page
 script sees it, capture phase included. A public event carries a value only for
 a field `isDisclosable` allows. The "what the page can observe" test in
 `src/orchestrator/zitadel-login.browser.spec.ts` enforces it across a whole

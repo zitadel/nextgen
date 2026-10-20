@@ -170,7 +170,7 @@ describe("<zl-field> form participation (chromium)", () => {
 
   it("syncs native input/change events with host value and FormData", async () => {
     const { form, field } = mount(
-      `<form><zl-field name="email" type="email" data-testid="zitadel-field-email"></zl-field></form>`,
+      `<form><zl-field name="email" type="email" autocomplete="username" data-testid="zitadel-field-email"></zl-field></form>`,
     );
     await field.updateComplete;
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;

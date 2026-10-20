@@ -493,8 +493,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
 
     it.each([
-      ["an email", field("email"), true],
-      ["a tel", field("tel"), true],
+      ["an email that is the username", field("email", "username"), true],
+      ["a tel that is a phone number", field("tel", "tel"), true],
       ["a username", field("text", "username"), true],
       ["an email address", field("text", "email"), true],
       ["a phone number", field("text", "tel"), true],
@@ -512,6 +512,16 @@ describe("<zitadel-login> against the typed Flow API", () => {
       ["a one-time code", field("text", "one-time-code"), false],
       ["a username that is also a one-time code", field("text", "username one-time-code"), false],
       ["an upper-case one-time-code token on an email", field("email", "ONE-TIME-CODE"), false],
+      ["an email with no autocomplete", field("email"), false],
+      ["a tel with no autocomplete, like a numeric PIN", field("tel"), false],
+      ["a username next to a card code", field("text", "username cc-csc"), false],
+      ["a card number next to a username", field("text", "cc-number username"), false],
+      ["an email holding a card number", field("email", "cc-number"), false],
+      [
+        "a new password trailed by a zero-width space",
+        field("text", "username new-password\u200b"),
+        false,
+      ],
       ["a number", field("number"), false],
       ["a url", field("url"), false],
       ["a date", field("date"), false],

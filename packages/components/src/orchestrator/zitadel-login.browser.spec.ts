@@ -848,6 +848,7 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
       text_key: "identifier.field.email",
       autocomplete: "nickname",
     },
+    { name: "newsletter", type: "checkbox", text_key: "identifier.field.email" },
   ]);
 
   let host: HTMLDivElement;
@@ -993,6 +994,13 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
     stage = "nickname";
     await focusField(element, "nickname");
     await userEvent.keyboard("ally");
+    stage = "checkbox";
+    const newsletter = await waitFor(() =>
+      element.shadowRoot
+        ?.querySelector('zl-checkbox[name="newsletter"]')
+        ?.shadowRoot?.querySelector("input"),
+    );
+    newsletter.click();
     stage = "register-submit";
     await submitStep(element);
 
@@ -1040,6 +1048,8 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
 
     expect(seen.some((observation) => observation.type === "zitadel-flow-step")).toBe(true);
     expect(observations.filter((observation) => observation.type === "zl-input")).toEqual([]);
+    expect(observations.filter((observation) => observation.type === "zl-change")).toEqual([]);
+    expect(String(stub.calls[3]?.init?.body)).toContain('"newsletter":true');
     expect(observations.filter((observation) => observation.type === "zl-passkey-result")).toEqual(
       [],
     );

@@ -106,7 +106,7 @@ Each widget event reaches the callback in the last column, which receives the ev
 | `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login | `onFlowError` |
 | `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session | `onSignout` |
 
-The `zitadel-flow-input` event is composed, so any script on the page can read it. It carries a field's value only for an identifier field: an `email` or `tel` field, or a `text` field whose `autocomplete` is `username`, `email`, `tel`, `name`, `given-name`, `additional-name`, `family-name` or `nickname`. Every other field, a password, a code or a PIN included, is reported as `{ name, secret: true }` with no value. Narrow on `secret` before reading `value`.
+The `zitadel-flow-input` event is composed, so any script on the page can read it. It carries a field's value only for an identifier field: a `text`, `email` or `tel` field whose `autocomplete` is `username`, `email`, `tel`, `name`, `given-name`, `additional-name`, `family-name` or `nickname`, with no sensitive token (`current-password`, `new-password`, `one-time-code`, `bday*`, `cc-*`, `transaction-*`) beside it. Every other field, a password, a code or a PIN included, is reported as `{ name, secret: true }` with no value. Narrow on `secret` before reading `value`.
 
 ```svelte
 <ZitadelLogin {project} theme="light" onFlowComplete={(detail) => track(detail)} />

@@ -381,8 +381,8 @@ describe("<zl-field> what leaves the widget", () => {
   });
 
   it.each([
-    ["an email", `<zl-field name="f" type="email"></zl-field>`, "a"],
-    ["a tel", `<zl-field name="f" type="tel"></zl-field>`, "a"],
+    ["an email", `<zl-field name="f" type="email" autocomplete="email"></zl-field>`, "a"],
+    ["a tel", `<zl-field name="f" type="tel" autocomplete="tel"></zl-field>`, "a"],
     ["a username", `<zl-field name="f" type="text" autocomplete="username"></zl-field>`, "a"],
   ])("re-publishes the typed character of %s field", async (_label, html, character) => {
     const field = await mount(html);
@@ -402,6 +402,12 @@ describe("<zl-field> what leaves the widget", () => {
     ["a plain text", `<zl-field name="f" type="text"></zl-field>`],
     ["a one-time code", `<zl-field name="f" type="text" autocomplete="one-time-code"></zl-field>`],
     ["a number", `<zl-field name="f" type="number"></zl-field>`],
+    ["an email with no autocomplete", `<zl-field name="f" type="email"></zl-field>`],
+    ["a tel with no autocomplete", `<zl-field name="f" type="tel"></zl-field>`],
+    [
+      "a username next to a card code",
+      `<zl-field name="f" autocomplete="username cc-csc"></zl-field>`,
+    ],
   ])("re-publishes no typed character of %s field", async (_label, html) => {
     const field = await mount(html);
     const data = republishedData(field);

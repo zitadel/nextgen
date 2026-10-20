@@ -77,6 +77,32 @@ describe("<zl-checkbox> form participation (chromium)", () => {
     expect(nativeChanges).toBe(1);
   });
 
+  it("keeps zl-change inside the widget, capture phase included", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = host.attachShadow({ mode: "open" });
+    const checkbox = document.createElement("zl-checkbox");
+    checkbox.name = "terms";
+    root.appendChild(checkbox);
+    await checkbox.updateComplete;
+    const seenByPage: string[] = [];
+    for (const target of [window, document]) {
+      for (const capture of [true, false]) {
+        target.addEventListener("zl-change", () => seenByPage.push("change"), capture);
+      }
+    }
+    const own: string[] = [];
+    checkbox.addEventListener("zl-change", () => own.push("change"));
+    const input = checkbox.shadowRoot?.querySelector("input");
+    if (!input) throw new Error("no native checkbox");
+
+    input.click();
+
+    expect(own).toEqual(["change"]);
+    expect(seenByPage).toEqual([]);
+    host.remove();
+  });
+
   it("restores the default checked state when the host form is reset", async () => {
     const { form, checkbox } = mount(
       `<form><zl-checkbox name="terms" checked></zl-checkbox></form>`,

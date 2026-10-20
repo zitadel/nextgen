@@ -62,6 +62,8 @@ The manifest type also has a `satisfies_gate` field for an atom that satisfies a
 
 Manifests are the single source of truth for parts, slots, and what an atom binds to on the step.
 
+The `events` an atom lists are what the orchestrator listens for on its own shadow root. Those that carry a field value or a credential (`zl-input`, `zl-change`, `zl-passkey-result`) are not composed, so they never leave the widget's shadow tree.
+
 ## Static validation (design)
 
 Given a flow definition (from the flow engine) and a template:

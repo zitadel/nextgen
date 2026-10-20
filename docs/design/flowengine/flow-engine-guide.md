@@ -146,7 +146,7 @@ Templates emit standard HTML containing Lit Web Components. These components are
 
 | Component | Renders | Events emitted |
 |---|---|---|
-| `<zl-field>` | Labeled input with validation | `zl-input` (value change) |
+| `<zl-field>` | Labeled input with validation | `zl-input` (value change; not composed, so it never leaves the widget) |
 | `<zl-submit>` | Primary button with loading spinner | `zl-submit` (click) |
 | `<zl-action>` | Secondary/ghost button | `zl-action` (click with action name) |
 | `<zl-sso-providers>` | Grid of branded SSO buttons | `zl-sso` (click with provider id) |
