@@ -29,6 +29,14 @@ A session belongs to the project it was signed in to, while a browser sends a ho
 
 The project comes from the middleware's `projectId` option, else from `ZITADEL_PROJECT_ID`, which setup writes to `.env.local`, else from the framework's public project id variable. With none, no session counts as signed in. A session of another project reads as signed out, and its cookie stays: it is live in the app it belongs to.
 
+## One session cookie per project
+
+Zitadel sets and reads one session cookie, `__nextgen_session`. Under that name alone, the apps and the Console on one host would share a single cookie, and each sign-in would sign the others out. So the proxy keeps the app's session in a cookie named after its project, `__nextgen_session_<project id>`. It renames the cookie Zitadel sets on its way to the browser, and sends the app's cookie to Zitadel under Zitadel's name. It passes no other project's session cookie on. On `localhost`, signing in to an app leaves the Console of a local server and every other app signed in.
+
+A user who signed in before an app moved to this cookie holds the session under `__nextgen_session`. The first time the middleware or the session check of the widgets reads it, and it signs in a user of the app's project, it moves to the app's cookie. A session of another project in that cookie stays where it is. With no project configured, the proxy passes the cookies through unchanged.
+
+The dev proxies the CLI writes for single-page apps keep the session the same way, reading the project from `ZITADEL_PROJECT_ID` in `.env.local`. They do not move a session kept under `__nextgen_session`, so a developer who was signed in to an SPA signs in once more after the upgrade. `zitadel setup` and `zitadel doctor --fix` add this to a dev proxy an earlier setup wrote, and `zitadel doctor` warns until then. In production, an SPA's own proxy passes `__nextgen_session` through, which is fine there: a production host serves one project.
+
 ## SPAs in production
 
 Single-page apps (React, Vue, Angular, Solid, Svelte, Qwik) have no server of their own. In local development the CLI scaffolds a dev-server proxy for `/__nextgen/*` that adds the project secret to the session exchange. The CLI scaffolds nothing for production yet. The generated app sends no credential of its own, so in production it needs a same-origin proxy that adds the project secret to the session exchange, and to no other call. A plain rewrite cannot do that.

@@ -4,15 +4,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearJwksCache } from "./jwt.js";
 import {
   HOP_BY_HOP,
+  SERVER_SESSION_COOKIE,
   checkOpaqueSessionToken,
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
   jwtNamesProject,
+  proxySessionCookies,
   requiresProjectSecret,
   resolveSession,
-  type ResolveSessionOptions,
+  serializeSessionCookie,
+  sessionCookieName,
   validateOpaqueSessionToken,
+  type ProxiedRequest,
+  type ResolveSessionOptions,
 } from "./middleware.js";
 
 /** The upstream response headers for one proxied call. */
@@ -273,13 +278,20 @@ describe("opaque session tokens", () => {
         Response.json({
           project_id: PROJECT,
           user_id: "u1",
+          expires_at: "2030-01-01T00:00:00Z",
           user: { identifier: "a@b.c", identifier_property: "email", display: "Ada" },
         }),
       );
 
       expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
         verdict: "live",
-        session: { userId: "u1", identifier: "a@b.c", identifierProperty: "email", display: "Ada" },
+        session: {
+          userId: "u1",
+          identifier: "a@b.c",
+          identifierProperty: "email",
+          display: "Ada",
+          expiresAt: "2030-01-01T00:00:00Z",
+        },
       });
     });
 
@@ -319,7 +331,13 @@ describe("opaque session tokens", () => {
 
       expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
         verdict: "live",
-        session: { userId: null, identifier: null, identifierProperty: null, display: null },
+        session: {
+          userId: null,
+          identifier: null,
+          identifierProperty: null,
+          display: null,
+          expiresAt: null,
+        },
       });
       expect(warn).not.toHaveBeenCalled();
     });
@@ -412,6 +430,7 @@ describe("opaque session tokens", () => {
         identifier: "a@b.c",
         identifierProperty: null,
         display: null,
+        expiresAt: null,
       });
     });
 
@@ -450,182 +469,523 @@ describe("jwtNamesProject", () => {
   });
 });
 
+describe("sessionCookieName", () => {
+  it("appends the project id to the server's name", () => {
+    expect(sessionCookieName("proj_01K7ZD3E")).toBe("__nextgen_session_proj_01K7ZD3E");
+  });
+
+  it("keeps the hyphens of a UUID", () => {
+    expect(sessionCookieName("proj_3f2b6c1e-8a4d-4f1b-9c2e-7d5a1b0c9e8f")).toBe(
+      "__nextgen_session_proj_3f2b6c1e-8a4d-4f1b-9c2e-7d5a1b0c9e8f",
+    );
+  });
+
+  it("percent-encodes what a cookie name cannot hold", () => {
+    expect(sessionCookieName("a b;c=ü")).toBe("__nextgen_session_a%20b%3Bc%3D%C3%BC");
+  });
+});
+
+describe("serializeSessionCookie", () => {
+  it("gives the cookie the attributes the server gives its own session cookie", () => {
+    expect(
+      serializeSessionCookie({
+        name: "__nextgen_session_p",
+        value: "tok",
+        maxAge: 60,
+        secure: true,
+      }),
+    ).toBe("__nextgen_session_p=tok; Path=/; Max-Age=60; HttpOnly; SameSite=Lax; Secure");
+  });
+
+  it("keeps a cookie without a Max-Age for the browser session", () => {
+    expect(
+      serializeSessionCookie({ name: "n", value: "v", maxAge: undefined, secure: false }),
+    ).toBe("n=v; Path=/; HttpOnly; SameSite=Lax");
+  });
+});
+
+describe("proxySessionCookies", () => {
+  const PROJECT = "proj_app";
+  const OWN = "__nextgen_session_proj_app";
+
+  function proxied(overrides: Partial<ProxiedRequest> = {}): ProxiedRequest {
+    return {
+      method: "GET",
+      path: "/flow",
+      search: "",
+      cookie: null,
+      requestUrl: "http://localhost:3000/__nextgen/flow",
+      ...overrides,
+    };
+  }
+
+  function answer(status: number, body: unknown, setCookies: string[] = []): Response {
+    const headers = new Headers({ "content-type": "application/json" });
+    for (const setCookie of setCookies) {
+      headers.append("set-cookie", setCookie);
+    }
+    return new Response(JSON.stringify(body), { status, headers });
+  }
+
+  it("sends the project's session cookie up under the server's name", () => {
+    const cookies = proxySessionCookies(
+      proxied({ cookie: `theme=dark; ${OWN}=mine; _zflow=f` }),
+      PROJECT,
+    );
+
+    expect(cookies.upstreamCookie).toBe("theme=dark; _zflow=f; __nextgen_session=mine");
+  });
+
+  it("keeps every other session cookie back", () => {
+    const cookies = proxySessionCookies(
+      proxied({
+        cookie: "__nextgen_session=console; __nextgen_session_proj_other=other; _zflow=f",
+      }),
+      PROJECT,
+    );
+
+    expect(cookies.upstreamCookie).toBe("_zflow=f");
+  });
+
+  it("sends no Cookie header when nothing is left to send", () => {
+    const cookies = proxySessionCookies(proxied({ cookie: "__nextgen_session=console" }), PROJECT);
+
+    expect(cookies.upstreamCookie).toBeNull();
+  });
+
+  it("renames the server's session cookie on the way back, set or cleared", async () => {
+    const cookies = proxySessionCookies(proxied(), PROJECT);
+
+    const { setCookies } = await cookies.toBrowser(
+      answer(200, {}, [
+        "__nextgen_session=tok; Path=/; Max-Age=3600; HttpOnly; SameSite=Lax",
+        "__nextgen_session=; Path=/; Max-Age=0",
+        "_zflow=; Path=/; Max-Age=0",
+      ]),
+    );
+
+    expect(setCookies).toEqual([
+      `${OWN}=tok; Path=/; Max-Age=3600; HttpOnly; SameSite=Lax`,
+      `${OWN}=; Path=/; Max-Age=0`,
+      "_zflow=; Path=/; Max-Age=0",
+    ]);
+  });
+
+  it("passes the cookies through as they are without a project", async () => {
+    const cookies = proxySessionCookies(
+      proxied({ cookie: "__nextgen_session=tok; a=b" }),
+      undefined,
+    );
+
+    const { setCookies } = await cookies.toBrowser(
+      answer(200, {}, ["__nextgen_session=tok; Path=/"]),
+    );
+
+    expect(cookies.upstreamCookie).toBe("__nextgen_session=tok; a=b");
+    expect(setCookies).toEqual(["__nextgen_session=tok; Path=/"]);
+  });
+
+  describe("a session kept under the server's name", () => {
+    const PROBE = { method: "GET", path: "/sessions/me", search: `?project_id=${PROJECT}` };
+
+    it("goes up to the session probe of this project", () => {
+      const cookies = proxySessionCookies(
+        proxied({ ...PROBE, cookie: "__nextgen_session=old" }),
+        PROJECT,
+      );
+
+      expect(cookies.upstreamCookie).toBe("__nextgen_session=old");
+    });
+
+    it.each([
+      ["DELETE /sessions/me", { method: "DELETE", path: "/sessions/me", search: PROBE.search }],
+      ["the probe without a project", { method: "GET", path: "/sessions/me", search: "" }],
+      [
+        "the probe of another project",
+        { method: "GET", path: "/sessions/me", search: "?project_id=proj_other" },
+      ],
+      ["GET /sessions/me/csrf", { method: "GET", path: "/sessions/me/csrf", search: "" }],
+      ["GET /users/me", { method: "GET", path: "/users/me", search: "" }],
+    ])("stays back from %s", (_label, request) => {
+      const cookies = proxySessionCookies(
+        proxied({ ...request, cookie: "__nextgen_session=old" }),
+        PROJECT,
+      );
+
+      expect(cookies.upstreamCookie).toBeNull();
+    });
+
+    it("stays back when the project's own cookie is there", () => {
+      const cookies = proxySessionCookies(
+        proxied({ ...PROBE, cookie: `__nextgen_session=old; ${OWN}=mine` }),
+        PROJECT,
+      );
+
+      expect(cookies.upstreamCookie).toBe("__nextgen_session=mine");
+    });
+
+    it("moves to the project's cookie when the probe signs its user in", async () => {
+      const expiresAt = new Date(Date.now() + 3_600_000).toISOString();
+      const body = { project_id: PROJECT, user_id: "u1", expires_at: expiresAt };
+      const cookies = proxySessionCookies(
+        proxied({ ...PROBE, cookie: "__nextgen_session=old" }),
+        PROJECT,
+      );
+
+      const forBrowser = await cookies.toBrowser(answer(200, body));
+
+      expect(forBrowser.setCookies).toHaveLength(2);
+      expect(forBrowser.setCookies[0]).toMatch(
+        new RegExp(`^${OWN}=old; Path=/; Max-Age=(3599|3600); HttpOnly; SameSite=Lax$`),
+      );
+      expect(forBrowser.setCookies[1]).toBe(
+        "__nextgen_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
+      );
+      expect(JSON.parse(String(forBrowser.body))).toEqual(body);
+    });
+
+    it.each([
+      ["another project's session", 403, { code: "sess.project_mismatch" }],
+      ["an anonymous session", 200, { project_id: PROJECT }],
+      ["an answer for another project", 200, { project_id: "proj_other", user_id: "u1" }],
+      ["a dead session", 401, { code: "auth.unauthorized" }],
+    ])("stays where it is when the probe finds %s", async (_label, status, body) => {
+      const cookies = proxySessionCookies(
+        proxied({ ...PROBE, cookie: "__nextgen_session=old" }),
+        PROJECT,
+      );
+
+      const forBrowser = await cookies.toBrowser(answer(status, body));
+
+      expect(forBrowser.setCookies).toEqual([]);
+    });
+
+    it("moves with Secure where the app is served over https", async () => {
+      const cookies = proxySessionCookies(
+        proxied({
+          ...PROBE,
+          cookie: "__nextgen_session=old",
+          requestUrl: "https://app.example.com/__nextgen/sessions/me",
+        }),
+        PROJECT,
+      );
+
+      const { setCookies } = await cookies.toBrowser(
+        answer(200, { project_id: PROJECT, user_id: "u1" }),
+      );
+
+      expect(setCookies[0]).toBe(`${OWN}=old; Path=/; HttpOnly; SameSite=Lax; Secure`);
+    });
+  });
+});
+
 describe("resolveSession", () => {
   const PROJECT = "proj_app";
-  const ISSUER = "http://auth.test";
-  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-  const jwk = { ...publicKey.export({ format: "jwk" }), kid: "k1", alg: "RS256", use: "sig" };
-
-  function base64url(input: string | Buffer): string {
-    return Buffer.from(input).toString("base64url");
-  }
-
-  function jwt(claims: Record<string, unknown>): string {
-    const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT", kid: "k1" }));
-    const body = base64url(
-      JSON.stringify({ iss: ISSUER, exp: Math.floor(Date.now() / 1000) + 3600, ...claims }),
-    );
-    const signature = createSign("SHA256").update(`${header}.${body}`).sign(privateKey);
-    return `${header}.${body}.${base64url(signature)}`;
-  }
-
-  const options: ResolveSessionOptions = {
-    url: ISSUER,
+  const OWN = "__nextgen_session_proj_app";
+  const OPTIONS: ResolveSessionOptions = {
+    url: "http://auth.test",
     projectId: PROJECT,
     allowedAlgorithms: ["RS256"],
-    clockSkewMs: 5000,
+    clockSkewMs: 0,
     audience: undefined,
     allowedTokenTypes: ["JWT"],
     jwksTimeoutMs: 1000,
     opaqueTokenTimeoutMs: 1000,
   };
+  const SIGNED_OUT = { isAuthenticated: false, session: null };
+  /** What clears the project's own session cookie. */
+  const CLEARED = { name: OWN, value: "", maxAge: 0, secure: false };
 
-  /** Serves the JWKS, and answers `GET /sessions/me` with `sessionsMe`. */
-  function backend(sessionsMe: () => Response | Promise<Response>) {
-    const fetchMock = vi.fn(async (url: string | URL) =>
-      String(url).endsWith("/auth/keys") ? Response.json({ keys: [jwk] }) : sessionsMe(),
-    );
+  function request(
+    cookies: Record<string, string>,
+    bearer: string | null = null,
+    requestUrl = "http://localhost:3000/",
+  ) {
+    return { bearer, cookie: (name: string) => cookies[name], requestUrl };
+  }
+
+  function backend(response: () => Response | Promise<Response>) {
+    const fetchMock = vi.fn(async () => response());
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;
   }
 
   beforeEach(() => {
-    clearJwksCache();
     vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    clearJwksCache();
   });
 
   it.each([
     [
       "an opaque session of this project",
       () => Response.json({ project_id: PROJECT, user_id: "u1" }),
-      { signedIn: true, clearCookies: false, undecided: false },
+      { signedIn: true, cookies: [], undecided: false },
     ],
     [
       "an anonymous opaque session",
       () => Response.json({ project_id: PROJECT }),
-      { signedIn: false, clearCookies: false, undecided: false },
+      { signedIn: false, cookies: [], undecided: false },
     ],
     [
       "another project's opaque session",
       () => Response.json({ code: "sess.project_mismatch" }, { status: 403 }),
-      { signedIn: false, clearCookies: false, undecided: false },
+      { signedIn: false, cookies: [], undecided: false },
     ],
     [
       "a refused opaque session",
       () => new Response(null, { status: 401 }),
-      { signedIn: false, clearCookies: true, undecided: false },
+      { signedIn: false, cookies: [CLEARED], undecided: false },
     ],
     [
       "an opaque session that is gone",
       () => Response.json({ code: "sess.not_found" }, { status: 404 }),
-      { signedIn: false, clearCookies: true, undecided: false },
+      { signedIn: false, cookies: [CLEARED], undecided: false },
     ],
     [
       "a session behind a backend that is down",
       () => new Response(null, { status: 503 }),
-      { signedIn: false, clearCookies: false, undecided: true },
+      { signedIn: false, cookies: [], undecided: true },
     ],
     [
       "a session behind a backend that cannot be reached",
       () => Promise.reject(new TypeError("fetch failed")),
-      { signedIn: false, clearCookies: false, undecided: true },
+      { signedIn: false, cookies: [], undecided: true },
     ],
   ])("judges a cookie holding %s", async (_label, sessionsMe, expected) => {
     backend(sessionsMe);
 
-    const { auth, clearCookies, undecided } = await resolveSession(
-      { bearer: null, cookie: "opaque-token" },
-      options,
+    const { auth, cookies, undecided } = await resolveSession(
+      request({ [OWN]: "opaque-token" }),
+      OPTIONS,
     );
 
-    expect({ signedIn: auth.isAuthenticated, clearCookies, undecided }).toEqual(expected);
+    expect({ signedIn: auth.isAuthenticated, cookies, undecided }).toEqual(expected);
   });
 
-  it.each([
-    ["a JWT of this project", { sub: "u1", aud: PROJECT }, { signedIn: true, clearCookies: false }],
-    [
-      "a JWT of another project",
-      { sub: "u1", aud: "proj_other" },
-      { signedIn: false, clearCookies: false },
-    ],
-    [
-      "a JWT of this project without a user",
-      { aud: PROJECT },
-      { signedIn: false, clearCookies: true },
-    ],
-    [
-      "an expired JWT",
-      { sub: "u1", aud: PROJECT, exp: 1 },
-      { signedIn: false, clearCookies: true },
-    ],
-  ])("judges a cookie holding %s", async (_label, claims, expected) => {
-    backend(() => new Response(null, { status: 500 }));
+  it("reads the project's own cookie before the server's", async () => {
+    const fetchMock = backend(() => Response.json({ project_id: PROJECT, user_id: "u1" }));
 
-    const { auth, clearCookies, undecided } = await resolveSession(
-      { bearer: null, cookie: jwt(claims) },
-      options,
+    const resolved = await resolveSession(
+      request({ [OWN]: "mine", [SERVER_SESSION_COOKIE]: "console" }),
+      OPTIONS,
     );
 
-    expect({ signedIn: auth.isAuthenticated, clearCookies, undecided }).toEqual({
-      ...expected,
-      undecided: false,
-    });
-  });
-
-  // A Bearer token and the cookie are separate credentials: a Bearer token that
-  // is not this app's leaves the cookie to be judged on its own.
-  it.each([
-    ["of another project", jwt({ sub: "bearer-user", aud: "proj_other" })],
-    ["without a user", jwt({ aud: PROJECT })],
-    ["that fails verification", `${jwt({ sub: "bearer-user", aud: PROJECT }).slice(0, -4)}AAAA`],
-    ["that is no JWT", "opaque-bearer"],
-  ])("judges the cookie on its own behind a Bearer token %s", async (_label, bearer) => {
-    const fetchMock = backend(() => Response.json({ project_id: PROJECT, user_id: "cookie-user" }));
-
-    const resolved = await resolveSession({ bearer, cookie: "opaque-token" }, options);
-
-    expect(resolved).toMatchObject({
-      auth: { isAuthenticated: true, session: { userId: "cookie-user", token: "opaque-token" } },
-      clearCookies: false,
-    });
+    expect(resolved.auth).toMatchObject({ isAuthenticated: true, session: { token: "mine" } });
+    expect(resolved.cookies).toEqual([]);
     expect(fetchMock).toHaveBeenCalledWith(
-      `${ISSUER}/sessions/me?project_id=${PROJECT}`,
-      expect.anything(),
+      expect.any(String),
+      expect.objectContaining({ headers: { cookie: "__nextgen_session=mine" } }),
     );
   });
 
-  it("keeps a dead cookie it never judged behind a Bearer token that signs in", async () => {
-    const fetchMock = backend(() => new Response(null, { status: 401 }));
-    const bearer = jwt({ sub: "bearer-user", aud: PROJECT });
+  it("moves this project's session out of the server's cookie", async () => {
+    const expiresAt = new Date(Date.now() + 600_000).toISOString();
+    backend(() => Response.json({ project_id: PROJECT, user_id: "u1", expires_at: expiresAt }));
 
-    const resolved = await resolveSession({ bearer, cookie: "opaque-token" }, options);
+    const resolved = await resolveSession(request({ [SERVER_SESSION_COOKIE]: "old" }), OPTIONS);
 
-    expect(resolved).toMatchObject({
-      auth: { isAuthenticated: true, session: { userId: "bearer-user", token: bearer } },
-      clearCookies: false,
-    });
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      expect.stringContaining("/sessions/me"),
-      expect.anything(),
-    );
+    expect(resolved.auth.isAuthenticated).toBe(true);
+    expect(resolved.cookies).toEqual([
+      { name: OWN, value: "old", maxAge: expect.any(Number), secure: false },
+      { name: SERVER_SESSION_COOKIE, value: "", maxAge: 0, secure: false },
+    ]);
+    expect(resolved.cookies[0]?.maxAge).toBeGreaterThan(590);
   });
 
-  it("signs in no one, and clears nothing, without a project", async () => {
+  it("leaves another project's session in the server's cookie", async () => {
+    backend(() => Response.json({ code: "sess.project_mismatch" }, { status: 403 }));
+
+    const resolved = await resolveSession(request({ [SERVER_SESSION_COOKIE]: "console" }), OPTIONS);
+
+    expect(resolved).toEqual({ auth: SIGNED_OUT, undecided: false, cookies: [] });
+  });
+
+  it.each([
+    [
+      "the project's own cookie",
+      { [OWN]: "dead", [SERVER_SESSION_COOKIE]: "console", __nextgen_session_proj_other: "x" },
+      OWN,
+    ],
+    [
+      "the server's cookie",
+      { [SERVER_SESSION_COOKIE]: "dead", __nextgen_session_proj_other: "x" },
+      SERVER_SESSION_COOKIE,
+    ],
+  ])("clears only %s when it holds a dead session", async (_label, cookies, cleared) => {
+    backend(() => new Response(null, { status: 401 }));
+
+    const resolved = await resolveSession(request(cookies), OPTIONS);
+
+    expect(resolved.cookies).toEqual([{ name: cleared, value: "", maxAge: 0, secure: false }]);
+  });
+
+  it("ignores another app's session cookie", async () => {
+    const fetchMock = backend(() => Response.json({}));
+
+    const resolved = await resolveSession(
+      request({ __nextgen_session_proj_other: "other" }),
+      OPTIONS,
+    );
+
+    expect(resolved).toEqual({ auth: SIGNED_OUT, undecided: false, cookies: [] });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("clears with Secure where the app is served over https", async () => {
+    backend(() => new Response(null, { status: 401 }));
+
+    const resolved = await resolveSession(
+      request({ [OWN]: "dead" }, null, "https://app.example.com/"),
+      OPTIONS,
+    );
+
+    expect(resolved.cookies).toEqual([{ name: OWN, value: "", maxAge: 0, secure: true }]);
+  });
+
+  it("signs in no one, and touches no cookie, without a project", async () => {
     const fetchMock = backend(() => Response.json({ project_id: PROJECT, user_id: "u1" }));
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    expect(
-      await resolveSession({ bearer: null, cookie: "opaque-token" }, { ...options, projectId: "" }),
-    ).toEqual({
-      auth: { isAuthenticated: false, session: null },
-      clearCookies: false,
-      undecided: false,
+    const resolved = await resolveSession(request({ [OWN]: "x", [SERVER_SESSION_COOKIE]: "y" }), {
+      ...OPTIONS,
+      projectId: undefined,
     });
+
+    expect(resolved).toEqual({ auth: SIGNED_OUT, undecided: false, cookies: [] });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  describe("with JWTs", () => {
+    const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const jwk = {
+      ...(publicKey.export({ format: "jwk" }) as Record<string, unknown>),
+      kid: "k1",
+      alg: "RS256",
+      use: "sig",
+    };
+
+    function jwt(claims: Record<string, unknown> = {}): string {
+      const part = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+      const signing = `${part({ alg: "RS256", typ: "JWT", kid: "k1" })}.${part({
+        iss: OPTIONS.url,
+        sub: "u1",
+        aud: PROJECT,
+        exp: Math.floor(Date.now() / 1000) + 600,
+        ...claims,
+      })}`;
+      return `${signing}.${createSign("SHA256").update(signing).sign(privateKey).toString("base64url")}`;
+    }
+
+    /** Serves the JWKS, and answers `GET /sessions/me` with `sessionsMe`. */
+    function keysAnd(sessionsMe: () => Response = () => new Response(null, { status: 500 })) {
+      const fetchMock = vi.fn(async (url: string | URL) =>
+        String(url).endsWith("/auth/keys") ? Response.json({ keys: [jwk] }) : sessionsMe(),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    }
+
+    it.each([
+      ["a JWT of this project", {}, { signedIn: true, cookies: [] }],
+      ["a JWT of another project", { aud: "proj_other" }, { signedIn: false, cookies: [] }],
+      [
+        "a JWT of this project without a user",
+        { sub: undefined },
+        { signedIn: false, cookies: [CLEARED] },
+      ],
+      ["an expired JWT", { exp: 1 }, { signedIn: false, cookies: [CLEARED] }],
+    ])("judges a cookie holding %s", async (_label, claims, expected) => {
+      keysAnd();
+
+      const { auth, cookies, undecided } = await resolveSession(
+        request({ [OWN]: jwt(claims) }),
+        OPTIONS,
+      );
+
+      expect({ signedIn: auth.isAuthenticated, cookies, undecided }).toEqual({
+        ...expected,
+        undecided: false,
+      });
+    });
+
+    it("moves a JWT of this project out of the server's cookie, for as long as it lives", async () => {
+      backend(() => Response.json({ keys: [jwk] }));
+      const token = jwt();
+
+      const resolved = await resolveSession(request({ [SERVER_SESSION_COOKIE]: token }), OPTIONS);
+
+      expect(resolved.auth).toMatchObject({ isAuthenticated: true, session: { token } });
+      expect(resolved.cookies[0]).toMatchObject({ name: OWN, value: token });
+      expect(resolved.cookies[0]?.maxAge).toBeGreaterThan(590);
+      expect(resolved.cookies[1]).toEqual({
+        name: SERVER_SESSION_COOKIE,
+        value: "",
+        maxAge: 0,
+        secure: false,
+      });
+    });
+
+    // A Bearer token and the cookie are separate credentials: a Bearer token that
+    // is not this app's leaves the cookie to be judged on its own.
+    it.each([
+      ["of another project", jwt({ sub: "bearer-user", aud: "proj_other" })],
+      ["without a user", jwt({ sub: undefined })],
+      ["that fails verification", `${jwt({ sub: "bearer-user" }).slice(0, -4)}AAAA`],
+      ["that is no JWT", "opaque-bearer"],
+    ])("judges the cookie on its own behind a Bearer token %s", async (_label, bearer) => {
+      const fetchMock = keysAnd(() =>
+        Response.json({ project_id: PROJECT, user_id: "cookie-user" }),
+      );
+
+      const resolved = await resolveSession(request({ [OWN]: "opaque-token" }, bearer), OPTIONS);
+
+      expect(resolved).toMatchObject({
+        auth: { isAuthenticated: true, session: { userId: "cookie-user", token: "opaque-token" } },
+        undecided: false,
+        cookies: [],
+      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${OPTIONS.url}/sessions/me?project_id=${PROJECT}`,
+        expect.anything(),
+      );
+    });
+
+    it("judges a JWT cookie on its own behind a Bearer token that signs no one in", async () => {
+      keysAnd();
+      const token = jwt();
+
+      const resolved = await resolveSession(
+        request({ [OWN]: token }, jwt({ aud: "proj_other" })),
+        OPTIONS,
+      );
+
+      expect(resolved).toMatchObject({
+        auth: { isAuthenticated: true, session: { token } },
+        undecided: false,
+        cookies: [],
+      });
+    });
+
+    it("keeps a dead cookie it never judged behind a Bearer token that signs in", async () => {
+      const fetchMock = keysAnd(() => new Response(null, { status: 401 }));
+      const bearer = jwt({ sub: "bearer-user" });
+
+      const resolved = await resolveSession(request({ [OWN]: "opaque-token" }, bearer), OPTIONS);
+
+      expect(resolved).toMatchObject({
+        auth: { isAuthenticated: true, session: { userId: "bearer-user", token: bearer } },
+        undecided: false,
+        cookies: [],
+      });
+      expect(fetchMock).not.toHaveBeenCalledWith(
+        expect.stringContaining("/sessions/me"),
+        expect.anything(),
+      );
+    });
   });
 });
