@@ -168,9 +168,9 @@ the corresponding resource permission.
 |---|---|---|
 | `user.create` | `POST /users` | |
 | `user.read` | `POST /users/query`, `GET /users/{id}`, `GET /users/{id}/identity_links` | Get + list; full representation for now. Listing is `POST /users/query` — there is no `GET /users`. `project_id` is optional and defaults to the credential's project; a session may name another project it holds a grant on (#1300), a project secret only its own. |
-| `user.write` | `PATCH /users/{id}`, non-credential action verbs (e.g. `verify_email`) | Profile / attribute edits. Does **not** include setting another user's password — see `user.set_password`. `PATCH /users/{id}` is **not yet exposed**. |
+| `user.write` | `PATCH /users/{id}`, non-credential action verbs (e.g. `verify_email`) | Profile / attribute edits. Does **not** include setting another user's password — see `user.set_password`. `PATCH /users/{id}` takes a project secret with `user.write` or a Console session, and needs write access on the user's project. |
 | `user.set_password` | `PUT /users/{id}/password` | **Credential-tier, account-takeover-grade.** Admin sets/resets *another* user's password. Held separately so a profile-editor / help-desk role can hold `user.write` without it. OpenAPI tags this endpoint `user.write` today (see [Drift notes](#drift-notes)). Reserve `user.reset_mfa` / similar for future admin factor-reset endpoints. |
-| `user.delete` | `DELETE /users/{id}` | **Not yet exposed**. |
+| `user.delete` | `DELETE /users/{id}` | Takes a project secret with `user.delete` or a Console session, and needs admin access on the user's project. |
 
 `/me` and `/me/memberships` are self-access and do not require system
 permissions — they are gated by the session/credential itself. That includes
