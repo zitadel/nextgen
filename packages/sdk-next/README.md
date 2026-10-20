@@ -66,15 +66,28 @@ The middleware runs on every matched route and does three things in one pass:
 
 ### 2. Reading auth in a Server Component
 
-```ts
+```tsx
 import { auth } from "@zitadel/sdk-next/server";
+import { Suspense } from "react";
 
-export default async function Page() {
+export default function Page() {
+  return (
+    <Suspense fallback={<p>Loading…</p>}>
+      <Greeting />
+    </Suspense>
+  );
+}
+
+async function Greeting() {
   const session = await auth();
   if (!session.isAuthenticated) return <p>Not signed in</p>;
   return <p>Hello {session.session.display ?? session.session.identifier}</p>;
 }
 ```
+
+`auth()` reads the request, so whatever awaits it renders inside
+`<Suspense>`: with Cache Components on (`cacheComponents`, which
+`create-next-app` enables), Next.js refuses request data outside it.
 
 `auth()` reads the token the middleware tunnelled into the request headers
 and **verifies it before trusting it** — JWTs cryptographically via JWKS,
@@ -101,16 +114,23 @@ read the state with `useAuth()` anywhere below it:
 
 ```tsx
 import { auth, NextgenProvider } from '@zitadel/sdk-next/server';
+import { Suspense } from 'react';
 
-export default async function RootLayout({ children }) {
-  const session = await auth();
+export default function RootLayout({ children }) {
   return (
     <html>
       <body>
-        <NextgenProvider session={session}>{children}</NextgenProvider>
+        <Suspense>
+          <AuthProvider>{children}</AuthProvider>
+        </Suspense>
       </body>
     </html>
   );
+}
+
+async function AuthProvider({ children }) {
+  const session = await auth();
+  return <NextgenProvider session={session}>{children}</NextgenProvider>;
 }
 ```
 
@@ -202,11 +222,20 @@ The `<zitadel-login>` web component (from `@zitadel/components`) must be rendere
 
 ```tsx
 // app/login/page.tsx (server)
-import { auth } from '@zitadel/sdk-next';
+import { auth } from '@zitadel/sdk-next/server';
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { LoginWidget } from './widget';
 
-export default async function LoginPage() {
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <SignedOutOnly />
+    </Suspense>
+  );
+}
+
+async function SignedOutOnly() {
   const session = await auth();
   if (session.isAuthenticated) redirect('/admin');
   return <LoginWidget />;

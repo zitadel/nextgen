@@ -248,9 +248,18 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   ].filter((op): op is FileOp => op !== undefined);
 }
 
+/**
+ * The home page of an app setup scaffolded: a redirect to `/login`. The
+ * pinned `create-next-app` turns on Cache Components, whose dev server
+ * validates every page for instant navigation and logs the redirect it throws
+ * as an error on each request to `/`; `instant = false` exempts the page.
+ */
 function homePageTemplate(): string {
   return `${MANAGED_MARKER}
 import { redirect } from "next/navigation";
+
+// A redirect is never an instant navigation: tell Next.js not to validate it.
+export const instant = false;
 
 export default function Home() {
   redirect("/login");
