@@ -11,7 +11,7 @@ import (
 )
 
 // projectOnCell finds a project hosted on cellLabel: prefer id==label, else first local project.
-// Known site defaults: eu-1→acme-fra, us-1→acme-iowa (when present).
+// Known site defaults: eu-1→acme (workspace root), then legacy acme-* names.
 func (a *App) projectOnCell(ctx context.Context, cellLabel string) (hostURL, projectID string, err error) {
 	hostURL, err = a.cellURLByLabel(cellLabel)
 	if err != nil {
@@ -25,9 +25,9 @@ func (a *App) projectOnCell(ctx context.Context, cellLabel string) (hostURL, pro
 		return "", "", fmt.Errorf("no projects on cell %s", cellLabel)
 	}
 	prefer := map[string]string{
-		"eu-1": "acme-fra",
+		"eu-1": "acme",
 		"us-1": "acme-iowa",
-		"us-2": "acme-sf",
+		"us-2": "acme-us2",
 		"eu-2": "acme-lis",
 	}
 	if want, ok := prefer[cellLabel]; ok {

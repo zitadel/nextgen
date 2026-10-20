@@ -87,20 +87,22 @@ func NewApp(cells []CellRef, logger *log.Logger) (*App, error) {
 	return a, nil
 }
 
-// labObserveHint appends where to look after a Lab mutation.
+// labObserveHint kept for unlinked legacy Lab POST handlers.
 func labObserveHint(projectID string) string {
 	if projectID == "" {
-		projectID = "acme-fra"
+		projectID = "acme"
 	}
-	return " · Trace drawer /trace-view · observe /projects/" + projectID
+	return " · observe /projects/" + projectID
 }
 
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", a.handleHome)
 	mux.HandleFunc("GET /tree", a.handleTree)
-	// Delay editor removed from UI; handler kept for tests / manual POST.
 	mux.HandleFunc("POST /cells/delays", a.handleCellsDelays)
+
+	mux.HandleFunc("GET /platform", a.handlePlatform)
+	mux.HandleFunc("POST /platform/teams", a.handlePlatformCreateTeam)
 
 	mux.HandleFunc("GET /workspaces", a.handleWorkspacesList)
 	mux.HandleFunc("POST /workspaces", a.handleWorkspaceCreate)
@@ -115,7 +117,6 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /create", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/workspaces", http.StatusSeeOther)
 	})
-	// Legacy create/expand POST handlers retained for scripts/tests; not linked in UI.
 	mux.HandleFunc("POST /create/site", a.handleCreateSiteLegacy)
 	mux.HandleFunc("POST /create/expand", a.handleExpandSite)
 	mux.HandleFunc("POST /create/project", a.handleCreateProject)
@@ -124,12 +125,19 @@ func (a *App) Handler() http.Handler {
 
 	mux.HandleFunc("GET /cells/{label}", a.handleCellDetail)
 	mux.HandleFunc("GET /projects/{id}", a.handleProjectDetail)
-	// Project page is observe-only — no mutation POST routes.
+	mux.HandleFunc("POST /projects/{id}/users", a.handleProjectCreateUser)
+	mux.HandleFunc("POST /projects/{id}/lookup", a.handleProjectLookup)
+	mux.HandleFunc("POST /projects/{id}/users/delete", a.handleProjectDeleteUser)
+	mux.HandleFunc("POST /projects/{id}/sites", a.handleProjectAddSite)
 
-	mux.HandleFunc("GET /lab", a.handleScenarios)
-	mux.HandleFunc("GET /scenarios", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/lab", http.StatusSeeOther)
+	// Lab removed from primary UI — redirect to workspaces.
+	mux.HandleFunc("GET /lab", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/workspaces", http.StatusSeeOther)
 	})
+	mux.HandleFunc("GET /scenarios", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/workspaces", http.StatusSeeOther)
+	})
+	// Legacy Lab POSTs kept unlinked (redirect targets still /lab → workspaces).
 	mux.HandleFunc("POST /scenarios/create-user", a.handleScenarioCreateUser)
 	mux.HandleFunc("POST /scenarios/lookup", a.handleScenarioLookup)
 	mux.HandleFunc("POST /scenarios/grant-joe", a.handleScenarioGrantJoe)
@@ -139,7 +147,6 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /scenarios/block-joe", a.handleScenarioBlockJoe)
 	mux.HandleFunc("POST /scenarios/delete-joe", a.handleScenarioDeleteJoe)
 	mux.HandleFunc("POST /scenarios/global-login", a.handleScenarioGlobalLogin)
-	// Lab aliases
 	mux.HandleFunc("POST /lab/create-user", a.handleScenarioCreateUser)
 	mux.HandleFunc("POST /lab/lookup", a.handleScenarioLookup)
 	mux.HandleFunc("POST /lab/grant-joe", a.handleScenarioGrantJoe)
@@ -185,34 +192,38 @@ type projectNode struct {
 }
 
 type pageData struct {
-	Title          string
-	NavActive      string
-	Breadcrumbs    []crumb
-	ShowTracePanel bool
-	Flash          string
-	FlashErr       string
-	Tree           []*snapshotNode
-	Unjoined       []*snapshotNode
-	ProjectTree    []*projectNode
-	Parents        []CellRef
-	UnjoinedO      []CellRef
-	Cells          []CellRef
-	Detail         *cellDetail
-	Project        *projectDetail
-	Trace          []traceEntry
-	Now            string
-	ScenarioOK     string
-	ScenarioErr    string
-	SignIn         *signInResult
-	GlobalLogin    *globalLoginResult
-	GroupCheck     *groupCheckResult
-	Lifecycle      *lifecycleResult
-	Workspaces     []string
-	WorkspaceList  []Workspace
-	Workspace      *Workspace
-	Sites          []siteSummary
-	CellMeta       map[string]string
-	DelayPairs     []delayPairView
+	Title         string
+	NavActive     string
+	Breadcrumbs   []crumb
+	Flash         string
+	FlashErr      string
+	Tree          []*snapshotNode
+	Unjoined      []*snapshotNode
+	ProjectTree   []*projectNode
+	Parents       []CellRef
+	UnjoinedO     []CellRef
+	Cells         []CellRef
+	Detail        *cellDetail
+	Project       *projectDetail
+	Platform      *platformDetail
+	Teams         []cell.TeamView
+	Trace         []traceEntry
+	LatestTrace   *traceEntry
+	Now           string
+	ScenarioOK    string
+	ScenarioErr   string
+	SignIn        *signInResult
+	GlobalLogin   *globalLoginResult
+	GroupCheck    *groupCheckResult
+	Lifecycle     *lifecycleResult
+	Workspaces    []string
+	WorkspaceList []Workspace
+	Workspace     *Workspace
+	Sites         []siteSummary
+	ChildSites    []siteSummary
+	ParentOptions []siteSummary
+	CellMeta      map[string]string
+	DelayPairs    []delayPairView
 }
 
 type lifecycleResult struct {
@@ -288,15 +299,17 @@ type cellDetail struct {
 }
 
 type projectDetail struct {
-	Project   cell.ProjectResponse
-	Users     []userRow
-	Lookup    []lookupRow
-	Apps      []cell.AppView
-	Tuples    []cell.TupleView
-	Interests []cell.InterestView
-	FlashOK   string
-	FlashErr  string
-	Error     string
+	Project       cell.ProjectResponse
+	HostLabel     string
+	Users         []userRow
+	Lookup        []lookupRow
+	ChildSites    []siteSummary
+	ParentOptions []siteSummary
+	CustomerTeam  string
+	WorkspaceRoot string
+	FlashOK       string
+	FlashErr      string
+	Error         string
 }
 
 type userRow struct {
@@ -334,21 +347,20 @@ func (a *App) handleHome(w http.ResponseWriter, r *http.Request) {
 	a.ensureWorkspaceFromSites(sites)
 	parents, unjoinedOpts := a.joinOptions(ctx)
 	a.render(w, "home", pageData{
-		Title:          "Cells",
-		NavActive:      "cells",
-		ShowTracePanel: true,
-		Tree:           tree,
-		Unjoined:       unjoined,
-		ProjectTree:    a.buildProjectTree(ctx),
-		Parents:        parents,
-		UnjoinedO:      unjoinedOpts,
-		Trace:          a.copyTrace(),
-		Now:            time.Now().UTC().Format(time.RFC3339),
-		Workspaces:     a.listWorkspaceIDs(sites),
-		Sites:          sites,
-		DelayPairs:     a.delayPairViews(),
-		Flash:          r.URL.Query().Get("ok"),
-		FlashErr:       r.URL.Query().Get("err"),
+		Title:       "Cells",
+		NavActive:   "cells",
+		Tree:        tree,
+		Unjoined:    unjoined,
+		ProjectTree: a.buildProjectTree(ctx),
+		Parents:     parents,
+		UnjoinedO:   unjoinedOpts,
+		Now:         time.Now().UTC().Format(time.RFC3339),
+		Workspaces:  a.listWorkspaceIDs(sites),
+		Sites:       sites,
+		DelayPairs:  a.delayPairViews(),
+		Flash:       r.URL.Query().Get("ok"),
+		FlashErr:    r.URL.Query().Get("err"),
+		LatestTrace: a.latestTrace(),
 	})
 }
 
@@ -425,7 +437,7 @@ func (a *App) handleCellDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	a.render(w, "detail", pageData{
 		Title: "Cell " + label, NavActive: "cells", Detail: detail,
-		ShowTracePanel: true, Trace: a.copyTrace(),
+		LatestTrace: a.latestTrace(),
 	})
 }
 
@@ -441,57 +453,56 @@ func (a *App) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		detail.Error = err.Error()
 		a.render(w, "project", pageData{
-			Title: "Project " + id, NavActive: "workspaces", Project: detail,
-			ShowTracePanel: true, Trace: a.copyTrace(),
+			Title: "Site " + id, NavActive: "workspaces", Project: detail,
 			Breadcrumbs: []crumb{{Label: "Workspaces", Href: "/workspaces"}, {Label: id}},
+			LatestTrace: a.latestTrace(),
+			Cells:       a.leafCells(),
 		})
 		return
 	}
 	detail.Project = proj
+	detail.CustomerTeam = proj.CustomerTeamID
+	detail.WorkspaceRoot = proj.WorkspaceID
+	if detail.WorkspaceRoot == "" {
+		detail.WorkspaceRoot = proj.ID
+	}
+	for _, c := range a.Cells {
+		if cell.NormalizeURL(c.URL) == cell.NormalizeURL(hostURL) {
+			detail.HostLabel = c.Label
+			break
+		}
+	}
 	var raw struct {
-		Users     []userRow           `json:"users"`
-		Lookup    []lookupRow         `json:"lookup"`
-		Apps      []cell.AppView      `json:"apps"`
-		Tuples    []cell.TupleView    `json:"tuples"`
-		Interests []cell.InterestView `json:"interests"`
+		Users  []userRow   `json:"users"`
+		Lookup []lookupRow `json:"lookup"`
 	}
 	if err := a.Peer.DoRaw(ctx, http.MethodGet, cell.NormalizeURL(hostURL)+"/v1/projects/"+id, nil, "", &raw); err != nil {
 		detail.Error = err.Error()
 	} else {
 		detail.Users = raw.Users
 		detail.Lookup = raw.Lookup
-		detail.Apps = raw.Apps
-		detail.Tuples = raw.Tuples
-		detail.Interests = raw.Interests
 	}
+	detail.ChildSites = a.childSitesOf(ctx, id)
+	detail.ParentOptions = a.sitesInWorkspace(ctx, detail.WorkspaceRoot)
+
 	crumbs := []crumb{{Label: "Workspaces", Href: "/workspaces"}}
-	if proj.WorkspaceID != "" {
+	if proj.WorkspaceID != "" && proj.WorkspaceID != proj.ID {
 		crumbs = append(crumbs,
-			crumb{Label: proj.WorkspaceID, Href: "/workspaces/" + url.PathEscape(proj.WorkspaceID)},
+			crumb{Label: proj.WorkspaceID, Href: "/projects/" + url.PathEscape(proj.WorkspaceID)},
 			crumb{Label: id},
 		)
 	} else {
 		crumbs = append(crumbs, crumb{Label: id})
 	}
+	nav := "workspaces"
+	if id == "platform" {
+		nav = "platform"
+		crumbs = []crumb{{Label: "Platform", Href: "/platform"}, {Label: "platform project"}}
+	}
 	a.render(w, "project", pageData{
-		Title: "Project " + id, NavActive: "workspaces", Project: detail,
-		Breadcrumbs: crumbs, ShowTracePanel: true, Trace: a.copyTrace(),
-	})
-}
-
-func (a *App) handleScenarios(w http.ResponseWriter, r *http.Request) {
-	a.render(w, "scenarios", pageData{
-		Title:          "Lab",
-		NavActive:      "lab",
-		ShowTracePanel: true,
-		Cells:          a.Cells,
-		Trace:          a.copyTrace(),
-		ScenarioOK:     r.URL.Query().Get("ok"),
-		ScenarioErr:    r.URL.Query().Get("err"),
-		SignIn:         a.copySignIn(),
-		GlobalLogin:    a.copyGlobalLogin(),
-		GroupCheck:     a.copyGroupCheck(),
-		Lifecycle:      a.copyLifecycle(),
+		Title: "Site " + id, NavActive: nav, Project: detail,
+		Breadcrumbs: crumbs, LatestTrace: a.latestTrace(),
+		Cells: a.leafCells(), ChildSites: detail.ChildSites, ParentOptions: detail.ParentOptions,
 	})
 }
 
@@ -1326,11 +1337,12 @@ func (a *App) handleTracePartial(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleTracePage(w http.ResponseWriter, r *http.Request) {
+	// Debug-only page; not in primary nav.
 	a.render(w, "trace_page", pageData{
-		Title:          "Global Trace",
-		NavActive:      "trace",
-		ShowTracePanel: true,
-		Trace:          a.copyTrace(),
+		Title:       "Trace (debug)",
+		NavActive:   "",
+		Trace:       a.copyTrace(),
+		LatestTrace: a.latestTrace(),
 	})
 }
 
@@ -1341,11 +1353,11 @@ func (a *App) handleTraceClear(w http.ResponseWriter, r *http.Request) {
 	a.traceBuf = nil
 	a.traceMu.Unlock()
 	ref := r.Header.Get("Referer")
-	if strings.Contains(ref, "/lab") {
-		http.Redirect(w, r, "/lab", http.StatusSeeOther)
+	if ref != "" && strings.Contains(ref, "/projects/") {
+		http.Redirect(w, r, ref, http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/trace-view", http.StatusSeeOther)
+	http.Redirect(w, r, "/workspaces", http.StatusSeeOther)
 }
 
 func (a *App) beginTrace(action string) {

@@ -34,6 +34,7 @@ type Project struct {
 	IsParent        bool
 	LookupEnabled   bool
 	WorkspaceID     string
+	CustomerTeamID  string // platform-project team that owns this customer workspace
 	ParentProjectID string
 	ParentCellURL   string
 	CreatedAt       time.Time
@@ -91,6 +92,9 @@ CREATE TABLE IF NOT EXISTS lookup_entries (
 	if err := s.ensureColumn("projects", "workspace_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
 	}
+	if err := s.ensureColumn("projects", "customer_team_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
 	if err := s.ensureColumn("lookup_entries", "source", "TEXT NOT NULL DEFAULT 'local'"); err != nil {
 		return err
 	}
@@ -114,9 +118,9 @@ func (s *Store) CreateProject(p Project) error {
 		lookup = 1
 	}
 	_, err := s.db.Exec(
-		`INSERT INTO projects(id, name, is_parent, lookup_enabled, workspace_id, parent_project_id, parent_cell_url, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, p.Name, isParent, lookup, strings.TrimSpace(p.WorkspaceID),
+		`INSERT INTO projects(id, name, is_parent, lookup_enabled, workspace_id, customer_team_id, parent_project_id, parent_cell_url, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, p.Name, isParent, lookup, strings.TrimSpace(p.WorkspaceID), strings.TrimSpace(p.CustomerTeamID),
 		strings.TrimSpace(p.ParentProjectID), NormalizeURL(p.ParentCellURL),
 		p.CreatedAt.UTC().Format(time.RFC3339Nano),
 	)
@@ -131,9 +135,10 @@ func (s *Store) GetProject(id string) (Project, error) {
 	var isParent, lookup int
 	var created string
 	err := s.db.QueryRow(
-		`SELECT id, name, is_parent, lookup_enabled, COALESCE(workspace_id, ''), parent_project_id, parent_cell_url, created_at
+		`SELECT id, name, is_parent, lookup_enabled, COALESCE(workspace_id, ''), COALESCE(customer_team_id, ''),
+		        parent_project_id, parent_cell_url, created_at
 		 FROM projects WHERE id = ?`, id,
-	).Scan(&p.ID, &p.Name, &isParent, &lookup, &p.WorkspaceID, &p.ParentProjectID, &p.ParentCellURL, &created)
+	).Scan(&p.ID, &p.Name, &isParent, &lookup, &p.WorkspaceID, &p.CustomerTeamID, &p.ParentProjectID, &p.ParentCellURL, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Project{}, ErrProjectNotFound
 	}
@@ -148,7 +153,8 @@ func (s *Store) GetProject(id string) (Project, error) {
 
 func (s *Store) ListProjects() ([]Project, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, is_parent, lookup_enabled, COALESCE(workspace_id, ''), parent_project_id, parent_cell_url, created_at
+		`SELECT id, name, is_parent, lookup_enabled, COALESCE(workspace_id, ''), COALESCE(customer_team_id, ''),
+		        parent_project_id, parent_cell_url, created_at
 		 FROM projects ORDER BY name`,
 	)
 	if err != nil {
@@ -160,7 +166,7 @@ func (s *Store) ListProjects() ([]Project, error) {
 		var p Project
 		var isParent, lookup int
 		var created string
-		if err := rows.Scan(&p.ID, &p.Name, &isParent, &lookup, &p.WorkspaceID, &p.ParentProjectID, &p.ParentCellURL, &created); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &isParent, &lookup, &p.WorkspaceID, &p.CustomerTeamID, &p.ParentProjectID, &p.ParentCellURL, &created); err != nil {
 			return nil, err
 		}
 		p.IsParent = isParent == 1

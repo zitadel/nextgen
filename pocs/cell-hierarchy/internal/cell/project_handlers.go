@@ -24,6 +24,7 @@ type ProjectView struct {
 	IsParent        bool   `json:"is_parent"`
 	LookupEnabled   bool   `json:"lookup_enabled"`
 	WorkspaceID     string `json:"workspace_id,omitempty"`
+	CustomerTeamID  string `json:"customer_team_id,omitempty"`
 	ParentProjectID string `json:"parent_project_id"`
 	ParentCellURL   string `json:"parent_cell_url"`
 	HostCellURL     string `json:"host_cell_url"`
@@ -103,6 +104,7 @@ func projectView(p Project, host string) ProjectView {
 		IsParent:        p.IsParent,
 		LookupEnabled:   p.LookupEnabled,
 		WorkspaceID:     p.WorkspaceID,
+		CustomerTeamID:  p.CustomerTeamID,
 		ParentProjectID: p.ParentProjectID,
 		ParentCellURL:   p.ParentCellURL,
 		HostCellURL:     host,
@@ -179,11 +181,12 @@ func (s *Server) handleListProjects(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ID            string `json:"id"`
-		Name          string `json:"name"`
-		IsParent      bool   `json:"is_parent"`
-		LookupEnabled bool   `json:"lookup_enabled"`
-		WorkspaceID   string `json:"workspace_id"`
+		ID             string `json:"id"`
+		Name           string `json:"name"`
+		IsParent       bool   `json:"is_parent"`
+		LookupEnabled  bool   `json:"lookup_enabled"`
+		WorkspaceID    string `json:"workspace_id"`
+		CustomerTeamID string `json:"customer_team_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid_json")
@@ -208,12 +211,13 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := Project{
-		ID:            id,
-		Name:          req.Name,
-		IsParent:      req.IsParent,
-		LookupEnabled: req.LookupEnabled,
-		WorkspaceID:   strings.TrimSpace(req.WorkspaceID),
-		CreatedAt:     s.Now(),
+		ID:             id,
+		Name:           req.Name,
+		IsParent:       req.IsParent,
+		LookupEnabled:  req.LookupEnabled,
+		WorkspaceID:    strings.TrimSpace(req.WorkspaceID),
+		CustomerTeamID: strings.TrimSpace(req.CustomerTeamID),
+		CreatedAt:      s.Now(),
 	}
 	if err := s.Store.CreateProject(p); err != nil {
 		if errors.Is(err, ErrProjectExists) {
@@ -561,6 +565,7 @@ func (s *Server) floatLookup(ctx context.Context, home Project, key, homeCellURL
 			IsParent:        next.IsParent,
 			LookupEnabled:   next.LookupEnabled,
 			WorkspaceID:     next.WorkspaceID,
+			CustomerTeamID:  next.CustomerTeamID,
 			ParentProjectID: next.ParentProjectID,
 			ParentCellURL:   next.ParentCellURL,
 		}

@@ -242,6 +242,7 @@ type ProjectResponse struct {
 	IsParent        bool   `json:"is_parent"`
 	LookupEnabled   bool   `json:"lookup_enabled"`
 	WorkspaceID     string `json:"workspace_id,omitempty"`
+	CustomerTeamID  string `json:"customer_team_id,omitempty"`
 	ParentProjectID string `json:"parent_project_id"`
 	ParentCellURL   string `json:"parent_cell_url"`
 	HostCellURL     string `json:"host_cell_url"`

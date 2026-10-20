@@ -23,7 +23,7 @@ func TestProjectOnCellPrefersSiteDefaults(t *testing.T) {
 	defer us1Store.Close()
 
 	now := time.Now().UTC()
-	if err := eu1Store.CreateProject(cell.Project{ID: "acme-fra", Name: "acme-fra", WorkspaceID: "acme", CreatedAt: now}); err != nil {
+	if err := eu1Store.CreateProject(cell.Project{ID: "acme", Name: "acme", WorkspaceID: "acme", CreatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
 	if err := eu1Store.CreateProject(cell.Project{ID: "other", Name: "Other", CreatedAt: now}); err != nil {
@@ -56,8 +56,8 @@ func TestProjectOnCellPrefersSiteDefaults(t *testing.T) {
 	if host != eu1HTTP.URL {
 		t.Fatalf("host=%s", host)
 	}
-	if id != "acme-fra" {
-		t.Fatalf("project=%s want acme-fra", id)
+	if id != "acme" {
+		t.Fatalf("project=%s want acme", id)
 	}
 
 	host, id, err = app.projectOnCell(ctx, "us-1")

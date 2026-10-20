@@ -23,11 +23,12 @@ type createPageData struct {
 }
 
 type projectOption struct {
-	ID          string
-	Name        string
-	HostLabel   string
-	HostURL     string
-	WorkspaceID string
+	ID             string
+	Name           string
+	HostLabel      string
+	HostURL        string
+	WorkspaceID    string
+	CustomerTeamID string
 }
 
 func (a *App) handleCreateForm(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +75,7 @@ func (a *App) listAllProjects(ctx context.Context) []projectOption {
 			}
 			out = append(out, projectOption{
 				ID: p.ID, Name: p.Name, HostLabel: c.Label, HostURL: host,
-				WorkspaceID: p.WorkspaceID,
+				WorkspaceID: p.WorkspaceID, CustomerTeamID: p.CustomerTeamID,
 			})
 		}
 	}

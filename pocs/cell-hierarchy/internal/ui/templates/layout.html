@@ -41,15 +41,13 @@ input, select, button { font:inherit; padding:0.45rem 0.6rem; border-radius:6px;
 input:not([type=checkbox]):not([type=range]), select { width:100%; }
 button { background:var(--accent); border-color:var(--accent); color:#041018; font-weight:600; cursor:pointer; margin-top:0.5rem; margin-right:0.5rem; }
 button.secondary { background:transparent; color:var(--text); }
-button.danger { color:var(--bad); }
+button.danger { color:var(--bad); background:transparent; border-color:var(--bad); }
 .grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
 @media (max-width:900px) {
   .app { flex-direction:column; }
   .sidebar { width:100%; border-right:none; border-bottom:1px solid var(--border); }
   .grid { grid-template-columns:1fr; }
 }
-.trace-drawer { border-top:1px solid var(--border); background:var(--panel); padding:0.75rem 1.25rem; position:sticky; bottom:0; max-height:40vh; overflow:auto; }
-.trace-drawer h2 { margin:0 0 0.5rem; display:flex; justify-content:space-between; align-items:center; }
 .controls { background:var(--panel); border:1px solid var(--accent); border-radius:8px; padding:1rem; margin-bottom:1rem; }
 .row { display:flex; flex-wrap:wrap; gap:0.5rem; align-items:flex-end; }
 form.inline { display:inline; }
@@ -62,6 +60,7 @@ form.row label { display:flex; flex-direction:column; gap:0.2rem; font-size:0.75
 tr.tombstoned td { opacity:0.55; text-decoration:line-through; }
 ul.compact { margin:0.35rem 0; padding-left:1.2rem; font-size:0.875rem; color:var(--muted); }
 .delay-matrix input { width:5rem; }
+.latest-trace { border-left:3px solid var(--accent); }
 {{end}}
 
 {{define "layout-nav"}}
@@ -69,8 +68,8 @@ ul.compact { margin:0.35rem 0; padding-left:1.2rem; font-size:0.875rem; color:va
   <div class="brand">cell hierarchy</div>
   <div class="nav-group">Ops</div>
   <a href="/" class="{{if eq .NavActive "cells"}}active{{end}}">Cells</a>
-  <a href="/lab" class="{{if eq .NavActive "lab"}}active{{end}}">Lab</a>
-  <a href="/trace-view" class="{{if eq .NavActive "trace"}}active{{end}}">Trace</a>
+  <div class="nav-group">Hoster</div>
+  <a href="/platform" class="{{if eq .NavActive "platform"}}active{{end}}">Platform</a>
   <div class="nav-group">Customer</div>
   <a href="/workspaces" class="{{if eq .NavActive "workspaces"}}active{{end}}">Workspaces</a>
 </aside>
@@ -87,19 +86,28 @@ ul.compact { margin:0.35rem 0; padding-left:1.2rem; font-size:0.875rem; color:va
 {{end}}
 {{end}}
 
-{{define "layout-trace-drawer"}}
-{{if .ShowTracePanel}}
-<div class="trace-drawer">
-  <h2>
-    <span>Global Trace</span>
-    <span>
-      <a href="/trace-view" class="muted" style="font-size:0.8rem;margin-right:0.75rem">Full page</a>
-      <form method="post" action="/trace/clear" style="display:inline"><button class="secondary" type="submit" style="margin:0">Clear</button></form>
-    </span>
-  </h2>
-  <div id="trace" hx-get="/trace" hx-trigger="every 3s" hx-swap="innerHTML">
-    {{template "trace" .}}
-  </div>
+{{define "latest-trace"}}
+{{with .LatestTrace}}
+<div class="panel latest-trace">
+  <h2>Latest hop</h2>
+  <p class="muted">{{.At}} · <strong>{{.Action}}</strong>{{if .Note}} — {{.Note}}{{end}}</p>
+  {{if .Hops}}
+  <table class="trace">
+    <thead><tr><th>Cell</th><th>Method</th><th>ms</th><th>Result</th></tr></thead>
+    <tbody>
+    {{range .Hops}}
+      <tr>
+        <td><code>{{.Cell}}</code></td>
+        <td><code>{{.Method}}</code></td>
+        <td>{{.Ms}}</td>
+        <td>{{.Result}}</td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted">No peer hops recorded for this action.</p>
+  {{end}}
 </div>
 {{end}}
 {{end}}

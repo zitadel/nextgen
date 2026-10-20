@@ -11,13 +11,19 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/zitadel/nextgen/pocs/cell-hierarchy/internal/cell"
 )
 
-// Workspace is UX metadata: name + home cell. Sites are projects with workspace_id.
+// Workspace is a thin registry entry for a root site.
+// The workspace IS the first site/project (id == project id).
 type Workspace struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	HomeCell string `json:"home_cell"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Cell           string `json:"cell"`
+	CustomerTeamID string `json:"customer_team_id"`
+	// HomeCell kept for back-compat with older workspace JSON files.
+	HomeCell string `json:"home_cell,omitempty"`
 }
 
 func (a *App) workspacePath() string {
@@ -35,14 +41,15 @@ func (a *App) seedWorkspaces() {
 		var list []Workspace
 		if json.Unmarshal(data, &list) == nil {
 			for _, w := range list {
-				if w.ID != "" {
-					a.workspaces[w.ID] = w
+				if w.ID == "" {
+					continue
 				}
+				if w.Cell == "" {
+					w.Cell = w.HomeCell
+				}
+				a.workspaces[w.ID] = w
 			}
 		}
-	}
-	if _, ok := a.workspaces["acme"]; !ok {
-		a.workspaces["acme"] = Workspace{ID: "acme", Name: "Acme", HomeCell: "eu-1"}
 	}
 	_ = a.persistWorkspacesLocked()
 }
@@ -67,7 +74,6 @@ func (a *App) persistWorkspacesLocked() error {
 func (a *App) listWorkspaces() []Workspace {
 	a.wsMu.Lock()
 	defer a.wsMu.Unlock()
-	// Merge registry with workspace_ids discovered on projects.
 	out := make([]Workspace, 0, len(a.workspaces))
 	for _, w := range a.workspaces {
 		out = append(out, w)
@@ -89,10 +95,14 @@ func (a *App) putWorkspace(w Workspace) error {
 	if a.workspaces == nil {
 		a.workspaces = map[string]Workspace{}
 	}
+	if w.Cell == "" {
+		w.Cell = w.HomeCell
+	}
 	a.workspaces[w.ID] = w
 	return a.persistWorkspacesLocked()
 }
 
+// ensureWorkspaceFromSites registers root sites (workspace_id == project id) into the thin registry.
 func (a *App) ensureWorkspaceFromSites(sites []siteSummary) {
 	a.wsMu.Lock()
 	defer a.wsMu.Unlock()
@@ -101,14 +111,18 @@ func (a *App) ensureWorkspaceFromSites(sites []siteSummary) {
 	}
 	changed := false
 	for _, s := range sites {
-		if s.WorkspaceID == "" {
+		if s.ID == "" || s.WorkspaceID == "" || s.WorkspaceID != s.ID {
+			continue // only roots: workspace_id == self
+		}
+		if s.IsPlatform {
 			continue
 		}
-		if _, ok := a.workspaces[s.WorkspaceID]; ok {
+		existing, ok := a.workspaces[s.ID]
+		if ok && existing.CustomerTeamID == s.CustomerTeamID && existing.Cell == s.HostLabel {
 			continue
 		}
-		a.workspaces[s.WorkspaceID] = Workspace{
-			ID: s.WorkspaceID, Name: s.WorkspaceID, HomeCell: s.HostLabel,
+		a.workspaces[s.ID] = Workspace{
+			ID: s.ID, Name: s.Name, Cell: s.HostLabel, CustomerTeamID: s.CustomerTeamID,
 		}
 		changed = true
 	}
@@ -122,16 +136,27 @@ func (a *App) handleWorkspacesList(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	sites := a.listSites(ctx)
 	a.ensureWorkspaceFromSites(sites)
+	teams, _ := a.listPlatformTeams(ctx)
+	var roots []siteSummary
+	for _, s := range sites {
+		if s.IsPlatform {
+			continue
+		}
+		if s.WorkspaceID == s.ID || (s.WorkspaceID != "" && s.ParentProjectID == "platform") {
+			roots = append(roots, s)
+		}
+	}
 	a.render(w, "workspaces", pageData{
-		Title:          "Workspaces",
-		NavActive:      "workspaces",
-		Breadcrumbs:    []crumb{{Label: "Workspaces"}},
-		Flash:          r.URL.Query().Get("ok"),
-		FlashErr:       r.URL.Query().Get("err"),
-		WorkspaceList:  a.listWorkspaces(),
-		Cells:          a.leafCells(),
-		ShowTracePanel: true,
-		Trace:          a.copyTrace(),
+		Title:         "Workspaces",
+		NavActive:     "workspaces",
+		Breadcrumbs:   []crumb{{Label: "Workspaces"}},
+		Flash:         r.URL.Query().Get("ok"),
+		FlashErr:      r.URL.Query().Get("err"),
+		WorkspaceList: a.listWorkspaces(),
+		Sites:         roots,
+		Cells:         a.leafCells(),
+		Teams:         teams,
+		LatestTrace:   a.latestTrace(),
 	})
 }
 
@@ -142,7 +167,11 @@ func (a *App) handleWorkspaceCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	id := strings.TrimSpace(r.FormValue("id"))
 	name := strings.TrimSpace(r.FormValue("name"))
-	home := strings.TrimSpace(r.FormValue("home_cell"))
+	cellLabel := strings.TrimSpace(r.FormValue("cell"))
+	if cellLabel == "" {
+		cellLabel = strings.TrimSpace(r.FormValue("home_cell"))
+	}
+	teamID := strings.TrimSpace(r.FormValue("customer_team_id"))
 	if id == "" {
 		http.Redirect(w, r, "/workspaces?err="+url.QueryEscape("workspace id required"), http.StatusSeeOther)
 		return
@@ -150,56 +179,68 @@ func (a *App) handleWorkspaceCreate(w http.ResponseWriter, r *http.Request) {
 	if name == "" {
 		name = id
 	}
-	if home == "" {
-		home = "eu-1"
+	if cellLabel == "" {
+		http.Redirect(w, r, "/workspaces?err="+url.QueryEscape("cell required"), http.StatusSeeOther)
+		return
 	}
-	if _, err := a.cellURLByLabel(home); err != nil {
+	if teamID == "" {
+		http.Redirect(w, r, "/workspaces?err="+url.QueryEscape("customer team required"), http.StatusSeeOther)
+		return
+	}
+	hostURL, err := a.cellURLByLabel(cellLabel)
+	if err != nil {
 		http.Redirect(w, r, "/workspaces?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+
+	// Validate team exists on platform.
+	if _, err := a.findPlatformTeam(ctx, teamID); err != nil {
+		http.Redirect(w, r, "/workspaces?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+
 	a.beginTrace("create workspace " + id)
-	if err := a.putWorkspace(Workspace{ID: id, Name: name, HomeCell: home}); err != nil {
+	proj, err := a.Peer.CreateProject(ctx, hostURL, map[string]any{
+		"id": id, "name": name,
+		"is_parent": false, "lookup_enabled": true,
+		"workspace_id": id, "customer_team_id": teamID,
+	})
+	if err != nil {
 		a.endTrace(err.Error(), nil)
 		http.Redirect(w, r, "/workspaces?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
-	a.endTrace("home_cell="+home, nil)
-	http.Redirect(w, r, "/workspaces/"+url.PathEscape(id)+"?ok="+url.QueryEscape("created workspace "+id), http.StatusSeeOther)
+
+	platformHost, err := a.cellURLByLabel("platform")
+	if err != nil {
+		a.endTrace("created but attach failed: "+err.Error(), nil)
+		http.Redirect(w, r, "/workspaces?err="+url.QueryEscape("created but attach to platform failed: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	if err := a.Peer.AttachProject(ctx, hostURL, proj.ID, "platform", platformHost); err != nil {
+		a.endTrace("created but attach failed: "+err.Error(), nil)
+		http.Redirect(w, r, "/projects/"+url.PathEscape(proj.ID)+"?err="+url.QueryEscape("created but attach failed: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+
+	_ = a.putWorkspace(Workspace{
+		ID: id, Name: name, Cell: cellLabel, CustomerTeamID: teamID,
+	})
+	msg := fmt.Sprintf("created workspace/site %s on %s (team %s)", proj.ID, cellLabel, teamID)
+	a.endTrace(msg, nil)
+	http.Redirect(w, r, "/projects/"+url.PathEscape(proj.ID)+"?ok="+url.QueryEscape(msg), http.StatusSeeOther)
 }
 
 func (a *App) handleWorkspaceHome(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
-	defer cancel()
 	wsID := strings.TrimSpace(r.PathValue("id"))
 	if wsID == "" {
 		http.Redirect(w, r, "/workspaces", http.StatusSeeOther)
 		return
 	}
-	sites := a.listSites(ctx)
-	a.ensureWorkspaceFromSites(sites)
-	ws, ok := a.getWorkspace(wsID)
-	if !ok {
-		ws = Workspace{ID: wsID, Name: wsID, HomeCell: "eu-1"}
-	}
-	var filtered []siteSummary
-	for _, s := range sites {
-		if s.WorkspaceID == wsID {
-			filtered = append(filtered, s)
-		}
-	}
-	a.render(w, "workspace", pageData{
-		Title:          "Workspace " + wsID,
-		NavActive:      "workspaces",
-		Breadcrumbs:    []crumb{{Label: "Workspaces", Href: "/workspaces"}, {Label: wsID}},
-		Flash:          r.URL.Query().Get("ok"),
-		FlashErr:       r.URL.Query().Get("err"),
-		Workspace:      &ws,
-		Sites:          filtered,
-		Cells:          a.leafCells(),
-		CellMeta:       a.cellDisplayMap(ctx),
-		ShowTracePanel: true,
-		Trace:          a.copyTrace(),
-	})
+	// Workspace IS the root site — redirect to the project page.
+	http.Redirect(w, r, "/projects/"+url.PathEscape(wsID), http.StatusSeeOther)
 }
 
 func (a *App) handleWorkspaceAddSite(w http.ResponseWriter, r *http.Request) {
@@ -215,51 +256,32 @@ func (a *App) handleWorkspaceAddSite(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/workspaces?err="+url.QueryEscape("workspace id required"), http.StatusSeeOther)
 		return
 	}
-	siteID := strings.TrimSpace(r.FormValue("id"))
-	name := strings.TrimSpace(r.FormValue("name"))
-	cellLabel := strings.TrimSpace(r.FormValue("cell"))
-	parentProjectID := strings.TrimSpace(r.FormValue("parent_project_id"))
-	if parentProjectID == "" {
-		parentProjectID = "platform"
+	// Prefer project-page add-site; keep this for back-compat.
+	r.Form.Set("parent_project_id", strings.TrimSpace(r.FormValue("parent_project_id")))
+	if r.Form.Get("parent_project_id") == "" {
+		r.Form.Set("parent_project_id", wsID)
 	}
-	if name == "" {
-		name = siteID
-	}
-	if siteID == "" || cellLabel == "" {
-		http.Redirect(w, r, "/workspaces/"+url.PathEscape(wsID)+"?err="+url.QueryEscape("site id and cell required"), http.StatusSeeOther)
-		return
-	}
-	hostURL, err := a.cellURLByLabel(cellLabel)
+	r.Form.Set("workspace_id", wsID)
+	a.handleProjectAddSite(w, r)
+}
+
+func (a *App) listPlatformTeams(ctx context.Context) ([]cell.TeamView, error) {
+	platformHost, err := a.cellURLByLabel("platform")
 	if err != nil {
-		http.Redirect(w, r, "/workspaces/"+url.PathEscape(wsID)+"?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
-		return
+		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
-	defer cancel()
-	a.beginTrace("add site " + siteID + " to " + wsID)
-	proj, err := a.Peer.CreateProject(ctx, hostURL, map[string]any{
-		"id": siteID, "name": name, "is_parent": false, "lookup_enabled": false,
-		"workspace_id": wsID,
-	})
+	return a.Peer.ListTeams(ctx, platformHost, "platform")
+}
+
+func (a *App) findPlatformTeam(ctx context.Context, teamID string) (cell.TeamView, error) {
+	teams, err := a.listPlatformTeams(ctx)
 	if err != nil {
-		a.endTrace(err.Error(), nil)
-		http.Redirect(w, r, "/workspaces/"+url.PathEscape(wsID)+"?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
-		return
+		return cell.TeamView{}, err
 	}
-	parentHost, parent, err := a.findProject(ctx, parentProjectID)
-	if err != nil {
-		a.endTrace("created but attach failed: "+err.Error(), nil)
-		http.Redirect(w, r, "/workspaces/"+url.PathEscape(wsID)+"?err="+url.QueryEscape("created but attach failed: "+err.Error()), http.StatusSeeOther)
-		return
+	for _, t := range teams {
+		if t.ID == teamID || t.Name == teamID {
+			return t, nil
+		}
 	}
-	// Prefer the reachable cell URL from the UI registry (HostCellURL may be a docker hostname).
-	parentCell := parentHost
-	if err := a.Peer.AttachProject(ctx, hostURL, proj.ID, parent.ID, parentCell); err != nil {
-		a.endTrace("created but attach failed: "+err.Error(), nil)
-		http.Redirect(w, r, "/workspaces/"+url.PathEscape(wsID)+"?err="+url.QueryEscape("created but attach failed: "+err.Error()), http.StatusSeeOther)
-		return
-	}
-	msg := fmt.Sprintf("created site %s on %s (workspace %s)", proj.ID, cellLabel, wsID)
-	a.endTrace(msg, nil)
-	http.Redirect(w, r, "/workspaces/"+url.PathEscape(wsID)+"?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+	return cell.TeamView{}, fmt.Errorf("customer team %q not found on platform — create it under Platform first", teamID)
 }

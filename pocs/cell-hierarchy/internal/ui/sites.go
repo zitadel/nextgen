@@ -13,16 +13,17 @@ import (
 )
 
 type siteSummary struct {
-	ID            string
-	Name          string
-	WorkspaceID   string
-	HostLabel     string
-	HostDisplay   string
-	HostURL       string
-	UserCount     int
-	AppCount      int
-	LookupEnabled bool
-	IsPlatform    bool
+	ID              string
+	Name            string
+	WorkspaceID     string
+	CustomerTeamID  string
+	ParentProjectID string
+	HostLabel       string
+	HostDisplay     string
+	HostURL         string
+	UserCount       int
+	LookupEnabled   bool
+	IsPlatform      bool
 }
 
 func (a *App) cellDisplayMap(ctx context.Context) map[string]string {
@@ -50,22 +51,22 @@ func (a *App) listSites(ctx context.Context) []siteSummary {
 		}
 		for _, p := range projects {
 			sum := siteSummary{
-				ID:            p.ID,
-				Name:          p.Name,
-				WorkspaceID:   p.WorkspaceID,
-				HostLabel:     c.Label,
-				HostDisplay:   displays[c.Label],
-				HostURL:       c.URL,
-				LookupEnabled: p.LookupEnabled,
-				IsPlatform:    p.ID == "platform",
+				ID:              p.ID,
+				Name:            p.Name,
+				WorkspaceID:     p.WorkspaceID,
+				CustomerTeamID:  p.CustomerTeamID,
+				ParentProjectID: p.ParentProjectID,
+				HostLabel:       c.Label,
+				HostDisplay:     displays[c.Label],
+				HostURL:         c.URL,
+				LookupEnabled:   p.LookupEnabled,
+				IsPlatform:      p.ID == "platform",
 			}
 			var raw struct {
-				Users []userRow      `json:"users"`
-				Apps  []cell.AppView `json:"apps"`
+				Users []userRow `json:"users"`
 			}
 			_ = a.Peer.DoRaw(ctx, http.MethodGet, cell.NormalizeURL(c.URL)+"/v1/projects/"+p.ID, nil, "", &raw)
 			sum.UserCount = len(raw.Users)
-			sum.AppCount = len(raw.Apps)
 			out = append(out, sum)
 		}
 	}
@@ -157,61 +158,24 @@ func (a *App) handleExpandSite(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/workspaces/"+url.PathEscape(ws)+"?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
+	teamID := src.CustomerTeamID
 	proj, err := a.Peer.CreateProject(ctx, hostURL, map[string]any{
-		"id": newSiteID, "name": newSiteID, "is_parent": false, "lookup_enabled": false,
-		"workspace_id": ws,
+		"id": newSiteID, "name": newSiteID, "is_parent": false, "lookup_enabled": true,
+		"workspace_id": ws, "customer_team_id": teamID,
 	})
 	if err != nil {
 		a.endTrace(err.Error(), nil)
-		http.Redirect(w, r, "/workspaces/"+url.PathEscape(ws)+"?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/projects/"+url.PathEscape(sourceSiteID)+"?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
-	parentID := src.ParentProjectID
-	if parentID == "" {
-		parentID = "platform"
-	}
-	parentHost, parent, err := a.findProject(ctx, parentID)
-	if err != nil {
+	// Child attaches to the source site (not platform sibling).
+	if err := a.Peer.AttachProject(ctx, hostURL, proj.ID, src.ID, srcHost); err != nil {
 		a.endTrace("created but attach failed: "+err.Error(), nil)
-		http.Redirect(w, r, "/workspaces/"+url.PathEscape(ws)+"?err="+url.QueryEscape("created but attach failed: "+err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/projects/"+url.PathEscape(sourceSiteID)+"?err="+url.QueryEscape("created but attach failed: "+err.Error()), http.StatusSeeOther)
 		return
 	}
-	parentCell := parentHost
-	if err := a.Peer.AttachProject(ctx, hostURL, proj.ID, parent.ID, parentCell); err != nil {
-		a.endTrace("created but attach failed: "+err.Error(), nil)
-		http.Redirect(w, r, "/workspaces/"+url.PathEscape(ws)+"?err="+url.QueryEscape("created but attach failed: "+err.Error()), http.StatusSeeOther)
-		return
-	}
-
-	appsCopied := 0
-	if copyChat {
-		apps, err := a.Peer.ListApps(ctx, srcHost, sourceSiteID)
-		if err != nil {
-			a.endTrace(err.Error(), nil)
-			http.Redirect(w, r, "/workspaces/"+url.PathEscape(ws)+"?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
-			return
-		}
-		for _, app := range apps {
-			if app.Name != "chat" {
-				continue
-			}
-			if _, err := a.Peer.CreateApp(ctx, hostURL, proj.ID, map[string]any{"name": app.Name}); err != nil {
-				a.endTrace(err.Error(), nil)
-				http.Redirect(w, r, "/workspaces/"+url.PathEscape(ws)+"?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
-				return
-			}
-			appsCopied++
-		}
-		if appsCopied == 0 {
-			if _, err := a.Peer.CreateApp(ctx, hostURL, proj.ID, map[string]any{"name": "chat"}); err != nil {
-				a.endTrace(err.Error(), nil)
-				http.Redirect(w, r, "/workspaces/"+url.PathEscape(ws)+"?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
-				return
-			}
-			appsCopied = 1
-		}
-	}
-	msg := fmt.Sprintf("expanded site %s on %s (from %s, apps=%d)", proj.ID, newCell, sourceSiteID, appsCopied)
+	_ = copyChat // apps deferred; flag ignored
+	msg := fmt.Sprintf("expanded site %s on %s (parent %s)", proj.ID, newCell, sourceSiteID)
 	a.endTrace(msg, nil)
-	http.Redirect(w, r, "/workspaces/"+url.PathEscape(ws)+"?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, "/projects/"+url.PathEscape(proj.ID)+"?ok="+url.QueryEscape(msg), http.StatusSeeOther)
 }

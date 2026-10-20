@@ -20,20 +20,22 @@ create_project() {
   local is_parent="$4"
   local lookup="$5"
   local workspace="${6:-}"
+  local team="${7:-}"
   if curl -fsS "$cell_url/v1/projects/$id" >/dev/null 2>&1; then
     echo "skip project $id (exists on $cell_url)"
     return 0
   fi
-  echo "create project $id on $cell_url (lookup=$lookup workspace=$workspace)"
+  echo "create project $id on $cell_url (lookup=$lookup workspace=$workspace team=$team)"
   curl -fsS -X POST "$cell_url/v1/projects" \
     -H 'Content-Type: application/json' \
     -d "$(jq -n \
       --arg id "$id" \
       --arg name "$name" \
       --arg ws "$workspace" \
+      --arg team "$team" \
       --argjson parent "$is_parent" \
       --argjson lookup "$lookup" \
-      '{id:$id, name:$name, is_parent:$parent, lookup_enabled:$lookup, workspace_id:$ws}')" >/dev/null
+      '{id:$id, name:$name, is_parent:$parent, lookup_enabled:$lookup, workspace_id:$ws, customer_team_id:$team}')" >/dev/null
 }
 
 attach_project() {
@@ -54,36 +56,21 @@ attach_project() {
       '{parent_project_id:$p, parent_cell_url:$u}')" >/dev/null
 }
 
-create_user() {
+create_team() {
   local cell_url="$1"
   local project_id="$2"
-  local email="$3"
-  local users
-  users="$(curl -fsS "$cell_url/v1/projects/$project_id")"
-  if printf '%s' "$users" | jq -e --arg e "$email" '.users[]? | select(.email == $e)' >/dev/null 2>&1; then
-    echo "skip user $email on $project_id"
+  local id="$3"
+  local name="$4"
+  local teams
+  teams="$(curl -fsS "$cell_url/v1/projects/$project_id/teams")"
+  if printf '%s' "$teams" | jq -e --arg id "$id" '.teams[]? | select(.id == $id)' >/dev/null 2>&1; then
+    echo "skip team $id on $project_id"
     return 0
   fi
-  echo "create user $email on $project_id"
-  curl -fsS -X POST "$cell_url/v1/projects/$project_id/users" \
+  echo "create team $id ($name) on $project_id"
+  curl -fsS -X POST "$cell_url/v1/projects/$project_id/teams" \
     -H 'Content-Type: application/json' \
-    -d "$(jq -n --arg e "$email" '{email:$e, defer_float:false}')" >/dev/null
-}
-
-create_app() {
-  local cell_url="$1"
-  local project_id="$2"
-  local name="$3"
-  local apps
-  apps="$(curl -fsS "$cell_url/v1/projects/$project_id/apps")"
-  if printf '%s' "$apps" | jq -e --arg n "$name" '.apps[]? | select(.name == $n)' >/dev/null 2>&1; then
-    echo "skip app $name on $project_id"
-    return 0
-  fi
-  echo "create app $name on $project_id"
-  curl -fsS -X POST "$cell_url/v1/projects/$project_id/apps" \
-    -H 'Content-Type: application/json' \
-    -d "$(jq -n --arg n "$name" '{name:$n}')" >/dev/null
+    -d "$(jq -n --arg id "$id" --arg name "$name" '{id:$id, name:$name}')" >/dev/null
 }
 
 PLATFORM="${PLATFORM_URL:-http://platform:8100}"
@@ -96,52 +83,15 @@ for u in "$PLATFORM" "$EU1" "$EU2" "$US1" "$US2"; do
   wait_healthy "$u"
 done
 
-# Sites = projects. Workspace is UX metadata (workspace_id).
-# platform = lookup zone. acme-fra on eu-1; leave US empty for Expand demo.
-create_project "$PLATFORM" "platform" "platform" true true ""
-create_project "$EU1" "acme-fra" "acme-fra" false false "acme"
+# Hoster: platform project (lookup zone) + customer team acme.
+# Customer: optional root workspace/site "acme" on eu-1 attached to platform.
+# Expand further sites (US-2, US-2-1, …) from the site page UI — parent picker.
+# Users + lookup only; no apps/tuples/groups seeded.
+create_project "$PLATFORM" "platform" "platform" true true "" ""
+create_team "$PLATFORM" "platform" "acme" "acme"
 
-attach_project "$EU1" "acme-fra" "platform" "$PLATFORM"
+create_project "$EU1" "acme" "acme" false true "acme" "acme"
+attach_project "$EU1" "acme" "platform" "$PLATFORM"
 
-create_user "$EU1" "acme-fra" "joe@example.com"
-create_user "$EU1" "acme-fra" "alice@example.com"
-
-create_app "$EU1" "acme-fra" "chat"
-
-# Phase 5 group chain (simplified for site topology):
-#   acme-fra: group:A#member@joe
-#   platform: group:B#member@group:A@acme-fra
-#   acme-fra: app:chat#viewer@group:B@platform
-seed_tuple() {
-  local cell_url="$1"
-  local project_id="$2"
-  local object="$3"
-  local relation="$4"
-  local subject_kind="$5"
-  local user_key="$6"
-  local home_project="$7"
-  local home_cell="$8"
-  local tuples
-  tuples="$(curl -fsS "$cell_url/v1/projects/$project_id/tuples")"
-  if printf '%s' "$tuples" | jq -e \
-    --arg o "$object" --arg r "$relation" --arg k "$user_key" --arg sk "$subject_kind" \
-    '.tuples[]? | select(.object == $o and .relation == $r and .user_key == $k and .subject_kind == $sk)' \
-    >/dev/null 2>&1; then
-    echo "skip tuple $object#$relation@$subject_kind:$user_key on $project_id"
-    return 0
-  fi
-  echo "create tuple $object#$relation@$subject_kind:$user_key on $project_id"
-  curl -fsS -X POST "$cell_url/v1/projects/$project_id/tuples" \
-    -H 'Content-Type: application/json' \
-    -d "$(jq -n \
-      --arg o "$object" --arg r "$relation" --arg sk "$subject_kind" --arg k "$user_key" \
-      --arg hp "$home_project" --arg hc "$home_cell" \
-      '{object:$o, relation:$r, subject_kind:$sk, user_key:$k,
-        home_project_id:$hp, home_cell_url:$hc, skip_interest:true}')" >/dev/null
-}
-
-seed_tuple "$EU1" "acme-fra" "group:A" "member" "user" "joe@example.com" "acme-fra" "$EU1"
-seed_tuple "$PLATFORM" "platform" "group:B" "member" "group" "A" "acme-fra" "$EU1"
-seed_tuple "$EU1" "acme-fra" "app:chat" "viewer" "group" "B" "platform" "$PLATFORM"
-
-echo "project bootstrap complete"
+echo "project bootstrap complete (platform + team acme + workspace/site acme @ eu-1)"
+echo "Next: open /projects/acme → create user → add child site → lookup from sibling"
