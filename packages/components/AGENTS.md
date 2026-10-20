@@ -71,9 +71,10 @@ roots they sit in are closed in a shipped build and open under test
 
 ## Tests
 
-- `pnpm test` runs both projects of `vitest.config.ts`: `unit` (jsdom) and
-  `browser` (Chromium, `*.browser.spec.ts`). `pnpm test:unit` is the fast lane;
-  `pnpm test:browser` runs the browser project alone.
+- `pnpm test` runs the three projects of `vitest.config.ts`: `unit` (jsdom),
+  `browser` (Chromium, `*.browser.spec.ts`) and `closed-roots` (Chromium with
+  the shipped closed roots, `*.closed.browser.spec.ts`). `pnpm test:unit` is
+  the fast lane; `pnpm test:browser` runs the two Chromium projects.
 - Put a test in the lowest project that proves it (the ladder in
   [`packages/testing/AGENTS.md`](../testing/AGENTS.md#which-layer-a-test-belongs-in)):
   form association and focus in `browser`, markup and ARIA in `unit`.
@@ -86,8 +87,6 @@ roots they sit in are closed in a shipped build and open under test
   both: each exercises a different SDK middleware.
 - The demos load this package's `dist/`: in a manual loop, run
   `moon run components:build` after an orchestrator change.
-- A spec that needs the shipped closed roots is `*.closed.browser.spec.ts`; it
-  runs in the `closed-roots` project and nowhere else.
 
 ### The browser project's cold start
 
@@ -108,23 +107,26 @@ in the library build so consumers share one copy; never bundle them there.
 
 ## Shadow roots
 
-Every shipped element's root is closed, so a page script cannot read a field
-through `host.shadowRoot`. Test and development builds keep it open.
+Every shipped element's root is closed, so `host.shadowRoot` is `null` for a
+page script. Source builds (Vitest, Storybook) keep it open; an app's dev
+server resolves `dist`, so it gets closed roots too.
 
 - The mode is decided once, by `SHADOW_ROOT_MODE` in
-  `src/internal/shadow-root.ts`, which `tsdown.config.ts` closes for both
-  shipped artifacts. Never write a mode or a second flag anywhere else.
+  `src/internal/shadow-root.ts`; `shadow-root-define.ts` closes it for both
+  shipped artifacts and the `closed-roots` test project. Never write a mode or
+  a second flag anywhere else.
 - Every element that renders into a shadow root extends `ZlElement` from that
-  file; one that extends `LitElement` directly fails `shadow-root.spec.ts`.
-- Reach your own root with `ownRoot(this)`, never `this.shadowRoot` (`null`
-  when closed), `this.renderRoot` (withheld) or `@query` (reads `renderRoot`).
+  file; `shadow-root.spec.ts` checks every element the package defines.
+- Reach your own root with `this.ownRoot`, never `this.shadowRoot` (`null`
+  when closed).
 - Never tell where an event came from with `composedPath()[0]`: a closed root
-  hides the inner nodes, so every inner event looks like the host's own.
+  hides the inner nodes, so every inner event looks like the host's own. Mark
+  the events your own listeners handled instead (`zl-button`, `zl-select`).
 - Secrets never cross the shadow boundary: no secret value in an event that
   leaves a root, in a host property or in an attribute.
 - Playwright pierces open roots only. Use `test` or `widgetTest` from
   `@zitadel/testing/playwright`, which open them; never patch `attachShadow`
   in a suite.
-- A closed root hides the root from a casual read, not from a script that runs
-  before the widget or from native keyboard events. Say so wherever you
+- A closed root is a guard against casual reads, not a boundary: Lit's own
+  properties on the element still lead to the root. Say so wherever you
   document it, and name a cross-origin iframe as the only real isolation.

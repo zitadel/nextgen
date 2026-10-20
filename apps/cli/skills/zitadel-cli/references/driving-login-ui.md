@@ -1,20 +1,33 @@
 ### Driving the login UI
 
 `<zitadel-login>`, `<zitadel-session>`, and `<zitadel-logout>` are Lit elements
-whose shadow roots the published package closes, so a script on the page cannot
-read a field and a driver that walks the DOM cannot see inside them. Open them
-first: with Playwright call `openShadowRoots(page)` from
-`@zitadel/testing/playwright` (its `test` and `widgetTest` do it for you) before
-the first navigation, and with any other driver add an init script that
-replaces `Element.prototype.attachShadow` so it always attaches with
-`mode: "open"`. Drivers that read the browser's accessibility tree see the fields
-without this.
+whose shadow roots the published package closes, so `el.shadowRoot` is `null`
+and locators and DOM walks find nothing inside them. Two ways in:
 
-Once open, the stable automation hooks live inside nested shadow roots, so a flat
+- Open the roots before the page's own scripts run. Playwright:
+  `openShadowRoots(page)` from `@zitadel/testing/playwright` (its `test` and
+  `widgetTest` do it for you). Any driver with a run-before-the-page hook
+  (Playwright `addInitScript`, Puppeteer `evaluateOnNewDocument`, CDP
+  `Page.addScriptToEvaluateOnNewDocument`) can install this instead:
+
+  ```js
+  const attachShadow = Element.prototype.attachShadow;
+  Element.prototype.attachShadow = function (init) {
+    return attachShadow.call(this, { ...init, mode: "open" });
+  };
+  ```
+
+- Or stay on the Chrome DevTools protocol, which reads closed roots:
+  `DOM.getDocument` with `pierce: true` and `Accessibility.getFullAXTree` list
+  the fields, and `DOM.focus` plus `Input.insertText` fill one by its backend
+  node id. Playwright's `getByRole` and `getByLabel` do not see closed roots.
+
+Once the roots are open, the stable automation hooks live inside nested shadow
+roots, so a flat
 `document.querySelector('[data-testid="zitadel-input-email"]')` will not find
 the native control. Browser drivers with shadow-DOM-aware locators, such as
 Playwright, can target the hooks directly. Generic DOM-eval drivers should
-pierce shadow roots recursively:
+pierce shadow roots recursively (this needs the roots open, as above):
 
 ```js
 function deepQuery(sel, root = document) {

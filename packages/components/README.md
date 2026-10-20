@@ -269,22 +269,34 @@ Do not build on server-rendered markup that carries an object-valued prop. React
 
 ## Shadow roots
 
-The published package closes the shadow roots of `<zitadel-login>`, `<zitadel-session>`, `<zitadel-logout>` and every `<zl-*>` atom, the npm entries and the standalone file alike. A script on the page cannot read a field the way it could through an open root: `host.shadowRoot` is `null`, `host.renderRoot` is withheld, and an event raised inside reaches the page retargeted to the host, with `composedPath()` listing no node inside. So `document.querySelector('zitadel-login').shadowRoot.querySelector('input').value` no longer reaches a password, and neither does the same walk through the nested `<zl-field>` or through `composedPath()`. Source builds, which is what the component tests, Storybook and the dev servers of this repository run, keep the roots open: the mode is one constant, `SHADOW_ROOT_MODE` in `src/internal/shadow-root.ts`.
+The published package attaches closed shadow roots for `<zitadel-login>`, `<zitadel-session>`, `<zitadel-logout>` and every `<zl-*>` atom, in the npm entries and the standalone file alike. `host.shadowRoot` is `null`, so `document.querySelector('zitadel-login').shadowRoot.querySelector('input')` finds nothing, and an event raised inside reaches a page listener retargeted to the host, with `composedPath()` listing no node inside. Builds that run the source (Vitest, Storybook) keep the roots open; the mode is one constant, `SHADOW_ROOT_MODE` in `src/internal/shadow-root.ts`. A dev server of an app resolves the published `dist`, so it gets closed roots like production.
 
-What closed roots do not protect against:
+This is a guard against casual reads, not a security boundary. It does not stop:
 
-- A script that runs before the widget loads, or that tampers with the page's DOM built-ins or with objects it hands the widget. It can patch `Element.prototype.attachShadow` and keep the root, replace the element classes, attach a root to an element before the widget upgrades it, or read the root while the widget renders through a patched built-in or a getter on a `branding` or `locales` object, and nothing in the widget can tell.
-- Values the widget itself publishes. A closed root hides the inner nodes, not what the widget chooses to put in an event detail or on its host, which is why the input events and the host state must never carry a secret.
-- Native keyboard events. The browser composes `keydown`, `keyup` and `beforeinput` out of every shadow root, so a page-level listener still sees each key press and its `key`, as it would for any text field on the page.
-- A script that already runs in the page's origin with the access to do worse, such as reading `document.cookie` or the DOM around the widget.
+- A script that inspects the element's own properties. Lit keeps the part it renders into on the element, and that part's `parentNode` is the root: in the console, `Object.values(el).find((v) => v?.parentNode instanceof ShadowRoot)?.parentNode` returns it for `<zitadel-login>` and for a nested `<zl-field>`. A test pins this limitation.
+- A script that runs before the widget, for example one that patches `Element.prototype.attachShadow` and keeps the root, or replaces the element classes.
+- Native keyboard, paste and composition events. The browser delivers them to a page-level capture listener with their `key` or `data`, whatever the root.
+- Browser extensions and developer tooling, which read closed roots on purpose.
 
-A closed root hides the widget's internals from casual reads; it is not an isolation boundary. Full isolation of a credential field from the host page needs a cross-origin iframe, which this package does not use.
+Full isolation of a credential field from the page that hosts it needs a cross-origin iframe, which this package does not use. The tests prove only this: with closed roots every element has no reachable `shadowRoot`, a capture listener on the page sees only the host as the target of a keystroke and no node or root in `composedPath()`, and the widget still signs in with keyboard input.
 
-Autofill works through a closed root, because the browser fills a field at the platform level. Password manager extensions differ in how they find fields, and the ones that look inside a shadow root through `element.shadowRoot` will not see these; extensions that use the browsers' extension-only access to closed roots do. If a manager you support cannot fill the widget, tell us which.
+Autofill works through a closed root, because the browser fills a field at the platform level. Password manager extensions differ in how they find fields; those that look inside a shadow root through `element.shadowRoot` will not see these fields, and those that use the extension-only access to closed roots do. This has not been verified against any extension.
 
-### Testing against the published build
+### Driving the closed roots
 
-Playwright pierces open roots only, so a test of a page that loads the published package must open them first. `@zitadel/testing/playwright` does it for you: its `test` (and `widgetTest`, for a suite without a Zitadel instance) opens the roots of every page of the test. To do it by hand, call `openShadowRoots(page)` or `openShadowRoots(context)` before the first navigation; it registers an init script that makes every `attachShadow` call attach open. Tools that read the accessibility tree through the browser, rather than walking the DOM, see the fields either way.
+Playwright locators (`getByRole`, `getByLabel`, `locator("zl-field input")`) find nothing inside a closed root. Open the roots first:
+
+- With `@zitadel/testing/playwright`, its `test` and `widgetTest` (for a suite without a Zitadel instance) open the roots of every page of the test. For a page or context you create by hand, call `openShadowRoots(page)` before the first navigation.
+- Any driver that can run a script before the page's own (Playwright `addInitScript`, Puppeteer `evaluateOnNewDocument`, CDP `Page.addScriptToEvaluateOnNewDocument`) can install the same override, after which DOM-walking and locators work as for open roots:
+
+```js
+const attachShadow = Element.prototype.attachShadow;
+Element.prototype.attachShadow = function (init) {
+  return attachShadow.call(this, { ...init, mode: "open" });
+};
+```
+
+- A driver on the Chrome DevTools protocol needs no override: `DOM.getDocument` with `pierce: true` and `Accessibility.getFullAXTree` include closed roots, and `DOM.focus` plus `Input.insertText` fill a field by its backend node id.
 
 ## Element APIs
 
