@@ -117,28 +117,20 @@ declared it as the fallback.
 
 ## Consequences
 
-- **Brand font out of the box.** CLI-generated apps, the console, and any
-  server that returns no `branding.font_url` now paint Arimo instead of the
-  system fallback. Verified live in Chrome against `demo-next`: the `.zl-card-title`
-  heading computes to `font-family: Arimo` and `font-weight: 700`, with the Arimo
-  `<link>` injected at document level and `document.fonts.check('700 16px Arimo')`
-  returning `true`. The `applyDefaultFont` default-path injection (used when no
-  tenant `font_url` is present) is covered by `font-loader.spec.ts` and uses the
-  identical document-level link mechanism.
-- **Override preserved.** `branding.font_url` still wins; the default link is
-  removed when a tenant font is present, so there is no redundant request and no
-  font clash.
-- **Consistent ownership.** Default *face loading* now lives in the same package
-  as the default token *values*; the server's branding stays the
-  customisation/override surface, consistent with `branding.yaml`.
-- **Third-party request by default.** The shipped default fetches Arimo from
-  Google Fonts, so the unbranded login page makes one cross-origin request and
-  exposes the end-user's IP to the font CDN. Mitigations: it is overridable per
-  deployment via `applyDefaultFont(href)` / `DEFAULT_BRAND_FONT_HREF`, and a
-  tenant `font_url` replaces it entirely. **Follow-up:** self-host the default
-  face inside the package (commit a latin-subset Arimo woff2, emit/inline it at
-  build time, and point the default `@font-face` at it) so the out-of-the-box
-  default needs no third-party request and works offline.
+Bullets marked superseded or resolved describe the original decision; the
+amendment above changed them.
+
+- **Brand font out of the box** *(superseded)*. Unbranded login pages painted
+  Arimo from a Google Fonts `<link>`. Since the amendment, only the first-party
+  shells (console, the server's hosted login) paint Arimo, from their own
+  origin; the components render Arimo only where the page or the OS has it.
+- **Override preserved.** `branding.font_url` still wins, and is now the only
+  font request the components make.
+- **Third-party request by default** *(resolved by the amendment)*. The
+  default fetched Arimo from Google Fonts and exposed each visitor's IP to the
+  font CDN. The components now make no font request without a tenant
+  `font_url`, so the earlier follow-up (self-host the face inside the package)
+  is dropped for the reasons in the amendment.
 - **No CSP work needed here.** The CLI-generated app sets no Content-Security
   -Policy, so the linked stylesheet loads without a `font-src` allowance. A
   deployment that enforces CSP must allow its chosen font origin — orthogonal to
