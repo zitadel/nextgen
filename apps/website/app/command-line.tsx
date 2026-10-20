@@ -39,8 +39,11 @@ export function CommandLine({
         </span>
         {children ?? <Words text={command} />}
       </span>
-      {end}
-      <CopyButton text={command} label={command} className={LINE_COPY} />
+      {/* Centered on the first line of the command, whatever its height. */}
+      <span className="my-[calc((1lh_-_1.75rem)/2)] flex shrink-0 items-center gap-2">
+        {end}
+        <CopyButton text={command} label={command} className={LINE_COPY} />
+      </span>
     </div>
   );
 }
