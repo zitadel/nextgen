@@ -9,6 +9,7 @@ export {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   matchesRoutes,
+  normalizeBackendUrl,
   filterResponseHeaders,
   requiresProjectSecret,
   checkOpaqueSessionToken,

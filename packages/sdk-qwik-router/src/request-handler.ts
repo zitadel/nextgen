@@ -10,6 +10,7 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  normalizeBackendUrl,
   proxySessionCookies,
   requiresProjectSecret,
   resolveSession,
@@ -331,8 +332,9 @@ export function createNextgenOnRequest(
     // `process.env` (set in production adapters) > localhost default. Qwik does
     // not surface `.env` files on `process.env`, so a factory-time read would
     // miss them and the proxy would fall back to :8080 ("fetch failed").
-    const url =
-      urlOption ?? ev.env?.get("ZITADEL_URL") ?? PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080";
+    const url = normalizeBackendUrl(
+      urlOption ?? ev.env?.get("ZITADEL_URL") ?? PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
+    );
     const projectSecret =
       projectSecretOption ??
       ev.env?.get("ZITADEL_PROJECT_SECRET") ??

@@ -758,6 +758,8 @@ describe("server SDK test titles", () => {
     "lets a request without the auth header through",
     "sends the exchange bearer from %s",
     "proxies to the backend from %s",
+    "verifies a JWT against a backend url given with a trailing slash",
+    "asks the session probe at a backend url given with a trailing slash",
   ];
 
   // Matches `it("title"`, `it.fails("title"` and the `it.each([...])("title"` form.

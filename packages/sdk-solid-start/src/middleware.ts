@@ -10,6 +10,7 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  normalizeBackendUrl,
   proxySessionCookies,
   requiresProjectSecret,
   resolveSession,
@@ -284,7 +285,7 @@ export function createNextgenMiddleware(
   options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
 ): SolidMiddlewareConfig {
   const {
-    url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
+    url: configuredUrl = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
     projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
@@ -299,6 +300,7 @@ export function createNextgenMiddleware(
     opaqueTokenTimeoutMs = 5000,
     projectSecret = PROCESS_ENV.ZITADEL_PROJECT_SECRET,
   } = options;
+  const url = normalizeBackendUrl(configuredUrl);
 
   // Guard against open-redirect: loginPath must be a relative path.
   if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {

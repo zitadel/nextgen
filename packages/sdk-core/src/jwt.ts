@@ -677,9 +677,11 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
     }
 
     // Strict equality is intentional: the issuer URL must match exactly as
-    // configured. We deliberately do not normalise trailing slashes, case, or
+    // given. This function does not normalise trailing slashes, case, or
     // surrounding whitespace — any difference is either a misconfiguration or
-    // a token issued by a different server and must be rejected.
+    // a token issued by a different server and must be rejected. The SDKs
+    // normalise the configured `url` once, with `normalizeBackendUrl`, before
+    // they pass it here.
     if (payload.iss !== issuerUrl) {
       return null;
     }

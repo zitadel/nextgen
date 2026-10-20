@@ -45,6 +45,31 @@ export const HOP_BY_HOP: ReadonlySet<string> = new Set([
  */
 export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-nextgen-auth-token"]);
 
+// ─── Backend URL ─────────────────────────────────────────────────────────────
+
+/**
+ * Normalizes the configured backend `url` once, where an SDK reads it: strips
+ * surrounding whitespace and trailing slashes.
+ *
+ * Every server SDK builds `${url}/auth/keys`, `${url}/sessions/me` and the
+ * proxy target from it, and {@link verifyJwt} compares a token's `iss` with it
+ * exactly. A `ZITADEL_URL` copied with a trailing slash or a stray newline
+ * would otherwise produce `//auth/keys` and reject every token on issuer
+ * mismatch. The `iss` check stays strict, against the normalized value.
+ *
+ * @param url - The backend URL as configured.
+ * @returns The URL without surrounding whitespace or trailing slashes.
+ */
+export function normalizeBackendUrl(url: string): string {
+  const trimmed = url.trim();
+  // A linear scan, not /\/+$/, which backtracks quadratically on a long run of slashes.
+  let end = trimmed.length;
+  while (end > 0 && trimmed.charCodeAt(end - 1) === 0x2f) {
+    end--;
+  }
+  return trimmed.slice(0, end);
+}
+
 // ─── Route matching ──────────────────────────────────────────────────────────
 
 /**
@@ -550,7 +575,8 @@ export type ClientAuthResult = ClientAuthState | UnauthState;
  */
 export type NextgenMiddlewareOptions = {
   /**
-   * Full URL of the Zitadel auth backend.
+   * Full URL of the Zitadel auth backend. Surrounding whitespace and trailing
+   * slashes are ignored.
    * @default process.env.ZITADEL_URL ?? "http://localhost:8080"
    */
   url?: string;

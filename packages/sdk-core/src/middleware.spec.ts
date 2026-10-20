@@ -9,6 +9,7 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  normalizeBackendUrl,
   jwtNamesProject,
   proxySessionCookies,
   requiresProjectSecret,
@@ -151,6 +152,33 @@ describe("matchesRoutes", () => {
 
     expect(matchesRoutes(pathname, ["/profile"])).toBe(false);
     expect(performance.now() - started).toBeLessThan(250);
+  });
+});
+
+describe("normalizeBackendUrl", () => {
+  it.each([
+    ["a url without a trailing slash", "http://localhost:8080", "http://localhost:8080"],
+    ["a trailing slash", "http://localhost:8080/", "http://localhost:8080"],
+    ["several trailing slashes", "https://auth.example.com///", "https://auth.example.com"],
+    ["surrounding whitespace", " \thttp://localhost:8080\n", "http://localhost:8080"],
+    ["whitespace around a trailing slash", " http://localhost:8080/ ", "http://localhost:8080"],
+    ["a path prefix", "https://example.com/zitadel/", "https://example.com/zitadel"],
+    ["an empty string", "", ""],
+    ["only slashes", "///", ""],
+  ])("normalizes %s", (_label, given, expected) => {
+    expect(normalizeBackendUrl(given)).toBe(expected);
+  });
+
+  it("is idempotent", () => {
+    const once = normalizeBackendUrl("http://localhost:8080//");
+
+    expect(normalizeBackendUrl(once)).toBe(once);
+  });
+
+  it("handles a long run of slashes", () => {
+    expect(normalizeBackendUrl(`http://localhost:8080${"/".repeat(200_000)}`)).toBe(
+      "http://localhost:8080",
+    );
   });
 });
 

@@ -1,7 +1,11 @@
 import "server-only";
 
 import { getZitadelConfig } from "@zitadel/api/config";
-import { checkOpaqueSessionToken, jwtNamesProject } from "@zitadel/sdk-core/middleware";
+import {
+  checkOpaqueSessionToken,
+  jwtNamesProject,
+  normalizeBackendUrl,
+} from "@zitadel/sdk-core/middleware";
 import { headers } from "next/headers";
 import { cache } from "react";
 
@@ -119,7 +123,7 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
   }
 
   const {
-    url = process.env.ZITADEL_URL ?? "http://localhost:8080",
+    url: configuredUrl = process.env.ZITADEL_URL ?? "http://localhost:8080",
     projectId = process.env.ZITADEL_PROJECT_ID ||
       process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ||
       getZitadelConfig()?.projectId,
@@ -130,6 +134,7 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
     jwksTimeoutMs,
     opaqueTokenTimeoutMs = 5000,
   } = options;
+  const url = normalizeBackendUrl(configuredUrl);
 
   if (!projectId) {
     warnMissingProject();

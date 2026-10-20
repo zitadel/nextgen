@@ -1275,12 +1275,51 @@ describe("server middleware", () => {
   it.each([
     ["the option", "http://option.test:4000", "http://env.test:4000", "http://option.test:4000/"],
     ["ZITADEL_URL", undefined, "http://env.test:4000", "http://env.test:4000/"],
+    [
+      "an option with a trailing slash",
+      " http://option.test:4000// ",
+      undefined,
+      "http://option.test:4000/",
+    ],
+    [
+      "ZITADEL_URL with a trailing slash",
+      undefined,
+      "http://env.test:4000/",
+      "http://env.test:4000/",
+    ],
   ])("proxies to the backend from %s", async (_l, option, environment, expected) => {
     vi.stubEnv("ZITADEL_URL", environment);
     const calls = captureFetch();
 
     await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, { url: option });
 
-    expect(calls[0]?.url.startsWith(expected)).toBe(true);
+    expect(calls[0]?.url).toBe(`${expected}v1/flow`);
+  });
+
+  it("verifies a JWT against a backend url given with a trailing slash", async () => {
+    const sign = signer();
+    const token = sign();
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: `${SESSION}=${token}` } },
+      { ...OPTIONS, url: " http://localhost:4000/ " },
+    );
+
+    expect(served.auth).toMatchObject({ isAuthenticated: true, session: { token } });
+    expect(fetch).toHaveBeenCalledWith("http://localhost:4000/auth/keys", expect.anything());
+  });
+
+  it("asks the session probe at a backend url given with a trailing slash", async () => {
+    const calls = captureFetch(() => Response.json({ project_id: PROJECT, user_id: "u1" }));
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: `${SESSION}=opaque-session-token` } },
+      { ...OPTIONS, url: "http://localhost:4000//" },
+    );
+
+    expect(served.auth?.isAuthenticated).toBe(true);
+    expect(calls[0]?.url.startsWith("http://localhost:4000/sessions/me?")).toBe(true);
   });
 });
