@@ -67,6 +67,12 @@ export { businessLocales } from "@zitadel/components";
  * }
  * ```
  */
+/** What `createComponent` takes as the element class: a constructor and its prototype. */
+type ElementClass<Tag extends WidgetTag> = {
+  new (): HTMLElementTagNameMap[Tag];
+  prototype: HTMLElementTagNameMap[Tag];
+};
+
 /**
  * `createComponent` binds every key found on the element's prototype as a DOM
  * property, and a property is never written into server markup. The widget
@@ -88,7 +94,7 @@ export { businessLocales } from "@zitadel/components";
 function asAttributes<Tag extends WidgetTag>(
   tag: Tag,
   ...keys: readonly string[]
-): { new (): HTMLElementTagNameMap[Tag]; prototype: HTMLElementTagNameMap[Tag] } {
+): ElementClass<Tag> {
   const hidden = new Set<PropertyKey>(keys);
   const prototype = new Proxy(
     {},
@@ -106,10 +112,7 @@ function asAttributes<Tag extends WidgetTag>(
       },
     },
   );
-  return { name: tag, prototype } as unknown as {
-    new (): HTMLElementTagNameMap[Tag];
-    prototype: HTMLElementTagNameMap[Tag];
-  };
+  return { name: tag, prototype } as unknown as ElementClass<Tag>;
 }
 
 /**

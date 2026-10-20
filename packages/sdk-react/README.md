@@ -101,7 +101,7 @@ React 19 does not apply an object property such as `project` while hydrating a s
 
 The wrapper loads on edge runtimes such as Cloudflare Workers and Vercel Edge, which have no DOM. It renders each widget by its tag name there and registers the elements only in the browser, so the markup a server sends is the same on every runtime.
 
-The edge checks run against React 19. React 18's server renderer logs a development-only warning for a layout effect, which `@lit/react` uses to bind props, so expect that line when you render on the edge with React 18; this has not been tested.
+The edge checks run against React 19. A server render of a widget with React 18.3 under the `browser` condition, which is how bundlers resolve `@lit/react` for the edge, logs React's development-only warning that `useLayoutEffect` does nothing on the server (twice per widget) and renders the same markup; the Node build of `@lit/react` logs nothing, and the production build of React drops the warning.
 
 ## Proxying to the backend (deployment)
 

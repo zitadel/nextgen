@@ -709,20 +709,19 @@ const entryProblems = (source: string): string[] => {
 
 describe("client SDK entries ↔ @zitadel/components", () => {
   const packagesDir = `${resolve(process.cwd(), "..")}/`;
-  const ENTRIES = {
-    "sdk-react": "sdk-react/src/index.tsx",
-    "sdk-vue": "sdk-vue/src/index.ts",
-    "sdk-angular": "sdk-angular/src/public-api.ts",
-    "sdk-svelte": "sdk-svelte/src/lib/index.ts",
-    "sdk-solid": "sdk-solid/src/index.tsx",
-    "sdk-qwik": "sdk-qwik/src/index.tsx",
-    "sdk-next": "sdk-next/src/client.ts",
-    "sdk-nuxt": "sdk-nuxt/src/index.ts",
-  } as const;
-  const entries = Object.keys(ENTRIES) as (keyof typeof ENTRIES)[];
+  const ENTRIES: [string, string][] = [
+    ["sdk-react", "sdk-react/src/index.tsx"],
+    ["sdk-vue", "sdk-vue/src/index.ts"],
+    ["sdk-angular", "sdk-angular/src/public-api.ts"],
+    ["sdk-svelte", "sdk-svelte/src/lib/index.ts"],
+    ["sdk-solid", "sdk-solid/src/index.tsx"],
+    ["sdk-qwik", "sdk-qwik/src/index.tsx"],
+    ["sdk-next", "sdk-next/src/client.ts"],
+    ["sdk-nuxt", "sdk-nuxt/src/index.ts"],
+  ];
 
-  it.each(entries)("%s registers the elements and re-exports no element class", (sdk) => {
-    expect(entryProblems(readFileSync(`${packagesDir}${ENTRIES[sdk]}`, "utf8"))).toEqual([]);
+  it.each(ENTRIES)("%s registers the elements and re-exports no element class", (_sdk, path) => {
+    expect(entryProblems(readFileSync(`${packagesDir}${path}`, "utf8"))).toEqual([]);
   });
 
   // The TanStack Start widgets are sdk-react's, and the package has no direct
