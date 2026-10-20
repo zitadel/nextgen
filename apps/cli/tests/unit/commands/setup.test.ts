@@ -1102,7 +1102,7 @@ describe("setup asked on a terminal", () => {
     await settingUp(cwd, "--force").catch(() => undefined);
 
     expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "Detected next. Proceed?" }),
+      expect.objectContaining({ message: "Set up Zitadel in this Next.js app?" }),
     );
   });
 
@@ -1143,7 +1143,9 @@ describe("setup asked on a terminal", () => {
 
       await expect(settingUp(cwd)).rejects.toThrow();
 
-      expect(text).toHaveBeenCalledWith(expect.objectContaining({ message: "Dev server port" }));
+      expect(text).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "Where will your app run during development?" }),
+      );
       expect(await readdir(cwd)).toEqual([]);
     });
 

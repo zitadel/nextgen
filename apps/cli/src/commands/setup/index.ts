@@ -112,6 +112,7 @@ import {
   formatFrameworkLine,
   id as styleId,
   path as stylePath,
+  prettyFramework,
   relativeDisplayPath as relativeDisplay,
   renderSummary,
   url as styleUrl,
@@ -120,6 +121,7 @@ import {
 } from "./summary";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
+import { Wizard } from "../../lib/wizard";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -315,7 +317,13 @@ export default class Setup extends BaseCommand {
 
     const orca = createOrca();
 
-    consola.start(`Detecting framework in ${shortPath(cwd)}`);
+    // A person at a terminal is shown the wizard's own opening line instead of
+    // these two log lines, which would print above its frame.
+    const willAsk = !nonInteractive && !dryRun;
+    if (!willAsk) {
+      consola.start(`Detecting framework in ${shortPath(cwd)}`);
+    }
+    let foundApp: string | undefined;
     // The app the questions are about: the one detected here, or else a new
     // one. Setup creates a new app only once it has every answer, just before
     // it patches it, so cancelling a question leaves the directory as it was,
@@ -329,9 +337,13 @@ export default class Setup extends BaseCommand {
     try {
       detected = await orca.detect(cwd, flags.framework);
       app = { framework: detected.id, devPort: detected.devPort };
-      consola.success(
-        `Detected ${detected.id}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
-      );
+      if (willAsk) {
+        foundApp = `Found a ${prettyFramework(detected.id)} app in this folder. Setup adds sign-in pages to it and connects it to Zitadel.`;
+      } else {
+        consola.success(
+          `Detected ${detected.id}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
+        );
+      }
     } catch (error) {
       if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
         const target = await inspectScaffoldTarget(cwd);
@@ -401,6 +413,9 @@ export default class Setup extends BaseCommand {
       // Asking which framework to scaffold opened the wizard already.
       if (!scaffoldedFramework || flags.framework !== undefined) {
         intro("Zitadel setup");
+      }
+      if (foundApp !== undefined) {
+        new Wizard({ ask: wizardInput }).say(foundApp);
       }
       const promptCtx = {
         input: wizardInput,

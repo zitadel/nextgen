@@ -143,7 +143,7 @@ function depFromFramework(framework: string): string {
   return detectorFor(framework)?.versionPackage ?? framework;
 }
 
-function prettyFramework(framework: string): string {
+export function prettyFramework(framework: string): string {
   return detectorFor(framework)?.displayName ?? framework;
 }
 

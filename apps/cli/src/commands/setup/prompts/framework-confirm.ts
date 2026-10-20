@@ -1,8 +1,9 @@
 import { ZitadelError } from "../../../lib/errors";
+import { prettyFramework } from "../summary";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
- * "Detected `<framework>`. Proceed?" — the wizard's first question. Accepting
+ * "Set up Zitadel in this `<framework>` app?" — the wizard's first question. Accepting
  * leaves answers unchanged; declining throws `E_UNSUPPORTED_PROJECT_SHAPE`
  * (the user should re-run with an explicit `--framework`). Skipped when the
  * developer already named the framework, by picking it to scaffold or with
@@ -16,7 +17,7 @@ export class FrameworkConfirmPrompt implements SetupPrompt {
     const ack = await ctx.input({
       kind: "confirm",
       name: "confirm the framework",
-      message: `Detected ${ctx.framework.id}. Proceed?`,
+      message: `Set up Zitadel in this ${prettyFramework(ctx.framework.id)} app?`,
       initialValue: true,
     });
     if (ack === false) {

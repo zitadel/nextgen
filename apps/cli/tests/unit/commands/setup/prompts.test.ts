@@ -43,6 +43,7 @@ import {
   googleSelection,
 } from "../../../helpers/idp-values";
 
+import { parseDevAddress } from "../../../../src/commands/setup/prompts/dev-port";
 import { type Asker, input } from "../../../../src/lib/input";
 import { takeReportedWarnings } from "../../../../src/lib/warnings";
 import { LocalServer } from "../../../../src/lib/local-server/server";
@@ -129,7 +130,7 @@ describe("FrameworkConfirmPrompt", () => {
 
     expect(out).toEqual(baseAnswers());
     expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining("next") }),
+      expect.objectContaining({ message: expect.stringContaining("Next.js") }),
     );
   });
 
@@ -250,6 +251,25 @@ describe("DevPortPrompt", () => {
 
     expect(out.devPort).toBe(4000);
   });
+
+  it.each([
+    ["3000", 3000],
+    [" 4321 ", 4321],
+    ["http://localhost:3000", 3000],
+    ["http://127.0.0.1:5173/", 5173],
+  ])("reads %j as port %i", (typed, port) => {
+    expect(parseDevAddress(typed)).toEqual({ ok: true, value: port });
+  });
+
+  it.each(["", "0", "70000", "localhost", "https://example.com:3000", "http://localhost"])(
+    "says how to write the address when given %j",
+    (typed) => {
+      expect(parseDevAddress(typed)).toEqual({
+        ok: false,
+        problem: "Enter a port such as 3000, or an address such as http://localhost:3000.",
+      });
+    },
+  );
 
   it("skips and keeps the flagged port when --dev-port was passed", async () => {
     const out = await new DevPortPrompt().ask(baseAnswers({ devPort: 5000 }), {
