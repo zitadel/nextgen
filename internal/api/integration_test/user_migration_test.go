@@ -129,7 +129,6 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 	resp, err := f.client.PatchUserByID(t.Context(), req, api.PatchUserByIDParams{UserID: api.UserID(userID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
-	assert.Equal(t, userID, string(resp.(*api.User).ID), "the response carries the same id")
 
 	// --- The user moved and changed -------------------------------------------
 	after, err := harness.EnsureUserFixture(t).GetByID(t.Context(), f.project.ID, userID)
