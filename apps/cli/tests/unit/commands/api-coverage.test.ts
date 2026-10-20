@@ -92,6 +92,8 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // operator credential (ADR 036), so these are not its to call.
   getMyUser: "the end user's own view of themselves, on their own credential",
   patchMyUser: "the end user's own view of themselves, on their own credential",
+  getMyUserSchema: "the end user's own view of themselves, on their own credential",
+  listMyTeams: "the end user's own view of themselves, on their own credential",
   getMySession: "the end user's own session, on their own credential",
   getMySessionCsrfToken:
     "the session's CSRF token (ADR 053 §5), read on the session's own credential; only the local-admin claim helper, not a command, uses it",

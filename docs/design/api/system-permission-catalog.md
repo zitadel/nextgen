@@ -173,7 +173,9 @@ the corresponding resource permission.
 | `user.delete` | `DELETE /users/{id}` | **Not yet exposed**. |
 
 `/me` and `/me/memberships` are self-access and do not require system
-permissions — they are gated by the session/credential itself. A user changing
+permissions — they are gated by the session/credential itself. That includes
+`GET /users/me/schema` (the schema the caller's own record is validated
+against) and `GET /users/me/teams` (the caller's own roster). A user changing
 their **own** password/factors is self-service (`/me`-gated), **not**
 `user.set_password`.
 
@@ -190,7 +192,7 @@ their **own** password/factors is self-service (`/me`-gated), **not**
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `team_membership.create` | `POST /teams/{id}/memberships`, `POST /team_memberships` | Prefer nested create; flat create with `team_id` in body is legacy. |
-| `team_membership.read` | `GET /teams/{id}/memberships`, `GET /team_memberships/{id}`, `GET /users/{id}/teams`, `GET /users/{id}` with `team_id`, `POST /users/query` with `expand: ["teams"]` or a `team_id` filter | Required on top of `user.read` for the user-side membership reads: reading users is not reading memberships. The `team_id` filter is gated with the expansion — it answers "who is in this team" a page at a time, which is the same read. **Drift ([ADR 036](../../adrs/036-api-credential-planes.md)):** granular scopes are not minted yet and memberships have no RSI kind, so an operator project secret satisfies this interim — preview secrets do not. Tighten when #420 lands. **Sessions ([#1300](https://github.com/zitadel/nextgen/issues/1300)):** a Console session carries no scopes, so on `POST /users/query` and `GET /users/{id}` with `team_id` the resolver answers instead: the session needs `viewer` on the target project, the finest read role the system catalog has ([ADR 054](../../adrs/054-customer-collaboration-grants.md) §5). A partial foothold still lists, but gets 403 on the expansion. The other endpoints in this row keep requiring the scope. |
+| `team_membership.read` | `GET /teams/{id}/memberships`, `GET /team_memberships/{id}`, `GET /users/{id}/teams`, `GET /users/{id}` with `team_id`, `POST /users/query` with `expand: ["teams"]` or a `team_id` filter | Required on top of `user.read` for the user-side membership reads: reading users is not reading memberships. The `team_id` filter is gated with the expansion — it answers "who is in this team" a page at a time, which is the same read. **Drift ([ADR 036](../../adrs/036-api-credential-planes.md)):** granular scopes are not minted yet and memberships have no RSI kind, so an operator project secret satisfies this interim — preview secrets do not. Tighten when #420 lands. **Sessions ([#1300](https://github.com/zitadel/nextgen/issues/1300)):** a Console session carries no scopes, so on `POST /users/query`, `GET /users/{id}` with `team_id` and `GET /users/{id}/teams` the resolver answers instead: the session needs `viewer` on the target project, the finest read role the system catalog has ([ADR 054](../../adrs/054-customer-collaboration-grants.md) §5). A partial foothold still lists, but gets 403 on the expansion. The other endpoints in this row keep requiring the scope. |
 | `team_membership.write` | `PATCH /team_memberships/{id}` | Role changes within a membership (replaces old `team.roles.assign`). |
 | `team_membership.delete` | `DELETE /team_memberships/{id}` | |
 
