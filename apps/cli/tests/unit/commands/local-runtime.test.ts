@@ -21,6 +21,7 @@ import {
 } from "../../../src/lib/local-server/runtime";
 import Reset from "../../../src/commands/reset";
 import { nextPort } from "../../helpers/ports";
+import { aMachineRunning, doctorSeeing, stopSeeing } from "../../helpers/local-servers";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
@@ -283,21 +284,18 @@ describe("local runtime commands", () => {
   it("doctor warns about other host-wide managed runtime processes and suggests stop --all", async () => {
     const cwd = await tempProject("zitadel-doctor-orphan-");
     const fake = await fakeServerBinary();
-    const processes = [
-      {
-        pid: 999_991,
-        ppid: 1,
-        command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
-      },
-      { pid: 999_992, ppid: 1, command: "/usr/local/bin/node /tmp/not-zitadel.js" },
-    ];
+    const servers = aMachineRunning({
+      pid: 999_991,
+      ppid: 1,
+      command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+    });
     const port = nextPort();
 
     const result = await runCliForTest(
       ["doctor", "--cwd", cwd, "--json", "--port", String(port)],
       { ZITADEL_SERVER_BINARY: fake.binPath },
       undefined,
-      processes,
+      doctorSeeing(servers),
     );
 
     expect(result.exitCode).toBe(0);
@@ -869,20 +867,17 @@ describe("local runtime commands", () => {
 
   it("stop --all reports only discovered CLI-managed runtime candidates", async () => {
     const cwd = await tempProject("zitadel-stop-all-");
-    const processes = [
-      {
-        pid: 999_981,
-        ppid: 1,
-        command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
-      },
-      { pid: 999_982, ppid: 1, command: "/usr/local/bin/node /tmp/unrelated.js" },
-    ];
+    const servers = aMachineRunning({
+      pid: 999_981,
+      ppid: 1,
+      command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+    });
 
     const result = await runCliForTest(
       ["stop", "--cwd", cwd, "--json", "--all"],
       {},
       undefined,
-      processes,
+      stopSeeing(servers),
     );
 
     expect(result.exitCode).toBe(0);

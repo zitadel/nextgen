@@ -6,8 +6,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { failureAdvice } from "../../../src/commands/doctor";
+import type { LocalServers } from "../../../src/lib/local-server/processes";
 import { publicCliCommand } from "../../../src/lib/public-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
+import { aMachineRunning, doctorSeeing } from "../../helpers/local-servers";
 import { nextPort } from "../../helpers/ports";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
@@ -603,6 +605,7 @@ async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
   tempDirs.push(binDir);
   const logPath = join(binDir, "docker.log");
   const dockerPath = join(binDir, "docker");
+  const psPath = join(binDir, "ps");
   await writeFile(
     dockerPath,
     `#!/usr/bin/env node
@@ -621,6 +624,8 @@ process.exit(0);
 `,
   );
   await chmod(dockerPath, 0o755);
+  await writeFile(psPath, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await chmod(psPath, 0o755);
   return { binDir, logPath };
 }
 
@@ -648,7 +653,7 @@ describe("doctor's managed runtime process check", () => {
     command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
   };
 
-  /** A `ps` that fails, so a doctor that reads the host's table cannot find it supported. */
+  /** A `ps` that fails, so a doctor that reads the host's processes cannot find them supported. */
   async function failingPs(): Promise<string> {
     const binDir = await mkdtemp(join(tmpdir(), "zitadel-failing-ps-"));
     tempDirs.push(binDir);
@@ -657,7 +662,7 @@ describe("doctor's managed runtime process check", () => {
     return binDir;
   }
 
-  async function doctorSeeing(processes: Parameters<typeof runCliForTest>[3]) {
+  async function doctorOn(servers: LocalServers) {
     const cwd = await makeHealthyProject();
     const fake = await fakeDocker();
     const res = await runCliForTest(
@@ -676,13 +681,13 @@ describe("doctor's managed runtime process check", () => {
         DOCKER_LOG: fake.logPath,
       },
       undefined,
-      processes,
+      doctorSeeing(servers),
     );
     return parseJson(res.stdout);
   }
 
-  it("reports the managed processes of the table it is given", async () => {
-    const json = await doctorSeeing([HOST_WIDE_SERVER]);
+  it("reports the servers of the machine it is given", async () => {
+    const json = await doctorOn(aMachineRunning(HOST_WIDE_SERVER));
 
     expect(json).toMatchObject({
       data: {
@@ -701,8 +706,8 @@ describe("doctor's managed runtime process check", () => {
     });
   });
 
-  it("reports none for an empty table, whatever the host runs", async () => {
-    const json = await doctorSeeing([]);
+  it("reports none for a machine running none, whatever the host runs", async () => {
+    const json = await doctorOn(aMachineRunning());
 
     expect(json).toMatchObject({
       data: {

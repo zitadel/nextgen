@@ -1,8 +1,6 @@
 import { execFile } from "node:child_process";
 import { basename } from "node:path";
 
-import { installedProcessTable, type ProcessRow, type ProcessTable } from "./process-table";
-
 export type ManagedRuntimeProcess = Readonly<{
   command: string;
   data_dir?: string;
@@ -17,41 +15,52 @@ export type ManagedRuntimeDiscovery = Readonly<{
   supported: boolean;
 }>;
 
-/** The real table: `ps`. The only reader of the host's processes. */
-export const psProcessTable: ProcessTable = {
-  async list(timeoutMs) {
-    return parsePsRows(await runPs(["axo", "pid=,ppid=,command="], timeoutMs));
-  },
-  commandOf: hydrateCommand,
-};
+/**
+ * Which CLI-managed local Zitadel servers are running on the machine, whichever
+ * directory started them. Everything that asks goes through this, so a test can
+ * answer for the machine instead of reading it.
+ */
+export interface LocalServers {
+  current(opts?: { readonly timeoutMs?: number }): Promise<ManagedRuntimeDiscovery>;
+}
 
-export async function discoverManagedRuntimeProcesses(opts?: {
-  readonly timeoutMs?: number;
-}): Promise<ManagedRuntimeDiscovery> {
-  if (process.platform === "win32") {
-    return { supported: false, processes: [], error: "process sweep is not available on Windows" };
+type ProcessRow = Readonly<{
+  command: string;
+  pid: number;
+  ppid?: number;
+}>;
+
+/** The real answer: the machine's processes, read with `ps`. */
+export class PsLocalServers implements LocalServers {
+  async current(opts?: { readonly timeoutMs?: number }): Promise<ManagedRuntimeDiscovery> {
+    if (process.platform === "win32") {
+      return {
+        supported: false,
+        processes: [],
+        error: "process sweep is not available on Windows",
+      };
+    }
+
+    const timeoutMs = opts?.timeoutMs ?? 1000;
+    let rows: ReadonlyArray<ProcessRow>;
+    try {
+      rows = parsePsRows(await runPs(["axo", "pid=,ppid=,command="], timeoutMs));
+    } catch (error) {
+      return { supported: false, processes: [], error: errorMessage(error) };
+    }
+
+    const candidates = rows.filter((row) => isRuntimeCandidate(row.command));
+    const hydrated = await Promise.all(
+      candidates.map(async (row) => ({
+        ...row,
+        command: await hydrateCommand(row.pid, row.command, timeoutMs),
+      })),
+    );
+    const processes = hydrated
+      .map(toManagedRuntimeProcess)
+      .filter((candidate): candidate is ManagedRuntimeProcess => candidate !== undefined);
+    return { supported: true, processes: uniqueByPid(processes) };
   }
-
-  const table = installedProcessTable() ?? psProcessTable;
-  const timeoutMs = opts?.timeoutMs ?? 1000;
-  let rows: ReadonlyArray<ProcessRow>;
-  try {
-    rows = await table.list(timeoutMs);
-  } catch (error) {
-    return { supported: false, processes: [], error: errorMessage(error) };
-  }
-
-  const candidates = rows.filter((row) => isRuntimeCandidate(row.command));
-  const hydrated = await Promise.all(
-    candidates.map(async (row) => ({
-      ...row,
-      command: await table.commandOf(row.pid, row.command, timeoutMs),
-    })),
-  );
-  const processes = hydrated
-    .map(toManagedRuntimeProcess)
-    .filter((candidate): candidate is ManagedRuntimeProcess => candidate !== undefined);
-  return { supported: true, processes: uniqueByPid(processes) };
 }
 
 function runPs(args: string[], timeoutMs: number): Promise<string> {
