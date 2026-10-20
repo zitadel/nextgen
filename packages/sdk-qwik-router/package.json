@@ -45,7 +45,8 @@
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
-    "@zitadel/sdk-core": "workspace:*"
+    "@zitadel/sdk-core": "workspace:*",
+    "ufo": "catalog:"
   },
   "peerDependencies": {
     "@qwik.dev/core": "^2.0.0-beta.45",

@@ -7,6 +7,8 @@
 
 import type { JwtPayload } from "./jwt.js";
 
+import { joinURL } from "ufo";
+
 import { isJwtShaped, verifyJwt } from "./jwt.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -554,11 +556,14 @@ async function retiresSharedSession(
   const cookie = `${SERVER_SESSION_COOKIE}=${token}`;
   let res: Response;
   try {
-    res = await fetch(`${upstream.url}/sessions/me?project_id=${encodeURIComponent(projectId)}`, {
-      method: "GET",
-      headers: { cookie },
-      signal: AbortSignal.timeout(upstream.timeoutMs),
-    });
+    res = await fetch(
+      `${joinURL(upstream.url, "/sessions/me")}?project_id=${encodeURIComponent(projectId)}`,
+      {
+        method: "GET",
+        headers: { cookie },
+        signal: AbortSignal.timeout(upstream.timeoutMs),
+      },
+    );
   } catch {
     return false;
   }
@@ -581,7 +586,7 @@ async function retiresSharedSession(
     // Logout needs no CSRF token (ADR 053 §5); a call without an Origin is no
     // cross-site request. A failed revoke still clears the cookie: the
     // browser no longer holds the session.
-    await fetch(`${upstream.url}/sessions/me`, {
+    await fetch(joinURL(upstream.url, "/sessions/me"), {
       method: "DELETE",
       headers: { cookie },
       signal: AbortSignal.timeout(upstream.timeoutMs),
@@ -929,7 +934,7 @@ export async function checkOpaqueSessionToken(
   if (otherProjectSessions.knows(key)) {
     return { verdict: "live", session: noUser() };
   }
-  const endpoint = `${issuerUrl}/sessions/me`;
+  const endpoint = joinURL(issuerUrl, "/sessions/me");
   try {
     const res = await fetch(`${endpoint}?project_id=${encodeURIComponent(projectId)}`, {
       method: "GET",

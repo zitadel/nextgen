@@ -10,8 +10,8 @@ dependsOn:
 tasks:
   typecheck:
     deps:
-      - "components:build"
-      - "sdk-core:build"
+      # client.edge.test.ts imports this package's built dist.
+      - "build"
 
   build:
     deps:
