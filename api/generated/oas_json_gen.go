@@ -14373,6 +14373,70 @@ func (s BuildReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case FlowdefInvalidBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.invalid")
+		{
+			s := s.FlowdefInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpFieldImmutableBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.field_immutable")
+		{
+			s := s.IdpFieldImmutable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpNotFoundBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.not_found")
+		{
+			s := s.IdpNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalBuildReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -14389,11 +14453,187 @@ func (s BuildReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedBuildReleaseErrorResponse:
+	case SchFetchDeniedBuildReleaseErrorResponse:
 		e.FieldStart("code")
-		e.Str("not_implemented")
+		e.Str("sch.fetch_denied")
 		{
-			s := s.NotImplemented
+			s := s.SchFetchDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchDowngradeBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_downgrade")
+		{
+			s := s.SchFetchDowngrade
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTimeoutBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_timeout")
+		{
+			s := s.SchFetchTimeout
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTooLargeBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_too_large")
+		{
+			s := s.SchFetchTooLarge
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTooManyRedirectsBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_too_many_redirects")
+		{
+			s := s.SchFetchTooManyRedirects
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchNotFoundBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.not_found")
+		{
+			s := s.SchNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelInvalidBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.invalid")
+		{
+			s := s.RelInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotFoundBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelPermissionDeniedBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.permission_denied")
+		{
+			s := s.RelPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelProjectNotFoundBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.project_not_found")
+		{
+			s := s.RelProjectNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevisionUnpinnableBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revision_unpinnable")
+		{
+			s := s.RelRevisionUnpinnable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelUnresolvedReferenceBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.unresolved_reference")
+		{
+			s := s.RelUnresolvedReference
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -14410,6 +14650,22 @@ func (s BuildReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case FlowdefSchemaFetchFailedBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.schema_fetch_failed")
+		{
+			s := s.FlowdefSchemaFetchFailed
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -14450,14 +14706,62 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedBuildReleaseErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidBuildReleaseErrorResponse
+					found = true
+				case "flowdef.invalid":
+					s.Type = FlowdefInvalidBuildReleaseErrorResponse
+					found = true
+				case "idp.field_immutable":
+					s.Type = IdpFieldImmutableBuildReleaseErrorResponse
+					found = true
+				case "idp.not_found":
+					s.Type = IdpNotFoundBuildReleaseErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalBuildReleaseErrorResponse
 					found = true
-				case "not_implemented":
-					s.Type = NotImplementedBuildReleaseErrorResponse
+				case "sch.fetch_denied":
+					s.Type = SchFetchDeniedBuildReleaseErrorResponse
+					found = true
+				case "sch.fetch_downgrade":
+					s.Type = SchFetchDowngradeBuildReleaseErrorResponse
+					found = true
+				case "sch.fetch_timeout":
+					s.Type = SchFetchTimeoutBuildReleaseErrorResponse
+					found = true
+				case "sch.fetch_too_large":
+					s.Type = SchFetchTooLargeBuildReleaseErrorResponse
+					found = true
+				case "sch.fetch_too_many_redirects":
+					s.Type = SchFetchTooManyRedirectsBuildReleaseErrorResponse
+					found = true
+				case "sch.not_found":
+					s.Type = SchNotFoundBuildReleaseErrorResponse
+					found = true
+				case "rel.invalid":
+					s.Type = RelInvalidBuildReleaseErrorResponse
+					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundBuildReleaseErrorResponse
+					found = true
+				case "rel.permission_denied":
+					s.Type = RelPermissionDeniedBuildReleaseErrorResponse
+					found = true
+				case "rel.project_not_found":
+					s.Type = RelProjectNotFoundBuildReleaseErrorResponse
+					found = true
+				case "rel.revision_unpinnable":
+					s.Type = RelRevisionUnpinnableBuildReleaseErrorResponse
+					found = true
+				case "rel.unresolved_reference":
+					s.Type = RelUnresolvedReferenceBuildReleaseErrorResponse
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidBuildReleaseErrorResponse
+					found = true
+				case "flowdef.schema_fetch_failed":
+					s.Type = FlowdefSchemaFetchFailedBuildReleaseErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -14477,16 +14781,80 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
+	case EvtInvalidBuildReleaseErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefInvalidBuildReleaseErrorResponse:
+		if err := s.FlowdefInvalid.Decode(d); err != nil {
+			return err
+		}
+	case IdpFieldImmutableBuildReleaseErrorResponse:
+		if err := s.IdpFieldImmutable.Decode(d); err != nil {
+			return err
+		}
+	case IdpNotFoundBuildReleaseErrorResponse:
+		if err := s.IdpNotFound.Decode(d); err != nil {
+			return err
+		}
 	case InternalBuildReleaseErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedBuildReleaseErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
+	case SchFetchDeniedBuildReleaseErrorResponse:
+		if err := s.SchFetchDenied.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchDowngradeBuildReleaseErrorResponse:
+		if err := s.SchFetchDowngrade.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTimeoutBuildReleaseErrorResponse:
+		if err := s.SchFetchTimeout.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTooLargeBuildReleaseErrorResponse:
+		if err := s.SchFetchTooLarge.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTooManyRedirectsBuildReleaseErrorResponse:
+		if err := s.SchFetchTooManyRedirects.Decode(d); err != nil {
+			return err
+		}
+	case SchNotFoundBuildReleaseErrorResponse:
+		if err := s.SchNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelInvalidBuildReleaseErrorResponse:
+		if err := s.RelInvalid.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundBuildReleaseErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelPermissionDeniedBuildReleaseErrorResponse:
+		if err := s.RelPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case RelProjectNotFoundBuildReleaseErrorResponse:
+		if err := s.RelProjectNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevisionUnpinnableBuildReleaseErrorResponse:
+		if err := s.RelRevisionUnpinnable.Decode(d); err != nil {
+			return err
+		}
+	case RelUnresolvedReferenceBuildReleaseErrorResponse:
+		if err := s.RelUnresolvedReference.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidBuildReleaseErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefSchemaFetchFailedBuildReleaseErrorResponse:
+		if err := s.FlowdefSchemaFetchFailed.Decode(d); err != nil {
 			return err
 		}
 	default:
