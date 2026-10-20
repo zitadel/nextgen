@@ -1,3 +1,6 @@
+import type { ClassList, HTMLElementAttrs } from "@qwik.dev/core";
+import type { StandardAttributeProps } from "@zitadel/sdk-core/types";
+
 /**
  * Re-exports the shared SPA widget types from `@zitadel/sdk-core`.
  *
@@ -7,3 +10,12 @@
  * of the browser SDK surface.
  */
 export type * from "@zitadel/sdk-core/types";
+
+/**
+ * The standard HTML attributes a widget wrapper accepts besides its own props,
+ * and nothing else, so no prop the type accepts is dropped. They are passed to
+ * the widget element.
+ */
+export type ZitadelWidgetAttributes = StandardAttributeProps<
+  HTMLElementAttrs & { class?: ClassList }
+>;
