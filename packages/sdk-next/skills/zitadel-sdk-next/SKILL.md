@@ -81,11 +81,16 @@ patcher emits `middleware.ts` for Next 15 and `proxy.ts` for Next 16+.
 **2. Read the session server-side** with `auth()` (it re-verifies the tunnelled
 token — the header alone is never trusted):
 
-```ts
+```tsx
 import { auth } from '@zitadel/sdk-next/server';
 
-const session = await auth();
-if (!session.isAuthenticated) return <p>Not signed in</p>;
+// Render <Greeting /> inside <Suspense>: with Cache Components on (the
+// create-next-app default), Next.js refuses request data outside it.
+async function Greeting() {
+  const session = await auth();
+  if (!session.isAuthenticated) return <p>Not signed in</p>;
+  return <p>Hello {session.session.display ?? session.session.userId}</p>;
+}
 ```
 
 **3. Seed client components** by rendering `NextgenProvider` (server-only — it

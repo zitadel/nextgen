@@ -113,6 +113,9 @@ describe("NextPatcher.plan", () => {
 
     expect(homePage).toContain(MANAGED_MARKER);
     expect(homePage).toContain('redirect("/login")');
+    // Cache Components' dev server logs the redirect as a failed instant
+    // validation on every GET / unless the page opts out.
+    expect(homePage).toContain("export const instant = false;");
     expect(homePage).not.toContain("Sign in, create an account");
   });
 

@@ -90,9 +90,18 @@ The Next.js SDK wires App Router applications through one server-side middleware
 Read auth state in a server component:
 
 ```tsx
-import { auth } from "@zitadel/sdk-next";
+import { auth } from "@zitadel/sdk-next/server";
+import { Suspense } from "react";
 
-export default async function Page() {
+export default function Page() {
+  return (
+    <Suspense fallback={<p>Loading…</p>}>
+      <Greeting />
+    </Suspense>
+  );
+}
+
+async function Greeting() {
   const session = await auth();
   if (!session.isAuthenticated) return <p>Not signed in</p>;
 
@@ -101,7 +110,9 @@ export default async function Page() {
 }
 ```
 
-`auth()` sees a session only on routes the middleware's `matcher` covers.
+`auth()` reads the request, so the component that calls it renders inside `<Suspense>`: with Cache Components on, which `create-next-app` enables, Next.js refuses request data outside it.
+
+`auth()` sees a session only on routes the middleware's `matcher` covers. Add the page's route to the `matcher` in `proxy.ts`, for example `"/dashboard/:path*"`.
 
 ## Widget events
 
