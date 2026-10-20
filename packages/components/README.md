@@ -273,7 +273,8 @@ The published package closes the shadow roots of `<zitadel-login>`, `<zitadel-se
 
 What closed roots do not protect against:
 
-- A script that runs before the widget loads. It can patch `Element.prototype.attachShadow` and keep the root, or replace the element classes, and nothing in the widget can tell.
+- A script that runs before the widget loads, or that tampers with the page's DOM built-ins or with objects it hands the widget. It can patch `Element.prototype.attachShadow` and keep the root, replace the element classes, attach a root to an element before the widget upgrades it, or read the root while the widget renders through a patched built-in or a getter on a `branding` or `locales` object, and nothing in the widget can tell.
+- Values the widget itself publishes. A closed root hides the inner nodes, not what the widget chooses to put in an event detail or on its host, which is why the input events and the host state must never carry a secret.
 - Native keyboard events. The browser composes `keydown`, `keyup` and `beforeinput` out of every shadow root, so a page-level listener still sees each key press and its `key`, as it would for any text field on the page.
 - A script that already runs in the page's origin with the access to do worse, such as reading `document.cookie` or the DOM around the widget.
 

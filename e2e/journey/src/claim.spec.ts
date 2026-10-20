@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import {
   expect,
   identity,
+  openShadowRoots,
   registerWithPassword,
   widgetTest as test,
 } from "@zitadel/testing/playwright";
@@ -106,6 +107,7 @@ test("the setup admin can add and remove a project admin, and the colleague sees
   // against the caller's home project, so a colleague registered in the app
   // project is silently not granted (#1295).
   const colleagueContext = await browser.newContext();
+  await openShadowRoots(colleagueContext);
   try {
     const colleaguePage = await colleagueContext.newPage();
     await colleaguePage.goto(`${serverOrigin}/ui/console/login`);

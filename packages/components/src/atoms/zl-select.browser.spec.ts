@@ -146,4 +146,30 @@ describe("<zl-select> form participation (chromium)", () => {
     select.focus();
     expect(select.shadowRoot?.activeElement).toBe(native(select));
   });
+
+  describe("inside another element's closed shadow root", () => {
+    async function mountNested(): Promise<ZlSelect> {
+      const wrapper = document.createElement("div");
+      host.appendChild(wrapper);
+      const select = document.createElement("zl-select") as ZlSelect;
+      select.options = OPTIONS;
+      wrapper.attachShadow({ mode: "closed" }).appendChild(select);
+      await select.updateComplete;
+      select.open = true;
+      await select.updateComplete;
+      return select;
+    }
+
+    it("stays open for a press on itself", async () => {
+      const select = await mountNested();
+      select.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
+      expect(select.open).toBe(true);
+    });
+
+    it("closes for a press elsewhere on the page", async () => {
+      const select = await mountNested();
+      document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      expect(select.open).toBe(false);
+    });
+  });
 });

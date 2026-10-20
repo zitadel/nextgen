@@ -28,6 +28,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { type Browser, type Page, chromium, errors } from "@playwright/test";
+import { openShadowRoots } from "@zitadel/testing/playwright";
 
 import { completeLogin } from "../support/sign-in";
 
@@ -257,6 +258,7 @@ let sessionDir: string | undefined;
 try {
   sessionDir = await mkdtemp(join(tmpdir(), "console-screenshots-"));
   const signInContext = await browser.newContext();
+  await openShadowRoots(signInContext);
   const page = await signInContext.newPage();
   console.log(`signing in to ${origin} as ${user.email}`);
   const project = await signIn(page);

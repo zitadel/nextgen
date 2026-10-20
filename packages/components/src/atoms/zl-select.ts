@@ -92,13 +92,15 @@ export class ZlSelect extends FormAtom {
   override connectedCallback(): void {
     super.connectedCallback();
     this.syncFormState();
-    document.addEventListener("pointerdown", this.handleDocumentPointerDown, true);
+    this.addEventListener("pointerdown", this.markPointerDown);
+    document.addEventListener("pointerdown", this.handleDocumentPointerDown);
     document.addEventListener("keydown", this.handleDocumentKeydown, true);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener("pointerdown", this.handleDocumentPointerDown, true);
+    this.removeEventListener("pointerdown", this.markPointerDown);
+    document.removeEventListener("pointerdown", this.handleDocumentPointerDown);
     document.removeEventListener("keydown", this.handleDocumentKeydown, true);
   }
 
@@ -290,8 +292,21 @@ export class ZlSelect extends FormAtom {
     }
   }
 
+  /**
+   * Pointer presses that landed on this select. The document listener cannot
+   * tell from `composedPath()`: when the select sits inside another element's
+   * closed root, the path a document listener sees omits it, so every press
+   * would read as outside and close the popup before an option is chosen.
+   */
+  private readonly pressedHere = new WeakSet<Event>();
+
+  private markPointerDown = (event: Event): void => {
+    this.pressedHere.add(event);
+  };
+
+  // Bubble phase, so the host's own listener has marked the press by now.
   private handleDocumentPointerDown = (event: Event): void => {
-    if (this.open && !event.composedPath().includes(this)) {
+    if (this.open && !this.pressedHere.has(event)) {
       this.open = false;
     }
   };
