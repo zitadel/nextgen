@@ -53,7 +53,9 @@ The Lit atoms (`<zl-*>`) and the orchestrators under `src/orchestrator/`
 ### Input atoms expose a real native control
 
 Agents, Playwright, password managers and screen readers drive native controls
-and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM.
+and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM. The
+roots they sit in are closed in a shipped build and open under test
+([Shadow roots](#shadow-roots)).
 
 - The operable control is native: `<zl-field>` an `<input>`, `<zl-checkbox>`
   an `<input type="checkbox">`, `<zl-select>` a `<select>` with real
@@ -61,8 +63,6 @@ and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM.
 - It carries `data-testid="zitadel-<kind>-<name>"`, re-dispatches a composed
   `change` (and `input`) across the shadow boundary, and keeps
   `setFormValue()` in sync on every change.
-- It sits in a shadow root that is closed in a shipped build, so tests reach it
-  with the open roots the test builds have ([Shadow roots](#shadow-roots)).
 - Hide it with `opacity: 0` and `pointer-events: none`, never `display: none`,
   `visibility: hidden` or `aria-hidden`.
 - Styling it cannot take (a custom popup) is a pointer-only layer:
