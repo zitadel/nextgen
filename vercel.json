@@ -98,6 +98,11 @@
       "source": "/storybook",
       "destination": "/storybook/",
       "permanent": true
+    },
+    {
+      "source": "/changelog/",
+      "destination": "/changelog",
+      "permanent": true
     }
   ],
   "rewrites": [
