@@ -125,8 +125,12 @@ func TestEnsureSQLiteSeedsAUsableProject(t *testing.T) {
 	}
 
 	// The user schema registrations validate against.
-	_, err = pool.Statements().GetJSONSchemaByID(ctx, projectID, schemas.DefaultHumanUserSchemaURL(testSchemaBase))
-	assert.NoError(t, err, "a project with no user schema cannot register anyone")
+	userSchema, err := pool.Statements().GetJSONSchemaByID(ctx, projectID, schemas.DefaultHumanUserSchemaURL(testSchemaBase))
+	require.NoError(t, err, "a project with no user schema cannot register anyone")
+
+	// The platform variant, not the default (its shape is pinned in
+	// platform_schema_test.go).
+	assert.Equal(t, []string{schemas.PlatformDisplayNameProperty}, domain.DesignatedDisplay(userSchema.Schema))
 
 	// The login flows the registration walks through. Their ids are minted at
 	// insert, so this counts them against the same defaults the seeding builds
