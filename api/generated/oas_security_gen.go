@@ -72,6 +72,7 @@ var operationRolesNextgenSession = map[string][]string{
 	ListSchemasOperation:           []string{},
 	ListUserIdentityLinksOperation: []string{},
 	ListUserPasskeysOperation:      []string{},
+	ListUserTeamsOperation:         []string{},
 	PatchMyUserOperation:           []string{},
 	PatchProjectOperation:          []string{},
 	QueryGrantsOperation:           []string{},
