@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Layers3 } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 
 import { api } from "@/api/zitadel";
+import { DeploySheet } from "@/components/deploy-sheet";
 import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
 import { CARD_HEADING, DetailPanel, DetailSection, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
@@ -16,6 +17,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/date";
 import { listReleaseDeployments } from "@/lib/deployment";
@@ -33,9 +35,10 @@ import {
  * Release detail: the header, the configuration the release pins, where it
  * went, and its metadata.
  *
- * The design also draws the actions on a release: **Deploy** in the header
- * and **Redeploy**, **Rollback** and **Revoke release** under its menu. They
- * are #1857's, once the API serves the writes.
+ * **Deploy release** in the header opens the drawer with this release fixed,
+ * while the release is not revoked. The design also draws a menu beside it
+ * with **Redeploy**, **Rollback** and **Revoke release**; those are #1857's,
+ * once the API serves the writes.
  *
  * The pointers fail soft; the release and deployment reads are what the
  * route's error state reports.
@@ -62,6 +65,7 @@ export const Route = createFileRoute("/_authed/releases/$releaseId")({
 
 function ReleaseDetail() {
   const { release, groups, deployments } = Route.useLoaderData();
+  const router = useRouter();
 
   return (
     <div className={`${DETAIL_PANEL_PAGE} flex flex-col gap-6`}>
@@ -73,11 +77,26 @@ function ReleaseDetail() {
             <ReleaseStatusBadge status={releaseStatus(release)} />
           </div>
 
-          <MetaCard bordered={false}>
-            <MetaValue label="Release ID" value={release.id} size="sm" copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(release.metadata.created_at)} size="sm" />
-          </MetaCard>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+            <MetaCard bordered={false}>
+              <MetaValue label="Release ID" value={release.id} size="sm" copyable />
+              <MetaRule />
+              <MetaValue
+                label="Created"
+                value={formatDate(release.metadata.created_at)}
+                size="sm"
+              />
+            </MetaCard>
+            {/* A revoked release can never be served again, so there is nothing
+                to deploy it to. The new deployment lands in the card below. */}
+            {releaseStatus(release) === "active" && (
+              <DeploySheet release={release} onDeployed={() => router.invalidate()}>
+                <Button size="sm" className="w-fit gap-1 px-2.5 text-xs">
+                  Deploy release
+                </Button>
+              </DeploySheet>
+            )}
+          </div>
         </div>
 
         <Separator />

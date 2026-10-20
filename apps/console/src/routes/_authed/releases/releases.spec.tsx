@@ -18,6 +18,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 const API = "http://localhost/api";
 const RELEASES_URL = `${API}/releases`;
 const DEPLOYMENTS_URL = `${API}/deployments`;
+const PROJECT_URL = `${API}/projects/proj_test`;
 
 const CREATED_AT = "2026-07-12T16:59:04Z";
 
@@ -290,5 +291,61 @@ describe("release detail", () => {
     await renderAt("/releases/rel_1");
     await screen.findByRole("heading", { name: "rel_1" });
     expect(seen.sort()).toEqual(["deployments:proj_test", "release:proj_test", "schema:proj_test"]);
+  });
+});
+
+describe("deploy from the release", () => {
+  it("deploys this release to the primary origins from the header", async () => {
+    servePointers();
+    let posted: { projectId: string | null; body: unknown } | undefined;
+    server.use(
+      http.get(`${API}/releases/rel_1`, () => HttpResponse.json(release())),
+      http.get(PROJECT_URL, () =>
+        HttpResponse.json({
+          id: "proj_test",
+          name: "Test project",
+          origins: [{ pattern: "https://app.acme.com", kind: "primary" }],
+          created_at: CREATED_AT,
+          updated_at: CREATED_AT,
+        }),
+      ),
+      http.post(DEPLOYMENTS_URL, async ({ request }) => {
+        posted = {
+          projectId: new URL(request.url).searchParams.get("project_id"),
+          body: await request.json(),
+        };
+        return HttpResponse.json(deployment("dep_new"), { status: 201 });
+      }),
+    );
+    await renderAt("/releases/rel_1");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Deploy release" }));
+    const drawer = await screen.findByRole("dialog", { name: "Deploy release" });
+    const inDrawer = within(drawer);
+    // The release is this one, and not for picking; no list of releases is read.
+    const picker = inDrawer.getByRole("combobox", { name: "Release" });
+    expect(picker).toHaveTextContent("rel_1");
+    expect(picker).toBeDisabled();
+    await inDrawer.findByRole("link", { name: "https://app.acme.com" });
+    await userEvent.click(inDrawer.getByRole("button", { name: "Deploy release" }));
+
+    expect(await screen.findByText("Release deployed")).toBeInTheDocument();
+    expect(posted).toEqual({
+      projectId: "proj_test",
+      body: { release_id: "rel_1", targets: ["primary"] },
+    });
+  });
+
+  it("offers no deploy on a revoked release", async () => {
+    servePointers();
+    server.use(
+      http.get(`${API}/releases/rel_1`, () =>
+        HttpResponse.json(release({ revoked_at: "2026-10-01T00:00:00Z" })),
+      ),
+    );
+    await renderAt("/releases/rel_1");
+
+    expect(await screen.findByRole("heading", { name: "rel_1" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Deploy release" })).not.toBeInTheDocument();
   });
 });
