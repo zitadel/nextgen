@@ -17,6 +17,23 @@ import (
 
 func newMockedReleaseServiceWithBranding(t *testing.T) (service.ReleaseService, *servicemocks.MockAllStatements) {
 	t.Helper()
+	pool, statements := mockedBuildPool(t)
+	return service.NewReleaseService(pool, nil, nil, service.NewBrandingService(pool), nil, testBuiltinBases), statements
+}
+
+// newMockedReleaseServiceWithSchemas builds with the schema writer. Its
+// resolver is nil, so a Build that tried to fetch a schema would panic.
+func newMockedReleaseServiceWithSchemas(t *testing.T) (service.ReleaseService, *servicemocks.MockAllStatements) {
+	t.Helper()
+	pool, statements := mockedBuildPool(t)
+	schemas := service.NewSchemaService(pool, nil, nil, testBuiltinBases)
+	return service.NewReleaseService(pool, schemas, nil, nil, nil, testBuiltinBases), statements
+}
+
+// mockedBuildPool runs every transaction inline on statements and accepts
+// every event.
+func mockedBuildPool(t *testing.T) (*service.DB, *servicemocks.MockAllStatements) {
+	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
@@ -30,8 +47,7 @@ func newMockedReleaseServiceWithBranding(t *testing.T) (service.ReleaseService, 
 		AnyTimes()
 	statementer.EXPECT().Statements().Return(statements).AnyTimes()
 	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	branding := service.NewBrandingService(service.NewPool(pool))
-	return service.NewReleaseService(service.NewPool(pool), nil, nil, branding, nil), statements
+	return service.NewPool(pool), statements
 }
 
 func TestBuildRelease_EmptyBundle(t *testing.T) {
@@ -225,4 +241,63 @@ func TestBuildRelease_CreateReleaseFailurePropagates(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to build release")
+}
+
+// A bundle may name a built-in schema by URL under a base the project was not
+// seeded under: Build reuses the row the project stores under the other base
+// and pins it, as Create does.
+func TestBuildRelease_ReusesBuiltinSchemaUnderAnotherBase(t *testing.T) {
+	t.Parallel()
+	const asked = "https://schemas.test/builtin/v0/default-human-user.json"
+	const stored = "https://schemas.test/builtin/v1/default-human-user.json"
+	svc, statements := newMockedReleaseServiceWithSchemas(t)
+
+	statements.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", asked).Return(nil, new(database.NoRowFoundError))
+	statements.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", stored).Return(&domain.JSONSchema{
+		ProjectID:  "proj_1",
+		URL:        stored,
+		ObjectType: new("human-user"),
+		Schema: []byte(`{"type": "object", "x-identifier": "email",
+			"x-auth-methods": {"password": {"enabled": true}},
+			"properties": {"email": {"type": "string", "format": "email", "x-unique": "team"}}}`),
+	}, nil)
+	statements.EXPECT().
+		GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).
+		Return(nil, new(database.NoRowFoundError))
+	statements.EXPECT().
+		CreateRelease(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, rel *domain.Release) error {
+			rel.ID = "rel_new"
+			return nil
+		})
+
+	result, err := svc.Build(t.Context(), service.BuildReleaseInput{
+		ProjectID: "proj_1",
+		Schemas:   []service.BuildSchema{{Index: 0, URL: asked}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []domain.ReleasePointer{
+		{Kind: domain.ReleasePointerKindSchema, Handle: "human-user", RevisionID: stored},
+	}, result.Release.Pointers)
+}
+
+// A URL in the built-in namespace names a document the project holds or never
+// will: a miss under every base fails that bundle entry and is never fetched.
+func TestBuildRelease_NeverFetchesTheBuiltinNamespace(t *testing.T) {
+	t.Parallel()
+	svc, statements := newMockedReleaseServiceWithSchemas(t)
+	statements.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", gomock.Any()).
+		Return(nil, new(database.NoRowFoundError)).
+		Times(2)
+
+	_, err := svc.Build(t.Context(), service.BuildReleaseInput{
+		ProjectID: "proj_1",
+		Schemas:   []service.BuildSchema{{Index: 0, URL: "https://schemas.test/builtin/v0/default-human-user.json"}},
+	})
+	var bundleErr *service.BundleValidationError
+	require.ErrorAs(t, err, &bundleErr)
+	require.Len(t, bundleErr.Resources, 1)
+	assert.Equal(t, domain.ReleasePointerKindSchema, bundleErr.Resources[0].Kind)
+	assert.Equal(t, domain.ErrJSONSchemaNotFound().Code, bundleErr.Resources[0].Err.Code)
 }

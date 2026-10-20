@@ -67,7 +67,11 @@ password_hasher:
 
 schema:
   lru_cache_size: 1000
-  builtin_public_base: https://nextgen.com/api/schemas
+  # An identifier namespace stamped into schema documents, not an address:
+  # nothing under it is fetched. Every base the built-in schemas were ever
+  # published under (https://nextgen.com/api/schemas included) keeps
+  # resolving, whichever one is configured here.
+  builtin_public_base: https://zitadel.com/schemas/v1
   # Bounds one whole schema ingest by URL, every $ref fetch included.
   # Per-request limits live under httpclient.
   resolve_timeout: 30s

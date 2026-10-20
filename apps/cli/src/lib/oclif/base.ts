@@ -11,7 +11,7 @@ import { type Asker, input as askInput } from "../input";
 import { isObject } from "../json";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
-import { resolveServer } from "../server";
+import { DEFAULT_SERVER, resolveServer } from "../server";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
 import { takeReportedWarnings } from "../warnings";
@@ -638,7 +638,7 @@ function renderKnownSections(lines: string[], data: Record<string, unknown>): vo
 function sourceSuffix(opts: GlobalOptions): string {
   try {
     const url = new URL(opts.source);
-    if (url.host === "api.zitadel.cloud") {
+    if (url.host === new URL(DEFAULT_SERVER).host) {
       return "";
     }
     return `(server: ${url.host})`;

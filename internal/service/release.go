@@ -60,6 +60,9 @@ type releaseService struct {
 	flows    *flowDefinitionService
 	branding *BrandingService
 	idps     *idpConnectionService
+	// builtinBases resolves a schema given as a built-in schema's `$id` under
+	// whichever base the project stores it; the release pins the row found.
+	builtinBases domain.BuiltinSchemaBases
 }
 
 // NewReleaseService wires Build's kind writers. flows and idps are the
@@ -70,13 +73,15 @@ func NewReleaseService(
 	flows *flowDefinitionService,
 	branding *BrandingService,
 	idps *idpConnectionService,
+	builtinBases domain.BuiltinSchemaBases,
 ) ReleaseService {
 	return &releaseService{
-		v2Pool:   v2Pool,
-		schemas:  schemas,
-		flows:    flows,
-		branding: branding,
-		idps:     idps,
+		v2Pool:       v2Pool,
+		schemas:      schemas,
+		flows:        flows,
+		branding:     branding,
+		idps:         idps,
+		builtinBases: builtinBases,
 	}
 }
 
@@ -267,7 +272,7 @@ func (s *releaseService) loadContent(ctx context.Context, projectID string, requ
 	for _, pointer := range requested {
 		switch pointer.Kind {
 		case domain.ReleasePointerKindSchema:
-			schema, err := stmts.GetJSONSchemaByID(ctx, projectID, pointer.RevisionID)
+			schema, err := s.builtinBases.GetJSONSchema(ctx, stmts, projectID, pointer.RevisionID)
 			if err != nil {
 				return content, mapRevisionLookupError(err, pointer)
 			}
