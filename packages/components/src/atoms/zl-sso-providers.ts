@@ -1,10 +1,11 @@
-import { LitElement, html, nothing } from "lit";
+import { html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 import ssoStyles from "./zl-sso-providers.css?inline";
 
 import { emit } from "../internal/emit.js";
 import { parseJsonAttribute } from "../internal/json-attribute.js";
+import { ZlElement } from "../internal/shadow-root.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
@@ -59,7 +60,7 @@ const NAME_PLACEHOLDER = "{name}";
  * on that same frame, so the disabled attribute is the whole mechanism.
  */
 @customElement("zl-sso-providers")
-export class ZlSsoProviders extends LitElement {
+export class ZlSsoProviders extends ZlElement {
   static override styles = [baseHostStyles, ...surfaceStyles(ssoStyles)];
 
   /**

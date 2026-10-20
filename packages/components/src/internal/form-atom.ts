@@ -1,5 +1,6 @@
-import { LitElement } from "lit";
 import { property, state } from "lit/decorators.js";
+
+import { ZlElement } from "./shadow-root.js";
 
 /**
  * Base for the form-associated input atoms: `ElementInternals`, focus
@@ -11,8 +12,10 @@ import { property, state } from "lit/decorators.js";
  * only describes its value: how to read and write it as the string the form
  * submits (`formValue`), and where its default comes from.
  */
-export abstract class FormAtom extends LitElement {
+export abstract class FormAtom extends ZlElement {
   static formAssociated = true;
+  /** Attaches its own `ElementInternals` in the constructor; see {@link ZlElement}. */
+  static override disabledFeatures: string[] = [];
 
   /** The atom's own `disabled` attribute. See {@link isDisabled}. */
   @property({ type: Boolean, reflect: true }) accessor disabled = false;
@@ -73,7 +76,7 @@ export abstract class FormAtom extends LitElement {
   }
 
   static override shadowRootOptions: ShadowRootInit = {
-    ...LitElement.shadowRootOptions,
+    ...ZlElement.shadowRootOptions,
     delegatesFocus: true,
   };
 

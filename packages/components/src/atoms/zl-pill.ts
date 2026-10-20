@@ -1,9 +1,10 @@
-import { LitElement, html, nothing } from "lit";
+import { html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
 import pillStyles from "./zl-pill.css?inline";
 
+import { ZlElement } from "../internal/shadow-root.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, sharedStyles, surfaceStyles } from "../styles/index.js";
 
@@ -24,7 +25,7 @@ import { baseHostStyles, sharedStyles, surfaceStyles } from "../styles/index.js"
  * `tone` follows the Badge's variants.
  */
 @customElement("zl-pill")
-export class ZlPill extends LitElement {
+export class ZlPill extends ZlElement {
   static override styles = [baseHostStyles, ...surfaceStyles(sharedStyles, pillStyles)];
 
   @property() accessor tone: "neutral" | "outline" | "success" | "error" = "neutral";

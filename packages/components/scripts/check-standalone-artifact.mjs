@@ -9,7 +9,9 @@
  *   a workspace dep's dist was not built yet — see the `config:build-release`
  *   dep in moon.yml), which a browser cannot resolve;
  * - a `node:` builtin leaking in (rolldown's CJS-interop `createRequire`
- *   helper when the build platform is not "browser").
+ *   helper when the build platform is not "browser");
+ * - the shadow roots not being closed, because the `define` in
+ *   tsdown.config.ts did not reach this entry (src/internal/shadow-root.ts).
  *
  * The bundler exits successfully in both cases — only loading the file in a
  * browser fails. `components:build-release` runs this after building, and
@@ -40,6 +42,9 @@ export function findArtifactViolations(source) {
   }
   if (source.includes(`"node:`) || source.includes(`'node:`)) {
     violations.push("node: builtin import (not available in a browser)");
+  }
+  if (!/\bconst SHADOW_ROOT_MODE = "closed";/.test(source)) {
+    violations.push("shadow roots are not closed (the build-time shadow root mode is missing)");
   }
   return violations;
 }

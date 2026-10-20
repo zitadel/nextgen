@@ -1,7 +1,16 @@
 ### Driving the login UI
 
 `<zitadel-login>`, `<zitadel-session>`, and `<zitadel-logout>` are Lit elements
-with open shadow roots. The stable automation hooks live inside nested shadow roots, so a flat
+whose shadow roots the published package closes, so a script on the page cannot
+read a field and a driver that walks the DOM cannot see inside them. Open them
+first: with Playwright call `openShadowRoots(page)` from
+`@zitadel/testing/playwright` (its `test` and `widgetTest` do it for you) before
+the first navigation, and with any other driver add an init script that
+replaces `Element.prototype.attachShadow` so it always attaches with
+`mode: "open"`. Drivers that read the browser's accessibility tree see the fields
+without this.
+
+Once open, the stable automation hooks live inside nested shadow roots, so a flat
 `document.querySelector('[data-testid="zitadel-input-email"]')` will not find
 the native control. Browser drivers with shadow-DOM-aware locators, such as
 Playwright, can target the hooks directly. Generic DOM-eval drivers should

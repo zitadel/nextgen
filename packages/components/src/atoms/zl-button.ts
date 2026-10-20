@@ -1,10 +1,11 @@
-import { LitElement, html, nothing } from "lit";
+import { html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
 import buttonStyles from "./zl-button.css?inline";
 
 import { emit } from "../internal/emit.js";
+import { ownRoot, ZlElement } from "../internal/shadow-root.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
@@ -33,11 +34,13 @@ import "./zl-icon.js";
  * Enter-to-submit pipe still fires the host form.
  */
 @customElement("zl-button")
-export class ZlButton extends LitElement {
+export class ZlButton extends ZlElement {
   static formAssociated = true;
+  /** Attaches its own `ElementInternals` in the constructor; see {@link ZlElement}. */
+  static override disabledFeatures: string[] = [];
 
   static override shadowRootOptions: ShadowRootInit = {
-    ...LitElement.shadowRootOptions,
+    ...ZlElement.shadowRootOptions,
     delegatesFocus: true,
   };
 
@@ -87,7 +90,7 @@ export class ZlButton extends LitElement {
   }
 
   override focus(options?: FocusOptions): void {
-    this.shadowRoot?.querySelector<HTMLButtonElement>("button")?.focus(options);
+    ownRoot(this)?.querySelector<HTMLButtonElement>("button")?.focus(options);
   }
 
   override render() {
@@ -131,12 +134,20 @@ export class ZlButton extends LitElement {
     `;
   }
 
+  /**
+   * Clicks the inner button already activated. The host listener skips them
+   * rather than reading `composedPath()[0]`: with a closed root the path hides
+   * the inner button, so every click would look like one on the host.
+   */
+  private readonly activated = new WeakSet<Event>();
+
   private handleClick = (event: MouseEvent): void => {
+    this.activated.add(event);
     this.activate(event);
   };
 
   private handleHostClick = (event: MouseEvent): void => {
-    if (event.composedPath()[0] !== this) return;
+    if (this.activated.has(event)) return;
     this.activate(event);
   };
 

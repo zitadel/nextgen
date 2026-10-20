@@ -1,4 +1,4 @@
-import { LitElement, html, nothing } from "lit";
+import { html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide";
 
+import { ZlElement } from "../internal/shadow-root.js";
 import type { AtomManifest } from "../manifest.js";
 import { surfaceStyles } from "../styles/index.js";
 
@@ -60,7 +61,7 @@ import { surfaceStyles } from "../styles/index.js";
  * accessible name (e.g. avoids "Loading Loading" on a loading button).
  */
 @customElement("zl-icon")
-export class ZlIcon extends LitElement {
+export class ZlIcon extends ZlElement {
   /* No baseHostStyles — would force white on :host; icons inherit context color. */
   static override styles = surfaceStyles(iconStyles);
 

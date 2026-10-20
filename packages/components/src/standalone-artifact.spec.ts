@@ -34,8 +34,14 @@ describe("standalone artifact", () => {
     expect(findArtifactViolations(`const m = await import("@zitadel/config");\n`)).not.toEqual([]);
     expect(
       findArtifactViolations(
-        `import { x } from "./chunk.mjs";\nimport "/abs.mjs";\nconst d = await import("./lazy.mjs");\n`,
+        `import { x } from "./chunk.mjs";\nimport "/abs.mjs";\nconst d = await import("./lazy.mjs");\nconst SHADOW_ROOT_MODE = "closed";\n`,
       ),
     ).toEqual([]);
+  });
+
+  it("the checker refuses a build whose shadow roots are not closed", () => {
+    expect(findArtifactViolations(`const SHADOW_ROOT_MODE = "open";\n`)).not.toEqual([]);
+    expect(findArtifactViolations(`const SHADOW_ROOT_MODE = void 0;\n`)).not.toEqual([]);
+    expect(findArtifactViolations(`export const x = 1;\n`)).not.toEqual([]);
   });
 });

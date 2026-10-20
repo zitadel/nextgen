@@ -4,6 +4,7 @@ import { waitForHandshake } from "./handshake";
 import { connectZitadel } from "./index";
 import { enableVirtualPasskey, type VirtualPasskey } from "./passkey";
 import { sessionCookieName } from "./session";
+import { openShadowRoots } from "./shadow-roots";
 import type {
   ConnectedZitadel,
   Identity,
@@ -53,7 +54,20 @@ export interface ZitadelWorkerFixtures {
   zitadel: ConnectedZitadel;
 }
 
-export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
+/**
+ * Playwright's `test` for a page that mounts the login widget, with its closed
+ * shadow roots opened (see {@link openShadowRoots}) in every context of the
+ * test. The one to use when the suite needs no Zitadel instance, for example
+ * against a mock API; with an instance, use {@link test}, which does the same.
+ */
+export const widgetTest = base.extend({
+  context: async ({ context }, use) => {
+    await openShadowRoots(context);
+    await use(context);
+  },
+});
+
+export const test = widgetTest.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
   zitadel: [
     // Playwright derives fixture dependencies from the destructuring pattern,
     // so the empty pattern is required here.
@@ -107,6 +121,7 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
     }
     const session = await zitadel.seedSession({ origin: baseURL });
     const context = await browser.newContext({ baseURL });
+    await openShadowRoots(context);
     // `addCookies` takes either url or domain/path; url derives the rest. The
     // session goes in under both names, so it signs the app in whichever its
     // proxy reads: a server SDK and the dev proxy setup writes read the
@@ -145,6 +160,7 @@ export type {
   RegistrationDetails,
 } from "./flows";
 export { enableVirtualPasskey } from "./passkey";
+export { FORCE_OPEN_SHADOW_ROOTS, openShadowRoots } from "./shadow-roots";
 export type { VirtualPasskey } from "./passkey";
 export { withZitadel } from "./playwright-config";
 export type { WithZitadelOptions } from "./playwright-config";

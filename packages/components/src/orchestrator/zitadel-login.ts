@@ -10,7 +10,7 @@ import type {
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
-import { css, html, LitElement, nothing, type PropertyValues } from "lit";
+import { css, html, type LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { property } from "../internal/property.js";
 
@@ -19,6 +19,7 @@ import type { ZlFieldInputDetail, ZlSubmitDetail } from "../atoms/index.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
 import { emit } from "../internal/emit.js";
+import { ownRoot, ZlElement } from "../internal/shadow-root.js";
 import { escapeHtml } from "../internal/escape-html.js";
 import {
   exchangeSession,
@@ -164,7 +165,7 @@ function apiErrorCode(error: unknown): string {
 @customElement("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
-    ...LitElement.shadowRootOptions,
+    ...ZlElement.shadowRootOptions,
     delegatesFocus: true,
   };
 
@@ -531,13 +532,14 @@ export class ZitadelLogin extends ZitadelSurface {
     // nodes. The template's `zl-page-shell` sits in a different shadow
     // scope, so the variant reaches it as a stamped attribute, not a
     // `:host([variant])` selector.
-    if (this.shadowRoot) {
-      stampExportparts(this.shadowRoot);
+    const root = ownRoot(this);
+    if (root) {
+      stampExportparts(root);
       // A configured-but-dead logo_url/hero_url is invisible everywhere else
       // in the pipeline; this is the only layer that can see the image fail.
-      armAssetFallbacks(this.shadowRoot);
+      armAssetFallbacks(root);
       const widget = this.variant !== "page";
-      for (const shell of this.shadowRoot.querySelectorAll("zl-page-shell")) {
+      for (const shell of root.querySelectorAll("zl-page-shell")) {
         shell.toggleAttribute("data-widget", widget);
         // CSS-level so it also covers user-ejected templates: the rule in
         // layout-chrome.css hides `.zl-card-title`/`.zl-card-subtitle`
@@ -552,10 +554,10 @@ export class ZitadelLogin extends ZitadelSurface {
       // Stamped on the card too: its header REGION must leave the flex flow
       // (zl-card.css) or the card keeps a blank 32px header band — the
       // slotted headings alone going sr-only doesn't collapse the region.
-      for (const card of this.shadowRoot.querySelectorAll("zl-card")) {
+      for (const card of root.querySelectorAll("zl-card")) {
         card.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
-      this.applyPasswordToggle(this.shadowRoot);
+      this.applyPasswordToggle(root);
     }
     const previousTheme = this.lastRenderedTheme;
     this.lastRenderedTheme = this.themeController.theme;
@@ -612,7 +614,7 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private async restoreValuesAfterRender(): Promise<void> {
     await this.updateComplete;
-    const atoms = this.shadowRoot?.querySelectorAll<LitElement>(
+    const atoms = ownRoot(this)?.querySelectorAll<LitElement>(
       "zl-field, zl-select, zl-checkbox, zl-button",
     );
     if (atoms) {
@@ -1166,7 +1168,7 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /** All rendered input atoms exposing the `formValue` contract. */
   private fieldAtoms(): FieldAtom[] {
-    const root = this.shadowRoot;
+    const root = ownRoot(this);
     if (!root) return [];
     return Array.from(root.querySelectorAll<HTMLElement>("[name]")).filter(isFieldAtom);
   }
@@ -1320,7 +1322,7 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private clearStaleErrors(fieldName: string): void {
     if (!this.response?.step.error) return;
-    const root = this.shadowRoot;
+    const root = ownRoot(this);
     if (!root) return;
     if (!this.stepErrorDismissed) {
       this.stepErrorDismissed = true;
@@ -1467,7 +1469,7 @@ export class ZitadelLogin extends ZitadelSurface {
   };
 
   private findPrimaryAction(): string | null {
-    const root = this.shadowRoot;
+    const root = ownRoot(this);
     if (!root) return null;
     const primary =
       root.querySelector('zl-button[hierarchy="primary"][type="submit"]') ??
@@ -1483,7 +1485,7 @@ export class ZitadelLogin extends ZitadelSurface {
    * derives the modality from the user's actual input.
    */
   private moveFocusToFirstField(fieldsOnly = false): void {
-    const root = this.shadowRoot;
+    const root = ownRoot(this);
     if (!root) return;
     const focusables = fieldsOnly
       ? this.fieldAtoms()

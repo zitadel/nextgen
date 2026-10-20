@@ -1,4 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, widgetTest as test } from "@zitadel/testing/playwright";
 
 /**
  * Return to the protected route after sign-in. `nextgenMiddleware` sends a

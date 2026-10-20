@@ -127,10 +127,17 @@ these before writing it — don't reproduce a catalogue from memory.
 ## Gotchas
 
 - **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or give a raw `<zitadel-login>` element `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
-- **Open shadow roots, nested.** The automation hooks sit inside nested shadow
-  roots, so a flat `document.querySelector('[data-testid="zitadel-input-email"]')`
-  misses them. Use a shadow-aware locator (Playwright) or recurse through
-  `el.shadowRoot`. Enter submits the step only for key events carrying
+- **Closed shadow roots, nested.** The published package closes the roots of
+  the widget and its atoms, so a page script cannot read a field, and the
+  automation hooks inside them are out of reach of Playwright and of
+  `el.shadowRoot` until the roots are opened: call `openShadowRoots(page)` from
+  `@zitadel/testing/playwright` (its `test` and `widgetTest` already do) or add
+  an init script that forces `mode: "open"` in `Element.prototype.attachShadow`.
+  Open, the hooks sit inside nested shadow roots, so a flat
+  `document.querySelector('[data-testid="zitadel-input-email"]')` misses them;
+  use a shadow-aware locator (Playwright) or recurse through `el.shadowRoot`.
+  A closed root is no boundary against a script that runs before the widget or
+  against native key events. Enter submits the step only for key events carrying
   `key: "Enter"`; CDP wrappers that omit it should click `zitadel-action-submit`.
 - **Same-origin proxy.** The element calls the typed `@zitadel/api` fetch client
   directly with `credentials: "include"`; the stateless server's `_zflow`

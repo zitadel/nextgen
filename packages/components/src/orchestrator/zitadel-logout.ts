@@ -2,6 +2,7 @@ import { css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { property } from "../internal/property.js";
 
+import { ownRoot } from "../internal/shadow-root.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { resolveApi } from "./resolve-api.js";
 import { SessionController } from "./session-controller.js";
@@ -232,7 +233,7 @@ export class ZitadelLogout extends ZitadelConfigured {
     // call keeps the token pipeline identical to the other orchestrator
     // surfaces so a future branding input only has to change the argument.
     this.themeController.setModePreference(this.theme === "" ? undefined : this.theme, "auto");
-    const root = this.shadowRoot;
+    const root = ownRoot(this);
     if (root && !this.templateMode) {
       applyBaseTokens(root);
       applyBrandingTokens(root, undefined);
@@ -287,7 +288,7 @@ export class ZitadelLogout extends ZitadelConfigured {
     if (!this.open) return;
     if (event.key !== "Escape") return;
     this.open = false;
-    this.shadowRoot?.querySelector<HTMLButtonElement>(".trigger")?.focus();
+    ownRoot(this)?.querySelector<HTMLButtonElement>(".trigger")?.focus();
   };
 
   private toggleOpen(): void {

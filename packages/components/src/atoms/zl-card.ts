@@ -1,9 +1,10 @@
-import { LitElement, html } from "lit";
+import { html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 import cardStyles from "./zl-card.css?inline";
 
 import { lightDomSlotFilled } from "../internal/slot-filled.js";
+import { ZlElement } from "../internal/shadow-root.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
@@ -29,7 +30,7 @@ import { baseHostStyles, surfaceStyles } from "../styles/index.js";
  *               because the card only sees a flat slot.
  */
 @customElement("zl-card")
-export class ZlCard extends LitElement {
+export class ZlCard extends ZlElement {
   static override styles = [baseHostStyles, ...surfaceStyles(cardStyles)];
 
   @property({ type: Boolean, reflect: true }) accessor compact = false;

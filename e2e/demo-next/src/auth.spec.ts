@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, widgetTest as test } from "@zitadel/testing/playwright";
 
 /** The demo's project (`apps/demo-next`). */
 const DEMO_PROJECT_ID = process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "proj_demo";

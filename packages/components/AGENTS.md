@@ -61,6 +61,8 @@ and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM.
 - It carries `data-testid="zitadel-<kind>-<name>"`, re-dispatches a composed
   `change` (and `input`) across the shadow boundary, and keeps
   `setFormValue()` in sync on every change.
+- It sits in a shadow root that is closed in a shipped build, so tests reach it
+  with the open roots the test builds have ([Shadow roots](#shadow-roots)).
 - Hide it with `opacity: 0` and `pointer-events: none`, never `display: none`,
   `visibility: hidden` or `aria-hidden`.
 - Styling it cannot take (a custom popup) is a pointer-only layer:
@@ -84,6 +86,8 @@ and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM.
   both: each exercises a different SDK middleware.
 - The demos load this package's `dist/`: in a manual loop, run
   `moon run components:build` after an orchestrator change.
+- A spec that needs the shipped closed roots is `*.closed.browser.spec.ts`; it
+  runs in the `closed-roots` project and nowhere else.
 
 ### The browser project's cold start
 
@@ -101,3 +105,26 @@ test; a warm `.vitest` cache brings that down to seconds.
 
 `tsdown.config.ts` keeps `lit`, `liquidjs`, `dompurify` and `lucide` external
 in the library build so consumers share one copy; never bundle them there.
+
+## Shadow roots
+
+Every shipped element's root is closed, so a page script cannot read a field
+through `host.shadowRoot`. Test and development builds keep it open.
+
+- The mode is decided once, by `SHADOW_ROOT_MODE` in
+  `src/internal/shadow-root.ts`, which `tsdown.config.ts` closes for both
+  shipped artifacts. Never write a mode or a second flag anywhere else.
+- Every element that renders into a shadow root extends `ZlElement` from that
+  file; one that extends `LitElement` directly fails `shadow-root.spec.ts`.
+- Reach your own root with `ownRoot(this)`, never `this.shadowRoot` (`null`
+  when closed), `this.renderRoot` (withheld) or `@query` (reads `renderRoot`).
+- Never tell where an event came from with `composedPath()[0]`: a closed root
+  hides the inner nodes, so every inner event looks like the host's own.
+- Secrets never cross the shadow boundary: no secret value in an event that
+  leaves a root, in a host property or in an attribute.
+- Playwright pierces open roots only. Use `test` or `widgetTest` from
+  `@zitadel/testing/playwright`, which open them; never patch `attachShadow`
+  in a suite.
+- A closed root hides the root from a casual read, not from a script that runs
+  before the widget or from native keyboard events. Say so wherever you
+  document it, and name a cross-origin iframe as the only real isolation.

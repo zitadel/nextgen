@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, widgetTest as test } from "@zitadel/testing/playwright";
 
 /** The demo's project (`apps/demo-nuxt`). */
 const DEMO_PROJECT_ID = process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID ?? "proj_demo";

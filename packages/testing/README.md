@@ -88,6 +88,15 @@ export default defineConfig({
 });
 ```
 
+### Closed shadow roots
+
+The published `@zitadel/components` closes the shadow roots of the login widget,
+and Playwright cannot pierce a closed root. The kit's `test` opens them for
+every page and context of the test, so the helpers and your own locators keep
+working. A suite that mounts the widget without an instance (against a mock
+API, for example) uses `widgetTest`, which does only that. For a page or context
+you create by hand, call `openShadowRoots(page)` before the first navigation.
+
 ### Start tests authenticated
 
 Most app tests don't want to re-test login. `authenticatedPage` seeds a user,

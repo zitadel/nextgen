@@ -1,9 +1,10 @@
-import { LitElement, html } from "lit";
+import { html } from "lit";
 import { customElement } from "lit/decorators.js";
 
 import pageShellStyles from "./zl-page-shell.css?inline";
 
 import { lightDomSlotFilled } from "../internal/slot-filled.js";
+import { ZlElement } from "../internal/shadow-root.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
@@ -31,7 +32,7 @@ import { baseHostStyles, surfaceStyles } from "../styles/index.js";
  * survives, because it separates real content (card → attribution pill).
  */
 @customElement("zl-page-shell")
-export class ZlPageShell extends LitElement {
+export class ZlPageShell extends ZlElement {
   static override styles = [baseHostStyles, ...surfaceStyles(pageShellStyles)];
 
   override render() {

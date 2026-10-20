@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import {
   clickFlowAction,
   enableVirtualPasskey,
@@ -14,6 +14,7 @@ import {
   registerWithPasskey,
   registerWithPassword,
   sessionCookieName,
+  widgetTest as test,
   type ProfileEntry,
 } from "@zitadel/testing/playwright";
 

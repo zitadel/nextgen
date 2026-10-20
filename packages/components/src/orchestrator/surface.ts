@@ -1,4 +1,4 @@
-import { LitElement } from "lit";
+import { ownRoot, ZlElement } from "../internal/shadow-root.js";
 import { property } from "../internal/property.js";
 import type { ZitadelProject } from "@zitadel/api/config";
 
@@ -12,7 +12,7 @@ import { ThemeController, type ThemeMode } from "./theme-controller.js";
  * Base for every orchestrator element: the project config `resolveApi` reads,
  * as an SDK handle or as declarative attributes.
  */
-export class ZitadelConfigured extends LitElement {
+export class ZitadelConfigured extends ZlElement {
   /**
    * SDK project handle returned by `configureZitadel()`. Set from JS (or a
    * framework binding). When set, takes precedence over both the
@@ -128,7 +128,7 @@ export class ZitadelSurface extends ZitadelConfigured {
       this.theme === "" ? undefined : this.theme,
       this.variant === "page" ? "dark" : "auto",
     );
-    const root = this.shadowRoot;
+    const root = ownRoot(this);
     if (root) {
       applyBaseTokens(root);
       applyBrandingTokens(root, branding);

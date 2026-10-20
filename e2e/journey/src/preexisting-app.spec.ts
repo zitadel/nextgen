@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { expect, test } from "@playwright/test";
+import { expect, widgetTest as test } from "@zitadel/testing/playwright";
 
 import { requiredEnv } from "./support";
 

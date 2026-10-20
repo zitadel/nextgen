@@ -240,7 +240,8 @@ apply when composing atoms directly without the orchestrator
 (`exportparts.browser.spec.ts` pins the forwarding).
 
 Automation can use the stable host and native shadow-root hooks that the default
-template emits. Host atoms expose hooks such as `zitadel-field-email`,
+template emits, once it has opened the roots the published package closes
+([Shadow roots](#shadow-roots)). Host atoms expose hooks such as `zitadel-field-email`,
 `zitadel-field-password`, and `zitadel-action-submit`; their native shadow
 controls expose hooks such as `zitadel-input-email`, `zitadel-input-password`,
 and `zitadel-action-submit-button`. Hooks are method-named even when the flow
@@ -265,6 +266,24 @@ A server-rendered page ships the widget as a bare custom element, and the browse
 So the configuration has to be there when the element starts. Give a raw element `project-id` and `proxy-path` as attributes in the server markup, configure globally with `configureZitadel()` before the bundle loads, or mount the widget on the client only, after hydration. Which of these a framework wrapper supports differs, so follow the page for your SDK.
 
 Do not build on server-rendered markup that carries an object-valued prop. React 19 does not apply a custom element's object property while hydrating it, so a `project` handle passed to a raw `<zitadel-login>` that was server-rendered is never delivered. Pass `project-id` and `proxy-path` as strings, configure globally before the bundle loads, or mount on the client only.
+
+## Shadow roots
+
+The published package closes the shadow roots of `<zitadel-login>`, `<zitadel-session>`, `<zitadel-logout>` and every `<zl-*>` atom, the npm entries and the standalone file alike. A script on the page cannot read a field the way it could through an open root: `host.shadowRoot` is `null`, `host.renderRoot` is withheld, and an event raised inside reaches the page retargeted to the host, with `composedPath()` listing no node inside. So `document.querySelector('zitadel-login').shadowRoot.querySelector('input').value` no longer reaches a password, and neither does the same walk through the nested `<zl-field>` or through `composedPath()`. Source builds, which is what the component tests, Storybook and the dev servers of this repository run, keep the roots open: the mode is one constant, `SHADOW_ROOT_MODE` in `src/internal/shadow-root.ts`.
+
+What closed roots do not protect against:
+
+- A script that runs before the widget loads. It can patch `Element.prototype.attachShadow` and keep the root, or replace the element classes, and nothing in the widget can tell.
+- Native keyboard events. The browser composes `keydown`, `keyup` and `beforeinput` out of every shadow root, so a page-level listener still sees each key press and its `key`, as it would for any text field on the page.
+- A script that already runs in the page's origin with the access to do worse, such as reading `document.cookie` or the DOM around the widget.
+
+A closed root hides the widget's internals from casual reads; it is not an isolation boundary. Full isolation of a credential field from the host page needs a cross-origin iframe, which this package does not use.
+
+Autofill works through a closed root, because the browser fills a field at the platform level. Password manager extensions differ in how they find fields, and the ones that look inside a shadow root through `element.shadowRoot` will not see these; extensions that use the browsers' extension-only access to closed roots do. If a manager you support cannot fill the widget, tell us which.
+
+### Testing against the published build
+
+Playwright pierces open roots only, so a test of a page that loads the published package must open them first. `@zitadel/testing/playwright` does it for you: its `test` (and `widgetTest`, for a suite without a Zitadel instance) opens the roots of every page of the test. To do it by hand, call `openShadowRoots(page)` or `openShadowRoots(context)` before the first navigation; it registers an init script that makes every `attachShadow` call attach open. Tools that read the accessibility tree through the browser, rather than walking the DOM, see the fields either way.
 
 ## Element APIs
 
@@ -431,7 +450,7 @@ see [`apps/demo-next/README.md`](../../apps/demo-next/README.md) and
 
 ## Testing strategy
 
-Tests are split across two Vitest projects:
+Tests are split across three Vitest projects:
 
 - **`unit`** — `jsdom`, fast feedback for rendering, Liquid wiring, branding
   validation, sanitiser allowlists, and DOM-level a11y attributes.
@@ -439,8 +458,13 @@ Tests are split across two Vitest projects:
   fake: `ElementInternals` / form-associated state, native form submit
   interception, focus delegation across shadow roots.
 
-Files ending in `.browser.spec.ts` run only in the browser project; everything
-else runs in jsdom.
+- **`closed-roots`** — the same Chromium, with the shipped build's closed shadow
+  roots: what a page script can and cannot reach, and that the widget still
+  signs in through them.
+
+Files ending in `.closed.browser.spec.ts` run only in the closed-roots project,
+the other `.browser.spec.ts` files only in the browser project; everything else
+runs in jsdom.
 
 ## Related design docs
 

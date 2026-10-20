@@ -3,8 +3,12 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { expect, test } from "@playwright/test";
-import { identity, registerWithPassword } from "@zitadel/testing/playwright";
+import {
+  expect,
+  identity,
+  registerWithPassword,
+  widgetTest as test,
+} from "@zitadel/testing/playwright";
 
 import { ERROR_BOUNDARY_TITLE, NEUTRAL_MESSAGE } from "../../console/support/copy";
 import { requiredEnv } from "./support";

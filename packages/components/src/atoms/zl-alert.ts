@@ -1,9 +1,10 @@
-import { LitElement, html } from "lit";
+import { html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 import alertStyles from "./zl-alert.css?inline";
 
 import { emit } from "../internal/emit.js";
+import { ZlElement } from "../internal/shadow-root.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, sharedStyles, surfaceStyles } from "../styles/index.js";
 
@@ -22,7 +23,7 @@ import type { IconName } from "./zl-icon.js";
  * context.
  */
 @customElement("zl-alert")
-export class ZlAlert extends LitElement {
+export class ZlAlert extends ZlElement {
   static override styles = [baseHostStyles, ...surfaceStyles(sharedStyles, alertStyles)];
 
   @property({ reflect: true }) accessor severity: "error" | "success" | "warning" | "info" =

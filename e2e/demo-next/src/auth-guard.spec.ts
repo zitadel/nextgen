@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, widgetTest as test } from "@zitadel/testing/playwright";
 
 /**
  * Middleware redirect contract. The Vitest suite stubs the SDK; this test
