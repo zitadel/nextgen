@@ -382,6 +382,20 @@ export function parseNewAttributeName(value: string, taken: readonly string[]): 
   return taken.includes(name) ? refuse(`"${name}" is already a user attribute.`) : ok(name);
 }
 
+/**
+ * The label the login form shows for an attribute nobody has written text for:
+ * the name split at capitals and underscores, in sentence case. The login
+ * component does the same (`humaniseFieldName` in `@zitadel/components`).
+ */
+export function fieldLabelFor(name: string): string {
+  const words = name
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_.-]+/g, " ")
+    .trim()
+    .toLowerCase();
+  return words === "" ? words : `${words[0]?.toUpperCase()}${words.slice(1)}`;
+}
+
 const describe = (attribute: SchemaAttribute): string =>
   `${attribute.name} (${attribute.type ?? "not a string, number, integer or boolean"})`;
 

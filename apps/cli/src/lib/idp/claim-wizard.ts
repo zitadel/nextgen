@@ -8,6 +8,7 @@ import {
   type ClaimType,
   mapClaim,
   type MappingState,
+  fieldLabelFor,
   parseClaimName,
   parseNewAttributeName,
   parseScopeList,
@@ -107,6 +108,13 @@ export async function askClaims(
       `${quoted(added.entry.claim)} now maps to ${quoted(added.entry.attribute)}${added.entry.create === true ? ", a new attribute in your user schema" : ""}.`,
       "success",
     );
+    if (added.entry.create === true) {
+      const name = added.entry.attribute;
+      wizard.say([
+        `The login form will label it ${quoted(fieldLabelFor(name))}. To use other wording, set`,
+        `register.field.${name} and register-sso.field.${name} in the locales of your login page.`,
+      ]);
+    }
   }
   return { entries, verified, scopes: [...new Set(scopes)] };
 }

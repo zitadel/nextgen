@@ -129,6 +129,35 @@ describe("askClaims", () => {
     ]);
   });
 
+  it("tells the person what the login form will call a new attribute and where to change it", async () => {
+    const { ask } = scripted([
+      true,
+      "employee_id",
+      "integer",
+      pick("Create a new attribute"),
+      "employeeNumber",
+      "",
+      false,
+    ]);
+    const { wizard, drawn } = wizardOver(ask);
+
+    await askClaims(state(), wizard, PROVIDER);
+
+    expect(drawn()).toContain('The login form will label it "Employee number".');
+    expect(drawn()).toContain(
+      "register.field.employeeNumber and register-sso.field.employeeNumber",
+    );
+  });
+
+  it("says nothing about labels for an attribute that already existed", async () => {
+    const { ask } = scripted([true, "mail", "string", "badge", "", false]);
+    const { wizard, drawn } = wizardOver(ask);
+
+    await askClaims(state(), wizard, PROVIDER);
+
+    expect(drawn()).not.toContain("The login form will label it");
+  });
+
   it("refuses, as it is typed, a new attribute that already exists", async () => {
     const { ask } = scripted([
       true,

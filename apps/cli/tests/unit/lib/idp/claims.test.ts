@@ -10,6 +10,7 @@ import {
   claimFlagText,
   claimRequestFromFlags,
   describeMapping,
+  fieldLabelFor,
   ENABLE_CLAIM_FLAGS,
   type MappingState,
   NO_CLAIM_REQUEST,
@@ -551,6 +552,19 @@ describe("mapClaim with create", () => {
     });
 
     expect(value(parsed).created.map((one) => one.name)).toEqual(["employeeNumber"]);
+  });
+});
+
+describe("fieldLabelFor", () => {
+  it.each([
+    ["employeeNumber", "Employee number"],
+    ["staff_no", "Staff no"],
+    ["email", "Email"],
+    ["dateOfBirth", "Date of birth"],
+    ["address2Line", "Address2 line"],
+    ["x", "X"],
+  ])("labels %s as %s, as the login form does", (name, label) => {
+    expect(fieldLabelFor(name)).toBe(label);
   });
 });
 

@@ -77,6 +77,7 @@ export {
   type ClaimRequest,
   type ClaimType,
   describeMapping,
+  fieldLabelFor,
   summariseClaims,
   type MappingState,
   NO_CLAIM_REQUEST,
