@@ -27,11 +27,12 @@ import {
   sessionConfig,
 } from "./__tests__/config-parity-harness";
 import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
-import { resumeServerLogin } from "./__tests__/resume-server-markup";
+import { resume, serverMarkup } from "./__tests__/resume-server-markup";
 import { UnsetPropHarness } from "./__tests__/unset-prop-harness";
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 import {
   businessLocales,
+  configureZitadel,
   ZitadelLogin,
   type ZitadelLoginProps,
   ZitadelLogout,
@@ -39,6 +40,8 @@ import {
   ZitadelSession,
   type ZitadelSessionProps,
 } from "./index";
+
+const waitFor = vi.waitFor;
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -452,14 +455,23 @@ describe("resumed server markup", () => {
 });
 
 describe("resuming a server-rendered login", () => {
-  const resumed = { projectId: "proj-global", proxyPath: "https://flow.test.invalid" };
-
   it("starts its first flow with the purpose the server rendered", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
     const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = await serverMarkup({ project: globalProject, purpose: "register" });
+    const firstStep = new Promise((resolve) =>
+      host
+        .querySelector(widgetTags.login)
+        ?.addEventListener("zitadel-flow-step", resolve, { once: true }),
+    );
 
-    const { host, firstStep } = await resumeServerLogin({ project: resumed, purpose: "register" });
+    resume(host);
 
-    await expect.poll(() => widgetIn(host, widgetTags.login).project).toEqual(resumed);
     await firstStep;
     const bodies = await Promise.all(
       fetched.mock.calls.map(async ([input, init]) =>
@@ -471,27 +483,36 @@ describe("resuming a server-rendered login", () => {
     const created = bodies.filter((body) => body?.project_id);
     expect(created).toHaveLength(1);
     expect(created[0]).toMatchObject({ purpose: "register" });
+    host.remove();
   });
 
   it("loads the supplied flow on its first request instead of creating one", async () => {
-    const fetched = vi.spyOn(globalThis, "fetch");
-
-    const { host, firstStep } = await resumeServerLogin({
-      project: resumed,
-      resumeFlowId: "flow_123",
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
     });
-    const rendered = widgetIn(host, widgetTags.login);
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = await serverMarkup({ project: globalProject, resumeFlowId: "flow_123" });
+    const rendered = host.querySelector(widgetTags.login);
+    expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
+    const firstStep = new Promise((resolve) =>
+      rendered?.addEventListener("zitadel-flow-step", resolve, { once: true }),
+    );
 
-    expect(rendered.getAttribute("resume-flow-id")).toBe("flow_123");
-    await expect.poll(() => rendered.project).toEqual(resumed);
+    resume(host);
+
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
+    expect(first.method).toBe("GET");
+    expect(first.url).toContain("flow_123");
+    expect(host.querySelector(widgetTags.login)).toBe(rendered);
     await firstStep;
-    await rendered.updateComplete;
+    await rendered?.updateComplete;
     await Promise.all(fetched.mock.results.map((result) => result.value));
-    const [first] = fetched.mock.calls.map(([input, init]) => new Request(input, init));
-    expect(first?.method).toBe("GET");
-    expect(first?.url).toContain("flow_123");
-    expect(widgetIn(host, widgetTags.login)).toBe(rendered);
     expect(fetched).toHaveBeenCalledTimes(1);
+    host.remove();
   });
 });
 
