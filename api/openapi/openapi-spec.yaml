@@ -45,6 +45,12 @@ tags:
       revisioned connection document and referenced by its slug from user
       schemas and flow definitions. Create-or-revise, query, read by id, and
       revision reads. A slug resolves through the query.
+  - name: Policies
+    description: |
+      Operation policies (ADR 066): a project publishes, per guarded
+      operation, the settings that operation is checked against, such as a
+      password policy's minimum length. Every publish is an immutable
+      revision.
   - name: Releases
     description: |
       A release is a snapshot of a project's configuration: one revision of
@@ -224,6 +230,10 @@ paths:
     $ref: endpoints/idps/by_id/revisions/methods.yaml
   /idps/revisions/{revision_id}:
     $ref: endpoints/idps/revisions/by_id/methods.yaml
+  /policies:
+    $ref: endpoints/policies/methods.yaml
+  /policies/revisions/{revision_id}:
+    $ref: endpoints/policies/revisions/by_id/methods.yaml
   /releases:
     $ref: endpoints/releases/methods.yaml
   /releases/build:
@@ -304,6 +314,10 @@ webhooks:
     $ref: endpoints/events/webhooks/origin-added.yaml
   origin.removed:
     $ref: endpoints/events/webhooks/origin-removed.yaml
+  policy.created:
+    $ref: endpoints/events/webhooks/policy-created.yaml
+  policy.updated:
+    $ref: endpoints/events/webhooks/policy-updated.yaml
   project.created:
     $ref: endpoints/events/webhooks/project-created.yaml
   project.deleted:

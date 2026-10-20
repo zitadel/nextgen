@@ -582,6 +582,14 @@ type Handler interface {
 	//
 	// GET /users/me/schema
 	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
+	// GetPolicyRevision implements getPolicyRevision operation.
+	//
+	// Reads one revision of a policy, newest or not.
+	// The lookup is scoped to the project in `project_id`: a revision of another
+	// project answers not found exactly as an unknown id does.
+	//
+	// GET /policies/revisions/{revision_id}
+	GetPolicyRevision(ctx context.Context, params GetPolicyRevisionParams) (GetPolicyRevisionRes, error)
 	// GetProject implements getProject operation.
 	//
 	// Returns the current state of a project.
@@ -873,6 +881,21 @@ type Handler interface {
 	//
 	// PATCH /users/{user_id}
 	PatchUserByID(ctx context.Context, req *PatchUserRequest, params PatchUserByIDParams) (PatchUserByIDRes, error)
+	// PublishPolicy implements publishPolicy operation.
+	//
+	// Publishes the project's policy for an operation as a new immutable
+	// revision, creating the policy on its first publish. The newest revision
+	// applies to the next time the operation runs; nothing already stored is
+	// re-evaluated, so a stricter password policy applies the next time a
+	// password is set.
+	// `config` is checked against the operation's template: an unknown
+	// operation or setting, a value of the wrong type or outside its bounds, or
+	// settings that contradict each other (a `min_length` above `max_length`)
+	// answer `pol.invalid`. A setting left out is off, and `{}` switches every
+	// rule off; there are no defaults.
+	//
+	// POST /policies
+	PublishPolicy(ctx context.Context, req *PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error)
 	// QueryGrants implements queryGrants operation.
 	//
 	// Returns the collaboration grants of a project, paginated with a cursor.
