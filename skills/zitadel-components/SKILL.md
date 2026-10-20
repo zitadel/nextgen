@@ -28,7 +28,7 @@ is the component itself: attributes, tokens, parts, events, shadow-DOM hooks.
 ## Install / use
 
 ```sh
-corepack pnpm add @zitadel/components
+corepack pnpm add @zitadel/components@alpha
 ```
 
 `lit`, `liquidjs`, `dompurify` are externalised peer/runtime deps (consumers
@@ -58,7 +58,13 @@ transparent, no font injection, no focus grab / `page`: full-page chrome),
 `theme` (`light`/`dark`/`auto`, resolved value lands on `data-theme`), `purpose`
 (`login`/`register`/`reset_password`/…), `flow-name`, `project` (object property,
 not an attribute — assign via `ref`/JS, not markup), `lang` + `locales`,
-`post-sign-in-url`, `resume-flow-id`, `preview-state` / `preview-success-step`.
+`post-sign-in-url` (`force-post-sign-in-url`: see below), `resume-flow-id`,
+`preview-state` / `preview-success-step`.
+After sign-in the widget returns to the path in the page's `next` query
+parameter, which every server SDK's middleware sets when it sends a signed-out
+visit to a protected route to the login page, and goes to `post-sign-in-url`
+when there is none or it is not a path on the page's origin. A page that uses
+`next` for something of its own sets `force-post-sign-in-url`.
 It emits `zitadel-flow-input`, `-step`, `-complete`, `-error`, `-redirect`
 events (`-step` fires for every step including the first; `-redirect` is a
 non-cancelable notification — the widget navigates to the IdP itself).
@@ -120,6 +126,7 @@ these before writing it — don't reproduce a catalogue from memory.
 
 ## Gotchas
 
+- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or give a raw `<zitadel-login>` element `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
 - **Open shadow roots, nested.** The automation hooks sit inside nested shadow
   roots, so a flat `document.querySelector('[data-testid="zitadel-input-email"]')`
   misses them. Use a shadow-aware locator (Playwright) or recurse through

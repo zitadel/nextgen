@@ -21,10 +21,7 @@
     "lint": "biome check ."
   },
   "dependencies": {
-    "@zitadel/api": "workspace:*",
     "@zitadel/sdk-nuxt": "workspace:*",
-    "@zitadel/components": "workspace:*",
-    "@zitadel/design-tokens": "workspace:*",
     "nuxt": "catalog:",
     "vue": "catalog:"
   },

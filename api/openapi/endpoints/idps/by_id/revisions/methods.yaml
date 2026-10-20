@@ -13,13 +13,7 @@ get:
         - idp.read
   parameters:
     - $ref: ../../../../components/parameters/project-id.yaml
-    - name: id
-      in: path
-      required: true
-      description: The connection id, allocated when the connection was created.
-      schema:
-        type: string
-        example: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+    - $ref: ../../../../components/parameters/idp-id.yaml
     - $ref: ../../../../components/parameters/limit.yaml
     - $ref: ../../../../components/parameters/page-token.yaml
   responses:

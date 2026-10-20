@@ -274,7 +274,11 @@ func (UnimplementedHandler) CreateIdp(ctx context.Context, req *CreateIdpRequest
 
 // CreateProject implements createProject operation.
 //
-// Create project.
+// Creates a project and returns its project secret and preview secret, which no
+// other endpoint returns.
+// The request needs no credential and is rate-limited. Unless `seed_defaults` is
+// `false`, the project starts with a default user schema and flow; the CLI turns
+// that off and uploads its own from `.zitadel/`.
 //
 // POST /projects
 func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (r CreateProjectRes, _ error) {
@@ -283,29 +287,22 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 
 // CreateRelease implements createRelease operation.
 //
-// Assembles a release from revisions that already exist, supplied as
-// `(kind, revision_id)` pairs. No new revisions are allocated: to build a
-// release from the files on disk, use `POST /releases/build`, which
-// allocates them.
-// Every referenced `revision_id` must exist in the project. Each one's
-// handle is read from the revision itself and recorded on the release, so a
-// resource is always pinned under the identity it declares.
-// Every handle a pinned resource references, such as a flow definition's
-// `user_schema` naming a schema by `objectType`, or a flow step's
-// `sso_providers` naming IDP connections by `slug`, must be pinned by the
-// same release. A handle the release does not pin refuses the request with
-// `rel.unresolved_reference`. The message names the pointer and the handle
-// that did not resolve, for example
-// `flow_definition default-login: user_schema human-user not found`,
-// because a release pins many and the code alone does not say which one
-// failed.
-// Idempotent on the pinned set: metadata is excluded from the comparison,
-// so re-submitting the same revisions with a different `message` answers
-// `200` with the release that already pins them rather than creating a
-// second one. A release the project did not hold before answers `201`.
-// Creating a release does not deploy it. A release is not tied to an
-// origin, and the same release can later be deployed to any number of
-// origins unchanged.
+// Assembles a release from existing revisions, given as
+// `(kind, revision_id)` pairs. To build one from files on disk, use
+// `POST /releases/build`.
+// Each revision must exist in the project and is recorded under the handle
+// it declares. The release must be complete and consistent:
+// - Every handle its revisions name must be in the release: a flow's
+// `user_schema`, and the IDP connections named by a flow step's
+// `sso_providers` or a schema's `x-auth-methods.sso.providers`. A missing
+// one answers `rel.unresolved_reference`, naming the resource and the
+// handle, e.g. `flow_definition default-login: user_schema human-user not found`.
+// - Every flow is validated as on save, against the user schema revision
+// in the release. A flow that fails answers `rel.invalid`, with the
+// reason in `details`.
+// Idempotent on the set of revisions: the same revisions with a different
+// `message` answer `200` with the existing release. A new release answers
+// `201`. Creating a release does not deploy it.
 //
 // POST /releases
 func (UnimplementedHandler) CreateRelease(ctx context.Context, req *CreateReleaseRequest, params CreateReleaseParams) (r CreateReleaseRes, _ error) {
@@ -355,7 +352,9 @@ func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessio
 
 // CreateTeam implements createTeam operation.
 //
-// Create team.
+// Creates a team in the project, with a name no other team in the project has.
+// A taken name is refused with `409 team.already_exists`. The new team has no
+// members yet.
 //
 // POST /teams
 func (UnimplementedHandler) CreateTeam(ctx context.Context, req *CreateTeamRequest, params CreateTeamParams) (r CreateTeamRes, _ error) {
@@ -364,7 +363,10 @@ func (UnimplementedHandler) CreateTeam(ctx context.Context, req *CreateTeamReque
 
 // CreateUser implements createUser operation.
 //
-// Create user.
+// Creates a user whose attributes satisfy the user schema the request names.
+// The server assigns the user's id. With `team_id`, the user also becomes an
+// active member of that team. A value the schema marks unique that another
+// user already holds is refused with `409`.
 //
 // POST /users
 func (UnimplementedHandler) CreateUser(ctx context.Context, req *CreateUserRequest, params CreateUserParams) (r CreateUserRes, _ error) {
@@ -406,7 +408,10 @@ func (UnimplementedHandler) DeleteTeam(ctx context.Context, params DeleteTeamPar
 
 // DeleteUserByID implements DeleteUserByID operation.
 //
-// Delete user by ID.
+// Deletes a user and removes them from every team they belong to.
+// The user is removed, not deactivated, and the deletion emits `user.deleted`.
+// With a project secret the request is idempotent: deleting a user that exists
+// in no project succeeds without changing anything.
 //
 // DELETE /users/{user_id}
 func (UnimplementedHandler) DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (r DeleteUserByIDRes, _ error) {
@@ -634,12 +639,13 @@ func (UnimplementedHandler) GetLive(ctx context.Context) (r GetLiveRes, _ error)
 //
 // Returns the current state of the current session including its factors and all currently
 // satisfied assurance levels.
+// With `project_id`, the session is returned only when it belongs to that project.
 // `assurance_levels[]` may shrink over time as factor freshness windows expire,
 // without the session itself expiring. Use step-up authentication (a new `auth_attempt`
 // against the same `session_id`) to restore a dropped assurance level.
 //
 // GET /sessions/me
-func (UnimplementedHandler) GetMySession(ctx context.Context) (r GetMySessionRes, _ error) {
+func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessionParams) (r GetMySessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -660,7 +666,9 @@ func (UnimplementedHandler) GetMySessionCsrfToken(ctx context.Context) (r GetMyS
 
 // GetMyUser implements getMyUser operation.
 //
-// Get my user information.
+// Returns the user signed in to the session that authenticates the request.
+// The project and the user both come from the session cookie, so a caller only
+// ever reads their own user.
 //
 // GET /users/me
 func (UnimplementedHandler) GetMyUser(ctx context.Context) (r GetMyUserRes, _ error) {
@@ -744,7 +752,9 @@ func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (
 
 // GetUserByID implements GetUserByID operation.
 //
-// Get user by ID.
+// Returns a user by its id, with the attributes its schema defines.
+// With `team_id`, the user is returned only while they are an active member of
+// that team.
 //
 // GET /users/{user_id}
 func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDParams) (r GetUserByIDRes, _ error) {
@@ -941,7 +951,10 @@ func (UnimplementedHandler) ListUserIdentityLinks(ctx context.Context, params Li
 
 // ListUserPasskeys implements listUserPasskeys operation.
 //
-// List user passkeys.
+// Returns the passkeys registered for a user, newest first, paginated with a
+// cursor.
+// Each passkey carries its id, its name and when it was registered, never the
+// credential itself.
 //
 // GET /users/{user_id}/passkeys
 func (UnimplementedHandler) ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (r ListUserPasskeysRes, _ error) {
@@ -1029,7 +1042,11 @@ func (UnimplementedHandler) QueryIdps(ctx context.Context, req *QueryIdpsRequest
 
 // QueryProjects implements queryProjects operation.
 //
-// Query projects.
+// Returns the project the project secret belongs to, as a page of at most one
+// project.
+// A credential is scoped to one project until ADR 036 widens it, so the filters
+// and sorting apply to that project alone. The projects a signed-in person can
+// act on are listed by `GET /users/me/projects`.
 //
 // POST /projects/query
 func (UnimplementedHandler) QueryProjects(ctx context.Context, req *QueryProjectsRequest) (r QueryProjectsRes, _ error) {
@@ -1182,7 +1199,10 @@ func (UnimplementedHandler) RollbackDeployment(ctx context.Context, req OptRollb
 
 // SetUserPassword implements setUserPassword operation.
 //
-// Set user password.
+// Sets a user's password, hashed with the project's current password hashing
+// policy.
+// The new password replaces the current one, and setting it emits
+// `auth.factor.password.set`.
 //
 // PUT /users/{user_id}/password
 func (UnimplementedHandler) SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (r SetUserPasswordRes, _ error) {

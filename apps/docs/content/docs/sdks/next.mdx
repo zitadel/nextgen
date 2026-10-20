@@ -73,7 +73,7 @@ The Next.js SDK wires App Router applications through one server-side middleware
     };
     ```
 
-    Set `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `NEXT_PUBLIC_ZITADEL_PROJECT_ID` in `.env.local`. The middleware adds the project secret to the session exchange; without it, sign-in cannot finish. See [SDK proxy](/docs/concepts/sdk-proxy).
+    Set `ZITADEL_URL`, `ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_SECRET`, and `NEXT_PUBLIC_ZITADEL_PROJECT_ID` in `.env.local`. The middleware adds the project secret to the session exchange; without it, sign-in cannot finish. The middleware and `auth()` count a session only when it belongs to `ZITADEL_PROJECT_ID` (else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`); with neither, nobody is signed in. See [SDK proxy](/docs/concepts/sdk-proxy).
   </Tab>
 </Tabs>
 
@@ -82,7 +82,7 @@ The Next.js SDK wires App Router applications through one server-side middleware
 <Steps>
   <Step>Proxy `/__nextgen/*` requests to the Zitadel backend.</Step>
   <Step>Validate the encrypted session token against `GET /sessions/me`.</Step>
-  <Step>Redirect unauthenticated users from protected routes to `loginPath`.</Step>
+  <Step>Redirect unauthenticated users from protected routes to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
 </Steps>
 
 ## Usage
@@ -102,6 +102,32 @@ export default async function Page() {
 ```
 
 `auth()` sees a session only on routes the middleware's `matcher` covers.
+
+## Widget events
+
+The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
+
+| Widget event | Fires when | Detail | Widgets |
+| --- | --- | --- | --- |
+| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login |
+| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login |
+| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login |
+| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login |
+| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session |
+
+```tsx
+const ref = useRef<HTMLElementTagNameMap['zitadel-login']>(null);
+
+useEffect(() => {
+  const login = ref.current;
+  const onComplete = (event: Event) => track((event as CustomEvent).detail);
+  login?.addEventListener('zitadel-flow-complete', onComplete);
+  return () => login?.removeEventListener('zitadel-flow-complete', onComplete);
+}, []);
+
+return <zitadel-login ref={ref} post-sign-in-url="/admin" />;
+```
 
 ## Verify
 

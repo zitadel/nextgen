@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
 import { upsertProductGithubRelease } from "./release-github.mjs";
 import {
-  findPrereleaseOnlyPackages,
-  prereleaseOnlyMessage,
+  findPublishBlockers,
+  publishBlockersMessage,
   readLocalPackages,
   readPrereleaseTag,
 } from "./release-dist-tags.mjs";
@@ -47,6 +47,8 @@ export async function main(args = forwardedArgs()) {
       return await commandPack();
     case "publish":
       return await commandPublish(options);
+    case "check-npm":
+      return await commandCheckNpm();
     case "verify":
       return await commandVerify();
     default:
@@ -147,7 +149,7 @@ async function commandPublish(options) {
 
   await assertNoUnrecordedPendingChangesets();
   await assertMainBranch(options, { allowDryRunBypass: !options.recoverVersion });
-  await assertPrereleaseTagApplies();
+  await assertPackagesPublishable();
 
   if (options.dryRun) {
     await commandSnapshot({ skipContainer: true });
@@ -182,18 +184,26 @@ async function commandPublish(options) {
   await upsertProductGithubRelease({ repoRoot, outDir, log: console.log });
 }
 
-// Fails before anything is published when `changeset publish` would put a
-// package on `latest` instead of the prerelease tag (see release-dist-tags.mjs).
-async function assertPrereleaseTagApplies() {
+// Fails before anything is published when `changeset publish` would publish a
+// package npm has never seen, which trusted publishing cannot create, or would
+// put a package on `latest` instead of the prerelease tag (see
+// release-dist-tags.mjs).
+async function assertPackagesPublishable() {
   const tag = await readPrereleaseTag(repoRoot);
-  if (!tag) {
-    return;
-  }
   const packages = await readLocalPackages(repoRoot, PUBLIC_PACKAGE_DIRS);
-  const stuck = await findPrereleaseOnlyPackages(packages, tag);
-  if (stuck.length > 0) {
-    throw new Error(prereleaseOnlyMessage(stuck, tag));
+  const blockers = await findPublishBlockers(packages, tag);
+  if (blockers.unpublished.length > 0 || blockers.prereleaseOnly.length > 0) {
+    throw new Error(publishBlockersMessage(blockers, tag));
   }
+}
+
+// The publish preflight's npm check, on its own. ci.yml runs it on the version
+// PR and its merge group, so a version that release publish would refuse fails
+// before it lands on main, not after.
+async function commandCheckNpm() {
+  const release = await readServerRelease(repoRoot);
+  await assertPackagesPublishable();
+  console.log(`npm preflight passed for ${release.version}`);
 }
 
 function assertRecoverVersion(release, recoverVersion) {
@@ -292,7 +302,7 @@ function usage(error) {
     console.error(error);
     console.error("");
   }
-  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|verify> [options]
+  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|check-npm|verify> [options]
 
 Options:
   --dry-run          Do not publish or mutate remote registries.

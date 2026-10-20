@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-next",
-  "version": "1.0.0-alpha.25",
+  "version": "1.0.0-alpha.27",
   "description": "Next.js helpers and mock auth UI for Zitadel",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-next#readme",
   "bugs": {
@@ -66,10 +66,11 @@
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/sdk-core": "workspace:*",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "ufo": "catalog:"
   },
   "peerDependencies": {
-    "next": ">=15",
+    "next": ">=15.2.3",
     "react": ">=18",
     "react-dom": ">=18"
   },

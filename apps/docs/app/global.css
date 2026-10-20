@@ -72,6 +72,53 @@
   background-color: var(--sidebar);
 }
 
+/* The logo (components/logo.tsx) moves as on the website while the pointer is
+   on it or its link, and is back at rest when it leaves; it never moves on its
+   own. A copy of apps/website/app/globals.css's: change both together. */
+.logo-icon {
+  transform-box: view-box;
+  transform-origin: 63px 63px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:hover > .logo .logo-icon,
+  .logo:hover .logo-icon {
+    animation: logo-spin 5s infinite;
+  }
+
+  a:hover > .logo .logo-letter,
+  .logo:hover .logo-letter {
+    animation: logo-roll 5s infinite both;
+  }
+}
+
+/* The logo's Lottie, 150 frames at 30 a second: the icon turns once in the
+   first 60, each letter rolls down in 30 (its start set in logo.tsx), and the
+   rest of the 5 s is still. */
+@keyframes logo-spin {
+  from {
+    rotate: -360deg;
+    animation-timing-function: cubic-bezier(0.108, 0, 0, 1);
+  }
+
+  40%,
+  to {
+    rotate: 0deg;
+  }
+}
+
+@keyframes logo-roll {
+  from {
+    translate: 0 0;
+    animation-timing-function: cubic-bezier(0.199, 0, 0.121, 1);
+  }
+
+  20%,
+  to {
+    translate: 0 100px;
+  }
+}
+
 /* Headings in the display face, at its one weight: the page's title and the
    sections of its text. */
 #nd-page > h1,

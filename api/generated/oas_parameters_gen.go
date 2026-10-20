@@ -18,6 +18,7 @@ import (
 
 // AddOriginParams is parameters of addOrigin operation.
 type AddOriginParams struct {
+	// The unique identifier of the project.
 	ProjectID ProjectID
 }
 
@@ -98,6 +99,7 @@ func decodeAddOriginParams(args [1]string, argsEscaped bool, r *http.Request) (p
 
 // BeginUserPasskeyRegistrationParams is parameters of beginUserPasskeyRegistration operation.
 type BeginUserPasskeyRegistrationParams struct {
+	// The unique identifier of the user.
 	UserID UserID
 }
 
@@ -251,6 +253,7 @@ func decodeBuildReleaseParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // CompleteClaimParams is parameters of completeClaim operation.
 type CompleteClaimParams struct {
+	// The unique identifier of the project.
 	ProjectID ProjectID
 }
 
@@ -1333,6 +1336,7 @@ func decodeDeleteGrantParams(args [1]string, argsEscaped bool, r *http.Request) 
 
 // DeleteTeamParams is parameters of deleteTeam operation.
 type DeleteTeamParams struct {
+	// The unique identifier of the team.
 	TeamID TeamID
 }
 
@@ -1413,6 +1417,7 @@ func decodeDeleteTeamParams(args [1]string, argsEscaped bool, r *http.Request) (
 
 // DeleteUserByIDParams is parameters of DeleteUserByID operation.
 type DeleteUserByIDParams struct {
+	// The unique identifier of the user.
 	UserID UserID
 }
 
@@ -1828,7 +1833,9 @@ func decodeExchangeHandoffParams(args [0]string, argsEscaped bool, r *http.Reque
 
 // FinishUserPasskeyRegistrationParams is parameters of finishUserPasskeyRegistration operation.
 type FinishUserPasskeyRegistrationParams struct {
-	UserID         UserID
+	// The unique identifier of the user.
+	UserID UserID
+	// The ceremony identifier returned by begin.
 	RegistrationID string
 }
 
@@ -2042,6 +2049,7 @@ func decodeGetAuthAttemptParams(args [1]string, argsEscaped bool, r *http.Reques
 
 // GetBrandingByIdParams is parameters of getBrandingById operation.
 type GetBrandingByIdParams struct {
+	// The unique identifier of the branding revision.
 	ID string
 }
 
@@ -2107,8 +2115,10 @@ func decodeGetBrandingByIdParams(args [1]string, argsEscaped bool, r *http.Reque
 
 // GetClaimStatusParams is parameters of getClaimStatus operation.
 type GetClaimStatusParams struct {
+	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The challenge minted by the matching claim init.
+	// The challenge minted by the matching claim init, as the claim URL carries
+	// it.
 	ChallengeID ChallengeID
 }
 
@@ -2248,8 +2258,10 @@ func decodeGetClaimStatusParams(args [1]string, argsEscaped bool, r *http.Reques
 
 // GetClaimWindowParams is parameters of getClaimWindow operation.
 type GetClaimWindowParams struct {
+	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The challenge from the claim URL.
+	// The challenge minted by the matching claim init, as the claim URL carries
+	// it.
 	ChallengeID ChallengeID
 }
 
@@ -3454,8 +3466,104 @@ func decodeGetIdpRevisionByIdParams(args [1]string, argsEscaped bool, r *http.Re
 	return params, nil
 }
 
+// GetMySessionParams is parameters of getMySession operation.
+type GetMySessionParams struct {
+	// The project the caller signs its users in to. The session is returned only
+	// when it belongs to this project, and answers `403` with
+	// `sess.project_mismatch` otherwise.
+	// A session belongs to one project, while a browser sends its cookie to every
+	// app on the same host. An app that reads the session to decide who is signed
+	// in passes its own project, so that a session of another project never reads
+	// as one of its users. The SDKs do this for you.
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in
+	// its own project, so keep its cookie.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
+}
+
+func unpackGetMySessionParams(packed middleware.Parameters) (params GetMySessionParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ProjectID = v.(OptProjectID)
+		}
+	}
+	return params
+}
+
+func decodeGetMySessionParams(args [0]string, argsEscaped bool, r *http.Request) (params GetMySessionParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal ProjectID
+				if err := func() error {
+					var paramsDotProjectIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotProjectIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID.SetTo(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.ProjectID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // GetProjectParams is parameters of getProject operation.
 type GetProjectParams struct {
+	// The unique identifier of the project.
 	ProjectID ProjectID
 }
 
@@ -3678,6 +3786,7 @@ func decodeGetReleaseByIdParams(args [1]string, argsEscaped bool, r *http.Reques
 
 // GetSchemaByIdParams is parameters of getSchemaById operation.
 type GetSchemaByIdParams struct {
+	// The unique identifier of the schema.
 	ID string
 	// The unique identifier of the team.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
@@ -3974,6 +4083,7 @@ func decodeGetSessionParams(args [1]string, argsEscaped bool, r *http.Request) (
 
 // GetTeamParams is parameters of getTeam operation.
 type GetTeamParams struct {
+	// The unique identifier of the team.
 	TeamID TeamID
 }
 
@@ -4068,6 +4178,7 @@ type GetUserByIDParams struct {
 	// project secret, read on the whole project for a Console session.
 	// Otherwise the answer is `403 user.permission_denied`.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
+	// The unique identifier of the user.
 	UserID UserID
 }
 
@@ -4570,6 +4681,7 @@ func decodeGetVariablesParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // InitClaimParams is parameters of initClaim operation.
 type InitClaimParams struct {
+	// The unique identifier of the project.
 	ProjectID ProjectID
 }
 
@@ -6230,7 +6342,7 @@ type ListFlowDefinitionsParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The project id to filter by.
+	// The unique identifier of the project.
 	ProjectID ProjectID
 	// Filter flow definitions by purpose (e.g., registration, login).
 	Purpose OptListFlowDefinitionsPurpose `json:",omitempty,omitzero"`
@@ -7162,7 +7274,7 @@ func decodeListMyProjectsParams(args [0]string, argsEscaped bool, r *http.Reques
 
 // ListPreviewsParams is parameters of listPreviews operation.
 type ListPreviewsParams struct {
-	// The project the previews belong to.
+	// The unique identifier of the project.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
@@ -8132,7 +8244,8 @@ type ListUserIdentityLinksParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	UserID    UserID
+	// The unique identifier of the user.
+	UserID UserID
 }
 
 func unpackListUserIdentityLinksParams(packed middleware.Parameters) (params ListUserIdentityLinksParams) {
@@ -8354,7 +8467,8 @@ type ListUserPasskeysParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	UserID    UserID
+	// The unique identifier of the user.
+	UserID UserID
 }
 
 func unpackListUserPasskeysParams(packed middleware.Parameters) (params ListUserPasskeysParams) {
@@ -8576,7 +8690,8 @@ type ListUserTeamsParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	UserID    UserID
+	// The unique identifier of the user.
+	UserID UserID
 }
 
 func unpackListUserTeamsParams(packed middleware.Parameters) (params ListUserTeamsParams) {
@@ -8791,6 +8906,7 @@ func decodeListUserTeamsParams(args [1]string, argsEscaped bool, r *http.Request
 
 // PatchProjectParams is parameters of patchProject operation.
 type PatchProjectParams struct {
+	// The unique identifier of the project.
 	ProjectID ProjectID
 }
 
@@ -8871,6 +8987,7 @@ func decodePatchProjectParams(args [1]string, argsEscaped bool, r *http.Request)
 
 // PatchUserByIDParams is parameters of PatchUserByID operation.
 type PatchUserByIDParams struct {
+	// The unique identifier of the user.
 	UserID UserID
 }
 
@@ -9331,6 +9448,7 @@ func decodeQueryUsersParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 // RemoveOriginParams is parameters of removeOrigin operation.
 type RemoveOriginParams struct {
+	// The unique identifier of the project.
 	ProjectID ProjectID
 }
 
@@ -9411,7 +9529,7 @@ func decodeRemoveOriginParams(args [1]string, argsEscaped bool, r *http.Request)
 
 // RemovePreviewParams is parameters of removePreview operation.
 type RemovePreviewParams struct {
-	// The project the previews belong to.
+	// The unique identifier of the project.
 	ProjectID ProjectID
 }
 
@@ -9857,6 +9975,7 @@ func decodeRollbackDeploymentParams(args [1]string, argsEscaped bool, r *http.Re
 
 // SetUserPasswordParams is parameters of setUserPassword operation.
 type SetUserPasswordParams struct {
+	// The unique identifier of the user.
 	UserID UserID
 }
 
@@ -10111,6 +10230,7 @@ func decodeSubmitFlowStepParams(args [1]string, argsEscaped bool, r *http.Reques
 
 // UpdateTeamParams is parameters of updateTeam operation.
 type UpdateTeamParams struct {
+	// The unique identifier of the team.
 	TeamID TeamID
 }
 

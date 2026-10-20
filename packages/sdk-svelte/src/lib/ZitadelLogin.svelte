@@ -1,5 +1,6 @@
 <script lang="ts">
   import '@zitadel/components';
+  import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelLogin as ZitadelLoginElement } from '@zitadel/components';
 
   import type {
@@ -8,8 +9,10 @@
     ZitadelFlowInputDetail,
     ZitadelFlowRedirectDetail,
     ZitadelFlowStepDetail,
-    ZitadelLoginProps,
+    ZitadelLoginSvelteProps,
   } from './types';
+  import { assignGiven } from './given';
+  import { onClient, proxyPathAttr } from './attributes';
 
   let {
     project,
@@ -18,6 +21,8 @@
     purpose = 'login',
     flowName,
     postSignInUrl,
+    forcePostSignInUrl,
+    resumeFlowId,
     locales,
     lang,
     variant,
@@ -29,7 +34,11 @@
     onFlowComplete,
     onFlowRedirect,
     onFlowError,
-  }: ZitadelLoginProps = $props();
+    ...rest
+  }: ZitadelLoginSvelteProps = $props();
+
+  // The standard HTML attributes are the only extra props the element takes.
+  const attributes = $derived(standardAttributes(rest));
 
   let el: ZitadelLoginElement | undefined = $state();
 
@@ -41,6 +50,21 @@
   export function getElement(): ZitadelLoginElement | undefined {
     return el;
   }
+
+  // Props the element has defaults for are assigned only when given; a
+  // binding would assign `undefined` and overwrite the default.
+  $effect(() => {
+    if (el) {
+      assignGiven(el, {
+        lang,
+        variant,
+        theme,
+        suppressHeader,
+        suppressPasswordToggle,
+        forcePostSignInUrl,
+      });
+    }
+  });
 
   $effect(() => {
     const node = el;
@@ -73,17 +97,15 @@
 </script>
 
 <zitadel-login
+  {...attributes}
   bind:this={el}
-  {project}
+  project={onClient(project)}
   {purpose}
   {locales}
-  {lang}
-  project-id={projectId}
-  proxy-path={proxyPath}
+  project-id={project?.projectId ?? projectId}
+  proxy-path={proxyPathAttr(project?.proxyPath ?? proxyPath)}
+  url={project?.url}
   post-sign-in-url={postSignInUrl}
+  resume-flow-id={resumeFlowId}
   flow-name={flowName}
-  variant={variant}
-  theme={theme}
-  suppressHeader={suppressHeader}
-  suppressPasswordToggle={suppressPasswordToggle}
 ></zitadel-login>

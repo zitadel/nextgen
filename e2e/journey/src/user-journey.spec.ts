@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   clickFlowAction,
@@ -10,9 +13,12 @@ import {
   loginWithPassword,
   registerWithPasskey,
   registerWithPassword,
-  SESSION_COOKIE_NAME,
+  sessionCookieName,
   type ProfileEntry,
 } from "@zitadel/testing/playwright";
+
+import { frameworkForId } from "../scripts/frameworks.mjs";
+import { requiredEnv } from "./support";
 
 test.describe.configure({ mode: "serial" });
 test.setTimeout(60_000);
@@ -24,7 +30,9 @@ const framework = process.env.JOURNEY_FRAMEWORK ?? "next";
 // `??`: the runner passes an empty string for "default preset", and an
 // empty preset must still register the password-first journeys.
 const preset = process.env.JOURNEY_PRESET || "password-first";
-const expectsProtectedRouteRedirect = framework === "next" || framework === "nuxt";
+// Frameworks whose server SDK guards /profile (the registry's flag) must
+// redirect a signed-out visit to /login; the SPA families have no server.
+const expectsProtectedRouteRedirect = frameworkForId(framework).expectsProtectedRouteRedirect;
 const loginUrl = /\/login(?:[/?#]|$)/;
 const profileUrl = /\/profile(?:[/?#]|$)/;
 
@@ -166,21 +174,30 @@ async function expectSignedIn(page: Page): Promise<void> {
   await expect(signedInLocator(page).first()).toBeVisible({ timeout: 30_000 });
 }
 
+/**
+ * The cookie the app keeps its session in: every scaffold's proxy, a server
+ * SDK's or the dev proxy setup writes for an SPA, keeps it under the app's
+ * project's name (ADR 073). setup records the project in `.zitadel/secret`.
+ */
+async function appSessionCookieName(): Promise<string> {
+  const secret = JSON.parse(
+    await readFile(join(requiredEnv("JOURNEY_APP_DIR"), ".zitadel/secret"), "utf8"),
+  ) as { project_id: string };
+  return sessionCookieName(secret.project_id);
+}
+
 async function expectSessionCookie(page: Page): Promise<void> {
+  const name = await appSessionCookieName();
   await expect
     .poll(
       async () =>
         Boolean(
-          (await page.context().cookies()).find(
-            (cookie) => cookie.name === SESSION_COOKIE_NAME && cookie.value,
-          ),
+          (await page.context().cookies()).find((cookie) => cookie.name === name && cookie.value),
         ),
       { timeout: 10_000 },
     )
     .toBe(true);
-  const sessionCookie = (await page.context().cookies()).find(
-    (cookie) => cookie.name === SESSION_COOKIE_NAME,
-  );
+  const sessionCookie = (await page.context().cookies()).find((cookie) => cookie.name === name);
   expect(sessionCookie?.httpOnly).toBe(true);
 }
 
@@ -206,12 +223,11 @@ async function logout(page: Page): Promise<void> {
 }
 
 async function expectSessionCleared(page: Page): Promise<void> {
+  const name = await appSessionCookieName();
   await expect
-    .poll(
-      async () =>
-        (await page.context().cookies()).some((cookie) => cookie.name === SESSION_COOKIE_NAME),
-      { timeout: 5000 },
-    )
+    .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === name), {
+      timeout: 5000,
+    })
     .toBe(false);
 }
 

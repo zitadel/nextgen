@@ -35,3 +35,27 @@ tasks:
     deps:
       # contract.spec.ts imports @zitadel/components/events from its dist.
       - "components:build"
+    inputs:
+      - "**/*"
+      # contract.spec.ts reads these SDK specs to check their copied
+      # SERVER_RENDER_CASES tables and standard-attribute test titles and bodies for drift.
+      - "/packages/sdk-react/src/index.spec.tsx"
+      - "/packages/sdk-vue/src/components.spec.ts"
+      - "/packages/sdk-angular/src/lib/components.spec.ts"
+      - "/packages/sdk-svelte/src/index.spec.ts"
+      - "/packages/sdk-svelte/src/index.ssr.spec.ts"
+      - "/packages/sdk-solid/src/index.spec.tsx"
+      - "/packages/sdk-solid/src/index.ssr.spec.tsx"
+      - "/packages/sdk-qwik/src/index.spec.tsx"
+      - "/packages/sdk-qwik/src/index.ssr.spec.tsx"
+      # And the meta-framework SDKs' server tests, to check they share their titles.
+      - "/packages/sdk-*/src/__tests__/*.test.ts"
+      - "/packages/sdk-*/src/__tests__/*/*.test.ts"
+      # It also reads every SDK's manifest and docs, and the demo apps' manifests
+      # and sources, to check that apps go through their SDK.
+      - "/packages/sdk-*/package.json"
+      - "/packages/sdk-*/README.md"
+      - "/packages/sdk-*/skills/**/SKILL.md"
+      - "/apps/demo-*/package.json"
+      - "/apps/demo-*/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,vue,svelte,astro}"
+      - "!/apps/demo-*/**/node_modules/**/*"

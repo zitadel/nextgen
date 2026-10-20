@@ -22,9 +22,8 @@ tasks:
     deps:
       - "api-mock:build"
       - "components:build"
-    # Runs in CI: the Vercel deploy builds the static site from this task, and
-    # Vercel is a CI environment, so a `runInCI: false` here would make moon
-    # report "no tasks found" for `storybook:build` and fail the deploy.
+    # The cloud's storybook service builds the site with turbo
+    # (`turbo run build`, repo-root vercel.json), not through this task.
 
   # Installs the Chromium that @storybook/addon-vitest drives. Mirrors the
   # journey e2e pattern (browsers aren't preinstalled on CI runners).

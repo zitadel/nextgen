@@ -7,9 +7,11 @@ import { Readable } from "node:stream";
 
 import { expect } from "vitest";
 
+import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
+import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
 
 const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
@@ -227,6 +229,25 @@ export class ScaffoldedApp {
     });
   }
 
+  /**
+   * `setup --framework next` in a directory without an app, so setup creates
+   * one: with stand-ins for the generator on PATH, nothing is downloaded.
+   */
+  async setupNewApp(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(
+      [
+        "setup",
+        "--non-interactive",
+        "--json",
+        "--skip-install",
+        "--framework",
+        "next",
+        ...extraArgs,
+      ],
+      { PATH: await aFakeAppGeneratorPath() },
+    );
+  }
+
   /** The client secret is never a flag, so it is piped as a script would. */
   setupWithSso(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>
@@ -379,6 +400,49 @@ export class ScaffoldedApp {
     });
   }
 
+  /** An app in a directory inside this one, the way a developer nests one under `start`. */
+  async appInside(name: string): Promise<ScaffoldedApp> {
+    await mkdir(join(this.path, name), { recursive: true });
+    return new ScaffoldedApp(join(this.path, name));
+  }
+
+  /** Runs `doctor` without naming a port, so it checks the one this directory's server uses. */
+  async doctorAtItsServer(): Promise<CliResult> {
+    const docker = await fakeDocker();
+    return this.cli(["doctor", "--json"], {
+      PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: docker.logPath,
+    });
+  }
+
+  /** The port a `doctor` run reported it checked. */
+  doctoredPortOf(result: CliResult): number {
+    return this.envelopeOf<{ port: number }>(result).data.port;
+  }
+
+  /** The argument lists a failed `doctor` run offered as recovery, for an agent to run as they are. */
+  suggestedArgsOf(result: CliResult): string[][] {
+    const { details } = this.envelopeOf<Record<string, unknown>>(result) as unknown as {
+      details?: { suggested_args?: string[][] };
+    };
+    return details?.suggested_args ?? [];
+  }
+
+  /** Leaves this directory with the record of a local server that is not running. */
+  async writeStoppedServerRecord(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
+    await writeFile(
+      join(this.path, ".zitadel/local/runtime.json"),
+      JSON.stringify(aBinaryRecord({ port: nextPort() })),
+    );
+  }
+
+  /** Leaves this directory with a record of its local server that is JSON but not a record. */
+  async writeMalformedServerRecord(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
+    await writeFile(join(this.path, ".zitadel/local/runtime.json"), JSON.stringify({ x: 1 }));
+  }
+
   /**
    * Starts this app's local server from a stand-in for the server binary, on a
    * port from this worker unless one is named.
@@ -440,12 +504,18 @@ export class ScaffoldedApp {
 
   /** The port a start reported its server on. */
   localPortOf(result: CliResult): number {
-    return this.envelopeOf<{ runtime: { port: number } }>(result).data.runtime.port;
+    return this.localRuntimeOf(result).port;
   }
 
   /** The process a start reported its server as. */
   localPidOf(result: CliResult): number {
-    return this.envelopeOf<{ runtime: { pid: number } }>(result).data.runtime.pid;
+    return this.localRuntimeOf(result).pid;
+  }
+
+  /** The server a start reported; a refused start fails here with its error code. */
+  private localRuntimeOf(result: CliResult): { port: number; pid: number } {
+    expect(result, "start should have succeeded").toSucceed();
+    return this.envelopeOf<{ runtime: { port: number; pid: number } }>(result).data.runtime;
   }
 
   /** Leaves this directory with a record of its local server that cannot be read. */
@@ -639,6 +709,15 @@ export class ScaffoldedApp {
 
   writeProjectFile(relativePath: string, contents: string): Promise<void> {
     return writeFile(join(this.path, relativePath), contents);
+  }
+
+  /** Leaves `version` of `name` in the app's `node_modules`, as its lockfile installed it. */
+  async hasInstalled(name: string, version: string): Promise<void> {
+    await mkdir(join(this.path, "node_modules", name), { recursive: true });
+    await this.writeProjectFile(
+      `node_modules/${name}/package.json`,
+      JSON.stringify({ name, version }),
+    );
   }
 
   deleteProjectFile(relativePath: string): Promise<void> {
@@ -949,6 +1028,17 @@ export async function anApp({
     join(path, "app/layout.tsx"),
     "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
+  return new ScaffoldedApp(path);
+}
+
+/**
+ * An empty directory for setup to create a new app in, under a name npm
+ * accepts for a package, which setup requires of one.
+ */
+export async function aNewAppDirectory(): Promise<ScaffoldedApp> {
+  const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
+  const path = join(parent, "my-app");
+  await mkdir(path);
   return new ScaffoldedApp(path);
 }
 

@@ -1,9 +1,9 @@
 /**
  * Compile-time fixtures for the shipped React JSX declarations
- * (`@zitadel/components/jsx`, pulled in through the `@zitadel/sdk-next/jsx`
+ * (the widget JSX types, pulled in through the `@zitadel/sdk-next/jsx`
  * reference in `custom-elements.d.ts`). Never imported at runtime —
  * `tsc --noEmit` is the assertion. The textual drift spec in
- * `@zitadel/components` keeps the property NAMES aligned with the elements;
+ * the components package keeps the property NAMES aligned with the elements;
  * this file exercises what only a real consumer program can: React's
  * standard props (`ref`, `key`, `className`) and the property value types.
  */

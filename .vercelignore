@@ -1,0 +1,11 @@
+# Paths no deployment is built from. git does not track them, so a Git
+# deployment never sees them; this keeps a CLI deployment (`vercel deploy`)
+# from uploading them and `vercel dev` (scripts/run-cloud.mjs) from watching
+# them: the desktop app's worktrees are whole checkouts, the rest caches and
+# local state. Vercel ignores node_modules on its own.
+.claude
+.go
+.turbo
+.moon/cache
+.zitadel
+tmp

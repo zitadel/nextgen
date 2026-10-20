@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"reflect"
 	"time"
 )
 
@@ -117,6 +118,21 @@ type Branding struct {
 	Typography     BrandingTypography
 	Shape          BrandingShape
 	CreatedAt      time.Time
+}
+
+// Equal reports whether b and other carry the same author-facing content.
+// Identity fields (project, revision id, timestamps) are ignored.
+func (b *Branding) Equal(other *Branding) bool {
+	if b == nil || other == nil {
+		return b == other
+	}
+	return b.Layout == other.Layout &&
+		b.LiquidTemplate == other.LiquidTemplate &&
+		b.LogoURL == other.LogoURL &&
+		b.HeroURL == other.HeroURL &&
+		reflect.DeepEqual(b.Theme, other.Theme) &&
+		reflect.DeepEqual(b.Typography, other.Typography) &&
+		reflect.DeepEqual(b.Shape, other.Shape)
 }
 
 // BrandingTheme names the sides a revision publishes. An absent side is never
