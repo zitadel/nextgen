@@ -6,8 +6,10 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  proxySessionCookies,
   requiresProjectSecret,
   resolveSession,
+  serializeSessionCookie,
 } from "@zitadel/sdk-core/middleware";
 
 /**
@@ -33,8 +35,10 @@ export type NextgenRequestDecision =
       readonly type: "continue";
       readonly auth: AuthResult;
       /**
-       * `Set-Cookie` values the response to this request must carry — the
-       * clearing of dead session cookies. Empty or absent when there are none.
+       * `Set-Cookie` values the response to this request must carry: a dead
+       * session cookie cleared, or a session of this project moved out of the
+       * shared cookie into the project's own. Empty or absent when there are
+       * none.
        */
       readonly setCookies?: readonly string[];
     };
@@ -81,11 +85,17 @@ function buildUpstreamHeaders(
   return headers;
 }
 
+/**
+ * Forwards a `/__nextgen/*` request to the upstream auth backend. The session
+ * cookie travels under this project's name in the browser and the server's name
+ * upstream ({@link proxySessionCookies}).
+ */
 async function proxyRequest(
   request: Request,
   url: URL,
   authUrl: string,
   proxyPath: string,
+  projectId: string | undefined,
   projectSecret: string | undefined,
   clientAddress: string | undefined,
   proxyTimeoutMs: number,
@@ -98,6 +108,21 @@ async function proxyRequest(
   const body = hasBody ? await request.arrayBuffer() : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(request, url, clientAddress);
+  const sessionCookies = proxySessionCookies(
+    {
+      method,
+      path: suffix,
+      search: url.search,
+      cookie: request.headers.get("cookie"),
+      requestUrl: url,
+    },
+    projectId,
+  );
+  if (sessionCookies.upstreamCookie === null) {
+    upstreamHeaders.delete("cookie");
+  } else {
+    upstreamHeaders.set("cookie", sessionCookies.upstreamCookie);
+  }
 
   // ADR 036: attach the project secret only to the handoff exchange — on every
   // operation it would make this public boundary an open relay with project
@@ -121,12 +146,12 @@ async function proxyRequest(
   // The app's own request URL: the origin a proxied redirect may name, and the
   // base a relative one resolves against (the IdP callback's 303 needs it).
   const responseHeaders = filterResponseHeaders(upstream.headers, url.toString());
-  const setCookies = upstream.headers.getSetCookie?.() ?? [];
-  for (const cookie of setCookies) {
+  const answer = await sessionCookies.toBrowser(upstream);
+  for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
   }
 
-  return new Response(upstream.body, {
+  return new Response(answer.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
@@ -143,10 +168,6 @@ function parseCookieHeader(header: string | null): Map<string, string> {
     if (name) jar.set(name, value);
   }
   return jar;
-}
-
-function clearCookie(name: string): string {
-  return `${name}=; Path=/; Max-Age=0`;
 }
 
 /**
@@ -214,6 +235,7 @@ export async function handleNextgenRequest(
       url2,
       url,
       proxyPath,
+      projectId,
       projectSecret,
       clientAddress,
       proxyTimeoutMs,
@@ -224,9 +246,12 @@ export async function handleNextgenRequest(
   const cookies = parseCookieHeader(request.headers.get("cookie"));
   const authHeader = request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cookieToken = cookies.get("__nextgen_session") ?? null;
-  const { auth, clearCookies, undecided } = await resolveSession(
-    { bearer: bearerToken, cookie: cookieToken },
+  const {
+    auth,
+    undecided,
+    cookies: sessionCookies,
+  } = await resolveSession(
+    { bearer: bearerToken, cookie: (name) => cookies.get(name), requestUrl: url2 },
     {
       url,
       projectId,
@@ -239,9 +264,13 @@ export async function handleNextgenRequest(
     },
   );
 
-  if (auth.isAuthenticated) {
-    return { type: "continue", auth };
-  }
+  // A dead session's cookie is cleared so the browser stops replaying it (each
+  // replay costs a backend session check), and a session of this project still
+  // under the shared name moves to the project's own cookie. A live session that
+  // signs no one in here (an anonymous one, whose sign-in may still complete, or
+  // one of another project) keeps its cookie, and so does one the backend gave
+  // no verdict on.
+  const setCookies = sessionCookies.map(serializeSessionCookie);
 
   // The backend could not say whether the session is live. The user may well
   // be signed in, so a protected route answers 503 rather than send them to
@@ -250,16 +279,7 @@ export async function handleNextgenRequest(
     return { type: "reject", response: new Response("Service Unavailable", { status: 503 }) };
   }
 
-  // Dead credentials are cleared on every unauthenticated response so the
-  // browser stops replaying them (each replay costs a backend session check).
-  // A live session that signs no one in here (an anonymous one, whose sign-in
-  // may still complete, or one of another project) keeps its cookie, and so
-  // does one the backend gave no verdict on.
-  const setCookies = clearCookies
-    ? [...cookies.keys()].filter((name) => name.startsWith("__nextgen")).map(clearCookie)
-    : [];
-
-  if (matchesRoutes(pathname, protectedRoutes)) {
+  if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
     const headers = new Headers({ location: loginRedirectUrl(loginPath, url2).toString() });
     for (const cookie of setCookies) {
       headers.append("set-cookie", cookie);
