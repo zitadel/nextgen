@@ -30,8 +30,8 @@ const renderWidget = async (name: WidgetName, props: EdgeProps): Promise<string>
   );
 };
 
-// edge-render:begin
-describe("the SDK in the edge runtime", () => {
+// edge-entry:begin
+describe("the SDK entry in the edge runtime", () => {
   it("runs without a DOM", () => {
     expect(typeof HTMLElement).toBe("undefined");
     expect(typeof document).toBe("undefined");
@@ -41,7 +41,11 @@ describe("the SDK in the edge runtime", () => {
   it("keeps the locale data it re-exports", () => {
     expect(Object.keys(businessLocales).length).toBeGreaterThan(0);
   });
+});
+// edge-entry:end
 
+// edge-render:begin
+describe("the SDK in the edge runtime", () => {
   it.each(widgetNames)(
     "renders the %s widget as its custom element with its attributes",
     async (name) => {
