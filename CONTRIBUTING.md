@@ -126,9 +126,12 @@ repository to be checked out, and corepack: without a `pnpm` on `PATH`, the
 wrapper puts [`scripts/shims/pnpm`](scripts/shims/pnpm) there for every build
 and for the generated app's install.
 
-Before invoking the local CLI, the wrapper builds and packs the public workspace
-packages, publishes them to a persistent local Verdaccio registry under
-`tmp/cli-local-registry`, and points the generated app install at that registry.
+For `setup`, the wrapper builds (cached) and packs only the packages a generated
+app installs (`APP_RELEASE_PACKAGES` in
+[`scripts/release-manifest.mjs`](scripts/release-manifest.mjs)), publishes them
+to a local Verdaccio registry under `tmp/cli-local-registry`, and points the
+generated app install at that registry. Test the release tarballs with
+`moon run release:pack` or the [journey](e2e/journey/AGENTS.md) instead.
 Set `ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` to install public npm packages in the
 generated app instead of local ones. The scaffolded app's lockfile points at the
 wrapper's local registry, so reinstalling it after the wrapper exits fails until

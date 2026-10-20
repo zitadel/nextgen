@@ -3,7 +3,9 @@ import { spawn } from "node:child_process";
 import { cp, mkdir, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+import { runCapture } from "../../../scripts/dev-process.mjs";
+import { packPublicPackages } from "../../../scripts/release-artifacts.mjs";
+import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 import { runnerCommand } from "../../../scripts/task-runner.mjs";
 import { packageName, parsePort } from "./lib.mjs";
 
@@ -58,16 +60,22 @@ export async function prepareLocalRegistry(input) {
   await writeVerdaccioConfig(paths.verdaccioConfigPath, paths.storagePath, input);
   await writeVerdaccioNpmrc(paths.npmrcPath, input.registryUrl, input);
 
-  await buildPackages(input.repoRoot, input.run, env, log, input.prebuiltTarballsDir);
-  await packPackages(
-    input.repoRoot,
-    paths.tarballsDir,
-    input.run,
-    env,
-    log,
-    input.prebuiltTarballsDir,
-  );
-  await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env);
+  if (input.packageSet === "app") {
+    await buildAppPackages(input.repoRoot, input.run, env, log);
+    await packAppPackages(input.repoRoot, paths.tarballsDir, env, log, input.runCapture);
+    await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env, ["--app-packages"]);
+  } else {
+    await buildPackages(input.repoRoot, input.run, env, log, input.prebuiltTarballsDir);
+    await packPackages(
+      input.repoRoot,
+      paths.tarballsDir,
+      input.run,
+      env,
+      log,
+      input.prebuiltTarballsDir,
+    );
+    await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env);
+  }
   const startRegistry = input.startLocalRegistry ?? startLocalRegistry;
   const registry = await startRegistry({
     env,
@@ -127,8 +135,39 @@ export async function packPackages(
   }
 }
 
-export async function verifyTarballs(repoRoot, tarballsDir, run, env) {
-  await run("node", ["e2e/journey/scripts/verify-tarballs.mjs", tarballsDir], {
+// The `app` package set: what a generated app installs, packed from the
+// packages' cached dev builds. `release:pack` rebuilds every public package
+// after cli:test and cross-compiles the server for every platform, none of
+// which a generated app installs.
+export async function buildAppPackages(repoRoot, run, env, log = () => undefined) {
+  log(`building ${APP_RELEASE_PACKAGES.map((pkg) => pkg.name).join(", ")}`);
+  const build = runnerCommand(
+    APP_RELEASE_PACKAGES.map((pkg) => `${pkg.moonProject}:build`),
+    env,
+  );
+  await run(build.command, build.args, { cwd: repoRoot, env });
+}
+
+// Each pack runs on pipes of its own (runReplayed in scripts/dev-process.mjs
+// says why); a failed pack's error carries its output.
+export async function packAppPackages(
+  repoRoot,
+  tarballsDir,
+  env,
+  log = () => undefined,
+  runCaptureFn = runCapture,
+) {
+  log(`packing npm tarballs into ${tarballsDir}`);
+  await packPublicPackages({
+    repoRoot,
+    dirs: APP_RELEASE_PACKAGES.map((pkg) => pkg.dir),
+    tarballsDir,
+    run: (command, args, options) => runCaptureFn(command, args, { ...options, env }),
+  });
+}
+
+export async function verifyTarballs(repoRoot, tarballsDir, run, env, flags = []) {
+  await run("node", ["e2e/journey/scripts/verify-tarballs.mjs", tarballsDir, ...flags], {
     cwd: repoRoot,
     env,
   });
