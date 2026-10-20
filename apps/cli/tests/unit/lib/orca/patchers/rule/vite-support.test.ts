@@ -1,9 +1,13 @@
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { SESSION_COOKIE_MARKER } from "../../../../../../src/lib/orca/patchers/rule/session-cookie";
 import {
   viteProxyEdit,
   viteSessionCookieEdit,
+  viteSessionCookieVerdict,
 } from "../../../../../../src/lib/orca/patchers/rule/vite-support";
 import { REMOTE_HOST, useRemoteServer } from "../../../../../helpers/remote-server";
 import { aViteApp, type DevApp } from "../../../../../helpers/vite";
@@ -102,9 +106,9 @@ describe("viteProxyEdit", () => {
 
     expect(out).toContain(SESSION_COOKIE_MARKER);
     expect(out).toContain('loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_ID');
-    expect(out).toContain(
-      'proxy.on("proxyRes", (proxyRes) => renameSessionCookie(proxyRes, appCookie));',
-    );
+    // The listeners themselves, so Vite's types reach their parameters.
+    expect(out).toContain('proxy.on("proxyRes", (proxyRes) => {');
+    expect(out).not.toMatch(/function \w+\(/);
   });
 
   it("is idempotent — re-running over its own output changes nothing", () => {
@@ -311,6 +315,154 @@ export default defineConfig({
 
   it("throws E_VALIDATION when the config is missing", () => {
     expect(() => sessionCookieEdit(undefined)).toThrowError(/not found/);
+  });
+
+  // A config saved on Windows: the parser's offsets must index the text the
+  // hooks are spliced into, or a statement after the bearer hook is cut apart.
+  it("gives a CRLF config the hooks with CRLF line ends", () => {
+    const withLogging = bearerOnly.replace(
+      '              proxyReq.setHeader("authorization", bearer);\n            }\n          });',
+      '              proxyReq.setHeader("authorization", bearer);\n            }\n          });\n          proxy.on("error", (error) => console.error("proxy", error));',
+    );
+    expect(withLogging).not.toBe(bearerOnly);
+    const crlf = withLogging.replace(/\n/g, "\r\n");
+
+    const out = sessionCookieEdit(crlf);
+
+    expect(out).toBe(sessionCookieEdit(withLogging).replace(/\n/g, "\r\n"));
+    expect(out).toContain('proxy.on("error", (error) => console.error("proxy", error));');
+    expect(sessionCookieEdit(out)).toBe(out);
+  });
+
+  it("keeps a byte-order mark", () => {
+    const out = sessionCookieEdit(`\uFEFF${bearerOnly}`);
+
+    expect(out).toBe(`\uFEFF${sessionCookieEdit(bearerOnly)}`);
+  });
+
+  // What Prettier and Biome make of the generated hook: create-vue's Prettier
+  // drops semicolons and arrow parentheses and uses single quotes.
+  it.each([
+    ["single quotes", (config: string) => config.replace(/"/g, "'")],
+    ["no semicolons", (config: string) => config.replace(/;$/gm, "")],
+    [
+      "arrow parameters without parentheses",
+      (config: string) => config.replace(/\((\w+)\) =>/g, "$1 =>"),
+    ],
+    [
+      "create-vue's Prettier style",
+      (config: string) =>
+        config
+          .replace(/"/g, "'")
+          .replace(/;$/gm, "")
+          .replace(/\((\w+)\) =>/g, "$1 =>"),
+    ],
+  ])("finds the entry it wrote in %s", (_label, format) => {
+    const formatted = format(bearerOnly);
+    expect(formatted).not.toBe(bearerOnly);
+
+    const out = sessionCookieEdit(formatted);
+
+    expect(viteSessionCookieVerdict(formatted)).toBe("detached");
+    expect(out).toContain(SESSION_COOKIE_MARKER);
+    expect(viteSessionCookieVerdict(out)).toBe("applied");
+  });
+});
+
+describe("viteSessionCookieVerdict", () => {
+  const bearerOnly = edit(PREVIOUS_CONFIG);
+
+  it("reads a config with the hooks as applied", () => {
+    expect(viteSessionCookieVerdict(edit(BARE_CONFIG))).toBe("applied");
+  });
+
+  it("reads the entry it wrote before the hooks as detached", () => {
+    expect(viteSessionCookieVerdict(bearerOnly)).toBe("detached");
+    expect(viteSessionCookieVerdict(bearerOnly.replace(/\n/g, "\r\n"))).toBe("detached");
+  });
+
+  it("reads a config without the CLI's entry as detached, since the proxy edit writes it with them", () => {
+    expect(viteSessionCookieVerdict(BARE_CONFIG)).toBe("detached");
+  });
+
+  // The edit leaves such an entry as it is, so its output says nothing.
+  it("does not read an entry whose bearer hook was changed as applied", () => {
+    const changed = bearerOnly.replace(
+      'proxyReq.setHeader("authorization", bearer);',
+      'proxyReq.setHeader("authorization", bearer);\n              console.debug("exchange");',
+    );
+
+    expect(sessionCookieEdit(changed)).toBe(changed);
+    expect(viteSessionCookieVerdict(changed)).toEqual({
+      unknown: expect.stringContaining("must be added by hand"),
+    });
+  });
+});
+
+/** The CLI package: a config checked from here resolves `vite` and `@types/node` as an app does. */
+const CLI_ROOT = fileURLToPath(new URL("../../../../../../", import.meta.url));
+
+/**
+ * The diagnostics of `source` checked as create-vite's TypeScript templates
+ * check their `vite.config.ts` (`tsconfig.node.json`): strict, with no unused
+ * locals or parameters.
+ */
+function strictDiagnostics(source: string): string[] {
+  const file = join(CLI_ROOT, "vite.config.strict-check.ts");
+  const options: ts.CompilerOptions = {
+    target: ts.ScriptTarget.ES2023,
+    lib: ["lib.es2023.d.ts"],
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+    moduleDetection: ts.ModuleDetectionKind.Force,
+    types: ["node"],
+    allowImportingTsExtensions: true,
+    verbatimModuleSyntax: true,
+    skipLibCheck: true,
+    noEmit: true,
+    strict: true,
+    noUnusedLocals: true,
+    noUnusedParameters: true,
+    noFallthroughCasesInSwitch: true,
+  };
+  const host = ts.createCompilerHost(options);
+  const { fileExists, getSourceFile, readFile } = host;
+  host.fileExists = (name) => name === file || fileExists.call(host, name);
+  host.readFile = (name) => (name === file ? source : readFile.call(host, name));
+  host.getSourceFile = (name, version, ...rest) =>
+    name === file
+      ? ts.createSourceFile(name, source, version)
+      : getSourceFile.call(host, name, version, ...rest);
+  const program = ts.createProgram([file], options, host);
+  return ts
+    .getPreEmitDiagnostics(program)
+    .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
+}
+
+// `npm run build` of the react-ts, vue-ts, solid-ts and qwik-ts templates (and
+// svelte-ts's `npm run check`) type-checks vite.config.ts this way.
+describe("the generated vite.config.ts, type-checked as a create-vite TS template does", () => {
+  it("type-checks as setup writes it", { timeout: 60_000 }, () => {
+    expect(strictDiagnostics(sessionCookieEdit(edit(BARE_CONFIG)))).toEqual([]);
+  });
+
+  it("type-checks once doctor --fix gave the entry it wrote before the hooks", {
+    timeout: 60_000,
+  }, () => {
+    const upgraded = sessionCookieEdit(edit(PREVIOUS_CONFIG));
+
+    expect(upgraded).toContain(SESSION_COOKIE_MARKER);
+    expect(strictDiagnostics(upgraded)).toEqual([]);
+  });
+
+  // Proves the check sees what a strict build sees.
+  it("reports an untyped parameter", { timeout: 60_000 }, () => {
+    const untyped = edit(BARE_CONFIG).replace(
+      `/* ${SESSION_COOKIE_MARKER} */`,
+      `/* ${SESSION_COOKIE_MARKER} */\n    function untyped(value) { return value; }\n    untyped(1);`,
+    );
+
+    expect(strictDiagnostics(untyped).join("\n")).toMatch(/implicitly has an 'any' type/);
   });
 });
 

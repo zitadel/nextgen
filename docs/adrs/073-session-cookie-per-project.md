@@ -27,8 +27,9 @@
 - The Console, which the server serves on its own origin, keeps
   `__nextgen_session`. The Console and the apps, and apps of different
   projects, stop overwriting each other's session.
-- A session an app's users hold under the old name moves to the new name the
-  first time the app checks it.
+- A session of the app's project held under the old name is copied to the new
+  name the first time the app checks it, and the old cookie is retired at the
+  next sign-in or sign-out through the app.
 
 ## Context
 
@@ -126,18 +127,38 @@ SDK reads the old cookie only where the server holds the answer to the app's
 project anyway:
 
 - **Middleware:** with no project cookie, it checks `__nextgen_session` in the
-  app's project, as it does today. A session that signs a user in moves: the
-  response sets the project's cookie to the same value, its `Max-Age` from the
-  session's `expires_at` (a JWT's `exp`), and clears the old cookie. That
-  cookie held this project's session, so nobody else loses theirs. Another
-  project's session and an anonymous one keep their cookie untouched; a dead
-  one is cleared, as today.
+  app's project, as it does today. A session that signs a user in is copied:
+  the response sets the project's cookie to the same value, its `Max-Age` from
+  the session's `expires_at` (a JWT's `exp`), and leaves the old cookie. On a
+  server without platform bootstrap (the Docker Compose quick start, a server
+  run by hand) the Console signs in to the app's project, so that cookie may
+  be the Console's: clearing it on every page would sign the Console out, and
+  the two would keep taking the session from each other. Another project's
+  session and an anonymous one keep their cookie untouched; a dead one is
+  cleared, as today. The middleware remembers for a few minutes which tokens
+  the server placed in another project (by a hash), so a signed-out visitor's
+  requests do not ask about the Console's session again.
 - **Proxy:** with no project cookie, it forwards `__nextgen_session` to one
   call only, `GET /sessions/me?project_id=<project>`, the probe the widgets and
   `getSession()` send, which the server refuses for another project's session.
-  An answer that signs a user in moves the cookie the same way. This covers a
+  An answer that signs a user in copies the cookie the same way. This covers a
   Next.js page outside the middleware `matcher`, which never runs the middleware.
   Every other proxied call goes without the old cookie.
+- **Sign-in and sign-out:** left in place, the old cookie would sign its user
+  back in once the app's own cookie is gone: after a sign-out, or once a newer
+  session the app signed in expires. So when `POST /sessions/exchange` sets the
+  app's session, or `DELETE /sessions/me` ends it, and the browser still holds
+  `__nextgen_session`, the proxy asks the server about that session in the
+  app's project (`GET /sessions/me?project_id=<project>`). A session of the
+  project is cleared, and on sign-out also ended; a dead one is cleared; one of
+  another project, the Console's on `localhost`, stays, and so does one the
+  server gave no verdict on.
+- **Cookie attributes:** every response that sets a session cookie sends
+  `Cache-Control: private, no-store`, as the server does on its session
+  answers, so no shared cache hands a session token to the next visitor.
+  `Secure` follows the server's rule on the scheme and host a proxy in front of
+  the app forwarded (`X-Forwarded-Proto`, `X-Forwarded-Host`), so an app behind
+  a TLS proxy that talks to it over loopback keeps it.
 
 Old and new SDKs on one host: an SDK from before this change still clears every
 `__nextgen*` cookie when its own session is dead, the new apps' cookies
@@ -151,7 +172,8 @@ included. Upgrading it ends that.
   the demos' SDK proxies rename in front of it, as they do in front of the real
   one.
 - **`@zitadel/testing`**: `SESSION_COOKIE_NAME` stays the server's name, the
-  one direct calls to the server and SPA apps use. A new
+  one direct calls to the server use, and an SPA whose dev proxy knows no
+  project. A new
   `sessionCookieName(projectId)` names the cookie a server SDK keeps. The
   `authenticatedPage` fixture signs its browser context in under both names,
   so it works on either kind of app.
@@ -194,14 +216,17 @@ through, so on `localhost` an SPA and the Console still shared a slot.
   to the SPA once more. Production SPAs, behind a proxy of their own, keep the
   server's name: a production host serves one project, and the SPA never reads
   the cookie.
-- **Existing apps.** Setup and `doctor --fix` recognize the proxy the CLI wrote
-  and add the two cookie hooks next to its bearer hook, leaving the user's
-  changes elsewhere alone: in `vite.config.*`, the `/__nextgen` entry with the
+- **Existing apps.** `doctor --fix` recognizes the proxy the CLI wrote and adds
+  the two cookie hooks next to its bearer hook, leaving the user's changes
+  elsewhere alone: in `vite.config.*`, the `/__nextgen` entry with the
   `zitadel:proxy:v2` marker and the generated bearer hook, however a formatter
-  laid it out since; in `proxy.conf.cjs`, the managed file with its generated
-  hooks. It is a `convenience` wiring: until it is applied, `doctor` warns
-  instead of failing, because sign-in works without it. A proxy the CLI does not
-  recognize is left alone and keeps the shared cookie.
+  laid it out since (quotes, semicolons, arrow parentheses, line ends); in
+  `proxy.conf.cjs`, the managed file with its generated hooks. Setup does not:
+  it leaves an app that is already set up alone. It is a `convenience` wiring:
+  until it is applied, `doctor` warns instead of failing, because sign-in works
+  without it, and names `doctor --fix` as the remedy. A proxy the CLI does not
+  recognize is left alone and keeps the shared cookie, and `doctor` warns that
+  the hooks must be added by hand.
 
 ### Not covered
 
@@ -218,6 +243,9 @@ through, so on `localhost` an SPA and the Console still shared a slot.
 - On `localhost` the Console and each app keep their own session; signing in to
   one leaves the others signed in.
 - A sign-out through an app's proxy ends that app's session only.
-- Users of an upgraded app stay signed in; the move happens on their first
-  request the middleware or the session probe sees.
+- Users of an upgraded app stay signed in; the copy happens on their first
+  request the middleware or the session probe sees, and the old cookie goes at
+  their next sign-in or sign-out through the app. On a server where the Console
+  shares the app's project, that sign-in or sign-out also signs the Console out
+  in this browser.
 - The browser holds one more cookie per project signed in on a host.

@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { runInNewContext } from "node:vm";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import { AngularPatcher } from "../../../../../../../src/lib/orca/patchers/rule/angular";
@@ -62,6 +64,75 @@ function proxyConfigEdit(): (source: string | undefined) => string {
     throw new Error("expected a proxy.conf.cjs edit op in the Angular plan");
   }
   return op.edit;
+}
+
+/** The session-cookie op's own doctor verdict. */
+function sessionCookieVerdict(): NonNullable<Extract<FileOp, { kind: "edit" }>["verify"]> {
+  const op = new AngularPatcher()
+    .plan(ctx())
+    .ops.filter(
+      (candidate): candidate is Extract<FileOp, { kind: "edit" }> =>
+        candidate.kind === "edit" && candidate.path === "proxy.conf.cjs",
+    )
+    .find((candidate) => candidate.wiring === "convenience");
+  if (!op?.verify) {
+    throw new Error("expected the session-cookie op to bring its own verify");
+  }
+  return op.verify;
+}
+
+/** The managed proxy.conf.cjs the first CLI alphas wrote: it read zitadel.json, and had no `env`. */
+const FIRST_ALPHA_PROXY_CONF = `${MANAGED_MARKER}
+const { readFileSync } = require("node:fs");
+
+const config = JSON.parse(readFileSync("zitadel.json", "utf8"));
+if (!config.project || !config.server) {
+  throw new Error("zitadel.json is missing \\"project\\" or \\"server\\"; re-run zitadel setup.");
+}
+const bearer = \`Bearer sk_\${config.project}\`;
+
+function setBearer(proxyReq) {
+  proxyReq.setHeader("authorization", bearer);
+}
+
+function stripPrefix(path) {
+  return path.replace(/^\\/__nextgen/, "").replace(/^(?!\\/)/, "/");
+}
+
+module.exports = {
+  "/__nextgen": {
+    target: config.server,
+    changeOrigin: false,
+    pathRewrite: stripPrefix,
+    rewrite: stripPrefix,
+    onProxyReq: setBearer,
+    configure: (proxy) => proxy.on("proxyReq", setBearer),
+  },
+};
+`;
+
+/** Runs a `proxy.conf.cjs` as Node would load it, with `files` as the only ones `node:fs` sees. */
+function loadProxyConf(source: string, files: Record<string, string>): Record<string, unknown> {
+  const module = { exports: {} as Record<string, unknown> };
+  const fs = {
+    existsSync: (path: string) => path in files,
+    readFileSync: (path: string) => {
+      const contents = files[path];
+      if (contents === undefined) {
+        throw new Error(`ENOENT: ${path}`);
+      }
+      return contents;
+    },
+  };
+  runInNewContext(source, {
+    module,
+    exports: module.exports,
+    require: (id: string) => (id === "node:fs" ? fs : undefined),
+    process: { env: {} },
+    URL,
+    TextEncoder,
+  });
+  return module.exports;
 }
 
 /** The `proxy.conf.cjs` edit that gives the managed proxy its session-cookie hooks. */
@@ -141,8 +212,68 @@ describe("AngularPatcher.plan", () => {
     const proxy = proxyConfigEdit()(undefined);
 
     expect(proxy).toContain(SESSION_COOKIE_MARKER);
-    expect(proxy).toContain("process.env.ZITADEL_PROJECT_ID ?? env.ZITADEL_PROJECT_ID");
-    expect(proxy).toContain("onProxyRes: (proxyRes) => renameSessionCookie(proxyRes, appCookie),");
+    expect(proxy).toContain(
+      'process.env.ZITADEL_PROJECT_ID ?? (typeof env === "undefined" ? undefined : env.ZITADEL_PROJECT_ID)',
+    );
+    expect(proxy).toContain("onProxyRes: renameSessionCookie,");
+  });
+
+  // A file saved on Windows: the exact text the edits look for has LF line ends.
+  it("gives a CRLF managed proxy the session-cookie hooks with CRLF line ends", () => {
+    const crlf = bearerOnlyProxyConf().replace(/\n/g, "\r\n");
+
+    const out = sessionCookieEdit()(crlf);
+
+    expect(out).toBe(proxyConfigEdit()(undefined).replace(/\n/g, "\r\n"));
+    expect(sessionCookieEdit()(out)).toBe(out);
+    expect(sessionCookieVerdict()(crlf)).toBe("detached");
+    expect(sessionCookieVerdict()(out)).toBe("applied");
+  });
+
+  it("migrates a CRLF legacy managed proxy's bearer hook", () => {
+    const legacy = proxyConfigEdit()(undefined).replace(
+      /\/\* zitadel:proxy:v2 \*\/\nfunction setBearer\(proxyReq\) \{[\s\S]*?\n\}/,
+      'function setBearer(proxyReq) {\n  proxyReq.setHeader("authorization", bearer);\n}',
+    );
+    expect(legacy).not.toContain("zitadel:proxy:v2");
+
+    const out = proxyConfigEdit()(legacy.replace(/\n/g, "\r\n"));
+
+    expect(out).toBe(proxyConfigEdit()(undefined).replace(/\n/g, "\r\n"));
+  });
+
+  // The first alphas read zitadel.json, not .env.local into `env`. Their
+  // bearer hook migrates to the current one, after which the session-cookie
+  // edit recognizes the file; the hooks must not assume `env`.
+  it("upgrades a managed proxy from before it read .env.local into a file that loads", () => {
+    const upgraded = sessionCookieEdit()(proxyConfigEdit()(FIRST_ALPHA_PROXY_CONF));
+    expect(upgraded).toContain(SESSION_COOKIE_MARKER);
+
+    const loaded = loadProxyConf(upgraded, {
+      "zitadel.json": '{"project":"p","server":"http://s"}',
+    });
+    const proxyReq = {
+      path: "/sessions/me",
+      method: "GET",
+      getHeader: () => "a=1",
+      setHeader: vi.fn(),
+    };
+    (loaded["/__nextgen"] as { onProxyReq(proxyReq: unknown): void }).onProxyReq(proxyReq);
+
+    // No project id in the environment: the cookies pass through.
+    expect(proxyReq.setHeader).not.toHaveBeenCalled();
+  });
+
+  it("reads a managed proxy changed by hand as unknown, not applied", () => {
+    const custom = bearerOnlyProxyConf().replace(
+      "    onProxyReq: setBearer,\n",
+      "    onProxyReq: (proxyReq) => setBearer(proxyReq),\n",
+    );
+
+    expect(sessionCookieEdit()(custom)).toBe(custom);
+    expect(sessionCookieVerdict()(custom)).toEqual({
+      unknown: expect.stringContaining("must be added by hand"),
+    });
   });
 
   it("gives the managed proxy it wrote before the session-cookie hooks", () => {
