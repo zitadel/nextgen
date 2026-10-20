@@ -73,7 +73,7 @@ The Next.js SDK wires App Router applications through one server-side middleware
     };
     ```
 
-    Set `ZITADEL_URL`, `ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_SECRET`, and `NEXT_PUBLIC_ZITADEL_PROJECT_ID` in `.env.local`. The middleware adds the project secret to the session exchange; without it, sign-in cannot finish. The middleware and `auth()` count a session only when it belongs to `ZITADEL_PROJECT_ID` (else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`); with neither, nobody is signed in. See [SDK proxy](/docs/concepts/sdk-proxy).
+    Set `ZITADEL_URL`, `ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_SECRET`, and `NEXT_PUBLIC_ZITADEL_PROJECT_ID` in `.env.local`. The middleware adds the project secret to the session exchange; without it, sign-in cannot finish. The middleware and `auth()` count a session only when it belongs to `ZITADEL_PROJECT_ID` (else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`); with neither, nobody is signed in. See [SDK proxy](/docs/sdks/proxy).
   </Tab>
 </Tabs>
 
@@ -161,6 +161,6 @@ return <zitadel-login ref={ref} post-sign-in-url="/admin" />;
 
 ## See also
 
-- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
 - [`apps/demo-next`](https://github.com/zitadel/nextgen/tree/main/apps/demo-next) — a runnable Next.js example in this repo.
 - [`@zitadel/sdk-next` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-next) and the [CLI Next.js patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/next).
