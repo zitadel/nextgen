@@ -133,6 +133,12 @@ func TestEnsurePersonalTeam_ProvisionsTeamAndMembershipTogether(t *testing.T) {
 			membership = m
 			return nil
 		})
+	var owner *domain.AuthzAssignment
+	f.stmts.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, a *domain.AuthzAssignment) error {
+			owner = a
+			return nil
+		})
 	expectEnsureTx(f)
 
 	require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, "user_1"))
@@ -149,6 +155,8 @@ func TestEnsurePersonalTeam_ProvisionsTeamAndMembershipTogether(t *testing.T) {
 	assert.Equal(t, "team_minted", membership.TeamID, "membership must join the team minted in the same transaction")
 	assert.Equal(t, "user_1", membership.UserID)
 	assert.Equal(t, domain.MembershipStatusActive, membership.Status)
+	// The owner grant: editor on that one team, for that user.
+	assert.Equal(t, domain.NewPersonalTeamOwnerAssignment(ensureTestPlatform, "team_minted", "user_1"), owner)
 }
 
 func TestEnsurePersonalTeam_TheNameIsAPureFunctionOfTheUserID(t *testing.T) {
@@ -177,6 +185,7 @@ func TestEnsurePersonalTeam_TheNameIsAPureFunctionOfTheUserID(t *testing.T) {
 			})
 		f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		f.stmts.EXPECT().CreateTeamMembership(gomock.Any(), gomock.Any()).Return(nil)
+		f.stmts.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).Return(nil)
 		expectEnsureTx(f)
 
 		require.NoError(t, f.ensurer.EnsurePersonalTeam(t.Context(), ensureTestPlatform, userID))

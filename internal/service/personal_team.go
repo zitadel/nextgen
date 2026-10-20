@@ -28,8 +28,8 @@ import (
 // before the effect existed converge on their next sign-in too.
 type PersonalTeamEnsurer interface {
 	// EnsurePersonalTeam is a no-op outside the platform project and for users
-	// that already hold an active membership. Otherwise it creates the team
-	// and its membership in one transaction.
+	// that already hold an active membership. Otherwise it creates the team,
+	// its membership and the user's owner grant on it in one transaction.
 	EnsurePersonalTeam(ctx context.Context, projectID, userID string) error
 }
 
@@ -114,12 +114,21 @@ func (s *personalTeamService) EnsurePersonalTeam(ctx context.Context, projectID,
 		}); err != nil {
 			return err
 		}
-		return tx.Statements().CreateTeamMembership(ctx, &domain.TeamMembership{
+		if err := tx.Statements().CreateTeamMembership(ctx, &domain.TeamMembership{
 			ProjectID: projectID,
 			TeamID:    team.ID,
 			UserID:    userID,
 			Status:    domain.MembershipStatusActive,
-		})
+		}); err != nil {
+			return err
+		}
+		// Membership grants nothing (ADR 054 §1); this is what lets the user
+		// rename the team they were given.
+		owner := domain.NewPersonalTeamOwnerAssignment(projectID, team.ID, userID)
+		if err := tx.Statements().CreateAuthzAssignment(ctx, owner); err != nil {
+			return err
+		}
+		return emitAuthzGranted(ctx, tx.Statements(), owner)
 	})
 
 	if err != nil {
