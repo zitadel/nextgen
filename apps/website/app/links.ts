@@ -4,5 +4,8 @@
 export const links = {
   docs: "/docs",
   quickstart: "/docs/get-started/quickstart",
+  llms: "/llms.txt",
   github: "https://github.com/zitadel/nextgen",
+  issues: "https://github.com/zitadel/nextgen/issues",
+  zitadel: "https://zitadel.com",
 } as const;

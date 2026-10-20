@@ -2,10 +2,11 @@
 /**
  * Renders the built-in schemas the server embeds
  * (`api/openapi/endpoints/schemas/*.json`) as the documents their identifiers
- * name, so that a URL such as
- * https://preview.zitadel.com/schemas/v1/user-schema.json answers with the
- * document whose `$id` it is. The hosted cloud's `schemas` service (repo-root
- * vercel.json) runs it as its build:
+ * name, so that a URL such as https://zitadel.com/schemas/v1/user-schema.json
+ * can answer with the document whose `$id` it is. The hosted cloud's `schemas`
+ * service (repo-root vercel.json) runs it as its build and serves the files
+ * under the same path; zitadel.com answers for the namespace by forwarding that
+ * path to the cloud (docs/runbooks/cloud.md#built-in-schemas):
  *
  *   node scripts/render-builtin-schemas.mjs [--base URL] [--out DIR] [--serve]
  *
@@ -46,11 +47,12 @@ import { parseArgs } from "node:util";
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 /**
- * Where the hosted cloud publishes the built-in schemas, which is the server's
- * default `schema.builtin_public_base`. It moves to https://zitadel.com/schemas/v1
- * when the preview does, together with that default.
+ * The namespace the built-in schemas are published under: the server's default
+ * `schema.builtin_public_base` (DEFAULT_BUILTIN_SCHEMA_BASE in
+ * packages/config/src/defaults.ts, which the tests hold this to). The hosted
+ * cloud serves the files at its path.
  */
-export const HOSTED_BASE = "https://preview.zitadel.com/schemas/v1";
+export const HOSTED_BASE = "https://zitadel.com/schemas/v1";
 
 /** The built-in schemas the server embeds, generated from the OpenAPI YAML. */
 export const SOURCE_DIR = join(ROOT, "api/openapi/endpoints/schemas");

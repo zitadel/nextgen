@@ -109,7 +109,7 @@ describe("the cli", () => {
 
         const result = await app.runWithoutServer(["status", "--json"]);
 
-        expect(app.envelopeOf(result).source).toBe("https://api.zitadel.cloud");
+        expect(app.envelopeOf(result).source).toBe("https://preview.zitadel.com");
       });
 
       it("prefers the server named in zitadel.json", async () => {

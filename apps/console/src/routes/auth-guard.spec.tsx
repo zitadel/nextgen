@@ -218,4 +218,43 @@ describe("authentication guard", () => {
     expect(signOut).toHaveBeenCalledOnce();
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/login"));
   });
+
+  // On localhost an app on another port can sign in while the console is open,
+  // and its session replaces the console's in the shared cookie. The screen's
+  // read names the console's project, so the server refuses that session
+  // rather than answering with the app's user, and the screen goes to sign-in
+  // as it does when the session is gone.
+  it("sends a screen whose read finds another project's session to /login", async () => {
+    // The refused loader is reported by the router; the redirect is the point.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      // The console's session until the read finds the app's in the cookie.
+      const reads: string[] = [];
+      fetchSession.mockImplementation(async () => (reads.length > 0 ? null : makeTestSession()));
+      server.use(
+        http.get("*/api/users/me", ({ request }) => {
+          reads.push(request.url);
+          return HttpResponse.json(
+            {
+              code: "sess.project_mismatch",
+              message: "The session belongs to a different project.",
+            },
+            { status: 403 },
+          );
+        }),
+      );
+      const router = await renderAt("/settings/profile");
+
+      expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
+      await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/login"));
+      expect(router.state.resolvedLocation?.search).toMatchObject({
+        next: expect.stringMatching(/^\/settings\/profile/),
+      });
+      expect(new URL(reads[0] ?? "").searchParams.get("project_id")).toBe("proj_test");
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
 });
