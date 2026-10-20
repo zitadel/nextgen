@@ -6,6 +6,7 @@ import {
   asksForClaims,
   attributesOf,
   claimedConnection,
+  claimNotes,
   claimFlagText,
   claimRequestFromFlags,
   describeMapping,
@@ -17,6 +18,7 @@ import {
   parseVerifiedEntry,
   SETUP_CLAIM_FLAGS,
   seedMapping,
+  summariseClaims,
   withClaims,
 } from "../../../../src/lib/idp";
 import {
@@ -310,14 +312,22 @@ describe("mapClaim", () => {
     const next = value(mapClaim(seeded(), { attribute: "email", claim: "mail" }));
 
     expect(next.verified).not.toHaveProperty("email");
-    expect(next.notes.join(" ")).toContain("--verified-claim email=<claim>");
+    expect(claimNotes(next).join(" ")).toContain("--verified-claim email=<claim>");
+  });
+
+  it("takes the note away once the replaced default is given a verification", () => {
+    const replaced = value(mapClaim(seeded(), { attribute: "email", claim: "mail" }));
+
+    const verified = value(verifyAttribute(replaced, { attribute: "email", source: true }));
+
+    expect(claimNotes(verified)).toEqual([]);
   });
 
   it("keeps the verification when the same claim is named again", () => {
     const next = value(mapClaim(seeded(), { attribute: "email", claim: "email" }));
 
     expect(next.verified.email).toBe("email_verified");
-    expect(next.notes).toEqual([]);
+    expect(claimNotes(next)).toEqual([]);
   });
 
   it("frees the claim a replaced default held, so another property can take it", () => {
@@ -537,6 +547,16 @@ describe("withClaims", () => {
     });
   });
 
+  it("removes the blocks a provider scaffolded when the state ends with none", () => {
+    const replaced = value(mapClaim(seeded(), { attribute: "email", claim: "mail" }));
+    const only = { ...replaced, mapping: { email: "mail" }, verified: {} };
+
+    const doc = withClaims(document({ verified_claims: { email: "email_verified" } }), only);
+
+    expect(doc).not.toHaveProperty("verified_claims");
+    expect(doc.claim_mapping).toEqual({ email: "mail" });
+  });
+
   it("leaves the keys out when there is nothing to write", () => {
     const empty = seedMapping({ oidc: { scopes: ["openid"] } }, []);
 
@@ -582,6 +602,19 @@ describe("claimedConnection", () => {
 describe("describeMapping", () => {
   it("writes one line per mapping, property first", () => {
     expect(describeMapping(seeded())).toContain("givenName ← given_name");
+  });
+
+  it("says how a mapped property is verified", () => {
+    expect(describeMapping(seeded())).toContain("email ← email (verified by email_verified)");
+    expect(
+      describeMapping(value(verifyAttribute(seeded(), { attribute: "email", source: true }))),
+    ).toContain("email ← email (the provider is trusted)");
+  });
+});
+
+describe("summariseClaims", () => {
+  it("ends with the scopes the connection asks for", () => {
+    expect(summariseClaims(seeded()).at(-1)).toBe("scopes: openid profile email");
   });
 });
 

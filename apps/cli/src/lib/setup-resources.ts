@@ -133,7 +133,7 @@ export async function materializeSetupResources(opts: {
   }
 
   const slugs = planned.map((entry) => entry.slug);
-  for (const { connectionPath, connection, selection } of planned) {
+  for (const { connectionPath, connection, selection, summary } of planned) {
     // The create comes before the file. Setup does not remove a connection
     // file it wrote -- that rule is what keeps a developer's own file safe --
     // so writing first would leave one behind on any failure here and the
@@ -161,6 +161,7 @@ export async function materializeSetupResources(opts: {
       )
     ) {
       filesWritten.push(join(opts.cwd, connectionPath));
+      consola.info(`Claims in ${connectionPath}:\n  ${summary.join("\n  ")}`);
     }
     // The same guard the syncer applies: this write puts the canonical body
     // into a file the developer commits, so a resolved secret must stop here
@@ -345,6 +346,8 @@ type PlannedConnection = {
   selection: ProviderSelection;
   /** What the claim request changed that the developer should hear about. */
   notes: readonly string[];
+  /** The mapping and scopes the file carries, one line each, for the developer to read. */
+  summary: readonly string[];
 };
 
 /** The connection each chosen provider gets, and the file it is written to. */
@@ -382,6 +385,7 @@ function planConnections(
       connection: claimed.document,
       selection: chosen.selection,
       notes: claimed.notes,
+      summary: claimed.summary,
     });
   }
   return planned;

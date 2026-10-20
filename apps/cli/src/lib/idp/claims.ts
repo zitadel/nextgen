@@ -56,8 +56,8 @@ export type MappingState = {
    * and a request may replace it; one in here is settled for this request.
    */
   readonly explicit: readonly string[];
-  /** What a request changed that the person should hear about. */
-  readonly notes: readonly string[];
+  /** Properties whose default was replaced and which had been verified by the claim replaced. */
+  readonly unverifiedByReplacing: readonly string[];
 };
 
 type StandardClaim = {
@@ -322,7 +322,7 @@ export function seedMapping(
     verified,
     scopes,
     explicit: [],
-    notes: [],
+    unverifiedByReplacing: [],
   };
 }
 
@@ -416,14 +416,25 @@ export function mapClaim(state: MappingState, entry: ClaimEntry): Parsed<Mapping
     },
     verified: replaced ? stillVerified : state.verified,
     explicit: [...state.explicit, attribute.name],
-    notes:
+    unverifiedByReplacing:
       replaced && wasVerified
-        ? [
-            ...state.notes,
-            `${attribute.name} is now filled from ${entry.claim} and is no longer verified, so a user whose ${attribute.name} must be unique is asked to confirm it at sign-up. Say how the provider verifies it with --verified-claim ${attribute.name}=<claim> (or =true to trust the provider).`,
-          ]
-        : state.notes,
+        ? [...state.unverifiedByReplacing, attribute.name]
+        : state.unverifiedByReplacing,
   });
+}
+
+/**
+ * What a person should hear about the state: a property whose default was
+ * replaced and has not been given a verification since. Worked out from the
+ * state, so verifying the property afterwards takes the note away.
+ */
+export function claimNotes(state: MappingState): string[] {
+  return state.unverifiedByReplacing
+    .filter((attribute) => !(attribute in state.verified))
+    .map(
+      (attribute) =>
+        `${attribute} is now filled from ${state.mapping[attribute]} and is no longer verified, so a user whose ${attribute} must be unique is asked to confirm it at sign-up. Say how the provider verifies it with --verified-claim ${attribute}=<claim> (or =true to trust the provider).`,
+    );
 }
 
 /**
@@ -460,23 +471,48 @@ export function applyRequest(state: MappingState, request: ClaimRequest): Parsed
   return ok(current);
 }
 
-/** The connection document with the mapping, its verification and its scopes written in. */
+/**
+ * The connection document with the mapping, its verification and its scopes
+ * written in. A block the state leaves empty is removed, not left as the
+ * provider scaffolded it: the state is what the connection ends up with.
+ */
 export function withClaims(
   document: Record<string, unknown>,
   state: MappingState,
 ): Record<string, unknown> {
+  const { claim_mapping: _mapping, verified_claims: _verified, ...rest } = document;
+  void _mapping;
+  void _verified;
   const oidc = isObject(document.oidc) ? document.oidc : {};
   return {
-    ...document,
+    ...rest,
     ...(Object.keys(state.mapping).length > 0 ? { claim_mapping: { ...state.mapping } } : {}),
     ...(Object.keys(state.verified).length > 0 ? { verified_claims: { ...state.verified } } : {}),
     oidc: { ...oidc, scopes: [...state.scopes] },
   };
 }
 
-/** `staffNumber ← employee_id`, one line per mapping, for a summary. */
+/**
+ * One line per mapping, for a summary: `staffNumber ← employee_id`, with how
+ * the provider verifies it when it does.
+ */
 export function describeMapping(state: MappingState): string[] {
-  return Object.entries(state.mapping).map(([attribute, claim]) => `${attribute} ← ${claim}`);
+  const lines = Object.entries(state.mapping).map(([attribute, claim]) => {
+    const source = state.verified[attribute];
+    const how =
+      source === undefined
+        ? ""
+        : source === true
+          ? " (the provider is trusted)"
+          : ` (verified by ${source})`;
+    return `${attribute} ← ${claim}${how}`;
+  });
+  return lines;
+}
+
+/** {@link describeMapping} and the scopes the connection asks for, as a summary prints them. */
+export function summariseClaims(state: MappingState): string[] {
+  return [...describeMapping(state), `scopes: ${state.scopes.join(" ")}`];
 }
 
 /**
@@ -487,10 +523,18 @@ export function claimedConnection(
   document: Record<string, unknown>,
   attributes: readonly SchemaAttribute[],
   request: ClaimRequest,
-): Parsed<{ readonly document: Record<string, unknown>; readonly notes: readonly string[] }> {
+): Parsed<{
+  readonly document: Record<string, unknown>;
+  readonly notes: readonly string[];
+  readonly summary: readonly string[];
+}> {
   const applied = applyRequest(seedMapping(document, attributes), request);
   return applied.ok
-    ? ok({ document: withClaims(document, applied.value), notes: applied.value.notes })
+    ? ok({
+        document: withClaims(document, applied.value),
+        notes: claimNotes(applied.value),
+        summary: summariseClaims(applied.value),
+      })
     : applied;
 }
 

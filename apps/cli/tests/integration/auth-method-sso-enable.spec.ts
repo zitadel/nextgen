@@ -663,6 +663,16 @@ describe("auth-method sso enable", () => {
           expect(result).toSay("--verified-claim email=<claim>");
         });
 
+        it("registers no verification for a default it replaced", async () => {
+          const app = await anAppWithStaffNumbers();
+          await app.enableCustomSso(ACME, ACME_CREDENTIALS, ["--claim", "email=mail"]);
+          await app.apply();
+
+          const [registered] = await app.registeredIdps();
+
+          expect(registered?.definition?.verified_claims).toBeUndefined();
+        });
+
         it("verifies a replaced default by the claim it is then given", async () => {
           const app = await anAppWithStaffNumbers();
           await app.enableCustomSso(ACME, ACME_CREDENTIALS, [
@@ -882,6 +892,22 @@ describe("auth-method sso enable", () => {
     });
 
     describe("rendered for a terminal", () => {
+      it("shows the claims the connection maps, and how they are verified", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+
+        expect(result).toSay("email ← email (verified by email_verified)");
+      });
+
+      it("shows the scopes the connection asks for", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+
+        expect(result).toSay("scopes: openid profile email");
+      });
+
       it("says which provider it enabled, and for which schema", async () => {
         const app = await aSetUpApp();
 

@@ -31,11 +31,13 @@ import {
   asksForClaims,
   askClaims,
   claimFlagText,
+  claimNotes,
   claimRequestFromFlags,
   claimsOrRefuse,
   ENABLE_CLAIM_FLAGS,
   type MappingState,
   seedMapping,
+  summariseClaims,
   withClaims,
   applySsoToSchema,
   askConnectionEndpoints,
@@ -233,7 +235,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           ),
           "",
         );
-    for (const note of mapped?.notes ?? []) {
+    for (const note of mapped === undefined ? [] : claimNotes(mapped)) {
       reportWarning(note);
     }
     if (reusing && claimsGiven) {
@@ -400,8 +402,11 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           ? mapped
           : claimsOrRefuse(applyRequest(mapped, await askClaims(mapped, this.input)), "");
       createdClaims = claims;
-      for (const note of claims.notes.slice(mapped.notes.length)) {
-        reportWarning(note);
+      const heard = new Set(claimNotes(mapped));
+      for (const note of claimNotes(claims)) {
+        if (!heard.has(note)) {
+          reportWarning(note);
+        }
       }
       const clientId = await this.input({
         kind: "text",
@@ -470,6 +475,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         publish,
       });
       consola.success(`Wrote ${plan.path}`);
+      consola.info(`Claims in ${plan.path}:\n  ${summariseClaims(claims).join("\n  ")}`);
     }
 
     const written = await this.enableInConfiguration(cwd, schema, edits);
