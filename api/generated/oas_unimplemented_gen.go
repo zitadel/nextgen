@@ -671,9 +671,11 @@ func (UnimplementedHandler) GetMySessionCsrfToken(ctx context.Context, params Ge
 // Returns the user signed in to the session that authenticates the request.
 // The project and the user both come from the session cookie, so a caller only
 // ever reads their own user.
+// With `project_id`, the user is returned only when the session belongs to
+// that project.
 //
 // GET /users/me
-func (UnimplementedHandler) GetMyUser(ctx context.Context) (r GetMyUserRes, _ error) {
+func (UnimplementedHandler) GetMyUser(ctx context.Context, params GetMyUserParams) (r GetMyUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -906,6 +908,9 @@ func (UnimplementedHandler) ListIdpRevisions(ctx context.Context, params ListIdp
 // This is not the same question as `queryProjects`, which answers with the one
 // project the calling credential is bound to. Here the session is the caller
 // and the grants are the answer, so the list spans projects.
+// With `project_id`, the projects are listed only when the session belongs to
+// that project. It names the project the session was signed in to, not one to
+// list.
 //
 // GET /users/me/projects
 func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyProjectsParams) (r ListMyProjectsRes, _ error) {
@@ -1000,9 +1005,11 @@ func (UnimplementedHandler) ListUserTeams(ctx context.Context, params ListUserTe
 // Partially updates the caller's own schema-defined attributes. The merged
 // result is validated against the user's schema before commit. Concurrent
 // writes are last-write-wins.
+// With `project_id`, the user is updated only when the session belongs to
+// that project.
 //
 // PATCH /users/me
-func (UnimplementedHandler) PatchMyUser(ctx context.Context, req *PatchMyUserRequest) (r PatchMyUserRes, _ error) {
+func (UnimplementedHandler) PatchMyUser(ctx context.Context, req *PatchMyUserRequest, params PatchMyUserParams) (r PatchMyUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

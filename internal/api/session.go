@@ -116,25 +116,33 @@ func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (a
 	return sessionToAPI(session), nil
 }
 
+// holdSessionToProject holds the cookie's session to the project the caller
+// names in project_id, on the operations that act on that session or its user
+// (/sessions/me, /users/me): a session of any other project is refused with
+// sess.project_mismatch. Callers run it before they look anything up, so the
+// refusal does not depend on the session's state: a live session of another
+// project on the same server is not one of the caller's users. The refusal
+// carries no Set-Cookie, so that session keeps its cookie.
+func holdSessionToProject(token *domain.Token, projectID api.OptProjectID) error {
+	if want, ok := projectID.Get(); ok && token.ProjectID != string(want) {
+		return domain.ErrSessionProjectMismatch()
+	}
+	return nil
+}
+
 // mySession reads the session the request's cookie names and checks that the
 // cookie is still its current token. A missing cookie and a superseded or
 // expired token come back as the auth.unauthorized verdict; the session
 // service's own errors, sess.not_found included, come back as they are, for
-// each caller to answer in its own way.
-//
-// With projectID, the /sessions/me operations hold the cookie's session to the
-// project the caller names: a session of any other project is refused with
-// sess.project_mismatch before it is looked up, whatever state it is in, because
-// a live session of another project on the same server is not one of the
-// caller's users. The refusal carries no Set-Cookie, so that session keeps its
-// cookie.
+// each caller to answer in its own way. With projectID, a session of another
+// project is refused before it is looked up (holdSessionToProject).
 func (h Handler) mySession(ctx context.Context, projectID api.OptProjectID, withUserIdentity bool) (*domain.Session, error) {
 	sessionToken, ok := sessionTokenFromContext(ctx)
 	if !ok {
 		return nil, invalidSessionCredential(domain.ErrSessionTokenInvalid())
 	}
-	if want, ok := projectID.Get(); ok && sessionToken.ProjectID != string(want) {
-		return nil, domain.ErrSessionProjectMismatch()
+	if err := holdSessionToProject(sessionToken, projectID); err != nil {
+		return nil, err
 	}
 	session, err := h.sessionService.Get(ctx, service.GetSessionInput{
 		ProjectID:        sessionToken.ProjectID,

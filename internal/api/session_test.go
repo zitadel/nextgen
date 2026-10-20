@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -133,6 +134,117 @@ func TestMySessionHoldsTheSessionToTheNamedProject(t *testing.T) {
 				require.Empty(t, rec.Header().Values("Set-Cookie"), "the session of another project keeps its cookie")
 			})
 		}
+	}
+}
+
+// TestMyUserHoldsTheSessionToTheNamedProject drives the operations on the
+// cookie's user (/users/me) through the generated server the same way: with
+// project_id, a session of another project is refused with 403
+// sess.project_mismatch before the user or its projects are looked up, and the
+// refusal clears no cookie; a session of the named project, or a request that
+// names none, is served as before.
+func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
+	t.Parallel()
+
+	operations := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{name: "read", method: http.MethodGet, path: "/users/me"},
+		{name: "patch", method: http.MethodPatch, path: "/users/me", body: `{"attributes":{"nickname":"Myself"}}`},
+		{name: "projects", method: http.MethodGet, path: "/users/me/projects"},
+	}
+	tests := []struct {
+		name    string
+		query   string
+		refused bool
+	}{
+		{name: "a session of another project", query: "?project_id=proj_app", refused: true},
+		{name: "a session of the named project", query: "?project_id=proj_other"},
+		{name: "a request that names no project", query: ""},
+	}
+	for _, op := range operations {
+		for _, tc := range tests {
+			t.Run(op.name+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				ctrl := gomock.NewController(t)
+				sid := "sess_1"
+				token := &domain.Token{
+					Type:      domain.TokenTypeSessionToken,
+					ProjectID: "proj_other",
+					SessionID: &sid,
+					TokenID:   "tkn_1",
+					UserID:    "user_1",
+				}
+				tokens := servicemocks.NewMockTokenService(ctrl)
+				tokens.EXPECT().IntrospectToken(gomock.Any(), "cookie").Return(token, nil)
+				// No expectation on a refused request: a lookup would fail the test.
+				users := &myUserService{}
+				projects := servicemocks.NewMockProjectService(ctrl)
+				if !tc.refused && op.path == "/users/me/projects" {
+					projects.EXPECT().
+						ListAuthorized(gomock.Any(), service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_other", UserID: "user_1", Limit: 20}).
+						Return(&service.ListProjectsResponse{}, nil)
+				}
+				srv, err := api.NewServer(&Handler{userService: users, projectService: projects}, NewSecurityHandler(tokens), api.WithErrorHandler(OgenErrorHandler))
+				require.NoError(t, err)
+
+				req := httptest.NewRequest(op.method, op.path+tc.query, strings.NewReader(op.body))
+				req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "cookie"})
+				if op.body != "" {
+					req.Header.Set("Content-Type", "application/json")
+					req.Header.Set(CSRFHeader, CSRFToken("cookie"))
+				}
+				rec := httptest.NewRecorder()
+				WithCSRFRequest(srv).ServeHTTP(rec, req)
+
+				if !tc.refused {
+					require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+					if op.path == "/users/me" {
+						self, err := domain.SelfFromSession(token, time.Now())
+						require.NoError(t, err)
+						require.Equal(t, []domain.Self{self}, users.served, "the user is the session's")
+					}
+					return
+				}
+				require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+				require.JSONEq(t,
+					`{"code":"sess.project_mismatch","message":"The session belongs to a different project."}`,
+					rec.Body.String(),
+				)
+				require.Empty(t, rec.Header().Values("Set-Cookie"), "the session of another project keeps its cookie")
+				require.Empty(t, users.served, "a refused request reads and changes no user")
+			})
+		}
+	}
+}
+
+// myUserService answers the reads and patches of the cookie's user and records
+// the caller each was asked for. Any other method panics.
+type myUserService struct {
+	service.UserService
+	served []domain.Self
+}
+
+func (s *myUserService) GetMyUser(_ context.Context, input service.GetMyUserInput) (*domain.User, error) {
+	s.served = append(s.served, input.Self)
+	return myUser(input.Self), nil
+}
+
+func (s *myUserService) PatchMyUser(_ context.Context, input service.PatchMyUserInput) (*domain.User, error) {
+	s.served = append(s.served, input.Self)
+	return myUser(input.Self), nil
+}
+
+func myUser(self domain.Self) *domain.User {
+	return &domain.User{
+		ProjectID: self.ProjectID(),
+		ID:        self.UserID(),
+		SchemaURL: "sch_1",
+		Metadata:  domain.UserMetadata{Status: domain.UserStatusActive},
 	}
 }
 

@@ -224,6 +224,18 @@ func requireSelf(ctx context.Context) (domain.Self, error) {
 	return self, nil
 }
 
+// requireSelfInProject is requireSelf for the self-access operations that take
+// project_id: a session of another project is refused first, whatever state it
+// is in (holdSessionToProject).
+func requireSelfInProject(ctx context.Context, projectID api.OptProjectID) (domain.Self, error) {
+	if token, ok := sessionTokenFromContext(ctx); ok {
+		if err := holdSessionToProject(token, projectID); err != nil {
+			return domain.Self{}, err
+		}
+	}
+	return requireSelf(ctx)
+}
+
 type contextKey struct{}
 
 // requestHostKey is a context key for the effective request host injected

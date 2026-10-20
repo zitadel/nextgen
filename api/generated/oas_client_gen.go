@@ -566,9 +566,11 @@ type Invoker interface {
 	// Returns the user signed in to the session that authenticates the request.
 	// The project and the user both come from the session cookie, so a caller only
 	// ever reads their own user.
+	// With `project_id`, the user is returned only when the session belongs to
+	// that project.
 	//
 	// GET /users/me
-	GetMyUser(ctx context.Context) (GetMyUserRes, error)
+	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)
 	// GetMyUserSchema invokes getMyUserSchema operation.
 	//
 	// The schema the signed-in user's own record is validated against.
@@ -747,6 +749,9 @@ type Invoker interface {
 	// This is not the same question as `queryProjects`, which answers with the one
 	// project the calling credential is bound to. Here the session is the caller
 	// and the grants are the answer, so the list spans projects.
+	// With `project_id`, the projects are listed only when the session belongs to
+	// that project. It names the project the session was signed in to, not one to
+	// list.
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
@@ -817,9 +822,11 @@ type Invoker interface {
 	// Partially updates the caller's own schema-defined attributes. The merged
 	// result is validated against the user's schema before commit. Concurrent
 	// writes are last-write-wins.
+	// With `project_id`, the user is updated only when the session belongs to
+	// that project.
 	//
 	// PATCH /users/me
-	PatchMyUser(ctx context.Context, request *PatchMyUserRequest) (PatchMyUserRes, error)
+	PatchMyUser(ctx context.Context, request *PatchMyUserRequest, params PatchMyUserParams) (PatchMyUserRes, error)
 	// PatchProject invokes patchProject operation.
 	//
 	// Updates the state of a project.
@@ -6867,14 +6874,16 @@ func (c *Client) sendGetMySessionCsrfToken(ctx context.Context, params GetMySess
 // Returns the user signed in to the session that authenticates the request.
 // The project and the user both come from the session cookie, so a caller only
 // ever reads their own user.
+// With `project_id`, the user is returned only when the session belongs to
+// that project.
 //
 // GET /users/me
-func (c *Client) GetMyUser(ctx context.Context) (GetMyUserRes, error) {
-	res, err := c.sendGetMyUser(ctx)
+func (c *Client) GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error) {
+	res, err := c.sendGetMyUser(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetMyUser(ctx context.Context) (res GetMyUserRes, err error) {
+func (c *Client) sendGetMyUser(ctx context.Context, params GetMyUserParams) (res GetMyUserRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMyUser"),
 		semconv.HTTPRequestMethodKey.String("GET"),
@@ -6914,6 +6923,30 @@ func (c *Client) sendGetMyUser(ctx context.Context) (res GetMyUserRes, err error
 	var pathParts [1]string
 	pathParts[0] = "/users/me"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
@@ -9950,6 +9983,9 @@ func (c *Client) sendListIdpRevisions(ctx context.Context, params ListIdpRevisio
 // This is not the same question as `queryProjects`, which answers with the one
 // project the calling credential is bound to. Here the session is the caller
 // and the grants are the answer, so the list spans projects.
+// With `project_id`, the projects are listed only when the session belongs to
+// that project. It names the project the session was signed in to, not one to
+// list.
 //
 // GET /users/me/projects
 func (c *Client) ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error) {
@@ -10030,6 +10066,26 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
 				if unwrapped := string(val); true {
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}
@@ -11421,14 +11477,16 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 // Partially updates the caller's own schema-defined attributes. The merged
 // result is validated against the user's schema before commit. Concurrent
 // writes are last-write-wins.
+// With `project_id`, the user is updated only when the session belongs to
+// that project.
 //
 // PATCH /users/me
-func (c *Client) PatchMyUser(ctx context.Context, request *PatchMyUserRequest) (PatchMyUserRes, error) {
-	res, err := c.sendPatchMyUser(ctx, request)
+func (c *Client) PatchMyUser(ctx context.Context, request *PatchMyUserRequest, params PatchMyUserParams) (PatchMyUserRes, error) {
+	res, err := c.sendPatchMyUser(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendPatchMyUser(ctx context.Context, request *PatchMyUserRequest) (res PatchMyUserRes, err error) {
+func (c *Client) sendPatchMyUser(ctx context.Context, request *PatchMyUserRequest, params PatchMyUserParams) (res PatchMyUserRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -11477,6 +11535,30 @@ func (c *Client) sendPatchMyUser(ctx context.Context, request *PatchMyUserReques
 	var pathParts [1]string
 	pathParts[0] = "/users/me"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "PATCH", u)

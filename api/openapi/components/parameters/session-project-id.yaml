@@ -1,6 +1,6 @@
 # Not project-id.yaml, which is required and names the project to act on: this
 # one is optional and states which project the caller expects the cookie's
-# session to belong to. The /sessions/me operations share it.
+# session to belong to. The /sessions/me and /users/me operations share it.
 name: project_id
 in: query
 required: false
@@ -11,8 +11,9 @@ description: |
 
   A session belongs to one project, while a browser sends its cookie to every
   app on the same host. An app passes its own project, so that a session of
-  another project never reads as one of its users, and signing out of the app
-  never ends it. The SDKs pass it when they read the session or sign out.
+  another project never reads or acts as one of its users, and signing out of
+  the app never ends it. The SDKs pass it when they read the session or sign
+  out.
 
   `sess.project_mismatch` does not mean the session is invalid: it is live in
   its own project, so keep its cookie.
