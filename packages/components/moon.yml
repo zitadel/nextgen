@@ -11,8 +11,9 @@ dependsOn:
 tasks:
   typecheck:
     deps:
+      # server.edge.spec.ts imports the built dist/server.mjs.
+      - "~:build"
       - "api-mock:build"
-      - "design-tokens:build"
 
   build:
     deps:

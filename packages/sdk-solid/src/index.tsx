@@ -4,8 +4,11 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
+// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
+// The edge build of the components package has no elements, so this does nothing there.
 import "@zitadel/components";
 import type { JSX } from "solid-js";
+import { Dynamic } from "solid-js/web";
 
 import { standardAttributes, widgetTags } from "@zitadel/sdk-core/types";
 import {
@@ -143,7 +146,8 @@ export function ZitadelLogin(props: ZitadelLoginSolidProps): JSX.Element {
   // Solid would assign them to a custom element as properties, so they take its `attr:` prefix.
   const attributes = () => standardAttributes(props, "attr:");
   return (
-    <zitadel-login
+    <Dynamic
+      component={widgetTags.login}
       {...attributes()}
       ref={props.ref}
       prop:project={props.project}
@@ -182,7 +186,8 @@ export function ZitadelLogout(props: ZitadelLogoutSolidProps): JSX.Element {
   // Solid would assign them to a custom element as properties, so they take its `attr:` prefix.
   const attributes = () => standardAttributes(props, "attr:");
   return (
-    <zitadel-logout
+    <Dynamic
+      component={widgetTags.logout}
       {...attributes()}
       ref={props.ref}
       prop:project={props.project}
@@ -207,7 +212,8 @@ export function ZitadelSession(props: ZitadelSessionSolidProps): JSX.Element {
   // Solid would assign them to a custom element as properties, so they take its `attr:` prefix.
   const attributes = () => standardAttributes(props, "attr:");
   return (
-    <zitadel-session
+    <Dynamic
+      component={widgetTags.session}
       {...attributes()}
       ref={props.ref}
       prop:project={props.project}
