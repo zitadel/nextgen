@@ -15,7 +15,10 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 // Absolute base so requests parse under jsdom/undici and MSW can intercept.
-const DEPLOYMENTS_URL = "http://localhost/api/deployments";
+const API = "http://localhost/api";
+const DEPLOYMENTS_URL = `${API}/deployments`;
+const RELEASES_URL = `${API}/releases`;
+const PROJECT_URL = `${API}/projects/proj_test`;
 
 const DEPLOYED_AT = "2026-10-02T14:52:00Z";
 
@@ -37,6 +40,40 @@ function deployment(id: string, overrides: Record<string, unknown> = {}) {
 /** `GET /deployments`: the project's history, newest first. */
 function serveDeployments(history: unknown[] = []) {
   server.use(http.get(DEPLOYMENTS_URL, () => HttpResponse.json({ deployments: history })));
+}
+
+/** One entry of `GET /releases`. */
+function releaseSummary(id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    project_id: "proj_test",
+    content_hash: `sha256:${"0".repeat(64)}`,
+    metadata: {
+      message: "Add phone_number to human-user",
+      git_sha: null,
+      git_dirty: false,
+      created_at: DEPLOYED_AT,
+      created_by: null,
+      created_by_type: "service",
+    },
+    revoked_at: null,
+    ...overrides,
+  };
+}
+
+/** `GET /projects/{id}`, with the origins the drawer lists. */
+function serveProject(origins: { pattern: string; kind: string }[]) {
+  server.use(
+    http.get(PROJECT_URL, () =>
+      HttpResponse.json({
+        id: "proj_test",
+        name: "Test project",
+        origins,
+        created_at: DEPLOYED_AT,
+        updated_at: DEPLOYED_AT,
+      }),
+    ),
+  );
 }
 
 async function renderAt(path: string) {
@@ -140,5 +177,118 @@ describe("deployments list", () => {
       errorSpy.mockRestore();
       warnSpy.mockRestore();
     }
+  });
+});
+
+describe("new deployment", () => {
+  const ORIGINS = [
+    { pattern: "https://app.acme.com", kind: "primary" },
+    { pattern: "https://*.preview.acme.com", kind: "preview" },
+  ];
+
+  it("deploys a picked release to the primary origins and lists the record", async () => {
+    const history: unknown[] = [];
+    let posted: { projectId: string | null; body: unknown } | undefined;
+    serveDeployments(history);
+    serveProject(ORIGINS);
+    server.use(
+      http.get(RELEASES_URL, () =>
+        HttpResponse.json({
+          releases: [
+            releaseSummary("rel_2"),
+            releaseSummary("rel_1", { revoked_at: "2026-10-01T00:00:00Z" }),
+          ],
+        }),
+      ),
+      http.post(DEPLOYMENTS_URL, async ({ request }) => {
+        posted = {
+          projectId: new URL(request.url).searchParams.get("project_id"),
+          body: await request.json(),
+        };
+        history.unshift(deployment("dep_new", { release_id: "rel_2" }));
+        return HttpResponse.json(deployment("dep_new", { release_id: "rel_2" }), { status: 201 });
+      }),
+    );
+    await renderAt("/deployments");
+
+    await userEvent.click(await screen.findByRole("button", { name: "New deployment" }));
+    const drawer = await screen.findByRole("dialog", { name: "Deploy release" });
+    const inDrawer = within(drawer);
+    // The card lists the primary origins only: that is what `primary` resolves to.
+    expect(await inDrawer.findByRole("link", { name: "https://app.acme.com" })).toHaveAttribute(
+      "href",
+      "https://app.acme.com",
+    );
+    expect(inDrawer.queryByText("https://*.preview.acme.com")).not.toBeInTheDocument();
+    expect(inDrawer.getByRole("radio", { name: /Primary/ })).toBeChecked();
+
+    const submit = inDrawer.getByRole("button", { name: "Deploy release" });
+    expect(submit).toBeDisabled();
+
+    // The picker hides the revoked release.
+    await userEvent.click(inDrawer.getByRole("combobox", { name: "Release" }));
+    const listbox = await screen.findByRole("listbox");
+    expect(within(listbox).queryByRole("option", { name: "rel_1" })).not.toBeInTheDocument();
+    await userEvent.click(within(listbox).getByRole("option", { name: "rel_2" }));
+    await userEvent.type(inDrawer.getByLabelText("Message"), "Ship it");
+    await userEvent.click(submit);
+
+    expect(await screen.findByText("Release deployed")).toBeInTheDocument();
+    expect(posted).toEqual({
+      projectId: "proj_test",
+      body: { release_id: "rel_2", targets: ["primary"], message: "Ship it" },
+    });
+    // The drawer closes and the list reads again, so the record is a row.
+    expect(screen.queryByRole("dialog", { name: "Deploy release" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "rel_2" })).toBeInTheDocument();
+  });
+
+  it("will not deploy to a project with no primary origin", async () => {
+    serveDeployments();
+    serveProject([{ pattern: "https://*.preview.acme.com", kind: "preview" }]);
+    server.use(
+      http.get(RELEASES_URL, () => HttpResponse.json({ releases: [releaseSummary("rel_2")] })),
+    );
+    await renderAt("/deployments");
+
+    await userEvent.click(await screen.findByRole("button", { name: "New deployment" }));
+    const drawer = await screen.findByRole("dialog", { name: "Deploy release" });
+    expect(
+      await within(drawer).findByText("This project has no primary origin."),
+    ).toBeInTheDocument();
+    await userEvent.click(within(drawer).getByRole("combobox", { name: "Release" }));
+    await userEvent.click(
+      within(await screen.findByRole("listbox")).getByRole("option", { name: "rel_2" }),
+    );
+    expect(within(drawer).getByRole("button", { name: "Deploy release" })).toBeDisabled();
+  });
+
+  it("shows the server's refusal in the drawer", async () => {
+    serveDeployments();
+    serveProject(ORIGINS);
+    server.use(
+      http.get(RELEASES_URL, () => HttpResponse.json({ releases: [releaseSummary("rel_2")] })),
+      http.post(DEPLOYMENTS_URL, () =>
+        HttpResponse.json(
+          { code: "dep.variables_missing", message: "Variable API_URL has no primary value." },
+          { status: 400 },
+        ),
+      ),
+    );
+    await renderAt("/deployments");
+
+    await userEvent.click(await screen.findByRole("button", { name: "New deployment" }));
+    const drawer = await screen.findByRole("dialog", { name: "Deploy release" });
+    await within(drawer).findByRole("link", { name: "https://app.acme.com" });
+    await userEvent.click(within(drawer).getByRole("combobox", { name: "Release" }));
+    await userEvent.click(
+      within(await screen.findByRole("listbox")).getByRole("option", { name: "rel_2" }),
+    );
+    await userEvent.click(within(drawer).getByRole("button", { name: "Deploy release" }));
+
+    expect(
+      await within(drawer).findByText("Variable API_URL has no primary value."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Release deployed")).not.toBeInTheDocument();
   });
 });

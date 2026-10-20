@@ -18274,6 +18274,22 @@ func (s CreateDeploymentErrorResponse) Encode(e *jx.Encoder) {
 
 func (s CreateDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidCreateDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedCreateDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -18492,6 +18508,9 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidCreateDeploymentErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedCreateDeploymentErrorResponse
 					found = true
@@ -18542,6 +18561,10 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidCreateDeploymentErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedCreateDeploymentErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err

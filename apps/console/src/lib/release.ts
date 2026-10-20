@@ -2,6 +2,7 @@ import type {
   GetReleaseById200,
   GetReleaseById200PointersItem,
   GetReleaseById200PointersItemKind,
+  ListReleases200ReleasesItem,
 } from "@zitadel/api/generated/model";
 
 import { api } from "@/api/zitadel";
@@ -126,4 +127,30 @@ export function groupPointers(pointers: ResolvedPointer[]): PointerGroup[] {
 /** The first ten characters of a commit sha, as `git log --abbrev` prints it. */
 export function shortSha(sha: string): string {
   return sha.slice(0, 10);
+}
+
+/** One entry of `GET /releases`: a release without its pointers. */
+export type ReleaseSummary = ListReleases200ReleasesItem;
+
+/** The most `GET /releases` hands back per page. */
+const RELEASE_PAGE_SIZE = 100;
+
+/**
+ * The project's releases that can still be deployed: every page, newest
+ * first, without the revoked ones. The list has no filter by state, and a
+ * project's releases are a few pages at most.
+ */
+export async function listDeployableReleases(projectId: string): Promise<ReleaseSummary[]> {
+  const releases: ReleaseSummary[] = [];
+  let pageToken: string | undefined;
+  do {
+    const page = await api.listReleases({
+      project_id: projectId,
+      limit: RELEASE_PAGE_SIZE,
+      page_token: pageToken,
+    });
+    releases.push(...page.releases);
+    pageToken = page.next_page_token ?? undefined;
+  } while (pageToken);
+  return releases.filter((release) => release.revoked_at === null);
 }

@@ -124,6 +124,17 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: ownedID, ReleaseID: created.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.Release{}, got, helpers.MustMarshal(t, got))
+
+		// The session deploys too: the Deploy release drawer posts with it.
+		_, err = harness.EnsureProjectService(t).AddOrigin(t.Context(), owned.ID,
+			domain.Origin{Pattern: "https://console-session.example.com", Kind: domain.OriginKindPrimary})
+		require.NoError(t, err)
+		deployed, err := session.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(created.ID),
+			Targets:   api.DeploymentTargetsRequest{"primary"},
+		}, api.CreateDeploymentParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
 	})
 
 	t.Run("teams", func(t *testing.T) {
@@ -290,6 +301,15 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, got))
 		assert.Equal(t, http.StatusNotFound, status)
 		assert.Equal(t, domain.ErrReleaseNotFound().Code, code)
+
+		// Nor deploy there: the write stops at the project, as not found.
+		deployed, err := session.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(created.ID),
+			Targets:   api.DeploymentTargetsRequest{"primary"},
+		}, api.CreateDeploymentParams{ProjectID: otherID})
+		require.NoError(t, err)
+		require.IsType(t, &api.CreateDeploymentNotFound{}, deployed, helpers.MustMarshal(t, deployed))
+		assert.Equal(t, api.ErrorCode(domain.ErrEnvironmentProjectNotFound().Code), deployed.(*api.CreateDeploymentNotFound).Code)
 	})
 
 	t.Run("cannot read another project's schema", func(t *testing.T) {

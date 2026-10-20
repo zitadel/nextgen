@@ -4,6 +4,7 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../components/schemas/errors/auth-csrf_invalid.yaml'
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../components/schemas/errors/dep-conflict.yaml'
         - $ref: '../../components/schemas/errors/dep-invalid.yaml'
@@ -19,6 +20,7 @@ content:
       discriminator:
         propertyName: code
         mapping:
+          auth.csrf_invalid: '../../components/schemas/errors/auth-csrf_invalid.yaml'
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
           dep.conflict: '../../components/schemas/errors/dep-conflict.yaml'
           dep.invalid: '../../components/schemas/errors/dep-invalid.yaml'
@@ -32,6 +34,11 @@ content:
           rel.not_found: '../../components/schemas/errors/rel-not_found.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
+      auth.csrf_invalid:
+        summary: auth.csrf_invalid
+        value:
+          code: auth.csrf_invalid
+          message: 'The request failed cross-site request forgery validation.'
       auth.unauthorized:
         summary: auth.unauthorized
         value:

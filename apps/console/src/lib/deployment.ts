@@ -72,3 +72,26 @@ export async function listProjectDeployments(
   });
   return { items: page.deployments, nextPageToken: page.next_page_token ?? undefined };
 }
+
+/** The target `POST /deployments` resolves to every primary origin of the project. */
+const PRIMARY_TARGET = "primary";
+
+/** The project's primary origins, in the order the project lists them. */
+export async function listPrimaryOrigins(projectId: string): Promise<string[]> {
+  const project = await api.getProject(projectId);
+  return project.origins
+    .filter((origin) => origin.kind === "primary")
+    .map((origin) => origin.pattern);
+}
+
+/**
+ * Makes a release live on every primary origin, with the message on the
+ * record. When the origins already serve the release with the same values
+ * the server writes nothing and answers with the deployment that is live.
+ */
+export function deployToPrimary(projectId: string, releaseId: string, message?: string) {
+  return api.createDeployment(
+    { release_id: releaseId, targets: [PRIMARY_TARGET], ...(message ? { message } : {}) },
+    { project_id: projectId },
+  );
+}
