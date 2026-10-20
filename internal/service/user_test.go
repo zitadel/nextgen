@@ -490,8 +490,9 @@ const takenAttributesSchema = `{
 
 // newTakenAttributesFixture wires a user service whose write collides on a
 // unique value. holders answers the registry probe per attribute key with the
-// id of the user holding it; a key it does not name is free.
-func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]string) (service.UserService, *servicemocks.MockAllStatements) {
+// id of the user holding it; a key it does not name is free. A non-nil
+// lookupErr fails the probe instead.
+func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]string, lookupErr error) (service.UserService, *servicemocks.MockAllStatements) {
 	t.Helper()
 
 	ctrl := gomock.NewController(t)
@@ -522,6 +523,9 @@ func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]str
 	}, nil).AnyTimes()
 	stmts.EXPECT().GetTakenUniqueAttributeKeys(gomock.Any(), "proj_1", gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ context.Context, _, userID string, claims []service.UniqueAttributeClaim) ([]domain.AttributeKey, error) {
+			if lookupErr != nil {
+				return nil, lookupErr
+			}
 			// Each unique attribute of the write is one claim under its
 			// registry team scope.
 			var taken []domain.AttributeKey
@@ -564,7 +568,7 @@ func TestUserService_UniquenessConflictNamesTheAttribute(t *testing.T) {
 
 	t.Run("create", func(t *testing.T) {
 		t.Parallel()
-		svc, stmts := newTakenAttributesFixture(t, map[domain.AttributeKey]string{"email": "user_2"})
+		svc, stmts := newTakenAttributesFixture(t, map[domain.AttributeKey]string{"email": "user_2"}, nil)
 		stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(unique)
 
 		_, err := svc.CreateUser(t.Context(), service.CreateUserInput{
@@ -581,7 +585,7 @@ func TestUserService_UniquenessConflictNamesTheAttribute(t *testing.T) {
 		svc, stmts := newTakenAttributesFixture(t, map[domain.AttributeKey]string{
 			"email":    "user_1", // the user's own claim
 			"username": "user_2",
-		})
+		}, nil)
 		stmts.EXPECT().PatchUser(gomock.Any(), gomock.Any()).Return(unique)
 
 		_, err := svc.PatchUser(t.Context(), service.PatchUserInput{
@@ -594,7 +598,7 @@ func TestUserService_UniquenessConflictNamesTheAttribute(t *testing.T) {
 
 	t.Run("a value freed since stays unnamed", func(t *testing.T) {
 		t.Parallel()
-		svc, stmts := newTakenAttributesFixture(t, nil)
+		svc, stmts := newTakenAttributesFixture(t, nil, nil)
 		stmts.EXPECT().PatchUser(gomock.Any(), gomock.Any()).Return(unique)
 
 		_, err := svc.PatchUser(t.Context(), service.PatchUserInput{
@@ -604,51 +608,17 @@ func TestUserService_UniquenessConflictNamesTheAttribute(t *testing.T) {
 		})
 		requireTakenFields(t, err)
 	})
-}
 
-func preparedCreateUserAction(t *testing.T) (*service.CreateUserAction, *servicemocks.MockAllStatements) {
-	t.Helper()
-	ctrl := gomock.NewController(t)
-	stmts := servicemocks.NewMockAllStatements(ctrl)
-	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
-	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
-		Return(&domain.JSONSchema{Schema: []byte(takenAttributesSchema)}, nil)
-	action := service.NewCreateUserAction(service.CreateUserInput{
-		ProjectID:  "proj_1",
-		ID:         "user_1",
-		SchemaURL:  "https://example.test/schema.json",
-		Attributes: map[string]any{"email": "taken@example.com"},
-	}, schemaStore)
-	require.NoError(t, action.Prepare(t.Context()))
-	return action, stmts
-}
+	t.Run("a failed lookup stays unnamed", func(t *testing.T) {
+		t.Parallel()
+		svc, stmts := newTakenAttributesFixture(t, nil, database.NewUnavailableError(nil))
+		stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(unique)
 
-// Spanner runs the transaction callback again after an abort. The error of
-// the aborted attempt must not outlive it and mask the retry's outcome.
-func TestCreateUserAction_RetriedApplyForgetsTheEarlierError(t *testing.T) {
-	t.Parallel()
-	action, stmts := preparedCreateUserAction(t)
-	gomock.InOrder(
-		stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(database.NewUnavailableError(nil)),
-		stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(nil),
-	)
-	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
-
-	require.Error(t, action.Apply(t.Context(), stmts))
-	require.NoError(t, action.Apply(t.Context(), stmts))
-	assert.NoError(t, action.Err(t.Context(), stmts))
-}
-
-// A lookup that fails names no attribute: the conflict is still answered,
-// without fields.
-func TestCreateUserAction_FailedLookupStaysUnnamed(t *testing.T) {
-	t.Parallel()
-	action, stmts := preparedCreateUserAction(t)
-	stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).
-		Return(database.NewUniqueError("user_unique_attributes", "pk", nil))
-	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
-	stmts.EXPECT().GetTakenUniqueAttributeKeys(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewUnavailableError(nil))
-
-	require.Error(t, action.Apply(t.Context(), stmts))
-	requireTakenFields(t, action.Err(t.Context(), stmts))
+		_, err := svc.CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  "proj_1",
+			SchemaURL:  "https://example.test/schema.json",
+			Attributes: map[string]any{"email": "taken@example.com"},
+		})
+		requireTakenFields(t, err)
+	})
 }

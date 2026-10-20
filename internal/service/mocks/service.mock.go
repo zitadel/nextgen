@@ -15442,44 +15442,6 @@ func (c *MockUserActionApplyCall) DoAndReturn(f func(context.Context, service.Al
 	return c
 }
 
-// Err mocks base method.
-func (m *MockUserAction) Err(ctx context.Context, stmts service.AllStatements) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Err", ctx, stmts)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Err indicates an expected call of Err.
-func (mr *MockUserActionMockRecorder) Err(ctx, stmts any) *MockUserActionErrCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Err", reflect.TypeOf((*MockUserAction)(nil).Err), ctx, stmts)
-	return &MockUserActionErrCall{Call: call}
-}
-
-// MockUserActionErrCall wrap *gomock.Call
-type MockUserActionErrCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserActionErrCall) Return(arg0 error) *MockUserActionErrCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserActionErrCall) Do(f func(context.Context, service.AllStatements) error) *MockUserActionErrCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserActionErrCall) DoAndReturn(f func(context.Context, service.AllStatements) error) *MockUserActionErrCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // Prepare mocks base method.
 func (m *MockUserAction) Prepare(ctx context.Context) error {
 	m.ctrl.T.Helper()

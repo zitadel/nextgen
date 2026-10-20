@@ -155,10 +155,6 @@ func TestFlowCreateUserWithPassword_TakenValueShowsStepError(t *testing.T) {
 	f.hasher.EXPECT().Hash("s3cret").Return("hash-s3cret", nil)
 	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).
 		Return(database.NewUniqueError("users", "users_email_key", nil))
-	// The lost race is audited and the taken attributes are looked up.
-	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
-	f.stmts.EXPECT().GetTakenUniqueAttributeKeys(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(nil, nil)
 	f.v2Pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
 			return fn(ctx, v2TestTx{stmts: f.stmts})

@@ -91,8 +91,6 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 // part of a user-mutation transaction, emitting the same auth.check.succeeded
 // events a challenge/proof cycle would.
 type recordAttemptFactorsAction struct {
-	noUserActionErr
-
 	projectID string
 	attemptID string
 	factors   []domain.AuthFactor

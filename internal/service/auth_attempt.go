@@ -494,7 +494,7 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		// with the check success (e.g. registration persists the user row and
 		// credential). It runs first so FK ordering holds.
 		if txExtra != nil {
-			if err := txExtra.apply(ctx, tx.Statements()); err != nil {
+			if err := txExtra(ctx, tx.Statements()); err != nil {
 				return err
 			}
 		}
@@ -504,11 +504,6 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, true)
 	})
 	if err != nil {
-		if txExtra != nil && txExtra.failed != nil {
-			if actionErr := txExtra.failed.Err(ctx, s.stmts.Statements()); actionErr != nil {
-				err = actionErr
-			}
-		}
 		// A provisional registration's create-user action can lose the
 		// uniqueness race inside the transaction. Surfacing the stable code
 		// explicitly also puts user.already_exists into the generated error
@@ -735,20 +730,11 @@ func (s *authAttemptService) resolveIdentifier(ctx context.Context, projectID st
 	return resolveDesignatedUser(ctx, s.stmts.Statements(), projectID, p.LoginName, false, "auth_attempt")
 }
 
-// verifyTx is the proof-type-specific part of the verify transaction.
-type verifyTx struct {
-	// apply writes inside the transaction, e.g. registration persists the
-	// user row and credential.
-	apply func(ctx context.Context, stmts AllStatements) error
-	// failed is the user action whose Apply failed in apply's last run. It
-	// translates its recorded error after the transaction.
-	failed UserAction
-}
-
 // verify dispatches proof verification to the appropriate secondary port.
-// Returns the checker to persist (always, even on failure), the optional
-// writes that must commit atomically with the check success, and any error.
-func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAttempt, proof Proof, challengeID string) (domain.AuthChallenge, domain.AuthFactor, *verifyTx, error) {
+// Returns the checker to persist (always, even on failure), an optional
+// closure with extra writes that must commit atomically with the check
+// success, and any error.
+func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAttempt, proof Proof, challengeID string) (domain.AuthChallenge, domain.AuthFactor, func(context.Context, AllStatements) error, error) {
 	switch p := proof.(type) {
 	case UserProof:
 		userChallenge, err := attempt.PrepareUserVerification(challengeID)
@@ -814,13 +800,13 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		// (exchange user binding, password step-up, enrollment targeting) key on — so the
 		// subject is pinned and the session/handoff carries the user id. For an identified
 		// login the user factor is already present and unchanged.
-		var txExtra *verifyTx
+		var txExtra func(context.Context, AllStatements) error
 		if userFactor == nil && verification.UserID != "" {
 			resolvedUser := attempt.SetUserFactor(&domain.User{ID: verification.UserID})
-			txExtra = &verifyTx{apply: func(ctx context.Context, stmts AllStatements) error {
+			txExtra = func(ctx context.Context, stmts AllStatements) error {
 				_, err := recordDirectAuthFactor(ctx, stmts, attempt, resolvedUser)
 				return err
-			}}
+			}
 		}
 		// Use the verified user as the source of truth: it is set for both identified and
 		// discoverable logins, whereas userFactor is nil in the discoverable case.
@@ -858,12 +844,9 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		_, hadUserFactor := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
 		factor := attempt.SetPasskeyRegistrationFactor(newPasskey)
 		userFactor := attempt.SetUserFactor(&domain.User{ID: registrationChallenge.UserID})
-		writes := &verifyTx{}
-		writes.apply = func(ctx context.Context, stmts AllStatements) error {
-			writes.failed = nil
+		txExtra := func(ctx context.Context, stmts AllStatements) error {
 			for _, action := range createActions {
 				if err := action.Apply(ctx, stmts); err != nil {
-					writes.failed = action
 					return err
 				}
 			}
@@ -892,7 +875,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 				},
 			})
 		}
-		return registrationChallenge, factor, writes, nil
+		return registrationChallenge, factor, txExtra, nil
 
 	default:
 		return nil, nil, nil, domain.ErrAuthAttemptInvalidRequest().WithMessage("unsupported proof type")
@@ -993,7 +976,7 @@ func (s *authAttemptService) FinishPasskeyEnrollment(ctx context.Context, input 
 	}
 	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if txExtra != nil {
-			if err := txExtra.apply(ctx, tx.Statements()); err != nil {
+			if err := txExtra(ctx, tx.Statements()); err != nil {
 				return err
 			}
 		}

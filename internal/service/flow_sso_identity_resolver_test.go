@@ -140,9 +140,6 @@ func (f *ssoResolverFixture) expectCreateUser(createErr error) *servicemocks.Moc
 	f.schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), ssoProjectID, ssoSchemaURL).
 		Return(&domain.JSONSchema{ProjectID: ssoProjectID, URL: ssoSchemaURL, Schema: []byte(ssoUserSchema)}, nil)
 	createUser := f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(createErr)
-	// A unique violation looks up which attributes are taken.
-	f.stmts.EXPECT().GetTakenUniqueAttributeKeys(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(nil, nil).AnyTimes()
 	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
 		f.events = append(f.events, ev)
 		return nil
@@ -926,33 +923,6 @@ func TestFlowSSOIdentityResolver_CreateLinked_LostLinkRaceEmitsUserCreateFailed(
 	_, err := f.resolver.CreateLinked(t.Context(), createInput())
 	require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
 	assert.NotNil(t, f.event(domain.EventTypeUserCreateFailed))
-}
-
-// Spanner retries an aborted transaction. A retry that fails before the
-// action that failed in the aborted run must answer its own error, not that
-// action's stale one: here the callback was consumed meanwhile, which the
-// stale-submit recovery handles.
-func TestFlowSSOIdentityResolver_CreateLinked_RetryAnswersItsOwnError(t *testing.T) {
-	t.Parallel()
-	f := newSSOResolverFixture(t)
-	statementer := servicemocks.NewMockStatementer[service.AllStatements](gomock.NewController(t))
-	statementer.EXPECT().Statements().Return(f.stmts).AnyTimes()
-	f.pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
-			if err := fn(ctx, statementer); !errors.Is(err, database.NewUnavailableError(nil)) {
-				return err
-			}
-			return fn(ctx, statementer)
-		},
-	)
-	gomock.InOrder(
-		f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil),
-		f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(domain.ErrSSOStateInvalid()),
-	)
-	f.expectCreateUser(database.NewUnavailableError(nil))
-
-	_, err := f.resolver.CreateLinked(t.Context(), createInput())
-	require.ErrorIs(t, err, domain.ErrSSOStateInvalid())
 }
 
 // A concurrent request on the same attempt settled the parked row first. The
