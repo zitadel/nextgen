@@ -122,7 +122,7 @@ describe("closed shadow roots", () => {
     });
   });
 
-  it("keeps the typed password out of a page-level capture listener", async () => {
+  it("does not expose the field through the DOM to a page-level capture listener", async () => {
     const login = await mountLogin();
     const seen: { type: string; target: EventTarget | null; path: EventTarget[] }[] = [];
     const record = (event: Event): void => {

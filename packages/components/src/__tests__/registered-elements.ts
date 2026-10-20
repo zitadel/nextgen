@@ -4,8 +4,9 @@ export interface RegisteredElement {
 }
 
 /**
- * Elements that render into their own light DOM and so have no shadow root to
- * open or close. Every other element the package defines must have one.
+ * Elements that render into their own light DOM (`createRenderRoot` returns
+ * the element), so they have no shadow root to open or close; every other
+ * element the package defines must have one, and the specs check both ways.
  */
 export const LIGHT_DOM_TAGS = ["zl-passkey"];
 
@@ -16,7 +17,7 @@ export const LIGHT_DOM_TAGS = ["zl-passkey"];
  * else in the file imports the package, because a module registers once.
  */
 export async function registeredElements(
-  load: () => Promise<unknown>,
+  load: () => Promise<object>,
 ): Promise<RegisteredElement[]> {
   const found: RegisteredElement[] = [];
   const define = customElements.define;
