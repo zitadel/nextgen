@@ -3,7 +3,37 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { normalizeFlowBody, normalizeSchemaBody, USER_PROPERTY_DEFAULTS } from "./normalize";
+import {
+  FLOW_STEP_DEFAULTS,
+  IDP_CONNECTION_DEFAULTS,
+  normalizeFlowBody,
+  normalizeIdpBody,
+  normalizeSchemaBody,
+  STEP_ACTION_DEFAULTS,
+  USER_PROPERTY_DEFAULTS,
+} from "./normalize";
+
+/**
+ * A meta-schema from the source tree. The default constants ship in the
+ * package, but their values are spec facts owned by api/openapi: drift means
+ * the meta-schema changed and the normalizer must follow.
+ */
+function metaSchema(name: string): Record<string, unknown> {
+  return JSON.parse(
+    readFileSync(join(__dirname, "../../../api/openapi/endpoints/schemas", name), "utf8"),
+  ) as Record<string, unknown>;
+}
+
+/** Every `default` the given meta-schema properties declare, by property name. */
+function declaredDefaults(
+  properties: Record<string, { default?: unknown }> | undefined,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(properties ?? {})
+      .filter(([, property]) => "default" in property)
+      .map(([name, property]) => [name, property.default]),
+  );
+}
 
 describe("normalizeFlowBody", () => {
   it("drops an empty audience in both wire shapes", () => {
@@ -49,6 +79,132 @@ describe("normalizeFlowBody", () => {
     const once = normalizeFlowBody(body);
     expect(body).toEqual({ name: "login", audience: {} });
     expect(normalizeFlowBody(once)).toEqual(once);
+  });
+
+  it("strips the step and action defaults a step spells out", () => {
+    const body = {
+      name: "login",
+      steps: [
+        {
+          name: "identifier",
+          fields: [],
+          gates: {},
+          sso_providers: [],
+          actions: [
+            { name: "submit", kind: "submit", primary: true },
+            { name: "register", kind: "navigate", primary: false },
+          ],
+        },
+        { name: "done", actions: [] },
+      ],
+    };
+
+    expect(normalizeFlowBody(body)).toEqual({
+      name: "login",
+      steps: [
+        {
+          name: "identifier",
+          actions: [
+            { name: "submit", kind: "submit", primary: true },
+            { name: "register", kind: "navigate" },
+          ],
+        },
+        { name: "done" },
+      ],
+    });
+    expect(body.steps[0]?.actions[1]).toHaveProperty("primary", false);
+  });
+
+  it("keeps step values that are not the default", () => {
+    const step = { name: "identifier", fields: ["email"], sso_providers: ["google"] };
+
+    expect(normalizeFlowBody({ steps: [step] })).toEqual({ steps: [step] });
+  });
+
+  it("matches the defaults declared by the flow-definition meta-schema", () => {
+    const defs = metaSchema("flow-definition.json").$defs as Record<
+      string,
+      { properties: Record<string, { default?: unknown }> }
+    >;
+
+    expect(declaredDefaults(defs.FlowDefinitionStep?.properties)).toEqual(FLOW_STEP_DEFAULTS);
+    expect(declaredDefaults(defs.StepAction?.properties)).toEqual(STEP_ACTION_DEFAULTS);
+  });
+});
+
+describe("normalizeIdpBody", () => {
+  const authored = {
+    $schema: "../meta/idp-connection.json",
+    slug: "google",
+    protocol: "oidc",
+    display_name: "Google",
+    oidc: {
+      issuer: "https://accounts.google.com",
+      client_id: "${{ GOOGLE_CLIENT_ID }}",
+      client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+      scopes: ["openid", "profile", "email"],
+    },
+  };
+
+  it("reads a stored connection that spells out the defaults as the file that leaves them out", () => {
+    const stored = {
+      slug: "google",
+      protocol: "oidc",
+      display_name: "Google",
+      provisioning: { creation: "auto" },
+      oidc: {
+        ...authored.oidc,
+        id_token_mapping: false,
+        pkce_enabled: true,
+        token_endpoint_auth_method: "client_secret_basic",
+      },
+    };
+
+    expect(normalizeIdpBody(stored)).toEqual(normalizeIdpBody(authored));
+  });
+
+  it("keeps a value that is not the default", () => {
+    const body = {
+      ...authored,
+      provisioning: { creation: "disabled" },
+      oidc: {
+        ...authored.oidc,
+        pkce_enabled: false,
+        token_endpoint_auth_method: "client_secret_post",
+      },
+    };
+    const { $schema: _pointer, ...expected } = body;
+
+    expect(normalizeIdpBody(body)).toEqual(expected);
+  });
+
+  it("keeps the scopes, whose default is only an editor prefill", () => {
+    expect(normalizeIdpBody(authored)).toHaveProperty("oidc.scopes", [
+      "openid",
+      "profile",
+      "email",
+    ]);
+  });
+
+  it("does not mutate its input and is idempotent", () => {
+    const body = structuredClone({ ...authored, oidc: { ...authored.oidc, pkce_enabled: true } });
+    const once = normalizeIdpBody(body);
+
+    expect(body.oidc.pkce_enabled).toBe(true);
+    expect(normalizeIdpBody(once)).toEqual(once);
+  });
+
+  it("matches the defaults declared by the connection meta-schema", () => {
+    const properties = metaSchema("idp-connection.json").properties as Record<
+      string,
+      { properties?: Record<string, { default?: unknown }> }
+    >;
+    const { scopes: _prefill, ...oidc } = declaredDefaults(properties.oidc?.properties);
+
+    expect({
+      oidc,
+      provisioning: declaredDefaults(properties.provisioning?.properties),
+    }).toEqual(IDP_CONNECTION_DEFAULTS);
   });
 });
 

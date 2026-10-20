@@ -172,6 +172,11 @@ Each invocation prints one JSON object:
   `data.unsupported_deletions` counts removed files whose resource cannot be
   deleted yet (they are kept, and are not part of `total`); on `apply` the files
   are listed in `data.unsupported_deletion_files`.
+- `apply` leaves the files under `.zitadel/` as written: what the server stores
+  is never written back, and a field a file leaves out reads as the server's
+  default, so `plan` reports no change after an `apply`. `data.files_updated`
+  lists the one rewrite: a flow whose `user_schema` pinned a schema revision id
+  the apply superseded, re-pinned to the new revision's id.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 
