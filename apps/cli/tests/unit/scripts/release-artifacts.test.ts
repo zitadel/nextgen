@@ -345,5 +345,9 @@ describe("release artifact helpers", () => {
     // every other public package — no special telemetry-channel env.
     const cliPack = calls.find((call) => call.args.includes("apps/cli"));
     expect(cliPack).toBeDefined();
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      expect(call.args).toContain("--silent");
+    }
   });
 });
