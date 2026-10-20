@@ -38,6 +38,7 @@ Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 - [Agent setup](/docs/get-started/agents.md): the CLI's JSON contract and the browser proof
 - [Flows and schemas](/docs/concepts/flows-and-schemas.md): how login flows, user schemas and the generated UI relate
 - [Plan and apply](/docs/cli/plan-apply.md): edit the local configuration and sync it
+- [Add social sign-in](/docs/cli/social-sign-in.md): "Sign in with Google" or any OpenID Connect provider, with \`zitadel auth-method sso enable\`
 - [Customize the login design](/docs/cli/customize-design.md): a starter design, your branding, published as a revision
 - [Docs MCP server](/docs/api/mcp): the tools search, list_pages and get_page
 
