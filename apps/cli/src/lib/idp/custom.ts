@@ -94,11 +94,29 @@ export function customFlagValues<K extends FlagKeys>(
   };
 }
 
-/** The warning a loopback issuer earns, or `undefined`: the server reaches only what its egress allow list permits. */
-export function loopbackIssuerWarning(selection: ProviderSelection): string | undefined {
-  return selection.kind === "custom" && isLoopbackIssuer(selection.connection.issuer)
-    ? `${selection.connection.issuer} is on this machine, and the server blocks requests to localhost unless NEXTGEN_HTTPCLIENT_ALLOW_LIST allows it, so sign-in will fail until it does.`
-    : undefined;
+/**
+ * How the target server reaches this machine's loopback: `allowed` for a
+ * server `zitadel start` runs as a process with the loopback allow list,
+ * `container` for one it runs in Docker, `unknown` for any other.
+ */
+export type LoopbackReach = "allowed" | "container" | "unknown";
+
+/** The warning a loopback issuer earns on a server that cannot reach it, or `undefined`. */
+export function loopbackIssuerWarning(
+  selection: ProviderSelection,
+  reach: LoopbackReach = "unknown",
+): string | undefined {
+  if (
+    selection.kind !== "custom" ||
+    !isLoopbackIssuer(selection.connection.issuer) ||
+    reach === "allowed"
+  ) {
+    return undefined;
+  }
+  const { issuer } = selection.connection;
+  return reach === "container"
+    ? `${issuer} is on this machine, but the local server runs in Docker, where localhost is the container itself, so sign-in will fail. Start the server with \`zitadel start --runtime binary\` instead.`
+    : `${issuer} is on this machine, and a server blocks requests to localhost unless NEXTGEN_HTTPCLIENT_ALLOW_LIST allows it, so sign-in will fail until it does. A server \`zitadel start\` runs allows it by default.`;
 }
 
 /**

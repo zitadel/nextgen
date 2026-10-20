@@ -388,10 +388,14 @@ describe("local runtime commands", () => {
     await expect(childEnv(serverUrl, "NEXTGEN_GOOGLE_SECRET")).resolves.toBe("canary-local");
     await expect(childEnv(serverUrl, "NEXTGEN_GITHUB_SECRET")).resolves.toBe("canary-github");
     await expect(childEnv(serverUrl, "UNDECLARED_SECRET")).resolves.toBeUndefined();
+    // The local defaults ride along: loopback is fetchable on a local server.
+    await expect(childEnv(serverUrl, "NEXTGEN_HTTPCLIENT_ALLOW_LIST")).resolves.toBe(
+      "localhost,127.0.0.0/8,::1/128",
+    );
 
     // Names only, in the envelope and on disk.
     expect(envelope.data.runtime.env).toEqual({
-      injected: ["NEXTGEN_GITHUB_SECRET", "NEXTGEN_GOOGLE_SECRET"],
+      injected: ["NEXTGEN_GITHUB_SECRET", "NEXTGEN_GOOGLE_SECRET", "NEXTGEN_HTTPCLIENT_ALLOW_LIST"],
     });
     expect(result.stdout).not.toContain("canary");
     expect(result.stderr).not.toContain("canary");

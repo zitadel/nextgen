@@ -50,6 +50,7 @@ export {
   flagText,
   SETUP_FLAG_KEYS,
   loopbackIssuerWarning,
+  type LoopbackReach,
   ENABLE_FLAG_NAMES,
   givenCustomFlags,
   SETUP_FLAG_NAMES,
