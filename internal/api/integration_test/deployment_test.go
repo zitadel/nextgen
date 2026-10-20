@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 const (
@@ -236,6 +238,85 @@ func TestCreateDeployment(t *testing.T) {
 	})
 }
 
+// TestRollbackDeployment deploys two releases to primary and rolls back to
+// the first: a new primary deployment of its release, with reason rollback
+// naming it. Rolling back to what is live already changes nothing.
+func TestRollbackDeployment(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	project := api.ProjectID(fixture.project)
+
+	first := fixture.deploy(t, fixture.release.ID)
+	require.IsType(t, &api.CreateDeploymentCreated{}, first, helpers.MustMarshal(t, first))
+	good := first.(*api.CreateDeploymentCreated)
+	second := fixture.deploy(t, fixture.otherRelease(t))
+	require.IsType(t, &api.CreateDeploymentCreated{}, second, helpers.MustMarshal(t, second))
+	bad := second.(*api.CreateDeploymentCreated)
+
+	rollback := func(t *testing.T, id api.DeploymentID, body api.RollbackDeploymentRequest) api.RollbackDeploymentRes {
+		t.Helper()
+		resp, err := fixture.client.RollbackDeployment(t.Context(), api.NewOptRollbackDeploymentRequest(body),
+			api.RollbackDeploymentParams{ProjectID: project, DeploymentID: id})
+		require.NoError(t, err)
+		return resp
+	}
+
+	t.Run("a guard naming another deployment", func(t *testing.T) {
+		resp := rollback(t, good.ID, api.RollbackDeploymentRequest{ExpectedDeploymentID: api.NewOptDeploymentID(good.ID)})
+		require.IsType(t, &api.DeploymentConflict{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, bad.ID, resp.(*api.DeploymentConflict).DeploymentGuardConflict.Details.Deployment.Value.ID)
+	})
+
+	t.Run("re-deploys the release to every primary origin", func(t *testing.T) {
+		resp := rollback(t, good.ID, api.RollbackDeploymentRequest{
+			Message:              api.NewOptString("phone_number broke sign-up"),
+			ExpectedDeploymentID: api.NewOptDeploymentID(bad.ID),
+		})
+		require.IsType(t, &api.RollbackDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		got := resp.(*api.RollbackDeploymentCreated)
+		assert.NotEqual(t, good.ID, got.ID)
+		assert.Equal(t, fixture.release.ID, got.ReleaseID)
+		assert.Equal(t, api.DeploymentKindPrimary, got.Kind)
+		assert.Equal(t, api.DeploymentStatusLive, got.Status)
+		assert.Equal(t, origins(good.Targets), origins(got.Targets))
+		assert.Equal(t, api.DeploymentReasonRollback, got.Metadata.Reason)
+		assert.Equal(t, good.ID, got.Metadata.RollbackTo.Value)
+		assert.Equal(t, "phone_number broke sign-up", got.Metadata.Message.Value)
+
+		read, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{ProjectID: project, DeploymentID: bad.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.Deployment{}, read, helpers.MustMarshal(t, read))
+		assert.Equal(t, api.DeploymentStatusInactive, read.(*api.Deployment).Status)
+	})
+
+	t.Run("again changes nothing", func(t *testing.T) {
+		resp := rollback(t, good.ID, api.RollbackDeploymentRequest{})
+		require.IsType(t, &api.RollbackDeploymentOK{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, fixture.release.ID, resp.(*api.RollbackDeploymentOK).ReleaseID)
+	})
+
+	t.Run("a deployment to preview URLs", func(t *testing.T) {
+		preview, err := service.NewDeploymentService(harness.EnsureServiceDB(t)).Create(t.Context(), service.CreateDeploymentInput{
+			ProjectID:  fixture.project,
+			ReleaseID:  string(fixture.release.ID),
+			OriginKind: domain.DeploymentOriginKindPreview,
+			Origins:    []string{previewOrigin},
+			Reason:     domain.DeploymentReasonDeploy,
+			PreviewTTL: time.Hour,
+		})
+		require.NoError(t, err)
+		resp := rollback(t, api.DeploymentID(preview.Deployment.ID), api.RollbackDeploymentRequest{})
+		// The declared 400 decodes into a typed body, which carries no status.
+		require.IsType(t, &api.ErrorDetails{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode(domain.ErrDeploymentInvalid().Code), resp.(*api.ErrorDetails).Code)
+	})
+
+	t.Run("an unknown deployment", func(t *testing.T) {
+		assertAuthzError(t, rollback(t, "dep_01KX4SB9C8E1F0N9WD3P2E4YM5", api.RollbackDeploymentRequest{}), domain.ErrDeploymentNotFound().Code)
+	})
+}
+
 // TestDeploymentReads deploys two releases to primary and reads them back:
 // only the newer one is live, and the live view follows the project's
 // primary origins.
@@ -381,19 +462,6 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 				Targets:     api.DeploymentTargetsRequest{"https://app.acme.com"},
 			},
 			api.CreateDeploymentParams{ProjectID: project})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("rollback", func(t *testing.T) {
-		resp, err := fixture.client.RollbackDeployment(t.Context(),
-			api.NewOptRollbackDeploymentRequest(api.RollbackDeploymentRequest{
-				Message: api.NewOptString("phone_number broke sign-up"),
-			}),
-			api.RollbackDeploymentParams{
-				ProjectID:    project,
-				DeploymentID: "dep_01KX4SB9C8E1F0N9WD3P2E4YM5",
-			})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
 	})

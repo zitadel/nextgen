@@ -317,6 +317,67 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 	})
 }
 
+func TestDeploymentServiceRollback(t *testing.T) {
+	t.Run("re-deploys the release to every primary origin", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		previous := servingDeployment("rel_1")
+		previous.ID = "dep_previous"
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", previous.ID).Return(previous, nil)
+		expectProjectOrigins(statements, appPrimary)
+		expectInsert(statements, expectServing(statements, servingDeployment("rel_2")))
+
+		result, err := svc.Rollback(t.Context(), service.RollbackDeploymentInput{ProjectID: "proj_1", DeploymentID: previous.ID, Message: new("phone_number broke sign-up")})
+		require.NoError(t, err)
+		assert.True(t, result.Created)
+		assert.Equal(t, "rel_1", result.Deployment.ReleaseID)
+		assert.Equal(t, []string{appOrigin}, result.Deployment.Origins())
+		assert.Equal(t, domain.DeploymentReasonRollback, result.Deployment.Metadata.Reason)
+		assert.Equal(t, previous.ID, *result.Deployment.Metadata.RollbackTo)
+		assert.Equal(t, "phone_number broke sign-up", *result.Deployment.Metadata.Message)
+	})
+
+	t.Run("writes nothing when the release is live already", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		previous := servingDeployment("rel_1")
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", previous.ID).Return(previous, nil)
+		expectProjectOrigins(statements, appPrimary)
+		expectServing(statements, previous)
+
+		result, err := svc.Rollback(t.Context(), service.RollbackDeploymentInput{ProjectID: "proj_1", DeploymentID: previous.ID})
+		require.NoError(t, err)
+		assert.False(t, result.Created)
+		assert.Same(t, previous, result.Deployment)
+	})
+
+	t.Run("a deployment to preview URLs", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		previous := servingDeployment("rel_1")
+		previous.OriginKind = domain.DeploymentOriginKindPreview
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", previous.ID).Return(previous, nil)
+
+		_, err := svc.Rollback(t.Context(), service.RollbackDeploymentInput{ProjectID: "proj_1", DeploymentID: previous.ID})
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+	})
+
+	t.Run("a project with no primary origin left", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		previous := servingDeployment("rel_1")
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", previous.ID).Return(previous, nil)
+		expectProjectOrigins(statements)
+
+		_, err := svc.Rollback(t.Context(), service.RollbackDeploymentInput{ProjectID: "proj_1", DeploymentID: previous.ID})
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+	})
+
+	t.Run("an unknown deployment", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_missing").Return(nil, database.NewNoRowFoundError(nil))
+
+		_, err := svc.Rollback(t.Context(), service.RollbackDeploymentInput{ProjectID: "proj_1", DeploymentID: "dep_missing"})
+		assertServiceDomainCode(t, err, domain.ErrDeploymentNotFound().Code)
+	})
+}
+
 func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 	t.Run("release missing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)

@@ -49,6 +49,16 @@ type DeployInput struct {
 	ExpectedDeploymentID *string
 }
 
+// RollbackDeploymentInput names the deployment whose release goes back to
+// every primary origin.
+type RollbackDeploymentInput struct {
+	ProjectID    string
+	DeploymentID string
+	Message      *string
+	// ExpectedDeploymentID makes the write conditional. Not persisted.
+	ExpectedDeploymentID *string
+}
+
 type ListDeploymentsInput struct {
 	ProjectID string
 	// Origin narrows the list to one origin's history.
@@ -149,6 +159,41 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 		Origins:              resolved,
 		Reason:               input.Reason,
 		Message:              input.Message,
+		ExpectedDeploymentID: input.ExpectedDeploymentID,
+	})
+}
+
+// Rollback re-deploys the release of a primary deployment to every current
+// primary origin, with reason rollback and the deployment it re-applies.
+// Like Deploy to primary, it writes nothing when the newest primary
+// deployment already serves that release.
+func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeploymentInput) (_ *CreateDeploymentOutput, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.Rollback")
+	defer end(&err)
+
+	previous, err := s.Get(ctx, input.ProjectID, input.DeploymentID)
+	if err != nil {
+		return nil, err
+	}
+	if previous.OriginKind != domain.DeploymentOriginKindPrimary {
+		return nil, domain.ErrDeploymentInvalid().WithMessage("a deployment to preview URLs cannot be rolled back; deploy to the preview again instead")
+	}
+	origins, err := s.projectOrigins(ctx, input.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	primary := domain.PrimaryOrigins(origins)
+	if len(primary) == 0 {
+		return nil, domain.ErrDeploymentInvalid().WithMessage("the project has no primary origin")
+	}
+	return s.Create(ctx, CreateDeploymentInput{
+		ProjectID:            input.ProjectID,
+		ReleaseID:            previous.ReleaseID,
+		OriginKind:           domain.DeploymentOriginKindPrimary,
+		Origins:              primary,
+		Reason:               domain.DeploymentReasonRollback,
+		Message:              input.Message,
+		RollbackTo:           &previous.ID,
 		ExpectedDeploymentID: input.ExpectedDeploymentID,
 	})
 }
