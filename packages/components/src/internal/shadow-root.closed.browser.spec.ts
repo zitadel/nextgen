@@ -227,20 +227,22 @@ describe("closed shadow roots", () => {
       expect(login.renderRoot).toBeInstanceOf(ShadowRoot);
     });
 
-    it.each(["zitadel-login", "zitadel-session", "zitadel-logout"])(
-      "through attachInternals() on <%s>, which never attaches its own",
-      async (tag) => {
-        configureZitadel({
-          proxyPath: "/__nextgen",
-          projectId: "test-project",
-          url: "http://localhost:4000",
-        });
-        const element = document.createElement(tag);
-        host.appendChild(element);
-        if ("updateComplete" in element) await element.updateComplete;
-        expect(element.attachInternals().shadowRoot).toBeInstanceOf(ShadowRoot);
-      },
-    );
+    it.each(
+      elements.filter(
+        ({ tag, ctor }) =>
+          !LIGHT_DOM_TAGS.includes(tag) && Reflect.get(ctor, "formAssociated") !== true,
+      ),
+    )("through attachInternals() on <$tag>, which never attaches its own", async ({ tag }) => {
+      configureZitadel({
+        proxyPath: "/__nextgen",
+        projectId: "test-project",
+        url: "http://localhost:4000",
+      });
+      const element = document.createElement(tag);
+      host.appendChild(element);
+      if ("updateComplete" in element) await element.updateComplete;
+      expect(element.attachInternals().shadowRoot).toBeInstanceOf(ShadowRoot);
+    });
 
     it("through the part Lit renders into, found by walking the element's own properties", async () => {
       const login = await mountLogin();
@@ -264,10 +266,9 @@ describe("closed shadow roots", () => {
 
     const { roots, strings } = reachableFrom(login, "hunter2");
 
-    // Every path to a root is the host's own member (`renderRoot` from Lit,
-    // `ownRoot` from ZlElement) or the part under Lit's `_$...`.
-    const own = ["renderRoot", "ownRoot"];
-    expect(roots.filter((path) => !own.includes(path) && !path.includes("_$"))).toEqual([]);
+    // Every path to a root is the host's `renderRoot` (Lit sets it) or the
+    // part under Lit's `_$...`.
+    expect(roots.filter((path) => path !== "renderRoot" && !path.includes("_$"))).toEqual([]);
     // `formValues` is the host's cache of what was typed; the secret-leak
     // change removes it, and this exclusion goes with it.
     expect(strings.filter((path) => !path.startsWith("formValues"))).toEqual([]);

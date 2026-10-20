@@ -32,12 +32,13 @@ export class ZlElement extends LitElement {
     ...LitElement.shadowRootOptions,
     mode: SHADOW_ROOT_MODE,
   };
+}
 
-  /**
-   * This element's own shadow root. Read it instead of `this.shadowRoot`,
-   * which is `null` when the root is closed.
-   */
-  protected get ownRoot(): ShadowRoot | null {
-    return this.renderRoot instanceof ShadowRoot ? this.renderRoot : null;
-  }
+/**
+ * The element's own shadow root, or `null` before it has one. Read it instead
+ * of `element.shadowRoot`, which is `null` when the root is closed. A function
+ * rather than a member, so the class gains no new way to the root.
+ */
+export function ownRoot(element: ZlElement): ShadowRoot | null {
+  return element.renderRoot instanceof ShadowRoot ? element.renderRoot : null;
 }

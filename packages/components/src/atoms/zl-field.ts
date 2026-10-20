@@ -9,6 +9,7 @@ import fieldStyles from "./zl-field.css?inline";
 
 import { emit } from "../internal/emit.js";
 import { FormAtom } from "../internal/form-atom.js";
+import { ownRoot } from "../internal/shadow-root.js";
 import { hookName } from "../internal/hook-name.js";
 import { nextUid } from "../internal/unique-id.js";
 import type { AtomManifest } from "../manifest.js";
@@ -174,13 +175,13 @@ export class ZlField extends FormAtom {
   }
 
   override get formValue(): string {
-    const native = this.inputEl ?? this.ownRoot?.querySelector<HTMLInputElement>("input");
+    const native = this.inputEl ?? ownRoot(this)?.querySelector<HTMLInputElement>("input");
     return native ? native.value : this.value;
   }
 
   override set formValue(value: string) {
     this.value = value;
-    const native = this.inputEl ?? this.ownRoot?.querySelector<HTMLInputElement>("input");
+    const native = this.inputEl ?? ownRoot(this)?.querySelector<HTMLInputElement>("input");
     if (native && native.value !== value) {
       native.value = value;
     }

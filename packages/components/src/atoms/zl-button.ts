@@ -5,7 +5,7 @@ import { classMap } from "lit/directives/class-map.js";
 import buttonStyles from "./zl-button.css?inline";
 
 import { emit } from "../internal/emit.js";
-import { ZlElement } from "../internal/shadow-root.js";
+import { ownRoot, ZlElement } from "../internal/shadow-root.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
@@ -88,7 +88,7 @@ export class ZlButton extends ZlElement {
   }
 
   override focus(options?: FocusOptions): void {
-    this.ownRoot?.querySelector<HTMLButtonElement>("button")?.focus(options);
+    ownRoot(this)?.querySelector<HTMLButtonElement>("button")?.focus(options);
   }
 
   override render() {

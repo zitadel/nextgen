@@ -273,14 +273,14 @@ The published package attaches closed shadow roots for `<zitadel-login>`, `<zita
 
 This is a guard against casual reads, not a security boundary. Any script on the page, at any time, still gets past it:
 
-- By reading members the element carries: its public `renderRoot` (Lit sets it), `attachInternals().shadowRoot` on `<zitadel-login>`, `<zitadel-session>` and `<zitadel-logout>` (they attach no internals of their own, so the page can), and the part Lit renders into, found by walking the element's own properties: `Object.values(el).find((v) => v?.parentNode instanceof ShadowRoot)?.parentNode`. Tests pin each of these.
+- By reading members the element carries: its public `renderRoot` (Lit sets it), `attachInternals().shadowRoot` on every element that attaches no internals of its own (all but the form atoms and `<zl-button>`, which do, so for those the page cannot), and the part Lit renders into, found by walking the element's own properties: `Object.values(el).find((v) => v?.parentNode instanceof ShadowRoot)?.parentNode`. Tests pin each of these.
 - By patching a built-in: `Element.prototype.attachShadow`, `HTMLInputElement.prototype.value` or `addEventListener`. Every step change creates new atoms, so a patch installed after the widget loaded still applies.
 - Through the selection: after a user select-all (or `execCommand("selectAll")` on a focused field), `getSelection().toString()` reads a non-password text field such as a PIN or a card number.
 - Through native events. The browser delivers `keydown` and `keyup` with their `key`, `beforeinput` and `input` with their `data`, `paste` with its clipboard data, and composition events to a page-level capture listener, whatever the root.
-- Through what the widget publishes itself: until the separate secret-leak change lands, the `zl-input` and `zitadel-flow-input` event details and the login host's `formValues` carry what was typed.
+- Through what the widget publishes itself. Merge #2090 first: on this branch alone the `zl-input` and `zitadel-flow-input` event details and the login host's `formValues` still carry what was typed.
 - Browser extensions and developer tooling read closed roots on purpose.
 
-Full isolation of a credential field from the page that hosts it needs a cross-origin iframe, which this package does not use. The tests prove only this: with closed roots every element has no reachable `shadowRoot`; a capture listener sees the host as the target of a keystroke and no node or root in `composedPath()`; walking the login host's members reaches a root only through the paths above and no typed secret beyond `formValues`; and the widget still signs in with keyboard input.
+Full isolation of a credential field from the page that hosts it needs a cross-origin iframe, which this package does not use. The tests prove only this: with closed roots every element has no reachable `shadowRoot`; a capture listener sees the host as the target of a keystroke and no node or root in `composedPath()`; walking the login host's members reaches a root only through the paths above, and no typed secret except in `formValues`, which #2090 removes; and the widget still signs in with keyboard input.
 
 Autofill and password managers have not been verified against closed roots. The browser's own autofill fills a field at the platform level, but extensions differ in how they find fields: those that look inside a shadow root through `element.shadowRoot` will not see these fields, and those that use the extension-only access to closed roots do.
 

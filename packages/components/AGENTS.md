@@ -108,8 +108,9 @@ in the library build so consumers share one copy; never bundle them there.
 ## Shadow roots
 
 Every shipped element's root is closed, so `host.shadowRoot` is `null` for a
-page script. Source builds (Vitest, Storybook) keep it open; an app's dev
-server resolves `dist`, so it gets closed roots too.
+page script, though `renderRoot` and `attachInternals().shadowRoot` still reach
+it. Source builds (Vitest, Storybook) keep it open; an app's dev server
+resolves `dist`, so it gets closed roots too.
 
 - The mode is decided once, by `SHADOW_ROOT_MODE` in
   `src/internal/shadow-root.ts`; `shadow-root-define.ts` closes it for both
@@ -117,7 +118,7 @@ server resolves `dist`, so it gets closed roots too.
   a second flag anywhere else.
 - Every element that renders into a shadow root extends `ZlElement` from that
   file; `shadow-root.spec.ts` checks every element the package defines.
-- Reach your own root with `this.ownRoot`, never `this.shadowRoot` (`null`
+- Reach your own root with `ownRoot(this)`, never `this.shadowRoot` (`null`
   when closed).
 - Never tell where an event came from with `composedPath()[0]`: a closed root
   hides the inner nodes, so every inner event looks like the host's own. Mark
