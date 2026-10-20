@@ -49,8 +49,8 @@ The Lit atoms (`<zl-*>`) and the orchestrators under `src/orchestrator/`
 - Coordinate before adding a `template` accessor to `<zitadel-login>`: it
   changes the public surface.
 - `src/server.ts` is what the package root resolves to on edge runtimes
-  (`workerd`, `worker`, `edge-light`): it must never import Lit, directly or
-  through another module. `server.spec.ts` proves it against the built `dist/`.
+  (`workerd`, `worker` or `edge-light` together with `browser`): it must never
+  import Lit, directly or through another module. `server.spec.ts` proves it against the built `dist/`.
 - Comments explain why, not what.
 
 ### Input atoms expose a real native control

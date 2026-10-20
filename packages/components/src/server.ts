@@ -1,13 +1,14 @@
 /**
  * `@zitadel/components` for runtimes without a DOM.
  *
- * `package.json` resolves the package root here under the `workerd`, `worker`
- * and `edge-light` export conditions. Those runtimes (Cloudflare Workers,
- * Vercel Edge, web workers) have no `HTMLElement`, `document` or
- * `customElements`, and bundlers target them with the `browser` condition, so
- * Lit resolves to its browser build and throws `HTMLElement is not defined`
- * the moment anything imports it. This entry therefore re-exports only what
- * never loads Lit, and never defines an element.
+ * `package.json` resolves the package root here when `browser` is active
+ * together with `workerd`, `worker` or `edge-light`. Those runtimes
+ * (Cloudflare Workers, Vercel Edge) have no `HTMLElement`, `document` or
+ * `customElements`, and bundlers target them with `browser`, so Lit resolves
+ * to its browser build and throws `HTMLElement is not defined` the moment
+ * anything imports it. This entry therefore re-exports only what never loads
+ * Lit, and never defines an element. Without `browser` the root stays the full
+ * entry, which Node-flavoured edge setups rely on.
  *
  * Every name is the same binding as the one `index.ts` exports. The elements,
  * their manifests and anything else that needs Lit stay in `index.ts`:
@@ -15,6 +16,11 @@
  */
 
 export { tokens, cssVars, type Tokens, type CssVars } from "./tokens/index.js";
+// Lit-free markup strings, unlike the rest of `internal/`.
+export {
+  ZITADEL_ATTRIBUTION_LOGOTYPE_SVG,
+  zitadelTrustmarkInnerHtml,
+} from "./internal/attribution-markup.js";
 
 export {
   buildBrandingStylesheet,

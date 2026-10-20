@@ -24,10 +24,22 @@
   "exports": {
     "./package.json": "./package.json",
     ".": {
+      "workerd": {
+        "types": "./dist/server.d.mts",
+        "browser": "./dist/server.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "worker": {
+        "types": "./dist/server.d.mts",
+        "browser": "./dist/server.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "edge-light": {
+        "types": "./dist/server.d.mts",
+        "browser": "./dist/server.mjs",
+        "default": "./dist/index.mjs"
+      },
       "types": "./dist/index.d.mts",
-      "workerd": "./dist/server.mjs",
-      "worker": "./dist/server.mjs",
-      "edge-light": "./dist/server.mjs",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
     },
