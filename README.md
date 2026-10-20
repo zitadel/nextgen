@@ -1,66 +1,47 @@
 # Zitadel — next generation
 
-The next generation of the Zitadel identity platform, built for developers
-and AI agents alike: registration and login live in your app, under your
-brand, while Zitadel guards the credentials, sessions, and tokens underneath.
+Add registration and login to your app, with your own branding. Zitadel handles credentials, sessions, and tokens underneath, with tools built for developers and AI agents.
 
-> **Preview status:** This work rebuilds Zitadel's storage core and API
-> surface, so it ships as a preview in its own repository and is intended to
-> merge back into [zitadel/zitadel](https://github.com/zitadel/zitadel) as the
-> foundation of a future major version. APIs, CLI flags, package surfaces, and
-> docs are still in flux. Create-first, claim-later is the product direction,
-> and `zitadel claim` ships in this repo
-> ([ADR 046](docs/adrs/046-claim-lifecycle-v2.md)). The full story is in
-> [VISION.md](VISION.md).
+> **This is a preview.** We're rebuilding Zitadel's storage core and API, and things are still changing — including APIs, CLI flags, packages, and docs. You can try it locally or self-host it; Cloud support comes later. This work lives in a separate repository for now and is intended to become the foundation of a future major version in [zitadel/zitadel](https://github.com/zitadel/zitadel). See [VISION.md](VISION.md) for where we're heading.
 
-## Workflow front doors
+## Where to start
 
-### I am contributing to Zitadel
+### Adding Zitadel to your app?
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor setup (including the
-devcontainer), Moon commands, local checks, integration tests, source builds,
-and release workflows. Agent-facing workspace rules live in
-[AGENTS.md](AGENTS.md).
+Follow the [quick start](#try-it-locally) below. These are the commands you'll use most:
 
-### I am adding Zitadel to my app
+| I want to… | Run |
+| --- | --- |
+| Check my local setup | `npx @zitadel/cli@alpha doctor` |
+| Start Zitadel locally | `npx @zitadel/cli@alpha start` |
+| Add authentication to my app | `npx @zitadel/cli@alpha setup --server local` |
+| Open the Console | `npx @zitadel/cli@alpha console` |
+| Stop Zitadel and keep my data | `npx @zitadel/cli@alpha stop` |
+| Delete my local Zitadel data | `npx @zitadel/cli@alpha reset --force` |
 
-| I want to...                                         | Run                                           |
-| ---------------------------------------------------- | --------------------------------------------- |
-| Check local runtime prerequisites                    | `npx @zitadel/cli@alpha doctor`               |
-| Start local Zitadel                                  | `npx @zitadel/cli@alpha start`                |
-| Add auth to my app                                   | `npx @zitadel/cli@alpha setup --server local` |
-| Open the local console, signed in as the local admin | `npx @zitadel/cli@alpha console`              |
-| Check generated app files                            | `npx @zitadel/cli@alpha doctor`               |
-| Stop local Zitadel, keeping data                     | `npx @zitadel/cli@alpha stop`                 |
-| Delete local Zitadel data                            | `npx @zitadel/cli@alpha reset --force`        |
+The CLI runs Zitadel through the `@zitadel/server` npm package. You don't need Docker, Go, Moon, or a checkout of this repository. If you prefer Docker, use `zitadel start --runtime docker`.
 
-The published `zitadel` runtime commands run the released local runtime through
-the `@zitadel/server` npm binary by default and do not require Docker, Go, Moon,
-or a source checkout. Docker remains available with
-`zitadel start --runtime docker`.
+### Contributing to Zitadel?
 
-### I am an agent (or driving one)
+Head to [CONTRIBUTING.md](CONTRIBUTING.md) for setup, running from source, testing, and releases. Instructions for coding agents working on this repository live in [AGENTS.md](AGENTS.md).
 
-The CLI is the agent-facing surface today: every command supports
-`--non-interactive --json` and returns a structured envelope.
-[apps/cli/skills/zitadel-cli/SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md) is the canonical contract for agents
-integrating Zitadel into an app; [AGENTS.md](AGENTS.md) is for agents
-contributing to this repository. The documentation site publishes LLM-friendly
-text at `/docs/llms.txt`, `/docs/llms-full.txt`, and page-level `.md` URLs.
+### Working with an AI agent?
 
-Install the skill into any skills-compatible agent (Claude Code, Cursor,
-Copilot, Codex, and more) straight from this repo:
+Install the Zitadel skills into your agent:
 
 ```sh
 npx skills add zitadel/nextgen --full-depth
 ```
 
-`--full-depth` installs the whole set — the `zitadel` router skill, the CLI
-skill, and the per-framework SDK and component skills. Without it, only the
-top-level router skill is installed. The CLI skill also ships inside the
-`@zitadel/cli` package.
+This installs the main Zitadel skill, the CLI skill, and the framework-specific SDK and component skills. Without `--full-depth`, only the main skill is installed. The CLI skill also comes with the `@zitadel/cli` package.
 
-## Customer quick start
+The [CLI skill](apps/cli/skills/zitadel-cli/SKILL.md) explains how to integrate Zitadel into an app. Commands support `--non-interactive --json` for automation, with structured output.
+
+The documentation site also provides `/docs/llms.txt`, `/docs/llms-full.txt`, and Markdown versions of individual pages.
+
+## Try it locally
+
+Start with a new directory and check that your machine is ready:
 
 ```sh
 mkdir myapp
@@ -68,74 +49,54 @@ cd myapp
 npx @zitadel/cli@alpha doctor
 ```
 
-Pick a server before running `setup`. It cannot be changed on this app
-afterwards. Use `--server local` for local development, or point at a hosted
-Zitadel Cloud instance if you want the project to belong to your team there.
-
-### Local
+Start Zitadel, then set up your app:
 
 ```sh
 npx @zitadel/cli@alpha start
 npx @zitadel/cli@alpha setup --server local
+```
+
+`start` creates a local admin and prints a one-time link to the Console.
+
+`setup` asks about your app, generates the files, and installs dependencies. It also creates a Project owned by your local admin's Team, ready to manage in the Console. To install dependencies yourself, pass `--skip-install`.
+
+Now run your app:
+
+```sh
 npm run dev
 ```
 
-`start` boots the local Zitadel runtime and creates a local admin,
-`admin@zitadel.localhost`. It ends by printing a sign-in link for the
-management console. That link works once.
+Open the URL printed by your development server and visit `/login`. Register a user to try the authentication flow. This is a user of your app; your local admin is the account you use to manage Zitadel.
 
-`setup --server local` creates the project and, by default, attaches it to
-that admin's team, so the project is owned from the start and `zitadel claim`
-reports it as already owned. If that attempt fails, setup prints a warning and
-`zitadel claim` remains the way to attach it. If you turned the platform
-bootstrap off, the server has no local admin and no claiming at all, so the
-project simply has no owning team.
+### Open the Console
 
-Any time you need the console again, print a fresh link:
+In another terminal, from the same app directory, run:
 
 ```sh
 npx @zitadel/cli@alpha console
 ```
 
-The console shows your project and lets you add colleagues as project admins
-by their email address. Pass `--no-open` to print the link instead of opening
-a browser. For the admin credential file, how its password is handled, and
-how to turn the local admin off, see [apps/cli/skills/zitadel-cli/SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md).
+This signs you in as the local admin so you can manage your Project. Whenever you need a fresh sign-in link, run the command again. Use `--no-open` if you'd prefer to copy the link into a browser yourself.
 
-Open http://localhost:3000/login and register your first user. That user is
-an end user of your app, a different identity from the console admin above.
-`setup` walks through the scaffold choices (such as which framework and use
-case) and writes the app into the current directory; pass `--skip-install` if
-you want to install dependencies yourself. The managed Zitadel runtime stores
-its metadata and data under `.zitadel/local/`; `stop` preserves that data and
-`reset --force` deletes it.
+More about local admin credentials and configuration: [CLI guidance](apps/cli/skills/zitadel-cli/SKILL.md).
 
-### Zitadel Cloud
+### When you're done
+
+Stop Zitadel while keeping your data:
 
 ```sh
-npx @zitadel/cli@alpha setup --server https://api.zitadel.cloud
-npm run dev
+npx @zitadel/cli@alpha stop
 ```
 
-A hosted server has no local runtime to manage, so `start`, `stop`, `reset`
-and `console` do not apply there. Once the app is up, attach the project to
-your team:
+Your local runtime data stays in `.zitadel/local/`. To delete it and start fresh, run:
 
 ```sh
-npx @zitadel/cli@alpha claim
+npx @zitadel/cli@alpha reset --force
 ```
 
-This opens a browser so you can sign in with your own Zitadel account (not
-one of the app's end users) and attach the project to your team. The link
-prints before any browser opens, so it works over SSH or headless too
-(`--no-open`); nothing about the running project changes. Claiming only
-works within 14 days of running `setup`. After that, `setup` a fresh
-project instead.
+## Run with Docker Compose
 
-## Manual Docker quick start
-
-Run the API and embedded UIs with Docker Compose when you want to inspect the
-operator-style stack directly:
+To explore the server directly, run the API and its built-in UIs with Docker Compose from this repository:
 
 ```sh
 cd docs/operations
@@ -143,58 +104,51 @@ cp env.example .env
 docker compose up -d
 ```
 
-| Surface            | URL                               |
-| ------------------ | --------------------------------- |
-| Management console | http://localhost:8080/ui/console/ |
-| Sign-in shell      | http://localhost:8080/ui/login/   |
-| Health             | http://localhost:8080/healthz     |
+| Open… | URL |
+| --- | --- |
+| Console | http://localhost:8080/ui/console/ |
+| Sign-in page | http://localhost:8080/ui/login/ |
+| Health endpoint | http://localhost:8080/healthz |
 
-A fresh Compose server has no project and no user yet, so this console shows
-its setup prompt until you seed one (see
-[docker-compose.md](docs/quick-start/docker-compose.md)). On the CLI path
-above, `zitadel console` signs you in as the local admin instead.
+A fresh Compose server has no Project or user, so the Console shows a setup prompt until you seed one. Follow the [Docker Compose guide](docs/quick-start/docker-compose.md) for that step. With the CLI setup above, `zitadel console` signs you in as the local admin.
 
-Details: [docs/quick-start/index.md](docs/quick-start/index.md). To build from source: [CONTRIBUTING.md](CONTRIBUTING.md).
+See the [quick-start docs](docs/quick-start/index.md) for more options, or [CONTRIBUTING.md](CONTRIBUTING.md) to build from source.
 
-## Documentation site
+## Work on the docs
 
-The documentation site lives in `apps/docs`: Fumadocs on Next.js, served
-under `/docs`.
+The documentation site lives in `apps/docs` and uses Fumadocs on Next.js, served under `/docs`.
 
 ```sh
 moon run docs:dev
 moon run docs:build
 ```
 
-The docs app bundles the OpenAPI source into a generated reference, has
-search, and publishes LLM-friendly text at `/docs/llms.txt`,
-`/docs/llms-full.txt` and page-level `.md` URLs, and an MCP server at
-`/docs/api/mcp`.
+It includes a generated API reference, search, Markdown pages for agents, and an MCP server at `/docs/api/mcp`.
 
-## Current status
+## What's available today?
 
-This repository is pre-release. The Go `server` command serves the OpenAPI
-surface and embeds the console and login UIs at `/ui/console/` and `/ui/login/`.
-CI produces installable snapshots for review, not official releases.
+This repository is pre-release. The Go `server` command serves the API and includes the Console at `/ui/console/` and login UI at `/ui/login/`. CI builds installable snapshots for testing and review.
 
-For product direction and the four pillars, see [VISION.md](VISION.md).
+For the wider product direction, see [VISION.md](VISION.md).
 
-## CI
+## Checks and CI
 
-Pull requests are gated by the GitHub Actions context `full-pr`, shown in the
-pull request UI as `ci / full-pr`: generated-file checks, lint, type checks,
-builds, unit and browser tests, the Go database lanes, a non-publishing release
-snapshot, and the end-to-end suites against the snapshot's npm tarballs.
-Changesets version PRs run a smaller release validation path instead. The full
-step list is in [CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
+Pull requests run the `ci / full-pr` check. It covers generated files, lint, type checks, builds, unit and browser tests, Go database tests, a release snapshot, and end-to-end tests against the snapshot's npm packages.
+
+Changesets version PRs use a smaller set of release checks. See [CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs) for the full list.
 
 ## Releases
 
-Moon builds the artifacts (Go binaries, containers, archives) and the draft
-GitHub Release; Changesets owns versions, npm publishing, and release notes,
-with the public packages on one fixed alpha train. Build a local snapshot with
-`moon run release:snapshot` (more in [CONTRIBUTING.md](CONTRIBUTING.md)). To
-cut or recover a release, follow the
-[release runbook](docs/runbooks/manual-release.md); for when to add a
-changeset, see [`.changeset/README.md`](.changeset/README.md); for the
-rationale, see [ADR 002](docs/adrs/002-multi-package-release-strategy.md).
+Moon builds the binaries, containers, archives, and draft GitHub Release. Changesets handles versions, npm publishing, and release notes. Public packages share one alpha release version.
+
+To build a local snapshot:
+
+```sh
+moon run release:snapshot
+```
+
+For more detail, see:
+
+- [Release runbook](docs/runbooks/manual-release.md) — cutting or recovering a release
+- [Changeset guide](.changeset/README.md) — when and how to add a changeset
+- [ADR 002](docs/adrs/002-multi-package-release-strategy.md) — the release strategy
