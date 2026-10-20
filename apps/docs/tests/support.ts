@@ -1,21 +1,31 @@
 import type { APIResponse } from "@playwright/test";
 
-/** A page as /docs/llms.txt lists it: `- [title](/docs/...): description`. */
+/**
+ * A page as /docs/llms.txt lists it, `- [title](/docs/....md): description`:
+ * the Markdown URL it lists and the page's own URL, the one without `.md`.
+ */
 export interface IndexedPage {
   title: string;
   url: string;
+  markdown: string;
   description?: string;
 }
 
 /** The pages the index lists, in its order. */
 export function parseIndex(index: string): IndexedPage[] {
   return [...index.matchAll(/^\s*- \[([^\]]+)\]\(([^)\s]+)\)(?:: (.*))?$/gm)].map(
-    ([, title = "", url = "", description]) => ({
+    ([, title = "", markdown = "", description]) => ({
       title,
-      url,
+      url: pageUrl(markdown),
+      markdown,
       ...(description !== undefined && { description }),
     }),
   );
+}
+
+/** The page a Markdown URL is the twin of; a URL without `.md` stays as it is. */
+function pageUrl(markdown: string): string {
+  return markdown === "/docs/index.md" ? "/docs" : markdown.replace(/\.md$/, "");
 }
 
 /**
