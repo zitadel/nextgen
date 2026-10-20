@@ -8,6 +8,7 @@ import selectStyles from "./zl-select.css?inline";
 
 import { emit } from "../internal/emit.js";
 import { FormAtom } from "../internal/form-atom.js";
+import { onOutsideEvent } from "../internal/outside-event.js";
 import { parseJsonAttribute } from "../internal/json-attribute.js";
 import { nextUid } from "../internal/unique-id.js";
 import type { AtomManifest } from "../manifest.js";
@@ -85,18 +86,21 @@ export class ZlSelect extends FormAtom {
 
   private readonly baseId = nextUid("zl-select");
 
+  /** Closes the popup on a press outside; see {@link onOutsideEvent}. */
+  private stopWatchingPresses: (() => void) | undefined;
+
   override connectedCallback(): void {
     super.connectedCallback();
     this.syncFormState();
-    this.addEventListener("pointerdown", this.markPointerDown);
-    document.addEventListener("pointerdown", this.handleDocumentPointerDown);
+    this.stopWatchingPresses = onOutsideEvent(this, "pointerdown", () => {
+      this.open = false;
+    });
     document.addEventListener("keydown", this.handleDocumentKeydown, true);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    this.removeEventListener("pointerdown", this.markPointerDown);
-    document.removeEventListener("pointerdown", this.handleDocumentPointerDown);
+    this.stopWatchingPresses?.();
     document.removeEventListener("keydown", this.handleDocumentKeydown, true);
   }
 
@@ -287,25 +291,6 @@ export class ZlSelect extends FormAtom {
       this.activeValue = option.value;
     }
   }
-
-  /**
-   * Pointer presses that landed on this select. The document listener cannot
-   * tell from `composedPath()`: when the select sits inside another element's
-   * closed root, the path a document listener sees omits it, so every press
-   * would read as outside and close the popup before an option is chosen.
-   */
-  private readonly pressedHere = new WeakSet<Event>();
-
-  private markPointerDown = (event: Event): void => {
-    this.pressedHere.add(event);
-  };
-
-  // Bubble phase, so the host's own listener has marked the press by now.
-  private handleDocumentPointerDown = (event: Event): void => {
-    if (this.open && !this.pressedHere.has(event)) {
-      this.open = false;
-    }
-  };
 
   /**
    * Escape closes the styled popup and stops propagation so it doesn't also

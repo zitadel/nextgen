@@ -148,6 +148,8 @@ describe("<zl-select> form participation (chromium)", () => {
   });
 
   describe("inside another element's closed shadow root", () => {
+    const settled = () => new Promise((resolve) => setTimeout(resolve, 20));
+
     async function mountNested(): Promise<ZlSelect> {
       const wrapper = document.createElement("div");
       host.appendChild(wrapper);
@@ -163,12 +165,24 @@ describe("<zl-select> form participation (chromium)", () => {
     it("stays open for a press on itself", async () => {
       const select = await mountNested();
       select.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
+      await settled();
       expect(select.open).toBe(true);
     });
 
     it("closes for a press elsewhere on the page", async () => {
       const select = await mountNested();
       document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      await settled();
+      expect(select.open).toBe(false);
+    });
+
+    it("closes for a press elsewhere whose page handler stops propagation", async () => {
+      const select = await mountNested();
+      const stop = (event: Event): void => event.stopPropagation();
+      document.body.addEventListener("pointerdown", stop);
+      document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      document.body.removeEventListener("pointerdown", stop);
+      await settled();
       expect(select.open).toBe(false);
     });
   });

@@ -76,7 +76,7 @@ describe("<zitadel-logout> open/close (chromium)", () => {
     expect(element.shadowRoot?.querySelector(".dropdown")).toBeTruthy();
 
     document.body.click();
-    await element.updateComplete;
+    await waitFor(() => (element.shadowRoot?.querySelector(".dropdown") ? null : true));
     expect(element.shadowRoot?.querySelector(".dropdown")).toBeNull();
   });
 
@@ -106,5 +106,47 @@ describe("<zitadel-logout> open/close (chromium)", () => {
     expect(url.startsWith(`${API_BASE}/sessions/me`)).toBe(true);
     expect(init.method).toBe("DELETE");
     expect(init.credentials).toBe("include");
+  });
+});
+
+describe("<zitadel-logout> inside another element's closed shadow root (chromium)", () => {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  async function mountNested() {
+    const wrapper = document.createElement("div");
+    host.appendChild(wrapper);
+    const logout = document.createElement("zitadel-logout");
+    wrapper.attachShadow({ mode: "closed" }).appendChild(logout);
+    const trigger = await waitFor(() =>
+      logout.shadowRoot?.querySelector<HTMLButtonElement>(".trigger"),
+    );
+    return { logout, trigger };
+  }
+
+  const settled = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+  it("opens its menu and keeps it open after the click that opened it", async () => {
+    const { trigger } = await mountNested();
+    trigger.click();
+    await settled();
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("closes its menu on a click elsewhere on the page", async () => {
+    const { trigger } = await mountNested();
+    trigger.click();
+    await settled();
+    document.body.click();
+    await settled();
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
 });

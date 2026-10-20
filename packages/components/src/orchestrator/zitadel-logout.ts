@@ -2,6 +2,7 @@ import { css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { property } from "../internal/property.js";
 
+import { onOutsideEvent } from "../internal/outside-event.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { resolveApi } from "./resolve-api.js";
 import { SessionController } from "./session-controller.js";
@@ -205,6 +206,9 @@ export class ZitadelLogout extends ZitadelConfigured {
     () => this.projectTemplate(),
   );
 
+  /** Closes the menu on a click outside; see {@link onOutsideEvent}. */
+  private stopWatchingClicks: (() => void) | undefined;
+
   override connectedCallback(): void {
     super.connectedCallback();
 
@@ -217,13 +221,15 @@ export class ZitadelLogout extends ZitadelConfigured {
       this.projectTemplate();
     }
 
-    document.addEventListener("click", this.handleDocumentClick);
+    this.stopWatchingClicks = onOutsideEvent(this, "click", () => {
+      this.open = false;
+    });
     document.addEventListener("keydown", this.handleDocumentKeydown);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener("click", this.handleDocumentClick);
+    this.stopWatchingClicks?.();
     document.removeEventListener("keydown", this.handleDocumentKeydown);
   }
 
@@ -276,12 +282,6 @@ export class ZitadelLogout extends ZitadelConfigured {
       });
     });
   }
-
-  private readonly handleDocumentClick = (event: MouseEvent): void => {
-    if (!this.open) return;
-    if (event.composedPath().includes(this)) return;
-    this.open = false;
-  };
 
   private readonly handleDocumentKeydown = (event: KeyboardEvent): void => {
     if (!this.open) return;
