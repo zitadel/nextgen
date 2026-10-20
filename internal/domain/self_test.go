@@ -18,7 +18,8 @@ func TestSelfFromSession(t *testing.T) {
 
 	self, err := domain.SelfFromSession(&domain.Token{ProjectID: "proj_1", UserID: "user_1", ExpiresAt: &future}, now)
 	require.NoError(t, err)
-	assert.Equal(t, domain.Self{ProjectID: "proj_1", UserID: "user_1"}, self)
+	assert.Equal(t, "proj_1", self.ProjectID())
+	assert.Equal(t, "user_1", self.UserID())
 
 	for name, token := range map[string]*domain.Token{
 		"no session": nil,

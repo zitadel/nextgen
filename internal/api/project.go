@@ -119,8 +119,8 @@ func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsP
 	}
 
 	listed, err := h.projectService.ListAuthorized(ctx, service.ListAuthorizedProjectsRequest{
-		HomeProjectID: self.ProjectID,
-		UserID:        self.UserID,
+		HomeProjectID: self.ProjectID(),
+		UserID:        self.UserID(),
 		Limit:         int(params.Limit.Value),
 		PageToken:     string(params.PageToken.Value),
 	})

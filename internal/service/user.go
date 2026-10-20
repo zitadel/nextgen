@@ -625,8 +625,8 @@ func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (
 	defer end(&err)
 
 	return s.PatchUser(ctx, PatchUserInput{
-		ProjectID:  input.Self.ProjectID,
-		UserID:     input.Self.UserID,
+		ProjectID:  input.Self.ProjectID(),
+		UserID:     input.Self.UserID(),
 		Attributes: input.Attributes,
 	})
 }
@@ -647,7 +647,7 @@ func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (_ *d
 	if err != nil {
 		return nil, err
 	}
-	if err := s.attachUserRefs(ctx, input.Self.ProjectID, user); err != nil {
+	if err := s.attachUserRefs(ctx, input.Self.ProjectID(), user); err != nil {
 		return nil, err
 	}
 	return user, nil
@@ -663,7 +663,7 @@ func (s *userService) GetMyUserSchema(ctx context.Context, input GetMyUserInput)
 	if err != nil {
 		return nil, err
 	}
-	schema, err := s.v2Pool.Statements().GetJSONSchemaByID(ctx, input.Self.ProjectID, user.SchemaURL)
+	schema, err := s.v2Pool.Statements().GetJSONSchemaByID(ctx, input.Self.ProjectID(), user.SchemaURL)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to get the user's schema from database")
 	}
@@ -673,8 +673,8 @@ func (s *userService) GetMyUserSchema(ctx context.Context, input GetMyUserInput)
 // ownUser reads the caller's own record.
 func (s *userService) ownUser(ctx context.Context, self domain.Self) (*domain.User, error) {
 	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
-		database.Equal(database.Col(domain.UserFieldProjectID), self.ProjectID),
-		database.Equal(database.Col(domain.UserFieldID), self.UserID),
+		database.Equal(database.Col(domain.UserFieldProjectID), self.ProjectID()),
+		database.Equal(database.Col(domain.UserFieldID), self.UserID()),
 	), UserQueryOptions{})
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {

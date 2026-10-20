@@ -451,7 +451,8 @@ func TestUserService_GetMyUserSchema(t *testing.T) {
 	t.Parallel()
 
 	svc, stmts := newMockedUserService(t)
-	self := domain.Self{ProjectID: "proj_1", UserID: "user_1"}
+	self, err := domain.SelfFromSession(&domain.Token{ProjectID: "proj_1", UserID: "user_1"}, time.Now())
+	require.NoError(t, err)
 	stmts.EXPECT().GetUser(gomock.Any(), database.And(
 		database.Equal(database.Col(domain.UserFieldProjectID), "proj_1"),
 		database.Equal(database.Col(domain.UserFieldID), "user_1"),

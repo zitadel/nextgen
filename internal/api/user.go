@@ -252,8 +252,8 @@ func (h *Handler) ListMyTeams(ctx context.Context, params api.ListMyTeamsParams)
 		return nil, err
 	}
 	teams, err := h.userService.ListUserTeams(ctx, service.ListUserTeamsInput{
-		ProjectID: self.ProjectID,
-		UserID:    self.UserID,
+		ProjectID: self.ProjectID(),
+		UserID:    self.UserID(),
 		PageToken: string(params.PageToken.Value),
 		Limit:     int(params.Limit.Value),
 	})
