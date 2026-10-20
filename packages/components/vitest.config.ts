@@ -10,9 +10,9 @@ const sharedPlugins = () => [liquidRaw()];
 /**
  * Two projects in one config, selected per lane (no separate config files):
  *
- * - `unit` (jsdom): the bulk of the suite. The fast local `test` = `vitest run
- *   --project unit`. Skips the form-associated custom-element checks that
- *   jsdom 29 only partially implements.
+ * - `unit` (jsdom): the bulk of the suite. The fast local lane is `test:unit`
+ *   = `vitest run --project unit`. Skips the form-associated custom-element
+ *   checks that jsdom 29 only partially implements.
  * - `browser` (real Chromium via Playwright): `*.browser.spec.ts` — form
  *   participation, Enter-to-submit, focus management. Local-only selector
  *   `test:browser` = `vitest run --project browser` (heavy Chromium cold start).
