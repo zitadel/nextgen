@@ -16,6 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // TestConsoleManagementAcceptsSession pins #1300 §1: the embedded Console
@@ -559,7 +560,7 @@ func TestConsoleSessionPartialAccessDoesNotExpand(t *testing.T) {
 
 	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	_, teamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+	memberID, teamID := harness.CreateUserOwnedByTeam(t, customer.ID)
 	asgn := &domain.AuthzAssignment{
 		ProjectID:     customer.ID,
 		CatalogID:     domain.SystemCatalogID,
@@ -596,6 +597,13 @@ func TestConsoleSessionPartialAccessDoesNotExpand(t *testing.T) {
 			assert.Equal(t, api.ErrorCode("user.permission_denied"), resp.(*api.QueryUsersForbidden).Code)
 		})
 	}
+	// The roster reads the same memberships by its own route.
+	t.Run("list user teams", func(t *testing.T) {
+		resp, err := session.ListUserTeams(t.Context(), api.ListUserTeamsParams{UserID: api.UserID(memberID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserTeamsForbidden{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.permission_denied"), resp.(*api.ListUserTeamsForbidden).Code)
+	})
 }
 
 // TestConsoleSessionByIDTeamFilterNeedsProjectRead closes the side door next
@@ -779,4 +787,98 @@ func requireUsersNotFound(t *testing.T, resp api.QueryUsersRes) {
 	denied := resp.(*api.QueryUsersErrorResponseStatusCode)
 	assert.Equal(t, http.StatusNotFound, denied.StatusCode)
 	assert.True(t, denied.Response.IsUserNotFound(), helpers.MustMarshal(t, resp))
+}
+
+// TestConsoleSessionReadsUserTeams: GET /users/{id}/teams takes the session
+// the way the membership expansion does (#1300 §4): viewer on the user's
+// project reads the roster, no grant does not find the user. The team-scoped
+// foothold is in TestConsoleSessionPartialAccessDoesNotExpand.
+func TestConsoleSessionReadsUserTeams(t *testing.T) {
+	t.Parallel()
+
+	_, operatorID, cookie := ownSessionUser(t)
+	session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	session.SetSessionToken(cookie.Value)
+
+	t.Run("viewer on the project reads the roster", func(t *testing.T) {
+		t.Parallel()
+		customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		memberID := harness.CreateUserWithTeam(t, customer.ID)
+		harness.SeedProjectViewer(t, customer.ID, operatorID)
+
+		resp, err := session.ListUserTeams(t.Context(), api.ListUserTeamsParams{UserID: api.UserID(memberID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserTeamsResponse{}, resp, helpers.MustMarshal(t, resp))
+		assert.Len(t, resp.(*api.ListUserTeamsResponse).Teams, 1)
+	})
+
+	t.Run("no grant does not find the user", func(t *testing.T) {
+		t.Parallel()
+		customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		memberID := harness.CreateUserWithTeam(t, customer.ID)
+
+		resp, err := session.ListUserTeams(t.Context(), api.ListUserTeamsParams{UserID: api.UserID(memberID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserTeamsNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.ListUserTeamsNotFound).Code)
+	})
+}
+
+// TestPersonalTeamOwnerRenamesTheirTeam: the team a platform user is given at
+// sign-up is theirs to rename (the owner grant EnsurePersonalTeam writes), and
+// the grant reaches no other team. Run against a project of the test's own,
+// configured as the platform project for the ensure.
+func TestPersonalTeamOwnerRenamesTheirTeam(t *testing.T) {
+	t.Parallel()
+
+	platform, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	ensurer := service.NewPersonalTeamService(harness.EnsureServiceDB(t), platform.ID)
+	signUp := func(t *testing.T) (*http.Cookie, string) {
+		t.Helper()
+		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  platform.ID,
+			SchemaURL:  test_data.UserSchemaURL,
+			Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, helpers.ProjectName()+"@example.com"),
+		})
+		require.NoError(t, err)
+		require.NoError(t, ensurer.EnsurePersonalTeam(t.Context(), platform.ID, user.ID))
+		cookie := sessionCookieIn(t, platform, user.ID)
+		status, body := consoleCall(t, cookie, http.MethodGet, "/users/me/teams", "")
+		require.Equal(t, http.StatusOK, status, body)
+		teams := helpers.MustUnmarshal[api.ListUserTeamsResponse](t, []byte(body)).Teams
+		require.Len(t, teams, 1)
+		return cookie, string(teams[0].ID)
+	}
+	cookie, teamID := signUp(t)
+	otherUserID := harness.CreateUserWithTeam(t, platform.ID)
+
+	t.Run("renames their team", func(t *testing.T) {
+		status, body := consoleCall(t, cookie, http.MethodPatch, "/teams/"+teamID, `{"name":"Acme Platform"}`)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, "Acme Platform", helpers.MustUnmarshal[api.TeamResponse](t, []byte(body)).Name)
+	})
+
+	t.Run("cannot rename another user's team", func(t *testing.T) {
+		_, otherTeamID := signUp(t)
+		status, body := consoleCall(t, cookie, http.MethodPatch, "/teams/"+otherTeamID, `{"name":"Not mine"}`)
+		assert.Equal(t, http.StatusForbidden, status, body)
+		assert.Equal(t, api.ErrorCode("team.permission_denied"), helpers.MustUnmarshal[api.ErrorDetails](t, []byte(body)).Code)
+	})
+
+	// The grant reaches nothing else in the platform project. It is a foothold
+	// there, so these answer 403 rather than 404 until #2112.
+	for name, tc := range map[string]struct{ path, code string }{
+		"cannot read the platform project":  {"/projects/" + platform.ID, "proj.permission_denied"},
+		"cannot read another platform user": {"/users/" + otherUserID, "user.permission_denied"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			status, body := consoleCall(t, cookie, http.MethodGet, tc.path, "")
+			assert.Equal(t, http.StatusForbidden, status, body)
+			assert.Equal(t, api.ErrorCode(tc.code), helpers.MustUnmarshal[api.ErrorDetails](t, []byte(body)).Code)
+		})
+	}
 }

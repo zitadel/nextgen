@@ -147,7 +147,7 @@ tasks:
       runInCI: "skip"
 
   # The embedded console against a deployment with the platform project
-  # bootstrapped (the server default).
+  # bootstrapped (the `zitadel start` default; the server alone leaves it off).
   console-platform:
     command: "env -u CI -u GITHUB_ACTIONS corepack pnpm exec playwright test --config console/playwright.platform.config.mts"
     inputs:
@@ -176,6 +176,22 @@ tasks:
     inputs:
       - "console/**/*"
       - "@group(laneShared)"
+    options:
+      cache: false
+      runInCI: false
+
+  # The built-in schemas on a deployment of the hosted cloud, which CLOUD_URL
+  # names, as the `schemas` service publishes them under /schemas/v1/: each
+  # one this commit renders (the spec imports the renderer), labelled, cached
+  # and routed as vercel.json says. HTTP only, nothing to build or boot; run
+  # beside the console's suite and, like it, not a dependency of `all`.
+  schemas-deployment:
+    command: "corepack pnpm exec playwright test --config schemas/playwright.deployment.config.mts"
+    inputs:
+      - "schemas/**/*"
+      - "@group(laneShared)"
+      - "/scripts/render-builtin-schemas.mjs"
+      - "/api/openapi/endpoints/schemas/*.json"
     options:
       cache: false
       runInCI: false

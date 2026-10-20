@@ -1,0 +1,35 @@
+get:
+  operationId: listMyTeams
+  summary: List the teams I belong to
+  description: The signed-in user's own team roster, ordered by team name.
+  tags:
+    - Users
+  security:
+    - nextgenSession: []
+  parameters:
+    - $ref: ../../../../components/parameters/limit.yaml
+    - $ref: ../../../../components/parameters/page-token.yaml
+  responses:
+    '200':
+      description: The user's teams.
+      headers:
+        Cache-Control:
+          $ref: ../../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../by_id/teams/list-user-teams-response.yaml
+    '400':
+      description: The page token or limit was not valid.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid session token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/auth-unauthorized.yaml
+    default:
+      $ref: listMyTeams-error-response.yaml

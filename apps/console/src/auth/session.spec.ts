@@ -10,8 +10,10 @@ import {
   _resetSessionForTesting,
   fetchSession,
   invalidateSessionCache,
+  sanitizeNextPath,
   sessionPage,
 } from "./session";
+import { _resetRuntimeForTesting, _setRuntimeForTesting } from "@/runtime/runtime";
 import { makeTestSession } from "@/test/session.fixture";
 import { server } from "@/test/msw";
 
@@ -21,6 +23,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   setApiCsrfToken(undefined);
+  _resetRuntimeForTesting();
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -213,6 +216,49 @@ describe("fetchSession", () => {
   });
 });
 
+// On localhost the console and the apps share one cookie jar, so the cookie may
+// hold an app's session. It signs no one in to the console.
+describe("fetchSession, held to the console's project", () => {
+  beforeEach(() => {
+    _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
+  });
+
+  it("names the console's project in the session read", async () => {
+    const urls: string[] = [];
+    server.use(
+      http.get("*/sessions/me", ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json(makeTestSession({ project_id: "proj_platform" }));
+      }),
+    );
+    stubCsrf(token("tok"));
+
+    expect(await fetchSession()).toMatchObject({ project_id: "proj_platform" });
+    expect(new URL(urls[0] ?? "").searchParams.get("project_id")).toBe("proj_platform");
+  });
+
+  it.each([
+    [
+      "the server refuses it",
+      () =>
+        HttpResponse.json(
+          { code: "sess.project_mismatch", message: "different project" },
+          { status: 403 },
+        ),
+    ],
+    [
+      "an older server answers for it",
+      () => HttpResponse.json(makeTestSession({ project_id: "proj_app" })),
+    ],
+  ])("reports no session for an app's session when %s", async (_label, respond) => {
+    server.use(http.get("*/sessions/me", respond));
+    const calls = stubCsrf(failing);
+
+    expect(await fetchSession()).toBeNull();
+    expect(calls()).toBe(0);
+  });
+});
+
 describe("CSRF rejection", () => {
   it("hands back a fresh token when the same person is still signed in", async () => {
     stubSession("user_a");
@@ -271,6 +317,24 @@ describe("CSRF rejection", () => {
     expect(getApiCsrfToken()).toBe("tok_a");
   });
 
+  // Only the server's project-mismatch answer means another project's session.
+  // Any other 403 on the re-check (a proxy, a firewall) is an unreadable
+  // session, which must not cost the person their page.
+  it("keeps the page when the re-check is refused for another reason", async () => {
+    _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_test" });
+    stubSession("user_a");
+    stubCsrf(token("tok_a"));
+    await fetchSession();
+
+    server.use(
+      http.get("*/sessions/me", () => HttpResponse.text("<html>Forbidden</html>", { status: 403 })),
+    );
+    expect(await rejectWrite()).toBeUndefined();
+
+    expect(sessionPage.reload).not.toHaveBeenCalled();
+    expect(getApiCsrfToken()).toBe("tok_a");
+  });
+
   // Without a recorded person there is nothing to compare the session to, so
   // no token is handed back and nothing is retried.
   it("does not retry when this page has no person yet", async () => {
@@ -311,5 +375,52 @@ describe("CSRF rejection", () => {
     expect(await rejected).toBeUndefined();
     expect(sessionPage.reload).toHaveBeenCalledOnce();
     expect(getApiCsrfToken()).toBeUndefined();
+  });
+});
+
+describe("sanitizeNextPath", () => {
+  it.each([
+    ["/", "/"],
+    ["/users", "/users"],
+    ["/users?tab=x", "/users?tab=x"],
+    ["/users?project=proj_test#top", "/users?project=proj_test#top"],
+    // Only where the browser goes is checked: a URL in the query stays the
+    // screen's own business.
+    ["/users?q=https://app.example", "/users?q=https://app.example"],
+  ])("keeps %s", (next, path) => {
+    expect(sanitizeNextPath(next)).toBe(path);
+  });
+
+  // The login screen joins the path with the deployment prefix, which a `..`
+  // left in place would climb out of.
+  it.each([
+    ["/users/../schemas", "/schemas"],
+    ["/../users", "/users"],
+    ["/./users?tab=x", "/users?tab=x"],
+  ])("collapses the dot segments in %s", (next, path) => {
+    expect(sanitizeNextPath(next)).toBe(path);
+  });
+
+  it.each([
+    ["no value", undefined],
+    ["an empty value", ""],
+    ["a path without a leading slash", "users"],
+    ["an absolute URL", "https://evil.example/phish"],
+    ["a protocol-relative URL", "//evil.example"],
+    // Browsers read `\` as `/`.
+    ["a backslash", "/\\evil.example"],
+    ["a backslash further in", "/users/\\evil.example"],
+    // Browsers drop tabs and newlines.
+    ["a tab", "/\t/evil.example"],
+    ["a newline", "/\n/evil.example"],
+    ["a carriage return", "/\r/evil.example"],
+    ["another control character", "/\u0000/evil.example"],
+    ["DEL", "/\u007f/evil.example"],
+    // Each of these collapses to //evil.example.
+    ["a dot segment before //", "/.//evil.example"],
+    ["a parent segment before //", "/users/..//evil.example"],
+    ["an encoded dot segment before //", "/%2e//evil.example"],
+  ])("refuses %s", (_, next) => {
+    expect(sanitizeNextPath(next)).toBeUndefined();
   });
 });

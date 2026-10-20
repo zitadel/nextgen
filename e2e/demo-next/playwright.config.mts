@@ -12,7 +12,7 @@ import {
  * E2E coverage for the embedded sign-in path:
  *
  *   demo-next /login → <zitadel-login> → /__nextgen proxy
- *                    → api-mock TCP server → __nextgen_session cookie
+ *                    → api-mock TCP server → the project's session cookie
  *                    → /admin (server-rendered, authenticated)
  *
  * This is the integration gap that Vitest cannot reach: real Next
@@ -26,6 +26,9 @@ export default defineConfig({
   ...e2eTimeouts,
   testDir: "./src",
   outputDir: "test-results/mock",
+  // The standalone api-mock drives one sign-in flow at a time: specs that
+  // sign in from parallel workers would advance each other's flow.
+  workers: 1,
   use: {
     ...e2eActionTimeouts,
     baseURL: "http://localhost:3002",

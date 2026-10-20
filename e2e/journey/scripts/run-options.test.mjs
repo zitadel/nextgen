@@ -24,7 +24,7 @@ test("local journey defaults to the full framework matrix", () => {
       "sveltekit",
       "tanstack-start",
       "solid-start",
-      "qwik-city",
+      "qwik-router",
     ],
     image: "",
     keep: false,

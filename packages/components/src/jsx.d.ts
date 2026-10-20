@@ -38,6 +38,8 @@ declare module "react" {
           "publishable-key"?: string;
           url?: string;
           "post-sign-in-url"?: string;
+          forcePostSignInUrl?: ZitadelLogin["forcePostSignInUrl"];
+          "force-post-sign-in-url"?: boolean;
           "resume-flow-id"?: string;
           "preview-state"?: ZitadelLogin["previewState"];
           "preview-success-step"?: string;
