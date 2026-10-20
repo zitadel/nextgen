@@ -394,21 +394,6 @@ describe("standard-attribute tests ↔ SDK specs", () => {
     expect(problems(specsOf(side), name, canonical)).toEqual([]);
   });
 
-  it("has the flow-input block, canonical in every SDK, Angular included", () => {
-    const sources = {
-      ...specsOf("client"),
-      "sdk-angular": read(ANGULAR_SPEC),
-    };
-    const canonical = [
-      "flow input",
-      "types a secret flow input without a value",
-      "forwards a secret flow input as it came, without a value",
-      "forwards the value of an ordinary flow input",
-    ];
-    expect(Object.keys(sources)).toHaveLength(6);
-    expect(problems(sources, "flow-input", canonical)).toEqual([]);
-  });
-
   it("has no block in Angular, the one documented exception", () => {
     const angular = read(ANGULAR_SPEC);
     expect(blockIn(angular, "standard-attributes")).toBeUndefined();

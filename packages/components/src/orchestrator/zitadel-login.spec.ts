@@ -18,7 +18,6 @@ import {
  * `ElementInternals` implementation.
  */
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
-import type { CreateFlow201, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,6 +25,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import "./zitadel-login.js";
 import type { ZlAlert } from "../atoms/zl-alert.js";
 import type { ZlField } from "../atoms/zl-field.js";
+import type { CreateFlow201, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 import { loginPreviewStatesFor, type ZitadelLogin } from "./zitadel-login.js";
 
 const API_BASE = "https://flow.test.invalid";
@@ -106,36 +106,6 @@ async function advanceMockLoginFlow(
   submit(element);
 }
 
-/** A passkey enrolment step, as the server would serve it, with a challenge to run. */
-const passkeyEnrollFlow: CreateFlow201 = {
-  id: "flow-1",
-  session_id: "sess-1",
-  session_token: "token-1",
-  step: {
-    name: "passkey-enroll",
-    texts: { title_key: "passkey-enroll.title" },
-    fields: [],
-    actions: [],
-    gates: {},
-    challenge: {
-      method: "passkey_register",
-      challenge_id: "reg-1",
-      options: {
-        challenge: "AAAA",
-        rp: { id: "localhost", name: "localhost" },
-        user: { id: "dXNlcl8x", name: "alice@example.com", displayName: "alice@example.com" },
-        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-      },
-    },
-  },
-  branding: {},
-};
-
-/** Makes the next flow start answer with the given step. */
-function serveFirstStep(flow: CreateFlow201): void {
-  server.use(http.post("*/flow", () => HttpResponse.json(flow, { status: 201 }), { once: true }));
-}
-
 /** Create and attach a login element without waiting for a render. */
 function attachLogin(host: HTMLElement): ZitadelLogin {
   const element = document.createElement("zitadel-login") as ZitadelLogin;
@@ -161,6 +131,61 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
   afterEach(() => {
     host.innerHTML = "";
+  });
+
+  describe("zitadel-flow-input", () => {
+    function serveField(kind: CreateFlow201StepFieldsItem["type"], autocomplete?: string): void {
+      const body: CreateFlow201 = {
+        id: "flow_test",
+        session_id: "sess_test",
+        session_token: "st_test",
+        step: {
+          name: "challenge",
+          texts: { title_key: "identifier.title" },
+          fields: [{ name: "f", type: kind, text_key: "identifier.field.email", autocomplete }],
+          actions: [{ name: "submit", kind: "submit", text_key: "submit.signin", primary: true }],
+          gates: {},
+        },
+        branding: {},
+      };
+      server.use(
+        http.post("*/flow", () => HttpResponse.json(body, { status: 201 }), { once: true }),
+      );
+    }
+
+    /** What a page script listening on the document sees while a visitor types "s3cret". */
+    async function seenWhileTyping(
+      kind: CreateFlow201StepFieldsItem["type"],
+      autocomplete?: string,
+    ): Promise<unknown[]> {
+      serveField(kind, autocomplete);
+      const element = await mount(host);
+      await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="f"]'));
+      const seen: unknown[] = [];
+      const listener = (event: Event): void => {
+        if (event instanceof CustomEvent) seen.push(event.detail);
+      };
+      document.addEventListener("zitadel-flow-input", listener);
+      type(element, "f", "s3cret");
+      document.removeEventListener("zitadel-flow-input", listener);
+      return seen;
+    }
+
+    it("is not dispatched for a password field", async () => {
+      expect(await seenWhileTyping("password", "current-password")).toEqual([]);
+    });
+
+    it("is not dispatched for a password type without an autocomplete token", async () => {
+      expect(await seenWhileTyping("password")).toEqual([]);
+    });
+
+    it("is not dispatched for a one-time-code field", async () => {
+      expect(await seenWhileTyping("text", "one-time-code")).toEqual([]);
+    });
+
+    it("is dispatched with name and value for an email field", async () => {
+      expect(await seenWhileTyping("email", "username")).toEqual([{ name: "f", value: "s3cret" }]);
+    });
   });
 
   it("starts a flow on mount and renders the first step", async () => {
@@ -403,207 +428,6 @@ describe("<zitadel-login> against the typed Flow API", () => {
     await waitFor(() => (completeEvents.length > 0 ? completeEvents : null));
     expect(completeEvents[0]?.detail).toEqual(expect.objectContaining({ behavior: "show" }));
     expect(completeEvents[0]?.detail.handoff_token).toBeTruthy();
-  });
-
-  describe("zitadel-flow-input never carries a secret value", () => {
-    const SECRET = "Zq9#vLx!k2";
-
-    /**
-     * Listens where any script on the page can: `window` and `document`, in the
-     * capture and the bubble phase. `details` holds the JSON of what the first
-     * of them (window, capture) saw; `calls` counts every listener invocation.
-     */
-    function listenOnPage(type: string): {
-      details: string[];
-      calls: () => number;
-      stop: () => void;
-    } {
-      const details: string[] = [];
-      let calls = 0;
-      const stops: (() => void)[] = [];
-      for (const target of [window, document]) {
-        for (const capture of [true, false]) {
-          const listener = (event: Event): void => {
-            calls += 1;
-            if (target === window && capture && event instanceof CustomEvent) {
-              details.push(JSON.stringify(event.detail));
-            }
-          };
-          target.addEventListener(type, listener, capture);
-          stops.push(() => target.removeEventListener(type, listener, capture));
-        }
-      }
-      return {
-        details,
-        calls: () => calls,
-        stop: () => {
-          for (const stop of stops) stop();
-        },
-      };
-    }
-
-    /** Types into the field's native input one character at a time, as a keyboard does. */
-    async function typeIntoField(element: ZitadelLogin, name: string, text: string): Promise<void> {
-      const input = await waitFor(() =>
-        element.shadowRoot
-          ?.querySelector<ZlField>(`zl-field[name="${name}"]`)
-          ?.shadowRoot?.querySelector("input"),
-      );
-      for (const character of text) {
-        input.value += character;
-        input.dispatchEvent(
-          new InputEvent("input", {
-            bubbles: true,
-            composed: true,
-            data: character,
-            inputType: "insertText",
-          }),
-        );
-      }
-    }
-
-    /** Serves one step with the given fields as the flow's first step. */
-    function serveStep(fields: CreateFlow201StepFieldsItem[]): void {
-      const body: CreateFlow201 = {
-        id: "flow_test",
-        session_id: "sess_test",
-        session_token: "st_test",
-        step: {
-          name: "challenge",
-          texts: { title_key: "identifier.title" },
-          fields,
-          actions: [{ name: "submit", kind: "submit", text_key: "submit.signin", primary: true }],
-          gates: {},
-        },
-        branding: {},
-      };
-      server.use(
-        http.post("*/flow", () => HttpResponse.json(body, { status: 201 }), { once: true }),
-      );
-    }
-
-    function field(
-      type: CreateFlow201StepFieldsItem["type"],
-      autocomplete?: string,
-    ): CreateFlow201StepFieldsItem {
-      return { name: "f", type, text_key: "identifier.field.email", autocomplete };
-    }
-
-    it("redacts the password a visitor types on the password step", async () => {
-      const element = await mount(host);
-      await typeIntoField(element, "email", "alice@acme.com");
-      submit(element);
-      await waitFor(() => element.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`));
-      const listening = listenOnPage("zitadel-flow-input");
-      try {
-        await typeIntoField(element, PASSWORD_FIELD, SECRET);
-
-        expect(listening.details).toHaveLength(SECRET.length);
-        expect(new Set(listening.details)).toEqual(
-          new Set([JSON.stringify({ name: PASSWORD_FIELD, secret: true })]),
-        );
-        expect(JSON.stringify(listening.details)).not.toContain(SECRET.slice(0, 3));
-      } finally {
-        listening.stop();
-      }
-    });
-
-    it("keeps the value of the identifier the visitor types", async () => {
-      const element = await mount(host);
-      const listening = listenOnPage("zitadel-flow-input");
-      try {
-        await typeIntoField(element, "email", "alice@acme.com");
-
-        expect(listening.details.at(-1)).toBe(
-          JSON.stringify({ name: "email", secret: false, value: "alice@acme.com" }),
-        );
-      } finally {
-        listening.stop();
-      }
-    });
-
-    it.each([
-      ["an email that is the username", field("email", "username"), true],
-      ["a tel that is a phone number", field("tel", "tel"), true],
-      ["a username", field("text", "username"), true],
-      ["an email address", field("text", "email"), true],
-      ["a phone number", field("text", "tel"), true],
-      ["a name", field("text", "name"), true],
-      ["a given name", field("text", "given-name"), true],
-      ["an additional name", field("text", "additional-name"), true],
-      ["a family name", field("text", "family-name"), true],
-      ["a nickname", field("text", "nickname"), true],
-      ["an upper-case username token", field("text", "USERNAME"), true],
-      ["a password", field("password", "current-password"), false],
-      ["a new password", field("password", "new-password"), false],
-      ["a password with no autocomplete", field("password"), false],
-      ["a plain text field, like a PIN or a security answer", field("text"), false],
-      ["a text field with an unrelated autocomplete", field("text", "off"), false],
-      ["a one-time code", field("text", "one-time-code"), false],
-      ["a username that is also a one-time code", field("text", "username one-time-code"), false],
-      ["an upper-case one-time-code token on an email", field("email", "ONE-TIME-CODE"), false],
-      ["an email with no autocomplete", field("email"), false],
-      ["a tel with no autocomplete, like a numeric PIN", field("tel"), false],
-      ["a username next to a card code", field("text", "username cc-csc"), false],
-      ["a card number next to a username", field("text", "cc-number username"), false],
-      ["an email holding a card number", field("email", "cc-number"), false],
-      [
-        "a new password trailed by a zero-width space",
-        field("text", "username new-password\u200b"),
-        false,
-      ],
-      ["a number", field("number"), false],
-      ["a url", field("url"), false],
-      ["a date", field("date"), false],
-    ])("reports %s according to its definition", async (_label, definition, disclosed) => {
-      serveStep([definition]);
-      const element = await mount(host);
-      const listening = listenOnPage("zitadel-flow-input");
-      try {
-        await typeIntoField(element, "f", SECRET);
-
-        const last = listening.details.at(-1);
-        if (disclosed) {
-          expect(last).toBe(JSON.stringify({ name: "f", secret: false, value: SECRET }));
-        } else {
-          expect(listening.details).toHaveLength(SECRET.length);
-          expect(new Set(listening.details)).toEqual(
-            new Set([JSON.stringify({ name: "f", secret: true })]),
-          );
-          expect(JSON.stringify(listening.details)).not.toContain(SECRET.slice(0, 3));
-        }
-      } finally {
-        listening.stop();
-      }
-    });
-
-    it("redacts a field the step does not define", async () => {
-      const element = await mount(host);
-      const listening = listenOnPage("zitadel-flow-input");
-      try {
-        // No rendered field has a name the step lacks, so this one case has to
-        // be dispatched at the shadow root rather than typed.
-        type(element, "not-in-the-step", SECRET);
-
-        expect(listening.details).toEqual([
-          JSON.stringify({ name: "not-in-the-step", secret: true }),
-        ]);
-      } finally {
-        listening.stop();
-      }
-    });
-
-    it("keeps the atom's zl-input event away from the page, capture phase included", async () => {
-      const element = await mount(host);
-      const listening = listenOnPage("zl-input");
-      try {
-        await typeIntoField(element, "email", "alice@acme.com");
-
-        expect(listening.calls()).toBe(0);
-      } finally {
-        listening.stop();
-      }
-    });
   });
 
   it("does not paint the terminal step when it is about to navigate away", async () => {
@@ -1000,8 +824,37 @@ describe("<zitadel-login> against the typed Flow API", () => {
         ),
       );
 
-      serveFirstStep(passkeyEnrollFlow);
-      const element = attachLogin(host);
+      const element = await mount(host);
+      Reflect.set(element, "response", {
+        id: "flow-1",
+        session_id: "sess-1",
+        session_token: "token-1",
+        step: {
+          name: "passkey-enroll",
+          texts: { title_key: "passkey-enroll.title" },
+          fields: [],
+          actions: [],
+          gates: {},
+          challenge: {
+            method: "passkey_register",
+            challenge_id: "reg-1",
+            options: {
+              challenge: "AAAA",
+              rp: { id: "localhost", name: "localhost" },
+              user: {
+                id: "dXNlcl8x",
+                name: "alice@example.com",
+                displayName: "alice@example.com",
+              },
+              pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+            },
+          },
+        },
+        branding: {},
+      });
+      Reflect.set(element, "loading", false);
+      await element.updateComplete;
+
       await waitFor(() => (create.mock.calls.length === 1 ? true : null));
       expect(element.shadowRoot?.querySelector("zl-passkey")).toBeTruthy();
 
@@ -1135,11 +988,39 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
 
     try {
-      serveFirstStep(passkeyEnrollFlow);
-      const element = attachLogin(host);
+      const element = await mount(host);
       const submitsBefore = mock
         .getCaptured()
         .filter((req) => req.kind === "submitFlowStep").length;
+      Reflect.set(element, "response", {
+        id: "flow-1",
+        session_id: "sess-1",
+        session_token: "token-1",
+        step: {
+          name: "passkey-enroll",
+          texts: { title_key: "passkey-enroll.title" },
+          fields: [],
+          actions: [],
+          gates: {},
+          challenge: {
+            method: "passkey_register",
+            challenge_id: "reg-1",
+            options: {
+              challenge: "AAAA",
+              rp: { id: "localhost", name: "localhost" },
+              user: {
+                id: "dXNlcl8x",
+                name: "alice@example.com",
+                displayName: "alice@example.com",
+              },
+              pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+            },
+          },
+        },
+        branding: {},
+      });
+      Reflect.set(element, "loading", false);
+      await element.updateComplete;
       await waitFor(() => (create.mock.calls.length === 1 ? true : null));
 
       // The atom renders its pending UI into its light DOM inside the

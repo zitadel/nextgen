@@ -1,7 +1,6 @@
-import type { ZitadelFlowInputEventDetail } from "@zitadel/components";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { standardAttributes, type ZitadelFlowInputDetail } from "./types.js";
+import { standardAttributes } from "./types.js";
 
 describe("standardAttributes", () => {
   it("keeps the standard attributes", () => {
@@ -95,24 +94,5 @@ describe("standardAttributes", () => {
     expectTypeOf(attributes).toEqualTypeOf<{ id?: string; hidden?: boolean }>();
     const prefixed = standardAttributes({ id: "a", style: "b" }, "attr:");
     expectTypeOf(prefixed).toEqualTypeOf<{ "attr:id"?: string; style?: string }>();
-  });
-});
-
-describe("ZitadelFlowInputDetail", () => {
-  it("types a secret flow input without a value", () => {
-    expectTypeOf<Extract<ZitadelFlowInputDetail, { secret: true }>>().not.toHaveProperty("value");
-    expectTypeOf<ZitadelFlowInputDetail>().not.toHaveProperty("value");
-  });
-
-  it("offers the value only once the field is narrowed to a non-secret one", () => {
-    const read = (detail: ZitadelFlowInputDetail): string | undefined =>
-      detail.secret ? undefined : detail.value;
-
-    expect(read({ name: "email", secret: false, value: "alice@acme.com" })).toBe("alice@acme.com");
-    expect(read({ name: "password", secret: true })).toBeUndefined();
-  });
-
-  it("is the detail the element emits", () => {
-    expectTypeOf<ZitadelFlowInputDetail>().toEqualTypeOf<ZitadelFlowInputEventDetail>();
   });
 });

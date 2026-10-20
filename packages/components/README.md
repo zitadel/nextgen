@@ -295,34 +295,6 @@ every applied step including the first, so a host app can drive its own chrome
 (progress, headings, analytics) from mount onwards rather than from the first
 submit.
 
-`zitadel-flow-input` fires on every edit and is composed, so any script on the
-page can read it. Its detail is `{ name, secret: false, value }` for an
-identifier field and `{ name, secret: true }`, with no `value` at all, for every
-other field: a password, a code, a PIN, a field the step does not define. A
-field is an identifier when its step definition has the type `text`, `email` or
-`tel` and an `autocomplete` of `username`, `email`, `tel`, `name`, `given-name`,
-`additional-name`, `family-name` or `nickname`; the type alone never qualifies,
-and a sensitive token beside it (`current-password`, `new-password`,
-`one-time-code`, `bday*`, `cc-*`, `transaction-*`) makes it secret.
-The name is never consulted. `ZitadelFlowInputEventDetail` types the detail.
-The atoms' internal `zl-input`, `zl-change` and `zl-passkey-result` events are
-not composed, so they never leave the widget, and the `input` event a field re-publishes
-carries no `data` for a secret field.
-
-The widget's state is kept out of the host as well: the typed values and the
-flow's session token, and the helpers that return or derive them, are ES-private
-on the three widgets, so no property or method of the element, or of the target of
-an event it emitted, returns them. This keeps the widget's own events and properties clean; it does not make
-the widget opaque to the page. An open shadow root lets a page script read an
-atom's `value` and its `<input>`, including through an event's `composedPath()`;
-the browser's own keyboard events are composed and reach page scripts, so a
-`keydown` listener's `key` rebuilds a typed password and host hardening does not
-stop it, and the `data` removed from a re-published `input` gives nothing
-against a script listening to `beforeinput`, `textInput` or `keydown`; `getSelection().toString()`
-reads a non-password text field, a PIN or a card number, once its text is
-selected; and `zitadel-flow-complete` carries the `handoff_token`. Only a
-cross-origin iframe isolates the widget from the page it is on.
-
 `zitadel-flow-redirect` fires when a step hands the browser to an identity
 provider, carrying the URL to send it to. The widget then navigates there
 itself, with `window.location.assign`: the provider's authorization endpoint
@@ -363,7 +335,7 @@ state, restores on form reset, and forwards Enter to `form.requestSubmit()`.
 | `label` | `string` | Visible label (rendered above) |
 | `aria-label` | `string` | Accessible name for the input when there is no `label` |
 | `type` | `'text' \| 'email' \| 'password' \| ...` | Native input type |
-| `value` | `string` | Two-way bound; emits `zl-input`, which is not composed and so stays inside the widget's shadow tree |
+| `value` | `string` | Two-way bound; emits `zl-input` |
 | `placeholder`, `autocomplete`, `pattern` | `string` | Forwarded |
 | `required`, `disabled`, `invalid` | `boolean` | |
 | `error` | `string` | Custom validity message |

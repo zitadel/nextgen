@@ -63,9 +63,7 @@ and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM.
   `<option>`s.
 - It carries `data-testid="zitadel-<kind>-<name>"`, re-dispatches a composed
   `change` (and `input`) across the shadow boundary, and keeps
-  `setFormValue()` in sync on every change. The re-dispatched `input` carries
-  its `data` only for a field `isDisclosable` (`src/internal/secret-field.ts`)
-  allows; for any other field it is `null`.
+  `setFormValue()` in sync on every change.
 - Hide it with `opacity: 0` and `pointer-events: none`, never `display: none`,
   `visibility: hidden` or `aria-hidden`.
 - Styling it cannot take (a custom popup) is a pointer-only layer:
@@ -74,52 +72,7 @@ and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM.
 
 ## Secrets and events
 
-The guarantee: no property or method of a widget's host element returns a typed
-value, a token or an atom, and no event that leaves the widget carries a secret
-value. The host is what `querySelector` and every event's retargeted
-`event.target` hand to a script, so this is what a script can reach without
-opening the shadow root. Three rules keep it true:
-
-- Events that cross the shadow boundary never carry secret values. An event that
-  carries a field value or a credential and is only for the widget itself
-  (`zl-input`, `zl-change`, `zl-passkey-result`) is emitted `{ composed: false }`,
-  so no page script sees it, capture phase included. A public event carries a
-  value only for a field `isDisclosable` allows.
-- Every member of a widget that holds, returns or derives state is an ES-private
-  (`#`) field or method, never a TypeScript-only `private` one, which is a plain
-  property at runtime. That covers the flow response with its session token, the
-  typed values, the helpers that return atoms or values (`#fieldAtoms`,
-  `#collectSubmitFields`) and the ones that derive identity or markup from them
-  (`#deriveIdentity`, `#renderStep`), on `<zitadel-login>`, `<zitadel-session>`
-  and `<zitadel-logout>` alike. Lit's decorators cannot declare a `#` field, so
-  its setter calls `requestUpdate` itself, with nothing sensitive as the old
-  value. What stays on the host is a literal allow-list of public properties and
-  non-secret reactive state.
-- A widget holds no credential beyond the flow's session token: the session and
-  logout state is the signed-in identity the widget shows and a project handle,
-  and the session is a cookie the script cannot read.
-
-The "what the page can observe" tests in
-`src/orchestrator/zitadel-login.browser.spec.ts` enforce this across a whole
-sign-in with real typing: they capture every event the widget can emit in both
-phases, scan everything reachable from the host and from each event's target for
-the typed values and session tokens, calling any method not on the allow-list,
-and fail when a widget host gains a member that is neither Lit's nor listed.
-Extend them, and the list, when you add an event, a kind of field, or state on a
-widget.
-
-What this does not cover is anything the browser or an open shadow root gives a
-script. An atom's `value`, `formValue` and `<input>` are reachable through an
-open `shadowRoot`, an event's `composedPath()` or `renderRoot`. The browser's
-own keyboard events are composed and reach any listener on the page: a
-`keydown` handler's `key` rebuilds a typed password, every character of it, and
-nothing on the host stops that. `beforeinput`, `textInput` and `input` are the
-same, which is why nulling `data` on the `input` a field re-publishes is defence
-in depth and gives nothing against such a script. `getSelection().toString()`
-reads a non-password text field (a PIN, a card number) after a user, or
-`execCommand("selectAll")`, selects its text. Closing the shadow roots
-(#2095, issue #2092) narrows the first; only a cross-origin iframe isolates the
-widget from the page.
+The widget never broadcasts a password or one-time-code value through its own events: `zitadel-flow-input` is not dispatched for a field whose type is `password` or whose autocomplete is `current-password`, `new-password` or `one-time-code`, and the internal `zl-input`, `zl-change` and `zl-passkey-result` events are emitted `{ composed: false }` so they stay inside the widget. It does not, and cannot, hide the input from other scripts on the same page.
 
 ## Tests
 

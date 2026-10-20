@@ -15,7 +15,6 @@ export {
   ZitadelLogin,
   loginPreviewStatesFor,
   type LoginPreviewState,
-  type ZitadelFlowInputEventDetail,
 } from "./zitadel-login.js";
 export { ZitadelLogout } from "./zitadel-logout.js";
 export { ZitadelSession } from "./zitadel-session.js";

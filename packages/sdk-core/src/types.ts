@@ -22,20 +22,11 @@ export interface ZitadelFlowStepDetail {
   readonly step: CreateFlow201Step;
 }
 
-/**
- * Payload of the `zitadel-flow-input` event. The event is composed, so any
- * script on the page can read it, and it therefore carries a field's value only
- * when the field's definition says it is an identifier: a `text`, `email` or
- * `tel` field whose `autocomplete` is `username`, `email`, `tel`, `name`,
- * `given-name`, `additional-name`, `family-name` or `nickname`, with no
- * sensitive token (a password, a one-time code, a card or a birthday) beside it.
- * Every other field (a password, a code, a PIN, anything unrecognised) is reported as
- * `{ name, secret: true }` with no `value`. Narrow on `secret` before reading
- * `value`; it exists only when `secret` is `false`.
- */
-export type ZitadelFlowInputDetail =
-  | { readonly name: string; readonly secret: false; readonly value: string }
-  | { readonly name: string; readonly secret: true };
+/** Payload of the `zitadel-flow-input` event. */
+export interface ZitadelFlowInputDetail {
+  readonly name: string;
+  readonly value: string;
+}
 
 /** Payload of the `zitadel-flow-complete` event. */
 export interface ZitadelFlowCompleteDetail {

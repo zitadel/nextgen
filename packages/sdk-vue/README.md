@@ -66,13 +66,11 @@ Each widget event reaches the callback in the last column, which receives the ev
 | Widget event | Fires when | Detail | Widgets | Callback |
 | --- | --- | --- | --- | --- |
 | `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `@flowStep` |
-| `zitadel-flow-input` | The visitor edits a field. | `{ name, secret: false, value }` for an identifier field, `{ name, secret: true }` for any other | Login | `@flowInput` |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login | `@flowInput` |
 | `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login | `@flowComplete` |
 | `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login | `@flowRedirect` |
 | `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login | `@flowError` |
 | `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session | `@signout` |
-
-The `zitadel-flow-input` event is composed, so any script on the page can read it. It carries a field's value only for an identifier field: a `text`, `email` or `tel` field whose `autocomplete` is `username`, `email`, `tel`, `name`, `given-name`, `additional-name`, `family-name` or `nickname`, with no sensitive token (`current-password`, `new-password`, `one-time-code`, `bday*`, `cc-*`, `transaction-*`) beside it. Every other field, a password, a code or a PIN included, is reported as `{ name, secret: true }` with no value. Narrow on `secret` before reading `value`.
 
 ```vue
 <ZitadelLogin :project="project" theme="light" @flowComplete="track" />

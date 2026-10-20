@@ -275,35 +275,11 @@ describe("<zitadel-login> with identity providers", () => {
     // provider hop does. Reading only that field made every OIDC/SAML
     // sign-in emit flow-redirect and stop calling the host back.
     clearSsoProviders();
-    // The shared mock has no fixture pairing a terminal step with a
-    // redirect_url, which is why this escaped, so serve one as the first step.
-    server.use(
-      http.post(
-        "*/flow",
-        () =>
-          HttpResponse.json(
-            {
-              id: "flow_terminal",
-              session_id: "sess",
-              session_token: "tok",
-              step: {
-                name: "done",
-                complete: "redirect",
-                redirect_url: "https://rp.example.invalid/cb?code=abc",
-                fields: [],
-                actions: [],
-                gates: {},
-              },
-              redirect_uri: "https://rp.example.invalid/cb?code=abc",
-            },
-            { status: 201 },
-          ),
-        { once: true },
-      ),
-    );
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
     element.project = testProject;
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
 
     const completes: CustomEvent[] = [];
     const redirects: CustomEvent[] = [];
@@ -311,7 +287,22 @@ describe("<zitadel-login> with identity providers", () => {
     element.addEventListener("zitadel-flow-redirect", (e) => redirects.push(e as CustomEvent));
 
     await withStubbedNavigation(async () => {
-      host.appendChild(element);
+      // Drive applyResponse directly: the shared mock has no fixture pairing
+      // a terminal step with a redirect_url, which is why this escaped.
+      (element as unknown as { applyResponse(wire: unknown): void }).applyResponse({
+        id: "flow_terminal",
+        session_id: "sess",
+        session_token: "tok",
+        step: {
+          name: "done",
+          complete: "redirect",
+          redirect_url: "https://rp.example.invalid/cb?code=abc",
+          fields: [],
+          actions: [],
+          gates: {},
+        },
+        redirect_uri: "https://rp.example.invalid/cb?code=abc",
+      });
       await waitFor(() => (completes.length > 0 ? completes : null));
     });
 

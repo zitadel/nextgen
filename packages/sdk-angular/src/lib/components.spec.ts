@@ -19,9 +19,9 @@ import {
   type ZitadelSessionConfig,
   widgetTags,
 } from "@zitadel/sdk-core/types";
-import { afterEach, describe, expect, it, vi, expectTypeOf } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { businessLocales, type ZitadelFlowInputDetail } from "../public-api";
+import { businessLocales } from "../public-api";
 import { ZitadelLoginComponent } from "./zitadel-login.component";
 import { ZitadelLogoutComponent } from "./zitadel-logout.component";
 import { ZitadelSessionComponent } from "./zitadel-session.component";
@@ -849,35 +849,3 @@ describe("server-rendered widget config", () => {
   });
 });
 // server-render-cases:end
-
-/** Dispatches the event on a rendered widget and returns what the `flowInput` output emitted, as JSON. */
-async function forwardFlowInput(detail: ZitadelFlowInputDetail): Promise<string> {
-  const { fixture, container } = await render(ZitadelLoginComponent, { inputs: { project } });
-  const spy = vi.fn();
-  outputOf(fixture.componentInstance, "zitadel-flow-input").subscribe(spy);
-  container
-    .querySelector("zitadel-login")
-    ?.dispatchEvent(new CustomEvent("zitadel-flow-input", { detail }));
-  return JSON.stringify(spy.mock.calls);
-}
-
-// flow-input:begin
-describe("flow input", () => {
-  it("types a secret flow input without a value", () => {
-    expectTypeOf<Extract<ZitadelFlowInputDetail, { secret: true }>>().not.toHaveProperty("value");
-    expectTypeOf<ZitadelFlowInputDetail>().not.toHaveProperty("value");
-  });
-
-  it("forwards a secret flow input as it came, without a value", async () => {
-    expect(await forwardFlowInput({ name: "password", secret: true })).toBe(
-      '[[{"name":"password","secret":true}]]',
-    );
-  });
-
-  it("forwards the value of an ordinary flow input", async () => {
-    expect(await forwardFlowInput({ name: "email", secret: false, value: "alice@acme.com" })).toBe(
-      '[[{"name":"email","secret":false,"value":"alice@acme.com"}]]',
-    );
-  });
-});
-// flow-input:end

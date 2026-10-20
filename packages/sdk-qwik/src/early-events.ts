@@ -18,8 +18,8 @@
  *   raw `<zitadel-login>` does not, are buffered. A raw widget never drains its
  *   queue, so anything kept for it would be retained for as long as it lives.
  * - Only the terminal events are buffered. `zitadel-flow-input` carries the
- *   value of identifier fields, and `zitadel-flow-step` is superseded by
- *   the next step, so neither is ever stored.
+ *   field name and its value, passwords included, and `zitadel-flow-step` is
+ *   superseded by the next step, so neither is ever stored.
  * - At most {@link MAX_HELD} events are kept per host, dropping the oldest, and
  *   they are held in a `WeakMap` keyed by the host, so they are released with it
  *   if no wrapper ever attaches, and dropped for good once one does.

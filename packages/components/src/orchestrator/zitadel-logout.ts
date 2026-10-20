@@ -187,22 +187,22 @@ export class ZitadelLogout extends ZitadelConfigured {
   // Set once in `connectedCallback` based on whether a `<template>` child is
   // present. Not reactive — switching modes mid-life would require re-running
   // light-DOM mutation, which we don't support.
-  #templateMode = false;
+  private templateMode = false;
 
   // The consumer-supplied `<template>` and its currently projected clone. The
   // template is re-projected whenever identity changes so a late config /
   // identity fetch updates the light-DOM markup rather than leaving it blank.
-  #pendingTemplate: HTMLTemplateElement | null = null;
+  private pendingTemplate: HTMLTemplateElement | null = null;
 
-  #projectedContainer: HTMLElement | null = null;
+  private projectedContainer: HTMLElement | null = null;
 
-  readonly #themeController = new ThemeController(this);
+  private readonly themeController = new ThemeController(this);
 
   // Re-projects once identity settles so template-mode markup shows it.
-  readonly #session = new SessionController(
+  private readonly session = new SessionController(
     this,
     () => resolveApi(this.project, this.projectAttrs, "<zitadel-logout>"),
-    () => this.#projectTemplate(),
+    () => this.projectTemplate(),
   );
 
   override connectedCallback(): void {
@@ -210,38 +210,38 @@ export class ZitadelLogout extends ZitadelConfigured {
 
     const tmpl = this.querySelector("template");
     if (tmpl instanceof HTMLTemplateElement) {
-      this.#templateMode = true;
-      this.#pendingTemplate = tmpl;
+      this.templateMode = true;
+      this.pendingTemplate = tmpl;
       // Project immediately so the logout control renders even before (or
       // without) a resolvable config; it is re-projected once identity loads.
-      this.#projectTemplate();
+      this.projectTemplate();
     }
 
-    document.addEventListener("click", this.#handleDocumentClick);
-    document.addEventListener("keydown", this.#handleDocumentKeydown);
+    document.addEventListener("click", this.handleDocumentClick);
+    document.addEventListener("keydown", this.handleDocumentKeydown);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener("click", this.#handleDocumentClick);
-    document.removeEventListener("keydown", this.#handleDocumentKeydown);
+    document.removeEventListener("click", this.handleDocumentClick);
+    document.removeEventListener("keydown", this.handleDocumentKeydown);
   }
 
   override willUpdate(): void {
     // No branding payload reaches this element (yet); the empty overrides
     // call keeps the token pipeline identical to the other orchestrator
     // surfaces so a future branding input only has to change the argument.
-    this.#themeController.setModePreference(this.theme === "" ? undefined : this.theme, "auto");
+    this.themeController.setModePreference(this.theme === "" ? undefined : this.theme, "auto");
     const root = this.shadowRoot;
-    if (root && !this.#templateMode) {
+    if (root && !this.templateMode) {
       applyBaseTokens(root);
       applyBrandingTokens(root, undefined);
     }
-    stampTheme(this, this.#themeController);
+    stampTheme(this, this.themeController);
   }
 
-  get #initial(): string {
-    const source = this.#session.label;
+  private get initial(): string {
+    const source = this.session.label;
     return source ? source.charAt(0).toUpperCase() : "?";
   }
 
@@ -256,63 +256,63 @@ export class ZitadelLogout extends ZitadelConfigured {
    * identity fetch (or a `project` assigned post-mount) updates the rendered
    * markup instead of leaving the placeholders stuck on their initial values.
    */
-  #projectTemplate(): void {
-    if (!this.#templateMode || !this.#pendingTemplate) return;
+  private projectTemplate(): void {
+    if (!this.templateMode || !this.pendingTemplate) return;
 
-    const clone = this.#pendingTemplate.content.cloneNode(true) as DocumentFragment;
-    fillTemplateTokens(clone, this.#session.display, this.#session.identifier, this.#initial);
+    const clone = this.pendingTemplate.content.cloneNode(true) as DocumentFragment;
+    fillTemplateTokens(clone, this.session.display, this.session.identifier, this.initial);
 
     const container = document.createElement("span");
     container.appendChild(clone);
-    this.#projectedContainer?.remove();
-    this.#projectedContainer = container;
+    this.projectedContainer?.remove();
+    this.projectedContainer = container;
     this.appendChild(container);
 
     const targets = container.querySelectorAll<HTMLElement>('[data-action="logout"]');
     targets.forEach((el) => {
       el.addEventListener("click", (event) => {
         event.preventDefault();
-        void this.#doLogout();
+        void this.doLogout();
       });
     });
   }
 
-  readonly #handleDocumentClick = (event: MouseEvent): void => {
+  private readonly handleDocumentClick = (event: MouseEvent): void => {
     if (!this.open) return;
     if (event.composedPath().includes(this)) return;
     this.open = false;
   };
 
-  readonly #handleDocumentKeydown = (event: KeyboardEvent): void => {
+  private readonly handleDocumentKeydown = (event: KeyboardEvent): void => {
     if (!this.open) return;
     if (event.key !== "Escape") return;
     this.open = false;
     this.shadowRoot?.querySelector<HTMLButtonElement>(".trigger")?.focus();
   };
 
-  #toggleOpen(): void {
+  private toggleOpen(): void {
     this.open = !this.open;
-    this.#session.clearError();
+    this.session.clearError();
   }
 
   /** Signs out, closes the menu, then optionally navigates to `postSignOutUrl`. */
-  async #doLogout(): Promise<void> {
+  private async doLogout(): Promise<void> {
     const closeMenu = () => {
       this.open = false;
     };
-    if (!(await this.#session.signOut(closeMenu))) return;
+    if (!(await this.session.signOut(closeMenu))) return;
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.href = this.postSignOutUrl;
     }
   }
 
-  #handleSignOutClick(event: Event): void {
+  private handleSignOutClick(event: Event): void {
     event.preventDefault();
-    void this.#doLogout();
+    void this.doLogout();
   }
 
   override render() {
-    if (this.#templateMode) {
+    if (this.templateMode) {
       // Rendering happens into the light DOM via `projectTemplate`. The
       // shadow root stays empty so the projected markup is the only thing
       // the user sees.
@@ -326,9 +326,9 @@ export class ZitadelLogout extends ZitadelConfigured {
         aria-label=${this.open ? "Close user menu" : "Open user menu"}
         aria-expanded=${this.open ? "true" : "false"}
         aria-haspopup="dialog"
-        @click=${this.#toggleOpen}
+        @click=${this.toggleOpen}
       >
-        ${this.#initial}
+        ${this.initial}
       </button>
 
       ${
@@ -336,12 +336,12 @@ export class ZitadelLogout extends ZitadelConfigured {
           ? html`
             <div class="dropdown" role="dialog" aria-label="User menu">
               <div class="preview">
-                <div class="preview-avatar" aria-hidden="true">${this.#initial}</div>
+                <div class="preview-avatar" aria-hidden="true">${this.initial}</div>
                 <div class="preview-info">
-                  <div class="preview-name">${this.#session.label}</div>
+                  <div class="preview-name">${this.session.label}</div>
                   ${
-                    this.#session.display && this.#session.identifier
-                      ? html`<div class="preview-email">${this.#session.identifier}</div>`
+                    this.session.display && this.session.identifier
+                      ? html`<div class="preview-email">${this.session.identifier}</div>`
                       : nothing
                   }
                 </div>
@@ -351,11 +351,11 @@ export class ZitadelLogout extends ZitadelConfigured {
                 <button
                   class="signout-btn"
                   type="button"
-                  ?disabled=${this.#session.loading}
-                  @click=${this.#handleSignOutClick}
+                  ?disabled=${this.session.loading}
+                  @click=${this.handleSignOutClick}
                 >
                   ${
-                    this.#session.loading
+                    this.session.loading
                       ? html`<zl-icon name="spinner" size="16" spin decorative></zl-icon>`
                       : html`
                         <svg
@@ -375,13 +375,13 @@ export class ZitadelLogout extends ZitadelConfigured {
                         </svg>
                       `
                   }
-                  <span>${this.#session.loading ? "Signing out…" : "Sign out"}</span>
+                  <span>${this.session.loading ? "Signing out…" : "Sign out"}</span>
                 </button>
               </div>
 
               ${
-                this.#session.errorMessage
-                  ? html`<div class="error-bar" role="alert">${this.#session.errorMessage}</div>`
+                this.session.errorMessage
+                  ? html`<div class="error-bar" role="alert">${this.session.errorMessage}</div>`
                   : nothing
               }
             </div>
