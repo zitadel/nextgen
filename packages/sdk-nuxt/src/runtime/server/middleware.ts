@@ -3,6 +3,7 @@ import type {
   NextgenMiddlewareOptions,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
+import { joinURL } from "ufo";
 import type { EventHandler, H3Event } from "h3";
 
 import { useRuntimeConfig } from "#imports";
@@ -133,7 +134,7 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
     opaqueTokenTimeoutMs = 5000,
   } = options;
 
-  // A blank `url` (the module's runtime config holds `""` until a value is
+  // An empty `url` (the module's runtime config holds `""` until a value is
   // set) counts as unset, so it falls back to `ZITADEL_URL`, then the default.
   const url = resolveUrl({ url: options.url });
 
@@ -206,7 +207,7 @@ async function proxyRequest(
   proxyTimeoutMs: number,
 ): Promise<ReadableStream<Uint8Array> | null> {
   const suffix = url.pathname.slice(proxyPath.length);
-  const target = `${authUrl}${suffix}${url.search}`;
+  const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const method = event.node.req.method ?? "GET";
   const hasBody = !["GET", "HEAD"].includes(method);

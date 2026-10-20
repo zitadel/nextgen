@@ -1,4 +1,5 @@
 import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import { joinURL } from "ufo";
 
 import {
   HOP_BY_HOP,
@@ -6,7 +7,6 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
-  resolveBackendUrl,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
@@ -104,7 +104,7 @@ async function proxyRequest(
   proxyTimeoutMs: number,
 ): Promise<Response> {
   const suffix = url.pathname.slice(proxyPath.length);
-  const target = `${authUrl}${suffix}${url.search}`;
+  const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const method = request.method;
   const hasBody = !["GET", "HEAD"].includes(method);
@@ -199,7 +199,7 @@ export async function handleNextgenRequest(
   options: NextgenRequestOptions = {},
 ): Promise<NextgenRequestDecision> {
   const {
-    url: configuredUrl,
+    url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
     projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
@@ -215,7 +215,6 @@ export async function handleNextgenRequest(
     projectSecret = PROCESS_ENV.ZITADEL_PROJECT_SECRET,
     clientAddress,
   } = options;
-  const url = resolveBackendUrl(configuredUrl, PROCESS_ENV.ZITADEL_URL);
 
   // Guard against open-redirect: loginPath must be a relative path.
   if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {

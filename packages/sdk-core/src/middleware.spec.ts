@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearJwksCache } from "./jwt.js";
 import {
-  DEFAULT_BACKEND_URL,
   HOP_BY_HOP,
   SERVER_SESSION_COOKIE,
   checkOpaqueSessionToken,
@@ -11,7 +10,6 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
-  resolveBackendUrl,
   jwtNamesProject,
   proxySessionCookies,
   requiresProjectSecret,
@@ -154,77 +152,6 @@ describe("matchesRoutes", () => {
 
     expect(matchesRoutes(pathname, ["/profile"])).toBe(false);
     expect(performance.now() - started).toBeLessThan(250);
-  });
-});
-
-describe("resolveBackendUrl", () => {
-  it.each([
-    ["a url without a trailing slash", "http://localhost:8080", "http://localhost:8080"],
-    ["a trailing slash", "http://localhost:8080/", "http://localhost:8080"],
-    ["several trailing slashes", "https://auth.example.com///", "https://auth.example.com"],
-    ["surrounding whitespace", " \thttp://localhost:8080\n", "http://localhost:8080"],
-    ["whitespace around a trailing slash", " http://localhost:8080/ ", "http://localhost:8080"],
-    ["whitespace between trailing slashes", "https://h.test/ /", "https://h.test"],
-    ["slashes and whitespace in turn", "https://h.test/ / \n//", "https://h.test"],
-  ])("strips %s", (_label, given, expected) => {
-    expect(resolveBackendUrl(given)).toBe(expected);
-  });
-
-  it.each([
-    ["a url without a trailing slash", "http://localhost:8080"],
-    ["a path prefix", "https://example.com/zitadel"],
-    ["the case of the scheme and host", "HTTP://Auth.Example.COM/Zitadel"],
-    ["credentials", "https://user:p%40ss@auth.example.com"],
-    ["a port", "http://localhost:4000"],
-    ["a port and a path", "http://localhost:4000/zitadel"],
-    ["an IPv6 host", "http://[::1]:8080"],
-    ["a trailing backslash", "https://auth.example.com\\"],
-    ["a query string", "https://auth.example.com/?q=1"],
-    ["slashes before a query", "https://auth.example.com//?q=1"],
-    ["a fragment", "https://auth.example.com/#top"],
-  ])("keeps %s", (_label, given) => {
-    expect(resolveBackendUrl(`${given}/`)).toBe(given);
-    expect(resolveBackendUrl(given)).toBe(given);
-  });
-
-  it("is idempotent", () => {
-    for (const given of [
-      "http://localhost:8080//",
-      "https://h.test/ /",
-      " https://h.test/ / ",
-      "/ ",
-      " ",
-      "",
-    ]) {
-      const once = resolveBackendUrl(given);
-
-      expect(resolveBackendUrl(once)).toBe(once);
-    }
-  });
-
-  it("takes the first candidate that is not blank", () => {
-    expect(resolveBackendUrl("http://one.test/", "http://two.test")).toBe("http://one.test");
-    expect(resolveBackendUrl(undefined, "", " \t", "http://two.test/")).toBe("http://two.test");
-  });
-
-  it.each([
-    ["no candidate", []],
-    ["undefined", [undefined]],
-    ["an empty string", [""]],
-    ["only whitespace", [" \t\n"]],
-    ["only slashes", ["///"]],
-    ["one slash", ["/"]],
-    ["a slash between whitespace", [" / "]],
-    ["only blank candidates", [undefined, "", "  ", " / "]],
-  ])("falls back to the local default for %s", (_label, candidates) => {
-    expect(resolveBackendUrl(...candidates)).toBe(DEFAULT_BACKEND_URL);
-    expect(DEFAULT_BACKEND_URL).toBe("http://localhost:8080");
-  });
-
-  it("handles a long run of slashes", () => {
-    expect(resolveBackendUrl(`http://localhost:8080${"/".repeat(200_000)}`)).toBe(
-      "http://localhost:8080",
-    );
   });
 });
 
@@ -378,6 +305,17 @@ describe("opaque session tokens", () => {
       expect(fetchMock).toHaveBeenCalledWith(
         "http://auth.test/sessions/me?project_id=proj_app",
         expect.objectContaining({ headers: { cookie: "__nextgen_session=tok" } }),
+      );
+    });
+
+    it("asks the backend at an address given with a trailing slash", async () => {
+      const fetchMock = backend(Response.json({ project_id: PROJECT, user_id: "u1" }));
+
+      await checkOpaqueSessionToken("tok", "http://auth.test/", 1000, PROJECT);
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://auth.test/sessions/me?project_id=proj_app",
+        expect.anything(),
       );
     });
 
@@ -862,6 +800,22 @@ describe("proxySessionCookies", () => {
           headers: { cookie: "__nextgen_session=earlier" },
         }),
       );
+    });
+
+    it("asks for and ends the second session at an address given with a trailing slash", async () => {
+      const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
+      const cookies = proxySessionCookies(
+        proxied({ ...SIGN_OUT, cookie: `${OWN}=current; __nextgen_session=earlier` }),
+        PROJECT,
+        { ...UPSTREAM, url: "http://auth.test/" },
+      );
+
+      await cookies.toBrowser(answer(204, null, [CLEARED_SHARED]));
+
+      expect(fetchMock.mock.calls.map(([url, init]) => [String(url), init?.method])).toEqual([
+        [`http://auth.test/sessions/me?project_id=${PROJECT}`, "GET"],
+        ["http://auth.test/sessions/me", "DELETE"],
+      ]);
     });
 
     it("clears a session of this project on sign-in without ending it", async () => {

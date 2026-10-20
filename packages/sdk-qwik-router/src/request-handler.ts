@@ -3,6 +3,7 @@ import type {
   NextgenMiddlewareOptions,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
+import { joinURL } from "ufo";
 
 import {
   HOP_BY_HOP,
@@ -10,7 +11,6 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
-  resolveBackendUrl,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
@@ -139,7 +139,7 @@ async function proxyResponse(
   proxyTimeoutMs: number,
 ): Promise<Response> {
   const suffix = ev.url.pathname.slice(proxyPath.length);
-  const target = `${authUrl}${suffix}${ev.url.search}`;
+  const target = `${joinURL(authUrl, suffix)}${ev.url.search}`;
 
   const method = ev.request.method;
   const hasBody = !["GET", "HEAD"].includes(method);
@@ -350,7 +350,8 @@ export function createNextgenOnRequest(
     // `process.env` (set in production adapters) > localhost default. Qwik does
     // not surface `.env` files on `process.env`, so a factory-time read would
     // miss them and the proxy would fall back to :8080 ("fetch failed").
-    const url = resolveBackendUrl(urlOption, ev.env?.get("ZITADEL_URL"), PROCESS_ENV.ZITADEL_URL);
+    const url =
+      urlOption ?? ev.env?.get("ZITADEL_URL") ?? PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080";
     const projectSecret =
       projectSecretOption ??
       ev.env?.get("ZITADEL_PROJECT_SECRET") ??

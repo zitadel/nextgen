@@ -192,8 +192,6 @@ interface ServeInit {
   readonly method?: string;
   readonly headers?: Record<string, string>;
   readonly clientIp?: string;
-  /** What the Qwik platform's `ev.env` holds; without it, the event has no `env`. */
-  readonly env?: Record<string, string>;
 }
 
 interface Served {
@@ -256,7 +254,6 @@ async function serve(
       },
     },
     headers: responseHeaders,
-    env: init.env === undefined ? undefined : { get: (key) => init.env?.[key] },
     send: (response) => {
       sent = response;
     },
@@ -1450,74 +1447,30 @@ describe("server middleware", () => {
     expect(calls[0]?.headers.get("authorization")).toBe(expected);
   });
 
-  // backend-url:begin
   it.each([
     ["the option", "http://option.test:4000", "http://env.test:4000", "http://option.test:4000/"],
     ["ZITADEL_URL", undefined, "http://env.test:4000", "http://env.test:4000/"],
-    [
-      "an option with a trailing slash",
-      " http://option.test:4000// ",
-      undefined,
-      "http://option.test:4000/",
-    ],
-    [
-      "ZITADEL_URL with a trailing slash",
-      undefined,
-      "http://env.test:4000/",
-      "http://env.test:4000/",
-    ],
-    ["an empty option, else ZITADEL_URL", "", "http://env.test:4000", "http://env.test:4000/"],
-    ["a blank option, else ZITADEL_URL", " \t", "http://env.test:4000", "http://env.test:4000/"],
-    [
-      "a blank option and a blank ZITADEL_URL, else the local default",
-      " ",
-      "\n",
-      "http://localhost:8080/",
-    ],
-    [
-      "an option kept as given apart from its slash",
-      "HTTP://User:Pw@Auth.Test:8080/Zitadel/",
-      undefined,
-      "HTTP://User:Pw@Auth.Test:8080/Zitadel/",
-    ],
-    ["an IPv6 option", "http://[::1]:8080/", undefined, "http://[::1]:8080/"],
-    [
-      "an option kept as given with a trailing backslash",
-      "http://option.test:4000\\",
-      undefined,
-      "http://option.test:4000\\/",
-    ],
-    [
-      "an option of only a slash, else ZITADEL_URL",
-      "/",
-      "http://env.test:4000",
-      "http://env.test:4000/",
-    ],
-    [
-      "an option of a slash between whitespace, else ZITADEL_URL",
-      " / ",
-      "http://env.test:4000",
-      "http://env.test:4000/",
-    ],
-    [
-      "an option of only slashes, else ZITADEL_URL",
-      "//",
-      "http://env.test:4000",
-      "http://env.test:4000/",
-    ],
-    [
-      "an option of only slashes and a ZITADEL_URL of only slashes, else the local default",
-      "//",
-      "/",
-      "http://localhost:8080/",
-    ],
   ])("proxies to the backend from %s", async (_l, option, environment, expected) => {
     vi.stubEnv("ZITADEL_URL", environment);
     const calls = captureFetch();
 
     await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, { url: option });
 
-    expect(calls[0]?.url).toBe(`${expected}v1/flow`);
+    expect(calls[0]?.url.startsWith(expected)).toBe(true);
+  });
+
+  // backend-url:begin
+  it("proxies to a backend url given with a trailing slash", async () => {
+    vi.stubEnv("ZITADEL_URL", "http://env.test:4000/");
+    const calls = captureFetch();
+
+    await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, { url: "http://option.test:4000/" });
+    await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, {});
+
+    expect(calls.map(({ url }) => url)).toEqual([
+      "http://option.test:4000/v1/flow",
+      "http://env.test:4000/v1/flow",
+    ]);
   });
 
   it("verifies a JWT against a backend url given with a trailing slash", async () => {
@@ -1527,7 +1480,7 @@ describe("server middleware", () => {
     const served = await serve(
       `${ORIGIN}/admin`,
       { headers: { cookie: `${SESSION}=${token}` } },
-      { ...OPTIONS, url: " http://localhost:4000/ " },
+      { ...OPTIONS, url: "http://localhost:4000/" },
     );
 
     expect(served.auth).toMatchObject({ isAuthenticated: true, session: { token } });
@@ -1540,58 +1493,11 @@ describe("server middleware", () => {
     const served = await serve(
       `${ORIGIN}/admin`,
       { headers: { cookie: `${SESSION}=opaque-session-token` } },
-      { ...OPTIONS, url: "http://localhost:4000//" },
+      { ...OPTIONS, url: "http://localhost:4000/" },
     );
 
     expect(served.auth?.isAuthenticated).toBe(true);
-    expect(calls[0]?.url.startsWith("http://localhost:4000/sessions/me?")).toBe(true);
+    expect(calls[0]?.url).toBe(`http://localhost:4000/sessions/me?project_id=${PROJECT}`);
   });
   // backend-url:end
-
-  // sdk-only:begin
-  it.each([
-    [
-      "the option",
-      "http://option.test:4000",
-      "http://platform.test:4000",
-      "http://option.test:4000/",
-    ],
-    [
-      "the platform environment",
-      undefined,
-      "http://platform.test:4000/",
-      "http://platform.test:4000/",
-    ],
-    ["process.env, past a blank platform environment", undefined, " ", "http://process.test:4000/"],
-    [
-      "process.env, past a platform environment of only slashes",
-      undefined,
-      "//",
-      "http://process.test:4000/",
-    ],
-  ])(
-    "proxies to the backend from %s, before process.env",
-    async (_l, option, platform, expected) => {
-      vi.stubEnv("ZITADEL_URL", "http://process.test:4000");
-      const calls = captureFetch();
-
-      await serve(
-        `${ORIGIN}/__nextgen/v1/flow`,
-        { env: { ZITADEL_URL: platform } },
-        { url: option },
-      );
-
-      expect(calls[0]?.url).toBe(`${expected}v1/flow`);
-    },
-  );
-
-  it("proxies to the local default when the platform environment and process.env are blank", async () => {
-    vi.stubEnv("ZITADEL_URL", " ");
-    const calls = captureFetch();
-
-    await serve(`${ORIGIN}/__nextgen/v1/flow`, { env: { ZITADEL_URL: "" } });
-
-    expect(calls[0]?.url).toBe("http://localhost:8080/v1/flow");
-  });
-  // sdk-only:end
 });

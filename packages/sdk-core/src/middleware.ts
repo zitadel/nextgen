@@ -7,6 +7,8 @@
 
 import type { JwtPayload } from "./jwt.js";
 
+import { joinURL } from "ufo";
+
 import { isJwtShaped, verifyJwt } from "./jwt.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -44,46 +46,6 @@ export const HOP_BY_HOP: ReadonlySet<string> = new Set([
  * forwarding them upstream would expose internal state and allow header injection.
  */
 export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-nextgen-auth-token"]);
-
-// ─── Backend URL ─────────────────────────────────────────────────────────────
-
-/** Where `zitadel start` runs the local server, which an unset backend `url` falls back to. */
-export const DEFAULT_BACKEND_URL = "http://localhost:8080";
-
-/** Strips surrounding whitespace and trailing slashes together, so the result is stable. */
-function normalizeBackendUrl(url: string): string {
-  // A linear scan, not /[\s/]+$/, which backtracks quadratically on a long run of slashes.
-  let end = url.length;
-  while (end > 0 && (url.charCodeAt(end - 1) === 0x2f || url.charAt(end - 1).trim() === "")) {
-    end--;
-  }
-  return url.slice(0, end).trimStart();
-}
-
-/**
- * Resolves the backend `url` once, where an SDK reads it: the first candidate
- * that is not blank, normalized, else {@link DEFAULT_BACKEND_URL}. A candidate
- * is blank when it is `undefined`, empty or only whitespace, so a `url` option
- * left unset falls through to `ZITADEL_URL` and then to the default.
- * Normalizing strips surrounding whitespace and trailing slashes; nothing else
- * in the url changes.
- *
- * Every server SDK builds `${url}/auth/keys`, `${url}/sessions/me` and the
- * proxy target from it, and {@link verifyJwt} compares a token's `iss` with it
- * exactly. A `ZITADEL_URL` copied with a trailing slash or a stray newline
- * would otherwise produce `//auth/keys` and reject every token on issuer
- * mismatch. The `iss` check stays strict, against the resolved value.
- *
- * @param candidates - The configured urls, highest precedence first.
- * @returns The backend URL without surrounding whitespace or trailing slashes.
- */
-export function resolveBackendUrl(...candidates: readonly (string | undefined)[]): string {
-  for (const candidate of candidates) {
-    const url = candidate === undefined ? "" : normalizeBackendUrl(candidate);
-    if (url !== "") return url;
-  }
-  return DEFAULT_BACKEND_URL;
-}
 
 // ─── Route matching ──────────────────────────────────────────────────────────
 
@@ -594,11 +556,14 @@ async function retiresSharedSession(
   const cookie = `${SERVER_SESSION_COOKIE}=${token}`;
   let res: Response;
   try {
-    res = await fetch(`${upstream.url}/sessions/me?project_id=${encodeURIComponent(projectId)}`, {
-      method: "GET",
-      headers: { cookie },
-      signal: AbortSignal.timeout(upstream.timeoutMs),
-    });
+    res = await fetch(
+      `${joinURL(upstream.url, "/sessions/me")}?project_id=${encodeURIComponent(projectId)}`,
+      {
+        method: "GET",
+        headers: { cookie },
+        signal: AbortSignal.timeout(upstream.timeoutMs),
+      },
+    );
   } catch {
     return false;
   }
@@ -621,7 +586,7 @@ async function retiresSharedSession(
     // Logout needs no CSRF token (ADR 053 §5); a call without an Origin is no
     // cross-site request. A failed revoke still clears the cookie: the
     // browser no longer holds the session.
-    await fetch(`${upstream.url}/sessions/me`, {
+    await fetch(joinURL(upstream.url, "/sessions/me"), {
       method: "DELETE",
       headers: { cookie },
       signal: AbortSignal.timeout(upstream.timeoutMs),
@@ -709,9 +674,8 @@ export type ClientAuthResult = ClientAuthState | UnauthState;
  */
 export type NextgenMiddlewareOptions = {
   /**
-   * Full URL of the Zitadel auth backend. Surrounding whitespace and trailing
-   * slashes are ignored, and a blank value counts as unset.
-   * @default process.env.ZITADEL_URL, else {@link DEFAULT_BACKEND_URL}
+   * Full URL of the Zitadel auth backend.
+   * @default process.env.ZITADEL_URL ?? "http://localhost:8080"
    */
   url?: string;
 
@@ -970,7 +934,7 @@ export async function checkOpaqueSessionToken(
   if (otherProjectSessions.knows(key)) {
     return { verdict: "live", session: noUser() };
   }
-  const endpoint = `${issuerUrl}/sessions/me`;
+  const endpoint = joinURL(issuerUrl, "/sessions/me");
   try {
     const res = await fetch(`${endpoint}?project_id=${encodeURIComponent(projectId)}`, {
       method: "GET",

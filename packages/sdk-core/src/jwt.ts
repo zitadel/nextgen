@@ -106,6 +106,8 @@
  * been consolidated here.
  */
 
+import { joinURL, withoutTrailingSlash } from "ufo";
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 /** How long a cached JWKS document is considered fresh before re-fetching. */
@@ -661,7 +663,7 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
     }
 
     const kid = header.kid;
-    const cryptoKey = await resolveJwk(`${issuerUrl}/auth/keys`, kid, alg, jwksTimeoutMs);
+    const cryptoKey = await resolveJwk(joinURL(issuerUrl, "/auth/keys"), kid, alg, jwksTimeoutMs);
     if (!cryptoKey) {
       return null;
     }
@@ -677,12 +679,11 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
     }
 
     // Strict equality is intentional: the issuer URL must match exactly as
-    // given. This function does not normalise trailing slashes, case, or
+    // configured, apart from a trailing slash on the configured address, which
+    // is not part of an issuer. We deliberately do not normalise case or
     // surrounding whitespace — any difference is either a misconfiguration or
-    // a token issued by a different server and must be rejected. The SDKs
-    // normalise the configured `url` once, with `resolveBackendUrl`, before
-    // they pass it here.
-    if (payload.iss !== issuerUrl) {
+    // a token issued by a different server and must be rejected.
+    if (payload.iss !== withoutTrailingSlash(issuerUrl)) {
       return null;
     }
 

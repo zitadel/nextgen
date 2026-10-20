@@ -1,7 +1,7 @@
 import { defineNuxtPlugin, useRequestEvent, useRuntimeConfig, useState } from "#imports";
 import { configureZitadel } from "@zitadel/api/config";
 
-import { resolveUrl } from "./lib/settings";
+import { DEFAULT_URL, resolveUrl } from "./lib/settings";
 import type { ClientAuthResult } from "./types";
 
 export default defineNuxtPlugin(() => {
@@ -42,10 +42,10 @@ export default defineNuxtPlugin(() => {
     "/__nextgen";
   const projectId = (publicConfig.zitadelProjectId as string | undefined) ?? "";
   // `runtimeConfig.nextgen` is private, so it exists only on the server;
-  // reading it in the browser makes Nuxt warn (NUXT_E1003). The browser has no
-  // backend url: it reaches the backend through the proxy path.
+  // reading it in the browser makes Nuxt warn (NUXT_E1003). The browser keeps
+  // the default, as it always did.
   const privateConfig = import.meta.server ? runtimeConfig.nextgen : undefined;
-  const url = import.meta.server ? resolveUrl(privateConfig) : undefined;
+  const url = import.meta.server ? resolveUrl(privateConfig) : DEFAULT_URL;
 
   if (proxyPath && projectId) {
     configureZitadel({ proxyPath, projectId, url });

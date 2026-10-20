@@ -769,6 +769,7 @@ describe("server SDK test titles", () => {
     "lets a request without the auth header through",
     "sends the exchange bearer from %s",
     "proxies to the backend from %s",
+    "proxies to a backend url given with a trailing slash",
     "verifies a JWT against a backend url given with a trailing slash",
     "asks the session probe at a backend url given with a trailing slash",
   ];
@@ -779,14 +780,8 @@ describe("server SDK test titles", () => {
   const sourceOf = (sdk: keyof typeof TEST_FILES): string =>
     readFileSync(`${packagesPath}${TEST_FILES[sdk]}`, "utf8");
 
-  /** The one place a spec may test beyond the canonical cases: a platform only its SDK has. */
-  const withoutSdkOnly = (source: string): string => {
-    const block = blockIn(source, "sdk-only");
-    return block === undefined ? source : source.replace(block, "");
-  };
-
   const titlesOf = (sdk: keyof typeof TEST_FILES): string[] =>
-    [...withoutSdkOnly(sourceOf(sdk)).matchAll(TITLE)].map((match) => match[2]!);
+    [...sourceOf(sdk).matchAll(TITLE)].map((match) => match[2]!);
 
   it.each(Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[])(
     "%s carries exactly the canonical tests, in the canonical order",
@@ -799,13 +794,6 @@ describe("server SDK test titles", () => {
     },
   );
 
-  it("allows SDK-only tests in the Qwik Router spec alone", () => {
-    for (const sdk of Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[]) {
-      const found = blockIn(sourceOf(sdk), "sdk-only") !== undefined;
-      expect(found, `${sdk} has an sdk-only block`).toBe(sdk === "sdk-qwik-router");
-    }
-  });
-
   /**
    * The backend-url tests are the one group of cases the server SDKs also
    * carry byte for byte: the same rows and bodies between the same markers, so
@@ -814,7 +802,7 @@ describe("server SDK test titles", () => {
    */
   describe("the backend-url block", () => {
     const URL_TITLES = [
-      "proxies to the backend from %s",
+      "proxies to a backend url given with a trailing slash",
       "verifies a JWT against a backend url given with a trailing slash",
       "asks the session probe at a backend url given with a trailing slash",
     ];
@@ -831,11 +819,8 @@ describe("server SDK test titles", () => {
       const fixture = [
         "describe('x', () => {",
         "  // backend-url:begin",
-        "  it.each([",
-        '    ["a", "http://a.test/"],',
-        '    ["b", "http://b.test/"],',
-        '  ])("proxies to the backend from %s", () => {',
-        "    expect(proxied()).toBe(1);",
+        '  it("proxies to a backend url given with a trailing slash", () => {',
+        '    expect(proxied("http://a.test/")).toBe("http://a.test/v1");',
         "  });",
         '  it("verifies a JWT against a backend url given with a trailing slash", () => {});',
         '  it("asks the session probe at a backend url given with a trailing slash", () => {});',
@@ -850,27 +835,23 @@ describe("server SDK test titles", () => {
         expect(check(fixture)).toEqual([]);
       });
 
-      it("sees a changed row and names the SDK", () => {
-        expect(check(fixture.replace('"http://b.test/"', '"http://b.test"'))).toEqual(CHANGED);
+      it("sees a changed body and names the SDK", () => {
+        expect(check(fixture.replace('"http://a.test/"', '"http://a.test"'))).toEqual(CHANGED);
       });
 
-      it("sees a dropped row", () => {
-        expect(check(fixture.replace('    ["b", "http://b.test/"],\n', ""))).toEqual(CHANGED);
-      });
-
-      it("sees an extra row", () => {
+      it("sees an extra test", () => {
         expect(
           check(
             fixture.replace(
-              '    ["b", "http://b.test/"],\n',
-              '    ["b", "http://b.test/"],\n    ["c", "x"],\n',
+              "  // backend-url:end",
+              '  it("extra", () => {});\n  // backend-url:end',
             ),
           ),
-        ).toEqual(CHANGED);
+        ).toHaveLength(2);
       });
 
       it("sees a changed assertion", () => {
-        expect(check(fixture.replace(".toBe(1)", ".not.toBe(1)"))).toEqual(CHANGED);
+        expect(check(fixture.replace(").toBe(", ").not.toBe("))).toEqual(CHANGED);
       });
 
       it("sees a missing marker", () => {
