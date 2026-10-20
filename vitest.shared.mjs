@@ -1,4 +1,5 @@
 import { globSync } from "node:fs";
+import { builtinModules } from "node:module";
 
 /**
  * Shared Vitest `test` defaults, spread into every project's own config:
@@ -66,6 +67,54 @@ export const baseTest = {
  */
 export const sourceConditions = ["@zitadel/source"];
 
+/** Files that only the test run loads: they may use Node built-ins to arrange a scenario. */
+const TEST_FILE =
+  /(\.(spec|test)\.[cm]?[jt]sx?$|[\\/](__tests__|__fixtures__)[\\/]|[\\/]test-setup\.[cm]?[jt]s$)/;
+
+/**
+ * A static or dynamic import of a Node built-in, by `node:` prefix or bare
+ * name, in transpiled code. Types are already erased there, so a built-in used
+ * only by a type import does not count.
+ */
+const BUILTIN_IMPORT = new RegExp(
+  String.raw`\b(?:from\s*|import\s*\(?\s*)["'](?:node:)?(${builtinModules
+    .filter((name) => !name.startsWith("_"))
+    .map((name) => name.replace("/", String.raw`\/`))
+    .join("|")})["']`,
+);
+
+/**
+ * Fails the run when code under test imports a Node built-in.
+ *
+ * Vitest hands `node:*` imports to Node before the edge VM or a resolver sees
+ * them, so without this a dependency on `node:crypto` loads fine in a spec and
+ * breaks only once deployed. The check reads every module Vite transforms, so
+ * the project also inlines its dependencies (`server.deps.inline`). Specs and
+ * their fixtures keep their built-ins to arrange a scenario, and a package
+ * listed in `allowedPackages` keeps its own because the edge platform
+ * polyfills it.
+ *
+ * @param {string[]} allowedPackages
+ * @returns {import("vite").Plugin}
+ */
+function rejectNodeBuiltins(allowedPackages) {
+  return {
+    name: "edge-reject-node-builtins",
+    enforce: "post",
+    transform(code, id) {
+      if (TEST_FILE.test(id) || id.includes("\0")) return null;
+      if (allowedPackages.some((name) => id.includes(`/node_modules/${name}/`))) return null;
+      const match = BUILTIN_IMPORT.exec(code);
+      if (match) {
+        throw new Error(
+          `Node built-in "${match[1]}" imported by ${id}, which must run on the edge`,
+        );
+      }
+      return null;
+    },
+  };
+}
+
 /**
  * A Vitest project that runs specs inside Vercel's `edge-runtime` VM (the
  * `@edge-runtime/vm` devDependency), whose globals are the WinterTC minimum
@@ -80,14 +129,22 @@ export const sourceConditions = ["@zitadel/source"];
  *   projects: [edgeProject({ include: ["src/jwt.spec.ts"] }), ...]
  *
  * `conditions` are extra resolve conditions, e.g. `sourceConditions`; `alias`
- * is the package's own `resolve.alias`.
+ * is the package's own `resolve.alias`. A Node built-in imported by anything
+ * but a spec or its fixtures fails the run, unless the importing dependency
+ * is in `polyfilledPackages` (Nitro polyfills it on the edge).
  *
  * Throws when `include` matches no file in the working directory.
  *
  * @param {import("./vitest.shared.d.mts").EdgeProjectOptions} options
  * @returns {import("./vitest.shared.d.mts").EdgeProject}
  */
-export function edgeProject({ include, exclude = [], conditions = [], alias = {} }) {
+export function edgeProject({
+  include,
+  exclude = [],
+  conditions = [],
+  alias = {},
+  polyfilledPackages = [],
+}) {
   // A pattern that matches nothing would leave the project running no spec
   // and every run green, so fail when the config loads instead.
   if (globSync(include, { cwd: process.cwd() }).length === 0) {
@@ -95,8 +152,16 @@ export function edgeProject({ include, exclude = [], conditions = [], alias = {}
   }
   return {
     cacheDir: ".vitest/edge",
+    plugins: [rejectNodeBuiltins(polyfilledPackages)],
     resolve: { conditions, alias },
     ssr: { resolve: { conditions: ["browser", ...conditions] } },
-    test: { name: "edge", globals: true, environment: "edge-runtime", include, exclude },
+    test: {
+      name: "edge",
+      globals: true,
+      environment: "edge-runtime",
+      include,
+      exclude,
+      server: { deps: { inline: true } },
+    },
   };
 }

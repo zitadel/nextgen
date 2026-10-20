@@ -16,9 +16,9 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/workspace",
     environment: "node",
-    include: ["scripts/**/*.test.mjs", "scripts/**/*.test.ts"],
+    include: ["scripts/**/*.test.mjs", "scripts/**/*.test.ts", "vitest.shared.test.mjs"],
     // Root tests exercise scripts/, not src/ (there is none at the repo root).
-    coverage: { ...baseTest.coverage, include: ["scripts/**/*.{mjs,ts}"] },
+    coverage: { ...baseTest.coverage, include: ["scripts/**/*.{mjs,ts}", "vitest.shared.mjs"] },
     // Several of these run slow work (the redocly lint, tsc program audits)
     // that run well past Vitest's 5s default; node:test had no timeout.
     testTimeout: 120_000,

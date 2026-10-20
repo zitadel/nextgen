@@ -32,6 +32,8 @@ export interface EdgeProjectOptions {
   conditions?: string[];
   /** The package's own `resolve.alias`. */
   alias?: Record<string, string>;
+  /** Dependencies allowed to import Node built-ins, because the edge platform polyfills them. */
+  polyfilledPackages?: string[];
 }
 
 export interface EdgeProject {

@@ -29,7 +29,13 @@ export default defineConfig({
       },
       // The server middleware runs on edge Nitro presets, so it must run in the
       // edge VM too, which has no `node:` modules and no socket.
-      edgeProject({ include: ["src/**/*.edge.spec.ts"], alias }),
+      // h3 depends on `node-mock-http` for its Node adapter, which Nitro's edge
+      // presets polyfill with unenv; nothing of ours reaches a Node built-in.
+      edgeProject({
+        include: ["src/**/*.edge.spec.ts"],
+        alias,
+        polyfilledPackages: ["node-mock-http"],
+      }),
     ],
   },
 });
