@@ -1,8 +1,7 @@
+import * as root from "@zitadel/sdk-next";
 import { describe, expect, it } from "vitest";
 
-import * as root from "../index";
-
-describe("package root", () => {
+describe("the package root in the edge runtime", () => {
   it("loads and exports the server helpers", () => {
     expect(root.auth).toBeTypeOf("function");
     expect(root.NextgenProvider).toBeTypeOf("function");
