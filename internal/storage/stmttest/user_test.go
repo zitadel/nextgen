@@ -717,85 +717,62 @@ func TestUserStatements_GetUser_UniqueTeamIDFiltersRegistryRows(t *testing.T) {
 	})
 }
 
-// Attributes list by any of their fields, joined to their registry claim.
-// A non-unique attribute has no claim, and a claim under another team scope
-// does not match.
-func TestUserStatements_ListUserAttributes(t *testing.T) {
+// GetTakenUniqueAttributeKeys answers every claim in one read: a claim
+// matches under its own team scope only, a value the asking user holds itself
+// is not taken, and a value nobody holds is absent.
+func TestUserStatements_GetTakenUniqueAttributeKeys(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-		attr := func(key domain.AttributeKey, value any, scope domain.AttributeUniqueness) domain.CreateAttribute {
-			a, err := domain.NewCreateAttribute(key, value, scope)
-			require.NoError(t, err)
-			return *a
+
+		owner := newTestUser(t, projectID, schemaURL, "user_taken_owner", "held@example.com", "Owner")
+		require.NoError(t, d.stmts.CreateUser(t.Context(), owner))
+
+		team := newTestTeam(projectID, "team_taken")
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
+		teamHandle, err := domain.NewCreateAttribute("handle", "alice", domain.AttributeUniquenessTeam)
+		require.NoError(t, err)
+		teamUser := &domain.CreateUser{
+			ProjectID:               projectID,
+			SchemaURL:               schemaURL,
+			ID:                      "user_taken_team",
+			InitialMembershipTeamID: &team.ID,
+			Attributes:              domain.CreateAttributes{*teamHandle},
 		}
-		username := attr("username", "alice", domain.AttributeUniquenessProject)
-		phone := attr("phone", "+41000000000", domain.AttributeUniquenessProject)
-		email := attr("email", "self@example.com", domain.AttributeUniquenessProject)
+		require.NoError(t, d.stmts.CreateUser(t.Context(), teamUser))
 
-		require.NoError(t, d.stmts.CreateUser(t.Context(), &domain.CreateUser{
-			ProjectID:  projectID,
-			SchemaURL:  schemaURL,
-			ID:         "user_attrs_self",
-			Attributes: domain.CreateAttributes{email},
-		}))
-		require.NoError(t, d.stmts.CreateUser(t.Context(), &domain.CreateUser{
-			ProjectID: projectID,
-			SchemaURL: schemaURL,
-			ID:        "user_attrs_other",
-			Attributes: domain.CreateAttributes{
-				username,
-				phone,
-				attr("nickname", "ally", domain.AttributeUniquenessUnspecified),
-			},
-		}))
-
-		projectScope := ""
-		byKey := database.OrderBy[domain.UserAttributeField]{
-			Columns:   []database.Column[domain.UserAttributeField]{database.Col(domain.UserAttributeFieldKey)},
-			Direction: database.OrderAsc,
-		}
-
-		t.Run("by user", func(t *testing.T) {
-			got, err := d.stmts.ListUserAttributes(t.Context(), &database.ListOptions[domain.UserAttributeField]{
-				Filter: database.And(
-					database.Equal(database.Col(domain.UserAttributeFieldProjectID), projectID),
-					database.Equal(database.Col(domain.UserAttributeFieldUserID), "user_attrs_other"),
-				),
-				Pagination: database.Page[domain.UserAttributeField]{OrderBy: byKey},
-			})
+		claim := func(teamID string, key domain.AttributeKey, value any) service.UniqueAttributeClaim {
+			hash, err := domain.UniqueValueHash(value)
 			require.NoError(t, err)
-			assert.Equal(t, []*domain.UserAttribute{
-				{ProjectID: projectID, UserID: "user_attrs_other", Key: "nickname", Value: "ally"},
-				{ProjectID: projectID, UserID: "user_attrs_other", Key: "phone", Value: "+41000000000", UniqueTeamID: &projectScope, ValueHash: phone.ValueHash[:]},
-				{ProjectID: projectID, UserID: "user_attrs_other", Key: "username", Value: "alice", UniqueTeamID: &projectScope, ValueHash: username.ValueHash[:]},
-			}, got.Items)
+			return service.UniqueAttributeClaim{TeamID: teamID, Key: key, ValueHash: hash}
+		}
+		email := claim("", "email", "held@example.com")
+		phone := claim("", "phone", "+41000000000")
+
+		t.Run("each claim under its own scope", func(t *testing.T) {
+			got, err := d.stmts.GetTakenUniqueAttributeKeys(t.Context(), projectID, "user_taken_other",
+				[]service.UniqueAttributeClaim{email, claim(team.ID, "handle", "alice"), phone})
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []domain.AttributeKey{"email", "handle"}, got)
 		})
 
-		t.Run("by claim", func(t *testing.T) {
-			claim := func(teamID string, a domain.CreateAttribute) database.Filter[domain.UserAttributeField] {
-				return database.And(
-					database.Equal(database.Col(domain.UserAttributeFieldUniqueTeamID), teamID),
-					database.Equal(database.Col(domain.UserAttributeFieldUniqueKey), string(a.Key)),
-					database.Equal(database.Col(domain.UserAttributeFieldValueHash), a.ValueHash[:]),
-				)
-			}
-			got, err := d.stmts.ListUserAttributes(t.Context(), &database.ListOptions[domain.UserAttributeField]{
-				Filter: database.And(
-					database.Equal(database.Col(domain.UserAttributeFieldProjectID), projectID),
-					database.Or(
-						claim("", username),
-						claim("", email),
-						claim("team_attrs", phone),
-						claim("", attr("login", "free", domain.AttributeUniquenessProject)),
-					),
-				),
-				Pagination: database.Page[domain.UserAttributeField]{OrderBy: byKey},
-			})
+		t.Run("a claim under another scope is not taken", func(t *testing.T) {
+			got, err := d.stmts.GetTakenUniqueAttributeKeys(t.Context(), projectID, "user_taken_other",
+				[]service.UniqueAttributeClaim{claim("", "handle", "alice")})
 			require.NoError(t, err)
-			assert.Equal(t, []*domain.UserAttribute{
-				{ProjectID: projectID, UserID: "user_attrs_self", Key: "email", Value: "self@example.com", UniqueTeamID: &projectScope, ValueHash: email.ValueHash[:]},
-				{ProjectID: projectID, UserID: "user_attrs_other", Key: "username", Value: "alice", UniqueTeamID: &projectScope, ValueHash: username.ValueHash[:]},
-			}, got.Items)
+			assert.Empty(t, got)
+		})
+
+		t.Run("the asking user's own claim is not taken", func(t *testing.T) {
+			got, err := d.stmts.GetTakenUniqueAttributeKeys(t.Context(), projectID, owner.ID,
+				[]service.UniqueAttributeClaim{email, claim(team.ID, "handle", "alice")})
+			require.NoError(t, err)
+			assert.Equal(t, []domain.AttributeKey{"handle"}, got)
+		})
+
+		t.Run("no claims read nothing", func(t *testing.T) {
+			got, err := d.stmts.GetTakenUniqueAttributeKeys(t.Context(), projectID, owner.ID, nil)
+			require.NoError(t, err)
+			assert.Empty(t, got)
 		})
 	})
 }

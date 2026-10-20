@@ -520,26 +520,22 @@ func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]str
 		ID:         "user_1",
 		Attributes: domain.Attributes{{Key: "givenName", Value: "Alice"}},
 	}, nil).AnyTimes()
-	stmts.EXPECT().ListUserAttributes(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, opts *database.ListOptions[domain.UserAttributeField]) (*database.ListResult[*domain.UserAttribute], error) {
+	stmts.EXPECT().GetTakenUniqueAttributeKeys(gomock.Any(), "proj_1", gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, _, userID string, claims []service.UniqueAttributeClaim) ([]domain.AttributeKey, error) {
 			// Each unique attribute of the write is one claim under its
 			// registry team scope.
-			claims := opts.Filter.(database.AndFilter[domain.UserAttributeField]).Filters[1].(database.OrFilter[domain.UserAttributeField]).Filters
-			var held []*domain.UserAttribute
+			var taken []domain.AttributeKey
 			for _, c := range claims {
-				terms := c.(database.AndFilter[domain.UserAttributeField]).Filters
-				team := terms[0].(*database.CompareFilter[domain.UserAttributeField]).Terms[0].Value.(string)
-				key := domain.AttributeKey(terms[1].(*database.CompareFilter[domain.UserAttributeField]).Terms[0].Value.(string))
-				if key == "username" {
-					assert.Equal(t, "team_1", team)
+				if c.Key == "username" {
+					assert.Equal(t, "team_1", c.TeamID)
 				} else {
-					assert.Empty(t, team)
+					assert.Empty(t, c.TeamID)
 				}
-				if holder, ok := holders[key]; ok {
-					held = append(held, &domain.UserAttribute{ProjectID: "proj_1", UserID: holder, Key: key, UniqueTeamID: &team})
+				if holder, ok := holders[c.Key]; ok && holder != userID {
+					taken = append(taken, c.Key)
 				}
 			}
-			return &database.ListResult[*domain.UserAttribute]{Items: held}, nil
+			return taken, nil
 		},
 	).AnyTimes()
 
@@ -651,7 +647,7 @@ func TestCreateUserAction_FailedLookupStaysUnnamed(t *testing.T) {
 	stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).
 		Return(database.NewUniqueError("user_unique_attributes", "pk", nil))
 	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
-	stmts.EXPECT().ListUserAttributes(gomock.Any(), gomock.Any()).Return(nil, database.NewUnavailableError(nil))
+	stmts.EXPECT().GetTakenUniqueAttributeKeys(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewUnavailableError(nil))
 
 	require.Error(t, action.Apply(t.Context(), stmts))
 	requireTakenFields(t, action.Err(t.Context(), stmts))

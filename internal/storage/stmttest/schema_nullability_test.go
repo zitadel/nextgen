@@ -19,7 +19,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/release"
 	"github.com/zitadel/nextgen/internal/storage/teammembership"
 	"github.com/zitadel/nextgen/internal/storage/user"
-	"github.com/zitadel/nextgen/internal/storage/userattribute"
 	"github.com/zitadel/nextgen/internal/storage/userpasskey"
 	"github.com/zitadel/nextgen/internal/storage/userpassword"
 	"github.com/zitadel/nextgen/internal/storage/userrecoverycodes"
@@ -51,18 +50,7 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	cols = append(cols, joined...)
 	joined, err = schematest.JoinColumns(map[string]string{"c": "idp_connections", "r": "idp_connection_revisions"}, idpconnection.Schema)
 	require.NoError(t, err)
-	cols = append(cols, joined...)
-	// The registry is LEFT JOINed, so its NOT NULL columns read as NULL for
-	// an attribute without a claim; only the attribute's own columns map
-	// onto the DDL.
-	joined, err = schematest.JoinColumns(map[string]string{"a": "user_attributes", "ua": "user_unique_attributes"}, userattribute.Schema)
-	require.NoError(t, err)
-	for _, col := range joined {
-		if col.Table == "user_attributes" {
-			cols = append(cols, col)
-		}
-	}
-	return cols
+	return append(cols, joined...)
 }
 
 // A nullable column whose binding misses the Nullable flag silently drops its

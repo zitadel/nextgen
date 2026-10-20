@@ -741,44 +741,26 @@ func (o *CreateUserAction) Err(ctx context.Context, stmts AllStatements) error {
 }
 
 // listConflictingUniqueAttributes names the unique attributes of attrs whose
-// value a user other than userID holds. A failed lookup is logged and
-// returned.
+// value a user other than userID holds, claimed under the team scope scopes
+// gives each. A failed lookup is logged and returned.
 func listConflictingUniqueAttributes(ctx context.Context, stmts UserStatements, projectID, userID string, attrs domain.CreateAttributes, scopes []string) ([]domain.AttributeKey, error) {
-	var claims []database.Filter[domain.UserAttributeField]
+	var claims []UniqueAttributeClaim
 	for i, attr := range attrs {
 		if attr.UniqueScope == domain.AttributeUniquenessUnspecified {
 			continue
 		}
-		claims = append(claims, database.And(
-			database.Equal(database.Col(domain.UserAttributeFieldUniqueTeamID), scopes[i]),
-			database.Equal(database.Col(domain.UserAttributeFieldUniqueKey), string(attr.Key)),
-			database.Equal(database.Col(domain.UserAttributeFieldValueHash), attr.ValueHash[:]),
-		))
+		claims = append(claims, UniqueAttributeClaim{TeamID: scopes[i], Key: attr.Key, ValueHash: attr.ValueHash})
 	}
 	if len(claims) == 0 {
 		return nil, nil
 	}
-	held, lookupErr := stmts.ListUserAttributes(ctx, &database.ListOptions[domain.UserAttributeField]{
-		Filter: database.And(
-			database.Equal(database.Col(domain.UserAttributeFieldProjectID), projectID),
-			database.Or(claims...),
-		),
-	})
-	if lookupErr != nil {
+	keys, err := stmts.GetTakenUniqueAttributeKeys(ctx, projectID, userID, claims)
+	if err != nil {
 		getLoggingContext(ctx, "user").WarnContext(ctx, "looking up the taken unique attributes failed",
 			slog.String("project_id", projectID),
-			slog.Any("error", lookupErr),
+			slog.Any("error", err),
 		)
-		return nil, lookupErr
-	}
-	var keys []domain.AttributeKey
-	for _, claim := range held.Items {
-		if claim.UserID != userID {
-			keys = append(keys, claim.Key)
-		}
-	}
-	if len(keys) == 0 {
-		return nil, nil
+		return nil, err
 	}
 	slices.Sort(keys)
 	return keys, nil

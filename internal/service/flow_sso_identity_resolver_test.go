@@ -141,8 +141,8 @@ func (f *ssoResolverFixture) expectCreateUser(createErr error) *servicemocks.Moc
 		Return(&domain.JSONSchema{ProjectID: ssoProjectID, URL: ssoSchemaURL, Schema: []byte(ssoUserSchema)}, nil)
 	createUser := f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(createErr)
 	// A unique violation looks up which attributes are taken.
-	f.stmts.EXPECT().ListUserAttributes(gomock.Any(), gomock.Any()).
-		Return(&database.ListResult[*domain.UserAttribute]{}, nil).AnyTimes()
+	f.stmts.EXPECT().GetTakenUniqueAttributeKeys(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, nil).AnyTimes()
 	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
 		f.events = append(f.events, ev)
 		return nil

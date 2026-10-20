@@ -142,34 +142,6 @@ func (attrs CreateAttributes) RegistryTeamScopes(preserved map[AttributeKey]stri
 	return scopes
 }
 
-// UserAttribute is one stored attribute of a user. UniqueTeamID and ValueHash
-// are set when the value is claimed in the unique-attributes registry, under
-// that team scope ("" means project-wide).
-type UserAttribute struct {
-	ProjectID    string
-	UserID       string
-	TeamID       string
-	Key          AttributeKey
-	Value        any
-	UniqueTeamID *string
-	ValueHash    []byte
-}
-
-// UserAttributeField enumerates the fields of UserAttribute which can be used
-// for filtering and ordering in storage statements.
-type UserAttributeField uint8
-
-const (
-	UserAttributeFieldUnspecified UserAttributeField = iota
-	UserAttributeFieldProjectID
-	UserAttributeFieldUserID
-	UserAttributeFieldTeamID
-	UserAttributeFieldKey
-	UserAttributeFieldUniqueTeamID
-	UserAttributeFieldUniqueKey
-	UserAttributeFieldValueHash
-)
-
 type CreateAttribute struct {
 	Key         AttributeKey        `json:"key"`
 	Value       any                 `json:"value"`
