@@ -22,9 +22,9 @@ import {
 import type { Component } from "svelte";
 import { hydrate, unmount } from "svelte";
 import { createServer } from "vite";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, expectTypeOf } from "vitest";
 
-import { businessLocales } from "./lib/index";
+import { businessLocales, type ZitadelFlowInputDetail } from "./lib/index";
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
@@ -89,6 +89,13 @@ describe("ZitadelLogin", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it("types a secret flow input without a value", () => {
+    expectTypeOf<Extract<ZitadelFlowInputDetail, { secret: true }>>().not.toHaveProperty("value");
+    // @ts-expect-error a secret field has no value to read
+    const leak = (detail: ZitadelFlowInputDetail): string => detail.value;
+    expect(leak).toBeTypeOf("function");
+  });
 
   it("exposes the underlying element via getElement()", () => {
     const { component, container } = render(ZitadelLogin, {

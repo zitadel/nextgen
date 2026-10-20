@@ -18,9 +18,15 @@ import {
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, expectTypeOf } from "vitest";
 
-import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
+import {
+  businessLocales,
+  ZitadelLogin,
+  ZitadelLogout,
+  ZitadelSession,
+  type ZitadelFlowInputDetail,
+} from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -76,6 +82,13 @@ describe("ZitadelLogin", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it("types a secret flow input without a value", () => {
+    expectTypeOf<Extract<ZitadelFlowInputDetail, { secret: true }>>().not.toHaveProperty("value");
+    // @ts-expect-error a secret field has no value to read
+    const leak = (detail: ZitadelFlowInputDetail): string => detail.value;
+    expect(leak).toBeTypeOf("function");
+  });
 
   it("forwards the ref to the underlying element", () => {
     let captured: ZitadelLoginElement | undefined;

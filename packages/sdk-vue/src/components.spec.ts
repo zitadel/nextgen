@@ -16,14 +16,14 @@ import {
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
 } from "@zitadel/sdk-core/types";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, expectTypeOf } from "vitest";
 import { createSSRApp, defineComponent, h, shallowRef, type Ref } from "vue";
 import { renderToString } from "vue/server-renderer";
 
 import ZitadelLogin from "./components/ZitadelLogin";
 import ZitadelLogout from "./components/ZitadelLogout";
 import ZitadelSession from "./components/ZitadelSession";
-import { businessLocales } from "./index";
+import { businessLocales, type ZitadelFlowInputDetail } from "./index";
 
 // A consumer's `ref` on these components resolves to the component instance,
 // whose `expose({ element })` surfaces the inner DOM node. Vue's exposed proxy
@@ -129,6 +129,13 @@ describe("ZitadelLogin", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it("types a secret flow input without a value", () => {
+    expectTypeOf<Extract<ZitadelFlowInputDetail, { secret: true }>>().not.toHaveProperty("value");
+    // @ts-expect-error a secret field has no value to read
+    const leak = (detail: ZitadelFlowInputDetail): string => detail.value;
+    expect(leak).toBeTypeOf("function");
+  });
 
   it("exposes the rendered element via the instance ref", () => {
     const { captured, container } = mountWithInstanceRef(ZitadelLogin);

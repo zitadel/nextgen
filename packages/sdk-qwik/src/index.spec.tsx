@@ -12,7 +12,7 @@ import {
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, expectTypeOf } from "vitest";
 
 import {
   LoginConfigHarness,
@@ -25,7 +25,13 @@ import {
 import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
 import { UnsetPropHarness } from "./__tests__/unset-prop-harness";
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
-import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
+import {
+  businessLocales,
+  ZitadelLogin,
+  ZitadelLogout,
+  ZitadelSession,
+  type ZitadelFlowInputDetail,
+} from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -204,6 +210,13 @@ describe("ZitadelLogin", () => {
       expect(received).toContain(detail);
     },
   );
+
+  it("types a secret flow input without a value", () => {
+    expectTypeOf<Extract<ZitadelFlowInputDetail, { secret: true }>>().not.toHaveProperty("value");
+    // @ts-expect-error a secret field has no value to read
+    const leak = (detail: ZitadelFlowInputDetail): string => detail.value;
+    expect(leak).toBeTypeOf("function");
+  });
 
   it("populates a consumer ref with the underlying element", async () => {
     const consumerRef = { value: undefined } as Signal<ZitadelLoginElement | undefined>;
@@ -507,7 +520,7 @@ describe("early event buffer", () => {
 
   it("never retains flow input values, even for a wrapper host", () => {
     const el = hostElement(true);
-    emit(el, "zitadel-flow-input", { name: "password", value: "hunter2" });
+    emit(el, "zitadel-flow-input", { name: "nickname", secret: false, value: "ally" });
     emit(el, "zitadel-flow-step", { step: "password" });
 
     expect(replayed(el, ALL)).toEqual([]);

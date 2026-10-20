@@ -21,9 +21,15 @@ import {
 import * as React from "react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, expectTypeOf } from "vitest";
 
-import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
+import {
+  businessLocales,
+  ZitadelLogin,
+  ZitadelLogout,
+  ZitadelSession,
+  type ZitadelFlowInputDetail,
+} from "./index";
 
 // A representative project handle. The element still starts its flow before
 // @lit/react binds this prop (see vitest.config.ts), so the expected mount-time
@@ -85,6 +91,13 @@ describe("ZitadelLogin", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it("types a secret flow input without a value", () => {
+    expectTypeOf<Extract<ZitadelFlowInputDetail, { secret: true }>>().not.toHaveProperty("value");
+    // @ts-expect-error a secret field has no value to read
+    const leak = (detail: ZitadelFlowInputDetail): string => detail.value;
+    expect(leak).toBeTypeOf("function");
+  });
 
   it("forwards a ref to the underlying element", () => {
     const ref = React.createRef<ZitadelLoginElement>();
