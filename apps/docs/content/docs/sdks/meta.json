@@ -1,6 +1,7 @@
 {
   "title": "SDKs",
   "pages": [
+    "proxy",
     "---Server frameworks---",
     "next",
     "nuxt",

@@ -1,0 +1,12 @@
+{
+  "/docs/sdks/qwik-city": "/docs/sdks/qwik-router",
+  "/docs/cli": "/docs/reference/cli",
+  "/docs/cli/local-runtime": "/docs/guides/local-runtime",
+  "/docs/concepts/local-runtime": "/docs/guides/local-runtime",
+  "/docs/cli/plan-apply": "/docs/guides/plan-apply",
+  "/docs/cli/social-sign-in": "/docs/guides/social-sign-in",
+  "/docs/cli/customize-design": "/docs/guides/customize-design",
+  "/docs/cli/customize-copy": "/docs/guides/customize-copy",
+  "/docs/cli/troubleshooting": "/docs/guides/troubleshooting",
+  "/docs/concepts/sdk-proxy": "/docs/sdks/proxy"
+}

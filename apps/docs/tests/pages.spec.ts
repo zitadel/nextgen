@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { type APIRequestContext, expect, test } from "@playwright/test";
 
 import {
@@ -48,8 +50,8 @@ test("the index lists every section, each page once, under /docs", async ({ requ
   // The sections skills/zitadel/SKILL.md describes to agents.
   for (const section of [
     "Get started",
+    "Guides",
     "Concepts",
-    "CLI",
     "SDKs",
     "CLI reference",
     "API reference",
@@ -65,7 +67,7 @@ test("the index lists every section, each page once, under /docs", async ({ requ
   ).toEqual([]);
   const urls = pages.map((page) => page.url);
   expect(urls).toEqual(
-    expect.arrayContaining(["/docs", "/docs/get-started/quickstart", "/docs/cli"]),
+    expect.arrayContaining(["/docs", "/docs/get-started/quickstart", "/docs/reference/cli"]),
   );
   expect(
     urls.filter((url) => url !== "/docs" && !url.startsWith("/docs/")),
@@ -231,6 +233,30 @@ test("a page that does not exist is a 404, as HTML and as Markdown", async ({ re
   expect(negotiated.status()).toBe(404);
 });
 
+test("a page that moved redirects to where it is now, as HTML and as Markdown", async ({
+  request,
+}) => {
+  // The pages next.config.mjs redirects, from their old URL to their new one.
+  const moved = JSON.parse(
+    readFileSync(new URL("../lib/moved.json", import.meta.url), "utf8"),
+  ) as Record<string, string>;
+  const twins = Object.entries(moved).flatMap(([from, to]) => [
+    [from, to],
+    [`${from}.md`, `${to}.md`],
+  ]);
+
+  const results = await mapLimit(twins, concurrency, async ([from = "", to = ""]) => {
+    const response = await request.get(from, { maxRedirects: 0 });
+    const location = new URL(response.headers().location ?? "", "http://docs").pathname;
+    if (response.status() !== 308 || location !== to) {
+      return `${from}: ${response.status()} to ${location}`;
+    }
+    const target = await request.get(to);
+    return target.status() === 200 ? null : `${to}: ${target.status()}`;
+  });
+  expect(failures(results), "moved pages that do not redirect to a page").toEqual([]);
+});
+
 test("llms-full.txt carries every page but the API operations", async ({ request }) => {
   const pages = await indexedPages(request);
   const response = await request.get("/docs/llms-full.txt");
@@ -254,7 +280,7 @@ test("llms-full.txt carries every page but the API operations", async ({ request
 });
 
 test("scripts and styles load from /docs/_next/", async ({ request }) => {
-  const html = await (await request.get("/docs/cli")).text();
+  const html = await (await request.get("/docs/get-started/quickstart")).text();
   // With Skew Protection on, the cloud appends `?dpl=<deployment>` to each URL.
   const assets = [
     ...new Set(
