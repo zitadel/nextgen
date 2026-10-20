@@ -246,15 +246,21 @@ setApiCsrfRejectionHandler(() => {
  * swallowed: an already-invalid session is an acceptable sign-out outcome,
  * and the caller navigates to the login screen either way. The revoke names the
  * console's project, so it never ends an app's session the cookie holds.
+ *
+ * Sign-out is a write, so it carries the CSRF token like any other (ADR 053
+ * §5): the caches, token included, are dropped only once the revoke and any
+ * retry are done. A refused token's re-check caches the session it reads, and
+ * dropping earlier would leave that session for `/login` to bounce back on.
  */
 export async function signOut(): Promise<void> {
-  invalidateSessionCache();
   try {
     await api.revokeMySession(consoleSessionProject(), withCredentials);
   } catch {
     // Already signed out (401), an app's session (403 sess.project_mismatch)
     // or unreachable — the redirect to /login is the user-visible outcome
     // either way.
+  } finally {
+    invalidateSessionCache();
   }
 }
 
