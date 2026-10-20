@@ -746,10 +746,12 @@ func TestPatchUser(t *testing.T) {
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 		return resp.(*api.User)
 	}
-	requireUserInvalid := func(t *testing.T, resp api.PatchUserByIDRes) {
+	requireAttributesInvalid := func(t *testing.T, resp api.PatchUserByIDRes, wantFields string) {
 		t.Helper()
 		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), resp.(*api.PatchUserByIDBadRequest).Code)
+		invalid := resp.(*api.PatchUserByIDBadRequest)
+		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), invalid.Code)
+		assert.JSONEq(t, wantFields, string(invalid.Details.Value["details"]))
 	}
 
 	t.Run("an older revision is validated like a newer one", func(t *testing.T) {
@@ -762,7 +764,7 @@ func TestPatchUser(t *testing.T) {
 			"schema": revisionV2,
 		}), params)
 		require.NoError(t, err)
-		requireUserInvalid(t, resp)
+		requireAttributesInvalid(t, resp, `{"fields":["attributes.country","attributes.nickname"]}`)
 		unchanged := getUser(t, user.ID)
 		assert.Equal(t, revisionV1, unchanged.Schema)
 		assert.Equal(t, "Nick", userProp(t, *unchanged, "nickname"))
@@ -781,7 +783,7 @@ func TestPatchUser(t *testing.T) {
 			"schema": revisionV1,
 		}), params)
 		require.NoError(t, err)
-		requireUserInvalid(t, resp)
+		requireAttributesInvalid(t, resp, `{"fields":["attributes.country"]}`)
 		unchanged = getUser(t, user.ID)
 		assert.Equal(t, revisionV2, unchanged.Schema)
 		assert.Equal(t, "CH", userProp(t, *unchanged, "country"))
