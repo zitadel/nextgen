@@ -172,6 +172,11 @@ Each invocation prints one JSON object:
   `data.unsupported_deletions` counts removed files whose resource cannot be
   deleted yet (they are kept, and are not part of `total`); on `apply` the files
   are listed in `data.unsupported_deletion_files`.
+- `apply` leaves the files under `.zitadel/` as written: what the server stores
+  is never written back, and a field a file leaves out reads as the server's
+  default, so `plan` reports no change after an `apply`. `data.files_updated`
+  lists the one rewrite: a flow whose `user_schema` pinned a schema revision id
+  the apply superseded, re-pinned to the new revision's id.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 
@@ -347,6 +352,20 @@ auth flow in a visible browser by registering a unique user, logging out, loggin
 back in with the same email/password, and ending on the signed-in profile page.
 Do not treat a rendered login or registration form as completion.
 
+To move a set-up app to another dev port (the dev server exits with
+`EADDRINUSE`, or another app needs the port), run `setup --dev-port <port>` in
+the app; never change the port in one file by hand. In a directory with a
+`zitadel.json`, `setup` returns `status: "skipped"` with `reason:
+"already-initialized"`, unless `--dev-port` is given: then it moves the app.
+It allows the new origin on the server first, and a refusal changes nothing.
+It then rewrites the dev script or dev-server config, `ZITADEL_ISSUER` in
+`.env.local`, `zitadel.json`, `.zitadel/secret` and the README/AGENTS.md
+guidance, and removes the old origin. `data.previous_issuer` and `data.issuer`
+name both origins, and `data.moved` is `false` when the app was already on that
+port. A social sign-in provider still redirects to the old port: `warnings`
+names the redirect URI to add at each provider. Restart the dev server
+afterwards.
+
 To change how users sign in after setup, use the `auth-method` commands. Each
 sign-in method has its own command, with `--schema` when the project has more
 than one:
@@ -358,6 +377,12 @@ than one:
   stdin when non-interactive. Any other OpenID Connect provider is
   `--provider custom` with `--slug`, `--display-name`, `--issuer` and optionally
   `--scopes` (default `openid profile email`).
+  An issuer on `http://localhost:<port>` (a test provider on this machine)
+  works against a server `zitadel start` runs as a process: `start` sets
+  `NEXTGEN_HTTPCLIENT_ALLOW_LIST=localhost,127.0.0.0/8,::1/128` unless
+  `.env.local`, `.env` or the shell sets it, and setting it empty turns it off.
+  Under `--runtime docker` localhost is the container, so the provider is not
+  reachable. Otherwise `sso enable` warns in `warnings` that sign-in will fail.
   `auth-method sso disable --provider google` removes a provider; a custom one
   is named by its slug, as in `auth-method sso disable --provider acme-sso`.
 

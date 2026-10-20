@@ -1,18 +1,22 @@
+import type * as PageTree from "fumadocs-core/page-tree";
 import type { AdvancedIndex } from "fumadocs-core/search/server";
 import { llms, loader, update } from "fumadocs-core/source";
 import { lucideIconsPlugin } from "fumadocs-core/source/lucide-icons";
 import { metaSchema, pageSchema } from "fumadocs-core/source/schema";
 import { applyMdxPreset } from "fumadocs-mdx/config";
 import { defineDocs } from "fumadocs-mdx/macro";
-import type { OpenAPIV3_2, OperationItem, WebhookItem } from "fumadocs-openapi";
+import type { OpenAPIV3_2, OperationItem, OperationObject, WebhookItem } from "fumadocs-openapi";
+import type { RequestData } from "fumadocs-openapi/requests";
+import { pathnameFromRequest } from "fumadocs-openapi/requests/generators";
+import { curl } from "fumadocs-openapi/requests/generators/curl";
 
 import { codeThemes } from "./code-theme";
 import { cliSample } from "./cli-sample";
 import { defaultRequest, withRefValues } from "./default-request";
 import { firstSentence, shortDescription } from "./description";
 import { openapi } from "./openapi";
-import { sdkSample } from "./sdk-sample";
-import { docsRoute } from "./shared";
+import { authentication, sdkSample } from "./sdk-sample";
+import { docsRoute, getPageMarkdownUrl } from "./shared";
 
 const docs = defineDocs({
   dir: "content/docs",
@@ -70,17 +74,48 @@ type OpenAPIPage = Extract<Page, { type: "openapi" }>;
 
 // llms.txt and MCP's list_pages have room for an operation's whole first
 // sentence (lib/description.ts); otherwise Fumadocs' own description.
-export const docsLlms = llms(source, {
-  renderDescription: (node) => {
-    const data =
-      node.type === "page" ? source.getNodePage(node)?.data : source.getNodeMeta(node)?.data;
-    if (data && "markdownDescription" in data) return firstSentence(data.markdownDescription ?? "");
-    return data?.description || (typeof node.description === "string" ? node.description : "");
-  },
-  renderPage: async (page) => `# ${page.data.title} (${page.url})
+function sourceLlms(input: typeof source) {
+  return llms(input, {
+    renderDescription: (node) => {
+      const data =
+        node.type === "page" ? source.getNodePage(node)?.data : source.getNodeMeta(node)?.data;
+      if (data && "markdownDescription" in data)
+        return firstSentence(data.markdownDescription ?? "");
+      return data?.description || (typeof node.description === "string" ? node.description : "");
+    },
+    renderPage: async (page) => `# ${page.data.title} (${page.url})
 
 ${page.type === "openapi" ? operationText(page) : await page.data.getText("processed")}`,
+  });
+}
+
+// The pages, llms-full.txt, and MCP, whose get_page takes the page URL its
+// list_pages lists.
+export const docsLlms = sourceLlms(source);
+
+// /docs/llms.txt, which lists each page by its Markdown URL (lib/shared.ts),
+// so an agent fetches the Markdown without asking for it through `Accept`.
+export const docsLlmsIndex = sourceLlms({
+  ...source,
+  getPageTree: (locale) => withMarkdownUrls(source.getPageTree(locale)),
 });
+
+function withMarkdownUrls<T extends PageTree.Root | PageTree.Node>(node: T): T {
+  switch (node.type) {
+    case "page": {
+      const page = source.getNodePage(node);
+      return page ? { ...node, url: getPageMarkdownUrl(page).url } : node;
+    }
+    case "separator":
+      return node;
+    default:
+      return {
+        ...node,
+        ...("index" in node && node.index && { index: withMarkdownUrls(node.index) }),
+        children: node.children.map((child) => withMarkdownUrls(child)),
+      };
+  }
+}
 
 // The props of an operation's or a webhook's page, a client component.
 // Fumadocs hands each page the whole document, so every page carried every
@@ -115,8 +150,8 @@ export function openapiPageProps(page: OpenAPIPage) {
 }
 
 // An operation or webhook page has no Markdown of its own. Its text is its
-// endpoints, an operation's call through @zitadel/api and its CLI command,
-// which the page shows too, and the part of the OpenAPI document they need,
+// endpoints, an operation's call through @zitadel/api, its CLI command and
+// cURL, which the page shows too, and the part of the OpenAPI document they need,
 // the operations or webhooks and every component they reference, so the page
 // stands on its own.
 function operationText(page: OpenAPIPage) {
@@ -136,6 +171,8 @@ function operationText(page: OpenAPIPage) {
       ...(sample.cli
         ? ["Run with [the CLI](/docs/cli):", `\`\`\`bash\n${sample.cli}\n\`\`\``]
         : []),
+      "With cURL, against a local server:",
+      `\`\`\`bash\n${sample.curl}\n\`\`\``,
     ];
   });
 
@@ -152,9 +189,9 @@ function operationText(page: OpenAPIPage) {
 
 const resolvable = new WeakMap<OpenAPIV3_2.Document, OpenAPIV3_2.Document>();
 
-// The page's TypeScript and CLI samples (lib/sdk-sample.ts, lib/cli-sample.ts)
-// with the operation's default request: the Markdown has no example selector
-// or playground.
+// The page's TypeScript, CLI and cURL samples (lib/sdk-sample.ts,
+// lib/cli-sample.ts, components/api-page.tsx) with the operation's default
+// request: the Markdown has no example selector or playground.
 function operationSamples(
   document: OpenAPIV3_2.Document,
   path: string,
@@ -172,8 +209,40 @@ function operationSamples(
   return {
     typescript: sdkSample(operation, path, pathItem, request),
     cli: cliSample(operation, path, request),
+    curl: curlSample(operation, path, request),
   };
 }
+
+// The page's cURL calls the page's own origin, the spec's server; the
+// Markdown's the local server the spec names, as lib/sdk-sample.ts does.
+const curlServer = "http://localhost:8080";
+
+// cURL as the page generates it. An operation a project secret authenticates
+// sends it as the bearer, from the variable the TypeScript sample reads; one
+// only the session cookie authenticates runs in the browser, through the SDK
+// proxy, so its cURL has no credential to send (lib/sdk-sample.ts).
+function curlSample(operation: OperationObject, path: string, request: RequestData) {
+  const [call = "", ...rest] = curl
+    .generate(
+      { ...request, url: `${curlServer}${pathnameFromRequest(path, request)}` },
+      { mediaAdapters: curlMediaAdapters, custom: null },
+    )
+    .split(" \\\n  ");
+  const bearer =
+    authentication(operation) === "secret"
+      ? ['-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"']
+      : [];
+  return [call, ...bearer, ...rest].join(" \\\n  ");
+}
+
+// Every request body of the API is JSON. cURL only asks whether its type has
+// an adapter, and writes the body itself.
+const curlMediaAdapters = {
+  "application/json": {
+    encode: ({ body }: { body: unknown }) => JSON.stringify(body),
+    generateExample: () => undefined,
+  },
+};
 
 function openapiFragment(
   document: OpenAPIV3_2.Document,

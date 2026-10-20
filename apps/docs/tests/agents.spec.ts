@@ -95,6 +95,19 @@ test.describe("the MCP server", () => {
     );
   });
 
+  test("lists each page by the URL get_page takes", async ({ request }) => {
+    // Not the Markdown URLs /docs/llms.txt lists (lib/source.ts).
+    const response = await call(request, {
+      id: 4,
+      method: "tools/call",
+      params: { name: "list_pages", arguments: {} },
+    });
+    expect(response.status()).toBe(200);
+    const result = (await jsonRpcMessage(response)).result as CallToolResult;
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0]?.text).toContain("(/docs/cli)");
+  });
+
   test("serves a page's Markdown through get_page", async ({ request }) => {
     const response = await call(request, {
       id: 3,

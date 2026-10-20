@@ -96,7 +96,7 @@ describe("status", () => {
       it("calls config pointing at a project that no longer exists orphaned", async () => {
         const app = await anApp();
         await app.writeConfig({
-          $schema: "https://schemas.zitadel.com/v2/project.schema.json",
+          $schema: "./.zitadel/meta/project.json",
           project: "orphan",
           server: "https://api.zitadel.cloud",
         });

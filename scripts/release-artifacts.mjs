@@ -5,7 +5,7 @@ import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mapWithConcurrency, run } from "./dev-process.mjs";
+import { mapWithConcurrency, run, runReplayed } from "./dev-process.mjs";
 import {
   PUBLIC_PACKAGE_DIRS,
   PUBLIC_RELEASE_PACKAGES,
@@ -218,7 +218,9 @@ export async function packPublicPackages(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const version = options.version ?? (await readServerRelease(repoRoot)).version;
   const outDir = options.outDir ?? releaseDir(repoRoot, version);
-  const runFn = options.run ?? run;
+  // The packs run side by side, so none may write to this process's stdout
+  // (see runReplayed); each pack's output arrives in one piece once it is done.
+  const runFn = options.run ?? runReplayed;
   const tarballsDir = join(outDir, "npm");
   await rm(tarballsDir, { recursive: true, force: true });
   await mkdir(tarballsDir, { recursive: true });

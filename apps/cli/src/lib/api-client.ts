@@ -144,10 +144,9 @@ export type SanitizeOptions = {
   /**
    * Return response bodies exactly as the server sent them. Only for a
    * caller that stores or compares what it reads rather than printing it:
-   * `apply` and `setup` write the server's canonical body back to the
-   * project's files, and `plan` diffs it against them, so an escaped
-   * `\r` or zero-width joiner would be written to disk as literal text and
-   * published as a change. Such a caller escapes at the point it prints.
+   * `plan` and `apply` compare the server's stored bodies against the
+   * project's files, so an escaped `\r` or zero-width joiner would read as a
+   * change that is not there. Such a caller escapes at the point it prints.
    * Errors are escaped either way.
    */
   verbatim?: boolean;

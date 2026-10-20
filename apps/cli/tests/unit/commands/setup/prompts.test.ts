@@ -68,7 +68,7 @@ const FRAMEWORK = {
 
 function baseAnswers(over: Partial<SetupAnswers> = {}): SetupAnswers {
   return {
-    server: "https://api.zitadel.cloud",
+    server: "https://preview.zitadel.com",
     devPort: 3000,
     preset: "passkey-first",
     useCase: "minimal",
@@ -155,11 +155,11 @@ describe("FrameworkConfirmPrompt", () => {
 
 describe("ServerPrompt", () => {
   it("writes the cloud choice without asking for a URL", async () => {
-    vi.mocked(select).mockResolvedValueOnce("https://api.zitadel.cloud" as never);
+    vi.mocked(select).mockResolvedValueOnce("https://preview.zitadel.com" as never);
 
     const out = await new ServerPrompt().ask(baseAnswers(), ctx);
 
-    expect(out.server).toBe("https://api.zitadel.cloud");
+    expect(out.server).toBe("https://preview.zitadel.com");
     expect(text).not.toHaveBeenCalled();
   });
 
@@ -192,20 +192,23 @@ describe("ServerPrompt", () => {
       initialValue: "http://localhost:8080",
     });
     const values = selectOptionsFromFirstCall().map((option) => option.value);
-    expect(values).toEqual(["https://api.zitadel.cloud", "http://localhost:8080", "__custom__"]);
+    expect(values).toEqual(["https://preview.zitadel.com", "http://localhost:8080", "__custom__"]);
   });
 
   it("offers only Cloud and Custom when no local server is detected", async () => {
     // Default mock (LocalServer.detectUrl → undefined) already simulates
     // this; assert explicitly that no detected URL leaks into the options.
-    vi.mocked(select).mockResolvedValueOnce("https://api.zitadel.cloud" as never);
+    vi.mocked(select).mockResolvedValueOnce("https://preview.zitadel.com" as never);
 
     await new ServerPrompt().ask(baseAnswers(), ctx);
 
     const values = selectOptionsFromFirstCall().map((option) => option.value);
-    expect(values).toEqual(["https://api.zitadel.cloud", "__custom__"]);
+    expect(values).toEqual(["https://preview.zitadel.com", "__custom__"]);
+    expect(selectOptionsFromFirstCall()[0]).toMatchObject({
+      label: "Zitadel Cloud (preview.zitadel.com)",
+    });
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
-      initialValue: "https://api.zitadel.cloud",
+      initialValue: "https://preview.zitadel.com",
     });
   });
 

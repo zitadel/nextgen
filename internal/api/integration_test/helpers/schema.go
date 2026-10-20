@@ -24,9 +24,16 @@ func (h *Harness) EnsureSchemaService(t testing.TB) *service.SchemaService {
 			h.EnsureServiceDB(t),
 			h.EnsureSchemaResolver(t),
 			h.EnsureSchemaValidator(t),
+			BuiltinSchemaBases(),
 		)
 	}
 	return h.schemaService.value
+}
+
+// BuiltinSchemaBases is the built-in schema namespace the harness serves:
+// BuiltinSchemaBaseURL, aliased by the bases a real deployment knows.
+func BuiltinSchemaBases() domain.BuiltinSchemaBases {
+	return domain.BuiltinSchemaBasesFor(BuiltinSchemaBaseURL)
 }
 
 func (h *Harness) EnsureSchemaStore(t testing.TB) domain.JSONSchemaStore {
