@@ -95,6 +95,8 @@ export { registrationLines } from "./registration";
 
 export { askScopes, parseScopeToken } from "./scopes";
 
+export { addAttributesToFlow, addAttributesToSchema } from "./new-attributes";
+
 export { askConnectionEndpoints } from "./endpoints";
 
 export {

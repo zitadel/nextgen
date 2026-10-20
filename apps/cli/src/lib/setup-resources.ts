@@ -36,6 +36,8 @@ import { FLOWS_DIR } from "./flows";
 import {
   applySsoToFlow,
   applySsoToSchema,
+  addAttributesToFlow,
+  addAttributesToSchema,
   attributesOf,
   authMethods,
   claimedConnection,
@@ -177,9 +179,14 @@ export async function materializeSetupResources(opts: {
 
   // Each slug in turn: the edits are additive and idempotent, so folding them
   // builds one schema that names every chosen provider.
+  // Properties the person chose to create while mapping claims join the schema,
+  // and the register step that asks for a person's details.
+  const created = [
+    ...new Map(planned.flatMap((entry) => entry.created).map((one) => [one.name, one])).values(),
+  ];
   const schemaBody = slugs.reduce<Record<string, unknown>>(
     (document, slug) => applySsoToSchema(document, slug).document as Record<string, unknown>,
-    schemaTemplate,
+    addAttributesToSchema(schemaTemplate, created),
   );
 
   const schemaWritten = await writeResourceFile(
@@ -219,7 +226,10 @@ export async function materializeSetupResources(opts: {
     hash: schemaHash,
   });
 
-  const flowTemplate = getDefaultLoginFlow({ preset, useCase });
+  const flowTemplate = addAttributesToFlow(
+    getDefaultLoginFlow({ preset, useCase }),
+    created.map((one) => one.name),
+  ) as ReturnType<typeof getDefaultLoginFlow>;
   // The conflict step the provider needs can only offer what this schema
   // actually enables, so the methods are read back off the composed document
   // rather than inferred from the preset.
@@ -348,6 +358,8 @@ type PlannedConnection = {
   notes: readonly string[];
   /** The mapping and scopes the file carries, one line each, for the developer to read. */
   summary: readonly string[];
+  /** Properties the claim mapping adds to the user schema. */
+  created: readonly SchemaAttribute[];
 };
 
 /** The connection each chosen provider gets, and the file it is written to. */
@@ -386,6 +398,7 @@ function planConnections(
       selection: chosen.selection,
       notes: claimed.notes,
       summary: claimed.summary,
+      created: claimed.created,
     });
   }
   return planned;

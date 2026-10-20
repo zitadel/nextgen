@@ -6,15 +6,15 @@ import {
   type ClaimEntry,
   type ClaimRequest,
   type ClaimType,
-  fillable,
-  hasFillable,
   mapClaim,
   type MappingState,
   parseClaimName,
+  parseNewAttributeName,
   parseScopeList,
   parseUnusedClaim,
   standardClaimScope,
   standardClaimType,
+  unmapped,
   type VerifiedEntry,
 } from "./claims";
 
@@ -42,8 +42,8 @@ function mappingRows(state: MappingState): Cell[][] {
   });
 }
 
-/** Raised inside a claim's questions when no attribute can hold it, to leave the branch. */
-class NothingToFill extends Error {}
+/** The select value for "create a new attribute", which no real attribute name can equal. */
+const CREATE = Symbol("create a new attribute");
 
 /**
  * Show what a provider fills by default, then let a person add to it.
@@ -80,7 +80,7 @@ export async function askClaims(
     ),
   ]);
 
-  while (hasFillable(current)) {
+  for (;;) {
     const more = await wizard.ask({
       kind: "select",
       name: "whether to map another claim",
@@ -95,24 +95,18 @@ export async function askClaims(
       break;
     }
 
-    try {
-      const before = current;
-      const added = await wizard.branch("Adding a claim", () =>
-        askOneClaim(wizard, before, provider),
-      );
-      current = added.state;
-      entries.push(added.entry);
-      verified.push(...added.verified);
-      scopes.push(...added.scopes);
-      wizard.say(
-        `${quoted(added.entry.claim)} now maps to ${quoted(added.entry.attribute)}.`,
-        "success",
-      );
-    } catch (error) {
-      if (!(error instanceof NothingToFill)) {
-        throw error;
-      }
-    }
+    const before = current;
+    const added = await wizard.branch("Adding a claim", () =>
+      askOneClaim(wizard, before, provider),
+    );
+    current = added.state;
+    entries.push(added.entry);
+    verified.push(...added.verified);
+    scopes.push(...added.scopes);
+    wizard.say(
+      `${quoted(added.entry.claim)} now maps to ${quoted(added.entry.attribute)}${added.entry.create === true ? ", a new attribute in your user schema" : ""}.`,
+      "success",
+    );
   }
   return { entries, verified, scopes: [...new Set(scopes)] };
 }
@@ -145,30 +139,50 @@ async function askOneClaim(
       initialValue: "string",
     }));
 
-  const candidates = fillable(before, type);
-  if (candidates.length === 0) {
-    wizard.say(`No user attribute can hold a ${TYPE_LABEL[type].toLowerCase()} value.`, "warn");
-    throw new NothingToFill();
+  const candidates = unmapped(before, type);
+  const chosen =
+    candidates.length === 0
+      ? CREATE
+      : await wizard.ask({
+          kind: "select",
+          name: "user attribute",
+          message: "Which user attribute should it map to?",
+          options: [
+            ...candidates.map((one) => ({
+              value: one.name as string | symbol,
+              label: one.name,
+              hint: [
+                one.type,
+                one.required ? "required" : undefined,
+                one.unique ? "unique" : undefined,
+              ]
+                .filter((part) => part !== undefined)
+                .join(", "),
+            })),
+            {
+              value: CREATE as string | symbol,
+              label: "Create a new attribute",
+              hint: `a ${type} property added to your user schema`,
+            },
+          ],
+        });
+  const creating = chosen === CREATE;
+  if (creating && candidates.length === 0) {
+    wizard.say("No user attribute is free to hold it, so it needs a new one.");
   }
-  const attribute = await wizard.ask({
-    kind: "select",
-    name: "user attribute",
-    message: "Which user attribute should it map to?",
-    options: candidates.map((one) => ({
-      value: one.name,
-      label: one.name,
-      hint: [
-        one.type,
-        one.required ? "required" : undefined,
-        one.unique ? "unique" : undefined,
-        before.mapping[one.name] === undefined
-          ? undefined
-          : `now from ${quoted(before.mapping[one.name] as string)}`,
-      ]
-        .filter((part) => part !== undefined)
-        .join(", "),
-    })),
-  });
+  const attribute = creating
+    ? await wizard.ask({
+        kind: "text",
+        name: "new attribute",
+        message: "What should the new attribute be called?",
+        placeholder: "employeeNumber",
+        parse: (value) =>
+          parseNewAttributeName(
+            value,
+            before.attributes.map((one) => one.name),
+          ),
+      })
+    : (chosen as string);
 
   const suggested = standardClaimScope(claim);
   const extra = await wizard.ask({
@@ -179,14 +193,19 @@ async function askOneClaim(
     initialValue: suggested !== undefined && !before.scopes.includes(suggested) ? suggested : "",
   });
 
-  const entry: ClaimEntry = { attribute, claim, ...(type === "string" ? {} : { type }) };
+  const entry: ClaimEntry = {
+    attribute,
+    claim,
+    ...(type === "string" ? {} : { type }),
+    ...(creating ? { create: true } : {}),
+  };
   const mapped = mapClaim(before, entry);
   if (!mapped.ok) {
     throw new ZitadelError("E_VALIDATION", mapped.problem);
   }
 
   const verifiedEntries: VerifiedEntry[] = [];
-  if (candidates.find((one) => one.name === attribute)?.unique === true) {
+  if (!creating && candidates.find((one) => one.name === attribute)?.unique === true) {
     if (before.verified[attribute] !== undefined && before.mapping[attribute] !== claim) {
       wizard.say(
         `${quoted(attribute)} now comes from ${quoted(claim)}, so ${quoted(String(before.verified[attribute] === true ? provider : before.verified[attribute]))} no longer vouches for it.`,

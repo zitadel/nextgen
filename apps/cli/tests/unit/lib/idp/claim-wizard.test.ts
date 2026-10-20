@@ -44,7 +44,8 @@ function scripted(answers: readonly unknown[]): { ask: Asker; asked: Question[] 
     if (queue.length === 0) {
       throw new Error(`unexpected question: ${question.message}`);
     }
-    const next = queue.shift();
+    const raw = queue.shift();
+    const next = typeof raw === "function" ? raw(question) : raw;
     if (question.kind === "text") {
       const parsed = question.parse(String(next));
       if (!parsed.ok) {
@@ -56,6 +57,12 @@ function scripted(answers: readonly unknown[]): { ask: Asker; asked: Question[] 
   }) as Asker;
   return { ask, asked };
 }
+
+/** The answer that picks the option with this label. */
+const pick = (label: string) => (question: Question) =>
+  question.kind === "select"
+    ? question.options.find((option) => option.label === label)?.value
+    : undefined;
 
 const names = (asked: Question[]) => asked.map((question) => question.name);
 
@@ -81,7 +88,7 @@ describe("askClaims", () => {
     expect(names(asked)).toEqual(["whether to map another claim"]);
   });
 
-  it("still offers to replace a default when every property has one", async () => {
+  it("still asks whether to map another claim when every attribute has one, since one can be created", async () => {
     const full = seedMapping(
       { claim_mapping: { email: "email" }, oidc: { scopes: ["openid"] } },
       attributesOf({ properties: { email: { type: "string" } } }),
@@ -93,15 +100,79 @@ describe("askClaims", () => {
     expect(names(asked)).toEqual(["whether to map another claim"]);
   });
 
-  it("replaces a default with the claim the person names, and says it is replaced", async () => {
-    const { ask, asked } = scripted([true, "mail", "string", "email", "", "none", false]);
+  it("offers the attributes without a claim, then a new one, and never one that already has a claim", async () => {
+    const { ask, asked } = scripted([true, "mail", "string", "badge", "", false]);
+
+    await askClaims(state(), wizardOver(ask).wizard, PROVIDER);
+
+    const attribute = asked.find((question) => question.name === "user attribute");
+    const offered =
+      attribute?.kind === "select" ? attribute.options.map((option) => option.label) : [];
+    expect(offered).toEqual(["badge", "Create a new attribute"]);
+  });
+
+  it("creates a new attribute the person names, typed to hold the claim", async () => {
+    const { ask } = scripted([
+      true,
+      "employee_id",
+      "integer",
+      pick("Create a new attribute"),
+      "employeeNumber",
+      "",
+      false,
+    ]);
 
     const request = await askClaims(state(), wizardOver(ask).wizard, PROVIDER);
 
-    const property = asked.find((question) => question.name === "user attribute");
-    const hints = property?.kind === "select" ? property.options.map((option) => option.hint) : [];
-    expect(request.entries).toEqual([{ attribute: "email", claim: "mail" }]);
-    expect(hints).toContain('string, required, unique, now from "email"');
+    expect(request.entries).toEqual([
+      { attribute: "employeeNumber", claim: "employee_id", type: "integer", create: true },
+    ]);
+  });
+
+  it("refuses, as it is typed, a new attribute that already exists", async () => {
+    const { ask } = scripted([
+      true,
+      "employee_id",
+      "string",
+      pick("Create a new attribute"),
+      "email",
+    ]);
+
+    await expect(askClaims(state(), wizardOver(ask).wizard, PROVIDER)).rejects.toThrow(
+      '"email" is already a user attribute.',
+    );
+  });
+
+  it("refuses a new attribute name that is not a plain identifier", async () => {
+    const { ask } = scripted([
+      true,
+      "employee_id",
+      "string",
+      pick("Create a new attribute"),
+      "staff number",
+    ]);
+
+    await expect(askClaims(state(), wizardOver(ask).wizard, PROVIDER)).rejects.toThrow(
+      "Use letters, digits and underscores",
+    );
+  });
+
+  it("goes straight to naming a new attribute when none is free to hold the claim", async () => {
+    const { ask, asked } = scripted([true, "points", "boolean", "pointsAwarded", "", false]);
+
+    const request = await askClaims(state(), wizardOver(ask).wizard, PROVIDER);
+
+    expect(request.entries).toEqual([
+      { attribute: "pointsAwarded", claim: "points", type: "boolean", create: true },
+    ]);
+    expect(names(asked)).toEqual([
+      "whether to map another claim",
+      "claim",
+      "claim type",
+      "new attribute",
+      "scope",
+      "whether to map another claim",
+    ]);
   });
 
   it("shows the default mapping as a table before asking", async () => {
@@ -142,22 +213,14 @@ describe("askClaims", () => {
   });
 
   it("offers only attributes whose type holds the claim", async () => {
-    const { ask, asked } = scripted([
-      true,
-      "employee_id",
-      "integer",
-      "staffNumber",
-      "",
-      "none",
-      false,
-    ]);
+    const { ask, asked } = scripted([true, "points", "integer", "score", "", false]);
 
     await askClaims(state(), wizardOver(ask).wizard, PROVIDER);
 
-    const property = asked.find((question) => question.name === "user attribute");
+    const attribute = asked.find((question) => question.name === "user attribute");
     const offered =
-      property?.kind === "select" ? property.options.map((option) => option.label) : [];
-    expect(offered).toEqual(["staffNumber", "score"]);
+      attribute?.kind === "select" ? attribute.options.map((option) => option.label) : [];
+    expect(offered).toEqual(["staffNumber", "score", "Create a new attribute"]);
   });
 
   it("refuses, as it is typed, a claim that already fills a property", async () => {
@@ -166,26 +229,6 @@ describe("askClaims", () => {
     await expect(askClaims(state(), wizardOver(ask).wizard, PROVIDER)).rejects.toThrow(
       "given_name already fills givenName: a claim fills one property.",
     );
-  });
-
-  it("says so, and asks again, when no empty property can hold the claim", async () => {
-    const small = seedMapping(
-      { claim_mapping: { email: "email" }, oidc: { scopes: ["openid", "email"] } },
-      attributesOf({
-        properties: { email: { type: "string" }, count: { type: "string" } },
-      }),
-    );
-    const { ask, asked } = scripted([true, "points", "boolean", false]);
-
-    const request = await askClaims(small, wizardOver(ask).wizard, PROVIDER);
-
-    expect(request.entries).toEqual([]);
-    expect(names(asked)).toEqual([
-      "whether to map another claim",
-      "claim",
-      "claim type",
-      "whether to map another claim",
-    ]);
   });
 
   it("suggests the scope a standard claim needs when it is not requested yet", async () => {
@@ -261,16 +304,15 @@ describe("askClaims", () => {
     expect(request.scopes).toEqual(["points"]);
   });
 
-  it("stops offering once every property has been mapped by the person", async () => {
-    const { ask, asked } = scripted([true, "badge_number", "string", "badge", ""]);
+  it("keeps offering after every attribute has a claim, since one can be created", async () => {
+    const { ask, asked } = scripted([true, "badge_number", "string", "badge", "", false]);
     const only = seedMapping(
       { claim_mapping: {}, oidc: { scopes: ["openid"] } },
       attributesOf({ properties: { badge: { type: "string" } } }),
     );
 
-    const request = await askClaims(only, wizardOver(ask).wizard, PROVIDER);
+    await askClaims(only, wizardOver(ask).wizard, PROVIDER);
 
-    expect(request.entries).toEqual([{ attribute: "badge", claim: "badge_number" }]);
-    expect(names(asked).filter((name) => name === "whether to map another claim")).toHaveLength(1);
+    expect(names(asked).filter((name) => name === "whether to map another claim")).toHaveLength(2);
   });
 });

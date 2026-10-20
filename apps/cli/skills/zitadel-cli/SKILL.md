@@ -373,7 +373,7 @@ than one:
   trust the provider) says how a unique property is verified. `setup` takes
   the same as `--sso-claim`, `--sso-claim-scope` and `--sso-verified-claim`.
   Interactively, with none of these given, both commands list what is mapped
-  and ask for more claims until the person continues. A connection that
+  and ask for more claims until the person continues; a claim can fill an attribute with no claim yet, or a new attribute, which is added to the user schema and the register steps of the login flow. A connection that
   already exists keeps the mapping in its file; edit `claim_mapping` there.
   `auth-method sso disable --provider google` removes a provider; a custom one
   is named by its slug, as in `auth-method sso disable --provider acme-sso`.

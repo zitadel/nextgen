@@ -23,6 +23,11 @@ export type ClaimEntry = {
   readonly claim: string;
   /** What the provider returns. Left out, it is the standard's type, else a string. */
   readonly type?: ClaimType;
+  /**
+   * The property does not exist yet: add it to the user schema, typed to hold
+   * the claim, and map the claim to it.
+   */
+  readonly create?: boolean;
 };
 
 /** How a property is verified: the boolean claim that says so, or `true` to trust the provider. */
@@ -58,6 +63,8 @@ export type MappingState = {
   readonly explicit: readonly string[];
   /** Properties whose default was replaced and which had been verified by the claim replaced. */
   readonly unverifiedByReplacing: readonly string[];
+  /** Properties the request adds to the user schema, so the commands can write them. */
+  readonly created: readonly SchemaAttribute[];
 };
 
 type StandardClaim = {
@@ -323,6 +330,7 @@ export function seedMapping(
     scopes,
     explicit: [],
     unverifiedByReplacing: [],
+    created: [],
   };
 }
 
@@ -346,6 +354,34 @@ export function hasFillable(state: MappingState): boolean {
   );
 }
 
+/** The properties no claim fills yet that a claim of this type could fill. */
+export function unmapped(state: MappingState, claimType: ClaimType): SchemaAttribute[] {
+  return state.attributes.filter(
+    (attribute) =>
+      attribute.type !== undefined &&
+      fits(claimType, attribute.type) &&
+      !(attribute.name in state.mapping),
+  );
+}
+
+/**
+ * A name for a property the request adds to the user schema. The schema only
+ * forbids a dot, but the name is a JSON key and a field in the login flow, so
+ * it is held to a plain identifier. It must not already be a property.
+ */
+export function parseNewAttributeName(value: string, taken: readonly string[]): Parsed<string> {
+  const name = value.trim();
+  if (name === "") {
+    return refuse("Enter a name for the attribute.");
+  }
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    return refuse(
+      "Use letters, digits and underscores, starting with a letter, as in employeeNumber.",
+    );
+  }
+  return taken.includes(name) ? refuse(`"${name}" is already a user attribute.`) : ok(name);
+}
+
 const describe = (attribute: SchemaAttribute): string =>
   `${attribute.name} (${attribute.type ?? "not a string, number, integer or boolean"})`;
 
@@ -355,6 +391,21 @@ const describe = (attribute: SchemaAttribute): string =>
  * already fills another, or the claim's type does not fit the property's.
  */
 export function mapClaim(state: MappingState, entry: ClaimEntry): Parsed<MappingState> {
+  if (entry.create === true) {
+    const name = parseNewAttributeName(
+      entry.attribute,
+      state.attributes.map((one) => one.name),
+    );
+    if (!name.ok) {
+      return name;
+    }
+    const type = entry.type ?? standardClaimType(entry.claim) ?? "string";
+    const added: SchemaAttribute = { name: name.value, type, required: false, unique: false };
+    return mapClaim(
+      { ...state, attributes: [...state.attributes, added], created: [...state.created, added] },
+      { attribute: entry.attribute, claim: entry.claim, type: entry.type },
+    );
+  }
   const attribute = state.attributes.find((one) => one.name === entry.attribute);
   if (attribute === undefined) {
     return refuse(
@@ -527,6 +578,7 @@ export function claimedConnection(
   readonly document: Record<string, unknown>;
   readonly notes: readonly string[];
   readonly summary: readonly string[];
+  readonly created: readonly SchemaAttribute[];
 }> {
   const applied = applyRequest(seedMapping(document, attributes), request);
   return applied.ok
@@ -534,6 +586,7 @@ export function claimedConnection(
         document: withClaims(document, applied.value),
         notes: claimNotes(applied.value),
         summary: summariseClaims(applied.value),
+        created: applied.value.created,
       })
     : applied;
 }

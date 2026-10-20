@@ -27,6 +27,8 @@ import { isDevelopmentBuild } from "../../../lib/build-channel";
 import { ZitadelError } from "../../../lib/errors";
 import { stableStringify } from "../../../lib/json";
 import {
+  addAttributesToFlow,
+  addAttributesToSchema,
   applyRequest,
   applySsoToFlow,
   asksForClaims,
@@ -37,6 +39,7 @@ import {
   claimsOrRefuse,
   ENABLE_CLAIM_FLAGS,
   type MappingState,
+  type SchemaAttribute,
   seedMapping,
   summariseClaims,
   withClaims,
@@ -270,7 +273,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // and before the connection is written or a credential published, so a
     // refusal (an edit the editors cannot make, or a flow `plan` would then
     // reject) stops the run with nothing changed (ADR 070 §3).
-    const edits = planEdits(schema, plan.slug, flows);
+    let edits = planEdits(schema, plan.slug, flows);
     refuseBrokenFlows(
       schema,
       edits.schema.document as Record<string, unknown>,
@@ -279,12 +282,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         after: result.document as Record<string, unknown>,
       })),
     );
-    const outcome = {
+    const outcomeOf = (planned: PlannedEdits) => ({
       schema,
       before: schema.body,
-      after: edits.schema.document as Record<string, unknown>,
-      flowsAfter: edits.flows.map(({ result }) => result.document as Record<string, unknown>),
-    };
+      after: planned.schema.document as Record<string, unknown>,
+      flowsAfter: planned.flows.map(({ result }) => result.document as Record<string, unknown>),
+    });
+    let outcome = outcomeOf(edits);
 
     consola.info(`Project   ${secretFile.project_id}`);
     consola.info(
@@ -433,6 +437,21 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         outro("Configuration captured");
       }
       createdClaims = claims;
+      // Attributes created while mapping claims join the schema and the steps
+      // that ask for a person's details, and the result is checked like any
+      // other edit before anything is written.
+      if (claims.created.length > 0) {
+        edits = withNewAttributes(edits, claims.created);
+        refuseBrokenFlows(
+          schema,
+          edits.schema.document as Record<string, unknown>,
+          edits.flows.map(({ flow, result }) => ({
+            file: flow,
+            after: result.document as Record<string, unknown>,
+          })),
+        );
+        outcome = outcomeOf(edits);
+      }
       const heard = new Set(claimNotes(mapped));
       for (const note of claimNotes(claims)) {
         if (!heard.has(note)) {
@@ -626,6 +645,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           ? {}
           : {
               claim_mapping: input.claims.mapping,
+              new_attributes: input.claims.created.map((one) => one.name),
               verified_claims: input.claims.verified,
               scopes: input.claims.scopes,
             }),
@@ -761,6 +781,30 @@ function planEdits(
     skipped: results.flatMap(({ flow, result }) =>
       result.skipped.map((entry) => ({ ...entry, region: `${flow.path} ${entry.region}` })),
     ),
+  };
+}
+
+/** The planned edits with the user attributes a claim mapping created added to them. */
+function withNewAttributes(edits: PlannedEdits, created: readonly SchemaAttribute[]): PlannedEdits {
+  const names = created.map((one) => one.name);
+  return {
+    ...edits,
+    schema: {
+      ...edits.schema,
+      document: addAttributesToSchema(edits.schema.document as Record<string, unknown>, created),
+      changed: true,
+    },
+    flows: edits.flows.map(({ flow, result }) => {
+      const document = addAttributesToFlow(result.document as Record<string, unknown>, names);
+      return {
+        flow,
+        result: {
+          ...result,
+          document,
+          changed: result.changed || JSON.stringify(document) !== JSON.stringify(result.document),
+        },
+      };
+    }),
   };
 }
 

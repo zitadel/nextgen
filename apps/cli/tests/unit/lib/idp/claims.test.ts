@@ -25,9 +25,11 @@ import {
   fillable,
   hasFillable,
   mapClaim,
+  parseNewAttributeName,
   parseUnusedClaim,
   standardClaimScope,
   standardClaimType,
+  unmapped,
   verifyAttribute,
 } from "../../../../src/lib/idp/claims";
 
@@ -454,6 +456,111 @@ describe("parseUnusedClaim", () => {
 
   it("accepts a claim nothing uses", () => {
     expect(value(parseUnusedClaim(seeded(), " employee_id "))).toBe("employee_id");
+  });
+});
+
+describe("parseNewAttributeName", () => {
+  it.each(["employeeNumber", "staff_no", "_x", "a1"])("accepts %s", (name) => {
+    expect(value(parseNewAttributeName(name, ["email"]))).toBe(name);
+  });
+
+  it("trims what was typed", () => {
+    expect(value(parseNewAttributeName(" employeeNumber ", []))).toBe("employeeNumber");
+  });
+
+  it("asks for a name when given none", () => {
+    expect(problem(parseNewAttributeName("  ", []))).toBe("Enter a name for the attribute.");
+  });
+
+  it.each(["staff number", "staff.no", "1abc", "staff-no", "é"])(
+    "refuses %j, which is not a plain identifier",
+    (name) => {
+      expect(problem(parseNewAttributeName(name, []))).toContain("Use letters, digits");
+    },
+  );
+
+  it("refuses a name that is already an attribute", () => {
+    expect(problem(parseNewAttributeName("email", ["email"]))).toBe(
+      '"email" is already a user attribute.',
+    );
+  });
+});
+
+describe("mapClaim with create", () => {
+  it("adds the attribute, typed to hold the claim, and maps the claim to it", () => {
+    const next = value(
+      mapClaim(seeded(), {
+        attribute: "employeeNumber",
+        claim: "employee_id",
+        type: "integer",
+        create: true,
+      }),
+    );
+
+    expect(next.mapping.employeeNumber).toBe("employee_id");
+    expect(next.created).toEqual([
+      { name: "employeeNumber", type: "integer", required: false, unique: false },
+    ]);
+  });
+
+  it("types a standard claim's attribute by the standard", () => {
+    const next = value(
+      mapClaim(seeded(), { attribute: "verifiedMail", claim: "email_verified", create: true }),
+    );
+
+    expect(next.created[0]?.type).toBe("boolean");
+  });
+
+  it("makes the new attribute known to later entries", () => {
+    const next = value(
+      applyRequest(seeded(), {
+        entries: [
+          { attribute: "employeeNumber", claim: "employee_id", type: "integer", create: true },
+        ],
+        verified: [{ attribute: "employeeNumber", source: true }],
+        scopes: [],
+      }),
+    );
+
+    expect(next.verified.employeeNumber).toBe(true);
+  });
+
+  it("refuses to create an attribute the schema already has", () => {
+    expect(problem(mapClaim(seeded(), { attribute: "score", claim: "points", create: true }))).toBe(
+      '"score" is already a user attribute.',
+    );
+  });
+
+  it("refuses a name that is not a plain identifier", () => {
+    expect(
+      problem(mapClaim(seeded(), { attribute: "staff number", claim: "n", create: true })),
+    ).toContain("Use letters, digits");
+  });
+
+  it("still refuses a claim that already fills another attribute", () => {
+    expect(
+      problem(mapClaim(seeded(), { attribute: "mailCopy", claim: "email", create: true })),
+    ).toContain("email already fills email");
+  });
+
+  it("is reported by claimedConnection so the commands can write the attribute", () => {
+    const parsed = claimedConnection(document(), attributes, {
+      entries: [{ attribute: "employeeNumber", claim: "employee_id", create: true }],
+      verified: [],
+      scopes: [],
+    });
+
+    expect(value(parsed).created.map((one) => one.name)).toEqual(["employeeNumber"]);
+  });
+});
+
+describe("unmapped", () => {
+  it("lists only attributes that have no claim yet and could hold the type", () => {
+    expect(unmapped(seeded(), "string").map((one) => one.name)).toEqual(
+      expect.arrayContaining(["phoneNumber"]),
+    );
+    expect(unmapped(seeded(), "string").map((one) => one.name)).not.toContain("email");
+    expect(unmapped(seeded(), "string").map((one) => one.name)).not.toContain("givenName");
   });
 });
 

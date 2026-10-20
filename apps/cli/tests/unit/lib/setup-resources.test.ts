@@ -811,6 +811,96 @@ describe("assertNoSetupResourceConflicts", () => {
   });
 });
 
+describe("materializeSetupResources with a created attribute", () => {
+  const client = () =>
+    ({
+      createIdp: vi.fn().mockResolvedValue({ id: "idp_1" }),
+      createSchema: vi.fn().mockResolvedValue({ id: "sch_1" }),
+      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_1", status: "active" }),
+    }) as unknown as ZitadelClient;
+
+  const claims = {
+    entries: [
+      { attribute: "employeeNumber", claim: "employee_id", type: "integer" as const, create: true },
+    ],
+    verified: [],
+    scopes: [],
+  };
+
+  it("adds the attribute to the schema it uploads", async () => {
+    const api = client();
+
+    await materializeSetupResources({
+      cwd,
+      client: api,
+      projectId: "project_123",
+      force: false,
+      cliVersion: TEST_CLI_VERSION,
+      sso: [{ selection: googleSelection, claims }],
+    });
+
+    const body = vi.mocked(api.createSchema).mock.calls[0]?.[0] as {
+      properties: Record<string, unknown>;
+    };
+    expect(body.properties).toMatchObject({ employeeNumber: { type: "integer" } });
+  });
+
+  it("asks for it on the register step of the flow it uploads", async () => {
+    const api = client();
+
+    await materializeSetupResources({
+      cwd,
+      client: api,
+      projectId: "project_123",
+      force: false,
+      cliVersion: TEST_CLI_VERSION,
+      sso: [{ selection: googleSelection, claims }],
+    });
+
+    const flow = vi.mocked(api.createFlowDefinition).mock.calls[0]?.[0] as {
+      flow_definition: { steps: { name: string; fields?: string[] }[] };
+    };
+    expect(flow.flow_definition.steps.find((step) => step.name === "register")?.fields).toContain(
+      "employeeNumber",
+    );
+  });
+
+  it("maps the claim in the connection it creates", async () => {
+    const api = client();
+
+    await materializeSetupResources({
+      cwd,
+      client: api,
+      projectId: "project_123",
+      force: false,
+      cliVersion: TEST_CLI_VERSION,
+      sso: [{ selection: googleSelection, claims }],
+    });
+
+    const body = vi.mocked(api.createIdp).mock.calls[0]?.[0] as {
+      idp: { claim_mapping: Record<string, string> };
+    };
+    expect(body.idp.claim_mapping).toMatchObject({ employeeNumber: "employee_id" });
+  });
+
+  it("adds nothing to the schema when no attribute was created", async () => {
+    const api = client();
+
+    await materializeSetupResources({
+      cwd,
+      client: api,
+      projectId: "project_123",
+      force: false,
+      cliVersion: TEST_CLI_VERSION,
+    });
+
+    const body = vi.mocked(api.createSchema).mock.calls[0]?.[0] as {
+      properties: Record<string, unknown>;
+    };
+    expect(body.properties).not.toHaveProperty("employeeNumber");
+  });
+});
+
 describe("defaultSchemaAttributes", () => {
   it("lists the properties the use case's schema defines, with their types", () => {
     expect(
