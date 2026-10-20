@@ -1433,6 +1433,36 @@ describe("server middleware", () => {
       "HTTP://User:Pw@Auth.Test:8080/Zitadel/",
     ],
     ["an IPv6 option", "http://[::1]:8080/", undefined, "http://[::1]:8080/"],
+    [
+      "an option kept as given with a trailing backslash",
+      "http://option.test:4000\\",
+      undefined,
+      "http://option.test:4000\\/",
+    ],
+    [
+      "an option of only a slash, else ZITADEL_URL",
+      "/",
+      "http://env.test:4000",
+      "http://env.test:4000/",
+    ],
+    [
+      "an option of a slash between whitespace, else ZITADEL_URL",
+      " / ",
+      "http://env.test:4000",
+      "http://env.test:4000/",
+    ],
+    [
+      "an option of only slashes, else ZITADEL_URL",
+      "//",
+      "http://env.test:4000",
+      "http://env.test:4000/",
+    ],
+    [
+      "an option of only slashes and a ZITADEL_URL of only slashes, else the local default",
+      "//",
+      "/",
+      "http://localhost:8080/",
+    ],
   ])("proxies to the backend from %s", async (_l, option, environment, expected) => {
     vi.stubEnv("ZITADEL_URL", environment);
     const calls = captureFetch();

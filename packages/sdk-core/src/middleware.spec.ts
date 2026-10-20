@@ -178,6 +178,7 @@ describe("resolveBackendUrl", () => {
     ["a port", "http://localhost:4000"],
     ["a port and a path", "http://localhost:4000/zitadel"],
     ["an IPv6 host", "http://[::1]:8080"],
+    ["a trailing backslash", "https://auth.example.com\\"],
     ["a query string", "https://auth.example.com/?q=1"],
     ["slashes before a query", "https://auth.example.com//?q=1"],
     ["a fragment", "https://auth.example.com/#top"],
@@ -212,6 +213,8 @@ describe("resolveBackendUrl", () => {
     ["an empty string", [""]],
     ["only whitespace", [" \t\n"]],
     ["only slashes", ["///"]],
+    ["one slash", ["/"]],
+    ["a slash between whitespace", [" / "]],
     ["only blank candidates", [undefined, "", "  ", " / "]],
   ])("falls back to the local default for %s", (_label, candidates) => {
     expect(resolveBackendUrl(...candidates)).toBe(DEFAULT_BACKEND_URL);

@@ -67,9 +67,15 @@ const firstDifference = (titles: readonly string[], canonical: readonly string[]
 // Matches `it("title"`, `it.each(…)("title"`, `describe("title"` and `describe.each(…)("title"`.
 const BLOCK_TITLE = /\b(?:it|describe)(?:\.each\([^)]*\))?\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
 
+/** Where the `// name:edge` marker comment, alone on its line, starts; -1 when there is none. */
+const markerAt = (source: string, name: string, edge: "begin" | "end"): number => {
+  const marker = new RegExp(`^[ \\t]*// ${name}:${edge}[ \\t]*$`, "m").exec(source);
+  return marker ? marker.index + marker[0].indexOf("//") : -1;
+};
+
 const blockIn = (source: string, name: string): string | undefined => {
-  const begin = source.indexOf(`// ${name}:begin`);
-  const end = source.indexOf(`// ${name}:end`);
+  const begin = markerAt(source, name, "begin");
+  const end = markerAt(source, name, "end");
   return begin >= 0 && end > begin ? source.slice(begin, end) : undefined;
 };
 
@@ -770,10 +776,17 @@ describe("server SDK test titles", () => {
   // Matches `it("title"`, `it.fails("title"` and the `it.each([...])("title"` form.
   const TITLE = /(?:\bit(?:\.fails)?\(|\]\)\()\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
 
+  const sourceOf = (sdk: keyof typeof TEST_FILES): string =>
+    readFileSync(`${packagesPath}${TEST_FILES[sdk]}`, "utf8");
+
+  /** The one place a spec may test beyond the canonical cases: a platform only its SDK has. */
+  const withoutSdkOnly = (source: string): string => {
+    const block = blockIn(source, "sdk-only");
+    return block === undefined ? source : source.replace(block, "");
+  };
+
   const titlesOf = (sdk: keyof typeof TEST_FILES): string[] =>
-    [...readFileSync(`${packagesPath}${TEST_FILES[sdk]}`, "utf8").matchAll(TITLE)].map(
-      (match) => match[2]!,
-    );
+    [...withoutSdkOnly(sourceOf(sdk)).matchAll(TITLE)].map((match) => match[2]!);
 
   it.each(Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[])(
     "%s carries exactly the canonical tests, in the canonical order",
@@ -785,6 +798,13 @@ describe("server SDK test titles", () => {
       ).toBe("");
     },
   );
+
+  it("allows SDK-only tests in the Qwik Router spec alone", () => {
+    for (const sdk of Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[]) {
+      const found = blockIn(sourceOf(sdk), "sdk-only") !== undefined;
+      expect(found, `${sdk} has an sdk-only block`).toBe(sdk === "sdk-qwik-router");
+    }
+  });
 
   /**
    * The backend-url tests are the one group of cases the server SDKs also
@@ -798,59 +818,81 @@ describe("server SDK test titles", () => {
       "verifies a JWT against a backend url given with a trailing slash",
       "asks the session probe at a backend url given with a trailing slash",
     ];
-    const sources = Object.fromEntries(
-      Object.entries(TEST_FILES).map(([sdk, file]) => [
-        sdk,
-        readFileSync(`${packagesPath}${file}`, "utf8"),
-      ]),
-    );
-    const mutated = (from: string, to: string): Record<string, string> => {
-      const source = sources["sdk-solid-start"] ?? "";
-      expect(source, "the mutated text is in the block").toContain(from);
-      return { ...sources, "sdk-solid-start": source.replace(from, to) };
-    };
-    const ROW = '    ["an IPv6 option", "http://[::1]:8080/", undefined, "http://[::1]:8080/"],\n';
 
     it("is canonical in every SDK", () => {
+      const sources = Object.fromEntries(
+        (Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[]).map((sdk) => [sdk, sourceOf(sdk)]),
+      );
       expect(problems(sources, "backend-url", URL_TITLES)).toEqual([]);
     });
 
-    it("sees a changed row and names the SDK", () => {
-      expect(
-        problems(mutated("http://[::1]:8080/", "http://[::1]:8080"), "backend-url", URL_TITLES),
-      ).toEqual(["sdk-solid-start: the body differs from the first SDK's"]);
-    });
+    // The guard's own logic, on a fixture block it is made to reject.
+    describe("the guard", () => {
+      const fixture = [
+        "describe('x', () => {",
+        "  // backend-url:begin",
+        "  it.each([",
+        '    ["a", "http://a.test/"],',
+        '    ["b", "http://b.test/"],',
+        '  ])("proxies to the backend from %s", () => {',
+        "    expect(proxied()).toBe(1);",
+        "  });",
+        '  it("verifies a JWT against a backend url given with a trailing slash", () => {});',
+        '  it("asks the session probe at a backend url given with a trailing slash", () => {});',
+        "  // backend-url:end",
+        "});",
+      ].join("\n");
+      const check = (other: string): string[] =>
+        problems({ one: fixture, two: other }, "backend-url", URL_TITLES);
+      const CHANGED = ["two: the body differs from the first SDK's"];
 
-    it("sees a dropped row", () => {
-      expect(problems(mutated(ROW, ""), "backend-url", URL_TITLES)).toEqual([
-        "sdk-solid-start: the body differs from the first SDK's",
-      ]);
-    });
+      it("accepts blocks that match", () => {
+        expect(check(fixture)).toEqual([]);
+      });
 
-    it("sees an extra row", () => {
-      expect(
-        problems(
-          mutated(ROW, `${ROW}${ROW.replace("IPv6", "second IPv6")}`),
-          "backend-url",
-          URL_TITLES,
-        ),
-      ).toEqual(["sdk-solid-start: the body differs from the first SDK's"]);
-    });
+      it("sees a changed row and names the SDK", () => {
+        expect(check(fixture.replace('"http://b.test/"', '"http://b.test"'))).toEqual(CHANGED);
+      });
 
-    it("sees a changed assertion", () => {
-      expect(
-        problems(
-          mutated("expect(calls[0]?.url).toBe(", "expect(calls[0]?.url).not.toBe("),
-          "backend-url",
-          URL_TITLES,
-        ),
-      ).toEqual(["sdk-solid-start: the body differs from the first SDK's"]);
-    });
+      it("sees a dropped row", () => {
+        expect(check(fixture.replace('    ["b", "http://b.test/"],\n', ""))).toEqual(CHANGED);
+      });
 
-    it("sees a missing marker", () => {
-      expect(problems(mutated("// backend-url:end", ""), "backend-url", URL_TITLES)).toEqual([
-        "sdk-solid-start has no backend-url block",
-      ]);
+      it("sees an extra row", () => {
+        expect(
+          check(
+            fixture.replace(
+              '    ["b", "http://b.test/"],\n',
+              '    ["b", "http://b.test/"],\n    ["c", "x"],\n',
+            ),
+          ),
+        ).toEqual(CHANGED);
+      });
+
+      it("sees a changed assertion", () => {
+        expect(check(fixture.replace(".toBe(1)", ".not.toBe(1)"))).toEqual(CHANGED);
+      });
+
+      it("sees a missing marker", () => {
+        expect(check(fixture.replace("  // backend-url:end\n", ""))).toEqual([
+          "two has no backend-url block",
+        ]);
+      });
+
+      it("does not take a longer marker for its own", () => {
+        expect(check(fixture.replace("// backend-url:end", "// backend-url:end2"))).toEqual([
+          "two has no backend-url block",
+        ]);
+        expect(check(fixture.replace("// backend-url:begin", "// backend-url:begin2"))).toEqual([
+          "two has no backend-url block",
+        ]);
+      });
+
+      it("does not take a marker inside other text for its own", () => {
+        expect(check(fixture.replace("  // backend-url:end", "  x // backend-url:end"))).toEqual([
+          "two has no backend-url block",
+        ]);
+      });
     });
   });
 });

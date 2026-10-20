@@ -710,8 +710,8 @@ export type ClientAuthResult = ClientAuthState | UnauthState;
 export type NextgenMiddlewareOptions = {
   /**
    * Full URL of the Zitadel auth backend. Surrounding whitespace and trailing
-   * slashes are ignored.
-   * @default process.env.ZITADEL_URL ?? "http://localhost:8080"
+   * slashes are ignored, and a blank value counts as unset.
+   * @default process.env.ZITADEL_URL, else {@link DEFAULT_BACKEND_URL}
    */
   url?: string;
 

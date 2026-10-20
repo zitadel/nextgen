@@ -372,6 +372,23 @@ describe("auth()", () => {
     expect(result.isAuthenticated).toBe(true);
   });
 
+  it("prefers the url option over ZITADEL_URL", async () => {
+    vi.stubEnv("ZITADEL_URL", "http://env.test");
+    routeFetch(nextKid(), () =>
+      jsonResponse({ session_id: "sess-3", project_id: PROJECT, state: "active", user_id: "u3" }),
+    );
+    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+
+    const auth = await importAuth();
+    const result = await auth(OPTIONS);
+
+    expect(result.isAuthenticated).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${ISSUER}/sessions/me?project_id=${PROJECT}`,
+      expect.anything(),
+    );
+  });
+
   it("falls back to ZITADEL_URL when the url option is blank", async () => {
     vi.stubEnv("ZITADEL_URL", ISSUER);
     routeFetch(nextKid(), () =>

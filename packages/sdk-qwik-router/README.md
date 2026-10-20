@@ -148,7 +148,7 @@ work-email copy for a business audience.
 
 | Option              | Type                 | Default                      | Description                                                          |
 | ------------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------- |
-| `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend. A trailing slash and surrounding whitespace are ignored. |
+| `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend. A trailing slash and surrounding whitespace are ignored, and a blank value falls back to the environment variable, then to the default. |
 | `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project secret, sent as the bearer on the handoff exchange only           |
 | `projectId`         | `string`             | `ZITADEL_PROJECT_ID`, else `PUBLIC_ZITADEL_PROJECT_ID` env | The project this app signs its users in to. A session of any other project on the server reads as signed out and keeps its cookie; with no project, no session counts |
 | `proxyPath`         | `string`             | `"/__nextgen"`               | Path prefix proxied to the auth backend                              |

@@ -36,7 +36,7 @@ describe("nextgen plugin", () => {
     expect(configureZitadel).toHaveBeenCalledWith({
       proxyPath: "/__nextgen",
       projectId: "proj-1",
-      url: "http://localhost:8080",
+      url: undefined,
     });
   });
 });

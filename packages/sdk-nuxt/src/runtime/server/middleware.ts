@@ -12,7 +12,6 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
-  resolveBackendUrl,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
@@ -134,9 +133,9 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
     opaqueTokenTimeoutMs = 5000,
   } = options;
 
-  // An empty `url` (the module's runtime config holds `""` until a value is
+  // A blank `url` (the module's runtime config holds `""` until a value is
   // set) counts as unset, so it falls back to `ZITADEL_URL`, then the default.
-  const url = resolveBackendUrl(resolveUrl({ url: options.url }));
+  const url = resolveUrl({ url: options.url });
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
