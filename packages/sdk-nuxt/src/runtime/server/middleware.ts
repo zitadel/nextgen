@@ -247,9 +247,7 @@ async function proxyRequest(
   // the future publishable-key exchange path.
   if (requiresProjectSecret(method, suffix) && !upstreamHeaders.has("authorization")) {
     const config = useRuntimeConfig();
-    const projectSecret = resolveProjectSecret(
-      config.nextgen as Record<string, unknown> | undefined,
-    );
+    const projectSecret = resolveProjectSecret(config.nextgen);
     if (projectSecret) {
       upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
     }

@@ -15,7 +15,13 @@ import {
   isStandardAttributeName,
   standardAttributes,
   widgetTags,
+  ZITADEL_LOGIN_EVENTS,
+  ZITADEL_LOGOUT_EVENTS,
+  ZITADEL_SESSION_EVENTS,
   type WidgetTag,
+  type ZitadelLoginEventMap,
+  type ZitadelLogoutEventMap,
+  type ZitadelSessionEventMap,
 } from "@zitadel/sdk-core/types";
 import * as React from "react";
 // Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
@@ -23,15 +29,9 @@ import * as React from "react";
 import "@zitadel/components";
 
 import type {
-  ZitadelFlowCompleteDetail,
-  ZitadelFlowRedirectDetail,
-  ZitadelFlowErrorDetail,
-  ZitadelFlowInputDetail,
-  ZitadelFlowStepDetail,
   ZitadelLoginProps,
   ZitadelLogoutProps,
   ZitadelSessionProps,
-  ZitadelSignoutDetail,
   ZitadelWidgetAttributes,
 } from "./types";
 
@@ -79,6 +79,30 @@ type ElementClass<Tag extends WidgetTag> = {
  */
 function isElementClass<Tag extends WidgetTag>(value: object): value is ElementClass<Tag> {
   return "name" in value && "prototype" in value;
+}
+
+/** The detail each widget event carries, by event name. */
+type EventDetails = ZitadelLoginEventMap & ZitadelLogoutEventMap & ZitadelSessionEventMap;
+
+/**
+ * The second boundary: `createComponent` reads the event a handler receives from
+ * the brand on its event name, which exists only in the type; a predicate
+ * narrows the name to it after checking the name is a widget event.
+ */
+function isEventName<Name extends keyof EventDetails>(
+  name: Name,
+): name is Name & EventName<CustomEvent<EventDetails[Name]>> {
+  return [...ZITADEL_LOGIN_EVENTS, ...ZITADEL_LOGOUT_EVENTS, ...ZITADEL_SESSION_EVENTS].some(
+    (event) => event === name,
+  );
+}
+
+/** A widget event's name, typed with the event it dispatches. */
+function eventName<Name extends keyof EventDetails>(
+  name: Name,
+): EventName<CustomEvent<EventDetails[Name]>> {
+  if (!isEventName(name)) throw new Error(`${name} is not a widget event`);
+  return name;
 }
 
 /**
@@ -154,15 +178,11 @@ const ZitadelLoginElementReact = createComponent({
   tagName: widgetTags.login,
   elementClass: asAttributes(widgetTags.login, "purpose", "resumeFlowId", "postSignInUrl", "url"),
   events: {
-    onZitadelFlowStep: "zitadel-flow-step" as EventName<CustomEvent<ZitadelFlowStepDetail>>,
-    onZitadelFlowInput: "zitadel-flow-input" as EventName<CustomEvent<ZitadelFlowInputDetail>>,
-    onZitadelFlowComplete: "zitadel-flow-complete" as EventName<
-      CustomEvent<ZitadelFlowCompleteDetail>
-    >,
-    onZitadelFlowRedirect: "zitadel-flow-redirect" as EventName<
-      CustomEvent<ZitadelFlowRedirectDetail>
-    >,
-    onZitadelFlowError: "zitadel-flow-error" as EventName<CustomEvent<ZitadelFlowErrorDetail>>,
+    onZitadelFlowStep: eventName("zitadel-flow-step"),
+    onZitadelFlowInput: eventName("zitadel-flow-input"),
+    onZitadelFlowComplete: eventName("zitadel-flow-complete"),
+    onZitadelFlowRedirect: eventName("zitadel-flow-redirect"),
+    onZitadelFlowError: eventName("zitadel-flow-error"),
   },
 });
 
@@ -171,7 +191,7 @@ const ZitadelLogoutElementReact = createComponent({
   tagName: widgetTags.logout,
   elementClass: asAttributes(widgetTags.logout, "url"),
   events: {
-    onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
+    onZitadelSignout: eventName("zitadel-signout"),
   },
 });
 
@@ -180,7 +200,7 @@ const ZitadelSessionElementReact = createComponent({
   tagName: widgetTags.session,
   elementClass: asAttributes(widgetTags.session, "url"),
   events: {
-    onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
+    onZitadelSignout: eventName("zitadel-signout"),
   },
 });
 

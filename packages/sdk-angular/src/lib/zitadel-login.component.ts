@@ -106,22 +106,22 @@ export class ZitadelLoginComponent {
   }
 
   onFlowStep(event: Event): void {
-    this.flowStep.emit((event as CustomEvent<ZitadelFlowStepDetail>).detail);
+    if (event instanceof CustomEvent) this.flowStep.emit(event.detail);
   }
 
   onFlowInput(event: Event): void {
-    this.flowInput.emit((event as CustomEvent<ZitadelFlowInputDetail>).detail);
+    if (event instanceof CustomEvent) this.flowInput.emit(event.detail);
   }
 
   onFlowComplete(event: Event): void {
-    this.flowComplete.emit((event as CustomEvent<ZitadelFlowCompleteDetail>).detail);
+    if (event instanceof CustomEvent) this.flowComplete.emit(event.detail);
   }
 
   onFlowRedirect(event: Event): void {
-    this.flowRedirect.emit((event as CustomEvent<ZitadelFlowRedirectDetail>).detail);
+    if (event instanceof CustomEvent) this.flowRedirect.emit(event.detail);
   }
 
   onFlowError(event: Event): void {
-    this.flowError.emit((event as CustomEvent<ZitadelFlowErrorDetail>).detail);
+    if (event instanceof CustomEvent) this.flowError.emit(event.detail);
   }
 }

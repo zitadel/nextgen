@@ -102,7 +102,7 @@ type Widget<P, R> = React.ForwardRefExoticComponent<
 
 function clientOnly<P, R>(Component: Widget<P, R>, displayName: string): Widget<P, R> {
   const ClientOnlyWidget = React.forwardRef<R, P>(function ClientOnlyWidget(props, ref) {
-    return useHydrated() ? <Component {...(props as React.PropsWithoutRef<P>)} ref={ref} /> : null;
+    return useHydrated() ? <Component {...props} ref={ref} /> : null;
   });
   ClientOnlyWidget.displayName = displayName;
   return ClientOnlyWidget;
