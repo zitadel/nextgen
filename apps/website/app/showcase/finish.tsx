@@ -46,7 +46,7 @@ export function Finish({ index, count }: { index: number; count: number }) {
         </span>
       </div>
 
-      <div className="finish-card relative isolate overflow-hidden rounded-2xl border bg-window px-5 py-10 text-center shadow-window md:px-10 md:py-14">
+      <div className="finish-card relative isolate overflow-hidden rounded-2xl border bg-window px-5 py-10 text-center shadow-(--window-shadow) md:px-10 md:py-14">
         <div aria-hidden="true" className="finish-glow absolute inset-0 -z-10" />
         <p className="finish-reveal font-mono text-(--step) text-xs leading-4" style={order(0)}>
           That's the whole loop

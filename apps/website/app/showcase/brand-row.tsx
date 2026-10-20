@@ -15,6 +15,7 @@ import {
 import { BrowserFrame } from "./browser-frame";
 import { FileCard } from "./file-card";
 import { LoginPreview } from "./login-preview";
+import { ThemeIcon, usePageLight } from "../theme-toggle";
 import { BAR_BUTTON, SEGMENTS, segment, WINDOW_INSET } from "../window";
 import { brandStep, loginAfterFlowChange } from "./sessions";
 import { Step } from "./step";
@@ -80,7 +81,7 @@ function Controls({
         <label
           title="Any color"
           className={`relative flex size-6 cursor-pointer items-center justify-center rounded-full border text-text-secondary text-xs leading-none has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text-primary has-[:focus-visible]:outline-offset-2 hover:text-text-primary ${
-            custom ? "border-text-primary border-solid" : "border-white/20 border-dashed"
+            custom ? "border-text-primary border-solid" : "border-tint/20 border-dashed"
           }`}
           style={custom ? { background: choice.color } : undefined}
         >
@@ -128,7 +129,13 @@ function Controls({
 }
 
 /** Shows the login in light or dark, as its `theme` follows the visitor's system. */
-function ThemeSwitch({ light, onChange }: { light: boolean; onChange: (light: boolean) => void }) {
+function PreviewThemeSwitch({
+  light,
+  onChange,
+}: {
+  light: boolean;
+  onChange: (light: boolean) => void;
+}) {
   return (
     <button
       type="button"
@@ -138,26 +145,7 @@ function ThemeSwitch({ light, onChange }: { light: boolean; onChange: (light: bo
       onClick={() => onChange(!light)}
       className={`${BAR_BUTTON} text-text-muted aria-pressed:text-text-primary`}
     >
-      <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="size-4">
-        {light ? (
-          <>
-            <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.4" />
-            <path
-              d="M8 1.5v1.25M8 13.25v1.25M1.5 8h1.25M13.25 8h1.25M3.4 3.4l.9.9M11.7 11.7l.9.9M3.4 12.6l.9-.9M11.7 4.3l.9-.9"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-            />
-          </>
-        ) : (
-          <path
-            d="M13.5 9.6A5.75 5.75 0 0 1 6.4 2.5a5.75 5.75 0 1 0 7.1 7.1Z"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinejoin="round"
-          />
-        )}
-      </svg>
+      <ThemeIcon theme={light ? "light" : "dark"} />
     </button>
   );
 }
@@ -172,7 +160,10 @@ function ThemeSwitch({ light, onChange }: { light: boolean; onChange: (light: bo
 export function BrandRow({ index, count }: { index: number; count: number }) {
   const [choice, setChoice] = useState<BrandChoice>(DEFAULT_CHOICE);
   const [showResult, setShowResult] = useState(true);
-  const [light, setLight] = useState(false);
+  // Until the visitor flips it here, the preview follows the page's theme.
+  const pageLight = usePageLight();
+  const [chosen, setChosen] = useState<boolean>();
+  const light = chosen ?? pageLight;
   const [screen, setScreen] = useState(0);
   const { url, screens } = loginAfterFlowChange;
   const change = (part: Partial<BrandChoice>) => {
@@ -199,7 +190,7 @@ export function BrandRow({ index, count }: { index: number; count: number }) {
           url={url}
           showResult={showResult}
           onToggle={setShowResult}
-          control={<ThemeSwitch light={light} onChange={setLight} />}
+          control={<PreviewThemeSwitch light={light} onChange={setChosen} />}
         >
           <LoginPreview
             screens={screens}

@@ -13,7 +13,7 @@ export function CallToAction({ className = "" }: { className?: string }) {
     <div className={`flex flex-wrap items-center justify-center gap-3 ${className}`}>
       <a
         href={links.quickstart}
-        className={`${BUTTON} bg-text-primary text-background hover:bg-white`}
+        className={`${BUTTON} bg-text-primary text-background hover:opacity-85`}
       >
         Read the quickstart
         <svg
@@ -33,7 +33,7 @@ export function CallToAction({ className = "" }: { className?: string }) {
       </a>
       <a
         href={links.github}
-        className={`${BUTTON} border border-window-border bg-white/[0.03] text-text-primary hover:bg-white/[0.07]`}
+        className={`${BUTTON} border border-window-border bg-tint/[0.03] text-text-primary hover:bg-tint/[0.07]`}
       >
         <GitHubMark className="size-4" />
         View on GitHub

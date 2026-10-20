@@ -24,7 +24,7 @@ export function BrowserFrame({
     <Window
       className="h-full"
       title={
-        <span className="flex h-7 w-full max-w-[17rem] min-w-0 items-center justify-center gap-1.5 rounded-md bg-white/[0.05] px-2 text-[0.6875rem] text-text-secondary sm:px-3 sm:text-xs">
+        <span className="flex h-7 w-full max-w-[17rem] min-w-0 items-center justify-center gap-1.5 rounded-md bg-tint/[0.05] px-2 text-[0.6875rem] text-text-secondary sm:px-3 sm:text-xs">
           <svg
             aria-hidden="true"
             viewBox="0 0 16 16"

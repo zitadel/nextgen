@@ -26,12 +26,11 @@ function Yours({ step, children }: { step: string; children: string }) {
 export default function Home() {
   return (
     <>
-      {/* The process's light over the top of the page: Zitadel's orange on
-          the left warming through amber to the finish's green on the right
-          (showcase/finish.tsx), the way the steps' line runs. */}
+      {/* The light over the top of the page: the accent's purple on the left
+          meeting the finish's green on the right (showcase/finish.tsx). */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[60rem] bg-[radial-gradient(45%_55%_at_28%_0%,color-mix(in_oklch,var(--color-step-start)_13%,transparent),transparent),radial-gradient(45%_55%_at_74%_0%,color-mix(in_oklch,var(--color-step-end)_9%,transparent),transparent)]"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[60rem] bg-[radial-gradient(45%_55%_at_28%_0%,color-mix(in_oklch,var(--color-text-accent)_16%,transparent),transparent),radial-gradient(45%_55%_at_74%_0%,color-mix(in_oklch,var(--color-step-end)_9%,transparent),transparent)]"
       />
       <SiteHeader />
       <main>

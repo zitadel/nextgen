@@ -15,6 +15,11 @@ export const setupCommand = "npx @zitadel/cli@alpha setup --framework next --ser
 
 export const commands = [startCommand, setupCommand, "npm run dev"];
 
+// What publishes a change to the user model or the login flow, as steps 3
+// and 4 run it and /llms.txt tells agents.
+export const planCommand = "npx @zitadel/cli@alpha plan";
+export const applyCommand = "npx @zitadel/cli@alpha apply";
+
 // The skills of this repository, for any skills-compatible coding agent
 // (README.md): the router skill, the CLI's, and one per framework SDK and
 // component.

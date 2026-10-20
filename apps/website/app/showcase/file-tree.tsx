@@ -91,7 +91,7 @@ export function FileTree({
                       aria-pressed={open === entry.path}
                       onClick={() => onOpen(entry.path)}
                       className={`group cursor-pointer transition-colors ${ROW} ${
-                        open === entry.path ? "bg-white/[0.06]" : "hover:bg-white/[0.04]"
+                        open === entry.path ? "bg-tint/[0.06]" : "hover:bg-tint/[0.04]"
                       }`}
                     >
                       {content}

@@ -13,13 +13,19 @@
   --color-border-primary: #252528;
   --color-border-secondary: #484a57;
   --color-success: #33a779;
+  /* The ink of translucent overlays (hover rows, tracks, pills): white on the
+     dark side, near-black on the light. */
+  --color-tint: #ffffff;
 
   /* The windows (window.tsx): a surface raised off the page, its title bar a
      shade lighter, a hairline edge lit from the top. */
   --color-window: #141417;
   --color-window-bar: #18181c;
   --color-window-border: rgb(255 255 255 / 0.08);
-  --shadow-window: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 1.5rem 3rem -1.5rem rgb(0 0 0 / 0.7);
+  --color-window-sunken: rgb(0 0 0 / 0.2);
+
+  /* The header's frosted plane (site-header.tsx). */
+  --color-glass: rgb(20 20 23 / 0.55);
 
   /* A diff's added and removed lines, and the new files setup writes. */
   --color-diff-added: #86efac;
@@ -42,6 +48,54 @@
 /* The page's one easing, for everything that moves in or settles. */
 :root {
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* The windows' and the header's shadows (shadow-(--window-shadow),
+     shadow-(--glass-shadow)): variables of their own, not @theme shadows,
+     which Tailwind writes into its utilities as values, so a theme could not
+     change them. */
+  /* Low on both sides, the same rise: a hairline of shade and a short,
+     soft fall, the dark side lit at its top edge too. */
+  --window-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 16px -10px rgb(0 0 0 / 0.6);
+  --glass-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 2px rgb(0 0 0 / 0.25), 0 4px 12px -8px rgb(0 0 0 / 0.5);
+  /* How much of the step colors the display titles' foot takes, and where
+     their ink has faded out. */
+  --title-ink: 70%;
+  --title-fade: 125%;
+  color-scheme: dark;
+}
+
+/* The light side: the same names, so every part follows. theme.ts sets
+   data-theme before the first paint, from the visitor's choice or their
+   system; without script the page stays dark. Unlayered, so it outranks
+   the theme layer above. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-background: #f6f6f8;
+  --color-foreground: #111114;
+  --color-text-primary: #111114;
+  --color-text-secondary: #4b4b5c;
+  --color-text-muted: #6d6d84;
+  --color-text-accent: #6a4cc2;
+  --color-border-primary: #e2e2e8;
+  --color-border-secondary: #c6c6d2;
+  --color-success: #1f8a5e;
+  --color-tint: #111114;
+  --color-window: #ffffff;
+  --color-window-bar: #f7f7f9;
+  --color-window-border: rgb(17 17 20 / 0.1);
+  --window-shadow: 0 1px 2px rgb(17 17 20 / 0.05), 0 6px 16px -10px rgb(17 17 20 / 0.12);
+  --color-window-sunken: rgb(17 17 20 / 0.025);
+  --color-glass: rgb(255 255 255 / 0.65);
+  --glass-shadow: 0 1px 2px rgb(17 17 20 / 0.04), 0 4px 12px -8px rgb(17 17 20 / 0.1);
+  --color-diff-added: #15803d;
+  --color-diff-added-surface: rgb(34 197 94 / 0.12);
+  --color-diff-removed: #b91c1c;
+  --color-diff-removed-surface: rgb(239 68 68 / 0.1);
+  --color-step-start: #e5432f;
+  --color-step-end: #16a067;
+  /* Dark ink grays the step colors more than white does: less of it, and
+     gone by the foot. */
+  --title-ink: 95%;
+  --title-fade: 95%;
 }
 
 /* The page's own pieces: the hero (page.tsx), the logo (logo.tsx) and the
@@ -73,11 +127,11 @@
     font-family: var(--font-heading);
     letter-spacing: -0.025em;
     background:
-      linear-gradient(180deg, var(--color-foreground) 30%, transparent 125%),
+      linear-gradient(180deg, var(--color-foreground) 30%, transparent var(--title-fade)),
       linear-gradient(
         in oklch to right,
-        color-mix(in oklch, var(--title-from, var(--step)) 70%, var(--color-foreground)),
-        color-mix(in oklch, var(--title-to, var(--step)) 70%, var(--color-foreground))
+        color-mix(in oklch, var(--title-from, var(--step)) var(--title-ink), var(--color-foreground)),
+        color-mix(in oklch, var(--title-to, var(--step)) var(--title-ink), var(--color-foreground))
       );
     /* Room under the line for a descender, the g of "login": the text is
        painted only where its background reaches. */

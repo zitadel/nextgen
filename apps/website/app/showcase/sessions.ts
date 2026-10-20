@@ -1,4 +1,4 @@
-import { appPath, setupCommand, startCommand } from "../commands";
+import { applyCommand, appPath, planCommand, setupCommand, startCommand } from "../commands";
 import type { Page, Screen, Session } from "./types";
 
 // The login's screens the steps show, drawn live from its atoms
@@ -132,9 +132,9 @@ export const sessions: Session[] = [
         },
       ],
       commands: [
-        { command: "npx @zitadel/cli@alpha plan", output: "Plan: 2 new revisions." },
+        { command: planCommand, output: "Plan: 2 new revisions." },
         {
-          command: "npx @zitadel/cli@alpha apply",
+          command: applyCommand,
           output: "✔ Sync complete. Changes are live — reload your app to see them.",
         },
       ],
@@ -174,9 +174,9 @@ export const sessions: Session[] = [
         },
       ],
       commands: [
-        { command: "npx @zitadel/cli@alpha plan", output: "Plan: 1 new revision." },
+        { command: planCommand, output: "Plan: 1 new revision." },
         {
-          command: "npx @zitadel/cli@alpha apply",
+          command: applyCommand,
           output: "✔ Sync complete. Changes are live — reload your app to see them.",
         },
       ],

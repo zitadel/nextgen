@@ -33,6 +33,13 @@ The hosted cloud's front page at `/`. Shared app rules:
 
 - `apps/docs/app/fonts/` holds the same Arimo file; update both.
 
+## The theme
+
+- Dark and light share one set of names in `app/globals.css`: add a color as
+  a token with a value on both sides, never a `white`/`black` literal.
+- `app/theme.ts` sets `data-theme` before the first paint, from the header
+  toggle's choice or the system's; the login previews follow it.
+
 ## The logo and the favicons
 
 - `app/logo.tsx` is the website's animated logo as inline SVG, its motion as
@@ -45,7 +52,8 @@ The hosted cloud's front page at `/`. Shared app rules:
   reaches them. A single `/favicon.ico` cannot replace the light/dark set.
 - `layout.tsx` imports the share image (`app/og.jpg`) and sets no
   `metadataBase`: on Vercel, Next makes its URL absolute with the deployment's
-  host.
+  host. Render it from `scripts/og.html` at 1200×630 as a JPEG (quality 88),
+  and change both when the hero's title, line or commands change.
 
 ## The commands and the showcase
 

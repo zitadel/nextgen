@@ -9,6 +9,7 @@ import {
   paintedProperties,
 } from "./brand-tokens";
 import styles from "./login-preview.module.css";
+import { usePageLight } from "../theme-toggle";
 import { useSeen } from "./motion";
 import type { Screen } from "./types";
 
@@ -93,7 +94,8 @@ function Card({ screen, onAction }: { screen: Screen; onAction?: () => void }) {
  * frame keeps the tallest one's height, so nothing below it moves while the
  * visitor switches or walks. `showResult` picks `screens` over `before`.
  * `choice` sets the --zl-* properties the brand step's visitor picked
- * (without one, the design system's own look), `light` its light side. The
+ * (without one, the design system's own look); `light` picks its light side,
+ * which otherwise follows the page's (theme.ts). The
  * atoms load once the first preview nears the viewport; until then, and if
  * they cannot load, it says so instead. Nothing submits: there is no server
  * behind it.
@@ -105,7 +107,7 @@ export function LoginPreview({
   index = 0,
   onAdvance,
   choice,
-  light = false,
+  light,
 }: {
   screens: Screen[];
   before?: Screen[];
@@ -122,6 +124,7 @@ export function LoginPreview({
   const logoId = `preview-${useId().replace(/[^\w-]/g, "")}`;
 
   const near = useSeen(root, { rootMargin: LOAD_MARGIN });
+  const pageLight = usePageLight();
   const stack = useRef<HTMLDivElement>(null);
   // The visitor pressed the shown screen's action, which hides that screen.
   const advanced = useRef(false);
@@ -171,7 +174,7 @@ export function LoginPreview({
     layers &&
     ({
       ...layers.dark,
-      ...(light && layers.light),
+      ...((light ?? pageLight) && layers.light),
       ...(choice && paintedProperties(choice)),
     } as CSSProperties);
   const flows = [

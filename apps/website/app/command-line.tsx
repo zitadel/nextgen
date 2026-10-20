@@ -32,7 +32,7 @@ export function CommandLine({
   end?: ReactNode;
 }) {
   return (
-    <div className="group -mx-2 flex items-start gap-2 rounded-md px-2 transition-colors hover:bg-white/[0.04]">
+    <div className="group -mx-2 flex items-start gap-2 rounded-md px-2 transition-colors hover:bg-tint/[0.04]">
       <span className="flex-1 pl-[2ch] -indent-[2ch] text-text-primary">
         <span aria-hidden="true" className="select-none text-text-accent">
           {"$ "}

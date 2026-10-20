@@ -65,7 +65,7 @@ function FlowSteps({
               className={`rounded-md border px-2.5 py-1 font-mono text-xs leading-4 transition-colors duration-300 ${
                 index === current
                   ? "border-text-accent/60 bg-text-accent/10 text-text-primary"
-                  : "border-window-border bg-white/[0.03] text-text-secondary"
+                  : "border-window-border bg-tint/[0.03] text-text-secondary"
               }`}
             >
               {name}

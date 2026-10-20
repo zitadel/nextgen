@@ -2,6 +2,7 @@ import { CommandLine } from "./command-line";
 import { startCommand } from "./commands";
 import { links } from "./links";
 import { Logo } from "./logo";
+import { ThemeSwitch } from "./theme-toggle";
 
 const COLUMNS = [
   {
@@ -25,7 +26,8 @@ const COLUMNS = [
 /**
  * The page's end: the logo with the line it stands for and the command that
  * starts Zitadel, to copy on the way out, beside the ways on into the docs
- * and the project.
+ * and the project; under them what this preview is, and the theme switch
+ * with System (theme-toggle.tsx).
  */
 export function SiteFooter() {
   return (
@@ -36,7 +38,7 @@ export function SiteFooter() {
             <Logo id="footer-logo" className="h-6 w-auto" autoplay />
           </a>
           <p className="text-sm text-text-muted leading-6">
-            Open-source auth that lives in your repo. A preview of the next Zitadel.
+            Open-source auth that lives in your repo.
           </p>
           <div className="mt-1 rounded-lg border border-window-border bg-window px-3 py-1 font-mono text-xs leading-7">
             <CommandLine command={startCommand} />
@@ -61,6 +63,14 @@ export function SiteFooter() {
             </div>
           ))}
         </nav>
+      </div>
+      <div className="border-border-primary border-t">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-5">
+          <p className="font-mono text-text-muted text-xs leading-4">
+            A preview of the next Zitadel: APIs, CLI flags and packages still change.
+          </p>
+          <ThemeSwitch />
+        </div>
       </div>
     </footer>
   );

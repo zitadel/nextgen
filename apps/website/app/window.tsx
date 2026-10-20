@@ -4,12 +4,12 @@ import type { ReactNode } from "react";
 // strip under the body.
 export const WINDOW_INSET = "px-5 md:px-6";
 export const WINDOW_BODY = `${WINDOW_INSET} py-4 font-mono text-xs leading-5 md:py-5 md:text-[0.8125rem]`;
-export const WINDOW_FOOTER = "border-window-border border-t bg-black/20";
+export const WINDOW_FOOTER = "border-window-border border-t bg-window-sunken";
 
 // The three dots' width, and the spacer's that balances them: smaller on a
 // phone, where the title needs the room.
 const DOTS_WIDTH = "w-8 sm:w-[2.625rem]";
-const DOT = "size-2 rounded-full bg-white/10 sm:size-2.5";
+const DOT = "size-2 rounded-full bg-tint/10 sm:size-2.5";
 
 /**
  * A title bar's button, as the copy button is wherever it stands: 28px high,
@@ -19,7 +19,7 @@ export const BAR_BUTTON =
   "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-transparent px-1.5 font-sans font-semibold text-xs leading-4 transition-colors hover:border-window-border hover:text-text-primary";
 
 /** The inset track a segmented control's options sit in. */
-export const SEGMENTS = "flex shrink-0 rounded-lg bg-white/[0.05] p-0.5";
+export const SEGMENTS = "flex shrink-0 rounded-lg bg-tint/[0.05] p-0.5";
 
 /**
  * One option of a segmented control in a window (the browser's Before /
@@ -28,7 +28,7 @@ export const SEGMENTS = "flex shrink-0 rounded-lg bg-white/[0.05] p-0.5";
  */
 export function segment(on: boolean): string {
   return `cursor-pointer rounded-md px-2 py-1 font-semibold text-xs leading-4 transition-colors sm:px-2.5 ${
-    on ? "bg-white/10 text-text-primary" : "text-text-muted hover:text-text-primary"
+    on ? "bg-tint/10 text-text-primary" : "text-text-muted hover:text-text-primary"
   }`;
 }
 
@@ -53,7 +53,7 @@ export function Window({
 }) {
   return (
     <div
-      className={`flex flex-col overflow-hidden rounded-xl border border-window-border bg-window shadow-window ${className}`}
+      className={`flex flex-col overflow-hidden rounded-xl border border-window-border bg-window shadow-(--window-shadow) ${className}`}
     >
       <div className="flex h-11 shrink-0 items-center gap-2 border-window-border border-b bg-window-bar px-3 sm:gap-3 sm:px-4">
         <Dots />
