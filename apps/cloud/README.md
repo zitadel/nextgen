@@ -29,11 +29,11 @@ under `/docs` ([`apps/docs/AGENTS.md`](../docs/AGENTS.md)). The website's
 scripts, styles and fonts load from `/_next/`; a page of its own beyond `/`
 needs a rewrite of its own. Its favicons are the host's: the console, the
 login UI and the docs link the same set at `/favicons/`
-([`apps/website/AGENTS.md`](../website/AGENTS.md)). The `schemas` service makes
-the URLs the server names its built-in schemas with resolve:
-`https://preview.zitadel.com/schemas/v1/user-schema.json` answers with the
-document whose `$id` it is, while the API keeps `/schemas` and `/schemas/{id}`
-(the runbook's
+([`apps/website/AGENTS.md`](../website/AGENTS.md)). The `schemas` service
+publishes the built-in schemas the server names under
+`https://zitadel.com/schemas/v1`: `/schemas/v1/user-schema.json` answers with
+the document whose `$id` is that URL, while the API keeps `/schemas` and
+`/schemas/{id}` (the runbook's
 [Built-in schemas](../../docs/runbooks/cloud.md#built-in-schemas)).
 
 The services install and build from `vercel.json` itself. The install

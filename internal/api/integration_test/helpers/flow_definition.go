@@ -16,6 +16,7 @@ func (h *Harness) EnsureFlowDefinitionService(t testing.TB) service.FlowDefiniti
 			h.EnsureServiceDB(t),
 			h.EnsureSchemaValidator(t),
 			nil,
+			BuiltinSchemaBases(),
 		)
 	}
 	return h.flowDefinitionService.value

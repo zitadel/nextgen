@@ -75,6 +75,9 @@ jobs:
       # stay apart from the Vercel builds' (the plan: "Who may write to the
       # cache"). Forks get no token.
       TURBO_CACHE: local:rw,remote:rw
+      # As in ci.yml: no Ryuk reaper, the postgres lane's only Docker Hub
+      # image. test-postgres passes TESTCONTAINERS_* through turbo's strict env.
+      TESTCONTAINERS_RYUK_DISABLED: "true"
     steps:
       # As in ci.yml: write dirty pages back early, so that Docker's container
       # creates do not wait for a backlog of several GB on Depot's EC2 runners.

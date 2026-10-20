@@ -1,11 +1,17 @@
 get:
   operationId: getMyUserSchema
   summary: Get my user schema
-  description: The schema the signed-in user's own record is validated against.
+  description: |
+    The schema the signed-in user's own record is validated against.
+
+    With `project_id`, the schema is returned only when the session belongs to
+    that project.
   tags:
     - Users
   security:
     - nextgenSession: []
+  parameters:
+    - $ref: ../../../../components/parameters/session-project-id.yaml
   responses:
     '200':
       description: The user's schema.
@@ -22,6 +28,12 @@ get:
         application/json:
           schema:
             $ref: ../../../../components/schemas/errors/auth-unauthorized.yaml
+    '403':
+      description: The session belongs to a different project than `project_id`.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/sess-project_mismatch.yaml
     '404':
       description: User referenced by the current session was not found.
       content:

@@ -815,6 +815,37 @@ func TestRequireResourceAccess(t *testing.T) {
 	assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
 }
 
+// The index holds a built-in schema under the base its row is stored at, so
+// a path id under another base must be looked up under each of them before
+// it is a miss; the first id names the resource in that miss.
+func TestRequireResourceAccessAmong(t *testing.T) {
+	const stored = "https://schemas.test/builtin/v1/default-human-user.json"
+	const asked = "https://schemas.test/builtin/v0/default-human-user.json"
+	stmts := stubAuthzStmts{
+		scopes: map[string]string{stored: "proj_a"},
+		kinds:  map[string]domain.ResourceKind{stored: domain.ResourceKindSchema},
+	}
+	operator := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+
+	projectID, err := requireResourceAccessAmong(operator, stmts, "", []string{asked, stored}, schemaAccess, opRead)
+	if err != nil {
+		t.Fatalf("twin id: %v", err)
+	}
+	if projectID != "proj_a" {
+		t.Fatalf("projectID = %q, want proj_a", projectID)
+	}
+
+	_, err = requireResourceAccessAmong(operator, stmts, "", []string{asked, "https://schemas.test/builtin/v2/default-human-user.json"}, schemaAccess, opRead)
+	assertDomainCode(t, err, domain.ErrJSONSchemaNotFound().Code)
+
+	// The one-id form is unchanged.
+	_, err = requireResourceAccess(operator, stmts, "", asked, schemaAccess, opRead)
+	assertDomainCode(t, err, domain.ErrJSONSchemaNotFound().Code)
+}
+
 func TestRequireResourceAccessWrongKind(t *testing.T) {
 	stmts := stubAuthzStmts{
 		scopes: map[string]string{"id_shared": "proj_a"},

@@ -123,7 +123,7 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			service.NewVariableService(h.EnsureServiceDB(t), h.EnsureKeyService(t)),
 			h.EnsureServiceDB(t),
 			platform.ID,
-		)
+		).WithBuiltinSchemaBases(BuiltinSchemaBases())
 	}
 	return h.handler.value
 }

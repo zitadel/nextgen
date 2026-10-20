@@ -14,6 +14,7 @@ vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clac
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import VariablesDelete from "../../../src/commands/variables/delete";
+import { DEFAULT_SERVER } from "../../../src/lib/server";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal as asPerson } from "../../helpers/terminal";
 
@@ -25,8 +26,6 @@ afterEach(() => {
   server.resetHandlers(...setupPlatformHandlers());
   resetPlatformStore();
 });
-
-const SERVER = "https://api.zitadel.cloud";
 
 async function makeProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-variables-"));
@@ -45,7 +44,7 @@ async function makeProject(): Promise<string> {
   return cwd;
 }
 
-const base = (cwd: string) => ["--cwd", cwd, "--json", "--server", SERVER];
+const base = (cwd: string) => ["--cwd", cwd, "--json", "--server", DEFAULT_SERVER];
 
 /** Writes a `zitadel.json`, for the runs that exercise server resolution. */
 async function writeConfig(cwd: string, config: unknown): Promise<void> {
@@ -53,7 +52,7 @@ async function writeConfig(cwd: string, config: unknown): Promise<void> {
 }
 
 /** The plain rendering: no `--json`. */
-const plainArgs = (cwd: string) => ["--cwd", cwd, "--server", SERVER, "--non-interactive"];
+const plainArgs = (cwd: string) => ["--cwd", cwd, "--server", DEFAULT_SERVER, "--non-interactive"];
 
 /** Run as though stdout were a terminal; under the test runner it is a pipe. */
 async function asTerminal<T>(run: () => Promise<T>): Promise<T> {
@@ -228,7 +227,7 @@ describe("variables list", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(hit).toBe(SERVER);
+    expect(hit).toBe(DEFAULT_SERVER);
   });
 
   it("prints the project and the server on a terminal, and neither on a pipe", async () => {
@@ -247,7 +246,7 @@ describe("variables list", () => {
     expect(piped.stdout).not.toContain("Server    ");
     expect(piped.stdout.trim()).toBe("A\tb");
     expect(terminal.stdout).toContain("proj_test");
-    expect(terminal.stdout).toContain(SERVER);
+    expect(terminal.stdout).toContain(DEFAULT_SERVER);
   });
 
   it("ignores a per-environment server block in zitadel.json", async () => {
@@ -258,7 +257,7 @@ describe("variables list", () => {
     // short-circuits resolution and would hide it.
     await writeConfig(cwd, {
       project: "proj_test",
-      server: SERVER,
+      server: DEFAULT_SERVER,
       environments: { prod: { server: "https://elsewhere.example" } },
     });
     let hit = "";
@@ -279,7 +278,7 @@ describe("variables list", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(hit).toBe(SERVER);
+    expect(hit).toBe(DEFAULT_SERVER);
   });
 });
 
@@ -931,7 +930,14 @@ describe("variables delete asked on a terminal", () => {
   // by running the command from source, where `input` is the one module asked.
   const deleting = (cwd: string) =>
     asPerson(() =>
-      VariablesDelete.run(["SUPPORT_EMAIL", "--project-level", "--cwd", cwd, "--server", SERVER]),
+      VariablesDelete.run([
+        "SUPPORT_EMAIL",
+        "--project-level",
+        "--cwd",
+        cwd,
+        "--server",
+        DEFAULT_SERVER,
+      ]),
     );
   const watchingDeletes = () => {
     const seen = { deleted: false };
@@ -1109,7 +1115,7 @@ describe("naming the owner", () => {
 
     const scripted = await runCliForTest(["variables", "list", ...base(cwd)]);
     const terminal = await asTerminal(() =>
-      runCliForTest(["variables", "list", "--cwd", cwd, "--json", "--server", SERVER]),
+      runCliForTest(["variables", "list", "--cwd", cwd, "--json", "--server", DEFAULT_SERVER]),
     );
 
     expect(scripted.exitCode).not.toBe(0);
