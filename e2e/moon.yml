@@ -167,7 +167,8 @@ tasks:
   # The hosted cloud's console on a deployment, which CLOUD_URL names
   # (VERCEL_AUTOMATION_BYPASS_SECRET opens its protection): how vercel.json routes
   # the console's paths, and the console signed out, down to the login widget's
-  # first step. Nothing to build or boot, no credential; the root's
+  # first step. Nothing to boot and no credential, only the test kit's build,
+  # whose helper opens the widget's closed shadow roots; the root's
   # `pnpm check:cloud` runs it beside every other deployment suite, and the
   # deployment-checks workflow runs it for every deployment. Not a dependency of
   # `all`: the config refuses to run without CLOUD_URL.
@@ -176,6 +177,8 @@ tasks:
     inputs:
       - "console/**/*"
       - "@group(laneShared)"
+    deps:
+      - "testing:build"
     options:
       cache: false
       runInCI: false
@@ -210,6 +213,7 @@ tasks:
     deps:
       - "api-mock:build"
       - "sdk-next:build"
+      - "testing:build"
     options:
       cache: false
       runInCI: "skip"
@@ -250,6 +254,7 @@ tasks:
     deps:
       - "api-mock:build"
       - "sdk-nuxt:build"
+      - "testing:build"
     options:
       cache: false
       runInCI: "skip"

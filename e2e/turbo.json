@@ -53,10 +53,12 @@
     // The hosted cloud's console on a deployment, which CLOUD_URL names
     // (VERCEL_AUTOMATION_BYPASS_SECRET opens its protection); the root's
     // `pnpm check:cloud` runs it beside every other deployment suite, and the
-    // deployment-checks workflow runs it for every deployment. Nothing to build.
-    // The Playwright config refuses to run without CLOUD_URL.
+    // deployment-checks workflow runs it for every deployment. Nothing to boot,
+    // only the test kit's build, whose helper opens the widget's closed shadow
+    // roots. The Playwright config refuses to run without CLOUD_URL.
     "console-deployment": {
       "inputs": ["console/**", "package.json", "playwright.shared.ts"],
+      "dependsOn": ["@zitadel/testing#build"],
       "cache": false,
       "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
     },
@@ -80,7 +82,7 @@
     // those need rather than a production build of the demo.
     "demo-next-mock": {
       "inputs": ["demo-next/**", "package.json", "playwright.shared.ts", "$TURBO_ROOT$/apps/demo-next/**"],
-      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/sdk-next#build"],
+      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/sdk-next#build", "@zitadel/testing#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -95,7 +97,7 @@
     },
     "demo-nuxt-mock": {
       "inputs": ["demo-nuxt/**", "package.json", "playwright.shared.ts", "$TURBO_ROOT$/apps/demo-nuxt/**"],
-      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/sdk-nuxt#build"],
+      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/sdk-nuxt#build", "@zitadel/testing#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
