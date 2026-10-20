@@ -15,6 +15,31 @@ export type Cell = string | { readonly text: string; readonly tone: Tone | "mute
 
 type Target = Writable & { columns?: number; rows?: number; isTTY?: boolean };
 
+type Question = Parameters<Asker>[0];
+
+/**
+ * Thrown by {@link Wizard.ask} when the person chooses to go back. A flow lets
+ * it travel up to the {@link Wizard.steps} run that can re-ask the previous
+ * question; nothing else should catch it.
+ */
+export class GoBack extends Error {
+  constructor() {
+    super("go back");
+    this.name = "GoBack";
+  }
+}
+
+/** What a "go back" answer is, before it is turned into {@link GoBack}. */
+const BACK = Symbol("wizard.back");
+
+/** The text a person types to go back from a question that takes text. */
+const BACK_TEXT = "<";
+
+/** One step of a flow: it asks what it needs and returns the state with the answers in. */
+export type Step<S> = (state: S) => Promise<S>;
+
+type Remembered = { index: number; state: unknown; answers: Map<string, unknown> };
+
 /**
  * A small framework for interactive flows that talk to a person, built on the
  * prompts the CLI already uses.
@@ -44,6 +69,14 @@ export class Wizard {
   private readonly rail: Rail;
   private readonly target: Target;
   private readonly base: Asker;
+  /** Questions drawn so far, so a step that asked nothing is known not to be a place to go back to. */
+  private asked = 0;
+  /** Whether going back is possible from the step running, innermost last. */
+  private readonly backAllowed: boolean[] = [];
+  /** What the running step has been answered, kept so that going back can show it again. */
+  private answers = new Map<string, unknown>();
+  /** Answers to show again after going back, by question name. */
+  private prefill = new Map<string, unknown>();
 
   /**
    * @param options.ask - The CLI's asker, with its session already filled in.
@@ -55,8 +88,22 @@ export class Wizard {
     this.rail = new Rail(this.target);
   }
 
-  /** Ask a question, drawn under the branch the flow is in. */
-  readonly ask: Asker = (question) => this.base({ ...question, output: this.rail.stream });
+  /**
+   * Ask a question, drawn under the branch the flow is in. Inside a
+   * {@link steps} run that has somewhere to go back to, a select gains a "Go
+   * back" option and a text question takes `<`; choosing either throws
+   * {@link GoBack}. A question that comes pre-answered from a flag is never
+   * drawn, so it is never offered a way back.
+   */
+  readonly ask: Asker = (async (question: Question) => {
+    const answer = await this.base({ ...this.prepared(question), output: this.rail.stream });
+    this.asked += 1;
+    if (answer === BACK) {
+      throw new GoBack();
+    }
+    this.answers.set(question.name, answer);
+    return answer;
+  }) as Asker;
 
   /** How deep the flow is: zero at the top, one more inside each branch. */
   get depth(): number {
@@ -118,6 +165,87 @@ export class Wizard {
     } finally {
       this.rail.pop();
     }
+  }
+
+  /**
+   * Run a flow as a list of steps a person can step back through.
+   *
+   * Each step asks what it needs and returns the state with its answers in.
+   * Going back from a step re-runs the previous one that asked something, with
+   * its earlier answers shown again and the state as it was before that step,
+   * so a step never sees answers from a path that was abandoned. Going back from
+   * the first step passes to the run around this one, if there is one.
+   */
+  async steps<S>(initial: S, steps: readonly Step<S>[]): Promise<S> {
+    const history: Remembered[] = [];
+    const parentAllows = this.backAllowed.at(-1) === true;
+    const outerAnswers = this.answers;
+    let state = initial;
+    let index = 0;
+    try {
+      while (index < steps.length) {
+        const before = this.asked;
+        const snapshot = state;
+        this.answers = new Map();
+        this.backAllowed.push(history.length > 0 || parentAllows);
+        try {
+          state = await (steps[index] as Step<S>)(state);
+        } catch (error) {
+          const previous = error instanceof GoBack ? history.pop() : undefined;
+          if (previous === undefined) {
+            throw error;
+          }
+          this.say("Going back.");
+          index = previous.index;
+          state = previous.state as S;
+          this.prefill = previous.answers;
+          continue;
+        } finally {
+          this.backAllowed.pop();
+        }
+        if (this.asked > before) {
+          history.push({ index, state: snapshot, answers: this.answers });
+        }
+        this.prefill = new Map();
+        index += 1;
+      }
+      return state;
+    } finally {
+      this.answers = outerAnswers;
+    }
+  }
+
+  /** The question as it is drawn: with a way back, and with an earlier answer in it. */
+  private prepared(question: Question): Question {
+    const given = "given" in question ? question.given : undefined;
+    const back = this.backAllowed.at(-1) === true && given === undefined;
+    const earlier = this.prefill.get(question.name);
+    if (question.kind === "select") {
+      return {
+        ...question,
+        ...(earlier === undefined ? {} : { initialValue: earlier }),
+        options: back ? [...question.options, { value: BACK, label: "Go back" }] : question.options,
+      };
+    }
+    if (question.kind === "text" || question.kind === "secret") {
+      const parse = question.parse;
+      return {
+        ...question,
+        ...(earlier === undefined ||
+        question.kind === "secret" ||
+        question.initialValue !== undefined
+          ? {}
+          : { initialValue: String(earlier) }),
+        ...(back
+          ? {
+              message: `${question.message} ${this.style("muted", `(${BACK_TEXT} goes back)`)}`,
+              parse: (value: string) =>
+                value.trim() === BACK_TEXT ? { ok: true as const, value: BACK } : parse(value),
+            }
+          : {}),
+      };
+    }
+    return question;
   }
 
   private write(lines: readonly string[]): void {

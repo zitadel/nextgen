@@ -14,6 +14,7 @@ import {
   IDP_PROVIDERS,
   parseClientId,
   parseClientSecret,
+  type Credentials,
   type ProviderName,
   type ProviderSelection,
   providerOf,
@@ -397,38 +398,58 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         intro(`Add "${entry.displayName}"`);
         wizard.say(registration);
       }
-      const clientId = await wizard.ask({
-        kind: "text",
-        name: `client id for ${entry.displayName}`,
-        message: "What is the OAuth client ID?",
-        flag: "--client-id",
-        parse: parseClientId,
-        given: flags["client-id"],
-        retry: retryFor("<client-id>"),
-      });
-      // Required, like the client id. The connection document references the
-      // secret as `${{ NAME }}` and the engine resolves that from the project's
-      // variables, so enabling a provider without one writes a sign-in button
-      // that fails at the token endpoint with `invalid_client` -- a failure
-      // that surfaces in a browser, not here. Refusing now is the cheaper answer.
-      const secretValue = await wizard.ask({
-        kind: "secret",
-        name: `client secret for ${scaffolded.clientSecret}`,
-        message: "What is the OAuth client secret?",
-        parse: parseClientSecret,
-        stdin: true,
-        retry: retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
-      });
-
-      // Flags that name claims are the whole answer, as `--preset` is for its
-      // question; a run nobody can answer takes the defaults.
-      const claims =
-        nonInteractive || claimsGiven
-          ? mapped
-          : claimsOrRefuse(
-              applyRequest(mapped, await askClaims(mapped, wizard, entry.displayName)),
-              "",
-            );
+      // Asked as steps, so a person can go back from the secret to the client
+      // id, or from the claims to the secret.
+      const answered = await wizard.steps<{
+        clientId?: Credentials["clientId"];
+        secret?: Credentials["secret"];
+        claims?: MappingState;
+      }>({}, [
+        async (state) => ({
+          ...state,
+          clientId: await wizard.ask({
+            kind: "text",
+            name: `client id for ${entry.displayName}`,
+            message: "What is the OAuth client ID?",
+            flag: "--client-id",
+            parse: parseClientId,
+            given: flags["client-id"],
+            retry: retryFor("<client-id>"),
+          }),
+        }),
+        // Required, like the client id. The connection document references the
+        // secret as `${{ NAME }}` and the engine resolves that from the
+        // project's variables, so enabling a provider without one writes a
+        // sign-in button that fails at the token endpoint with `invalid_client`
+        // -- a failure that surfaces in a browser, not here. Refusing now is
+        // the cheaper answer.
+        async (state) => ({
+          ...state,
+          secret: await wizard.ask({
+            kind: "secret",
+            name: `client secret for ${scaffolded.clientSecret}`,
+            message: "What is the OAuth client secret?",
+            parse: parseClientSecret,
+            stdin: true,
+            retry: retryFor(String(state.clientId), `printf '%s' "$CLIENT_SECRET" | `),
+          }),
+        }),
+        // Flags that name claims are the whole answer, as `--preset` is for its
+        // question; a run nobody can answer takes the defaults.
+        async (state) => ({
+          ...state,
+          claims:
+            nonInteractive || claimsGiven
+              ? mapped
+              : claimsOrRefuse(
+                  applyRequest(mapped, await askClaims(mapped, wizard, entry.displayName)),
+                  "",
+                ),
+        }),
+      ]);
+      const clientId = answered.clientId as NonNullable<typeof answered.clientId>;
+      const secretValue = answered.secret as NonNullable<typeof answered.secret>;
+      const claims = answered.claims as MappingState;
       if (!nonInteractive) {
         outro("Configuration captured");
       }

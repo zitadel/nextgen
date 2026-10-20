@@ -177,3 +177,231 @@ describe("Wizard", () => {
     });
   });
 });
+
+/** What a script answers: a value, or going back. */
+const BACK = Symbol("back");
+
+/**
+ * A wizard over a script. A script entry of BACK is the person going back: for
+ * a select it picks the "Go back" option, for text it types `<`. Everything the
+ * wizard asked is kept, as it was drawn.
+ */
+function scriptedWizard(script: unknown[]): { wizard: Wizard; asked: Question[] } {
+  const asked: Question[] = [];
+  const ask = (async (question: Question) => {
+    asked.push(question);
+    const next = script.shift();
+    if (question.kind === "select") {
+      if (next === BACK) {
+        return question.options.find((option) => option.label === "Go back")?.value;
+      }
+      return next;
+    }
+    if (question.kind === "text" || question.kind === "secret") {
+      const parsed = question.parse(next === BACK ? "<" : String(next));
+      if (!parsed.ok) {
+        throw new Error(parsed.problem);
+      }
+      return parsed.value;
+    }
+    return next;
+  }) as Asker;
+  return { wizard: new Wizard({ ask, output: new PassThrough() }), asked };
+}
+
+const text = (name: string, message = name): Question => ({
+  kind: "text",
+  name,
+  message,
+  parse: (value) => ({ ok: true, value }),
+});
+
+const choice = (name: string): Question => ({
+  kind: "select",
+  name,
+  message: name,
+  options: [
+    { value: "a", label: "A" },
+    { value: "b", label: "B" },
+  ],
+});
+
+describe("Wizard.steps", () => {
+  it("runs the steps in order and returns the state they build", async () => {
+    const { wizard } = scriptedWizard(["one", "two"]);
+
+    const state = await wizard.steps<Record<string, string>>({}, [
+      async (s) => ({ ...s, first: (await wizard.ask(text("first"))) as string }),
+      async (s) => ({ ...s, second: (await wizard.ask(text("second"))) as string }),
+    ]);
+
+    expect(state).toEqual({ first: "one", second: "two" });
+  });
+
+  it("goes back to the previous step and re-runs it with the state it started from", async () => {
+    const { wizard, asked } = scriptedWizard(["one", BACK, "uno", "two"]);
+    const seen: Record<string, string>[] = [];
+
+    const state = await wizard.steps<Record<string, string>>({}, [
+      async (s) => {
+        seen.push(s);
+        return { ...s, first: (await wizard.ask(text("first"))) as string };
+      },
+      async (s) => ({ ...s, second: (await wizard.ask(text("second"))) as string }),
+    ]);
+
+    expect(state).toEqual({ first: "uno", second: "two" });
+    expect(seen).toEqual([{}, {}]);
+    expect(asked.map((one) => one.name)).toEqual(["first", "second", "first", "second"]);
+  });
+
+  it("offers no way back from the first step", async () => {
+    const { wizard, asked } = scriptedWizard(["one"]);
+
+    await wizard.steps({}, [async (s) => ({ ...s, v: await wizard.ask(choice("pick")) })]);
+
+    const first = asked[0];
+    expect(first?.kind === "select" ? first.options.map((one) => one.label) : []).toEqual([
+      "A",
+      "B",
+    ]);
+  });
+
+  it("offers a Go back option on a select once there is somewhere to go back to", async () => {
+    const { wizard, asked } = scriptedWizard(["x", "a"]);
+
+    await wizard.steps({}, [
+      async (s) => ({ ...s, one: await wizard.ask(text("one")) }),
+      async (s) => ({ ...s, two: await wizard.ask(choice("two")) }),
+    ]);
+
+    const second = asked[1];
+    expect(second?.kind === "select" ? second.options.map((one) => one.label) : []).toEqual([
+      "A",
+      "B",
+      "Go back",
+    ]);
+  });
+
+  it("lets a text question take < to go back, and says so", async () => {
+    const { wizard, asked } = scriptedWizard(["x", "y"]);
+
+    await wizard.steps({}, [
+      async (s) => ({ ...s, one: await wizard.ask(text("one")) }),
+      async (s) => ({ ...s, two: await wizard.ask(text("two", "Second?")) }),
+    ]);
+
+    expect(asked[1]?.message).toContain("Second?");
+    expect(asked[1]?.message).toContain("< goes back");
+  });
+
+  it("goes back from a text question when < is typed", async () => {
+    const { wizard, asked } = scriptedWizard(["x", BACK, "x2", "y"]);
+
+    const state = await wizard.steps<Record<string, unknown>>({}, [
+      async (s) => ({ ...s, one: await wizard.ask(text("one")) }),
+      async (s) => ({ ...s, two: await wizard.ask(text("two")) }),
+    ]);
+
+    expect(state).toEqual({ one: "x2", two: "y" });
+    expect(asked.map((one) => one.name)).toEqual(["one", "two", "one", "two"]);
+  });
+
+  it("skips a step that asked nothing when going back", async () => {
+    const { wizard, asked } = scriptedWizard(["x", BACK, "x2", "y2"]);
+
+    await wizard.steps({}, [
+      async (s) => ({ ...s, one: await wizard.ask(text("one")) }),
+      async (s) => s,
+      async (s) => ({ ...s, three: await wizard.ask(text("three")) }),
+    ]);
+
+    expect(asked.map((one) => one.name)).toEqual(["one", "three", "one", "three"]);
+  });
+
+  it("shows an earlier answer again when its question is re-asked", async () => {
+    const { wizard, asked } = scriptedWizard(["x", BACK, "x2", "y"]);
+
+    await wizard.steps({}, [
+      async (s) => ({ ...s, one: await wizard.ask(text("one")) }),
+      async (s) => ({ ...s, two: await wizard.ask(text("two")) }),
+    ]);
+
+    const again = asked[2];
+    expect(again?.kind === "text" ? again.initialValue : undefined).toBe("x");
+  });
+
+  it("never shows a secret again", async () => {
+    const { wizard, asked } = scriptedWizard(["x", BACK, "x2", "hunter3"]);
+    const secret = (): Question => ({
+      kind: "secret",
+      name: "secret",
+      message: "Secret",
+      parse: (value) => ({ ok: true, value }),
+    });
+
+    await wizard.steps({}, [
+      async (s) => ({ ...s, one: await wizard.ask(text("one")) }),
+      async (s) => ({ ...s, secret: await wizard.ask(secret()) }),
+    ]);
+
+    const again = asked[3];
+    expect(
+      again?.kind === "secret" ? (again as { initialValue?: string }).initialValue : "x",
+    ).toBeUndefined();
+  });
+
+  it("does not offer a way back from a question a flag already answered", async () => {
+    const { wizard, asked } = scriptedWizard(["x"]);
+    const given: Question = { ...text("two"), given: "from-flag" } as Question;
+
+    await wizard.steps({}, [
+      async (s) => ({ ...s, one: await wizard.ask(text("one")) }),
+      async (s) => ({ ...s, two: await wizard.ask(given) }),
+    ]);
+
+    expect(asked[1]?.message).toBe("two");
+  });
+
+  it("passes a back from the first step to the run around it", async () => {
+    const { wizard, asked } = scriptedWizard(["o", BACK, "o2", "i2"]);
+
+    const state = await wizard.steps<Record<string, unknown>>({}, [
+      async (s) => ({ ...s, outer: await wizard.ask(text("outer")) }),
+      async (s) => ({
+        ...s,
+        inner: await wizard.steps<Record<string, unknown>>({}, [
+          async (t) => ({ ...t, inner: await wizard.ask(text("inner")) }),
+        ]),
+      }),
+    ]);
+
+    expect(state.outer).toBe("o2");
+    expect(asked.map((one) => one.name)).toEqual(["outer", "inner", "outer", "inner"]);
+  });
+
+  it("says it is going back", async () => {
+    const sink = new PassThrough();
+    let drawn = "";
+    sink.on("data", (chunk) => {
+      drawn += chunk.toString();
+    });
+    const script: unknown[] = ["x", BACK, "x2", "y"];
+    const wizard = new Wizard({
+      ask: (async (question: Question) => {
+        const next = script.shift();
+        const parsed =
+          question.kind === "text" ? question.parse(next === BACK ? "<" : String(next)) : undefined;
+        return parsed?.ok ? parsed.value : undefined;
+      }) as Asker,
+      output: sink,
+    });
+
+    await wizard.steps({}, [
+      async (s) => ({ ...s, one: await wizard.ask(text("one")) }),
+      async (s) => ({ ...s, two: await wizard.ask(text("two")) }),
+    ]);
+
+    expect(drawn).toContain("Going back.");
+  });
+});

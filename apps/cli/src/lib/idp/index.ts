@@ -93,7 +93,7 @@ export { callbackUriFor } from "./callback";
 
 export { registrationLines } from "./registration";
 
-export { askScopes } from "./scopes";
+export { askScopes, parseScopeToken } from "./scopes";
 
 export { askConnectionEndpoints } from "./endpoints";
 

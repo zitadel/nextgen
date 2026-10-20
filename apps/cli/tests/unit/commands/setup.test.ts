@@ -18,6 +18,7 @@ vi.mock("../../../src/commands/setup/prompts", async (importOriginal) => ({
 import { confirm, intro, isCancel, multiselect, select, text } from "@clack/prompts";
 
 import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
+import { Wizard } from "../../../src/lib/wizard";
 import {
   localServerHostsPlatform,
   retryOptionsFromFlags,
@@ -1023,7 +1024,7 @@ describe("a custom provider named with --sso", () => {
 
     expect(askCustomSettings).toHaveBeenCalledWith(
       expect.objectContaining({ slug: "acme-sso" }),
-      ask,
+      expect.any(Wizard),
     );
   });
 

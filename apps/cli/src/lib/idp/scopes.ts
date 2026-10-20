@@ -1,67 +1,120 @@
-import { parseScopes } from "@zitadel/config/idp";
+import { type Parsed, parseScopes } from "@zitadel/config/idp";
 
-import type { Asker } from "../input";
+import { GoBack, type Wizard } from "../wizard";
 
-import { parseScopeList } from "./claims";
+/** What every connection asks for, so it is stated rather than offered. */
+const ALWAYS_ASKED = ["openid", "profile", "email"] as const;
 
-/** The scopes OpenID Connect defines, with what each one makes a provider send. */
-const STANDARD_SCOPES = [
-  { value: "openid", label: "openid", hint: "required: it makes the provider send an ID token" },
-  { value: "profile", label: "profile", hint: "name, picture, locale and similar" },
-  { value: "email", label: "email", hint: "email and whether it is verified" },
-  { value: "phone", label: "phone", hint: "phone number and whether it is verified" },
-  { value: "address", label: "address", hint: "postal address" },
-  { value: "offline_access", label: "offline_access", hint: "a refresh token" },
-] as const;
+const ok = <T>(value: T): Parsed<T> => ({ ok: true, value });
+const refuse = (problem: string): Parsed<never> => ({ ok: false, problem });
 
-/** What a connection asks for unless told otherwise. */
-const DEFAULT_CHOICES = ["openid", "profile", "email"];
+/** Printable ASCII except space, the double quote and the backslash. */
+function isScopeCharacter(code: number): boolean {
+  return code === 0x21 || (code >= 0x23 && code <= 0x5b) || (code >= 0x5d && code <= 0x7e);
+}
+
+/**
+ * One scope as typed. OAuth 2.0 (RFC 6749, 3.3) defines a scope as a run of
+ * printable characters without a space, a double quote or a backslash, so
+ * that is what is checked. It must not already be asked for.
+ */
+export function parseScopeToken(value: string, taken: readonly string[]): Parsed<string> {
+  const scope = value.trim();
+  if (scope === "") {
+    return refuse("Enter a scope.");
+  }
+  if (![...scope].every((char) => isScopeCharacter(char.charCodeAt(0)))) {
+    return refuse(
+      "A scope is one word of printable characters, without spaces, quotes or backslashes.",
+    );
+  }
+  return taken.includes(scope) ? refuse(`"${scope}" is already asked for.`) : ok(scope);
+}
 
 /**
  * The scopes a custom connection asks its provider for, as the text `--scopes`
  * takes.
  *
- * Given on the command line they are only checked. Otherwise a person ticks the
- * standard ones, then adds any the provider documents beyond them (`groups`,
- * `employee`). `openid` is always asked for: without it the provider sends no
- * ID token.
+ * Given on the command line they are only checked. Otherwise `openid`,
+ * `profile` and `email` are stated as always asked for, and a person adds any
+ * others the provider documents, one at a time, each checked as it is typed.
+ * One at a time because a list typed into one line is easy to get wrong and
+ * cannot be checked scope by scope. Going back from "any more?" re-asks the
+ * scope just added.
  *
- * @param provider - How the provider is named in the question.
+ * @param provider - How the provider is named in messages.
  */
 export async function askScopes(
-  ask: Asker,
+  wizard: Wizard,
   provider: string,
   given: string | undefined,
 ): Promise<string> {
   if (given !== undefined) {
-    return (
-      await ask({
-        kind: "text",
-        name: "scopes",
-        message: "Which scopes should be asked for?",
-        parse: parseScopes,
-        given,
-      })
-    ).join(" ");
+    const scopes = await wizard.ask({
+      kind: "text",
+      name: "scopes",
+      message: "Which scopes should be asked for?",
+      parse: parseScopes,
+      given,
+    });
+    return scopes.join(" ");
   }
-  const chosen = await ask({
-    kind: "multiselect",
-    name: "scopes",
-    message: `Which scopes should "${provider}" be asked for?`,
-    options: STANDARD_SCOPES.map((scope) => ({ ...scope })),
-    initialValues: DEFAULT_CHOICES,
-    required: true,
-  });
-  const extra = await ask({
-    kind: "text",
-    name: "additional scopes",
-    message: "Would you like to ask for any additional scopes? Leave blank for none.",
-    placeholder: "groups employee",
-    parse: parseScopeList,
-  });
-  const scopes = parseScopes(["openid", ...chosen, ...extra].join(" "));
-  if (!scopes.ok) {
-    throw new Error(scopes.problem);
+
+  wizard.say(
+    `"${provider}" is always asked for the scopes ${ALWAYS_ASKED.slice(0, -1).join(", ")} and ${ALWAYS_ASKED.at(-1)}.`,
+  );
+  const added: string[] = [];
+  let reask: string | undefined;
+  for (;;) {
+    if (reask === undefined) {
+      let more: boolean;
+      try {
+        more = await wizard.ask({
+          kind: "select",
+          name: "more scopes",
+          message:
+            added.length === 0
+              ? "Would you like to ask for any additional scopes?"
+              : "Would you like to ask for any more additional scopes?",
+          options: [
+            { value: false, label: "No" },
+            { value: true, label: "Yes, add a scope" },
+          ],
+          initialValue: false,
+        });
+      } catch (error) {
+        const last = added.pop();
+        if (!(error instanceof GoBack) || last === undefined) {
+          throw error;
+        }
+        reask = last;
+        continue;
+      }
+      if (!more) {
+        break;
+      }
+    }
+    const previous = reask;
+    reask = undefined;
+    try {
+      added.push(
+        await wizard.ask({
+          kind: "text",
+          name: "scope",
+          message: "Which scope should be added?",
+          placeholder: "groups",
+          ...(previous === undefined ? {} : { initialValue: previous }),
+          parse: (value) => parseScopeToken(value, [...ALWAYS_ASKED, ...added]),
+        }),
+      );
+    } catch (error) {
+      if (!(error instanceof GoBack)) {
+        throw error;
+      }
+      if (previous !== undefined) {
+        added.push(previous);
+      }
+    }
   }
-  return scopes.value.join(" ");
+  return [...ALWAYS_ASKED, ...added].join(" ");
 }

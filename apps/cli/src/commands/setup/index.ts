@@ -414,11 +414,13 @@ export default class Setup extends BaseCommand {
       if (!scaffoldedFramework || flags.framework !== undefined) {
         intro("Zitadel setup");
       }
+      const wizard = new Wizard({ ask: wizardInput });
       if (foundApp !== undefined) {
-        new Wizard({ ask: wizardInput }).say(foundApp);
+        wizard.say(foundApp);
       }
       const promptCtx = {
-        input: wizardInput,
+        input: wizard.ask,
+        wizard,
         framework: { id: app.framework },
         cwd,
         frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
@@ -429,9 +431,12 @@ export default class Setup extends BaseCommand {
         ssoFromFlag: flags.sso !== undefined,
         developmentBuild: isDevelopmentBuild(),
       };
-      for (const prompt of SETUP_PROMPTS) {
-        answers = await prompt.ask(answers, promptCtx);
-      }
+      // Each question is a step a person can go back from, so a mistake three
+      // questions ago does not mean starting again.
+      answers = await wizard.steps(
+        answers,
+        SETUP_PROMPTS.map((prompt) => (state: SetupAnswers) => prompt.ask(state, promptCtx)),
+      );
       outro("Configuration captured");
     }
 
@@ -1204,7 +1209,7 @@ export async function ssoFromFlags(
   const selection = selectionFromFlags(
     flags.sso,
     flags.sso === CUSTOM_PROVIDER && !nonInteractive
-      ? await askCustomSettings(customValues, ask)
+      ? await askCustomSettings(customValues, new Wizard({ ask }))
       : customValues,
     SETUP_FLAG_NAMES,
     SSO_CUSTOM_EXAMPLE,

@@ -10,6 +10,7 @@ import {
 
 import type { ClaimRequest } from "../../../lib/idp";
 import type { Asker } from "../../../lib/input";
+import type { Wizard } from "../../../lib/wizard";
 import type { FrameworkFacts } from "../../../lib/orca";
 
 /**
@@ -100,6 +101,12 @@ export type SetupAnswers = {
 
 /** Read-only facts a prompt may need. */
 export type PromptContext = {
+  /**
+   * The wizard the flow is drawn on, when the command runs it as steps a
+   * person can go back through. A prompt without one makes its own over
+   * {@link PromptContext.input}.
+   */
+  readonly wizard?: Wizard;
   /** Where the wizard draws, left out for the terminal. Only a test sets it. */
   readonly wizardOutput?: Writable;
   /**
