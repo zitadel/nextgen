@@ -752,6 +752,104 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
   });
 });
 
+/** A string some script could read, and the path of property accesses that reaches it. */
+interface Reached {
+  readonly path: string;
+  readonly value: string;
+}
+
+/**
+ * Every string reachable from `root` the way a script on the page would reach
+ * it: through own properties and through the accessors of the root's class chain
+ * (below `HTMLElement`), then through the values of arrays, maps, sets and
+ * plain objects, to `maxDepth`. DOM nodes other than the root are not entered,
+ * since reaching a node's contents is the open shadow root's business, and
+ * methods are not called. An ES-private (`#`) field is invisible to it, as it is
+ * to a page; a TypeScript-only `private` member is not.
+ */
+function reachableStrings(root: object, maxDepth = 8): Reached[] {
+  const found: Reached[] = [];
+  const visited = new WeakSet<object>();
+  const walk = (value: unknown, path: string, depth: number): void => {
+    if (typeof value === "string") {
+      found.push({ path, value });
+      return;
+    }
+    if (typeof value !== "object" || value === null || depth > maxDepth || visited.has(value)) {
+      return;
+    }
+    visited.add(value);
+    if (value !== root && value instanceof Node) return;
+    if (value instanceof Map) {
+      for (const [key, entry] of value) {
+        walk(key, `${path}.<key>`, depth + 1);
+        walk(entry, `${path}.<${String(key)}>`, depth + 1);
+      }
+      return;
+    }
+    if (value instanceof Set || Array.isArray(value)) {
+      for (const entry of value) walk(entry, `${path}[]`, depth + 1);
+      return;
+    }
+    for (const key of Object.getOwnPropertyNames(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      const entry = descriptor?.get ? descriptor.get.call(value) : descriptor?.value;
+      walk(entry, `${path}.${key}`, depth + 1);
+    }
+    for (
+      let proto = Object.getPrototypeOf(value);
+      proto && proto !== Object.prototype && proto !== HTMLElement.prototype;
+      proto = Object.getPrototypeOf(proto)
+    ) {
+      for (const key of Object.getOwnPropertyNames(proto)) {
+        const getter = Object.getOwnPropertyDescriptor(proto, key)?.get;
+        if (getter) walk(getter.call(value), `${path}.${key}`, depth + 1);
+      }
+    }
+  };
+  walk(root, "host", 0);
+  return found;
+}
+
+describe("reachableStrings", () => {
+  class Holder {
+    ownField = "own-canary";
+    private tsPrivate = "ts-private-canary";
+    readonly nested = { list: ["list-canary"], map: new Map([["k", "map-canary"]]) };
+    readonly set = new Set(["set-canary"]);
+    #esPrivate = "es-private-canary";
+    get accessor(): string {
+      return `${this.#esPrivate.length}accessor-canary`;
+    }
+    reveal(): string {
+      return this.tsPrivate;
+    }
+  }
+
+  it("finds what a page script could read, and not an ES-private field", () => {
+    const reached = reachableStrings(new Holder()).map((entry) => entry.value);
+
+    expect(reached).toEqual(
+      expect.arrayContaining([
+        "own-canary",
+        "ts-private-canary",
+        "list-canary",
+        "map-canary",
+        "set-canary",
+        "17accessor-canary",
+      ]),
+    );
+    expect(reached).not.toContain("es-private-canary");
+  });
+
+  it("does not enter DOM nodes below the root", () => {
+    const holder = Object.assign(new Holder(), { child: document.createElement("div") });
+    Object.assign(holder.child, { planted: "node-canary" });
+
+    expect(reachableStrings(holder).map((entry) => entry.value)).not.toContain("node-canary");
+  });
+});
+
 /**
  * What a script on the page can observe while a visitor signs in.
  *
@@ -798,6 +896,8 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
     readonly stage: string;
     readonly detail: string;
     readonly data: string | null | undefined;
+    /** What a page listener gets as `event.target`: the retargeted host. */
+    readonly target: EventTarget | null;
   }
 
   function step(name: string, fields: CreateFlow201Step["fields"]): CreateFlow201 {
@@ -855,6 +955,7 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
   let stub: ReturnType<typeof installFlowFetchStub>;
   let observations: Observation[];
   let stage: string;
+  let reachedDuringEvents: Reached[];
   let stopObserving: () => void;
   let credentials: PropertyDescriptor | undefined;
 
@@ -867,17 +968,22 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
 
     observations = [];
     stage = "start";
+    reachedDuringEvents = [];
     const stops: (() => void)[] = [];
     for (const target of [window, document]) {
       for (const capture of [true, false]) {
         for (const type of EVENT_TYPES) {
           const listener = (event: Event): void => {
+            if (target === window && capture && event.target !== null) {
+              reachedDuringEvents.push(...canaryHits(event.target));
+            }
             observations.push({
               type,
               byWidget: !event.isTrusted && !(event.composedPath()[0] instanceof HTMLInputElement),
               stage,
               detail: event instanceof CustomEvent ? JSON.stringify(event.detail) : "",
               data: event instanceof InputEvent ? event.data : undefined,
+              target: event.target,
             });
           };
           target.addEventListener(type, listener, capture);
@@ -937,6 +1043,25 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
     button.click();
   }
 
+  /** The session tokens the stubbed server hands out; none may be reachable from the host. */
+  const SESSION_TOKENS = ["tok_identifier", "tok_password", "tok_register", "tok_2"];
+
+  /** The secrets and tokens a script holding `target` can reach. */
+  function canaryHits(target: object): Reached[] {
+    return reachableStrings(target).filter((entry) =>
+      [...SECRETS, ...SESSION_TOKENS].some((canary) => entry.value.includes(canary)),
+    );
+  }
+
+  /** What a script holding the host, or an event's retargeted target, can reach. */
+  function reachableFromHost(element: object): Reached[] {
+    const targets = new Set<object>([element]);
+    for (const observation of observations) {
+      if (observation.target !== null) targets.add(observation.target);
+    }
+    return [...targets].flatMap(canaryHits);
+  }
+
   function leaks(observation: Observation): string[] {
     const haystack = `${observation.detail}${observation.data ?? ""}`;
     return SECRETS.flatMap((secret) =>
@@ -945,6 +1070,26 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
       ).filter((prefix) => haystack.includes(prefix)),
     );
   }
+
+  it("exposes no member on the host that hands back the values, the atoms or the flow", () => {
+    const element = document.createElement("zitadel-login");
+    const names = Object.getOwnPropertyNames(element);
+    for (
+      let proto = Object.getPrototypeOf(element);
+      proto && proto !== HTMLElement.prototype;
+      proto = Object.getPrototypeOf(proto)
+    ) {
+      names.push(...Object.getOwnPropertyNames(proto));
+    }
+
+    expect(
+      names.filter((name) =>
+        /^(response|formValues?|fieldAtoms|collect.*|(get|read|serialize).*(Values?|Fields))$|Atoms?$/.test(
+          name,
+        ),
+      ),
+    ).toEqual([]);
+  });
 
   it("shows the page no secret across a whole sign-in and sign-up", async () => {
     const element = document.createElement("zitadel-login");
@@ -960,6 +1105,7 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
     stage = "password";
     const typed = await focusField(element, "password");
     await userEvent.keyboard(PASSWORD);
+    const reachedWhileTyping = reachableFromHost(element);
     await userEvent.keyboard("{Backspace}{Backspace}");
     await userEvent.keyboard(PASSWORD.slice(-2));
     const toggle = await waitFor(() =>
@@ -984,6 +1130,7 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
     typed.value = AUTOFILLED;
     typed.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
     typed.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+    const reachedAfterAutofill = reachableFromHost(element);
     await submitStep(element);
 
     stage = "register";
@@ -1013,6 +1160,16 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
     element.shadowRoot?.appendChild(passkey);
     await waitFor(() => (stub.calls.length >= 5 ? stub.calls : null));
     expect(String(stub.calls[4]?.init?.body)).toContain("challenge_response");
+
+    expect(reachedWhileTyping).toEqual([]);
+    expect(reachedDuringEvents).toEqual([]);
+    expect(reachedAfterAutofill).toEqual([]);
+    expect(reachableFromHost(element)).toEqual([]);
+    expect(
+      observations.every(
+        (observation) => observation.target === element || observation.target === null,
+      ),
+    ).toBe(true);
 
     const seen = observations.filter((observation) => observation.byWidget);
     expect(seen.length).toBeGreaterThan(0);

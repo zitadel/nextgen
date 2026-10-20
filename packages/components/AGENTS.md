@@ -71,13 +71,41 @@ and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM.
 
 ## Secrets and events
 
-Events that cross the shadow boundary must never carry secret values. An event
-that carries a field value or a credential and is only for the widget itself
-(`zl-input`, `zl-change`, `zl-passkey-result`) is emitted `{ composed: false }`, so no page
-script sees it, capture phase included. A public event carries a value only for
-a field `isDisclosable` allows. The "what the page can observe" test in
-`src/orchestrator/zitadel-login.browser.spec.ts` enforces it across a whole
-sign-in with real typing; extend it when you add an event or a kind of field.
+Nothing a page script can reach from the host element may hold or return a
+secret. Three rules keep that true:
+
+- Events that cross the shadow boundary never carry secret values. An event that
+  carries a field value or a credential and is only for the widget itself
+  (`zl-input`, `zl-change`, `zl-passkey-result`) is emitted `{ composed: false }`,
+  so no page script sees it, capture phase included. A public event carries a
+  value only for a field `isDisclosable` allows.
+- A host's state that holds a typed value or a token (`response` with the flow's
+  session token, `formValues`) is an ES-private (`#`) field, and so is every
+  helper that returns atoms or values (`#fieldAtoms`, `#collectSubmitFields`).
+  TypeScript's `private` is gone at runtime, and the host is what `querySelector`
+  and every event's retargeted `event.target` hand to a script. Lit's decorators
+  cannot declare a `#` field, so its setter calls `requestUpdate` itself.
+- `<zitadel-session>` and `<zitadel-logout>` hold no credential: their state is
+  the signed-in identity the widget shows and a project handle, and the session
+  is a cookie the script cannot read.
+
+The "what the page can observe" tests in
+`src/orchestrator/zitadel-login.browser.spec.ts` enforce this across a whole
+sign-in with real typing: they capture every event the widget can emit in both
+phases, scan everything reachable from the host and from each event's target for
+the typed values and session tokens, and check the host exposes no member named
+for values, atoms or the flow. Extend them when you add an event, a kind of
+field, or state on a widget.
+
+What this does not cover is anything the browser or an open shadow root gives a
+script: an atom's `value`, `formValue` and `<input>` through an open `shadowRoot`
+or an event's `composedPath()`; the browser's own keyboard, `beforeinput`,
+`textInput` and `input` events (nulling `data` on the `input` a field re-publishes
+is defence in depth, it gives nothing against a script listening to those); and
+`getSelection().toString()`, which reads a non-password text field (a PIN, a card
+number) after a user, or `execCommand("selectAll")`, selects its text. Closing
+the shadow roots in production narrows the first of these and is tracked
+separately.
 
 ## Tests
 

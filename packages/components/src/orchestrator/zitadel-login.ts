@@ -326,7 +326,28 @@ export class ZitadelLogin extends ZitadelSurface {
     | Readonly<Record<string, Partial<Locale>>>
     | undefined;
 
-  @state() private accessor response: CreateFlow201 | null = null;
+  /**
+   * The flow state, with the flow's session token. ES-private, not a `private`
+   * member: TypeScript's `private` is gone at runtime, and anything on the page
+   * can reach the host element, or the host an event is retargeted to. Lit's
+   * decorators cannot declare an ES-private field, so the setter requests the
+   * update itself, naming `response` so `updated()` still sees the old value.
+   */
+  #responseState: CreateFlow201 | null = null;
+
+  get #response(): CreateFlow201 | null {
+    return this.#responseState;
+  }
+
+  set #response(next: CreateFlow201 | null) {
+    const previous = this.#responseState;
+    if (previous === next) return;
+    this.#responseState = next;
+    // Lit keeps the old value in `_$changedProperties` until the update runs,
+    // and a listener on the event the new step emits would read it there. `updated`
+    // only asks whether there was a previous response, so that is all it gets.
+    this.requestUpdate("response", previous === null ? null : true);
+  }
 
   @state() private accessor branding: Branding | undefined = undefined;
 
@@ -337,13 +358,27 @@ export class ZitadelLogin extends ZitadelSurface {
 
   @state() private accessor startupError: string | null = null;
 
-  @state() private accessor formValues: Record<string, string> = {};
+  /**
+   * Every value the visitor has typed, passwords included. ES-private for the
+   * reason {@link ZitadelLogin.#response} is: no property of the host, or of an
+   * event's retargeted target, may hand a page script a secret.
+   */
+  #formValuesState: Record<string, string> = {};
+
+  get #formValues(): Record<string, string> {
+    return this.#formValuesState;
+  }
+
+  set #formValues(next: Record<string, string>) {
+    this.#formValuesState = next;
+    this.requestUpdate();
+  }
 
   /**
    * The step the server served, kept while previewing so every preview state
    * derives from the same response rather than from the last one shown.
    */
-  private previewBase: CreateFlow201 | null = null;
+  #previewBase: CreateFlow201 | null = null;
 
   /**
    * Set while the next commit repaints a preview state, so `updated` treats
@@ -502,16 +537,16 @@ export class ZitadelLogin extends ZitadelSurface {
     }
     const previewChanged =
       changed.has("previewState") || (changed.has("previewSuccessStep") && this.preview !== "");
-    if (previewChanged && this.response) {
+    if (previewChanged && this.#response) {
       // A flow already on screen becomes the base when preview is switched on
       // after mount; leaving preview restores it as it was served and lets
       // the flow run for real from there.
-      this.previewBase ??= this.response;
+      this.#previewBase ??= this.#response;
       this.applyPreviewState();
-      if (!this.preview) this.previewBase = null;
+      if (!this.preview) this.#previewBase = null;
       // A preview holds no history entry; a flow resumed from one takes the
       // entry its step calls for.
-      this.syncBackSentinel(this.preview ? null : this.response.step);
+      this.syncBackSentinel(this.preview ? null : this.#response.step);
     }
     this.applySurfaceTheme(this.branding);
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
@@ -652,10 +687,10 @@ export class ZitadelLogin extends ZitadelSurface {
     // `completing` holds the loader through the terminal step: painting a
     // success screen the host immediately navigates away from shows the user
     // two confirmations for one sign-in.
-    if (!this.response || !this.engine || this.completing) {
+    if (!this.#response || !this.engine || this.completing) {
       return html`<slot name="loader"></slot>`;
     }
-    const rendered = this.injectAttribution(this.renderStep(this.response.step, this.engine));
+    const rendered = this.injectAttribution(this.renderStep(this.#response.step, this.engine));
     return html`<form
       class="zl-mount"
       part="form"
@@ -682,7 +717,7 @@ export class ZitadelLogin extends ZitadelSurface {
    * that lands on it is handed to the step's first control.
    */
   private renderPairedIdentifier() {
-    const identifier = this.response?.step.identifier;
+    const identifier = this.#response?.step.identifier;
     if (!identifier?.value) return nothing;
     return html`<input
       type="text"
@@ -850,7 +885,7 @@ export class ZitadelLogin extends ZitadelSurface {
    * completion must not react to it.
    */
   private applyPreviewState(): void {
-    const base = this.previewBase;
+    const base = this.#previewBase;
     if (!base) return;
     const state = this.preview;
     this.stepErrorDismissed = false;
@@ -858,9 +893,9 @@ export class ZitadelLogin extends ZitadelSurface {
     const next = previewResponse(base, state, this.previewSuccessStep || "done");
     // Same object for `default` right after the start: no repaint to flag,
     // and the initial paint keeps its own focus rule.
-    if (next === this.response) return;
+    if (next === this.#response) return;
     this.previewRepaint = true;
-    this.response = next;
+    this.#response = next;
   }
 
   /**
@@ -875,7 +910,7 @@ export class ZitadelLogin extends ZitadelSurface {
     this.resumeFlowId = "";
     // Values typed into the refused flow (a password included) must not be
     // merged into the fresh step and submitted on a new attempt.
-    this.formValues = {};
+    this.#formValues = {};
     clearFlowIdFromLocation();
     await this.startFlow();
     return true;
@@ -915,7 +950,7 @@ export class ZitadelLogin extends ZitadelSurface {
     // turn later, and by then the terminal screen has already painted. A
     // preview navigates nowhere, so it never holds the loader for it.
     this.completing = !preview && navigatesOnComplete(wire, this.postSignInUrl);
-    this.response = wire;
+    this.#response = wire;
     const { branding, issues } = validateBranding(wire.branding, {
       renderingOrigin: this.ownerDocument.location.origin,
     });
@@ -926,13 +961,13 @@ export class ZitadelLogin extends ZitadelSurface {
     }
     // Defaults seed every declared field; existing entries (typed input,
     // carry-over from prior steps) win on conflict.
-    this.formValues = { ...collectInitialValues(wire.step), ...this.formValues };
+    this.#formValues = { ...collectInitialValues(wire.step), ...this.#formValues };
 
     // A preview never leaves the step it shows: it takes no history entry,
     // makes no trip to a provider, exchanges no handoff and tells no host the
     // visitor signed in. The served step becomes what its states derive from.
     if (preview) {
-      this.previewBase = wire;
+      this.#previewBase = wire;
       return;
     }
 
@@ -1165,9 +1200,9 @@ export class ZitadelLogin extends ZitadelSurface {
    * `family_name` when the register step ran.
    */
   private deriveIdentity(): FlowIdentity | null {
-    const email = this.formValues.email?.trim();
-    const given = this.formValues.given_name?.trim();
-    const family = this.formValues.family_name?.trim();
+    const email = this.#formValues.email?.trim();
+    const given = this.#formValues.given_name?.trim();
+    const family = this.#formValues.family_name?.trim();
     const display = [given, family].filter(Boolean).join(" ").trim();
     if (!email && !display) return null;
     return {
@@ -1177,17 +1212,17 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /** All rendered input atoms exposing the `formValue` contract. */
-  private fieldAtoms(): FieldAtom[] {
+  #fieldAtoms(): FieldAtom[] {
     const root = this.shadowRoot;
     if (!root) return [];
     return Array.from(root.querySelectorAll<HTMLElement>("[name]")).filter(isFieldAtom);
   }
 
   private applyValuesToFields(): void {
-    for (const atom of this.fieldAtoms()) {
+    for (const atom of this.#fieldAtoms()) {
       const name = atom.getAttribute("name");
       if (!name) continue;
-      const next = this.formValues[name];
+      const next = this.#formValues[name];
       if (next !== undefined && atom.formValue !== next) {
         atom.formValue = next;
       }
@@ -1202,12 +1237,12 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private missingRequiredFields(): string[] {
     const values = new Map<string, string>();
-    for (const atom of this.fieldAtoms()) {
+    for (const atom of this.#fieldAtoms()) {
       const name = atom.getAttribute("name");
       if (name) values.set(name, atom.formValue);
     }
-    return this.response
-      ? requiredFieldNames(this.response.step).filter((name) => (values.get(name) ?? "") === "")
+    return this.#response
+      ? requiredFieldNames(this.#response.step).filter((name) => (values.get(name) ?? "") === "")
       : [];
   }
 
@@ -1219,13 +1254,13 @@ export class ZitadelLogin extends ZitadelSurface {
    * the same keys (both submit entry points fire on one click) is a no-op.
    */
   private reportRequiredErrors(fields: readonly string[]): void {
-    if (!this.response) return;
+    if (!this.#response) return;
     const errorKey = fields.map((name) => `error.${name}_required`).join("; ");
-    if (this.response.step.error === errorKey) return;
+    if (this.#response.step.error === errorKey) return;
     this.stepErrorDismissed = false;
-    this.response = {
-      ...this.response,
-      step: { ...this.response.step, error: errorKey },
+    this.#response = {
+      ...this.#response,
+      step: { ...this.#response.step, error: errorKey },
     };
   }
 
@@ -1238,17 +1273,17 @@ export class ZitadelLogin extends ZitadelSurface {
    * field-less payload. Captured values are folded into `formValues` for
    * cross-step identity (the signed-in greeting) and post-error restoration.
    */
-  private collectSubmitFields(): SubmitFlowStepBodyFields {
+  #collectSubmitFields(): SubmitFlowStepBodyFields {
     const current = new Map<string, string>();
-    for (const atom of this.fieldAtoms()) {
+    for (const atom of this.#fieldAtoms()) {
       const name = atom.getAttribute("name");
       if (name) current.set(name, atom.formValue);
     }
     if (current.size > 0) {
-      this.formValues = { ...this.formValues, ...Object.fromEntries(current) };
+      this.#formValues = { ...this.#formValues, ...Object.fromEntries(current) };
     }
     const fields: SubmitFlowStepBodyFields = {};
-    for (const f of this.response?.step.fields ?? []) {
+    for (const f of this.#response?.step.fields ?? []) {
       const value = current.get(f.name) ?? "";
       // A `checkbox` maps to a JSON `boolean` schema property. The atom carries
       // its value token when checked and "" when unchecked (native-checkbox
@@ -1290,10 +1325,10 @@ export class ZitadelLogin extends ZitadelSurface {
     if (!event.detail) return;
     const { name, value } = event.detail;
     if (!name) return;
-    this.formValues = { ...this.formValues, [name]: value };
+    this.#formValues = { ...this.#formValues, [name]: value };
     this.syncFieldElementValue(name, value);
     this.clearStaleErrors(name);
-    const field = this.response?.step.fields?.find((f) => f.name === name);
+    const field = this.#response?.step.fields?.find((f) => f.name === name);
     const detail: ZitadelFlowInputEventDetail = isDisclosable(field)
       ? { name, secret: false, value }
       : { name, secret: true };
@@ -1315,7 +1350,7 @@ export class ZitadelLogin extends ZitadelSurface {
     if (!name) return;
     const atom = event.target;
     if (atom instanceof HTMLElement && isFieldAtom(atom)) {
-      this.formValues = { ...this.formValues, [name]: atom.formValue };
+      this.#formValues = { ...this.#formValues, [name]: atom.formValue };
     }
     this.clearStaleErrors(name);
   };
@@ -1335,7 +1370,7 @@ export class ZitadelLogin extends ZitadelSurface {
    * Imperative on purpose; see {@link stepErrorDismissed}.
    */
   private clearStaleErrors(fieldName: string): void {
-    if (!this.response?.step.error) return;
+    if (!this.#response?.step.error) return;
     const root = this.shadowRoot;
     if (!root) return;
     if (!this.stepErrorDismissed) {
@@ -1357,7 +1392,7 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /** Mirror a value onto the matching rendered atom (used after atom events). */
   private syncFieldElementValue(name: string, value: string): void {
-    for (const atom of this.fieldAtoms()) {
+    for (const atom of this.#fieldAtoms()) {
       if (atom.getAttribute("name") === name && atom.formValue !== value) {
         atom.formValue = value;
       }
@@ -1445,7 +1480,7 @@ export class ZitadelLogin extends ZitadelSurface {
    * an error message so the user sees feedback and can retry or skip.
    *
    * Guard: if the step already carries the same error key, skip the update.
-   * Mutating `this.response` triggers `unsafeHTML` to replace the DOM tree,
+   * Mutating `this.#response` triggers `unsafeHTML` to replace the DOM tree,
    * which reconnects a fresh `<zl-passkey>` that immediately re-starts the
    * ceremony — creating an infinite loop. The guard breaks the cycle.
    *
@@ -1461,20 +1496,20 @@ export class ZitadelLogin extends ZitadelSurface {
       timed_out?: boolean;
     }>,
   ): void => {
-    if (!this.response) return;
+    if (!this.#response) return;
     const { error: message, aborted, timed_out: timedOut } = event.detail;
     const errorKey = timedOut
       ? "error.passkey_timeout"
       : aborted
         ? "error.passkey_cancelled"
         : "error.passkey_failed";
-    if (this.response.step.error === errorKey) return;
+    if (this.#response.step.error === errorKey) return;
     // This path replaces the response without going through applyResponse;
     // the fresh error must not start life dismissed.
     this.stepErrorDismissed = false;
-    const { challenge: _dropped, ...stepWithoutChallenge } = this.response.step;
-    this.response = {
-      ...this.response,
+    const { challenge: _dropped, ...stepWithoutChallenge } = this.#response.step;
+    this.#response = {
+      ...this.#response,
       step: { ...stepWithoutChallenge, error: errorKey },
     };
     console.warn(
@@ -1502,7 +1537,7 @@ export class ZitadelLogin extends ZitadelSurface {
     const root = this.shadowRoot;
     if (!root) return;
     const focusables = fieldsOnly
-      ? this.fieldAtoms()
+      ? this.#fieldAtoms()
       : Array.from(
           root.querySelectorAll<HTMLElement>("zl-field, zl-select, zl-checkbox, zl-button"),
         );
@@ -1522,15 +1557,15 @@ export class ZitadelLogin extends ZitadelSurface {
   ): Promise<void> {
     // Every other entry point (actions, back, passkey proofs) lands here, so
     // this one check keeps a preview from ever writing to the flow.
-    if (!this.response || this.loading || this.preview) return;
-    const { id, session_token } = this.response;
+    if (!this.#response || this.loading || this.preview) return;
+    const { id, session_token } = this.#response;
     this.loading = true;
     try {
       // Only send field values the current step defines. `formValues` carries
       // state across steps (e.g. email for the signed-in greeting), but
       // collectSubmitFields keys off the step's declared fields, so a step
       // without fields yields an empty map and never leaks prior values.
-      const fields = this.collectSubmitFields();
+      const fields = this.#collectSubmitFields();
       const body: SubmitFlowStepBody = {
         session_token,
         action: action ?? "submit",
@@ -1592,7 +1627,7 @@ export class ZitadelLogin extends ZitadelSurface {
       }
       // Back press: the browser popped the sentinel.
       this.armed = false;
-      const backAction = this.response?.step?.actions?.find((a) => a.kind === "back");
+      const backAction = this.#response?.step?.actions?.find((a) => a.kind === "back");
       if (backAction) {
         history.pushState({ zl: true }, "");
         this.armed = true;

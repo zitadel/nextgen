@@ -106,6 +106,36 @@ async function advanceMockLoginFlow(
   submit(element);
 }
 
+/** A passkey enrolment step, as the server would serve it, with a challenge to run. */
+const passkeyEnrollFlow: CreateFlow201 = {
+  id: "flow-1",
+  session_id: "sess-1",
+  session_token: "token-1",
+  step: {
+    name: "passkey-enroll",
+    texts: { title_key: "passkey-enroll.title" },
+    fields: [],
+    actions: [],
+    gates: {},
+    challenge: {
+      method: "passkey_register",
+      challenge_id: "reg-1",
+      options: {
+        challenge: "AAAA",
+        rp: { id: "localhost", name: "localhost" },
+        user: { id: "dXNlcl8x", name: "alice@example.com", displayName: "alice@example.com" },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+      },
+    },
+  },
+  branding: {},
+};
+
+/** Makes the next flow start answer with the given step. */
+function serveFirstStep(flow: CreateFlow201): void {
+  server.use(http.post("*/flow", () => HttpResponse.json(flow, { status: 201 }), { once: true }));
+}
+
 /** Create and attach a login element without waiting for a render. */
 function attachLogin(host: HTMLElement): ZitadelLogin {
   const element = document.createElement("zitadel-login") as ZitadelLogin;
@@ -970,37 +1000,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
         ),
       );
 
-      const element = await mount(host);
-      Reflect.set(element, "response", {
-        id: "flow-1",
-        session_id: "sess-1",
-        session_token: "token-1",
-        step: {
-          name: "passkey-enroll",
-          texts: { title_key: "passkey-enroll.title" },
-          fields: [],
-          actions: [],
-          gates: {},
-          challenge: {
-            method: "passkey_register",
-            challenge_id: "reg-1",
-            options: {
-              challenge: "AAAA",
-              rp: { id: "localhost", name: "localhost" },
-              user: {
-                id: "dXNlcl8x",
-                name: "alice@example.com",
-                displayName: "alice@example.com",
-              },
-              pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-            },
-          },
-        },
-        branding: {},
-      });
-      Reflect.set(element, "loading", false);
-      await element.updateComplete;
-
+      serveFirstStep(passkeyEnrollFlow);
+      const element = attachLogin(host);
       await waitFor(() => (create.mock.calls.length === 1 ? true : null));
       expect(element.shadowRoot?.querySelector("zl-passkey")).toBeTruthy();
 
@@ -1134,39 +1135,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
 
     try {
-      const element = await mount(host);
+      serveFirstStep(passkeyEnrollFlow);
+      const element = attachLogin(host);
       const submitsBefore = mock
         .getCaptured()
         .filter((req) => req.kind === "submitFlowStep").length;
-      Reflect.set(element, "response", {
-        id: "flow-1",
-        session_id: "sess-1",
-        session_token: "token-1",
-        step: {
-          name: "passkey-enroll",
-          texts: { title_key: "passkey-enroll.title" },
-          fields: [],
-          actions: [],
-          gates: {},
-          challenge: {
-            method: "passkey_register",
-            challenge_id: "reg-1",
-            options: {
-              challenge: "AAAA",
-              rp: { id: "localhost", name: "localhost" },
-              user: {
-                id: "dXNlcl8x",
-                name: "alice@example.com",
-                displayName: "alice@example.com",
-              },
-              pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-            },
-          },
-        },
-        branding: {},
-      });
-      Reflect.set(element, "loading", false);
-      await element.updateComplete;
       await waitFor(() => (create.mock.calls.length === 1 ? true : null));
 
       // The atom renders its pending UI into its light DOM inside the
