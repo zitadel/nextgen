@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { fetchSession } from "@/auth/session";
+import { makeTestSession } from "@/test/session.fixture";
 import { scopedPath } from "@/test/project-scope.fixture";
 
 import { THEME_STORAGE_KEY } from "../../theme";
@@ -209,17 +211,33 @@ describe("settings view", () => {
 });
 
 /**
- * The footer names the signed-in person over the account they work in — their
- * team in the sign-in project — and the sidebar's header carries the one
- * collapse toggle, beside the logo.
+ * The footer names the signed-in person — by name over their email once a name
+ * is set, else by email over the account they work in — and the sidebar's
+ * header carries the one collapse toggle, beside the logo.
  */
 describe("sidebar chrome", () => {
-  it("names the person and their account in the footer", async () => {
+  it("leads the footer with the person's name, their email beneath", async () => {
     renderShell();
-    const account = await screen.findByRole("button", {
-      name: "Account: test.user@example.com",
-    });
-    await waitFor(() => expect(account).toHaveTextContent("Test account"));
+    const account = await screen.findByRole("button", { name: "Account: Test User" });
+    expect(account).toHaveTextContent("Test User");
+    expect(account).toHaveTextContent("test.user@example.com");
+  });
+
+  it("names the account under the email while the person has no name", async () => {
+    const session = makeTestSession();
+    vi.mocked(fetchSession).mockResolvedValue({
+      ...session,
+      user: { ...session.user, display: undefined },
+    } as typeof session);
+    try {
+      renderShell();
+      const account = await screen.findByRole("button", {
+        name: "Account: test.user@example.com",
+      });
+      await waitFor(() => expect(account).toHaveTextContent("Test account"));
+    } finally {
+      vi.mocked(fetchSession).mockImplementation(async () => makeTestSession());
+    }
   });
 
   it("shows the person alone when they are on no team", async () => {

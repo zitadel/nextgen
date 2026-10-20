@@ -122,7 +122,10 @@ test("a platform operator adds their name from the account menu", async ({ page,
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expectNoErrorBoundary(page);
 
-  await account.click();
+  // The footer now leads with the name, the email beneath it.
+  const named = page.getByRole("button", { name: "Account: Ada Lovelace" });
+  await expect(named).toContainText(operator.email);
+  await named.click();
   await expect(page.getByRole("menu").getByText("Ada Lovelace")).toBeVisible();
   await expect(page.getByRole("menuitem", { name: /Add your name/ })).toHaveCount(0);
 });

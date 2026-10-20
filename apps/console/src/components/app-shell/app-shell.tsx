@@ -86,12 +86,11 @@ function readSidebarOpen(): boolean {
 
 /**
  * The sidebar's top band: the logo with the collapse toggle beside it, 56px
- * tall and ruled underneath so it reads as one band with the top bar. In the
- * icon rail the logo goes and the toggle centres — there is no room for both,
- * and the toggle is what brings the logo back.
+ * tall, level with the top bar. In the icon rail the logo goes and the toggle
+ * centres — there is no room for both, and the toggle brings the logo back.
  */
 const BRAND_HEADER =
-  "h-14 shrink-0 flex-row items-center justify-between border-b border-border py-0 pr-3 pl-6 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0";
+  "h-14 shrink-0 flex-row items-center justify-between py-0 pr-3 pl-6 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0";
 
 /** The design's `Sidebar / Header Button`: 28px square around a 16px glyph. */
 const HEADER_BUTTON = "size-7! text-sidebar-foreground";

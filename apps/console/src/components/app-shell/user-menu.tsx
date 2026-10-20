@@ -40,6 +40,9 @@ const AVATAR = "size-6 shrink-0 rounded-full bg-(image:--zl-gradient-red)";
 const MENU_ITEM = "h-8 pr-8";
 const MENU_SEPARATOR = "mx-0 my-0";
 
+/** The footer's second line: the email under a name, else the account. */
+const FOOTER_SECOND_LINE = "truncate text-xs font-light text-muted-foreground";
+
 const THEMES: { value: ThemePreference; label: string }[] = [
   { value: "system", label: "System" },
   { value: "light", label: "Light" },
@@ -100,12 +103,10 @@ function ThemeRow() {
  * Footer account entry: the signed-in person over the account they work in,
  * opening the account dropdown to the right of the sidebar (Console ADR 0003).
  *
- * The footer names the person by identifier (their email) and the dropdown
- * header by name, as the design draws them, so the footer stays the stable
- * sign-in identity whether or not a name is set (identifier → display → user
- * id here, the reverse of ADR 058's rendering order on purpose). The account
- * is their team in the sign-in project (`lib/account.ts`); only the current
- * one is shown.
+ * The person is named in ADR 058's order (display → identifier → user id):
+ * once a name is set it leads, with the email beneath it; until then the
+ * email leads, with the account beneath it — their team in the sign-in project
+ * (`lib/account.ts`), which the dropdown also lists.
  *
  * The design draws a plan badge (`Pro`) beside the account; it is left out
  * until billing (#667) can say which plan an account is on. `Documentation` and
@@ -113,8 +114,8 @@ function ThemeRow() {
  * neither has a destination yet, and a row that does nothing reads as broken.
  */
 export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
-  const primary = user?.identifier ?? user?.display ?? user?.userId ?? "Signed in";
-  const name = user?.display ?? primary;
+  const email = user?.identifier ?? user?.userId ?? "Signed in";
+  const name = user?.display ?? email;
   const account = useSessionCached(readAccountTeam, null);
   // Asked only while there is no name: once `display` is set there is nothing
   // to prompt for.
@@ -128,21 +129,19 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
         <DropdownMenuTrigger asChild>
           <SidebarMenuButton
             size="lg"
-            tooltip={primary}
-            aria-label={`Account: ${primary}`}
+            tooltip={name}
+            aria-label={`Account: ${name}`}
             className="h-auto min-h-12 py-2"
           >
             <span aria-hidden className={AVATAR} />
             <span className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="truncate text-sm leading-none font-semibold">{primary}</span>
-              {account === undefined ? (
+              <span className="truncate text-sm leading-none font-semibold">{name}</span>
+              {user?.display ? (
+                <span className={FOOTER_SECOND_LINE}>{email}</span>
+              ) : account === undefined ? (
                 <Skeleton className="h-4 w-24" />
               ) : (
-                account && (
-                  <span className="truncate text-xs font-light text-muted-foreground">
-                    {account.name}
-                  </span>
-                )
+                account && <span className={FOOTER_SECOND_LINE}>{account.name}</span>
               )}
             </span>
             <ChevronRight className="ml-auto text-sidebar-foreground" aria-hidden />
@@ -160,18 +159,14 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             <DropdownMenuItem asChild className="flex-col items-start gap-0.5 py-2 pr-8">
               <Link to="/settings/profile" hash={nameProperty}>
                 <span className="truncate text-sm text-muted-foreground italic">Add your name</span>
-                <span className="truncate text-xs leading-none text-muted-foreground">
-                  {primary}
-                </span>
+                <span className="truncate text-xs leading-none text-muted-foreground">{email}</span>
               </Link>
             </DropdownMenuItem>
           ) : (
             <DropdownMenuLabel className="flex flex-col gap-0.5 py-2 pr-8 font-normal">
               <span className="truncate text-sm">{name}</span>
-              {name !== primary && (
-                <span className="truncate text-xs leading-none text-muted-foreground">
-                  {primary}
-                </span>
+              {user?.display && (
+                <span className="truncate text-xs leading-none text-muted-foreground">{email}</span>
               )}
             </DropdownMenuLabel>
           )}
