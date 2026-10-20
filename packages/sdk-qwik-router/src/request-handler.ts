@@ -11,6 +11,7 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   proxySessionCookies,
+  SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
 } from "@zitadel/sdk-core/middleware";
@@ -55,6 +56,11 @@ export interface QwikRequestEvent {
     set(name: string, value: string, options?: QwikCookieOptions): void;
     delete(name: string, options?: { path?: string }): void;
   };
+  /**
+   * The headers of the response that goes out, a redirect this handler throws
+   * included. Optional so that unit-test mocks need not stub it.
+   */
+  readonly headers?: Headers;
   /** Sends a custom response and ends the chain. */
   send(response: Response): void;
   /** Returns a redirect marker to be thrown. */
@@ -146,8 +152,11 @@ async function proxyResponse(
       search: ev.url.search,
       cookie: ev.request.headers.get("cookie"),
       requestUrl: ev.url,
+      forwardedProto: ev.request.headers.get("x-forwarded-proto"),
+      forwardedHost: ev.request.headers.get("x-forwarded-host"),
     },
     projectId,
+    { url: authUrl, timeoutMs: proxyTimeoutMs },
   );
   if (sessionCookies.upstreamCookie === null) {
     upstreamHeaders.delete("cookie");
@@ -180,6 +189,9 @@ async function proxyResponse(
   const answer = await sessionCookies.toBrowser(upstream);
   for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
+  }
+  if (answer.setCookies.length > 0) {
+    responseHeaders.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
   }
 
   return new Response(answer.body, {
@@ -223,6 +235,8 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
       bearer: bearerToken,
       cookie: (name) => ev.cookie.get(name)?.value ?? cookies.get(name),
       requestUrl: ev.url,
+      forwardedProto: ev.request.headers.get("x-forwarded-proto"),
+      forwardedHost: ev.request.headers.get("x-forwarded-host"),
     },
     verification,
   );
@@ -239,10 +253,11 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
 
   // A dead session's cookie is cleared so the browser stops replaying it (each
   // replay costs a backend session check), and a session of this project still
-  // under the shared name moves to the project's own cookie. A live session that
-  // signs no one in here (an anonymous one, whose sign-in may still complete, or
-  // one of another project) keeps its cookie, and so does one the backend gave
-  // no verdict on. Qwik applies the changes to whichever response goes out.
+  // under the shared name is copied to the project's own cookie. A live session
+  // that signs no one in here (an anonymous one, whose sign-in may still
+  // complete, or one of another project) keeps its cookie, and so does one the
+  // backend gave no verdict on. Qwik applies the changes to whichever response
+  // goes out.
   for (const cookie of sessionCookies) {
     if (cookie.maxAge === 0) {
       ev.cookie.delete(cookie.name, { path: "/" });
@@ -255,6 +270,9 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
         ...(cookie.maxAge === undefined ? {} : { maxAge: cookie.maxAge }),
       });
     }
+  }
+  if (sessionCookies.length > 0) {
+    ev.headers?.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
   }
 
   if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {

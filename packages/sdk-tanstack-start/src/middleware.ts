@@ -7,6 +7,7 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   proxySessionCookies,
+  SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
   serializeSessionCookie,
@@ -36,9 +37,10 @@ export type NextgenRequestDecision =
       readonly auth: AuthResult;
       /**
        * `Set-Cookie` values the response to this request must carry: a dead
-       * session cookie cleared, or a session of this project moved out of the
+       * session cookie cleared, or a session of this project copied out of the
        * shared cookie into the project's own. Empty or absent when there are
-       * none.
+       * none. A response that carries them also sends
+       * `Cache-Control: private, no-store`, so no shared cache keeps them.
        */
       readonly setCookies?: readonly string[];
     };
@@ -115,8 +117,11 @@ async function proxyRequest(
       search: url.search,
       cookie: request.headers.get("cookie"),
       requestUrl: url,
+      forwardedProto: request.headers.get("x-forwarded-proto"),
+      forwardedHost: request.headers.get("x-forwarded-host"),
     },
     projectId,
+    { url: authUrl, timeoutMs: proxyTimeoutMs },
   );
   if (sessionCookies.upstreamCookie === null) {
     upstreamHeaders.delete("cookie");
@@ -149,6 +154,9 @@ async function proxyRequest(
   const answer = await sessionCookies.toBrowser(upstream);
   for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
+  }
+  if (answer.setCookies.length > 0) {
+    responseHeaders.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
   }
 
   return new Response(answer.body, {
@@ -251,7 +259,13 @@ export async function handleNextgenRequest(
     undecided,
     cookies: sessionCookies,
   } = await resolveSession(
-    { bearer: bearerToken, cookie: (name) => cookies.get(name), requestUrl: url2 },
+    {
+      bearer: bearerToken,
+      cookie: (name) => cookies.get(name),
+      requestUrl: url2,
+      forwardedProto: request.headers.get("x-forwarded-proto"),
+      forwardedHost: request.headers.get("x-forwarded-host"),
+    },
     {
       url,
       projectId,
@@ -266,10 +280,10 @@ export async function handleNextgenRequest(
 
   // A dead session's cookie is cleared so the browser stops replaying it (each
   // replay costs a backend session check), and a session of this project still
-  // under the shared name moves to the project's own cookie. A live session that
-  // signs no one in here (an anonymous one, whose sign-in may still complete, or
-  // one of another project) keeps its cookie, and so does one the backend gave
-  // no verdict on.
+  // under the shared name is copied to the project's own cookie. A live session
+  // that signs no one in here (an anonymous one, whose sign-in may still
+  // complete, or one of another project) keeps its cookie, and so does one the
+  // backend gave no verdict on.
   const setCookies = sessionCookies.map(serializeSessionCookie);
 
   // The backend could not say whether the session is live. The user may well
@@ -283,6 +297,9 @@ export async function handleNextgenRequest(
     const headers = new Headers({ location: loginRedirectUrl(loginPath, url2).toString() });
     for (const cookie of setCookies) {
       headers.append("set-cookie", cookie);
+    }
+    if (setCookies.length > 0) {
+      headers.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
     }
     return { type: "redirect", response: new Response(null, { status: 302, headers }) };
   }
@@ -356,6 +373,7 @@ export function createNextgenRequestMiddleware(
       for (const cookie of decision.setCookies) {
         response.headers.append("set-cookie", cookie);
       }
+      response.headers.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
       return response;
     }
     return decision.response;

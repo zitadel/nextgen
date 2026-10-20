@@ -9,9 +9,9 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   proxySessionCookies,
+  SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
-  serializeSessionCookie,
 } from "@zitadel/sdk-core/middleware";
 import { NextResponse } from "next/server";
 
@@ -203,8 +203,11 @@ async function proxyRequest(
       search: url.search,
       cookie: req.headers.get("cookie"),
       requestUrl: url,
+      forwardedProto: req.headers.get("x-forwarded-proto"),
+      forwardedHost: req.headers.get("x-forwarded-host"),
     },
     projectId,
+    { url: authUrl, timeoutMs: proxyTimeoutMs },
   );
   if (sessionCookies.upstreamCookie === null) {
     upstreamHeaders.delete("cookie");
@@ -247,6 +250,9 @@ async function proxyRequest(
   for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
   }
+  if (answer.setCookies.length > 0) {
+    responseHeaders.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
+  }
 
   return new Response(answer.body, {
     status: upstream.status,
@@ -283,7 +289,13 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
   const authHeader = req.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const { auth, undecided, cookies } = await resolveSession(
-    { bearer: bearerToken, cookie: (name) => req.cookies.get(name)?.value, requestUrl: req.url },
+    {
+      bearer: bearerToken,
+      cookie: (name) => req.cookies.get(name)?.value,
+      requestUrl: req.url,
+      forwardedProto: req.headers.get("x-forwarded-proto"),
+      forwardedHost: req.headers.get("x-forwarded-host"),
+    },
     verification,
   );
 
@@ -304,12 +316,23 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
   }
 
   // A dead session's cookie is cleared so the browser stops replaying it, and a
-  // session of this project still under the shared name moves to the project's
-  // own cookie. A live session that signs no one in here (an anonymous one, or
-  // one of another project) keeps its cookie, and so does one the backend gave
-  // no verdict on.
+  // session of this project still under the shared name is copied to the
+  // project's own cookie. A live session that signs no one in here (an
+  // anonymous one, or one of another project) keeps its cookie, and so does one
+  // the backend gave no verdict on. The cookies go through the response's
+  // cookie jar, so a middleware composed around this one that sets a cookie of
+  // its own through it keeps them.
   for (const cookie of cookies) {
-    response.headers.append("set-cookie", serializeSessionCookie(cookie));
+    response.cookies.set(cookie.name, cookie.value, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: cookie.secure,
+      ...(cookie.maxAge === undefined ? {} : { maxAge: cookie.maxAge }),
+    });
+  }
+  if (cookies.length > 0) {
+    response.headers.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
   }
   return response;
 }
