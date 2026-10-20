@@ -554,9 +554,11 @@ type Handler interface {
 	// GetMyUserSchema implements getMyUserSchema operation.
 	//
 	// The schema the signed-in user's own record is validated against.
+	// With `project_id`, the schema is returned only when the session belongs to
+	// that project.
 	//
 	// GET /users/me/schema
-	GetMyUserSchema(ctx context.Context) (GetMyUserSchemaRes, error)
+	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
 	// GetProject implements getProject operation.
 	//
 	// Returns the current state of a project.
@@ -738,6 +740,8 @@ type Handler interface {
 	// ListMyTeams implements listMyTeams operation.
 	//
 	// The signed-in user's own team roster, ordered by team name.
+	// With `project_id`, the teams are listed only when the session belongs to
+	// that project.
 	//
 	// GET /users/me/teams
 	ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error)

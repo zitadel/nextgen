@@ -29266,11 +29266,12 @@ func (*GetMyUserErrorResponseStatusCode) getMyUserRes() {}
 
 // GetMyUserSchemaErrorResponse represents sum type.
 type GetMyUserSchemaErrorResponse struct {
-	Type             GetMyUserSchemaErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
-	UserNotFound     UserNotFound
+	Type                GetMyUserSchemaErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
 }
 
 // GetMyUserSchemaErrorResponseType is oneOf type of GetMyUserSchemaErrorResponse.
@@ -29278,10 +29279,11 @@ type GetMyUserSchemaErrorResponseType string
 
 // Possible values for GetMyUserSchemaErrorResponseType.
 const (
-	AuthUnauthorizedGetMyUserSchemaErrorResponse GetMyUserSchemaErrorResponseType = "auth.unauthorized"
-	InternalGetMyUserSchemaErrorResponse         GetMyUserSchemaErrorResponseType = "internal"
-	ReqInvalidGetMyUserSchemaErrorResponse       GetMyUserSchemaErrorResponseType = "req.invalid"
-	UserNotFoundGetMyUserSchemaErrorResponse     GetMyUserSchemaErrorResponseType = "user.not_found"
+	AuthUnauthorizedGetMyUserSchemaErrorResponse    GetMyUserSchemaErrorResponseType = "auth.unauthorized"
+	InternalGetMyUserSchemaErrorResponse            GetMyUserSchemaErrorResponseType = "internal"
+	ReqInvalidGetMyUserSchemaErrorResponse          GetMyUserSchemaErrorResponseType = "req.invalid"
+	SessProjectMismatchGetMyUserSchemaErrorResponse GetMyUserSchemaErrorResponseType = "sess.project_mismatch"
+	UserNotFoundGetMyUserSchemaErrorResponse        GetMyUserSchemaErrorResponseType = "user.not_found"
 )
 
 // IsAuthUnauthorized reports whether GetMyUserSchemaErrorResponse is AuthUnauthorized.
@@ -29297,6 +29299,11 @@ func (s GetMyUserSchemaErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether GetMyUserSchemaErrorResponse is ReqInvalid.
 func (s GetMyUserSchemaErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetMyUserSchemaErrorResponse
+}
+
+// IsSessProjectMismatch reports whether GetMyUserSchemaErrorResponse is SessProjectMismatch.
+func (s GetMyUserSchemaErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchGetMyUserSchemaErrorResponse
 }
 
 // IsUserNotFound reports whether GetMyUserSchemaErrorResponse is UserNotFound.
@@ -29364,6 +29371,27 @@ func (s GetMyUserSchemaErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetMyUserSchemaErrorResponse(v ReqInvalid) GetMyUserSchemaErrorResponse {
 	var s GetMyUserSchemaErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets GetMyUserSchemaErrorResponse to SessProjectMismatch.
+func (s *GetMyUserSchemaErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchGetMyUserSchemaErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if GetMyUserSchemaErrorResponse is SessProjectMismatch.
+func (s GetMyUserSchemaErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchGetMyUserSchemaErrorResponse returns new GetMyUserSchemaErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchGetMyUserSchemaErrorResponse(v SessProjectMismatch) GetMyUserSchemaErrorResponse {
+	var s GetMyUserSchemaErrorResponse
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
@@ -36084,11 +36112,12 @@ func (*ListMyProjectsResponseHeaders) listMyProjectsRes() {}
 
 // ListMyTeamsErrorResponse represents sum type.
 type ListMyTeamsErrorResponse struct {
-	Type             ListMyTeamsErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
-	UserNotFound     UserNotFound
+	Type                ListMyTeamsErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
 }
 
 // ListMyTeamsErrorResponseType is oneOf type of ListMyTeamsErrorResponse.
@@ -36096,10 +36125,11 @@ type ListMyTeamsErrorResponseType string
 
 // Possible values for ListMyTeamsErrorResponseType.
 const (
-	AuthUnauthorizedListMyTeamsErrorResponse ListMyTeamsErrorResponseType = "auth.unauthorized"
-	InternalListMyTeamsErrorResponse         ListMyTeamsErrorResponseType = "internal"
-	ReqInvalidListMyTeamsErrorResponse       ListMyTeamsErrorResponseType = "req.invalid"
-	UserNotFoundListMyTeamsErrorResponse     ListMyTeamsErrorResponseType = "user.not_found"
+	AuthUnauthorizedListMyTeamsErrorResponse    ListMyTeamsErrorResponseType = "auth.unauthorized"
+	InternalListMyTeamsErrorResponse            ListMyTeamsErrorResponseType = "internal"
+	ReqInvalidListMyTeamsErrorResponse          ListMyTeamsErrorResponseType = "req.invalid"
+	SessProjectMismatchListMyTeamsErrorResponse ListMyTeamsErrorResponseType = "sess.project_mismatch"
+	UserNotFoundListMyTeamsErrorResponse        ListMyTeamsErrorResponseType = "user.not_found"
 )
 
 // IsAuthUnauthorized reports whether ListMyTeamsErrorResponse is AuthUnauthorized.
@@ -36115,6 +36145,11 @@ func (s ListMyTeamsErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether ListMyTeamsErrorResponse is ReqInvalid.
 func (s ListMyTeamsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListMyTeamsErrorResponse
+}
+
+// IsSessProjectMismatch reports whether ListMyTeamsErrorResponse is SessProjectMismatch.
+func (s ListMyTeamsErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchListMyTeamsErrorResponse
 }
 
 // IsUserNotFound reports whether ListMyTeamsErrorResponse is UserNotFound.
@@ -36182,6 +36217,27 @@ func (s ListMyTeamsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListMyTeamsErrorResponse(v ReqInvalid) ListMyTeamsErrorResponse {
 	var s ListMyTeamsErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets ListMyTeamsErrorResponse to SessProjectMismatch.
+func (s *ListMyTeamsErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchListMyTeamsErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if ListMyTeamsErrorResponse is SessProjectMismatch.
+func (s ListMyTeamsErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchListMyTeamsErrorResponse returns new ListMyTeamsErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchListMyTeamsErrorResponse(v SessProjectMismatch) ListMyTeamsErrorResponse {
+	var s ListMyTeamsErrorResponse
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
@@ -66404,8 +66460,10 @@ func (s *SessProjectMismatch) SetDetails(val OptSessProjectMismatchDetails) {
 	s.Details = val
 }
 
-func (*SessProjectMismatch) getMyUserRes()      {}
-func (*SessProjectMismatch) listMyProjectsRes() {}
+func (*SessProjectMismatch) getMyUserRes()       {}
+func (*SessProjectMismatch) getMyUserSchemaRes() {}
+func (*SessProjectMismatch) listMyProjectsRes()  {}
+func (*SessProjectMismatch) listMyTeamsRes()     {}
 
 // Additional error-specific context.
 type SessProjectMismatchDetails map[string]jx.Raw
