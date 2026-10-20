@@ -4,7 +4,9 @@ package integration_test
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -22,18 +24,42 @@ import (
 
 const passwordSetOperation = "auth.factor.password.set"
 
-func publishPolicy(t *testing.T, client *helpers.ApiClient, projectID string, config map[string]string) api.PublishPolicyRes {
+func publishPolicy(t *testing.T, client *helpers.ApiClient, projectID string, config api.PasswordSetConfig) api.PublishPolicyRes {
 	t.Helper()
-	cfg := make(api.PublishPolicyRequestConfig, len(config))
-	for name, raw := range config {
-		cfg[name] = jx.Raw(raw)
-	}
-	resp, err := client.PublishPolicy(t.Context(), &api.PublishPolicyRequest{
-		Operation: passwordSetOperation,
-		Config:    cfg,
-	}, api.PublishPolicyParams{ProjectID: api.ProjectID(projectID)})
+	resp, err := client.PublishPolicy(t.Context(), api.NewPasswordSetPolicyInputPublishPolicyRequest(api.PasswordSetPolicyInput{
+		Operation: api.PasswordSetPolicyInputOperationAuthFactorPasswordSet,
+		Config:    config,
+	}), api.PublishPolicyParams{ProjectID: api.ProjectID(projectID)})
 	require.NoError(t, err)
 	return resp
+}
+
+// passwordSetPolicy unwraps a password policy from a policy response.
+func passwordSetPolicy(t *testing.T, resp any) api.PasswordSetPolicy {
+	t.Helper()
+	require.IsType(t, &api.Policy{}, resp, helpers.MustMarshal(t, resp))
+	policy, ok := resp.(*api.Policy).GetPasswordSetPolicy()
+	require.True(t, ok, helpers.MustMarshal(t, resp))
+	return policy
+}
+
+// publishRawPolicy posts a body the typed client cannot build and returns
+// the status and the error code.
+func publishRawPolicy(t *testing.T, token, projectID, body string) (int, api.ErrorCode) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		harness.EnsureTestServer(t).URL+"/policies?project_id="+url.QueryEscape(projectID),
+		strings.NewReader(body),
+	)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := harness.EnsureHttpClient(t).Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	return resp.StatusCode, helpers.MustUnmarshal[api.ErrorDetails](t, raw).Code
 }
 
 // TestPolicies covers publishing a policy and reading revisions back
@@ -47,18 +73,15 @@ func TestPolicies(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	first := publishPolicy(t, client, project.ID, map[string]string{"min_length": "12"})
-	require.IsType(t, &api.Policy{}, first, helpers.MustMarshal(t, first))
-	rev1 := first.(*api.Policy)
+	rev1 := passwordSetPolicy(t, publishPolicy(t, client, project.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(12)}))
 	assert.True(t, strings.HasPrefix(string(rev1.ID), "pol_"))
 	assert.True(t, strings.HasPrefix(string(rev1.RevisionID), "polrev_"))
-	assert.Equal(t, passwordSetOperation, rev1.Operation)
-	assert.JSONEq(t, "12", string(rev1.Config["min_length"]))
+	assert.Equal(t, api.PasswordSetPolicyOperationAuthFactorPasswordSet, rev1.Operation)
+	assert.Equal(t, api.PasswordSetConfig{MinLength: api.NewOptInt(12)}, rev1.Config)
 	assert.True(t, rev1.CreatedAt.Equal(rev1.UpdatedAt))
 
-	second := publishPolicy(t, client, project.ID, map[string]string{"min_length": "15", "history_depth": "4"})
-	require.IsType(t, &api.Policy{}, second, helpers.MustMarshal(t, second))
-	rev2 := second.(*api.Policy)
+	rev2 := passwordSetPolicy(t, publishPolicy(t, client, project.ID,
+		api.PasswordSetConfig{MinLength: api.NewOptInt(15), HistoryDepth: api.NewOptInt(4)}))
 	assert.Equal(t, rev1.ID, rev2.ID, "a project has one policy per operation")
 	assert.NotEqual(t, rev1.RevisionID, rev2.RevisionID)
 	assert.True(t, rev2.CreatedAt.Equal(rev1.CreatedAt))
@@ -70,39 +93,41 @@ func TestPolicies(t *testing.T) {
 			RevisionID: rev1.RevisionID,
 		})
 		require.NoError(t, err)
-		require.IsType(t, &api.Policy{}, resp, helpers.MustMarshal(t, resp))
-		got := resp.(*api.Policy)
+		got := passwordSetPolicy(t, resp)
 		assert.Equal(t, rev1.RevisionID, got.RevisionID)
-		assert.JSONEq(t, "12", string(got.Config["min_length"]))
-		assert.NotContains(t, got.Config, "history_depth")
+		assert.Equal(t, api.PasswordSetConfig{MinLength: api.NewOptInt(12)}, got.Config,
+			"a setting the revision left out stays out")
 	})
 
-	t.Run("invalid configs are refused", func(t *testing.T) {
-		for name, config := range map[string]map[string]string{
-			"below the bound":    {"min_length": "0"},
-			"unknown setting":    {"min_lenght": "12"},
-			"min above max":      {"min_length": "20", "max_length": "10"},
-			"not an integer":     {"min_length": `"12"`},
-			"history above four": {"history_depth": "5"},
+	t.Run("a config outside the typed request is malformed", func(t *testing.T) {
+		for name, config := range map[string]string{
+			"below the bound":    `{"min_length": 0}`,
+			"unknown setting":    `{"min_lenght": 12}`,
+			"not an integer":     `{"min_length": "12"}`,
+			"history above four": `{"history_depth": 5}`,
 		} {
 			t.Run(name, func(t *testing.T) {
-				resp := publishPolicy(t, client, project.ID, config)
-				require.IsType(t, &api.PublishPolicyErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
-				denied := resp.(*api.PublishPolicyErrorResponseStatusCode)
-				assert.Equal(t, http.StatusBadRequest, denied.StatusCode)
-				assert.True(t, denied.Response.IsPolInvalid(), helpers.MustMarshal(t, resp))
+				status, code := publishRawPolicy(t, client.Token(), project.ID,
+					`{"operation": "auth.factor.password.set", "config": `+config+`}`)
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.Equal(t, api.ErrorCode("req.invalid"), code)
 			})
 		}
 	})
 
-	t.Run("an unknown operation is refused", func(t *testing.T) {
-		resp, err := client.PublishPolicy(t.Context(), &api.PublishPolicyRequest{
-			Operation: "auth.factor.passkey.enroll",
-			Config:    api.PublishPolicyRequestConfig{},
-		}, api.PublishPolicyParams{ProjectID: api.ProjectID(project.ID)})
-		require.NoError(t, err)
+	t.Run("an unknown operation is malformed", func(t *testing.T) {
+		status, code := publishRawPolicy(t, client.Token(), project.ID,
+			`{"operation": "auth.factor.passkey.enroll", "config": {}}`)
+		assert.Equal(t, http.StatusBadRequest, status)
+		assert.Equal(t, api.ErrorCode("req.invalid"), code)
+	})
+
+	t.Run("contradicting settings fail the template", func(t *testing.T) {
+		resp := publishPolicy(t, client, project.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(20), MaxLength: api.NewOptInt(10)})
 		require.IsType(t, &api.PublishPolicyErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
-		assert.True(t, resp.(*api.PublishPolicyErrorResponseStatusCode).Response.IsPolInvalid())
+		denied := resp.(*api.PublishPolicyErrorResponseStatusCode)
+		assert.Equal(t, http.StatusBadRequest, denied.StatusCode)
+		assert.True(t, denied.Response.IsPolInvalid(), helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("another project's credentials cannot publish", func(t *testing.T) {
@@ -115,7 +140,7 @@ func TestPolicies(t *testing.T) {
 		// Project B's secret, project A's id: a weaker policy for A must not
 		// land. To B, project A does not exist, so the write is refused the way
 		// schemas, flows, users and branding refuse it.
-		resp := publishPolicy(t, otherClient, project.ID, map[string]string{"min_length": "1"})
+		resp := publishPolicy(t, otherClient, project.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(1)})
 		require.IsType(t, &api.PublishPolicyErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
 		denied := resp.(*api.PublishPolicyErrorResponseStatusCode)
 		assert.Equal(t, http.StatusBadRequest, denied.StatusCode, helpers.MustMarshal(t, resp))
@@ -159,8 +184,7 @@ func TestPasswordPolicyEnforced(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	published := publishPolicy(t, client, project.ID, map[string]string{"min_length": "12"})
-	require.IsType(t, &api.Policy{}, published, helpers.MustMarshal(t, published))
+	passwordSetPolicy(t, publishPolicy(t, client, project.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(12)}))
 
 	t.Run("admin API", func(t *testing.T) {
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
