@@ -34,6 +34,12 @@ jobs:
       # warns on every process that also sees NO_COLOR. Blank it so only the
       # test output is left in the log.
       NO_COLOR: ""
+      # Keep testcontainers from starting its Ryuk reaper. Ryuk is the postgres
+      # lane's only image from Docker Hub (testcontainers/ryuk), whose pull rate
+      # limit then fails the lane. Nothing here needs reaping: every test
+      # package stops its own container, and the runner goes away after the
+      # job with whatever a crashed test binary left running.
+      TESTCONTAINERS_RYUK_DISABLED: "true"
     steps:
       # Depot runs some jobs on plain EC2 instances, whose root disk is an EBS
       # volume that writes about 250 MB/s. Linux writes dirty pages back only

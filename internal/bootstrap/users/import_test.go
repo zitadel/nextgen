@@ -20,6 +20,12 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	os.Exit(runTests(m))
+}
+
+// runTests holds the deferred stop, which os.Exit would skip. CI runs without
+// testcontainers' reaper, so a container nobody stops lives until the job ends.
+func runTests(m *testing.M) int {
 	ctx := context.Background()
 	pool, stop, err := dbtest.Postgres(ctx)
 	if err != nil {
@@ -29,7 +35,7 @@ func TestMain(m *testing.M) {
 	defer pool.Close(ctx)
 
 	testServiceDB = service.NewPool(pool)
-	os.Exit(m.Run())
+	return m.Run()
 }
 
 var testServiceDB *service.DB
