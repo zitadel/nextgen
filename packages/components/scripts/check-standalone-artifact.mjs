@@ -18,8 +18,8 @@
  * `src/standalone-artifact.spec.ts` runs the same checks against the dev
  * build. Single source: both import {@link findArtifactViolations}.
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 /**
@@ -49,9 +49,39 @@ export function findArtifactViolations(source) {
   return violations;
 }
 
+/**
+ * The npm library build: some module of it sets the shadow root mode, and none
+ * sets anything but closed. `standalone.mjs` is checked by
+ * {@link findArtifactViolations}; this covers the entries and chunks beside it.
+ */
+export function findLibraryViolations(distDir) {
+  const modules = (dir) =>
+    readdirSync(dir).flatMap((name) => {
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) return modules(path);
+      return name.endsWith(".mjs") && name !== "standalone.mjs" ? [path] : [];
+    });
+  const modes = modules(distDir).flatMap((path) =>
+    [...readFileSync(path, "utf8").matchAll(/\bconst SHADOW_ROOT_MODE = ([^;\n]+);/g)].map(
+      (match) => match[1],
+    ),
+  );
+  const violations = [];
+  if (modes.length === 0) {
+    violations.push("the library build does not set the shadow root mode");
+  }
+  if (modes.some((mode) => mode !== '"closed"')) {
+    violations.push("the library build does not close the shadow roots");
+  }
+  return violations;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const path = process.argv[2] ?? join(process.cwd(), "dist/standalone.mjs");
-  const violations = findArtifactViolations(readFileSync(path, "utf8"));
+  const violations = [
+    ...findArtifactViolations(readFileSync(path, "utf8")),
+    ...findLibraryViolations(dirname(path)),
+  ];
   if (violations.length > 0) {
     console.error(`standalone artifact check failed for ${path}:`);
     for (const violation of violations) {
