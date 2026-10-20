@@ -33,7 +33,7 @@ describe("NextScaffolder", () => {
     expect(command).toBe("npx");
     expect(args).toEqual([
       "--yes",
-      "create-next-app@16.2.4",
+      "create-next-app@16.4.2",
       ".",
       "--ts",
       "--app",
@@ -81,7 +81,7 @@ describe("NextScaffolder", () => {
     make: (node, platform) => new NextScaffolder(node, platform),
     framework: "next",
     label: "create-next-app",
-    spec: "create-next-app@16.2.4",
+    spec: "create-next-app@16.4.2",
     fallback: ">=20.9.0",
     enforcement: "warn",
     supported: ["24.15.0", "20.9.0"],

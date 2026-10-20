@@ -363,6 +363,13 @@ export function createMockApp(options: { issuer: string }): express.Express {
   // GET /sessions/me — validate opaque session cookie and return session data.
   // Mirrors the Go server's GetMySession handler.
   app.get("/sessions/me", (req: express.Request, res: express.Response) => {
+    // Mirrors the server, which validates a present project_id against the
+    // project-id pattern before it reads the session.
+    const projectParam = req.query.project_id;
+    if (projectParam !== undefined && !/^[a-zA-Z0-9_-]+$/.test(String(projectParam))) {
+      res.status(400).json(errorBody("req.invalid", "project_id is not a valid project id."));
+      return;
+    }
     const found = lookupSession(req);
     switch (found.status) {
       case "missing":
@@ -374,8 +381,20 @@ export function createMockApp(options: { issuer: string }): express.Express {
       case "expired":
         res.status(401).json(errorBody("unauthenticated", "session expired"));
         return;
-      case "active":
+      case "active": {
+        // Mirrors the server: a read that names a project refuses a session
+        // of any other project, the way an app on a shared host sees one.
+        const projectId = req.query.project_id;
+        if (typeof projectId === "string" && found.session.project_id !== projectId) {
+          res
+            .status(403)
+            .json(
+              errorBody("sess.project_mismatch", "The session belongs to a different project."),
+            );
+          return;
+        }
         res.json(found.session);
+      }
     }
   });
 

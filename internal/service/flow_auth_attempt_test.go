@@ -151,6 +151,7 @@ func TestFlowAuthAttemptAdapter_SubmitIdentifier_HappyPath(t *testing.T) {
 		AttemptID:     "att-1",
 		AttributeName: "email",
 		Value:         "alice@example.com",
+		UserSchemaURL: "sch_human",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "user-1", userID)
@@ -164,6 +165,7 @@ func TestFlowAuthAttemptAdapter_SubmitIdentifier_HappyPath(t *testing.T) {
 	proof := fake.verifyIn.Proof.(service.UserProof)
 	assert.Equal(t, "email", proof.AttributeName)
 	assert.Equal(t, "alice@example.com", proof.LoginName)
+	assert.Equal(t, "sch_human", proof.UserSchemaURL)
 }
 
 func TestFlowAuthAttemptAdapter_SubmitIdentifier_ProofRejectedSurfaces(t *testing.T) {

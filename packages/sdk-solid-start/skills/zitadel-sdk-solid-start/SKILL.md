@@ -67,7 +67,9 @@ export default defineConfig({
 ```
 
 `url` and `projectSecret` default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET`
-from the server environment; pass them only to override. To compose with your own
+from the server environment; pass them only to override. Sessions count only in
+the app's own project: `projectId`, else `ZITADEL_PROJECT_ID`, else
+`VITE_ZITADEL_PROJECT_ID`. With none set, nobody is signed in. To compose with your own
 handlers, spread the config's `onRequest` into your own `createMiddleware` call.
 
 **2. Read auth server-side** with `getAuth(getRequestEvent()!)` inside a

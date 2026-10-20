@@ -15264,18 +15264,18 @@ func (m *MockUserLookup) EXPECT() *MockUserLookupMockRecorder {
 }
 
 // GetByAttributes mocks base method.
-func (m *MockUserLookup) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
+func (m *MockUserLookup) GetByAttributes(ctx context.Context, projectID string, schemaURLs []string, attrs []domain.Attribute) (*domain.User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetByAttributes", ctx, projectID, attrs)
+	ret := m.ctrl.Call(m, "GetByAttributes", ctx, projectID, schemaURLs, attrs)
 	ret0, _ := ret[0].(*domain.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetByAttributes indicates an expected call of GetByAttributes.
-func (mr *MockUserLookupMockRecorder) GetByAttributes(ctx, projectID, attrs any) *MockUserLookupGetByAttributesCall {
+func (mr *MockUserLookupMockRecorder) GetByAttributes(ctx, projectID, schemaURLs, attrs any) *MockUserLookupGetByAttributesCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByAttributes", reflect.TypeOf((*MockUserLookup)(nil).GetByAttributes), ctx, projectID, attrs)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByAttributes", reflect.TypeOf((*MockUserLookup)(nil).GetByAttributes), ctx, projectID, schemaURLs, attrs)
 	return &MockUserLookupGetByAttributesCall{Call: call}
 }
 
@@ -15291,13 +15291,13 @@ func (c *MockUserLookupGetByAttributesCall) Return(arg0 *domain.User, arg1 error
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserLookupGetByAttributesCall) Do(f func(context.Context, string, []domain.Attribute) (*domain.User, error)) *MockUserLookupGetByAttributesCall {
+func (c *MockUserLookupGetByAttributesCall) Do(f func(context.Context, string, []string, []domain.Attribute) (*domain.User, error)) *MockUserLookupGetByAttributesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserLookupGetByAttributesCall) DoAndReturn(f func(context.Context, string, []domain.Attribute) (*domain.User, error)) *MockUserLookupGetByAttributesCall {
+func (c *MockUserLookupGetByAttributesCall) DoAndReturn(f func(context.Context, string, []string, []domain.Attribute) (*domain.User, error)) *MockUserLookupGetByAttributesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

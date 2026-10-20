@@ -30,7 +30,7 @@ import type {
   GetMySession200,
   SubmitFlowStepBody,
 } from "@zitadel/api/generated/model";
-import { ApiError } from "@zitadel/api/runtime/fetch";
+import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
 
 const apiRequestInit: RequestInit = { credentials: "include" };
 
@@ -91,9 +91,28 @@ export async function exchangeSession(
  * Reads the current session (`GET /sessions/me`) with credentials so the
  * `__nextgen_session` cookie authenticates the request. Used by the
  * orchestrator's signed-in surfaces to render the user's identity.
+ *
+ * The read names the element's project. A session of another project on the
+ * same server, which the server refuses (`403 sess.project_mismatch`) or a
+ * server that predates the parameter answers for, resolves to `null`: it is
+ * live, but not this app's. Any other failure rejects.
  */
-export async function getSession(api: ZitadelApi): Promise<SessionIdentity> {
-  return api.getMySession(apiRequestInit);
+export async function getSession(
+  api: ZitadelApi,
+  projectId: string,
+): Promise<SessionIdentity | null> {
+  if (!projectId) {
+    return api.getMySession(undefined, apiRequestInit);
+  }
+  try {
+    const session = await api.getMySession({ project_id: projectId }, apiRequestInit);
+    return session.project_id === projectId ? session : null;
+  } catch (error) {
+    if (apiErrorCode(error) === "sess.project_mismatch") {
+      return null;
+    }
+    throw error;
+  }
 }
 
 /**

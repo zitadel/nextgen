@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func (h *Harness) EnsureHttpClient(t *testing.T) *http.Client {
+func (h *Harness) EnsureHttpClient(t testing.TB) *http.Client {
 	t.Helper()
 	h.httpClient.mutex.Lock()
 	defer h.httpClient.mutex.Unlock()

@@ -241,6 +241,16 @@ describe("steps", () => {
     );
   });
 
+  it.each(RESERVED_OUTCOMES)("rejects a declared action named %s", (outcome) => {
+    const def = flow();
+    const s = step(def, "identifier");
+    s.actions.push({ name: outcome, kind: "navigate" });
+    s.transitions[outcome] = { target: "done" };
+    expect(messages(validateFlowDefinition(def))).toContain(
+      `step "identifier": action name "${outcome}" is reserved for flow outcomes`,
+    );
+  });
+
   it("rejects a non-terminal step that does nothing", () => {
     const def = flow();
     def.steps.push({ name: "idle", transitions: { user_not_found: { target: "done" } } });

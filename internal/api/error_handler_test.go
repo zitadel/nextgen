@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -428,6 +431,74 @@ func TestValidationFieldPaths(t *testing.T) {
 
 	require.Equal(t, []string{"idp.slug", "idp.oidc.client_secret"}, validationFieldPaths(wrapped))
 	require.Nil(t, validationFieldPaths(&ogenerrors.DecodeRequestError{Err: errors.New("unexpected end of JSON input")}))
+}
+
+// unmappedClientCodes are the codes errorResponse answers with 500 only because
+// no mapper lists them, though they are not server faults: they can be caused
+// by client input or a caller's mistake. A service span keeps status Unset for
+// them. Map such a code to its 4xx when it reaches a handler, then drop it here.
+var unmappedClientCodes = map[string]bool{
+	"att.sso_state_invalid":       true,
+	"auth.csrf_invalid":           true,
+	"claim.session_expired":       true,
+	"claim.session_not_active":    true,
+	"claim.session_wrong_project": true,
+	"enc_key.no_replacement_key":  true,
+	"enc_key.not_found":           true,
+	"idp.endpoint_cleartext":      true,
+	"idp.endpoints_partial":       true,
+	"idp.protocol_block_missing":  true,
+	"idp.scopes_missing_openid":   true,
+	"tkn.invalid":                 true,
+	"tkn.invalid_tknid":           true,
+	"tkn.revoked":                 true,
+	"user.password_invalid":       true,
+}
+
+// serverFaultStatus is the status each server-fault code is answered with.
+// A code missing here is answered with a 500.
+var serverFaultStatus = map[string]int{
+	domain.ErrNotImplemented().Code: http.StatusNotImplemented,
+	domain.ErrUnavailable().Code:    http.StatusServiceUnavailable,
+}
+
+// TestErrorResponse_serverFaultsAre5xx keeps the HTTP status and
+// domain.IsServerFault, which a service span reads, from drifting apart: every
+// code in the generated error catalog that gets a 5xx must be a server fault,
+// or be listed in unmappedClientCodes.
+func TestErrorResponse_serverFaultsAre5xx(t *testing.T) {
+	t.Parallel()
+
+	files, err := filepath.Glob("../../api/openapi/components/schemas/errors/*.yaml")
+	require.NoError(t, err)
+	require.NotEmpty(t, files, "the generated error catalog is missing")
+	constRe := regexp.MustCompile(`(?m)^\s+const: (\S+)$`)
+	for _, file := range files {
+		raw, err := os.ReadFile(file)
+		require.NoError(t, err)
+		m := constRe.FindSubmatch(raw)
+		require.NotNil(t, m, "no code in %s", file)
+		code := string(m[1])
+
+		// The parent carries another server-fault code, so a status read from
+		// the parent instead of the body code fails here.
+		e := domain.Error{Code: code, Parent: domain.ErrUnavailable()}
+		resp := errorResponse(e)
+		is5xx := resp.StatusCode >= http.StatusInternalServerError
+		switch {
+		case domain.IsServerFault(e):
+			require.Equal(t, api.ErrorCode(code), resp.Response.Code)
+			want, ok := serverFaultStatus[code]
+			if !ok {
+				want = http.StatusInternalServerError
+			}
+			require.Equal(t, want, resp.StatusCode, "%s is a server fault answered with the wrong status", code)
+		case unmappedClientCodes[code]:
+			require.True(t, is5xx, "%s is mapped now: remove it from unmappedClientCodes", code)
+		default:
+			require.False(t, is5xx, "%s gets a 5xx: add it to the server faults in internal/domain/error.go, or map it to a 4xx", code)
+		}
+	}
 }
 
 // A security handler that cannot reach a decision (the CSRF request state is

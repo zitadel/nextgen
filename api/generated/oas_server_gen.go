@@ -520,12 +520,13 @@ type Handler interface {
 	//
 	// Returns the current state of the current session including its factors and all currently
 	// satisfied assurance levels.
+	// With `project_id`, the session is returned only when it belongs to that project.
 	// `assurance_levels[]` may shrink over time as factor freshness windows expire,
 	// without the session itself expiring. Use step-up authentication (a new `auth_attempt`
 	// against the same `session_id`) to restore a dropped assurance level.
 	//
 	// GET /sessions/me
-	GetMySession(ctx context.Context) (GetMySessionRes, error)
+	GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error)
 	// GetMySessionCsrfToken implements getMySessionCsrfToken operation.
 	//
 	// Returns the session-bound token for cross-site request forgery protection
