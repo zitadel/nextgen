@@ -20382,6 +20382,22 @@ func (s CreateDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelRevokedCreateDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -20457,6 +20473,9 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "rel.not_found":
 					s.Type = RelNotFoundCreateDeploymentErrorResponse
 					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedCreateDeploymentErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateDeploymentErrorResponse
 					found = true
@@ -20516,6 +20535,10 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case RelNotFoundCreateDeploymentErrorResponse:
 		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedCreateDeploymentErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidCreateDeploymentErrorResponse:
@@ -80039,6 +80062,40 @@ func (s *OptQueryUsersRequestSorting) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes RelInUseDetails as json.
+func (o OptRelInUseDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes RelInUseDetails from json.
+func (o *OptRelInUseDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptRelInUseDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(RelInUseDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptRelInUseDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptRelInUseDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes RelInvalidDetails as json.
 func (o OptRelInvalidDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -101144,6 +101201,194 @@ func (s *QueryUsersUnauthorized) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *RelInUse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *RelInUse) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("rel.in_use")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfRelInUse = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes RelInUse from json.
+func (s *RelInUse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RelInUse to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode RelInUse")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfRelInUse) {
+					name = jsonFieldsNameOfRelInUse[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *RelInUse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RelInUse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s RelInUseDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s RelInUseDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes RelInUseDetails from json.
+func (s *RelInUseDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RelInUseDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode RelInUseDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s RelInUseDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RelInUseDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *RelInvalid) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -107517,6 +107762,22 @@ func (s RevokeReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidRevokeReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalRevokeReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -107533,11 +107794,59 @@ func (s RevokeReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedRevokeReleaseErrorResponse:
+	case RelInUseRevokeReleaseErrorResponse:
 		e.FieldStart("code")
-		e.Str("not_implemented")
+		e.Str("rel.in_use")
 		{
-			s := s.NotImplemented
+			s := s.RelInUse
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotFoundRevokeReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelPermissionDeniedRevokeReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.permission_denied")
+		{
+			s := s.RelPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelProjectNotFoundRevokeReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.project_not_found")
+		{
+			s := s.RelProjectNotFound
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -107594,11 +107903,23 @@ func (s *RevokeReleaseErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedRevokeReleaseErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidRevokeReleaseErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalRevokeReleaseErrorResponse
 					found = true
-				case "not_implemented":
-					s.Type = NotImplementedRevokeReleaseErrorResponse
+				case "rel.in_use":
+					s.Type = RelInUseRevokeReleaseErrorResponse
+					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundRevokeReleaseErrorResponse
+					found = true
+				case "rel.permission_denied":
+					s.Type = RelPermissionDeniedRevokeReleaseErrorResponse
+					found = true
+				case "rel.project_not_found":
+					s.Type = RelProjectNotFoundRevokeReleaseErrorResponse
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidRevokeReleaseErrorResponse
@@ -107621,12 +107942,28 @@ func (s *RevokeReleaseErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
+	case EvtInvalidRevokeReleaseErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
 	case InternalRevokeReleaseErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedRevokeReleaseErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
+	case RelInUseRevokeReleaseErrorResponse:
+		if err := s.RelInUse.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundRevokeReleaseErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelPermissionDeniedRevokeReleaseErrorResponse:
+		if err := s.RelPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case RelProjectNotFoundRevokeReleaseErrorResponse:
+		if err := s.RelProjectNotFound.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidRevokeReleaseErrorResponse:

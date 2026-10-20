@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -74,6 +75,15 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 			DeployedByType: api.NewOptNilDeploymentMetadataDeployedByType(api.DeploymentMetadataDeployedByTypeService),
 		},
 	}), resp.DeploymentGuardConflict.Details.Deployment)
+}
+
+// A revoked release is the other member of the 409 union.
+func TestDeploymentConflictRendersARevokedRelease(t *testing.T) {
+	resp, ok := deploymentConflictResponse(domain.ErrReleaseRevoked())
+	require.True(t, ok)
+	raw, err := json.Marshal(resp)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"code":"rel.revoked","message":"release: revoked"}`, string(raw))
 }
 
 // Any other error is left to NewError.

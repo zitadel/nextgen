@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -451,4 +452,69 @@ func TestReleaseServiceCreateResolvesBuiltinSchemaUnderAnotherBase(t *testing.T)
 	assert.Equal(t, []domain.ReleasePointer{
 		{Kind: domain.ReleasePointerKindSchema, Handle: "human-user", RevisionID: stored},
 	}, result.Release.Pointers)
+}
+
+func TestReleaseServiceRevoke(t *testing.T) {
+	revokedAt := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+	unrevoked := &domain.Release{ProjectID: "proj_1", ID: "rel_1", ContentHash: "abc"}
+	primary := domain.Origin{Pattern: "https://app.acme.com", Kind: domain.OriginKindPrimary}
+	noPreviews := &database.ListResult[*domain.Preview]{}
+
+	t.Run("revokes a release nothing serves", func(t *testing.T) {
+		svc, statements := newMockedReleaseService(t)
+		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(unrevoked, nil)
+		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1", Origins: []domain.Origin{primary}}, nil)
+		statements.EXPECT().ListPreviews(gomock.Any(), gomock.Any()).Return(noPreviews, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{primary.Pattern}).
+			Return([]domain.OriginDeployment{{Origin: primary.Pattern, DeploymentID: "dep_2", ReleaseID: "rel_2"}}, nil)
+		revoked := *unrevoked
+		revoked.RevokedAt = &revokedAt
+		statements.EXPECT().RevokeRelease(gomock.Any(), "proj_1", "rel_1").Return(&revoked, nil)
+
+		got, err := svc.Revoke(t.Context(), "proj_1", "rel_1")
+		require.NoError(t, err)
+		assert.Equal(t, &revokedAt, got.RevokedAt)
+	})
+
+	t.Run("a revoked release comes back unchanged", func(t *testing.T) {
+		svc, statements := newMockedReleaseService(t)
+		revoked := *unrevoked
+		revoked.RevokedAt = &revokedAt
+		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&revoked, nil)
+
+		got, err := svc.Revoke(t.Context(), "proj_1", "rel_1")
+		require.NoError(t, err)
+		assert.Same(t, &revoked, got)
+	})
+
+	t.Run("an origin still serving it", func(t *testing.T) {
+		svc, statements := newMockedReleaseService(t)
+		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(unrevoked, nil)
+		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1", Origins: []domain.Origin{primary}}, nil)
+		statements.EXPECT().ListPreviews(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.Preview]{
+			Items: []*domain.Preview{{ProjectID: "proj_1", Origin: "https://pr-1-acmeinc.vercel.app"}},
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{primary.Pattern, "https://pr-1-acmeinc.vercel.app"}).
+			Return([]domain.OriginDeployment{
+				{Origin: "https://pr-1-acmeinc.vercel.app", DeploymentID: "dep_3", ReleaseID: "rel_1"},
+				{Origin: primary.Pattern, DeploymentID: "dep_2", ReleaseID: "rel_2"},
+			}, nil)
+
+		_, err := svc.Revoke(t.Context(), "proj_1", "rel_1")
+		require.Error(t, err)
+		de, ok := err.(domain.Error)
+		require.True(t, ok)
+		assert.Equal(t, domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code, de.Code)
+		assert.Equal(t, domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
+			{Origin: "https://pr-1-acmeinc.vercel.app", DeploymentID: "dep_3"},
+		}}, de.Details)
+	})
+
+	t.Run("an unknown release", func(t *testing.T) {
+		svc, statements := newMockedReleaseService(t)
+		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_x").Return(nil, database.NewNoRowFoundError(nil))
+
+		_, err := svc.Revoke(t.Context(), "proj_1", "rel_x")
+		assert.ErrorIs(t, err, domain.ErrReleaseNotFound())
+	})
 }

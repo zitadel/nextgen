@@ -234,6 +234,12 @@ type ReleasePointerPayload struct {
 
 type ReleaseCreatedPayload = ReleasePayload
 
+// ReleaseRevokedPayload repeats the digest so the audit stream names the
+// release the way the CLI prints it.
+type ReleaseRevokedPayload struct {
+	ContentHash string `json:"content_hash"`
+}
+
 // ReleasePayloadSnapshot is the allowlisted create snapshot for release events.
 func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
 	if rel == nil {

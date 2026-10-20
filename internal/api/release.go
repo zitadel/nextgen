@@ -5,16 +5,51 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// RevokeRelease answers 501 until the release service can revoke. Without it
-// the generated stub's sentinel is not a domain error and maps to 500.
-func (h *Handler) RevokeRelease(context.Context, api.RevokeReleaseParams) (api.RevokeReleaseRes, error) {
-	return nil, domain.ErrNotImplemented()
+func (h *Handler) RevokeRelease(ctx context.Context, params api.RevokeReleaseParams) (api.RevokeReleaseRes, error) {
+	// Scoped to the project like the read, so a release of another project
+	// answers not found rather than confirming it exists.
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), releaseAccess, opWrite); err != nil {
+		return nil, err
+	}
+
+	entity, err := h.releaseService.Revoke(ctx, string(params.ProjectID), string(params.ReleaseID))
+	if conflict, ok := releaseInUseResponse(err); ok {
+		return conflict, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	release := toAPIRelease(entity)
+	return &release, nil
+}
+
+// releaseInUseResponse answers rel.in_use with the typed 409, whose
+// details.origins names each origin still serving the release. Through
+// NewError the details would nest under details.details.
+func releaseInUseResponse(err error) (*api.RevokeReleaseConflict, bool) {
+	de, ok := errors.AsType[domain.Error](err)
+	if !ok || de.Code != domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code {
+		return nil, false
+	}
+	details, _ := de.Details.(domain.ReleaseInUseDetails)
+	resp := api.RevokeReleaseConflict{Code: api.ErrorCode(de.Code), Message: de.Message}
+	resp.Details.Origins = make([]api.RevokeReleaseConflictDetailsOriginsItem, len(details.Origins))
+	for i, origin := range details.Origins {
+		// A stored origin is a validated scheme://host[:port], so it parses.
+		parsed, _ := url.Parse(origin.Origin)
+		resp.Details.Origins[i] = api.RevokeReleaseConflictDetailsOriginsItem{
+			Origin:       *parsed,
+			DeploymentID: api.DeploymentID(origin.DeploymentID),
+		}
+	}
+	return &resp, true
 }
 
 func (h *Handler) BuildRelease(ctx context.Context, req *api.BuildReleaseRequest, params api.BuildReleaseParams) (api.BuildReleaseRes, error) {
@@ -257,7 +292,7 @@ func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParam
 			ProjectID:   api.ProjectID(entity.ProjectID),
 			ContentHash: toAPIReleaseContentHash(entity.ContentHash),
 			Metadata:    toAPIReleaseMetadata(entity),
-			RevokedAt:   api.NilDateTime{Null: true},
+			RevokedAt:   toAPIRevokedAt(entity),
 		}
 	}
 	if result.NextPageToken != "" {
@@ -290,9 +325,17 @@ func toAPIRelease(entity *domain.Release) api.Release {
 		ProjectID:   api.ProjectID(entity.ProjectID),
 		ContentHash: toAPIReleaseContentHash(entity.ContentHash),
 		Metadata:    toAPIReleaseMetadata(entity),
-		RevokedAt:   api.NilDateTime{Null: true},
+		RevokedAt:   toAPIRevokedAt(entity),
 		Pointers:    pointers,
 	}
+}
+
+// toAPIRevokedAt writes the revocation time, or an explicit null.
+func toAPIRevokedAt(entity *domain.Release) api.NilDateTime {
+	if entity.RevokedAt == nil {
+		return api.NilDateTime{Null: true}
+	}
+	return api.NewNilDateTime(*entity.RevokedAt)
 }
 
 // toAPIReleaseMetadata writes absent fields as explicit nulls rather than
@@ -341,7 +384,7 @@ func releaseErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrReleasePermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
-	case domain.ErrReleaseRevoked().Code, domain.ErrReleaseNotDeployed(nil).Code:
+	case domain.ErrReleaseRevoked().Code, domain.ErrReleaseNotDeployed(nil).Code, domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	default:
 		return internalErrorResponse(err)

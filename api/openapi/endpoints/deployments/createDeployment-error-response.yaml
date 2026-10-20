@@ -15,6 +15,7 @@ content:
         - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../components/schemas/errors/rel-not_found.yaml'
+        - $ref: '../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
@@ -30,6 +31,7 @@ content:
           not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           proj.not_found: '../../components/schemas/errors/proj-not_found.yaml'
           rel.not_found: '../../components/schemas/errors/rel-not_found.yaml'
+          rel.revoked: '../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
       auth.unauthorized:
@@ -87,6 +89,11 @@ content:
         value:
           code: rel.not_found
           message: 'release: not found'
+      rel.revoked:
+        summary: rel.revoked
+        value:
+          code: rel.revoked
+          message: 'release: revoked'
       req.invalid:
         summary: req.invalid
         value:

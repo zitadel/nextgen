@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/preview"
 	"github.com/zitadel/nextgen/internal/storage/release"
 )
 
@@ -52,6 +56,7 @@ type ReleaseService interface {
 	Build(ctx context.Context, input BuildReleaseInput) (*CreateReleaseOutput, error)
 	Get(ctx context.Context, projectID, id string) (*domain.Release, error)
 	List(ctx context.Context, input ListReleasesInput) (*ListReleasesOutput, error)
+	Revoke(ctx context.Context, projectID, id string) (*domain.Release, error)
 }
 
 type releaseService struct {
@@ -231,6 +236,100 @@ func (s *releaseService) Get(ctx context.Context, projectID, id string) (_ *doma
 	}
 	return entity, nil
 }
+
+// Revoke marks the release revoked, once: a release already revoked comes
+// back unchanged. A release an origin still serves is refused with the
+// origins and the deployments that pin it.
+func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *domain.Release, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.Revoke")
+	defer end(&err)
+
+	var revoked *domain.Release
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		stmts := tx.Statements()
+		entity, err := stmts.GetReleaseByID(ctx, projectID, id)
+		if err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				return domain.ErrReleaseNotFound()
+			}
+			return domain.ErrInternal(err).WithMessage("failed to get release from database")
+		}
+		if entity.RevokedAt != nil {
+			revoked = entity
+			return nil
+		}
+		served, err := servedOrigins(ctx, stmts, projectID, id, time.Now())
+		if err != nil {
+			return err
+		}
+		if len(served) > 0 {
+			return domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: served})
+		}
+		revoked, err = stmts.RevokeRelease(ctx, projectID, id)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to revoke release")
+		}
+		return audit.Emit(ctx, stmts, audit.EmitSpec{
+			Type:       domain.EventTypeReleaseRevoked,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  projectID,
+			EntityType: "release",
+			EntityID:   id,
+			Payload:    domain.ReleaseRevokedPayload{ContentHash: revoked.ContentHash},
+		})
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to revoke release")
+	}
+	return revoked, nil
+}
+
+// servedOrigins lists, sorted, the origins whose newest deployment pins the
+// release: the project's primary origins and the preview URLs live at now.
+func servedOrigins(ctx context.Context, stmts AllStatements, projectID, releaseID string, now time.Time) ([]domain.ReleaseInUseOrigin, error) {
+	project, err := stmts.GetProjectByID(ctx, projectID)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to get project from database")
+	}
+	origins := domain.PrimaryOrigins(project.Origins)
+	var cursor []byte
+	for {
+		opts := preview.LiveListOptions(projectID, now, livePreviewPageSize)
+		opts.Pagination.Cursor = cursor
+		page, err := stmts.ListPreviews(WithAuthzListUnrestricted(ctx), opts)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to list previews")
+		}
+		for _, p := range page.Items {
+			origins = append(origins, p.Origin)
+		}
+		if len(page.NextCursor) == 0 {
+			break
+		}
+		cursor = page.NextCursor
+	}
+	if len(origins) == 0 {
+		return nil, nil
+	}
+	newest, err := stmts.GetNewestPerOrigin(ctx, projectID, origins)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the newest deployment per origin")
+	}
+	var served []domain.ReleaseInUseOrigin
+	for _, d := range newest {
+		if d.ReleaseID == releaseID {
+			served = append(served, domain.ReleaseInUseOrigin{Origin: d.Origin, DeploymentID: d.DeploymentID})
+		}
+	}
+	slices.SortFunc(served, func(a, b domain.ReleaseInUseOrigin) int { return strings.Compare(a.Origin, b.Origin) })
+	return served, nil
+}
+
+// livePreviewPageSize pages the live previews a revoke checks.
+const livePreviewPageSize = 100
 
 func (s *releaseService) List(ctx context.Context, input ListReleasesInput) (_ *ListReleasesOutput, err error) {
 	ctx, end := startSpan(ctx, "ReleaseService.List")

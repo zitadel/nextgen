@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -127,12 +128,25 @@ func decodeBuildReleaseRequest(body string) (api.BuildReleaseRequest, error) {
 	return req, req.Validate()
 }
 
-// Pins revoke's answer until the service can revoke: 501, not the 500 the
-// generated stub's sentinel would map to.
-func TestRevokeReleaseNotImplemented(t *testing.T) {
-	_, err := (&Handler{}).RevokeRelease(t.Context(), api.RevokeReleaseParams{})
-	require.Error(t, err)
-	assert.Equal(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
+// A revoked release and one still served are both conflicts.
+func TestReleaseErrorResponseConflicts(t *testing.T) {
+	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseRevoked()).StatusCode)
+	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{})).StatusCode)
+}
+
+// The 409 names every origin still serving the release, so the caller can
+// deploy elsewhere or roll back before revoking again.
+func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {
+	resp, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
+		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+	}}))
+	require.True(t, ok)
+	raw, err := json.Marshal(resp)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"code":"rel.in_use","message":"release: still served by an origin","details":{"origins":[{"origin":"https://app.acme.com","deployment_id":"dep_1"}]}}`, string(raw))
+
+	_, ok = releaseInUseResponse(domain.ErrReleaseNotFound())
+	assert.False(t, ok)
 }
 
 func TestRequireBuildKindScopes(t *testing.T) {
