@@ -30,10 +30,11 @@ function artifactEdge(project, target) {
   if (project === "bench") return target === "server"; // vet compiles the Go the server's generation writes
   if (project === "console") return target === "cli"; // dev-real boots an instance through the built CLI
   if (project === "workspace") return target === "console" || target === "login-ui"; // the local image embeds the UI builds
-  // The e2e suite runs built apps and the server binary; demo-next's dev server
-  // loads the built sdk-next, demo-nuxt's the built sdk-nuxt.
+  // The e2e suite runs built apps, the server binary and the journey's mock
+  // OIDC provider binary; demo-next's dev server loads the built sdk-next,
+  // demo-nuxt's the built sdk-nuxt.
   if (project === "e2e" || project.endsWith("-e2e"))
-    return ["cli", "server", "console"].includes(target) || target.startsWith("sdk-");
+    return ["cli", "server", "console", "oidc-mock"].includes(target) || target.startsWith("sdk-");
   return false;
 }
 

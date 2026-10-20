@@ -271,6 +271,8 @@ tasks:
     deps:
       - "cli:build"
       - "testing:build"
+      # The mock OIDC provider the runner starts beside each framework lane.
+      - "oidc-mock:build"
     options:
       cache: false
       runInCI: false
@@ -302,6 +304,7 @@ tasks:
     deps:
       - "cli:build"
       - "testing:build"
+      - "oidc-mock:build"
       # sdk-next is omitted: cli:build already reaches it (no duplicate edges).
       - "sdk-nuxt:build"
       - "sdk-react:build"
