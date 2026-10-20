@@ -28,7 +28,7 @@ projects:
     sdk-svelte: "packages/sdk-svelte"
     sdk-sveltekit: "packages/sdk-sveltekit"
     sdk-tanstack-start: "packages/sdk-tanstack-start"
-    sdk-qwik-city: "packages/sdk-qwik-city"
+    sdk-qwik-router: "packages/sdk-qwik-router"
     sdk-vue: "packages/sdk-vue"
     testing: "packages/testing"
     storybook: "apps/storybook"

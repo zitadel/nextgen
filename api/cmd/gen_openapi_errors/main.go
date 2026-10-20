@@ -934,6 +934,12 @@ var operationExcludedErrors = map[string][]string{
 	// gone renders the step again. sch.not_found is remapped as for
 	// getFlowStep.
 	"submitFlowStep": {"domain.ErrFlowSSOUnavailable", "domain.ErrIDPConnectionNotFound", "domain.ErrJSONSchemaNotFound", "domain.ErrSSOStateInvalid"},
+	// The identifier lookup of the flow path turns a bound user schema the
+	// project does not hold into domain.ErrInternal (resolveIdentifier), so
+	// sch.not_found never reaches the response.
+	"verifyChallengeProof": {"domain.ErrJSONSchemaNotFound"},
+	// sch.not_found is remapped as for verifyChallengeProof.
+	"finishUserPasskeyRegistration": {"domain.ErrJSONSchemaNotFound"},
 	// Create and revise run the engine's connection parse after the schema
 	// check. The schema already refuses a missing protocol block, scopes
 	// without openid, and a cleartext endpoint as req.invalid, so only the

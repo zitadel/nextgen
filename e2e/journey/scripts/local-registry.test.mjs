@@ -61,7 +61,7 @@ test("prepares local package tarballs and publishes them to Verdaccio", async ()
 
   assert.ok(
     logs.includes(
-      "building release npm tarballs for @zitadel/cli, @zitadel/server, @zitadel/server-linux-x64, @zitadel/server-linux-arm64, @zitadel/server-darwin-x64, @zitadel/server-darwin-arm64, @zitadel/server-win32-x64, @zitadel/api, @zitadel/config, @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt, @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular, @zitadel/sdk-solid, @zitadel/sdk-svelte, @zitadel/sdk-qwik, @zitadel/sdk-sveltekit, @zitadel/sdk-solid-start, @zitadel/sdk-qwik-city, @zitadel/sdk-tanstack-start, @zitadel/testing",
+      "building release npm tarballs for @zitadel/cli, @zitadel/server, @zitadel/server-linux-x64, @zitadel/server-linux-arm64, @zitadel/server-darwin-x64, @zitadel/server-darwin-arm64, @zitadel/server-win32-x64, @zitadel/api, @zitadel/config, @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt, @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular, @zitadel/sdk-solid, @zitadel/sdk-svelte, @zitadel/sdk-qwik, @zitadel/sdk-sveltekit, @zitadel/sdk-solid-start, @zitadel/sdk-qwik-router, @zitadel/sdk-tanstack-start, @zitadel/testing",
     ),
     logs.join("\n"),
   );

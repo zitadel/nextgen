@@ -62,7 +62,7 @@ The middleware runs on every matched route and does three things in one pass:
 
 1. **Proxies** `/__nextgen/*` requests to the auth backend
 2. **Verifies** the session JWT via JWKS using the Web Crypto API
-3. **Redirects** unauthenticated requests to `loginPath` for protected routes
+3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in
 
 ### 2. Reading auth in a Server Component
 
@@ -154,8 +154,10 @@ scaffolded matcher covers just the proxy path and the protected routes — so a
 header on a public page would always look signed out. For your app's own chrome
 (header navigation, account menus), read the session client-side with
 `getSession()` from `@zitadel/sdk-next/session`. It fetches the same-origin
-`{proxyPath}/sessions/me` — the same read the `<zitadel-session>` card performs —
-so it works on every page and the answer is the server's:
+`{proxyPath}/sessions/me?project_id=…` — the same read the `<zitadel-session>`
+card performs — so it works on every page and the answer is the server's. The
+project is the `projectId` option, else the project of `configureZitadel()`,
+else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`; with none, it reads as signed out:
 
 ```tsx
 'use client';
@@ -167,7 +169,7 @@ export function HeaderNav() {
   const [auth, setAuth] = useState<ClientAuthResult>();
   const [error, setError] = useState<Error>();
   useEffect(() => {
-    getSession().then(setAuth, setError);
+    getSession({ projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID }).then(setAuth, setError);
   }, []);
   if (error) return <span role="alert">Session unavailable</span>;
   if (!auth) return null;
@@ -184,8 +186,9 @@ A rejected `getSession()` means the state is *unknown* (broken proxy, network,
 
 A `200` with a non-empty `user_id` resolves to
 `{ isAuthenticated: true, session: { userId, email, name } }` (client-safe —
-no token); the canonical `401/auth.unauthorized`,
-`404/sess.not_found`, and anonymous sessions resolve to signed out. The request
+no token); the canonical `401/auth.unauthorized`, `403/sess.project_mismatch`
+(a session of another project on the same host), `404/sess.not_found`, and
+anonymous sessions resolve to signed out. The request
 and response are both marked no-store. Any other response — including malformed
 JSON or a framework's HTML 404 page from a misrouted proxy — throws so a broken
 proxy doesn't silently render as signed out. Sign-in and sign-out navigate
@@ -272,7 +275,8 @@ return <zitadel-login ref={ref} post-sign-in-url="/admin" />;
 
 | Option              | Type                 | Default                  | Description                                                                                                                |
 | ------------------- | -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `url`                 | `string`             | `ZITADEL_URL` env        | Full URL of the Zitadel auth backend                                                                                       |
+| `url`                 | `string`             | `ZITADEL_URL` env        | Full URL of the Zitadel auth backend. A trailing slash is ignored.                                                         |
+| `projectId`         | `string`             | `ZITADEL_PROJECT_ID`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID` | The project this app signs its users in to. A session of any other project on the server reads as signed out and keeps its cookie; with no project, no session counts. Pass the same value to `auth()` |
 | `proxyPath`         | `string`             | `"/__nextgen"`           | Path prefix proxied to the auth backend. Sign-in with an external provider currently requires the default: the provider returns to `/__nextgen/idp/{slug}/callback` |
 | `protectedRoutes`   | `string[]`           | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
 | `ignoredRoutes`     | `string[]`           | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
@@ -292,5 +296,5 @@ The verification pipeline is shared across SDKs and documented once in
 [`@zitadel/sdk-core`](https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#how-jwt-verification-works).
 On top of that pipeline, the Next.js middleware adds:
 
-1. The `x-nextgen-auth-token` header is stripped from all proxied requests to prevent internal state leakage
+1. A request that carries an `x-nextgen-auth-token` header is refused with a 400 on every route, including ignored routes and the proxy path: the header is an internal channel that only the middleware writes, so a client never sends it
 2. `auth()` re-applies the same verification to the tunnelled token in the server runtime — the header alone is never treated as proof of a session

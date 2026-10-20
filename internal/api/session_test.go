@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -47,6 +49,68 @@ func TestInvalidSessionCredential(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrSessionTokenInvalid())
 	require.Equal(t, "auth.unauthorized", err.Code)
 	require.Equal(t, sessionUnauthorizedMessage, err.Message)
+}
+
+// TestGetMySessionHoldsTheSessionToTheNamedProject drives GET /sessions/me
+// through the generated server. With project_id, a session of another project
+// is refused with 403 sess.project_mismatch before it is looked up; a session
+// of the named project, or a read that names none, is served as before.
+func TestGetMySessionHoldsTheSessionToTheNamedProject(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		query      string
+		wantStatus int
+	}{
+		{name: "a session of another project", query: "?project_id=proj_app", wantStatus: http.StatusForbidden},
+		{name: "a session of the named project", query: "?project_id=proj_other", wantStatus: http.StatusOK},
+		{name: "a read that names no project", query: "", wantStatus: http.StatusOK},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			sid := "sess_1"
+			tokens := servicemocks.NewMockTokenService(ctrl)
+			tokens.EXPECT().IntrospectToken(gomock.Any(), "cookie").Return(&domain.Token{
+				Type:      domain.TokenTypeSessionToken,
+				ProjectID: "proj_other",
+				SessionID: &sid,
+				TokenID:   "tkn_1",
+				UserID:    "user_1",
+			}, nil)
+			// No expectation on the refused read: a lookup would fail the test.
+			sessions := servicemocks.NewMockSessionService(ctrl)
+			if tc.wantStatus == http.StatusOK {
+				sessions.EXPECT().
+					Get(gomock.Any(), service.GetSessionInput{ProjectID: "proj_other", SessionID: sid, WithUserIdentity: true}).
+					Return(&domain.Session{
+						ProjectID: "proj_other",
+						ID:        sid,
+						TokenID:   "tkn_1",
+						UserID:    new("user_1"),
+						ExpiresAt: time.Now().Add(time.Hour),
+					}, nil)
+			}
+			srv, err := api.NewServer(&Handler{sessionService: sessions}, NewSecurityHandler(tokens), api.WithErrorHandler(OgenErrorHandler))
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodGet, "/sessions/me"+tc.query, nil)
+			req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "cookie"})
+			rec := httptest.NewRecorder()
+			WithCSRFRequest(srv).ServeHTTP(rec, req)
+
+			require.Equal(t, tc.wantStatus, rec.Code, rec.Body.String())
+			if tc.wantStatus == http.StatusForbidden {
+				require.JSONEq(t,
+					`{"code":"sess.project_mismatch","message":"The session belongs to a different project."}`,
+					rec.Body.String(),
+				)
+			}
+		})
+	}
 }
 
 // RevokeMySession is idempotent: logging out a session that is already gone

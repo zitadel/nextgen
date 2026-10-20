@@ -15,7 +15,7 @@ test("the CI matrix skips the meta-frameworks whose scaffolders track upstream r
     "sveltekit",
     "tanstack-start",
     "solid-start",
-    "qwik-city",
+    "qwik-router",
   ]);
   assert.deepEqual(ciFrameworkIds, [
     "next",
@@ -48,7 +48,7 @@ test("framework registry lists every CLI journey target", () => {
       "sveltekit",
       "tanstack-start",
       "solid-start",
-      "qwik-city",
+      "qwik-router",
     ],
   );
   assert.deepEqual(
@@ -71,7 +71,7 @@ test.each([
   ["sveltekit", true],
   ["tanstack-start", true],
   ["solid-start", true],
-  ["qwik-city", true],
+  ["qwik-router", true],
   ["react", false],
   ["vue", false],
   ["angular", false],

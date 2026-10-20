@@ -3,7 +3,7 @@
  *
  * The middleware-layer types are defined once in sdk-core and shared by every
  * server SDK (`sdk-next`, `sdk-nuxt`, `sdk-sveltekit`, `sdk-tanstack-start`,
- * `sdk-solid-start`, `sdk-qwik-city`).
+ * `sdk-solid-start`, `sdk-qwik-router`).
  */
 export type {
   NextgenSession,

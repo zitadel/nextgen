@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"testing"
 
@@ -94,4 +95,10 @@ func TestError_logValue_nonGCPIncludesLocationWhenEnabled(t *testing.T) {
 		}
 	}
 	require.True(t, hasLocation)
+}
+
+func TestIsServerFault(t *testing.T) {
+	assert.True(t, domain.IsServerFault(errors.New("driver detail")), "a non-domain error")
+	assert.True(t, domain.IsServerFault(fmt.Errorf("read: %w", domain.ErrFailedToDecryptVariable(nil))), "a wrapped server fault")
+	assert.False(t, domain.IsServerFault(domain.ErrAuthAttemptNotFound()), "a client error")
 }

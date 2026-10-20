@@ -96,6 +96,15 @@ describe("LocalServer", () => {
       });
     });
 
+    it("reports nothing stopped where Docker is not installed", async () => {
+      vi.stubEnv("PATH", await directory());
+
+      await expect(at(await directory()).stop()).resolves.toMatchObject({
+        runtime: undefined,
+        stopped: false,
+      });
+    });
+
     it("reports nothing stopped when the recorded process is already gone", async () => {
       await expect(at(await directoryWithAGoneServer()).stop()).resolves.toMatchObject({
         stopped: false,

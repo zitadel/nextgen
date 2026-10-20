@@ -1,1 +1,0 @@
-# @zitadel/sdk-qwik-city
