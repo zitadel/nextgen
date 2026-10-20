@@ -26,3 +26,15 @@ export interface InitScriptTarget {
 export async function openShadowRoots(target: InitScriptTarget): Promise<void> {
   await target.addInitScript({ content: FORCE_OPEN_SHADOW_ROOTS });
 }
+
+/**
+ * The body of the `context` fixture in `test` and `widgetTest`: opens the
+ * roots, then hands the same context to the test.
+ */
+export async function withOpenShadowRoots<Context extends InitScriptTarget>(
+  context: Context,
+  use: (context: Context) => Promise<void>,
+): Promise<void> {
+  await openShadowRoots(context);
+  await use(context);
+}

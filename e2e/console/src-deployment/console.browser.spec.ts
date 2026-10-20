@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, widgetTest as test } from "@zitadel/testing/playwright";
 
 /**
  * The console signed out, as the deployment serves it. A deep link proves the

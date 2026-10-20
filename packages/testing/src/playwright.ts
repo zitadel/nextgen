@@ -4,7 +4,7 @@ import { waitForHandshake } from "./handshake";
 import { connectZitadel } from "./index";
 import { enableVirtualPasskey, type VirtualPasskey } from "./passkey";
 import { sessionCookieName } from "./session";
-import { openShadowRoots } from "./shadow-roots";
+import { openShadowRoots, withOpenShadowRoots } from "./shadow-roots";
 import type {
   ConnectedZitadel,
   Identity,
@@ -62,8 +62,7 @@ export interface ZitadelWorkerFixtures {
  */
 export const widgetTest = base.extend({
   context: async ({ context }, use) => {
-    await openShadowRoots(context);
-    await use(context);
+    await withOpenShadowRoots(context, use);
   },
 });
 

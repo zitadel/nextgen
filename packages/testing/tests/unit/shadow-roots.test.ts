@@ -2,7 +2,11 @@ import { runInNewContext } from "node:vm";
 
 import { describe, expect, it } from "vitest";
 
-import { FORCE_OPEN_SHADOW_ROOTS, openShadowRoots } from "../../src/shadow-roots";
+import {
+  FORCE_OPEN_SHADOW_ROOTS,
+  openShadowRoots,
+  withOpenShadowRoots,
+} from "../../src/shadow-roots";
 
 interface AttachInit {
   mode: string;
@@ -43,5 +47,22 @@ describe("openShadowRoots", () => {
     });
 
     expect(scripts).toEqual([{ content: FORCE_OPEN_SHADOW_ROOTS }]);
+  });
+});
+
+describe("withOpenShadowRoots", () => {
+  it("opens the roots before the test sees the context, and hands it over unchanged", async () => {
+    const calls: string[] = [];
+    const context = {
+      addInitScript: async () => {
+        calls.push("opened");
+      },
+    };
+
+    await withOpenShadowRoots(context, async (given) => {
+      calls.push(given === context ? "same context" : "other context");
+    });
+
+    expect(calls).toEqual(["opened", "same context"]);
   });
 });
