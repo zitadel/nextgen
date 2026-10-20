@@ -27,6 +27,10 @@ const concurrency = 8;
 // page, one level up, is content like any other.
 const operationPage = /^\/docs\/reference\/api\/[^/]+\/[^/]+$/;
 
+// The CLI reference is /docs/reference/cli, and a command's page has the
+// command's words as the segments after it: /docs/reference/cli/users/list.
+const cliReferencePage = /^\/docs\/reference\/cli(?:\/(.+))?$/;
+
 async function indexedPages(request: APIRequestContext): Promise<IndexedPage[]> {
   const response = await request.get("/docs/llms.txt");
   expect(response.status()).toBe(200);
@@ -189,6 +193,33 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
   });
   expect(operations).toBeGreaterThan(0);
   expect(failures(results), "operations without their @zitadel/api call").toEqual([]);
+});
+
+test("every CLI command shows its usage, in tables whose rows keep their two cells", async ({
+  request,
+}) => {
+  test.setTimeout(120_000);
+  const pages = (await indexedPages(request)).filter((page) => cliReferencePage.test(page.url));
+
+  // A command's usage runs the command its URL names, and a `|` in the help
+  // it is generated from, as in a list's `--filter` grammar, stays inside its
+  // table cell (lib/cli-reference.ts). A cell splits at every `|` it does not
+  // escape, in a code span too.
+  const cells = (row: string) => row.slice(1, -1).split(/(?<!\\)\|/).length;
+  let commands = 0;
+  const results = await mapLimit(pages, concurrency, async ({ url }) => {
+    const markdown = await (await request.get(markdownUrl(url))).text();
+    const words = cliReferencePage.exec(url)?.[1];
+    if (words) {
+      commands++;
+      const usage = `## Usage\n\n\`\`\`sh\nnpx @zitadel/cli@alpha ${words.split("/").join(" ")} `;
+      if (!markdown.includes(usage)) return `${markdownUrl(url)}: no usage of its command`;
+    }
+    const ragged = markdown.split("\n").find((line) => line.startsWith("| ") && cells(line) !== 2);
+    return ragged ? `${markdownUrl(url)}: a table row that is not two cells: ${ragged}` : null;
+  });
+  expect(commands).toBeGreaterThan(0);
+  expect(failures(results), "CLI reference pages whose Markdown is wrong").toEqual([]);
 });
 
 test("a page that does not exist is a 404, as HTML and as Markdown", async ({ request }) => {
