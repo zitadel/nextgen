@@ -101,9 +101,7 @@ describe("standardAttributes", () => {
 describe("ZitadelFlowInputDetail", () => {
   it("types a secret flow input without a value", () => {
     expectTypeOf<Extract<ZitadelFlowInputDetail, { secret: true }>>().not.toHaveProperty("value");
-    // @ts-expect-error a secret field has no value to read
-    const leak = (detail: ZitadelFlowInputDetail): string => detail.value;
-    expect(leak).toBeTypeOf("function");
+    expectTypeOf<ZitadelFlowInputDetail>().not.toHaveProperty("value");
   });
 
   it("offers the value only once the field is narrowed to a non-secret one", () => {

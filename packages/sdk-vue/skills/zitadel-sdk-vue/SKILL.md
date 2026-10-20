@@ -105,7 +105,7 @@ Each widget event reaches the callback in the last column, which receives the ev
 | Widget event | Fires when | Detail | Widgets | Callback |
 | --- | --- | --- | --- | --- |
 | `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `@flowStep` |
-| `zitadel-flow-input` | The visitor edits a field. | `{ name, secret: false, value }`, or `{ name, secret: true }` for a secret field | Login | `@flowInput` |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, secret: false, value }` for an identifier field, `{ name, secret: true }` for any other | Login | `@flowInput` |
 | `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login | `@flowComplete` |
 | `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login | `@flowRedirect` |
 | `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login | `@flowError` |

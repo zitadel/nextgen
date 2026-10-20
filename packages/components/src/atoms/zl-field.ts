@@ -8,6 +8,7 @@ import { live } from "lit/directives/live.js";
 import fieldStyles from "./zl-field.css?inline";
 
 import { emit } from "../internal/emit.js";
+import { isDisclosable } from "../internal/secret-field.js";
 import { FormAtom } from "../internal/form-atom.js";
 import { hookName } from "../internal/hook-name.js";
 import { nextUid } from "../internal/unique-id.js";
@@ -419,7 +420,12 @@ export class ZlField extends FormAtom {
 
   private handleClear = (): void => {
     this.value = "";
-    emit<ZlFieldInputDetail>(this, "zl-input", { name: this.name, value: this.value });
+    emit<ZlFieldInputDetail>(
+      this,
+      "zl-input",
+      { name: this.name, value: this.value },
+      { composed: false },
+    );
     this.syncFormState();
     this.dispatchNativeInput();
     this.inputEl?.focus();
@@ -441,7 +447,12 @@ export class ZlField extends FormAtom {
     const input = event.target as HTMLInputElement;
     this.value = input.value;
     this.syncFormState();
-    emit<ZlFieldInputDetail>(this, "zl-input", { name: this.name, value: this.value });
+    emit<ZlFieldInputDetail>(
+      this,
+      "zl-input",
+      { name: this.name, value: this.value },
+      { composed: false },
+    );
     this.dispatchNativeInput(event);
   };
 
@@ -481,11 +492,14 @@ export class ZlField extends FormAtom {
   private dispatchNativeInput(source?: Event): void {
     if (typeof InputEvent === "function") {
       const input = source instanceof InputEvent ? source : undefined;
+      // The typed character is the secret one keystroke at a time, so it is
+      // re-published only for a field whose value may leave the widget.
+      const disclose = isDisclosable({ type: this.type, autocomplete: this.autocomplete });
       this.dispatchEvent(
         new InputEvent("input", {
           bubbles: true,
           composed: true,
-          data: input?.data ?? null,
+          data: disclose ? (input?.data ?? null) : null,
           inputType: input?.inputType ?? "",
           isComposing: input?.isComposing ?? false,
         }),

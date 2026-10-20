@@ -96,13 +96,6 @@ describe("ZitadelLogin", () => {
     },
   );
 
-  it("types a secret flow input without a value", () => {
-    expectTypeOf<Extract<ZitadelFlowInputDetail, { secret: true }>>().not.toHaveProperty("value");
-    // @ts-expect-error a secret field has no value to read
-    const leak = (detail: ZitadelFlowInputDetail): string => detail.value;
-    expect(leak).toBeTypeOf("function");
-  });
-
   it("forwards the ref to the underlying element", () => {
     let captured: ZitadelLoginElement | undefined;
     const { container } = render(() => (
@@ -626,3 +619,34 @@ describe.each(widgetNames)("%s standard attributes", (widget) => {
   });
 });
 // standard-attributes:end
+
+/** Dispatches the event on a rendered widget and returns the calls `onFlowInput` got, as JSON. */
+function forwardFlowInput(detail: ZitadelFlowInputDetail): string {
+  const spy = vi.fn();
+  const { container } = render(() => <ZitadelLogin project={project} onFlowInput={spy} />);
+  container
+    .querySelector("zitadel-login")
+    ?.dispatchEvent(new CustomEvent("zitadel-flow-input", { detail }));
+  return JSON.stringify(spy.mock.calls);
+}
+
+// flow-input:begin
+describe("flow input", () => {
+  it("types a secret flow input without a value", () => {
+    expectTypeOf<Extract<ZitadelFlowInputDetail, { secret: true }>>().not.toHaveProperty("value");
+    expectTypeOf<ZitadelFlowInputDetail>().not.toHaveProperty("value");
+  });
+
+  it("forwards a secret flow input as it came, without a value", async () => {
+    expect(await forwardFlowInput({ name: "password", secret: true })).toBe(
+      '[[{"name":"password","secret":true}]]',
+    );
+  });
+
+  it("forwards the value of an ordinary flow input", async () => {
+    expect(await forwardFlowInput({ name: "email", secret: false, value: "alice@acme.com" })).toBe(
+      '[[{"name":"email","secret":false,"value":"alice@acme.com"}]]',
+    );
+  });
+});
+// flow-input:end

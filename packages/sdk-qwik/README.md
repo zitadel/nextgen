@@ -68,13 +68,13 @@ Each widget event reaches the callback in the last column, which receives the ev
 | Widget event | Fires when | Detail | Widgets | Callback |
 | --- | --- | --- | --- | --- |
 | `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `onFlowStep$` |
-| `zitadel-flow-input` | The visitor edits a field. | `{ name, secret: false, value }`, or `{ name, secret: true }` for a secret field | Login | `onFlowInput$` |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, secret: false, value }` for an identifier field, `{ name, secret: true }` for any other | Login | `onFlowInput$` |
 | `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login | `onFlowComplete$` |
 | `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login | `onFlowRedirect$` |
 | `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login | `onFlowError$` |
 | `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session | `onSignout$` |
 
-A secret field is a password, a one-time or recovery code, or any field the step defines as one. The `zitadel-flow-input` event is composed, so any script on the page can read it, and for a secret field its detail therefore carries the field's `name` and `secret: true` but never the value. Narrow on `secret` before reading `value`.
+The `zitadel-flow-input` event is composed, so any script on the page can read it. It carries a field's value only for an identifier field: an `email` or `tel` field, or a `text` field whose `autocomplete` is `username`, `email`, `tel`, `name`, `given-name`, `additional-name`, `family-name` or `nickname`. Every other field, a password, a code or a PIN included, is reported as `{ name, secret: true }` with no value. Narrow on `secret` before reading `value`.
 
 ```tsx
 <ZitadelLogin project={project} theme="light" onFlowComplete$={(detail) => track(detail)} />

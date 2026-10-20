@@ -68,9 +68,6 @@ when there is none or it is not a path on the page's origin. A page that uses
 It emits `zitadel-flow-input`, `-step`, `-complete`, `-error`, `-redirect`
 events (`-step` fires for every step including the first; `-redirect` is a
 non-cancelable notification — the widget navigates to the IdP itself).
-`-input` is composed, so it never carries a secret field's value: its detail is
-`{ name, secret: true }` for a password or one-time code, and
-`{ name, secret: false, value }` otherwise.
 
 `<zitadel-logout>`: `project`, `post-sign-out-url`; supports a light-DOM
 `<template>` slot for a custom menu.

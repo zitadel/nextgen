@@ -224,13 +224,6 @@ describe("ZitadelLogin", () => {
     },
   );
 
-  it("types a secret flow input without a value", () => {
-    expectTypeOf<Extract<ZitadelFlowInputDetail, { secret: true }>>().not.toHaveProperty("value");
-    // @ts-expect-error a secret field has no value to read
-    const leak = (detail: ZitadelFlowInputDetail): string => detail.value;
-    expect(leak).toBeTypeOf("function");
-  });
-
   it("populates a consumer ref with the underlying element", async () => {
     const consumerRef = { value: undefined } as Signal<ZitadelLoginElement | undefined>;
     const host = await renderWidget(<ZitadelLogin project={project} ref={consumerRef} />);
@@ -960,3 +953,43 @@ describe.each(widgetNames)("%s standard attributes", (widget) => {
   });
 });
 // standard-attributes:end
+
+/** Dispatches the event on a rendered widget and returns the calls `onFlowInput$` got, as JSON. */
+async function forwardFlowInput(detail: ZitadelFlowInputDetail): Promise<string> {
+  const received: ZitadelFlowInputDetail[] = [];
+  const host = await renderWidget(
+    <ZitadelLogin
+      project={project}
+      onFlowInput$={$((forwarded: ZitadelFlowInputDetail) => {
+        received.push(forwarded);
+      })}
+    />,
+  );
+  const el = host.querySelector("zitadel-login");
+  if (!el) throw new Error("no widget rendered");
+  await dispatchUntilForwarded(el, "zitadel-flow-input", detail, received);
+  // The probe is re-dispatched until the listener exists, so a late attach can
+  // see it more than once; the first delivery is the one that matters.
+  return JSON.stringify(received.slice(0, 1).map((forwarded) => [forwarded]));
+}
+
+// flow-input:begin
+describe("flow input", () => {
+  it("types a secret flow input without a value", () => {
+    expectTypeOf<Extract<ZitadelFlowInputDetail, { secret: true }>>().not.toHaveProperty("value");
+    expectTypeOf<ZitadelFlowInputDetail>().not.toHaveProperty("value");
+  });
+
+  it("forwards a secret flow input as it came, without a value", async () => {
+    expect(await forwardFlowInput({ name: "password", secret: true })).toBe(
+      '[[{"name":"password","secret":true}]]',
+    );
+  });
+
+  it("forwards the value of an ordinary flow input", async () => {
+    expect(await forwardFlowInput({ name: "email", secret: false, value: "alice@acme.com" })).toBe(
+      '[[{"name":"email","secret":false,"value":"alice@acme.com"}]]',
+    );
+  });
+});
+// flow-input:end

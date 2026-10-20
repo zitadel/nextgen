@@ -1,7 +1,11 @@
-import type { CreateFlow201 } from "@zitadel/api/generated/model";
+import type { CreateFlow201, CreateFlow201Step } from "@zitadel/api/generated/model";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { userEvent } from "vitest/browser";
+
+import { DISPATCHED_EVENTS } from "../events.js";
+import { manifestRegistry } from "../manifests.js";
 
 import "./zitadel-login.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
@@ -745,5 +749,299 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     const body = JSON.parse(String(submit.init?.body)) as { fields: Record<string, unknown> };
     expect(body.fields).toHaveProperty("x-auth-methods#password", "hunter2");
     expect(Object.keys(body.fields)).toEqual(["x-auth-methods#password"]);
+  });
+});
+
+/**
+ * What a script on the page can observe while a visitor signs in.
+ *
+ * Listeners sit on `window` and `document`, in the capture and the bubble
+ * phase, for every event the widget can emit: the public `zitadel-*` events,
+ * every atom event the manifests declare, and the `input` and `change` the
+ * atoms re-publish. Typing goes through the real keyboard into the real
+ * `<zl-field>`. The browser's own trusted events (key presses and the native
+ * `input` of a keystroke) are not the widget's to withhold, so they are left
+ * out; everything the widget dispatches itself must carry no secret.
+ */
+describe("<zitadel-login> what the page can observe while signing in (chromium)", () => {
+  const PASSWORD = "Zq9#vLx!k2";
+  const NEW_PASSWORD = "Wm4$pTn@8d";
+  const PIN = "7391-Rk5";
+  const PASTED = "Pa5ted&Secret1";
+  const AUTOFILLED = "Au7ofill%Sec2";
+  const REVEALED = "Rv6ealed^Ty3";
+  const PASSKEY_SIGNATURE = "Qw8sig-proof-Mk3Xq";
+  const SECRETS = [
+    PASSWORD,
+    NEW_PASSWORD,
+    PIN,
+    PASTED,
+    AUTOFILLED,
+    REVEALED,
+    PASSKEY_SIGNATURE,
+    btoa(PASSKEY_SIGNATURE).replace(/=+$/, ""),
+  ];
+
+  const EVENT_TYPES = [
+    ...new Set<string>([
+      ...DISPATCHED_EVENTS,
+      ...manifestRegistry.flatMap((manifest) => manifest.events),
+      "input",
+      "change",
+    ]),
+  ];
+
+  interface Observation {
+    readonly type: string;
+    /** Dispatched by the widget: not the browser's, and not on the native input. */
+    readonly byWidget: boolean;
+    readonly stage: string;
+    readonly detail: string;
+    readonly data: string | null | undefined;
+  }
+
+  function step(name: string, fields: CreateFlow201Step["fields"]): CreateFlow201 {
+    return {
+      id: "flow_1",
+      session_id: "sess_1",
+      session_token: `tok_${name}`,
+      step: {
+        name,
+        texts: { title_key: "identifier.title" },
+        fields,
+        actions: [{ name: "submit", kind: "submit", text_key: "submit.signin", primary: true }],
+        gates: {},
+      },
+    };
+  }
+
+  const identifier = step("identifier", [
+    {
+      name: "email",
+      type: "email",
+      text_key: "identifier.field.email",
+      autocomplete: "username",
+      required: true,
+    },
+  ]);
+  const password = step("password", [
+    {
+      name: "password",
+      type: "password",
+      text_key: "identifier.field.password",
+      autocomplete: "current-password",
+      required: true,
+    },
+  ]);
+  const register = step("register", [
+    {
+      name: "new_password",
+      type: "password",
+      text_key: "identifier.field.password",
+      autocomplete: "new-password",
+      required: true,
+    },
+    { name: "pin", type: "text", text_key: "identifier.field.email" },
+    {
+      name: "nickname",
+      type: "text",
+      text_key: "identifier.field.email",
+      autocomplete: "nickname",
+    },
+  ]);
+
+  let host: HTMLDivElement;
+  let stub: ReturnType<typeof installFlowFetchStub>;
+  let observations: Observation[];
+  let stage: string;
+  let stopObserving: () => void;
+  let credentials: PropertyDescriptor | undefined;
+
+  beforeEach(() => {
+    _resetConfigForTesting();
+    configureZitadel({ proxyPath: "/__nextgen", projectId: "test-project" });
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    stub = installFlowFetchStub([identifier, password, register, passkeyUpsellStep]);
+
+    observations = [];
+    stage = "start";
+    const stops: (() => void)[] = [];
+    for (const target of [window, document]) {
+      for (const capture of [true, false]) {
+        for (const type of EVENT_TYPES) {
+          const listener = (event: Event): void => {
+            observations.push({
+              type,
+              byWidget: !event.isTrusted && !(event.composedPath()[0] instanceof HTMLInputElement),
+              stage,
+              detail: event instanceof CustomEvent ? JSON.stringify(event.detail) : "",
+              data: event instanceof InputEvent ? event.data : undefined,
+            });
+          };
+          target.addEventListener(type, listener, capture);
+          stops.push(() => target.removeEventListener(type, listener, capture));
+        }
+      }
+    }
+    stopObserving = () => {
+      for (const stop of stops) stop();
+    };
+
+    credentials = Object.getOwnPropertyDescriptor(navigator, "credentials");
+    Object.defineProperty(navigator, "credentials", {
+      configurable: true,
+      value: {
+        get: async () => ({
+          id: "cred-id",
+          rawId: new TextEncoder().encode("rawid").buffer,
+          type: "public-key",
+          response: {
+            clientDataJSON: new TextEncoder().encode("{}").buffer,
+            authenticatorData: new TextEncoder().encode("authdata").buffer,
+            signature: new TextEncoder().encode(PASSKEY_SIGNATURE).buffer,
+          },
+        }),
+      },
+    });
+  });
+
+  afterEach(() => {
+    stopObserving();
+    host.remove();
+    stub.restore();
+    if (credentials) Object.defineProperty(navigator, "credentials", credentials);
+  });
+
+  function nativeInput(element: ZitadelLogin, name: string): HTMLInputElement | undefined {
+    return (
+      element.shadowRoot
+        ?.querySelector(`zl-field[name="${name}"]`)
+        ?.shadowRoot?.querySelector("input") ?? undefined
+    );
+  }
+
+  async function focusField(element: ZitadelLogin, name: string): Promise<HTMLInputElement> {
+    const input = await waitFor(() => nativeInput(element, name));
+    input.focus();
+    return input;
+  }
+
+  async function submitStep(element: ZitadelLogin): Promise<void> {
+    const button = await waitFor(() =>
+      element.shadowRoot
+        ?.querySelector('zl-button[action="submit"]')
+        ?.shadowRoot?.querySelector("button"),
+    );
+    button.click();
+  }
+
+  function leaks(observation: Observation): string[] {
+    const haystack = `${observation.detail}${observation.data ?? ""}`;
+    return SECRETS.flatMap((secret) =>
+      Array.from({ length: secret.length - 2 }, (_unused, index) =>
+        secret.slice(0, index + 3),
+      ).filter((prefix) => haystack.includes(prefix)),
+    );
+  }
+
+  it("shows the page no secret across a whole sign-in and sign-up", async () => {
+    const element = document.createElement("zitadel-login");
+    element.purpose = "login";
+    element.project = configureZitadel({ proxyPath: "/__nextgen", projectId: "test-project" });
+    host.appendChild(element);
+
+    stage = "identifier";
+    await focusField(element, "email");
+    await userEvent.keyboard("alice@acme.com");
+    await submitStep(element);
+
+    stage = "password";
+    const typed = await focusField(element, "password");
+    await userEvent.keyboard(PASSWORD);
+    await userEvent.keyboard("{Backspace}{Backspace}");
+    await userEvent.keyboard(PASSWORD.slice(-2));
+    const toggle = await waitFor(() =>
+      element.shadowRoot
+        ?.querySelector('zl-field[name="password"]')
+        ?.shadowRoot?.querySelector<HTMLButtonElement>('[part~="password-toggle"]'),
+    );
+    toggle.click();
+    await waitFor(() => (typed.type === "text" ? typed : null));
+    await userEvent.keyboard(REVEALED);
+    typed.type = "text";
+    typed.value = "";
+    typed.value = PASTED;
+    typed.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        composed: true,
+        data: PASTED,
+        inputType: "insertFromPaste",
+      }),
+    );
+    typed.value = AUTOFILLED;
+    typed.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    typed.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+    await submitStep(element);
+
+    stage = "register";
+    await focusField(element, "new_password");
+    await userEvent.keyboard(NEW_PASSWORD);
+    await focusField(element, "pin");
+    await userEvent.keyboard(PIN);
+    stage = "nickname";
+    await focusField(element, "nickname");
+    await userEvent.keyboard("ally");
+    stage = "register-submit";
+    await submitStep(element);
+
+    stage = "passkey";
+    await waitFor(() => element.shadowRoot?.querySelector('zl-button[action="setup"]'));
+    const passkey = document.createElement("zl-passkey");
+    passkey.challengeId = "ch_1";
+    passkey.method = "passkey";
+    passkey.options = { challenge: "AAAA" };
+    element.shadowRoot?.appendChild(passkey);
+    await waitFor(() => (stub.calls.length >= 5 ? stub.calls : null));
+    expect(String(stub.calls[4]?.init?.body)).toContain("challenge_response");
+
+    const seen = observations.filter((observation) => observation.byWidget);
+    expect(seen.length).toBeGreaterThan(0);
+
+    expect(seen.flatMap(leaks)).toEqual([]);
+
+    const secretStages = new Set(["password", "register", "passkey"]);
+    const published = seen.filter(
+      (observation) => observation.type === "input" && secretStages.has(observation.stage),
+    );
+    expect(published.length).toBeGreaterThan(0);
+    expect(published.every((observation) => observation.data === null)).toBe(true);
+
+    const flowInputs = seen.filter((observation) => observation.type === "zitadel-flow-input");
+    expect(
+      flowInputs.some((observation) => observation.detail.includes('"value":"alice@acme.com"')),
+    ).toBe(true);
+    expect(
+      flowInputs
+        .filter(
+          (observation) =>
+            secretStages.has(observation.stage) && observation.detail.includes('"name":"password"'),
+        )
+        .every((observation) => observation.detail === '{"name":"password","secret":true}'),
+    ).toBe(true);
+    expect(
+      flowInputs.some(
+        (observation) =>
+          observation.detail.includes('"name":"nickname"') &&
+          observation.detail.includes('"value":"ally"'),
+      ),
+    ).toBe(true);
+
+    expect(seen.some((observation) => observation.type === "zitadel-flow-step")).toBe(true);
+    expect(observations.filter((observation) => observation.type === "zl-input")).toEqual([]);
+    expect(observations.filter((observation) => observation.type === "zl-passkey-result")).toEqual(
+      [],
+    );
   });
 });

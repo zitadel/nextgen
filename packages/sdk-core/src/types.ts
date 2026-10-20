@@ -23,34 +23,18 @@ export interface ZitadelFlowStepDetail {
 }
 
 /**
- * Payload of the `zitadel-flow-input` event for a field whose value is not a
- * secret.
+ * Payload of the `zitadel-flow-input` event. The event is composed, so any
+ * script on the page can read it, and it therefore carries a field's value only
+ * when the field's definition says it is an identifier: an `email` or `tel`
+ * field, or a `text` field whose `autocomplete` is `username`, `email`, `tel`,
+ * `name`, `given-name`, `additional-name`, `family-name` or `nickname`. Every
+ * other field (a password, a code, a PIN, anything unrecognised) is reported as
+ * `{ name, secret: true }` with no `value`. Narrow on `secret` before reading
+ * `value`; it exists only when `secret` is `false`.
  */
-export interface ZitadelFlowValueInputDetail {
-  readonly name: string;
-  readonly secret: false;
-  readonly value: string;
-}
-
-/**
- * Payload of the `zitadel-flow-input` event for a secret field: a password, a
- * one-time or recovery code, or any field the step defines as one. The event is
- * composed, so any script on the page can read it; the value is therefore never
- * part of it. There is deliberately no `value` to read.
- */
-export interface ZitadelFlowSecretInputDetail {
-  readonly name: string;
-  readonly secret: true;
-}
-
-/**
- * Payload of the `zitadel-flow-input` event. Narrow on `secret` before reading
- * `value`: it exists only when `secret` is `false`. A field is a secret when
- * its step definition has the `password` type or an `autocomplete` of
- * `current-password`, `new-password` or `one-time-code`; a field the step does
- * not define is treated as one too.
- */
-export type ZitadelFlowInputDetail = ZitadelFlowValueInputDetail | ZitadelFlowSecretInputDetail;
+export type ZitadelFlowInputDetail =
+  | { readonly name: string; readonly secret: false; readonly value: string }
+  | { readonly name: string; readonly secret: true };
 
 /** Payload of the `zitadel-flow-complete` event. */
 export interface ZitadelFlowCompleteDetail {

@@ -298,3 +298,116 @@ describe("<zl-field> password toggle", () => {
     expect(input(field).type).toBe("password");
   });
 });
+
+describe("<zl-field> what leaves the widget", () => {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  /** Mounts the field in a shadow root, as the orchestrator does. */
+  async function mount(html: string): Promise<ZlField> {
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = html;
+    const field = root.querySelector("zl-field");
+    if (!field) throw new Error("no zl-field mounted");
+    await field.updateComplete;
+    return field;
+  }
+
+  function nativeInput(field: ZlField): HTMLInputElement {
+    const input = field.shadowRoot?.querySelector("input");
+    if (!input) throw new Error("no native input");
+    return input;
+  }
+
+  function typeCharacter(field: ZlField, character: string): void {
+    const input = nativeInput(field);
+    input.value += character;
+    input.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        composed: true,
+        data: character,
+        inputType: "insertText",
+      }),
+    );
+  }
+
+  /** The `data` of every `input` event the field re-publishes to the page. */
+  function republishedData(field: ZlField): (string | null)[] {
+    const data: (string | null)[] = [];
+    field.addEventListener("input", (event) => {
+      if (event instanceof InputEvent) data.push(event.data);
+    });
+    return data;
+  }
+
+  it("keeps zl-input inside the widget, capture phase included", async () => {
+    const field = await mount(`<zl-field name="email" type="email"></zl-field>`);
+    const seen: string[] = [];
+    for (const target of [window, document]) {
+      for (const capture of [true, false]) {
+        target.addEventListener("zl-input", () => seen.push("page"), capture);
+      }
+    }
+    const own: string[] = [];
+    field.addEventListener("zl-input", (event) => {
+      if (event instanceof CustomEvent) own.push(JSON.stringify(event.detail));
+    });
+
+    typeCharacter(field, "a");
+
+    expect(seen).toEqual([]);
+    expect(own).toEqual(['{"name":"email","value":"a"}']);
+  });
+
+  it("keeps zl-input inside the widget when the field is cleared", async () => {
+    const field = await mount(`<zl-field name="email" type="email" value="a@b.c"></zl-field>`);
+    const seen: string[] = [];
+    window.addEventListener("zl-input", () => seen.push("page"), true);
+    const clear = field.shadowRoot?.querySelector<HTMLButtonElement>('[aria-label="Clear"]');
+    if (!clear) throw new Error("no clear button");
+
+    clear.click();
+
+    expect(seen).toEqual([]);
+  });
+
+  it.each([
+    ["an email", `<zl-field name="f" type="email"></zl-field>`, "a"],
+    ["a tel", `<zl-field name="f" type="tel"></zl-field>`, "a"],
+    ["a username", `<zl-field name="f" type="text" autocomplete="username"></zl-field>`, "a"],
+  ])("re-publishes the typed character of %s field", async (_label, html, character) => {
+    const field = await mount(html);
+    const data = republishedData(field);
+
+    typeCharacter(field, character);
+
+    expect(data).toEqual([character]);
+  });
+
+  it.each([
+    ["a password", `<zl-field name="f" type="password"></zl-field>`],
+    [
+      "a new password",
+      `<zl-field name="f" type="password" autocomplete="new-password"></zl-field>`,
+    ],
+    ["a plain text", `<zl-field name="f" type="text"></zl-field>`],
+    ["a one-time code", `<zl-field name="f" type="text" autocomplete="one-time-code"></zl-field>`],
+    ["a number", `<zl-field name="f" type="number"></zl-field>`],
+  ])("re-publishes no typed character of %s field", async (_label, html) => {
+    const field = await mount(html);
+    const data = republishedData(field);
+
+    typeCharacter(field, "Z");
+
+    expect(data).toEqual([null]);
+  });
+});

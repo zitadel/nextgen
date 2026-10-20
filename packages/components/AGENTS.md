@@ -60,12 +60,24 @@ and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM.
   `<option>`s.
 - It carries `data-testid="zitadel-<kind>-<name>"`, re-dispatches a composed
   `change` (and `input`) across the shadow boundary, and keeps
-  `setFormValue()` in sync on every change.
+  `setFormValue()` in sync on every change. The re-dispatched `input` carries
+  its `data` only for a field `isDisclosable` (`src/internal/secret-field.ts`)
+  allows; for any other field it is `null`.
 - Hide it with `opacity: 0` and `pointer-events: none`, never `display: none`,
   `visibility: hidden` or `aria-hidden`.
 - Styling it cannot take (a custom popup) is a pointer-only layer:
   `aria-hidden`, out of the tab order, its state in `data-*` hooks.
   `<zl-select>` is the reference.
+
+## Secrets and events
+
+Events that cross the shadow boundary must never carry secret values. An event
+that carries a field value or a credential and is only for the widget itself
+(`zl-input`, `zl-passkey-result`) is emitted `{ composed: false }`, so no page
+script sees it, capture phase included. A public event carries a value only for
+a field `isDisclosable` allows. The "what the page can observe" test in
+`src/orchestrator/zitadel-login.browser.spec.ts` enforces it across a whole
+sign-in with real typing; extend it when you add an event or a kind of field.
 
 ## Tests
 

@@ -167,6 +167,25 @@ describe("<zl-passkey>", () => {
     expect(result.proof.authenticatorAttachment).toBe("platform");
   });
 
+  it("keeps the proof inside the widget, capture phase included", async () => {
+    const root = host.attachShadow({ mode: "open" });
+    const el = create({
+      ceremony: "authenticate",
+      options: { challenge: "AAAA" },
+    });
+    const seenByPage: string[] = [];
+    for (const target of [window, document]) {
+      for (const capture of [true, false]) {
+        target.addEventListener("zl-passkey-result", () => seenByPage.push("proof"), capture);
+      }
+    }
+    const done = nextEvent(el, "zl-passkey-result");
+    root.appendChild(el);
+    await done;
+
+    expect(seenByPage).toEqual([]);
+  });
+
   it("decodes allowCredentials descriptors into ArrayBuffer ids", async () => {
     const el = create({
       ceremony: "authenticate",
