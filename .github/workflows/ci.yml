@@ -82,11 +82,11 @@ jobs:
           nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
       # Keyed on every module's go.sum (tools/bench and tools/oidc-mock are
-      # modules of their own) instead of setup-go's default, go.mod. ci-turbo.yml shared the go.mod
-      # key until it got a cache of its own, and its entry there for Go 1.26.8
-      # holds Go's own cache files. On Depot this job builds through GOCACHEPROG
-      # (`depot gocache`, which keeps depot-* files in GOCACHE), so it cannot
-      # use them.
+      # modules of their own) instead of setup-go's default, go.mod.
+      # ci-turbo.yml shared the go.mod key until it got a cache of its own,
+      # and its entry there for Go 1.26.8 holds Go's own cache files. On Depot
+      # this job builds through GOCACHEPROG (`depot gocache`, which keeps
+      # depot-* files in GOCACHE), so it cannot use them.
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod

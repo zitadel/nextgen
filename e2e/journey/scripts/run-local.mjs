@@ -175,6 +175,11 @@ function parseArgsOrExit(args) {
     const parsed = parseLocalJourneyArgs(args);
     if (!parsed.help) {
       assertPrebuiltTarballs(parsed, process.env);
+      // The lane starts the mock from its own work dir, so a relative path
+      // must not depend on the cwd.
+      if (parsed.oidcMockBinary) {
+        parsed.oidcMockBinary = resolve(repoRoot, parsed.oidcMockBinary);
+      }
       // By default the binary `moon run oidc-mock:build` writes, when it is there.
       const builtOidcMock = join(repoRoot, "tools/oidc-mock/dist/oidc-mock");
       if (!parsed.oidcMockBinary && existsSync(builtOidcMock)) {
@@ -329,9 +334,10 @@ async function createJourneyContext(variant, framework) {
   );
   const zitadelPort = await resolveFrameworkPort("JOURNEY_ZITADEL_PORT");
   const edgePort = variant.remote ? await resolveFrameworkPort("JOURNEY_EDGE_PORT") : undefined;
-  // The testkit lane boots its own instance and never talks to the mock.
+  // The testkit lane boots its own instance and never talks to the mock. A
+  // docker runtime cannot reach a mock that listens on the host only.
   const oidcMockPort =
-    variant.suite !== "testkit" && options.oidcMockBinary
+    variant.suite !== "testkit" && options.runtime !== "docker" && options.oidcMockBinary
       ? await resolveFrameworkPort("JOURNEY_OIDC_MOCK_PORT")
       : undefined;
   const appUrl = `http://localhost:${appPort}`;
