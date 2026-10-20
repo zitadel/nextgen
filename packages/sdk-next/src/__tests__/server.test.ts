@@ -1,4 +1,4 @@
-import { describe, expectTypeOf, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type {
   AuthOptions,
@@ -9,7 +9,7 @@ import type {
   UnauthState,
 } from "../server";
 
-import { auth } from "../server";
+import { auth, NextgenProvider } from "../server";
 
 describe("server entry", () => {
   // A Server Component imports `auth` and the types it answers with from one
@@ -19,5 +19,10 @@ describe("server entry", () => {
     expectTypeOf<AuthState["session"]>().toEqualTypeOf<NextgenSession>();
     expectTypeOf<UnauthState["session"]>().toEqualTypeOf<null>();
     expectTypeOf<AuthOptions["audience"]>().toEqualTypeOf<NextgenMiddlewareOptions["audience"]>();
+  });
+
+  it("loads and exports the server helpers", () => {
+    expect(auth).toBeTypeOf("function");
+    expect(NextgenProvider).toBeTypeOf("function");
   });
 });

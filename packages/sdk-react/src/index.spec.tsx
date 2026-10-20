@@ -813,6 +813,21 @@ describe("server-rendered widget config", () => {
 });
 // server-render-cases:end
 
+describe("server-rendered properties", () => {
+  it("leaves the properties and the callbacks out of the server markup", async () => {
+    const attributes = await renderAttributes("login", {
+      project: { projectId: "p1", proxyPath: "/px" },
+      variant: "page",
+      locales: { en: {} },
+      onFlowStep: () => undefined,
+    });
+    for (const name of ["variant", "locales", "onflowstep"]) {
+      expect(attributes).not.toHaveProperty(name);
+    }
+    expect(Object.values(attributes).join(" ")).not.toContain("object Object");
+  });
+});
+
 type ForwardedAttributes = {
   className: string;
   style: React.CSSProperties;

@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { render } from "svelte/server";
 import { describe, expect, it } from "vitest";
 
@@ -173,3 +172,23 @@ describe.each(widgetNames)("%s server-rendered standard attributes", (widget) =>
   });
 });
 // standard-attributes-server:end
+
+describe("the package entry on a Node server", () => {
+  it.each(widgetNames)(
+    "renders the %s widget from the entry a consumer resolves",
+    async (widget) => {
+      const sdk = await import("@zitadel/sdk-svelte");
+      const component = {
+        login: sdk.ZitadelLogin,
+        logout: sdk.ZitadelLogout,
+        session: sdk.ZitadelSession,
+      }[widget];
+      expect(
+        serverAttributes(widgetTags[widget], component, { projectId: "p1", proxyPath: "/px" }),
+      ).toMatchObject({
+        "project-id": "p1",
+        "proxy-path": "/px",
+      });
+    },
+  );
+});

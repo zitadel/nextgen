@@ -32,6 +32,22 @@ change needs a changeset, and the whole train versions together.
   ([ADR 036](../docs/adrs/036-api-credential-planes.md), ADR 005). Server SDKs
   implement it; SPA SDKs document a dev/deploy proxy (production guidance:
   [#560](https://github.com/zitadel/nextgen/issues/560)).
+- **Edge entries are tested in the edge runtime**: an SDK entry that claims
+  edge support has an `edge` project (`edgeProject()` in `vitest.shared.mjs`,
+  Vercel's `edge-runtime` VM) that re-runs its existing mirrored specs, chosen
+  by `include`. It fails at config load if `include` matches nothing. Every
+  edge project resolves with `workerd`, the condition Wrangler adds for
+  Cloudflare Workers. A package adds a condition only where what it loads
+  needs one: `react-server` and `edge-light` for Next, whose bundler adds both,
+  and `worker` for Solid, which ships its server build under that name. Each
+  carries a one-line comment saying why. Add an edge project only where the README claims edge, and leave
+  Node-only entries out. A client wrapper's edge spec loads the built package
+  by its name, as a consumer's bundler resolves it, never the source.
+  A spec that runs only there is named after its entry, `<entry>.edge.<spec|test>.<ext>`,
+  sits where the package keeps the spec of that entry and uses the suffix of
+  the package's own tests; the contract spec in `sdk-core` holds the client
+  SDKs' `edge-entry` and `edge-render` blocks and every edge project
+  declaration to one shape.
 - **One Agent Skill per framework SDK**, at `<pkg>/skills/<name>/SKILL.md`,
   plus `skills/zitadel-components/SKILL.md` for `@zitadel/components`; the
   top-level `skills/zitadel` routes to them. A new framework SDK adds its
