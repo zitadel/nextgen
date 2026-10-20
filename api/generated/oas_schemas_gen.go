@@ -55982,6 +55982,7 @@ func (*PatchUserByIDConflict) patchUserByIDRes() {}
 // PatchUserByIDErrorResponse represents sum type.
 type PatchUserByIDErrorResponse struct {
 	Type                 PatchUserByIDErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
@@ -55998,6 +55999,7 @@ type PatchUserByIDErrorResponseType string
 
 // Possible values for PatchUserByIDErrorResponseType.
 const (
+	AuthCsrfInvalidPatchUserByIDErrorResponse      PatchUserByIDErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedPatchUserByIDErrorResponse     PatchUserByIDErrorResponseType = "auth.unauthorized"
 	EvtInvalidPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "evt.invalid"
 	InternalPatchUserByIDErrorResponse             PatchUserByIDErrorResponseType = "internal"
@@ -56008,6 +56010,11 @@ const (
 	UserNotFoundPatchUserByIDErrorResponse         PatchUserByIDErrorResponseType = "user.not_found"
 	UserPermissionDeniedPatchUserByIDErrorResponse PatchUserByIDErrorResponseType = "user.permission_denied"
 )
+
+// IsAuthCsrfInvalid reports whether PatchUserByIDErrorResponse is AuthCsrfInvalid.
+func (s PatchUserByIDErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidPatchUserByIDErrorResponse
+}
 
 // IsAuthUnauthorized reports whether PatchUserByIDErrorResponse is AuthUnauthorized.
 func (s PatchUserByIDErrorResponse) IsAuthUnauthorized() bool {
@@ -56052,6 +56059,27 @@ func (s PatchUserByIDErrorResponse) IsUserNotFound() bool {
 // IsUserPermissionDenied reports whether PatchUserByIDErrorResponse is UserPermissionDenied.
 func (s PatchUserByIDErrorResponse) IsUserPermissionDenied() bool {
 	return s.Type == UserPermissionDeniedPatchUserByIDErrorResponse
+}
+
+// SetAuthCsrfInvalid sets PatchUserByIDErrorResponse to AuthCsrfInvalid.
+func (s *PatchUserByIDErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidPatchUserByIDErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if PatchUserByIDErrorResponse is AuthCsrfInvalid.
+func (s PatchUserByIDErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidPatchUserByIDErrorResponse(v AuthCsrfInvalid) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets PatchUserByIDErrorResponse to AuthUnauthorized.
