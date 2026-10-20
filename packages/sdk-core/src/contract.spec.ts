@@ -664,6 +664,169 @@ describe("SDK READMEs ↔ opening structure", () => {
 });
 
 /**
+ * What every client SDK entry holds in common about `@zitadel/components`: the
+ * side-effect import that registers the elements in the browser, and the
+ * `businessLocales` re-export, each with the same comment, once. Nothing else
+ * of the package is re-exported: an element class (as a value or as a type)
+ * would pull the elements entry into a bundle that has to load on the edge, and
+ * would make one SDK export what the others do not.
+ */
+const IMPORT_BLOCK = [
+  "// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.",
+  "// The edge build of the components package has no elements, so this does nothing there.",
+  'import "@zitadel/components";',
+].join("\n");
+
+const EXPORT_BLOCK = [
+  "// Re-exported so scaffolded apps can wire the business copy overlay without a",
+  "// direct @zitadel/components dependency (strict package managers reject those).",
+  'export { businessLocales } from "@zitadel/components";',
+].join("\n");
+
+const BUSINESS_LOCALES_EXPORT = 'export { businessLocales } from "@zitadel/components"';
+
+/** Every `export … from "@zitadel/components"` statement of a source. */
+const EXPORTS_FROM_COMPONENTS = /\bexport\s[^;]*?from\s*["']@zitadel\/components["']/g;
+
+const occurrences = (source: string, part: string): number => source.split(part).length - 1;
+
+/** What is wrong with the way a client SDK entry uses `@zitadel/components`. */
+const entryProblems = (source: string): string[] => {
+  const found: string[] = [];
+  if (occurrences(source, IMPORT_BLOCK) !== 1) {
+    found.push("does not hold the registering import, with its comment, exactly once");
+  }
+  if (occurrences(source, EXPORT_BLOCK) !== 1) {
+    found.push("does not hold the businessLocales re-export, with its comment, exactly once");
+  }
+  for (const statement of source.match(EXPORTS_FROM_COMPONENTS) ?? []) {
+    if (statement !== BUSINESS_LOCALES_EXPORT) {
+      found.push(`re-exports more than businessLocales: ${statement.replace(/\s+/g, " ")}`);
+    }
+  }
+  return found;
+};
+
+describe("client SDK entries ↔ @zitadel/components", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const ENTRIES = {
+    "sdk-react": "sdk-react/src/index.tsx",
+    "sdk-vue": "sdk-vue/src/index.ts",
+    "sdk-angular": "sdk-angular/src/public-api.ts",
+    "sdk-svelte": "sdk-svelte/src/lib/index.ts",
+    "sdk-solid": "sdk-solid/src/index.tsx",
+    "sdk-qwik": "sdk-qwik/src/index.tsx",
+    "sdk-next": "sdk-next/src/client.ts",
+    "sdk-nuxt": "sdk-nuxt/src/index.ts",
+  } as const;
+  const entries = Object.keys(ENTRIES) as (keyof typeof ENTRIES)[];
+
+  it.each(entries)("%s registers the elements and re-exports no element class", (sdk) => {
+    expect(entryProblems(readFileSync(`${packagesDir}${ENTRIES[sdk]}`, "utf8"))).toEqual([]);
+  });
+
+  // The TanStack Start widgets are sdk-react's, and the package has no direct
+  // dependency on the components, so it takes the locales from sdk-react.
+  it("sdk-tanstack-start takes the locales from sdk-react and exports no element class", () => {
+    const source = readFileSync(`${packagesDir}sdk-tanstack-start/src/react.tsx`, "utf8");
+    expect(source).toContain('export { businessLocales } from "@zitadel/sdk-react";');
+    expect(source.match(EXPORTS_FROM_COMPONENTS)).toBeNull();
+  });
+
+  describe("the guard", () => {
+    const good = `${IMPORT_BLOCK}\n\n${EXPORT_BLOCK}\nexport const x = 1;\n`;
+
+    it("accepts the canonical lines", () => {
+      expect(entryProblems(good)).toEqual([]);
+    });
+
+    it("sees a missing import and a missing re-export", () => {
+      expect(entryProblems(good.replace(IMPORT_BLOCK, ""))).toHaveLength(1);
+      expect(entryProblems(good.replace(EXPORT_BLOCK, ""))).toHaveLength(1);
+    });
+
+    it("sees a repeated import", () => {
+      expect(entryProblems(`${IMPORT_BLOCK}\n${good}`)).toHaveLength(1);
+    });
+
+    it("sees a reworded comment", () => {
+      expect(entryProblems(good.replace("Registers", "Loads"))).toHaveLength(1);
+    });
+
+    it.each([
+      'export { ZitadelLogin } from "@zitadel/components";',
+      'export type { ZitadelLogout, ZitadelSession } from "@zitadel/components";',
+      'export { businessLocales, ZitadelSession } from "@zitadel/components";',
+      'export * from "@zitadel/components";',
+      'export {\n  ZitadelLogin,\n} from "@zitadel/components";',
+    ])("sees %j", (statement) => {
+      expect(entryProblems(`${good}${statement}\n`)).toHaveLength(1);
+    });
+
+    it("lets an entry import an element class as a type for its own use", () => {
+      expect(
+        entryProblems(`import type { ZitadelLogin } from "@zitadel/components";\n${good}`),
+      ).toEqual([]);
+    });
+  });
+});
+
+/**
+ * The edge specs of the client SDKs that server-render widgets.
+ *
+ * Each loads its built entry in the edge VM and renders a login, a session and
+ * a logout, with one block between the same markers, byte for byte, so every
+ * SDK is held to the same facts. Only the glue outside the block, `renderWidget`
+ * and the imports, is the framework's. `@zitadel/sdk-next/client` registers
+ * elements and renders no widget, so its edge spec has no such block. The
+ * comparison itself is tested on the backend-url block below.
+ */
+describe("client SDK edge specs", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const SPECS = {
+    "sdk-react": "sdk-react/src/index.edge.spec.tsx",
+    "sdk-vue": "sdk-vue/src/index.edge.spec.ts",
+    "sdk-angular": "sdk-angular/src/public-api.edge.spec.ts",
+    "sdk-svelte": "sdk-svelte/src/index.edge.spec.ts",
+    "sdk-solid": "sdk-solid/src/index.edge.spec.tsx",
+    "sdk-qwik": "sdk-qwik/src/index.edge.spec.tsx",
+  } as const;
+  const EDGE_TITLES = [
+    "the SDK in the edge runtime",
+    "runs without a DOM",
+    "keeps the locale data it re-exports",
+    "renders the %s widget as its custom element with its attributes",
+    "writes the purpose and the resumed flow into the login markup",
+    "omits the language when none is set",
+  ];
+
+  it("is canonical in every SDK", () => {
+    const sources = Object.fromEntries(
+      Object.entries(SPECS).map(([sdk, path]) => [
+        sdk,
+        readFileSync(`${packagesDir}${path}`, "utf8"),
+      ]),
+    );
+    expect(problems(sources, "edge-render", EDGE_TITLES)).toEqual([]);
+  });
+
+  it("every server SDK runs its canonical middleware tests in the edge VM", () => {
+    const CONFIGS = {
+      "sdk-next": ["sdk-next/vitest.config.ts", "middleware.test.ts"],
+      "sdk-sveltekit": ["sdk-sveltekit/vitest.config.ts", "handle.test.ts"],
+      "sdk-solid-start": ["sdk-solid-start/vitest.config.ts", "middleware.test.ts"],
+      "sdk-qwik-router": ["sdk-qwik-router/vitest.config.ts", "request-handler.test.ts"],
+      "sdk-tanstack-start": ["sdk-tanstack-start/vitest.config.ts", "middleware.test.ts"],
+    } as const;
+    for (const [sdk, [config, file]] of Object.entries(CONFIGS)) {
+      const source = readFileSync(`${packagesDir}${config}`, "utf8");
+      const edge = source.slice(source.indexOf("edgeProject({"));
+      expect(edge, `${sdk} does not run ${file} in the edge VM`).toContain(`src/__tests__/${file}`);
+    }
+  });
+});
+
+/**
  * The server SDKs' test titles.
  *
  * The six meta-framework SDKs test the same server behaviours, so their test

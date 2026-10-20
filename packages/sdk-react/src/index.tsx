@@ -18,10 +18,8 @@ import {
   type WidgetTag,
 } from "@zitadel/sdk-core/types";
 import * as React from "react";
-// Registers <zitadel-login> / <zitadel-logout> / <zitadel-session> with the
-// browser. On an edge runtime the package resolves to an entry without the
-// elements, so importing it there is harmless. No element class is imported
-// here: the components look the class up by tag name when they render.
+// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
+// The edge build of the components package has no elements, so this does nothing there.
 import "@zitadel/components";
 
 import type {

@@ -32,7 +32,12 @@ export default defineConfig({
           setupFiles: ["src/test-setup.ts"],
           include: ["src/**/*.{test,spec}.ts"],
           // Never run the svelte-package build output (a staged copy of the spec).
-          exclude: [...configDefaults.exclude, ".svelte-kit/**", "src/**/*.ssr.spec.ts"],
+          exclude: [
+            ...configDefaults.exclude,
+            ".svelte-kit/**",
+            "src/**/*.ssr.spec.ts",
+            "src/**/*.edge.spec.ts",
+          ],
         },
       },
       {
@@ -47,7 +52,7 @@ export default defineConfig({
         },
       },
       edgeProject({
-        include: ["src/index.ssr.spec.ts"],
+        include: ["src/**/*.edge.spec.ts"],
         conditions: ["worker"],
         plugins: [svelte()],
         // Svelte loads `node:async_hooks` for its async server rendering, which

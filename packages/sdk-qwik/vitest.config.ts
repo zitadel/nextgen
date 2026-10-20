@@ -40,7 +40,7 @@ export default defineConfig({
           globals: true,
           setupFiles: ["src/test-setup.ts"],
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/*.ssr.spec.tsx"],
+          exclude: ["src/**/*.ssr.spec.tsx", "src/**/*.edge.spec.tsx"],
           browser: {
             enabled: true,
             provider: playwright(),
@@ -60,7 +60,7 @@ export default defineConfig({
         },
       },
       edgeProject({
-        include: ["src/index.ssr.spec.tsx"],
+        include: ["src/**/*.edge.spec.tsx"],
         conditions: ["edge-light"],
         plugins: [qwikVite()],
         // Qwik keeps its request context in an AsyncLocalStorage, which Workers

@@ -48,6 +48,25 @@ tasks:
       - "/packages/sdk-solid/src/index.ssr.spec.tsx"
       - "/packages/sdk-qwik/src/index.spec.tsx"
       - "/packages/sdk-qwik/src/index.ssr.spec.tsx"
+      # The client SDK entries (to check what they take from the components) and edge
+      # specs (to check their shared block), and the server SDKs' Vitest configs (to
+      # check they run their middleware tests in the edge VM).
+      - "/packages/sdk-react/src/index.tsx"
+      - "/packages/sdk-vue/src/index.ts"
+      - "/packages/sdk-angular/src/public-api.ts"
+      - "/packages/sdk-svelte/src/lib/index.ts"
+      - "/packages/sdk-solid/src/index.tsx"
+      - "/packages/sdk-qwik/src/index.tsx"
+      - "/packages/sdk-next/src/client.ts"
+      - "/packages/sdk-nuxt/src/index.ts"
+      - "/packages/sdk-tanstack-start/src/react.tsx"
+      - "/packages/sdk-react/src/index.edge.spec.tsx"
+      - "/packages/sdk-vue/src/index.edge.spec.ts"
+      - "/packages/sdk-angular/src/public-api.edge.spec.ts"
+      - "/packages/sdk-svelte/src/index.edge.spec.ts"
+      - "/packages/sdk-solid/src/index.edge.spec.tsx"
+      - "/packages/sdk-qwik/src/index.edge.spec.tsx"
+      - "/packages/sdk-*/vitest.config.ts"
       # And the meta-framework SDKs' server tests, to check they share their titles.
       - "/packages/sdk-*/src/__tests__/*.test.ts"
       - "/packages/sdk-*/src/__tests__/*/*.test.ts"

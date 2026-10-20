@@ -30,7 +30,7 @@ export default defineConfig({
           environment: "jsdom",
           setupFiles: ["src/test-setup.ts"],
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/*.ssr.spec.tsx", "src/**/*.hydrate.spec.tsx"],
+          exclude: ["src/**/*.ssr.spec.tsx", "src/**/*.hydrate.spec.tsx", "src/**/*.edge.spec.tsx"],
         },
       },
       {
@@ -44,7 +44,7 @@ export default defineConfig({
         },
       },
       edgeProject({
-        include: ["src/index.ssr.spec.tsx"],
+        include: ["src/**/*.edge.spec.tsx"],
         conditions: ["worker"],
         plugins: [solid({ ssr: true })],
       }),

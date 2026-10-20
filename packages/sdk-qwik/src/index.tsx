@@ -15,6 +15,8 @@ import type {
 // Installs the early event buffer before the elements register (and so before any
 // of them can emit); keep it directly above the components import.
 import "./early-events";
+// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
+// The edge build of the components package has no elements, so this does nothing there.
 import "@zitadel/components";
 import { component$, useSignal, useVisibleTask$, type QRL, type Signal } from "@qwik.dev/core";
 import { standardAttributes } from "@zitadel/sdk-core/types";
