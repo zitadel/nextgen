@@ -32,12 +32,11 @@ change needs a changeset, and the whole train versions together.
   ([ADR 036](../docs/adrs/036-api-credential-planes.md), ADR 005). Server SDKs
   implement it; SPA SDKs document a dev/deploy proxy (production guidance:
   [#560](https://github.com/zitadel/nextgen/issues/560)).
-- **Edge entries are tested in the edge runtime**: `sdk-core` and the
-  `sdk-next` middleware claim edge support, so their existing mirrored specs
-  also run in the `edge` project (`edgeProject()` in `vitest.shared.mjs`,
-  Vercel's `edge-runtime` VM, selected by `include`). The other SDKs are not
-  documented for edge and have no such project; add one only where the README
-  claims it.
+- **Edge entries are tested in the edge runtime**: an SDK entry that claims
+  edge support has an `edge` project (`edgeProject()` in `vitest.shared.mjs`,
+  Vercel's `edge-runtime` VM) that re-runs its existing mirrored specs, chosen
+  by `include`. It fails at config load if `include` matches nothing. Add one
+  only where the README claims edge, and leave Node-only entries out.
 - **One Agent Skill per framework SDK**, at `<pkg>/skills/<name>/SKILL.md`,
   plus `skills/zitadel-components/SKILL.md` for `@zitadel/components`; the
   top-level `skills/zitadel` routes to them. A new framework SDK adds its

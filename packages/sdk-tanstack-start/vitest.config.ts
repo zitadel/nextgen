@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject } from "../../vitest.shared.mjs";
 
 /**
  * Two projects in one config:
@@ -28,6 +28,11 @@ export default defineConfig({
           exclude: ["src/**/react.test.tsx"],
         },
       },
+      // The `/server` entry is what runs on the edge, with the JWT helpers it
+      // verifies sessions with: both must run in the edge VM.
+      edgeProject({
+        include: ["src/__tests__/middleware.test.ts", "src/__tests__/lib/jwt.test.ts"],
+      }),
       {
         cacheDir: ".vitest/react",
         resolve: { conditions: ["browser"] },
