@@ -51,6 +51,42 @@ func TestAuthAttemptPasswordLogin(t *testing.T) {
 	require.NotEmpty(t, handoffResp.(*api.HandoffResponse).HandoffToken)
 }
 
+// TestAuthAttemptIdentifierOnly_CannotHandoff is the REST-path regression for
+// the identifier-only session hole: a caller that verifies only the identifier
+// (no password/passkey/SSO) must not be able to mint a handoff token, and so
+// cannot exchange one for a session. Resolving the identifier proves who the
+// caller claims to be, never that they are that user; handoff fails closed with
+// att.not_completed. Before the fix, the attempt was "completed" the moment the
+// identifier resolved (RequiredChecks is empty on this path) and a token was
+// minted — a full account takeover from the public publishable key plus a known
+// email.
+func TestAuthAttemptIdentifierOnly_CannotHandoff(t *testing.T) {
+	project, team := attemptProject(t)
+
+	const (
+		userID    = "user_attempt_idonly"
+		userEmail = "idonly@example.com"
+	)
+	createAttemptUser(t, project, team, defaultSchemaURL(), userID, map[string]string{"email": userEmail})
+
+	client := attemptClient(t, project)
+	attemptID := newAttempt(t, client, project)
+
+	identified := verifyAttemptProof(t, client, attemptID, api.ChallengeMethodIdentifier, identifierProof(userEmail))
+	require.Contains(t, completedMethods(identified), api.FactorMethodIdentifier)
+	require.Equal(t, userID, identifiedUser(t, identified), "identified the wrong user")
+	// The attempt is not complete on the identifier alone, even though it was
+	// created with no explicit required checks.
+	require.Equal(t, api.AuthAttemptResponseStateInProgress, identified.State, helpers.MustMarshal(t, identified))
+
+	handoffResp, err := client.CreateHandoff(t.Context(), api.CreateHandoffParams{AttemptID: attemptID})
+	require.NoError(t, err)
+	rejected, ok := handoffResp.(*api.CreateHandoffErrorResponseStatusCode)
+	require.True(t, ok, "expected handoff refused, got %s", helpers.MustMarshal(t, handoffResp))
+	require.Equal(t, http.StatusConflict, rejected.StatusCode, helpers.MustMarshal(t, rejected))
+	require.Equal(t, api.AttNotCompletedCreateHandoffErrorResponse, rejected.Response.Type, helpers.MustMarshal(t, rejected))
+}
+
 // A value held in a unique property the schema does not designate identifies
 // nobody: uniqueness is data integrity, identification is a designation. This is
 // the rule a caller-chosen property would break — a unique employee id or phone
