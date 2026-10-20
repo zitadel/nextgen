@@ -23,6 +23,8 @@ import { escapeHtml } from "../internal/escape-html.js";
 import {
   exchangeSession,
   getCurrentStep,
+  getSession,
+  revokeSession,
   startFlow as apiStartFlow,
   submitStep as apiSubmitStep,
 } from "./api-client.js";
@@ -324,6 +326,16 @@ export class ZitadelLogin extends ZitadelSurface {
   @state() private accessor completing = false;
 
   @state() private accessor startupError: string | null = null;
+
+  /**
+   * Who the page's session already signs in, found when the element mounted:
+   * the visitor is offered to continue as them or to sign out, instead of a
+   * second sign-in. `null` when nobody is signed in, or once they chose.
+   */
+  @state() private accessor signedInAs: string | null = null;
+
+  /** The session check runs once, on the first start: see {@link signedInSession}. */
+  private sessionChecked = false;
 
   @state() private accessor formValues: Record<string, string> = {};
 
@@ -643,6 +655,9 @@ export class ZitadelLogin extends ZitadelSurface {
     if (!this.response || !this.engine || this.completing) {
       return html`<slot name="loader"></slot>`;
     }
+    if (this.signedInAs !== null) {
+      return this.renderSignedIn(this.signedInAs);
+    }
     const rendered = this.injectAttribution(this.renderStep(this.response.step, this.engine));
     return html`<form
       class="zl-mount"
@@ -652,6 +667,97 @@ export class ZitadelLogin extends ZitadelSurface {
     >
       ${this.renderPairedIdentifier()}${unsafeHTML(rendered)}
     </form>`;
+  }
+
+  /**
+   * The card shown instead of the form when the page's session already signs
+   * someone in: continue to where a sign-in would have gone, or sign out and
+   * sign in as someone else. Composed from the same atoms as a step, and
+   * painted with the flow's branding, which the flow started for it carries.
+   */
+  private renderSignedIn(label: string) {
+    const locale = this.resolveLocale();
+    const text = (key: string, fallback: string) => locale[key] ?? fallback;
+    return html`<form class="zl-mount" part="form" novalidate aria-busy=${this.loading ? "true" : "false"}
+      @submit=${(event: Event) => event.preventDefault()}
+    >
+      <zl-page-shell data-zl-template-root>
+        <zl-card>
+          <h1 slot="header" class="zl-card-title">${text("signed-in.title", "Signed in as")}</h1>
+          <p slot="header" class="zl-card-subtitle" data-testid="zitadel-signed-in-account">${label}</p>
+          <div class="zl-card-actions">
+            <zl-button
+              hierarchy="primary"
+              size="medium"
+              block
+              data-testid="zitadel-signed-in-continue"
+              label=${text("signed-in.action.continue", "Continue")}
+              @zl-submit=${this.continueSignedIn}
+            ></zl-button>
+            <zl-button
+              hierarchy="secondary"
+              size="medium"
+              block
+              ?loading=${this.loading}
+              data-testid="zitadel-signed-in-sign-out"
+              label=${text("signed-in.action.sign_out", "Sign out")}
+              @zl-submit=${this.signOutAndSignIn}
+            ></zl-button>
+          </div>
+        </zl-card>
+        ${unsafeHTML(this.renderAttributionHtml("footer"))}
+      </zl-page-shell>
+    </form>`;
+  }
+
+  private continueSignedIn = (event: Event): void => {
+    event.stopPropagation();
+    if (typeof window === "undefined") return;
+    window.location.assign(this.postSignInTarget());
+  };
+
+  /**
+   * Signs the session out, then starts a fresh flow: the one started at mount
+   * ran on the session just revoked, so it cannot sign anyone in.
+   */
+  private signOutAndSignIn = async (event: Event): Promise<void> => {
+    event.stopPropagation();
+    if (this.loading) return;
+    this.loading = true;
+    try {
+      const { project: cfg, api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
+      await revokeSession(api, cfg.projectId);
+    } catch (error) {
+      this.loading = false;
+      this.handleTransportError(error);
+      return;
+    }
+    this.loading = false;
+    this.signedInAs = null;
+    this.response = null;
+    this.formValues = {};
+    await this.startFlow();
+  };
+
+  /**
+   * Who the page's session signs in to this project, or `null`. Asked only
+   * where a sign-in has somewhere to continue to (`post-sign-in-url`), on the
+   * first start of a sign-in or sign-up that resumes nothing: a hosted login
+   * page completing an OIDC request, a resumed flow and a preview all run the
+   * flow as before. Never throws: a failed check shows the form.
+   */
+  private async signedInSession(api: Parameters<typeof getSession>[0], projectId: string) {
+    if (this.sessionChecked) return null;
+    this.sessionChecked = true;
+    if (!this.postSignInUrl || this.preview) return null;
+    if (this.purpose !== "login" && this.purpose !== "register") return null;
+    try {
+      const session = await getSession(api, projectId);
+      if (!session?.user_id) return null;
+      return session.user?.display || session.user?.identifier || session.user_id;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -781,6 +887,12 @@ export class ZitadelLogin extends ZitadelSurface {
       const { project: cfg, api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       let wire: CreateFlow201 | undefined;
       const resumeId = this.restarting ? "" : this.resumeFlowId || flowIdFromLocation();
+      // In parallel with the flow, so a visitor nobody signed in waits no
+      // longer for the form; resuming a flow is never interrupted.
+      const signedIn =
+        resumeId || this.restarting
+          ? Promise.resolve(null)
+          : this.signedInSession(api, cfg.projectId);
       if (resumeId) {
         try {
           wire = await getCurrentStep(api, resumeId);
@@ -815,12 +927,15 @@ export class ZitadelLogin extends ZitadelSurface {
       if (this.restarting) {
         wire = { ...wire, step: { ...wire.step, error: "error.flow_restart_required" } };
       }
+      // Decided before the first paint, so the form never flashes up under it.
+      this.signedInAs = await signedIn;
       this.applyResponse(wire);
       // Symmetric with `submit()`: every applied step announces itself, the
       // first one included. A host app driving its own chrome from the step
       // (progress, headings, analytics) would otherwise see nothing until
-      // after the visitor's first submit.
-      emit(this, "zitadel-flow-step", { step: wire.step });
+      // after the visitor's first submit. Not while the signed-in card stands
+      // in for the step: the step announces itself if the visitor signs out.
+      if (this.signedInAs === null) emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
       if (await this.restartIfRequired(error)) return;
       this.handleTransportError(this.describeFlowSelectionError(error));

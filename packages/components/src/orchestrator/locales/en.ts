@@ -247,6 +247,11 @@ export const en: Record<string, string> = {
   "error.sso_failed.title": "Sign-in failed",
   "error.sso_failed.body": "The sign-in could not be completed. Please try again.",
   "error.more_info": "More information",
+
+  // --- Already signed in (the page's session signs someone in) ---
+  "signed-in.title": "Signed in as",
+  "signed-in.action.continue": "Continue",
+  "signed-in.action.sign_out": "Sign out",
 };
 
 export type Locale = Record<string, string>;

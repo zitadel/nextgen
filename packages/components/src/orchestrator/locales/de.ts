@@ -236,4 +236,9 @@ export const de: Locale = {
   "error.sso_failed.body":
     "Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
   "error.more_info": "Weitere Informationen",
+
+  // --- Bereits angemeldet ---
+  "signed-in.title": "Angemeldet als",
+  "signed-in.action.continue": "Weiter",
+  "signed-in.action.sign_out": "Abmelden",
 };

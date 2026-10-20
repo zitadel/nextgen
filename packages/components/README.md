@@ -312,6 +312,13 @@ to record the hand-off (analytics, a spinner, saving scroll state) before the
 page goes away. The framework wrappers surface it as `onFlowRedirect`, except
 Vue and Angular, which emit `flowRedirect`, and Qwik, which takes
 `onFlowRedirect$`.
+A visitor the page's session already signs in to the project is not asked to
+sign in again: with `post-sign-in-url` set, a `login` or `register` element that
+resumes no flow reads `GET /sessions/me` while the flow starts and, when it finds
+a user, shows "Signed in as …" with **Continue** (to where a sign-in would have
+gone) and **Sign out** (which revokes the session and shows the form of a fresh
+flow). Without `post-sign-in-url` it runs the flow as before.
+
 The orchestrator exposes `::part(form)` for tenant-side CSS hooks. Adopts
 design tokens and `branding.font_url` into its shadow root on each update.
 

@@ -228,4 +228,9 @@ export const it: Locale = {
   "error.sso_failed.title": "Accesso non riuscito",
   "error.sso_failed.body": "Non è stato possibile completare l'accesso. Riprova.",
   "error.more_info": "Maggiori informazioni",
+
+  // --- Accesso già effettuato ---
+  "signed-in.title": "Accesso effettuato come",
+  "signed-in.action.continue": "Continua",
+  "signed-in.action.sign_out": "Esci",
 };
