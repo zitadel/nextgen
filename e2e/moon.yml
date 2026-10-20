@@ -147,7 +147,7 @@ tasks:
       runInCI: "skip"
 
   # The embedded console against a deployment with the platform project
-  # bootstrapped (the server default).
+  # bootstrapped (the `zitadel start` default; the server alone leaves it off).
   console-platform:
     command: "env -u CI -u GITHUB_ACTIONS corepack pnpm exec playwright test --config console/playwright.platform.config.mts"
     inputs:

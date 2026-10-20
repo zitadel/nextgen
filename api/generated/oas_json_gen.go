@@ -14373,6 +14373,70 @@ func (s BuildReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case FlowdefInvalidBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.invalid")
+		{
+			s := s.FlowdefInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpFieldImmutableBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.field_immutable")
+		{
+			s := s.IdpFieldImmutable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpNotFoundBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.not_found")
+		{
+			s := s.IdpNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalBuildReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -14389,11 +14453,187 @@ func (s BuildReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedBuildReleaseErrorResponse:
+	case SchFetchDeniedBuildReleaseErrorResponse:
 		e.FieldStart("code")
-		e.Str("not_implemented")
+		e.Str("sch.fetch_denied")
 		{
-			s := s.NotImplemented
+			s := s.SchFetchDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchDowngradeBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_downgrade")
+		{
+			s := s.SchFetchDowngrade
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTimeoutBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_timeout")
+		{
+			s := s.SchFetchTimeout
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTooLargeBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_too_large")
+		{
+			s := s.SchFetchTooLarge
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchFetchTooManyRedirectsBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.fetch_too_many_redirects")
+		{
+			s := s.SchFetchTooManyRedirects
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case SchNotFoundBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("sch.not_found")
+		{
+			s := s.SchNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelInvalidBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.invalid")
+		{
+			s := s.RelInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotFoundBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelPermissionDeniedBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.permission_denied")
+		{
+			s := s.RelPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelProjectNotFoundBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.project_not_found")
+		{
+			s := s.RelProjectNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevisionUnpinnableBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revision_unpinnable")
+		{
+			s := s.RelRevisionUnpinnable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelUnresolvedReferenceBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.unresolved_reference")
+		{
+			s := s.RelUnresolvedReference
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -14410,6 +14650,22 @@ func (s BuildReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case FlowdefSchemaFetchFailedBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("flowdef.schema_fetch_failed")
+		{
+			s := s.FlowdefSchemaFetchFailed
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -14450,14 +14706,62 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedBuildReleaseErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidBuildReleaseErrorResponse
+					found = true
+				case "flowdef.invalid":
+					s.Type = FlowdefInvalidBuildReleaseErrorResponse
+					found = true
+				case "idp.field_immutable":
+					s.Type = IdpFieldImmutableBuildReleaseErrorResponse
+					found = true
+				case "idp.not_found":
+					s.Type = IdpNotFoundBuildReleaseErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalBuildReleaseErrorResponse
 					found = true
-				case "not_implemented":
-					s.Type = NotImplementedBuildReleaseErrorResponse
+				case "sch.fetch_denied":
+					s.Type = SchFetchDeniedBuildReleaseErrorResponse
+					found = true
+				case "sch.fetch_downgrade":
+					s.Type = SchFetchDowngradeBuildReleaseErrorResponse
+					found = true
+				case "sch.fetch_timeout":
+					s.Type = SchFetchTimeoutBuildReleaseErrorResponse
+					found = true
+				case "sch.fetch_too_large":
+					s.Type = SchFetchTooLargeBuildReleaseErrorResponse
+					found = true
+				case "sch.fetch_too_many_redirects":
+					s.Type = SchFetchTooManyRedirectsBuildReleaseErrorResponse
+					found = true
+				case "sch.not_found":
+					s.Type = SchNotFoundBuildReleaseErrorResponse
+					found = true
+				case "rel.invalid":
+					s.Type = RelInvalidBuildReleaseErrorResponse
+					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundBuildReleaseErrorResponse
+					found = true
+				case "rel.permission_denied":
+					s.Type = RelPermissionDeniedBuildReleaseErrorResponse
+					found = true
+				case "rel.project_not_found":
+					s.Type = RelProjectNotFoundBuildReleaseErrorResponse
+					found = true
+				case "rel.revision_unpinnable":
+					s.Type = RelRevisionUnpinnableBuildReleaseErrorResponse
+					found = true
+				case "rel.unresolved_reference":
+					s.Type = RelUnresolvedReferenceBuildReleaseErrorResponse
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidBuildReleaseErrorResponse
+					found = true
+				case "flowdef.schema_fetch_failed":
+					s.Type = FlowdefSchemaFetchFailedBuildReleaseErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -14477,16 +14781,80 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
+	case EvtInvalidBuildReleaseErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefInvalidBuildReleaseErrorResponse:
+		if err := s.FlowdefInvalid.Decode(d); err != nil {
+			return err
+		}
+	case IdpFieldImmutableBuildReleaseErrorResponse:
+		if err := s.IdpFieldImmutable.Decode(d); err != nil {
+			return err
+		}
+	case IdpNotFoundBuildReleaseErrorResponse:
+		if err := s.IdpNotFound.Decode(d); err != nil {
+			return err
+		}
 	case InternalBuildReleaseErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedBuildReleaseErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
+	case SchFetchDeniedBuildReleaseErrorResponse:
+		if err := s.SchFetchDenied.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchDowngradeBuildReleaseErrorResponse:
+		if err := s.SchFetchDowngrade.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTimeoutBuildReleaseErrorResponse:
+		if err := s.SchFetchTimeout.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTooLargeBuildReleaseErrorResponse:
+		if err := s.SchFetchTooLarge.Decode(d); err != nil {
+			return err
+		}
+	case SchFetchTooManyRedirectsBuildReleaseErrorResponse:
+		if err := s.SchFetchTooManyRedirects.Decode(d); err != nil {
+			return err
+		}
+	case SchNotFoundBuildReleaseErrorResponse:
+		if err := s.SchNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelInvalidBuildReleaseErrorResponse:
+		if err := s.RelInvalid.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundBuildReleaseErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelPermissionDeniedBuildReleaseErrorResponse:
+		if err := s.RelPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case RelProjectNotFoundBuildReleaseErrorResponse:
+		if err := s.RelProjectNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevisionUnpinnableBuildReleaseErrorResponse:
+		if err := s.RelRevisionUnpinnable.Decode(d); err != nil {
+			return err
+		}
+	case RelUnresolvedReferenceBuildReleaseErrorResponse:
+		if err := s.RelUnresolvedReference.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidBuildReleaseErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case FlowdefSchemaFetchFailedBuildReleaseErrorResponse:
+		if err := s.FlowdefSchemaFetchFailed.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -49083,22 +49451,6 @@ func (s GetMyUserErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case SessTokenInvalidGetMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("sess.token_invalid")
-		{
-			s := s.SessTokenInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case UserNotFoundGetMyUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.not_found")
@@ -49150,9 +49502,6 @@ func (s *GetMyUserErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidGetMyUserErrorResponse
 					found = true
-				case "sess.token_invalid":
-					s.Type = SessTokenInvalidGetMyUserErrorResponse
-					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundGetMyUserErrorResponse
 					found = true
@@ -49182,10 +49531,6 @@ func (s *GetMyUserErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case SessTokenInvalidGetMyUserErrorResponse:
-		if err := s.SessTokenInvalid.Decode(d); err != nil {
-			return err
-		}
 	case UserNotFoundGetMyUserErrorResponse:
 		if err := s.UserNotFound.Decode(d); err != nil {
 			return err
@@ -49205,6 +49550,166 @@ func (s GetMyUserErrorResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *GetMyUserErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GetMyUserSchemaErrorResponse as json.
+func (s GetMyUserSchemaErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s GetMyUserSchemaErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedGetMyUserSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalGetMyUserSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidGetMyUserSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserNotFoundGetMyUserSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.not_found")
+		{
+			s := s.UserNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes GetMyUserSchemaErrorResponse from json.
+func (s *GetMyUserSchemaErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetMyUserSchemaErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedGetMyUserSchemaErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalGetMyUserSchemaErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidGetMyUserSchemaErrorResponse
+					found = true
+				case "user.not_found":
+					s.Type = UserNotFoundGetMyUserSchemaErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedGetMyUserSchemaErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalGetMyUserSchemaErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidGetMyUserSchemaErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserNotFoundGetMyUserSchemaErrorResponse:
+		if err := s.UserNotFound.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s GetMyUserSchemaErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetMyUserSchemaErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -60297,6 +60802,166 @@ func (s *ListMyProjectsResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *ListMyProjectsResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ListMyTeamsErrorResponse as json.
+func (s ListMyTeamsErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s ListMyTeamsErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedListMyTeamsErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalListMyTeamsErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidListMyTeamsErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserNotFoundListMyTeamsErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.not_found")
+		{
+			s := s.UserNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes ListMyTeamsErrorResponse from json.
+func (s *ListMyTeamsErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListMyTeamsErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedListMyTeamsErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalListMyTeamsErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidListMyTeamsErrorResponse
+					found = true
+				case "user.not_found":
+					s.Type = UserNotFoundListMyTeamsErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedListMyTeamsErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalListMyTeamsErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidListMyTeamsErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserNotFoundListMyTeamsErrorResponse:
+		if err := s.UserNotFound.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ListMyTeamsErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListMyTeamsErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -72616,40 +73281,6 @@ func (s *OptSessTokenCreationFailedDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes SessTokenInvalidDetails as json.
-func (o OptSessTokenInvalidDetails) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes SessTokenInvalidDetails from json.
-func (o *OptSessTokenInvalidDetails) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptSessTokenInvalidDetails to nil")
-	}
-	o.Set = true
-	o.Value = make(SessTokenInvalidDetails)
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptSessTokenInvalidDetails) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptSessTokenInvalidDetails) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes SessionDeletedEventDelegationType as json.
 func (o OptSessionDeletedEventDelegationType) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -78269,22 +78900,6 @@ func (s PatchMyUserErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case SessTokenInvalidPatchMyUserErrorResponse:
-		e.FieldStart("code")
-		e.Str("sess.token_invalid")
-		{
-			s := s.SessTokenInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case UserAlreadyExistsPatchMyUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.already_exists")
@@ -78390,9 +79005,6 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidPatchMyUserErrorResponse
 					found = true
-				case "sess.token_invalid":
-					s.Type = SessTokenInvalidPatchMyUserErrorResponse
-					found = true
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsPatchMyUserErrorResponse
 					found = true
@@ -78437,10 +79049,6 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidPatchMyUserErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case SessTokenInvalidPatchMyUserErrorResponse:
-		if err := s.SessTokenInvalid.Decode(d); err != nil {
 			return err
 		}
 	case UserAlreadyExistsPatchMyUserErrorResponse:
@@ -100232,194 +100840,6 @@ func (s SessTokenCreationFailedDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *SessTokenCreationFailedDetails) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *SessTokenInvalid) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *SessTokenInvalid) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("code")
-		e.Str("sess.token_invalid")
-	}
-	{
-		e.FieldStart("message")
-		e.Str(s.Message)
-	}
-	{
-		if s.Details.Set {
-			e.FieldStart("details")
-			s.Details.Encode(e)
-		}
-	}
-}
-
-var jsonFieldsNameOfSessTokenInvalid = [3]string{
-	0: "code",
-	1: "message",
-	2: "details",
-}
-
-// Decode decodes SessTokenInvalid from json.
-func (s *SessTokenInvalid) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode SessTokenInvalid to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "code":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.Code = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"code\"")
-			}
-		case "message":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Str()
-				s.Message = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"message\"")
-			}
-		case "details":
-			if err := func() error {
-				s.Details.Reset()
-				if err := s.Details.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"details\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode SessTokenInvalid")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000011,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfSessTokenInvalid) {
-					name = jsonFieldsNameOfSessTokenInvalid[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *SessTokenInvalid) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *SessTokenInvalid) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s SessTokenInvalidDetails) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s SessTokenInvalidDetails) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		if len(elem) != 0 {
-			e.Raw(elem)
-		}
-	}
-}
-
-// Decode decodes SessTokenInvalidDetails from json.
-func (s *SessTokenInvalidDetails) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode SessTokenInvalidDetails to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem jx.Raw
-		if err := func() error {
-			v, err := d.RawAppend(nil)
-			elem = jx.Raw(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode SessTokenInvalidDetails")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s SessTokenInvalidDetails) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *SessTokenInvalidDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

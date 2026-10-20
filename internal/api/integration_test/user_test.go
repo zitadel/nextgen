@@ -635,18 +635,11 @@ func TestPatchUser(t *testing.T) {
 		require.NoError(t, err)
 		return user
 	}
-	patchReq := func(t *testing.T, body map[string]any) *api.PatchUserRequest {
-		t.Helper()
-		req := &api.PatchUserRequest{}
-		require.NoError(t, req.UnmarshalJSON([]byte(helpers.MustMarshal(t, body))))
-		return req
-	}
-
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 		user := createUser(t, "testpatchuser.ok@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{
 				"email":    "testpatchuser.ok.patched@example.com",
 				"nickname": "Patched",
@@ -665,13 +658,13 @@ func TestPatchUser(t *testing.T) {
 		user := createUser(t, "testpatchuser.null@example.com")
 		params := api.PatchUserByIDParams{UserID: api.UserID(user.ID)}
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": "Ephemeral"},
 		}), params)
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 
-		resp, err = client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": nil},
 		}), params)
 		require.NoError(t, err)
@@ -684,7 +677,7 @@ func TestPatchUser(t *testing.T) {
 		t.Parallel()
 		user := createUser(t, "testpatchuser.invalid@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"email": 5},
 		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 		require.NoError(t, err)
@@ -695,7 +688,7 @@ func TestPatchUser(t *testing.T) {
 		t.Parallel()
 		user := createUser(t, "testpatchuser.unknownschema@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"schema": "https://example.com/schemas/does-not-exist",
 		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 		require.NoError(t, err)
@@ -707,7 +700,7 @@ func TestPatchUser(t *testing.T) {
 		createUser(t, "testpatchuser.taken@example.com")
 		userB := createUser(t, "testpatchuser.claimant@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"email": "testpatchuser.taken@example.com"},
 		}), api.PatchUserByIDParams{UserID: api.UserID(userB.ID)})
 		require.NoError(t, err)
@@ -717,7 +710,7 @@ func TestPatchUser(t *testing.T) {
 	t.Run("unknown user", func(t *testing.T) {
 		t.Parallel()
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": "Nobody"},
 		}), api.PatchUserByIDParams{UserID: api.UserID("user_does-not-exist")})
 		require.NoError(t, err)
@@ -743,6 +736,15 @@ func TestPatchUser(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
 	})
+}
+
+// patchUserRequest builds a PATCH /users/{user_id} body from a plain map, so a
+// test can send JSON null to delete an attribute.
+func patchUserRequest(t *testing.T, body map[string]any) *api.PatchUserRequest {
+	t.Helper()
+	req := &api.PatchUserRequest{}
+	require.NoError(t, req.UnmarshalJSON([]byte(helpers.MustMarshal(t, body))))
+	return req
 }
 
 // TestPatchUserFailedMigration pins the guarantee #1507 makes: a patch that
@@ -882,10 +884,7 @@ func TestPatchUserFailedMigration(t *testing.T) {
 			if tc.collide {
 				body["attributes"] = map[string]any{"username": taken, "preferredLanguage": "en"}
 			}
-			req := &api.PatchUserRequest{}
-			require.NoError(t, req.UnmarshalJSON([]byte(helpers.MustMarshal(t, body))))
-
-			resp, err := client.PatchUserByID(t.Context(), req, api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
+			resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, body), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 			require.NoError(t, err)
 			require.IsType(t, tc.wantStatus, resp, helpers.MustMarshal(t, resp))
 			assertAuthzError(t, resp, tc.wantCode)
@@ -1271,6 +1270,60 @@ func TestListPasskeys(t *testing.T) {
 		require.NoError(t, err)
 		assert.IsType(t, &api.ListUserPasskeysNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
+}
+
+// TestSelfAccessReads: a person reads their own schema and roster with only
+// their session, and anything short of a user-bound session gets the 401 the
+// contract declares.
+func TestSelfAccessReads(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	userID, teamID := harness.CreateUserOwnedByTeam(t, project.ID)
+	cookie := sessionCookieIn(t, project, userID)
+
+	t.Run("own schema, without a grant", func(t *testing.T) {
+		t.Parallel()
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		me := helpers.MustUnmarshal[api.User](t, []byte(body))
+
+		status, body = cookieRequest(t, cookie, http.MethodGet, "/users/me/schema", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, me.Schema, helpers.MustUnmarshal[api.Schema](t, []byte(body)).ID)
+	})
+
+	t.Run("own teams, without a grant", func(t *testing.T) {
+		t.Parallel()
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/teams", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		teams := helpers.MustUnmarshal[api.ListUserTeamsResponse](t, []byte(body)).Teams
+		require.Len(t, teams, 1)
+		assert.Equal(t, teamID, string(teams[0].ID))
+	})
+
+	session := harness.CreateSession(t, project.ID, time.Hour)
+	crypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	anonymous, err := session.Token(crypter)
+	require.NoError(t, err)
+
+	for _, path := range []string{"/users/me", "/users/me/schema", "/users/me/teams"} {
+		for name, cookie := range map[string]*http.Cookie{
+			"anonymous session": {Name: "__nextgen_session", Value: anonymous},
+			"no cookie":         nil,
+		} {
+			t.Run(path+" "+name, func(t *testing.T) {
+				t.Parallel()
+				status, body := cookieRequest(t, cookie, http.MethodGet, path, "", nil)
+				assert.Equal(t, http.StatusUnauthorized, status, body)
+				details := helpers.MustUnmarshal[api.ErrorDetails](t, []byte(body))
+				assert.Equal(t, api.ErrorCode("auth.unauthorized"), details.Code)
+				assert.Equal(t, "Missing or invalid session token.", details.Message)
+			})
+		}
+	}
 }
 
 func TestListUserIdentityLinks(t *testing.T) {

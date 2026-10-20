@@ -35,7 +35,7 @@
     "@zitadel/testing": "0.0.0",
     "@zitadel/cli-skill-e2e": "0.0.0",
     "@zitadel/website": "0.0.0",
-    "@zitadel/sdk-qwik-city": "1.0.0-alpha.25",
+    "@zitadel/sdk-qwik-router": "1.0.0-alpha.25",
     "@zitadel/sdk-solid-start": "1.0.0-alpha.25",
     "@zitadel/sdk-sveltekit": "1.0.0-alpha.25",
     "@zitadel/sdk-tanstack-start": "1.0.0-alpha.25",

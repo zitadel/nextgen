@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -139,6 +140,8 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.PatchMyUserOperation:           true,
 	api.CompleteClaimOperation:         true,
 	api.ListMyProjectsOperation:        true,
+	api.GetMyUserSchemaOperation:       true,
+	api.ListMyTeamsOperation:           true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous
@@ -146,16 +149,18 @@ var sessionCookieOperations = map[api.OperationName]bool{
 // session-only operation nothing else can satisfy, so the skip becomes the 401
 // the contract declares.
 var userBoundSessionOperations = map[api.OperationName]bool{
-	api.CreateGrantOperation:    true,
-	api.GetGrantOperation:       true,
-	api.DeleteGrantOperation:    true,
-	api.QueryGrantsOperation:    true,
-	api.QueryUsersOperation:     true,
-	api.QueryTeamsOperation:     true,
-	api.GetTeamOperation:        true,
-	api.ListMyProjectsOperation: true,
-	api.GetProjectOperation:     true,
-	api.PatchProjectOperation:   true,
+	api.CreateGrantOperation:     true,
+	api.GetGrantOperation:        true,
+	api.DeleteGrantOperation:     true,
+	api.QueryGrantsOperation:     true,
+	api.QueryUsersOperation:      true,
+	api.QueryTeamsOperation:      true,
+	api.GetTeamOperation:         true,
+	api.ListMyProjectsOperation:  true,
+	api.GetMyUserSchemaOperation: true,
+	api.ListMyTeamsOperation:     true,
+	api.GetProjectOperation:      true,
+	api.PatchProjectOperation:    true,
 	// Console management screens (#1300 §1). Their writes need the CSRF token
 	// (ADR 053 §5, csrf.go).
 	api.CreateUserOperation:            true,
@@ -204,6 +209,18 @@ func sessionCookieFromContext(ctx context.Context) (string, bool) {
 func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
 	v, ok := ctx.Value(sessionTokenKey{}).(*domain.Token)
 	return v, ok && v != nil
+}
+
+// requireSelf resolves the caller of a self-access operation (`/me`). A
+// refusal answers like a missing session, so it never tells a caller that its
+// cookie is genuine but its user is gone (#553).
+func requireSelf(ctx context.Context) (domain.Self, error) {
+	token, _ := sessionTokenFromContext(ctx)
+	self, err := domain.SelfFromSession(token, time.Now())
+	if err != nil {
+		return domain.Self{}, invalidSessionCredential(err)
+	}
+	return self, nil
 }
 
 type contextKey struct{}

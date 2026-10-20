@@ -1,8 +1,6 @@
 # Agent Instructions — `internal/service/`
 
-These instructions apply to `internal/service/`. Defer to
-[`internal/AGENTS.md`](../AGENTS.md) (format before push) and root
-[`AGENTS.md`](../../AGENTS.md) for broader rules.
+The rules in [`internal/AGENTS.md`](../AGENTS.md) apply here too.
 
 ## Events stay in sync with mutations
 
@@ -31,10 +29,12 @@ Authority (do not duplicate payload rules or the catalog table here):
 - Types: [`internal/domain/event.go`](../domain/event.go) `EventType`
   constants.
 - Payloads: [`internal/domain/event_payload.go`](../domain/event_payload.go).
-- OpenAPI: payload YAML under
-  `api/openapi/endpoints/events/payloads/` plus the map in
-  [`api/cmd/gen_event_schemas/main.go`](../../api/cmd/gen_event_schemas/main.go);
-  regenerate with `moon run server:generate` or `go generate ./api/`.
+- OpenAPI: payload YAML under `api/openapi/endpoints/events/payloads/`, the
+  type's entries in `payloadByEventType` and `webhookByEventType`
+  ([`api/cmd/gen_event_schemas/main.go`](../../api/cmd/gen_event_schemas/main.go)),
+  and its webhook in the root `webhooks:` list of
+  [`api/openapi/openapi-spec.yaml`](../../api/openapi/openapi-spec.yaml),
+  which the generator checks. Regenerate with `moon run server:generate`.
 - Producer allowlist:
   [`internal/audit/catalog_producers_test.go`](../audit/catalog_producers_test.go)
   — live catalog types must have a producer; do not list deferred types as
