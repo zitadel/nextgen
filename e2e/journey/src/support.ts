@@ -32,28 +32,27 @@ export type JourneyMetadata = {
 
 /**
  * The journey's own metadata, plus the lanes a framework-independent suite
- * stays out of: the fresh next lane already covers `subject`, a preset lane
- * keeps to its sign-in journey, and the docker lane keeps to the scaffold
- * journey.
+ * stays out of: the fresh next lane already covers it, a preset lane keeps to
+ * its sign-in journey, and the docker lane keeps to the scaffold journey.
  */
-export async function journeyMetadataOrSkip(
-  subject: string,
-): Promise<JourneyMetadata & { localRuntimeUrl: string }> {
+export async function journeyMetadataOrSkip(): Promise<
+  JourneyMetadata & { localRuntimeUrl: string }
+> {
   const metadata = JSON.parse(
     await readFile(join(requiredEnv("JOURNEY_OUTPUT_DIR"), "metadata.json"), "utf8"),
   ) as JourneyMetadata;
-  test.skip(metadata.framework !== "next", `${subject} is framework-independent; next lane only`);
+  test.skip(metadata.framework !== "next", "this suite is framework-independent; next lane only");
   test.skip(
     metadata.preset !== null,
-    `the fresh-app lane already proves ${subject}; a preset lane keeps to its sign-in journey`,
+    "the fresh-app lane already runs this suite; a preset lane keeps to its sign-in journey",
   );
   test.skip(
     process.env.JOURNEY_PREEXISTING_APP === "1",
-    `the fresh-app lane already proves ${subject}; keep the preexisting lane lean`,
+    "the fresh-app lane already runs this suite; keep the preexisting lane lean",
   );
   test.skip(
     metadata.runtime === "docker",
-    `the binary lane proves ${subject}; the docker lane keeps to the scaffold journey`,
+    "the binary lane runs this suite; the docker lane keeps to the scaffold journey",
   );
   if (!metadata.localRuntimeUrl) throw new Error("metadata.json has no localRuntimeUrl");
   return { ...metadata, localRuntimeUrl: metadata.localRuntimeUrl };

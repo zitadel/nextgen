@@ -29,7 +29,7 @@ test.setTimeout(180_000);
 test("a local project is owned from setup, and the console signs the local admin in", async ({
   page,
 }) => {
-  const metadata = await journeyMetadataOrSkip("local ownership");
+  const metadata = await journeyMetadataOrSkip();
   const serverOrigin = new URL(metadata.localRuntimeUrl).origin;
 
   // setup already attached the project to the local admin's team.
@@ -75,7 +75,7 @@ test("the setup admin can add and remove a project admin, and the colleague sees
   browser,
   page,
 }) => {
-  const metadata = await journeyMetadataOrSkip("local ownership");
+  const metadata = await journeyMetadataOrSkip();
   const serverOrigin = new URL(metadata.localRuntimeUrl).origin;
   const secret = JSON.parse(await readFile(join(metadata.appDir, ".zitadel/secret"), "utf8")) as {
     project_id: string;

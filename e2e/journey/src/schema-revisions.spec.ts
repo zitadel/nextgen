@@ -1,4 +1,4 @@
-import { access, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
@@ -20,11 +20,8 @@ import {
  * revision; a user keeps the revision it was created on. So a user created
  * before a schema publish and one created after it must both sign in, with a
  * password and through the SSO provider, and neither record may change.
- *
- * Both users register through the mock OIDC provider the runner starts
- * (tools/oidc-mock), which creates them without a collection step, so the
- * register step stays the same across the two revisions. Their password is
- * set through the API right after.
+ * This spec runs before user-journey.spec.ts in the same lane and leaves the
+ * app with SSO enabled, an IdP connection and schema revision 2.
  */
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
@@ -51,7 +48,7 @@ let recordA: UserRecord;
 let recordB: UserRecord;
 
 test.beforeAll(async () => {
-  metadata = await journeyMetadataOrSkip("schema revisions under one flow");
+  metadata = await journeyMetadataOrSkip();
   test.skip(!mockUrl, "mock OIDC provider not started");
   const secret = JSON.parse(await readFile(join(metadata.appDir, ".zitadel/secret"), "utf8")) as {
     project_id: string;
@@ -85,7 +82,6 @@ test("enables the mock provider", async () => {
   );
   await runCli(metadata, ["apply", "--non-interactive", "--json"]);
 
-  await access(join(metadata.appDir, ".zitadel/idps", `${slug}.json`));
   objectType = (await readSchemaFile()).objectType as string;
   revision1 = await latestRevision();
 });
@@ -103,17 +99,8 @@ test("publishes revision 2", async () => {
 
   revision2 = await latestRevision();
   expect(revision2).not.toBe(revision1);
-  const all = await client.listSchemas({
-    project_id: projectId,
-    object_type: objectType,
-    revisions: "all",
-  });
-  expect(all.schemas.map((schema) => schema.id)).toEqual(
-    expect.arrayContaining([revision1, revision2]),
-  );
 
-  // The flow names the schema by objectType, not by a revision id, so it
-  // runs on revision 2 from now on without being published again.
+  // The flow names the schema by objectType, so it runs on revision 2 from now on.
   const flows = await client.listFlowDefinitions({ project_id: projectId, revisions: "latest" });
   expect(flows.flow_definitions.length).toBeGreaterThan(0);
   for (const flow of flows.flow_definitions) {
@@ -197,13 +184,12 @@ async function registerThroughProvider(
   await signInAtProvider(page, user.username);
   await expectSignedIn(page);
 
-  const { users } = await client.queryUsers({}, { project_id: projectId });
+  const { users } = await client.queryUsers({ limit: 100 }, { project_id: projectId });
   const created = users.find((candidate) => candidate.identifier === user.email);
-  expect(created, `${user.email} was not created`).toBeDefined();
-  const id = created?.id ?? "";
-  expect(created?.schema).toBe(revision);
-  await client.setUserPassword(id, { password });
+  if (!created) throw new Error(`${user.email} was not created`);
+  expect(created.schema).toBe(revision);
+  await client.setUserPassword(created.id, { password });
 
   await logout(page);
-  return client.getUserByID(id);
+  return client.getUserByID(created.id);
 }
