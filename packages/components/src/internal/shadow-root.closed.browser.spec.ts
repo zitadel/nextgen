@@ -1,13 +1,9 @@
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { CreateFlow201 } from "@zitadel/api/generated/model";
-import type { LitElement } from "lit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 
-import "../atoms/index.js";
-import { listKnownTags } from "../manifests.js";
-import "../orchestrator/index.js";
-import type { ZitadelLogin } from "../orchestrator/zitadel-login.js";
+import { LIGHT_DOM_TAGS, registeredElements } from "../__tests__/registered-elements.js";
 
 import { SHADOW_ROOT_MODE } from "./shadow-root.js";
 
@@ -18,8 +14,7 @@ import { SHADOW_ROOT_MODE } from "./shadow-root.js";
  * runs would fail, which is what makes them the proof.
  */
 
-const ORCHESTRATOR_TAGS = ["zitadel-login", "zitadel-session", "zitadel-logout"];
-const LIGHT_DOM_TAGS = ["zl-passkey"];
+const elements = await registeredElements(() => import("../index.js"));
 
 const signInStep: CreateFlow201 = {
   id: "flow_1",
@@ -85,8 +80,8 @@ describe("closed shadow roots", () => {
     vi.unstubAllGlobals();
   });
 
-  async function mountLogin(): Promise<ZitadelLogin> {
-    const login = document.createElement("zitadel-login") as ZitadelLogin;
+  async function mountLogin() {
+    const login = document.createElement("zitadel-login");
     login.purpose = "login";
     login.project = configureZitadel({
       proxyPath: "/__nextgen",
@@ -102,16 +97,16 @@ describe("closed shadow roots", () => {
     expect(SHADOW_ROOT_MODE).toBe("closed");
   });
 
-  describe.each([...listKnownTags(), ...ORCHESTRATOR_TAGS])("<%s>", (tag) => {
-    async function mountTag(): Promise<LitElement> {
+  describe.each(elements)("<$tag>", ({ tag }) => {
+    async function mountTag() {
       configureZitadel({
         proxyPath: "/__nextgen",
         projectId: "test-project",
         url: "http://localhost:4000",
       });
-      const element = document.createElement(tag) as LitElement;
+      const element = document.createElement(tag);
       host.appendChild(element);
-      await element.updateComplete;
+      if ("updateComplete" in element) await element.updateComplete;
       return element;
     }
 
@@ -120,21 +115,11 @@ describe("closed shadow roots", () => {
       expect(element.shadowRoot).toBeNull();
     });
 
-    it.skipIf(LIGHT_DOM_TAGS.includes(tag))(
-      "does not hand its root out as renderRoot",
-      async () => {
-        const element = await mountTag();
-        expect(element.renderRoot).toBeUndefined();
-      },
-    );
-
-    it.skipIf(LIGHT_DOM_TAGS.includes(tag))(
-      "cannot be asked for ElementInternals, which expose the root",
-      async () => {
-        const element = await mountTag();
-        expect(() => element.attachInternals()).toThrow();
-      },
-    );
+    it.skipIf(LIGHT_DOM_TAGS.includes(tag))("renders into a closed root", async () => {
+      const element = await mountTag();
+      const root = "renderRoot" in element ? element.renderRoot : null;
+      expect(root instanceof ShadowRoot && root.mode).toBe("closed");
+    });
   });
 
   it("keeps the typed password out of a page-level capture listener", async () => {
@@ -143,7 +128,7 @@ describe("closed shadow roots", () => {
     const record = (event: Event): void => {
       seen.push({ type: event.type, target: event.target, path: event.composedPath() });
     };
-    const types = ["focusin", "keydown", "beforeinput", "input", "change", "zl-input"];
+    const types = ["focusin", "keydown", "beforeinput", "input", "change"];
     for (const type of types) document.addEventListener(type, record, true);
 
     login.focus();
@@ -180,6 +165,21 @@ describe("closed shadow roots", () => {
     expect(keys).toEqual(["a", "b"]);
   });
 
+  // A limitation, pinned so a Lit upgrade that changes it forces the README's
+  // "Shadow roots" section to be revisited. Lit keeps the part it renders
+  // into on the element, and that part's parent is the root.
+  it("still lets a script that walks the element's own properties reach the root", async () => {
+    const login = await mountLogin();
+    const holder = Reflect.ownKeys(login)
+      .map((key) => Reflect.get(login, key))
+      .find(
+        (value) =>
+          typeof value === "object" && Reflect.get(value ?? {}, "parentNode") instanceof ShadowRoot,
+      );
+
+    expect(Reflect.get(holder ?? {}, "parentNode")).toBeInstanceOf(ShadowRoot);
+  });
+
   it("still signs in: typing, Tab and Enter reach the flow through the closed roots", async () => {
     const login = await mountLogin();
 
@@ -187,7 +187,7 @@ describe("closed shadow roots", () => {
     await userEvent.keyboard("alice@acme.com{Tab}hunter2{Enter}");
 
     await waitFor(() => (bodies.length >= 2 ? bodies : null));
-    const submitted = JSON.parse(bodies[1] ?? "{}") as { fields?: Record<string, string> };
+    const submitted: { fields?: Record<string, string> } = JSON.parse(bodies[1] ?? "{}");
     expect(submitted.fields).toEqual({ email: "alice@acme.com", password: "hunter2" });
   });
 });

@@ -5,7 +5,7 @@ import { classMap } from "lit/directives/class-map.js";
 import buttonStyles from "./zl-button.css?inline";
 
 import { emit } from "../internal/emit.js";
-import { ownRoot, ZlElement } from "../internal/shadow-root.js";
+import { ZlElement } from "../internal/shadow-root.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
@@ -36,8 +36,6 @@ import "./zl-icon.js";
 @customElement("zl-button")
 export class ZlButton extends ZlElement {
   static formAssociated = true;
-  /** Attaches its own `ElementInternals` in the constructor; see {@link ZlElement}. */
-  static override disabledFeatures: string[] = [];
 
   static override shadowRootOptions: ShadowRootInit = {
     ...ZlElement.shadowRootOptions,
@@ -90,7 +88,7 @@ export class ZlButton extends ZlElement {
   }
 
   override focus(options?: FocusOptions): void {
-    ownRoot(this)?.querySelector<HTMLButtonElement>("button")?.focus(options);
+    this.ownRoot?.querySelector<HTMLButtonElement>("button")?.focus(options);
   }
 
   override render() {

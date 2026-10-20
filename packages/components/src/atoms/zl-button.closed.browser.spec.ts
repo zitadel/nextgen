@@ -24,7 +24,8 @@ describe("<zl-button> activation (closed shadow root)", () => {
 
   async function mount(type: string): Promise<{ button: ZlButton; submits: () => number }> {
     host.innerHTML = `<form><zl-button type="${type}" action="go" label="Go"></zl-button></form>`;
-    const button = host.querySelector("zl-button") as ZlButton;
+    const button = host.querySelector("zl-button");
+    if (!button) throw new Error("zl-button did not render");
     let count = 0;
     button.addEventListener("zl-submit", () => {
       count += 1;

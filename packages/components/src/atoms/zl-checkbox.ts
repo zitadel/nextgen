@@ -1,5 +1,5 @@
 import { html, nothing, type PropertyValues } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, query } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
@@ -8,7 +8,6 @@ import checkboxStyles from "./zl-checkbox.css?inline";
 
 import { emit } from "../internal/emit.js";
 import { FormAtom } from "../internal/form-atom.js";
-import { ownRoot } from "../internal/shadow-root.js";
 import { nextUid } from "../internal/unique-id.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, sharedStyles, surfaceStyles } from "../styles/index.js";
@@ -52,10 +51,7 @@ export class ZlCheckbox extends FormAtom {
    */
   @property({ attribute: "data-state" }) accessor forcedState: string | null = null;
 
-  /** Not `@query`: that reads `renderRoot`, which a closed build withholds. */
-  private get inputEl(): HTMLInputElement | null {
-    return ownRoot(this)?.querySelector<HTMLInputElement>(".zr-checkbox__input") ?? null;
-  }
+  @query(".zr-checkbox__input") private accessor inputEl: HTMLInputElement | null = null;
 
   private readonly inputId = nextUid("zl-checkbox");
 

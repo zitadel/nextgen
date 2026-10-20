@@ -3,27 +3,23 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import "../atoms/index.js";
-import { listKnownTags } from "../manifests.js";
-import "../orchestrator/index.js";
+import { LIGHT_DOM_TAGS, registeredElements } from "../__tests__/registered-elements.js";
 
 import { SHADOW_ROOT_MODE, ZlElement } from "./shadow-root.js";
 
-const ORCHESTRATOR_TAGS = ["zitadel-login", "zitadel-session", "zitadel-logout"];
-
-/**
- * Elements that render into their own light DOM and so have no root to open or
- * close. Anything else in the registry must derive from {@link ZlElement}.
- */
-const LIGHT_DOM_TAGS = ["zl-passkey"];
-
-const ROOT_BEARING_TAGS = [...listKnownTags(), ...ORCHESTRATOR_TAGS].filter(
-  (tag) => !LIGHT_DOM_TAGS.includes(tag),
-);
+const elements = await registeredElements(() => import("../index.js"));
+const rootBearing = elements.filter(({ tag }) => !LIGHT_DOM_TAGS.includes(tag));
 
 // Resolved from the package cwd, not `import.meta.url` — vite rewrites module
 // URLs, and vitest always runs with the package directory as cwd.
 const DIST = join(process.cwd(), "dist");
+
+/** The root options of a class that derives from ZlElement, else `undefined`. */
+function shadowRootOptionsOf(
+  ctor: CustomElementConstructor | undefined,
+): ShadowRootInit | undefined {
+  return ctor?.prototype instanceof ZlElement ? Reflect.get(ctor, "shadowRootOptions") : undefined;
+}
 
 function builtModules(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -39,12 +35,16 @@ describe("shadow root mode in the source build", () => {
     expect(ZlElement.shadowRootOptions.mode).toBe("open");
   });
 
-  it.each(ROOT_BEARING_TAGS)("<%s> takes its root options from ZlElement", (tag) => {
-    const ctor = customElements.get(tag);
-    expect(ctor, `${tag} is not registered`).toBeDefined();
-    expect(ctor?.prototype).toBeInstanceOf(ZlElement);
-    const { shadowRootOptions } = ctor as unknown as typeof ZlElement;
-    expect(shadowRootOptions.mode).toBe(SHADOW_ROOT_MODE);
+  it("finds the whole package, the atoms and the three orchestrators", () => {
+    const tags = elements.map(({ tag }) => tag);
+    expect(tags).toEqual(expect.arrayContaining(["zl-field", "zl-button", "zitadel-login"]));
+    expect(tags).toEqual(expect.arrayContaining(["zitadel-session", "zitadel-logout"]));
+    expect(rootBearing.length).toBeGreaterThanOrEqual(13);
+  });
+
+  it.each(rootBearing)("<$tag> takes its root options from ZlElement", ({ ctor }) => {
+    expect(ctor.prototype).toBeInstanceOf(ZlElement);
+    expect(shadowRootOptionsOf(ctor)?.mode).toBe(SHADOW_ROOT_MODE);
   });
 
   it.each(LIGHT_DOM_TAGS)("<%s> has no shadow root to close", (tag) => {
@@ -56,8 +56,7 @@ describe("shadow root mode in the source build", () => {
 
   it("keeps the focus delegation the form atoms and the login widget add", () => {
     for (const tag of ["zl-field", "zl-select", "zl-checkbox", "zl-button", "zitadel-login"]) {
-      const { shadowRootOptions } = customElements.get(tag) as unknown as typeof ZlElement;
-      expect(shadowRootOptions.delegatesFocus, tag).toBe(true);
+      expect(shadowRootOptionsOf(customElements.get(tag))?.delegatesFocus, tag).toBe(true);
     }
   });
 });

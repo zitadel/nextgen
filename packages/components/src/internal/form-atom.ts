@@ -14,8 +14,6 @@ import { ZlElement } from "./shadow-root.js";
  */
 export abstract class FormAtom extends ZlElement {
   static formAssociated = true;
-  /** Attaches its own `ElementInternals` in the constructor; see {@link ZlElement}. */
-  static override disabledFeatures: string[] = [];
 
   /** The atom's own `disabled` attribute. See {@link isDisabled}. */
   @property({ type: Boolean, reflect: true }) accessor disabled = false;

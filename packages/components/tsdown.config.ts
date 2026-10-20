@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { defineConfig, type TsdownPlugin } from "tsdown";
 
+import { CLOSED_SHADOW_ROOTS } from "./shadow-root-define.ts";
+
 /**
  * Rolldown plugin that turns `.liquid` files into default-exported strings.
  * Mirrors what Vite does natively so `import tpl from "./file.liquid"` works
@@ -45,14 +47,6 @@ const INLINE_STANDALONE_ONLY = [/^@zitadel\/config(\/|$)/];
 /** Third-party runtime deps the components need in the browser. */
 const THIRD_PARTY = ["lit", /^lit\//, "liquidjs", "dompurify", "lucide", /^lucide\//] as const;
 
-/**
- * Every artifact this config writes ships, so every one is built with closed
- * shadow roots. The identifier is declared in `src/internal/shadow-root.ts`
- * and is left undefined everywhere else, which is what keeps the roots open
- * under Vitest, Storybook and any dev server running the source.
- */
-const SHIPPED_BUILD_DEFINE = { __ZITADEL_SHADOW_ROOT_MODE__: JSON.stringify("closed") };
-
 export default defineConfig([
   /**
    * Library build — the npm entrypoints. `lit`/`liquidjs`/`dompurify`/`lucide`
@@ -94,7 +88,8 @@ export default defineConfig([
     // `clean: false` so it appends standalone.mjs instead of wiping this one.
     clean: true,
     target: "es2022",
-    define: SHIPPED_BUILD_DEFINE,
+    // Every artifact this config writes ships, so every one is built closed.
+    define: CLOSED_SHADOW_ROOTS,
     deps: {
       neverBundle: [...THIRD_PARTY, "@zitadel/api-mock"],
       alwaysBundle: INLINE_INTERNAL,
@@ -128,7 +123,8 @@ export default defineConfig([
     sourcemap: false,
     clean: false,
     target: "es2022",
-    define: SHIPPED_BUILD_DEFINE,
+    // Every artifact this config writes ships, so every one is built closed.
+    define: CLOSED_SHADOW_ROOTS,
     deps: {
       neverBundle: ["@zitadel/api-mock"],
       alwaysBundle: [...INLINE_INTERNAL, ...INLINE_STANDALONE_ONLY, ...THIRD_PARTY],

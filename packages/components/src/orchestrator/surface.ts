@@ -1,4 +1,4 @@
-import { ownRoot, ZlElement } from "../internal/shadow-root.js";
+import { ZlElement } from "../internal/shadow-root.js";
 import { property } from "../internal/property.js";
 import type { ZitadelProject } from "@zitadel/api/config";
 
@@ -128,7 +128,7 @@ export class ZitadelSurface extends ZitadelConfigured {
       this.theme === "" ? undefined : this.theme,
       this.variant === "page" ? "dark" : "auto",
     );
-    const root = ownRoot(this);
+    const root = this.ownRoot;
     if (root) {
       applyBaseTokens(root);
       applyBrandingTokens(root, branding);

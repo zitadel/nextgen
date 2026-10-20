@@ -1,5 +1,5 @@
 import { html, nothing, type PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
@@ -8,7 +8,6 @@ import selectStyles from "./zl-select.css?inline";
 
 import { emit } from "../internal/emit.js";
 import { FormAtom } from "../internal/form-atom.js";
-import { ownRoot } from "../internal/shadow-root.js";
 import { parseJsonAttribute } from "../internal/json-attribute.js";
 import { nextUid } from "../internal/unique-id.js";
 import type { AtomManifest } from "../manifest.js";
@@ -82,10 +81,7 @@ export class ZlSelect extends FormAtom {
 
   @state() private accessor activeValue: string | null = null;
 
-  /** Not `@query`: that reads `renderRoot`, which a closed build withholds. */
-  private get nativeEl(): HTMLSelectElement | null {
-    return ownRoot(this)?.querySelector<HTMLSelectElement>(".zr-select__native") ?? null;
-  }
+  @query(".zr-select__native") private accessor nativeEl: HTMLSelectElement | null = null;
 
   private readonly baseId = nextUid("zl-select");
 

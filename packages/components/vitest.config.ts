@@ -2,6 +2,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
+import { CLOSED_SHADOW_ROOTS } from "./shadow-root-define.ts";
 import { liquidRaw } from "./vite-liquid-plugin.ts";
 
 /** Browser specs that run only in the `closed-roots` project. */
@@ -79,11 +80,11 @@ export default defineConfig({
         // The browser project with the shipped build's shadow root mode
         // forced on: the only place the closed roots run, because a custom
         // element registers once per page and the mode is fixed when the
-        // module loads. Same define as the `define` in tsdown.config.ts.
+        // module loads.
         cacheDir: ".vitest/closed-roots",
         plugins: sharedPlugins(),
         resolve: { conditions: sourceConditions },
-        define: { __ZITADEL_SHADOW_ROOT_MODE__: JSON.stringify("closed") },
+        define: CLOSED_SHADOW_ROOTS,
         test: {
           name: "closed-roots",
           globals: true,

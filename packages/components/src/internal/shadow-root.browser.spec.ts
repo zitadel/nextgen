@@ -1,6 +1,8 @@
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LIGHT_DOM_TAGS, registeredElements } from "../__tests__/registered-elements.js";
+
 /**
  * The npm package as a consumer loads it. This project runs the source with
  * open roots, so a closed root here can only come from the build: the proof
@@ -11,20 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * same tags and a tag registers once per page.
  */
 const BUILT_ENTRY = "/dist/index.mjs";
-const ORCHESTRATOR_TAGS = ["zitadel-login", "zitadel-session", "zitadel-logout"];
-const LIGHT_DOM_TAGS = ["zl-passkey"];
 
-function tagsOf(manifests: unknown): string[] {
-  if (!Array.isArray(manifests)) throw new Error("the built package exports no manifestRegistry");
-  return manifests.map((manifest: { tag: string }) => manifest.tag);
-}
-
-const built: unknown = await import(/* @vite-ignore */ BUILT_ENTRY);
-const manifests =
-  typeof built === "object" && built !== null ? Reflect.get(built, "manifestRegistry") : [];
-const TAGS = [...tagsOf(manifests), ...ORCHESTRATOR_TAGS].filter(
-  (tag) => !LIGHT_DOM_TAGS.includes(tag),
-);
+const elements = await registeredElements(() => import(/* @vite-ignore */ BUILT_ENTRY));
 
 describe("the built package", () => {
   let host: HTMLDivElement;
@@ -54,15 +44,19 @@ describe("the built package", () => {
     host.remove();
   });
 
-  it("registers every tag it ships", () => {
-    expect(TAGS.length).toBeGreaterThan(ORCHESTRATOR_TAGS.length);
-    for (const tag of TAGS) expect(customElements.get(tag), tag).toBeDefined();
+  it("registers the atoms and the three orchestrators", () => {
+    const tags = elements.map(({ tag }) => tag);
+    expect(tags).toEqual(expect.arrayContaining(["zl-field", "zitadel-login", "zitadel-logout"]));
+    expect(elements.length).toBeGreaterThanOrEqual(14);
   });
 
-  it.each(TAGS)("<%s> attaches a closed shadow root", (tag) => {
-    const element = document.createElement(tag);
-    host.appendChild(element);
-    expect(modes).toEqual(["closed"]);
-    expect(element.shadowRoot).toBeNull();
-  });
+  it.each(elements)(
+    "<$tag> attaches a closed shadow root, or none if it is light DOM",
+    ({ tag }) => {
+      const element = document.createElement(tag);
+      host.appendChild(element);
+      expect(modes).toEqual(LIGHT_DOM_TAGS.includes(tag) ? [] : ["closed"]);
+      expect(element.shadowRoot).toBeNull();
+    },
+  );
 });

@@ -151,7 +151,7 @@ describe("<zl-select> form participation (chromium)", () => {
     async function mountNested(): Promise<ZlSelect> {
       const wrapper = document.createElement("div");
       host.appendChild(wrapper);
-      const select = document.createElement("zl-select") as ZlSelect;
+      const select = document.createElement("zl-select");
       select.options = OPTIONS;
       wrapper.attachShadow({ mode: "closed" }).appendChild(select);
       await select.updateComplete;

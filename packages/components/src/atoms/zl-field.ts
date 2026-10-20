@@ -1,6 +1,6 @@
 import type { CreateFlow201StepFieldsItemType } from "@zitadel/api/generated/model";
 import { html, nothing, type PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
@@ -9,7 +9,6 @@ import fieldStyles from "./zl-field.css?inline";
 
 import { emit } from "../internal/emit.js";
 import { FormAtom } from "../internal/form-atom.js";
-import { ownRoot } from "../internal/shadow-root.js";
 import { hookName } from "../internal/hook-name.js";
 import { nextUid } from "../internal/unique-id.js";
 import type { AtomManifest } from "../manifest.js";
@@ -102,10 +101,7 @@ export class ZlField extends FormAtom {
   @state() private accessor hasHelp = false;
   @state() private accessor hasSuffixSlot = false;
 
-  /** Not `@query`: that reads `renderRoot`, which a closed build withholds. */
-  private get inputEl(): HTMLInputElement | null {
-    return ownRoot(this)?.querySelector<HTMLInputElement>(".zr-field__input") ?? null;
-  }
+  @query(".zr-field__input") private accessor inputEl: HTMLInputElement | null = null;
 
   private readonly inputId = nextUid("zl-field");
 
@@ -178,13 +174,13 @@ export class ZlField extends FormAtom {
   }
 
   override get formValue(): string {
-    const native = this.inputEl ?? ownRoot(this)?.querySelector<HTMLInputElement>("input");
+    const native = this.inputEl ?? this.ownRoot?.querySelector<HTMLInputElement>("input");
     return native ? native.value : this.value;
   }
 
   override set formValue(value: string) {
     this.value = value;
-    const native = this.inputEl ?? ownRoot(this)?.querySelector<HTMLInputElement>("input");
+    const native = this.inputEl ?? this.ownRoot?.querySelector<HTMLInputElement>("input");
     if (native && native.value !== value) {
       native.value = value;
     }
