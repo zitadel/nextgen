@@ -931,6 +931,8 @@ describe("server SDK edge specs", () => {
     "the server SDK in the edge runtime",
     "answers a protected route with a redirect to the login path",
     "forwards the proxy path to the backend",
+    "forwards a GET on the proxy path as a GET",
+    "refuses a request that carries the auth header before forwarding it",
     "passes an unprotected route through",
   ];
 

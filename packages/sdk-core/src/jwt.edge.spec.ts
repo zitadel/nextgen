@@ -19,7 +19,7 @@ const options = {
 };
 
 /** Signs a token with a fresh RS256 key and publishes the key as the issuer's JWKS. */
-async function signedToken(claims: Record<string, unknown>): Promise<string> {
+async function signedToken(claims: object): Promise<string> {
   const { privateKey, publicKey } = await crypto.subtle.generateKey(
     {
       name: "RSASSA-PKCS1-v1_5",
