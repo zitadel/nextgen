@@ -4,8 +4,33 @@ import type { CreateFlow201, CreateFlow201StepFieldsItem } from "@zitadel/api/ge
 import type { SeedContext } from "./seed";
 import type { InstanceHandle, MintedSession, SeededUser } from "./types";
 
-/** Mirrors the server's session cookie (internal/api/session.go). */
+/**
+ * Mirrors the server's session cookie (internal/api/session.go): the name a
+ * direct call to the server sends, and the one an app keeps behind a proxy that
+ * passes the server's cookie through, such as an SPA's in production.
+ */
 export const SESSION_COOKIE_NAME = "__nextgen_session";
+
+/**
+ * The cookie an app keeps its session in on its own origin behind a server SDK
+ * (Next.js, Nuxt, SvelteKit, SolidStart, TanStack Start, Qwik Router) or the dev
+ * proxy `zitadel setup` writes for an SPA: `__nextgen_session_<projectId>`. The
+ * proxy renames the server's cookie, so the apps and the Console on one host
+ * keep a session each (ADR 073).
+ *
+ * Mirrors `sessionCookieName` in `@zitadel/sdk-core`, including the
+ * percent-encoding of every byte outside `[A-Za-z0-9_-]`.
+ */
+export function sessionCookieName(projectId: string): string {
+  let name = `${SESSION_COOKIE_NAME}_`;
+  for (const byte of new TextEncoder().encode(projectId)) {
+    const char = String.fromCharCode(byte);
+    name += /[A-Za-z0-9_-]/.test(char)
+      ? char
+      : `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
+  }
+  return name;
+}
 
 const MAX_FLOW_STEPS = 6;
 

@@ -75,6 +75,17 @@ func errReleaseUnresolved(kind ReleasePointerKind, handle, field, ref string) er
 	return ErrReleaseUnresolvedReference().WithMessage(fmt.Sprintf("%s %s: %s %s not found", kind, handle, field, ref))
 }
 
+// SchemaSSOProviderSlugs returns the IDP slugs named by a user schema's
+// x-auth-methods.sso.providers. Used when assembling a release to auto-pin
+// connections the schema references.
+func SchemaSSOProviderSlugs(document *jsonschema.Schema) ([]string, error) {
+	authMethods, err := newSchemaReader(document).AuthMethods()
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to read user schema auth methods")
+	}
+	return authMethods.SSOProviders(), nil
+}
+
 // validateReleaseFlowDefinitions validates each flow as a save does, against
 // the schema revision in the release instead of the newest one. Runs after
 // closure, so the schema is there.

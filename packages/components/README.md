@@ -266,6 +266,10 @@ So the configuration has to be there when the element starts. Give a raw element
 
 Do not build on server-rendered markup that carries an object-valued prop. React 19 does not apply a custom element's object property while hydrating it, so a `project` handle passed to a raw `<zitadel-login>` that was server-rendered is never delivered. Pass `project-id` and `proxy-path` as strings, configure globally before the bundle loads, or mount on the client only.
 
+### Edge runtimes
+
+Cloudflare Workers and Vercel Edge have no DOM, and bundlers target them with the `browser` condition next to `workerd`, `worker` or `edge-light`, so Lit's browser build throws `HTMLElement is not defined` as soon as it is imported. When one of those conditions is active together with `browser`, the package root therefore resolves to a build that never loads Lit and defines no element. It keeps what does not need one: `businessLocales` and the other locales, `tokens` and `cssVars`, the branding helpers, the attribution markup and the flow API client. The elements, their manifests, the sanitiser and `ThemeController` are not in it, so a bundle for those runtimes fails at build time if it imports one. The other entries (`./atoms`, `./manifests`, `./orchestrator`, `./standalone`) are unchanged and still need a DOM, as does the root under `browser` alone. Without `browser`, `workerd`, `worker` and `edge-light` resolve to the full root as before.
+
 ## Element APIs
 
 ### `<zitadel-login>`
@@ -279,7 +283,8 @@ Do not build on server-rendered markup that carries an object-valued prop. React
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property (not an attribute). When unset, the element falls back to the global handle from `getZitadelConfig()` |
 | `lang` | `string` | BCP 47 tag (e.g. `"de"`, `"en-US"`). Resolves to a built-in dictionary; falls back to `<html lang>` / `navigator.language` |
 | `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work |
-| `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` for a session cookie and navigate here |
+| `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` for a session cookie and navigate here, or back to the path in the page's `next` query parameter when that is a path on the page's origin: every server SDK's middleware sends a signed-out visit to a protected route to the login page with `?next=<path>`. A `next` that is a URL, starts with `//`, or holds a `\` or a control character is ignored |
+| `forcePostSignInUrl` / `force-post-sign-in-url` | `boolean` | Navigate to `post-sign-in-url` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own |
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh. Unset, `null` or `""` fall back to the `flow` query parameter. Every SDK's login wrapper takes it as `resumeFlowId` |
 | `previewState` / `preview-state` | `'default' \| 'validation_error' \| 'submission_error' \| 'loading' \| 'success'` | Preview mode for operator surfaces such as the console's branding screen. The flow still starts, so the step is the one the project serves; the element then shows it in this state and submits nothing. Only the purpose's entry step can be previewed. `LOGIN_PREVIEW_STATES` lists the values, and `loginPreviewStatesFor(step)` the ones that show a served step differently from `default`; any other value runs the flow for real |
 | `previewSuccessStep` / `preview-success-step` | `string` | The terminal step the `success` preview paints, for a flow definition that names it differently from the default flow's `done` |
@@ -308,8 +313,11 @@ design tokens and `branding.font_url` into its shadow root on each update.
 Session menu / sign-out control for embedded apps. Reads the signed-in
 identity from `getMySession` (`GET /sessions/me`) — the same source as
 `<zitadel-session>` — calls `revokeMySession` (`DELETE /sessions/me`) through
-the SDK handle, and clears the session. Uses the same token adoption as
-`<zitadel-login>` (`applyBaseTokens`).
+the SDK handle, and clears the session. The read and the revoke name the
+handle's project: a session of another project on the same host, such as the
+Console's on `localhost`, shows no identity and stays signed in. A session that
+already ended, in another tab or by expiring, signs out without an error. Uses
+the same token adoption as `<zitadel-login>` (`applyBaseTokens`).
 
 | Property | Type | Notes |
 | --- | --- | --- |
@@ -384,6 +392,7 @@ packages/components/
 │   ├── tokens/            re-export of @zitadel/design-tokens
 │   ├── styles/            shared host styles, focus ring, t() css-var bridge
 │   ├── manifests.ts       per-atom attribute / part / event manifests
+│   ├── server.ts          Lit-free subset the root resolves to on edge
 │   └── index.ts           barrel
 ├── tsdown.config.ts       library build (externalises lit/liquidjs/dompurify)
 └── vitest.config.ts       jsdom (unit) + chromium (browser) projects

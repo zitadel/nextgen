@@ -28,11 +28,6 @@ const browserHeaders = new Set(["origin"]);
 
 const safeMethods = new Set(["get", "head", "options"]);
 
-// The writes the session cookie authenticates without a CSRF token, as the
-// session scheme's description names them: sign-out. (The query reads it
-// names accept a project secret, which the sample uses instead.)
-const csrfExempt = new Set(["revokeMySession"]);
-
 /** The sample's code. */
 export function sdkSample(
   operation: OperationObject,
@@ -43,7 +38,10 @@ export function sdkSample(
   const method = clientMethod(operation.operationId ?? "");
   const parameters = operationParameters(operation, pathItem);
   const auth = authentication(operation);
-  const csrf = !safeMethods.has(request.method.toLowerCase()) && !csrfExempt.has(method);
+  // Every write the session cookie authenticates needs the CSRF token. (The
+  // query reads the session scheme exempts accept a project secret, which the
+  // sample uses instead.)
+  const csrf = !safeMethods.has(request.method.toLowerCase());
 
   const query = parameters.filter((parameter) => parameter.in === "query");
   const params = queryArguments(query, request);

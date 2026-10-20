@@ -84,6 +84,9 @@ test-output
 
 ## Framework build outputs (Next.js / Nuxt / SvelteKit)
 .next/
+# Next.js rewrites it on every `next dev`, `next build` and `next typegen`,
+# and dev points it at other route types (apps/AGENTS.md)
+next-env.d.ts
 .nuxt/
 .nuxt-typecheck/
 .output/

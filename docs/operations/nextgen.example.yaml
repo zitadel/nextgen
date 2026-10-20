@@ -105,3 +105,12 @@ httpclient:
   # For local development against loopback schema hosts:
   # allow_list: [localhost, 127.0.0.0/8, "::1/128"]
   allow_list: []
+
+# How long a session lasts after a completed sign-in (POST /sessions/exchange).
+# It runs from the sign-in; using the session does not extend it. A sign-in
+# may ask for its own lifetime, up to max_ttl. An anonymous session created
+# before sign-in always lasts 10 minutes.
+# Env: NEXTGEN_SESSION_DEFAULT_TTL, NEXTGEN_SESSION_MAX_TTL.
+session:
+  default_ttl: 24h
+  max_ttl: 720h # 30 days

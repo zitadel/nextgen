@@ -36,12 +36,14 @@ vi.mock("@/auth/session", async (importOriginal) => {
 vi.mock("@zitadel/sdk-react", () => ({
   ZitadelLogin: (props: {
     postSignInUrl?: string;
+    forcePostSignInUrl?: boolean;
     theme?: string;
     project?: { projectId?: string };
   }) => (
     <div
       data-testid="zitadel-login"
       data-post-sign-in-url={props.postSignInUrl}
+      data-force-post-sign-in-url={props.forcePostSignInUrl ? "" : undefined}
       data-project-id={props.project?.projectId}
       data-widget-theme={props.theme}
     />
@@ -101,6 +103,21 @@ describe("authentication guard", () => {
   });
 
   /**
+   * The widget returns to the page's `?next=` by default, but the console's
+   * `next` is router-relative: followed as a document path it would land
+   * outside the deployment prefix. The post-sign-in URL already joins it with
+   * the prefix, so the widget must go there instead.
+   */
+  it("keeps the widget on the post-sign-in URL rather than the page's ?next=", async () => {
+    fetchSession.mockResolvedValue(null);
+    await renderAt("/users");
+
+    expect(await screen.findByTestId("zitadel-login")).toHaveAttribute(
+      "data-force-post-sign-in-url",
+    );
+  });
+
+  /**
    * The widget resolves its own colour mode and, as a widget-variant embed,
    * paints no surface of its own. Left to itself it defaults to dark, so on
    * a light console its text landed on the console's light background and
@@ -131,6 +148,24 @@ describe("authentication guard", () => {
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/schemas"));
   });
 
+  it("keeps the requested path's query when it redirects a signed-in visitor", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    // Not the visitor's only project, which the guard would select by itself:
+    // this one can only come from `next`.
+    server.use(
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
+    );
+    const router = await renderAt(
+      `/login?next=${encodeURIComponent("/schemas?project=proj_other")}`,
+    );
+
+    expect(await screen.findByRole("heading", { name: "User schemas" })).toBeInTheDocument();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/schemas"));
+    expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_other" });
+  });
+
   it("drops unsafe ?next= values instead of following them", async () => {
     fetchSession.mockResolvedValue(null);
     await renderAt("/login?next=https://evil.example/phish");
@@ -140,6 +175,25 @@ describe("authentication guard", () => {
       "/",
     );
   });
+
+  /**
+   * Each of these starts with a single `/` and still ends on `//evil.example`:
+   * the browser reads `\` as `/`, drops tabs, and collapses dot segments. The
+   * dev server has no deployment prefix, so the widget would send the browser
+   * to `next` just as it stands.
+   */
+  it.each(["/%5Cevil.example", "/%09/evil.example", "/.//evil.example"])(
+    "drops ?next=%s, which the browser reads as //evil.example",
+    async (next) => {
+      fetchSession.mockResolvedValue(null);
+      await renderAt(`/login?next=${next}`);
+
+      expect(await screen.findByTestId("zitadel-login")).toHaveAttribute(
+        "data-post-sign-in-url",
+        "/",
+      );
+    },
+  );
 
   it("shows the setup hint instead of the widget while no project exists", async () => {
     _resetRuntimeForTesting();
@@ -163,5 +217,44 @@ describe("authentication guard", () => {
     expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
     expect(signOut).toHaveBeenCalledOnce();
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/login"));
+  });
+
+  // On localhost an app on another port can sign in while the console is open,
+  // and its session replaces the console's in the shared cookie. The screen's
+  // read names the console's project, so the server refuses that session
+  // rather than answering with the app's user, and the screen goes to sign-in
+  // as it does when the session is gone.
+  it("sends a screen whose read finds another project's session to /login", async () => {
+    // The refused loader is reported by the router; the redirect is the point.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      // The console's session until the read finds the app's in the cookie.
+      const reads: string[] = [];
+      fetchSession.mockImplementation(async () => (reads.length > 0 ? null : makeTestSession()));
+      server.use(
+        http.get("*/api/users/me", ({ request }) => {
+          reads.push(request.url);
+          return HttpResponse.json(
+            {
+              code: "sess.project_mismatch",
+              message: "The session belongs to a different project.",
+            },
+            { status: 403 },
+          );
+        }),
+      );
+      const router = await renderAt("/settings/profile");
+
+      expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
+      await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/login"));
+      expect(router.state.resolvedLocation?.search).toMatchObject({
+        next: expect.stringMatching(/^\/settings\/profile/),
+      });
+      expect(new URL(reads[0] ?? "").searchParams.get("project_id")).toBe("proj_test");
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });

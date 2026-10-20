@@ -1,8 +1,9 @@
 <script lang="ts">
   import '@zitadel/components';
+  import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelLogout as ZitadelLogoutElement } from '@zitadel/components';
 
-  import type { ZitadelLogoutProps, ZitadelSignoutDetail } from './types';
+  import type { ZitadelLogoutSvelteProps } from './types';
   import { assignGiven } from './given';
   import { onClient, proxyPathAttr } from './attributes';
 
@@ -13,7 +14,11 @@
     postSignOutUrl,
     theme,
     onSignout,
-  }: ZitadelLogoutProps = $props();
+    ...rest
+  }: ZitadelLogoutSvelteProps = $props();
+
+  // The standard HTML attributes are the only extra props the element takes.
+  const attributes = $derived(standardAttributes(rest));
 
   let el: ZitadelLogoutElement | undefined = $state();
 
@@ -39,8 +44,9 @@
     if (!node) {
       return;
     }
-    const signout = (event: Event): void =>
-      onSignout?.((event as CustomEvent<ZitadelSignoutDetail>).detail);
+    const signout = (event: Event): void => {
+      if (event instanceof CustomEvent) onSignout?.(event.detail);
+    };
     node.addEventListener('zitadel-signout', signout);
     return () => {
       node.removeEventListener('zitadel-signout', signout);
@@ -49,6 +55,7 @@
 </script>
 
 <zitadel-logout
+  {...attributes}
   bind:this={el}
   project={onClient(project)}
   project-id={project?.projectId ?? projectId}

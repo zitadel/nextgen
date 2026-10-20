@@ -147,8 +147,12 @@ describe("guidance content", () => {
     expect(agents).toContain("`matcher`");
     expect(agents).toContain("no-store");
     expect(agents).toContain("401/auth.unauthorized");
+    expect(agents).toContain("403/sess.project_mismatch");
     expect(agents).toContain("404/sess.not_found");
     expect(agents).toContain("non-empty `user_id`");
+    // The read names the app's project, so another project's session on the
+    // same host never reads as signed in.
+    expect(agents).toContain("NEXT_PUBLIC_ZITADEL_PROJECT_ID");
 
     // Nuxt: the composable the scaffolded auth plugin seeds — no Next helper.
     const nuxtCtx = {
@@ -166,9 +170,10 @@ describe("guidance content", () => {
       framework: { id: "react", devPort: 5173, url: "http://localhost:5173" },
     } as PatchContext;
     const reactAgents = agentsGuidanceSection(reactCtx);
-    expect(reactAgents).toContain("/__nextgen/sessions/me");
+    expect(reactAgents).toContain("/__nextgen/sessions/me?project_id=");
     expect(reactAgents).toContain('cache: "no-store"');
     expect(reactAgents).toContain("401/auth.unauthorized");
+    expect(reactAgents).toContain("403/sess.project_mismatch");
     expect(reactAgents).toContain("404/sess.not_found");
     expect(reactAgents).toContain("unknown/error, never signed-out");
     expect(reactAgents).not.toContain("@zitadel/sdk-next/session");

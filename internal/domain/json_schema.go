@@ -317,12 +317,18 @@ func (r *JSONSchemaResolver) Resolve(
 	}
 	// Compilation itself does no I/O and never observes ctx, so the
 	// envelope could expire between the last fetch and this point; an
-	// expired resolve must fail, not be cached as success. Returned raw
-	// (not classified into a fetch_* code): the schema service classifies
-	// it, so operations whose resolver cannot egress never advertise fetch
-	// errors in their inferred error sets.
+	// expired resolve must fail, not be cached as success. ctx.Err alone
+	// misses that: it reports a deadline only once the runtime has fired
+	// the deadline's timer, which can trail the deadline itself, so the
+	// deadline is read against the clock too. Returned raw (not classified
+	// into a fetch_* code): the schema service classifies it, so operations
+	// whose resolver cannot egress never advertise fetch errors in their
+	// inferred error sets.
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return nil, ctxErr
+	}
+	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) <= 0 {
+		return nil, context.DeadlineExceeded
 	}
 	r.cache.Add(cacheKey, schema)
 	return schema, nil
@@ -399,6 +405,9 @@ func loadBuiltinSchemaBytes(relPath, canonicalSchemaURL string) ([]byte, error) 
 // when the public base is https://iam.example.com/schema).
 // canonicalDocumentURL must be the absolute schema URL used as JSON Schema $id and for resolution
 // (typically the request URL used to serve this document).
+//
+// The hosted cloud publishes the built-ins rendered the same way, by
+// scripts/render-builtin-schemas.mjs; a change here belongs there too.
 func WriteBuiltinJSONSchema(w io.Writer, schemaPath string, canonicalDocumentURL string) error {
 	raw, ok := builtinSchemas[schemaPath]
 	if !ok {

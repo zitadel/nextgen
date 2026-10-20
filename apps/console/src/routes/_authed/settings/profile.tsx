@@ -9,6 +9,7 @@ import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
 import { api } from "@/api/zitadel";
+import { consoleSessionProject } from "@/auth/session";
 import { field } from "@/lib/record";
 import { userAttributes } from "@/lib/user";
 
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/_authed/settings/profile")({
   staticData: {
     nav: { label: "Profile", order: 0, icon: CircleUserRound, view: "settings", group: "ACCOUNT" },
   },
-  loader: async () => ({ user: await api.getMyUser() }),
+  loader: async () => ({ user: await api.getMyUser(consoleSessionProject()) }),
   component: ProfileScreen,
 });
 

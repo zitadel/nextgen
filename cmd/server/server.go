@@ -293,8 +293,15 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
-	releaseService := service.NewReleaseService(serviceDBPool, builtinBases)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
+	releaseService := service.NewReleaseService(
+		serviceDBPool,
+		schemaService,
+		flowDefinitionSvc,
+		brandingService,
+		idpConnectionService,
+		builtinBases,
+	)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	userService := service.NewUserService(
@@ -599,7 +606,9 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	// origins.shared_hosts is not SetDefault'd: viper merges map defaults with
 	// overrides, which would break replace-defaults. Nil after unmarshal means
 	// "use DefaultSharedHosts"; an explicit empty map disables the checks.
-	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
+	// default_ttl is the lifetime of a signed-in session, not of the
+	// anonymous shell POST /sessions mints (domain.SessionAnonymousTTL).
+	v.SetDefault("session.default_ttl", domain.SessionDefaultTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 	// Empty means "the deployment's first-created non-platform project is the
 	// default" (Console ADR 0004 §2; the built-in platform row is skipped by

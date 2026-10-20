@@ -55,7 +55,8 @@ as `ZitadelSession`).
 | `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
 | `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
 | `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
-| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. |
+| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
+| `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
 | `postSignOutUrl` | `string` | unset | Logout, Session | Where to navigate after sign-out. |
 | `resumeFlowId` | `string` or `null` | unset | Login | An existing flow's id to resume instead of starting a new flow; unset, `null` or `""` falls back to the `flow` query parameter, and an id that no longer resolves starts a new flow. |
 | `variant` | `"widget"` or `"page"` | `"widget"` | Login, Session | `widget` is content-sized and paints no page chrome; `page` claims the viewport, paints the surface background and loads the brand font, and on Login focuses the first field. |
@@ -82,11 +83,25 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin project={project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
 
+## Standard HTML attributes
+
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`className`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabIndex`, `data-*` and `aria-*`) and pass them to the widget element, so you can position, style and label the widget without an extra wrapper element. Nothing else reaches the element: any other prop is ignored.
+
+```tsx
+<ZitadelLogin project={project} className="login" data-testid="login" aria-label="Sign in" />
+```
+
 ## Server rendering
 
 If your app renders on the server, mount the widget on the client only, after hydration, or pass `project-id` and `proxy-path` to the `ZitadelLogin` wrapper as strings (they are written into the server markup as attributes), because a widget that starts before its configuration arrives shows an error instead of the flow.
 
 React 19 does not apply an object property such as `project` while hydrating a server-rendered custom element, so on a server-rendered page pass `project-id` and `proxy-path` as strings instead of a `project` handle.
+
+### Edge runtimes
+
+The wrapper loads on edge runtimes such as Cloudflare Workers and Vercel Edge, which have no DOM. It renders each widget by its tag name there and registers the elements only in the browser, so the markup a server sends is the same on every runtime.
+
+The edge checks run against React 19. A server render of a widget with React 18.3 under the `browser` condition, which is how bundlers resolve `@lit/react` for the edge, logs React's development-only warning that `useLayoutEffect` does nothing on the server (twice per widget) and renders the same markup; the Node build of `@lit/react` logs nothing, and the production build of React drops the warning.
 
 ## Proxying to the backend (deployment)
 

@@ -467,8 +467,8 @@ func requireExpandScope(ctx context.Context, scope string, denied func() domain.
 // Console session) with read on the whole of projectID, which stands in for the
 // team_membership.read / team.read scopes such a principal never mints. The
 // system catalog has no finer read permission than the project viewer role
-// (ADR 054 §5). For an operation that has no list check whose decision it can
-// use (GET /users/{id}?team_id=), it asks the resolver.
+// (ADR 054 §5). Operations with no list check whose decision they can use ask
+// the resolver through requireMembershipReadIn.
 func (h *Handler) userReadsProject(ctx context.Context, projectID string) (bool, error) {
 	sc, ok := GetScopeContext(ctx)
 	if !ok || sc.PrincipalType != domain.AuthzPrincipalTypeUser {
@@ -484,10 +484,20 @@ func (h *Handler) userReadsProject(ctx context.Context, projectID string) (bool,
 	return dec == resolver.DecisionAllow, nil
 }
 
+// requireMembershipReadIn gates a membership read of a user in projectID that
+// has no list check to lean on (GET /users/{id}?team_id=, GET /users/{id}/teams):
+// by scope for a project secret, by project-wide read for a session.
+func (h *Handler) requireMembershipReadIn(ctx context.Context, projectID string) error {
+	reads, err := h.userReadsProject(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	return requireMembershipReadUnless(ctx, reads)
+}
+
 // requireMembershipReadUnless is requireMembershipRead, waived when the caller
-// is a session with read on the whole project (userReadsProject, or the list
-// check's project-wide decision): the gate POST /users/query and
-// GET /users/{id}?team_id= share.
+// is a session with read on the whole project (the list check's project-wide
+// decision on POST /users/query, or requireMembershipReadIn).
 func requireMembershipReadUnless(ctx context.Context, sessionReadsProject bool) error {
 	if sessionReadsProject {
 		return nil

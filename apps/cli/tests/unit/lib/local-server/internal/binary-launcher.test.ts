@@ -208,15 +208,19 @@ describe("local server binary helpers", () => {
   describe("telling one directory's server from another's", () => {
     const real = () => vi.importActual<typeof import("node:child_process")>("node:child_process");
     const launcher = new BinaryLauncher({ cliVersion: "0.0.0-test", dataDir: "/d", logPath: "/l" });
-    const recordFor = (pid: number, dataDir: string) =>
-      aBinaryRecord({ pid, command: "/bin/sleep 30", data_dir: dataDir });
+    const recordFor = (pid: number, dataDir: string) => aBinaryRecord({ pid, data_dir: dataDir });
 
+    /**
+     * A process that runs the server program for a data directory. It is Node,
+     * not `sleep`: macOS keeps the environment of its own programs out of `ps`,
+     * and the environment is where the data directory is read.
+     */
     async function aServerOf(dataDir: string) {
-      const child = (await real()).spawn("sleep", ["30"], {
-        stdio: "ignore",
-        env: { ...process.env, NEXTGEN_SERVER_DATA_DIR: dataDir },
-      });
-      return child;
+      return (await real()).spawn(
+        process.execPath,
+        ["-e", "setTimeout(() => undefined, 30000)", "/opt/zitadel/nextgen"],
+        { stdio: "ignore", env: { ...process.env, NEXTGEN_SERVER_DATA_DIR: dataDir } },
+      );
     }
 
     it("accepts the process that serves the record's data directory", async () => {

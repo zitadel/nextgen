@@ -99,7 +99,7 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
 <Steps>
   <Step>The hook proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
   <Step>It verifies the session token and puts the result on `event.locals.nextgenAuth`; read it with `getAuth(event)` in a load function or endpoint.</Step>
-  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`.</Step>
+  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
 </Steps>
 
 ## Verify

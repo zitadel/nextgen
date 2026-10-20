@@ -445,22 +445,75 @@ func TestUserService_PatchUser_EmptyPatchRefused(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrUserInvalid())
 }
 
-func TestUserService_PatchMyUser_SessionGuards(t *testing.T) {
+// A patch naming a schema of another objectType is refused before the write
+// transaction opens, so the user keeps both its attributes and its schema.
+func TestUserService_PatchUser_OtherLogicalSchemaRefused(t *testing.T) {
 	t.Parallel()
 
-	svc, _ := newMockedUserService(t)
+	const schemaJSON = `{"type": "object", "properties": {"givenName": {"type": "string"}}}`
 
-	_, err := svc.PatchMyUser(t.Context(), service.PatchMyUserInput{
-		Attributes: map[string]any{"givenName": "Alicia"},
-	})
-	require.ErrorIs(t, err, domain.ErrSessionTokenInvalid())
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	// No Transaction, PatchUser or InsertEvent expectation: reaching any of
+	// them fails the test.
 
-	expired := time.Now().Add(-time.Hour)
-	_, err = svc.PatchMyUser(t.Context(), service.PatchMyUserInput{
-		SessionToken: &domain.Token{ProjectID: "proj_1", UserID: "user_1", ExpiresAt: &expired},
-		Attributes:   map[string]any{"givenName": "Alicia"},
+	stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&domain.User{
+			ProjectID:  "proj_1",
+			SchemaURL:  "https://example.test/human.json",
+			ID:         "user_1",
+			Attributes: domain.Attributes{{Key: "givenName", Value: "Alice"}},
+		}, nil)
+	stmts.EXPECT().GetUserUniqueAttributeScopes(gomock.Any(), "proj_1", "user_1").
+		Return(map[domain.AttributeKey]string{}, nil)
+
+	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
+	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/human.json").
+		Return(&domain.JSONSchema{
+			ProjectID:  "proj_1",
+			URL:        "https://example.test/human.json",
+			ObjectType: new("human-user"),
+			Schema:     []byte(schemaJSON),
+		}, nil)
+	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/machine.json").
+		Return(&domain.JSONSchema{
+			ProjectID:  "proj_1",
+			URL:        "https://example.test/machine.json",
+			ObjectType: new("machine-user"),
+			Schema:     []byte(schemaJSON),
+		}, nil)
+
+	svcPool := service.NewPool(pool)
+	svc := service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{})
+
+	_, err := svc.PatchUser(t.Context(), service.PatchUserInput{
+		ProjectID: "proj_1",
+		UserID:    "user_1",
+		SchemaURL: new("https://example.test/machine.json"),
 	})
-	require.ErrorIs(t, err, domain.ErrSessionTokenInvalid())
+	require.ErrorIs(t, err, domain.ErrUserInvalid())
+}
+
+// The read is pinned to the caller's own record and the schema it points at:
+// identity and project come from Self, never from the request.
+func TestUserService_GetMyUserSchema(t *testing.T) {
+	t.Parallel()
+
+	svc, stmts := newMockedUserService(t)
+	self, err := domain.SelfFromSession(&domain.Token{ProjectID: "proj_1", UserID: "user_1"}, time.Now())
+	require.NoError(t, err)
+	stmts.EXPECT().GetUser(gomock.Any(), database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), "proj_1"),
+		database.Equal(database.Col(domain.UserFieldID), "user_1"),
+	), gomock.Any()).Return(&domain.User{ProjectID: "proj_1", ID: "user_1", SchemaURL: "https://example.test/schema.json"}, nil)
+	stmts.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
+		Return(&domain.JSONSchema{ProjectID: "proj_1", URL: "https://example.test/schema.json"}, nil)
+
+	schema, err := svc.GetMyUserSchema(t.Context(), service.GetMyUserInput{Self: self})
+	require.NoError(t, err)
+	assert.Equal(t, "https://example.test/schema.json", schema.URL)
 }
 
 func newMockedUserService(t *testing.T) (service.UserService, *servicemocks.MockAllStatements) {

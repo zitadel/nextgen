@@ -12,8 +12,13 @@ func (h *Harness) EnsureReleaseService(t testing.TB) service.ReleaseService {
 	defer h.releaseService.mutex.Unlock()
 
 	if h.releaseService.value == nil {
+		db := h.EnsureServiceDB(t)
 		h.releaseService.value = service.NewReleaseService(
-			h.EnsureServiceDB(t),
+			db,
+			h.EnsureSchemaService(t),
+			service.NewFlowDefinitionService(db, h.EnsureSchemaValidator(t), nil, BuiltinSchemaBases()),
+			h.EnsureBrandingService(t),
+			service.NewIDPConnectionService(db, h.EnsureSchemaValidator(t)),
 			BuiltinSchemaBases(),
 		)
 	}

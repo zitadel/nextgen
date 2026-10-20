@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-svelte",
-  "version": "1.0.0-alpha.25",
+  "version": "1.0.0-alpha.27",
   "description": "Svelte components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-svelte#readme",
   "bugs": {
@@ -14,14 +14,16 @@
   "license": "MIT",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "src/lib",
+    "!src/lib/**/*.spec.ts"
   ],
-  "svelte": "./dist/index.js",
+  "svelte": "./src/lib/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "svelte": "./dist/index.js",
+      "svelte": "./src/lib/index.ts",
       "default": "./dist/index.js"
     }
   },
@@ -46,6 +48,7 @@
     "svelte": "^5.0.0"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@testing-library/svelte": "^5.3.1",
     "@types/node": "catalog:",
