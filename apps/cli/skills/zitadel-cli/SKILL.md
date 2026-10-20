@@ -358,6 +358,12 @@ than one:
   stdin when non-interactive. Any other OpenID Connect provider is
   `--provider custom` with `--slug`, `--display-name`, `--issuer` and optionally
   `--scopes` (default `openid profile email`).
+  An issuer on `http://localhost:<port>` (a test provider on this machine)
+  works against a server `zitadel start` runs as a process: `start` sets
+  `NEXTGEN_HTTPCLIENT_ALLOW_LIST=localhost,127.0.0.0/8,::1/128` unless
+  `.env.local`, `.env` or the shell sets it, and setting it empty turns it off.
+  Under `--runtime docker` localhost is the container, so the provider is not
+  reachable. Otherwise `sso enable` warns in `warnings` that sign-in will fail.
   `auth-method sso disable --provider google` removes a provider; a custom one
   is named by its slug, as in `auth-method sso disable --provider acme-sso`.
 
