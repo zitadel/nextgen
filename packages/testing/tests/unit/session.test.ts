@@ -195,7 +195,8 @@ describe("seedSession", () => {
 });
 
 describe("session cookie names", () => {
-  // A direct call to the server, and an SPA app, use the server's name.
+  // A direct call to the server uses the server's name, and so does an SPA
+  // whose dev proxy knows no project.
   it("names the server's session cookie", () => {
     expect(SESSION_COOKIE_NAME).toBe("__nextgen_session");
   });

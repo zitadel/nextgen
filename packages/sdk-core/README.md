@@ -88,7 +88,15 @@ session in a cookie of its own, `sessionCookieName(projectId)`:
   on `localhost`, by the Console, is read only where the server holds it to the
   app's project: by the middleware, and by the proxy for the session probe
   `GET /sessions/me?project_id=…`. A session that signs a user of this project
-  in moves to the app's cookie; any other stays where it is.
+  in is copied to the app's cookie, and the old cookie stays: the Console may
+  share the project. When the app next signs a user in (`POST /sessions/exchange`)
+  or out (`DELETE /sessions/me`), the proxy retires it: cleared when it holds a
+  session of this project (and on sign-out that session is ended), or a dead
+  one; left when it holds another project's.
+- **Every response that sets a session cookie** sends
+  `Cache-Control: private, no-store` (`SESSION_COOKIE_CACHE_CONTROL`), and
+  `Secure` follows the server's rule on the scheme and host a proxy in front of
+  the app forwarded (`X-Forwarded-Proto`, `X-Forwarded-Host`).
 - **Without a project**, the proxy passes the cookies through unchanged.
 
 Framework-specific steps (header tunnelling, `auth()` re-verification) are

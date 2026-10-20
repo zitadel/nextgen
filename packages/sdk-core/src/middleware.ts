@@ -308,21 +308,54 @@ export function serializeSessionCookie(cookie: SessionCookie): string {
 }
 
 /**
- * Whether a session cookie this app sets needs `Secure`, by the rule the server
- * applies to its own: always, except over plain http to a loopback host, where
- * Safari would drop a `Secure` cookie.
+ * The `Cache-Control` of a response that sets a session cookie, as the server
+ * sends on its session answers: a shared cache must not hand the cookie, the
+ * session token it carries or its clearing, to the next visitor.
  */
-function secureFor(requestUrl: string | URL): boolean {
+export const SESSION_COOKIE_CACHE_CONTROL = "private, no-store";
+
+/** The browser's request as the app sees it, and as a proxy in front of it forwarded it. */
+export interface BrowserRequest {
+  /** The app's own request URL. */
+  readonly requestUrl: string | URL;
+  /** The request's `X-Forwarded-Proto`, or `null`. */
+  readonly forwardedProto?: string | null;
+  /** The request's `X-Forwarded-Host`, or `null`. */
+  readonly forwardedHost?: string | null;
+}
+
+/** The first entry of a forwarded header a chain of proxies appended to, if any. */
+function firstForwarded(value: string | null | undefined): string | undefined {
+  const first = value?.split(",")[0]?.trim();
+  return first ? first : undefined;
+}
+
+/**
+ * Whether a session cookie this app sets needs `Secure`, by the rule the server
+ * applies to its own (`cookieSecureFromContext`): always, except over plain
+ * http to a loopback host, where Safari would drop a `Secure` cookie. The
+ * scheme and host are what a proxy in front of the app forwarded (the first
+ * `X-Forwarded-Proto` and `X-Forwarded-Host`), else the app's request URL's,
+ * so an app behind a TLS proxy that talks to it over loopback keeps `Secure`.
+ */
+function secureFor(request: BrowserRequest): boolean {
   let url: URL;
   try {
-    url = new URL(requestUrl);
+    url = new URL(request.requestUrl);
   } catch {
     return true;
   }
-  if (url.protocol !== "http:") {
+  const proto = firstForwarded(request.forwardedProto) ?? url.protocol.slice(0, -1);
+  if (proto.toLowerCase() !== "http") {
     return true;
   }
-  const host = url.hostname.toLowerCase();
+  let host: string;
+  try {
+    host = new URL(`http://${firstForwarded(request.forwardedHost) ?? url.host}`).hostname;
+  } catch {
+    return true;
+  }
+  host = host.toLowerCase();
   return !(host === "localhost" || host === "[::1]" || /^127(?:\.\d{1,3}){3}$/.test(host));
 }
 
@@ -339,20 +372,20 @@ function clearedCookie(name: string, secure: boolean): SessionCookie {
 }
 
 /**
- * Moves a session of this project out of the server's cookie into the
- * project's own. The server's cookie held this project's session, so clearing
- * it costs no other app its sign-in.
+ * Copies a session of this project found in the server's cookie into the
+ * project's own. The server's cookie keeps it: on a server without platform
+ * bootstrap the Console signs in to the app's project, and clearing the cookie
+ * would sign it out. The proxy retires the server's cookie when the app signs
+ * a user in or out ({@link proxySessionCookies}), so it cannot sign its user
+ * back in once the app's own cookie is gone.
  */
-function movedToProjectCookie(
+function copiedToProjectCookie(
   token: string,
   projectId: string,
   maxAge: number | undefined,
   secure: boolean,
-): SessionCookie[] {
-  return [
-    { name: sessionCookieName(projectId), value: token, maxAge, secure },
-    clearedCookie(SERVER_SESSION_COOKIE, secure),
-  ];
+): SessionCookie {
+  return { name: sessionCookieName(projectId), value: token, maxAge, secure };
 }
 
 /** The pieces of a `Cookie` header, each with the name it carries. */
@@ -381,8 +414,11 @@ function setCookieName(setCookie: string): string {
   return index === -1 ? "" : setCookie.slice(0, index).trim();
 }
 
-/** What a proxied request carries that decides its session cookies. */
-export interface ProxiedRequest {
+/**
+ * What a proxied request carries that decides its session cookies. The
+ * request URL and the forwarded headers decide whether a cookie needs `Secure`.
+ */
+export interface ProxiedRequest extends BrowserRequest {
   readonly method: string;
   /** The path after the proxy prefix, e.g. `/sessions/me`. */
   readonly path: string;
@@ -390,8 +426,14 @@ export interface ProxiedRequest {
   readonly search: string;
   /** The request's `Cookie` header, or `null`. */
   readonly cookie: string | null;
-  /** The app's own request URL, which decides whether a cookie needs `Secure`. */
-  readonly requestUrl: string | URL;
+}
+
+/** The server a proxy forwards to, for the calls it makes of its own. */
+export interface ProxyUpstream {
+  /** Base URL of the auth backend. */
+  readonly url: string;
+  /** How long to wait for an answer. */
+  readonly timeoutMs: number;
 }
 
 /** What a proxied answer sends the browser. */
@@ -422,19 +464,29 @@ export interface ProxiedSessionCookies {
  *   and every other session cookie stays behind. Other cookies pass unchanged.
  * - On the way back, a `Set-Cookie` of the server's session cookie, which sets
  *   or clears it, is renamed to the app's.
- * - A session kept under the server's name before ADR 073 goes up to one call
- *   only, the session probe `GET /sessions/me?project_id=<project>`, which the
- *   server refuses for another project's session. When the answer signs a user
- *   of this project in, the session moves to the app's cookie.
+ * - A session kept under the server's name goes up to one call only, the
+ *   session probe `GET /sessions/me?project_id=<project>`, which the server
+ *   refuses for another project's session. When the answer signs a user of
+ *   this project in, the session is copied to the app's cookie; the server's
+ *   cookie keeps it, since the Console may share the project.
+ * - When the app signs a user in (`POST /sessions/exchange`) or out
+ *   (`DELETE /sessions/me`), a session still kept under the server's name is
+ *   retired, or it would sign its user back in once the app's own cookie is
+ *   gone: the server is asked about it in this project, and a session of this
+ *   project is cleared (and on sign-out also ended), a dead one cleared, and
+ *   one of another project, the Console's on `localhost`, left alone.
  * - Without a project the cookies pass as they are: nothing says which session
  *   is the app's.
  *
  * @param request   - The proxied request.
  * @param projectId - The project this app signs its users in to.
+ * @param upstream  - The server the proxy forwards to, which it asks about a
+ *   session kept under the server's name.
  */
 export function proxySessionCookies(
   request: ProxiedRequest,
   projectId: string | undefined,
+  upstream: ProxyUpstream,
 ): ProxiedSessionCookies {
   if (!projectId) {
     return {
@@ -449,27 +501,43 @@ export function proxySessionCookies(
   const ownName = sessionCookieName(projectId);
   const pieces = cookiePieces(request.cookie);
   const own = cookieValue(pieces, ownName);
+  // A session kept under the server's name, which goes up to the probe only.
+  const shared = cookieValue(pieces, SERVER_SESSION_COOKIE);
+  const method = request.method.toUpperCase();
   const isProbe =
-    request.method.toUpperCase() === "GET" &&
+    method === "GET" &&
     request.path === "/sessions/me" &&
     new URLSearchParams(request.search).get("project_id") === projectId;
-  // A session kept under the server's name, which goes up to the probe only.
-  const probed = own === null && isProbe ? cookieValue(pieces, SERVER_SESSION_COOKIE) : null;
+  const signsIn = method === "POST" && request.path === "/sessions/exchange";
+  const signsOut = method === "DELETE" && request.path === "/sessions/me";
+  const probed = own === null && isProbe ? shared : null;
+  const secure = secureFor(request);
 
-  const upstream = pieces.filter(({ name }) => !isSessionCookie(name)).map(({ piece }) => piece);
+  const sent = pieces.filter(({ name }) => !isSessionCookie(name)).map(({ piece }) => piece);
   const session = own ?? probed;
   if (session !== null) {
-    upstream.push(`${SERVER_SESSION_COOKIE}=${session}`);
+    sent.push(`${SERVER_SESSION_COOKIE}=${session}`);
   }
 
   return {
-    upstreamCookie: upstream.length > 0 ? upstream.join("; ") : null,
+    upstreamCookie: sent.length > 0 ? sent.join("; ") : null,
     async toBrowser(answer) {
-      const setCookies = (answer.headers.getSetCookie?.() ?? []).map((setCookie) =>
+      const upstreamSetCookies = answer.headers.getSetCookie?.() ?? [];
+      const setCookies = upstreamSetCookies.map((setCookie) =>
         setCookieName(setCookie) === SERVER_SESSION_COOKIE
           ? `${ownName}${setCookie.slice(setCookie.indexOf("="))}`
           : setCookie,
       );
+      // A sign-in that set the app's session, or any sign-out: the session the
+      // server's cookie still holds goes too, unless it is another project's.
+      const setsSession = upstreamSetCookies.some(
+        (setCookie) => setCookieName(setCookie) === SERVER_SESSION_COOKIE,
+      );
+      if (shared !== null && (signsOut || (signsIn && answer.ok && setsSession))) {
+        if (await retiresSharedSession(shared, projectId, upstream, signsOut)) {
+          setCookies.push(serializeSessionCookie(clearedCookie(SERVER_SESSION_COOKIE, secure)));
+        }
+      }
       if (probed === null || answer.status !== 200) {
         return { setCookies, body: answer.body };
       }
@@ -482,18 +550,69 @@ export function proxySessionCookies(
         const maxAge = signedIn.expiresAt
           ? secondsUntil(Date.parse(signedIn.expiresAt))
           : undefined;
-        for (const cookie of movedToProjectCookie(
-          probed,
-          projectId,
-          maxAge,
-          secureFor(request.requestUrl),
-        )) {
-          setCookies.push(serializeSessionCookie(cookie));
-        }
+        setCookies.push(
+          serializeSessionCookie(copiedToProjectCookie(probed, projectId, maxAge, secure)),
+        );
       }
       return { setCookies, body };
     },
   };
+}
+
+/**
+ * Whether the session kept under the server's name goes when the app signs a
+ * user in or out: the server is asked about it in this project. A session of
+ * this project goes, and on sign-out it is ended too, so that it cannot sign
+ * its user back in; one the server no longer holds goes as well. One of another
+ * project, the Console's on `localhost`, stays, and so does one the server gave
+ * no verdict on, and a JWT, which the middleware judges itself.
+ */
+async function retiresSharedSession(
+  token: string,
+  projectId: string,
+  upstream: ProxyUpstream,
+  signsOut: boolean,
+): Promise<boolean> {
+  if (isJwtShaped(token)) {
+    return false;
+  }
+  const cookie = `${SERVER_SESSION_COOKIE}=${token}`;
+  let res: Response;
+  try {
+    res = await fetch(`${upstream.url}/sessions/me?project_id=${encodeURIComponent(projectId)}`, {
+      method: "GET",
+      headers: { cookie },
+      signal: AbortSignal.timeout(upstream.timeoutMs),
+    });
+  } catch {
+    return false;
+  }
+  if (res.status === 401) {
+    return true;
+  }
+  if (res.status === 404 || res.status === 403) {
+    return (await errorCode(res)) === SESSION_NOT_FOUND;
+  }
+  if (!res.ok) {
+    return false;
+  }
+  const answer = parsedJson(await res.text().catch(() => "")) as
+    | { project_id?: unknown }
+    | undefined;
+  if (answer?.project_id !== projectId) {
+    return false;
+  }
+  if (signsOut) {
+    // Logout needs no CSRF token (ADR 053 §5); a call without an Origin is no
+    // cross-site request. A failed revoke still clears the cookie: the
+    // browser no longer holds the session.
+    await fetch(`${upstream.url}/sessions/me`, {
+      method: "DELETE",
+      headers: { cookie },
+      signal: AbortSignal.timeout(upstream.timeoutMs),
+    }).catch(() => undefined);
+  }
+  return true;
 }
 
 /** `text` as JSON, or `undefined` when it is not JSON. */
@@ -832,6 +951,10 @@ export async function checkOpaqueSessionToken(
   if (!projectId) {
     return { verdict: "live", session: noUser() };
   }
+  const key = await otherProjectKey(token, projectId);
+  if (otherProjectSessions.knows(key)) {
+    return { verdict: "live", session: noUser() };
+  }
   const endpoint = `${issuerUrl}/sessions/me`;
   try {
     const res = await fetch(`${endpoint}?project_id=${encodeURIComponent(projectId)}`, {
@@ -846,15 +969,77 @@ export async function checkOpaqueSessionToken(
       return { verdict: "refused" };
     }
     if (res.status === 403 && (await errorCode(res)) === SESSION_PROJECT_MISMATCH) {
+      otherProjectSessions.remember(key);
       return { verdict: "live", session: noUser() };
     }
     if (!res.ok) {
       return undecided(endpoint, `HTTP ${res.status}`);
     }
-    return { verdict: "live", session: sessionAnswer(await res.json(), projectId) };
+    const body: unknown = await res.json();
+    if ((body as { project_id?: unknown } | null)?.project_id !== projectId) {
+      otherProjectSessions.remember(key);
+    }
+    return { verdict: "live", session: sessionAnswer(body, projectId) };
   } catch (err) {
     return undecided(endpoint, failureCause(err, timeoutMs));
   }
+}
+
+/**
+ * The opaque session tokens the backend placed in another project, so that a
+ * request signed out here does not ask again about the session another app,
+ * or on `localhost` the Console, keeps under the server's cookie: a session
+ * never changes its project. Each is known for a while, and only so many.
+ */
+const otherProjectSessions = (() => {
+  const TTL_MS = 5 * 60_000;
+  const MAX_ENTRIES = 1024;
+  const known = new Map<string, number>();
+  return {
+    knows(key: string): boolean {
+      const until = known.get(key);
+      if (until === undefined) {
+        return false;
+      }
+      if (until > Date.now()) {
+        return true;
+      }
+      known.delete(key);
+      return false;
+    },
+    remember(key: string): void {
+      known.delete(key);
+      known.set(key, Date.now() + TTL_MS);
+      if (known.size > MAX_ENTRIES) {
+        const oldest = known.keys().next().value;
+        if (oldest !== undefined) {
+          known.delete(oldest);
+        }
+      }
+    },
+    clear(): void {
+      known.clear();
+    },
+  };
+})();
+
+/** The memo key of a token in a project: a hash, so that the memo holds no session token. */
+async function otherProjectKey(token: string, projectId: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  let hex = "";
+  for (const byte of new Uint8Array(digest)) {
+    hex += byte.toString(16).padStart(2, "0");
+  }
+  return `${projectId}:${hex}`;
+}
+
+/**
+ * Forgets which session tokens the backend placed in another project
+ * ({@link checkOpaqueSessionToken} remembers them for a while). For tests that
+ * answer for the same token differently.
+ */
+export function clearSessionCheckCache(): void {
+  otherProjectSessions.clear();
 }
 
 /**
@@ -925,8 +1110,11 @@ export function jwtNamesProject(payload: JwtPayload, projectId: string): boolean
 
 // ─── Session resolution ──────────────────────────────────────────────────────
 
-/** What a request carries that decides its session. */
-export interface SessionRequest {
+/**
+ * What a request carries that decides its session. The request URL and the
+ * forwarded headers decide whether a cookie needs `Secure`.
+ */
+export interface SessionRequest extends BrowserRequest {
   /**
    * The `Authorization: Bearer` token, or `null`. It takes precedence: when it
    * signs a user of this project in, the cookie is not consulted.
@@ -934,8 +1122,6 @@ export interface SessionRequest {
   readonly bearer: string | null;
   /** Reads one of the request's cookies by name. */
   readonly cookie: (name: string) => string | null | undefined;
-  /** The app's own request URL, which decides whether a cookie needs `Secure`. */
-  readonly requestUrl: string | URL;
 }
 
 /** The settings {@link resolveSession} judges a request's session by. */
@@ -962,9 +1148,11 @@ export interface ResolvedSession {
    */
   readonly undecided: boolean;
   /**
-   * The session cookies the response sets. A cookie the backend refused is
-   * cleared so the browser stops sending it; a session of this project found
-   * in the server's cookie moves to the project's own. No other cookie is
+   * The session cookies the response sets, with {@link SESSION_COOKIE_CACHE_CONTROL}
+   * when there are any. A cookie the backend refused is cleared so the browser
+   * stops sending it; a session of this project found in the server's cookie is
+   * copied to the project's own, and the server's cookie keeps it, since the
+   * Console may share the project. No other cookie is
    * touched: a session that is live but signs no one in here (an anonymous
    * one, or one of another project) keeps its cookie, and so does one the
    * backend gave no verdict on, and one behind a Bearer token that signed the
@@ -1075,7 +1263,7 @@ async function judgeJwt(
  *   project in, that is the answer and the cookie is not judged; otherwise the
  *   cookie speaks for itself.
  * - The session cookie is the project's own, else the server's. A session of
- *   this project found in the server's cookie moves to the project's own.
+ *   this project found in the server's cookie is copied to the project's own.
  * - A JWT-shaped session cookie signs its `sub` in when it verifies and its
  *   `aud` names the project. It never reaches the backend, which does not
  *   re-check JWT claims.
@@ -1111,12 +1299,12 @@ export async function resolveSession(
   if (!stored) {
     return { auth: signedOut(), undecided: false, cookies: [] };
   }
-  const secure = secureFor(request.requestUrl);
-  // The cookie's session moves to the project's own cookie once it signs a
-  // user in; a session already there stays where it is.
+  const secure = secureFor(request);
+  // A session of this project in the server's cookie is copied to the
+  // project's own once it signs a user in; one already there stays as it is.
   const moved = (maxAge: number | undefined): SessionCookie[] =>
     stored.name === SERVER_SESSION_COOKIE
-      ? movedToProjectCookie(stored.token, projectId, maxAge, secure)
+      ? [copiedToProjectCookie(stored.token, projectId, maxAge, secure)]
       : [];
   const cleared = (): SessionCookie[] => [clearedCookie(stored.name, secure)];
 

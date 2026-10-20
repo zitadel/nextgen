@@ -13,6 +13,7 @@ import {
   matchesRoutes,
   normalizeBackendUrl,
   proxySessionCookies,
+  SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
   serializeSessionCookie,
@@ -146,8 +147,11 @@ async function proxyRequest(
       search: url.search,
       cookie: event.request.headers.get("cookie"),
       requestUrl: url,
+      forwardedProto: event.request.headers.get("x-forwarded-proto"),
+      forwardedHost: event.request.headers.get("x-forwarded-host"),
     },
     projectId,
+    { url: authUrl, timeoutMs: proxyTimeoutMs },
   );
   if (sessionCookies.upstreamCookie === null) {
     upstreamHeaders.delete("cookie");
@@ -181,6 +185,9 @@ async function proxyRequest(
   const answer = await sessionCookies.toBrowser(upstream);
   for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
+  }
+  if (answer.setCookies.length > 0) {
+    responseHeaders.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
   }
 
   return new Response(answer.body, {
@@ -226,7 +233,13 @@ async function handleAuth(
     undecided,
     cookies: sessionCookies,
   } = await resolveSession(
-    { bearer: bearerToken, cookie: (name) => event.cookies.get(name), requestUrl: event.url },
+    {
+      bearer: bearerToken,
+      cookie: (name) => event.cookies.get(name),
+      requestUrl: event.url,
+      forwardedProto: event.request.headers.get("x-forwarded-proto"),
+      forwardedHost: event.request.headers.get("x-forwarded-host"),
+    },
     verification,
   );
 
@@ -240,36 +253,62 @@ async function handleAuth(
   }
 
   // A dead session's cookie is cleared so the browser stops replaying it, and a
-  // session of this project still under the shared name moves to the project's
-  // own cookie. A live session that signs no one in here (an anonymous one,
-  // whose sign-in may still complete, or one of another project) keeps its
-  // cookie, and so does one the backend gave no verdict on.
+  // session of this project still under the shared name is copied to the
+  // project's own cookie. A live session that signs no one in here (an
+  // anonymous one, whose sign-in may still complete, or one of another project)
+  // keeps its cookie, and so does one the backend gave no verdict on.
   if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
     const headers = new Headers({ location: loginRedirectUrl(loginPath, event.url).toString() });
     for (const cookie of sessionCookies) {
       headers.append("set-cookie", serializeSessionCookie(cookie));
     }
+    if (sessionCookies.length > 0) {
+      headers.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
+    }
     return new Response(null, { status: 302, headers });
   }
 
   // SvelteKit applies `event.cookies` changes to the response `resolve`
-  // produces, whose headers may be immutable.
+  // produces, whose headers may be immutable. Every attribute is given: left
+  // out, SvelteKit adds `Secure` on its own, which Safari drops over plain http
+  // to 127.0.0.1 and [::1].
   for (const cookie of sessionCookies) {
+    const attributes = {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: cookie.secure,
+    } as const;
     if (cookie.maxAge === 0) {
-      event.cookies.delete(cookie.name, { path: "/" });
+      event.cookies.delete(cookie.name, attributes);
     } else {
       event.cookies.set(cookie.name, cookie.value, {
-        path: "/",
-        httpOnly: true,
-        sameSite: "lax",
-        secure: cookie.secure,
+        ...attributes,
         ...(cookie.maxAge === undefined ? {} : { maxAge: cookie.maxAge }),
         // The value is the server's token, sent back as the server sent it.
         encode: (value) => value,
       });
     }
   }
-  return resolve(event);
+  const response = await resolve(event);
+  return sessionCookies.length > 0 ? withNoStore(response) : response;
+}
+
+/**
+ * `response` with {@link SESSION_COOKIE_CACHE_CONTROL}, so a shared cache keeps
+ * no session cookie it sets. It is set on the response, not through
+ * `event.setHeaders`, which fails the request when a page sets the header too;
+ * a response whose headers are immutable is copied.
+ */
+function withNoStore(response: Response): Response {
+  try {
+    response.headers.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
+    return response;
+  } catch {
+    const copy = new Response(response.body, response);
+    copy.headers.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
+    return copy;
+  }
 }
 
 /**

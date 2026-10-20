@@ -6,6 +6,7 @@ import {
   HOP_BY_HOP,
   SERVER_SESSION_COOKIE,
   checkOpaqueSessionToken,
+  clearSessionCheckCache,
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
@@ -292,6 +293,7 @@ describe("opaque session tokens", () => {
   let warn: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    clearSessionCheckCache();
     warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
@@ -447,6 +449,31 @@ describe("opaque session tokens", () => {
 
       expect(warn).toHaveBeenCalledWith(expect.stringContaining("(HTTP 502)"));
     });
+
+    // A session never changes its project: on localhost every request of a
+    // signed-out visitor would otherwise ask about the Console's session again.
+    it("asks about another project's session only once", async () => {
+      const fetchMock = vi.fn(async () =>
+        Response.json({ code: "sess.project_mismatch" }, { status: 403 }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      await checkOpaqueSessionToken("console", "http://auth.test", 1000, PROJECT);
+      const again = await checkOpaqueSessionToken("console", "http://auth.test", 1000, PROJECT);
+
+      expect(again).toMatchObject({ verdict: "live", session: { userId: null } });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks again about an anonymous session of this project, whose sign-in may complete", async () => {
+      const fetchMock = vi.fn(async () => Response.json({ project_id: PROJECT }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await checkOpaqueSessionToken("anon", "http://auth.test", 1000, PROJECT);
+      await checkOpaqueSessionToken("anon", "http://auth.test", 1000, PROJECT);
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("validateOpaqueSessionToken", () => {
@@ -535,6 +562,7 @@ describe("serializeSessionCookie", () => {
 describe("proxySessionCookies", () => {
   const PROJECT = "proj_app";
   const OWN = "__nextgen_session_proj_app";
+  const UPSTREAM = { url: "http://auth.test", timeoutMs: 1000 };
 
   function proxied(overrides: Partial<ProxiedRequest> = {}): ProxiedRequest {
     return {
@@ -552,13 +580,14 @@ describe("proxySessionCookies", () => {
     for (const setCookie of setCookies) {
       headers.append("set-cookie", setCookie);
     }
-    return new Response(JSON.stringify(body), { status, headers });
+    return new Response(status === 204 ? null : JSON.stringify(body), { status, headers });
   }
 
   it("sends the project's session cookie up under the server's name", () => {
     const cookies = proxySessionCookies(
       proxied({ cookie: `theme=dark; ${OWN}=mine; _zflow=f` }),
       PROJECT,
+      UPSTREAM,
     );
 
     expect(cookies.upstreamCookie).toBe("theme=dark; _zflow=f; __nextgen_session=mine");
@@ -570,19 +599,24 @@ describe("proxySessionCookies", () => {
         cookie: "__nextgen_session=console; __nextgen_session_proj_other=other; _zflow=f",
       }),
       PROJECT,
+      UPSTREAM,
     );
 
     expect(cookies.upstreamCookie).toBe("_zflow=f");
   });
 
   it("sends no Cookie header when nothing is left to send", () => {
-    const cookies = proxySessionCookies(proxied({ cookie: "__nextgen_session=console" }), PROJECT);
+    const cookies = proxySessionCookies(
+      proxied({ cookie: "__nextgen_session=console" }),
+      PROJECT,
+      UPSTREAM,
+    );
 
     expect(cookies.upstreamCookie).toBeNull();
   });
 
   it("renames the server's session cookie on the way back, set or cleared", async () => {
-    const cookies = proxySessionCookies(proxied(), PROJECT);
+    const cookies = proxySessionCookies(proxied(), PROJECT, UPSTREAM);
 
     const { setCookies } = await cookies.toBrowser(
       answer(200, {}, [
@@ -603,6 +637,7 @@ describe("proxySessionCookies", () => {
     const cookies = proxySessionCookies(
       proxied({ cookie: "__nextgen_session=tok; a=b" }),
       undefined,
+      UPSTREAM,
     );
 
     const { setCookies } = await cookies.toBrowser(
@@ -620,6 +655,7 @@ describe("proxySessionCookies", () => {
       const cookies = proxySessionCookies(
         proxied({ ...PROBE, cookie: "__nextgen_session=old" }),
         PROJECT,
+        UPSTREAM,
       );
 
       expect(cookies.upstreamCookie).toBe("__nextgen_session=old");
@@ -638,6 +674,7 @@ describe("proxySessionCookies", () => {
       const cookies = proxySessionCookies(
         proxied({ ...request, cookie: "__nextgen_session=old" }),
         PROJECT,
+        UPSTREAM,
       );
 
       expect(cookies.upstreamCookie).toBeNull();
@@ -647,27 +684,27 @@ describe("proxySessionCookies", () => {
       const cookies = proxySessionCookies(
         proxied({ ...PROBE, cookie: `__nextgen_session=old; ${OWN}=mine` }),
         PROJECT,
+        UPSTREAM,
       );
 
       expect(cookies.upstreamCookie).toBe("__nextgen_session=mine");
     });
 
-    it("moves to the project's cookie when the probe signs its user in", async () => {
+    it("is copied to the project's cookie when the probe signs its user in", async () => {
       const expiresAt = new Date(Date.now() + 3_600_000).toISOString();
       const body = { project_id: PROJECT, user_id: "u1", expires_at: expiresAt };
       const cookies = proxySessionCookies(
         proxied({ ...PROBE, cookie: "__nextgen_session=old" }),
         PROJECT,
+        UPSTREAM,
       );
 
       const forBrowser = await cookies.toBrowser(answer(200, body));
 
-      expect(forBrowser.setCookies).toHaveLength(2);
+      // The server's cookie keeps it: the Console may share the project.
+      expect(forBrowser.setCookies).toHaveLength(1);
       expect(forBrowser.setCookies[0]).toMatch(
         new RegExp(`^${OWN}=old; Path=/; Max-Age=(3599|3600); HttpOnly; SameSite=Lax$`),
-      );
-      expect(forBrowser.setCookies[1]).toBe(
-        "__nextgen_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
       );
       expect(JSON.parse(String(forBrowser.body))).toEqual(body);
     });
@@ -681,6 +718,7 @@ describe("proxySessionCookies", () => {
       const cookies = proxySessionCookies(
         proxied({ ...PROBE, cookie: "__nextgen_session=old" }),
         PROJECT,
+        UPSTREAM,
       );
 
       const forBrowser = await cookies.toBrowser(answer(status, body));
@@ -688,7 +726,7 @@ describe("proxySessionCookies", () => {
       expect(forBrowser.setCookies).toEqual([]);
     });
 
-    it("moves with Secure where the app is served over https", async () => {
+    it("is copied with Secure where the app is served over https", async () => {
       const cookies = proxySessionCookies(
         proxied({
           ...PROBE,
@@ -696,6 +734,7 @@ describe("proxySessionCookies", () => {
           requestUrl: "https://app.example.com/__nextgen/sessions/me",
         }),
         PROJECT,
+        UPSTREAM,
       );
 
       const { setCookies } = await cookies.toBrowser(
@@ -703,6 +742,182 @@ describe("proxySessionCookies", () => {
       );
 
       expect(setCookies[0]).toBe(`${OWN}=old; Path=/; HttpOnly; SameSite=Lax; Secure`);
+    });
+
+    it("is copied with Secure behind a TLS proxy that talks to the app over loopback", async () => {
+      const cookies = proxySessionCookies(
+        proxied({
+          ...PROBE,
+          cookie: "__nextgen_session=old",
+          requestUrl: "http://127.0.0.1:3000/__nextgen/sessions/me",
+          forwardedProto: "https",
+          forwardedHost: "app.example.com",
+        }),
+        PROJECT,
+        UPSTREAM,
+      );
+
+      const { setCookies } = await cookies.toBrowser(
+        answer(200, { project_id: PROJECT, user_id: "u1" }),
+      );
+
+      expect(setCookies[0]).toBe(`${OWN}=old; Path=/; HttpOnly; SameSite=Lax; Secure`);
+    });
+  });
+
+  // Left in place, a session kept under the server's name signs its user back
+  // in once the app's own cookie is gone: after a sign-out, or once a newer
+  // session the app signed in expires.
+  describe("a session kept under the server's name, when the app signs a user in or out", () => {
+    const SIGN_OUT = { method: "DELETE", path: "/sessions/me", search: "" };
+    const SIGN_IN = { method: "POST", path: "/sessions/exchange", search: "" };
+    const CLEARED_SHARED = "__nextgen_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax";
+
+    /** Answers the proxy's own calls: the session check with `check`, a revoke with 204. */
+    function server(check: () => Response) {
+      const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) =>
+        init?.method === "DELETE" ? new Response(null, { status: 204 }) : check(),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("ends and clears a second session of this project on sign-out", async () => {
+      const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
+      const cookies = proxySessionCookies(
+        proxied({ ...SIGN_OUT, cookie: `${OWN}=current; __nextgen_session=earlier` }),
+        PROJECT,
+        UPSTREAM,
+      );
+
+      const { setCookies } = await cookies.toBrowser(
+        answer(204, null, ["__nextgen_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"]),
+      );
+
+      expect(cookies.upstreamCookie).toBe("__nextgen_session=current");
+      expect(setCookies).toEqual([
+        `${OWN}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`,
+        CLEARED_SHARED,
+      ]);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `http://auth.test/sessions/me?project_id=${PROJECT}`,
+        expect.objectContaining({
+          method: "GET",
+          headers: { cookie: "__nextgen_session=earlier" },
+        }),
+      );
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://auth.test/sessions/me",
+        expect.objectContaining({
+          method: "DELETE",
+          headers: { cookie: "__nextgen_session=earlier" },
+        }),
+      );
+    });
+
+    it("clears a session of this project on sign-in without ending it", async () => {
+      const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
+      const cookies = proxySessionCookies(
+        proxied({ ...SIGN_IN, cookie: "__nextgen_session=earlier" }),
+        PROJECT,
+        UPSTREAM,
+      );
+
+      const { setCookies } = await cookies.toBrowser(
+        answer(200, {}, ["__nextgen_session=new; Path=/; Max-Age=3600; HttpOnly; SameSite=Lax"]),
+      );
+
+      expect(setCookies).toEqual([
+        `${OWN}=new; Path=/; Max-Age=3600; HttpOnly; SameSite=Lax`,
+        CLEARED_SHARED,
+      ]);
+      expect(fetchMock).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ method: "DELETE" }),
+      );
+    });
+
+    it.each([
+      ["sign-out", SIGN_OUT, answer(204, null, [CLEARED_SHARED])],
+      ["sign-in", SIGN_IN, answer(200, {}, ["__nextgen_session=new; Path=/; HttpOnly"])],
+    ])(
+      "leaves the Console's session of another project alone on %s",
+      async (_label, request, response) => {
+        const fetchMock = server(() =>
+          Response.json({ code: "sess.project_mismatch" }, { status: 403 }),
+        );
+        const cookies = proxySessionCookies(
+          proxied({ ...request, cookie: `${OWN}=current; __nextgen_session=console` }),
+          PROJECT,
+          UPSTREAM,
+        );
+
+        const { setCookies } = await cookies.toBrowser(response);
+
+        expect(setCookies).not.toContain(CLEARED_SHARED);
+        expect(fetchMock).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ method: "DELETE" }),
+        );
+      },
+    );
+
+    it.each([
+      ["a refused session", () => new Response(null, { status: 401 }), true],
+      [
+        "a session that is gone",
+        () => Response.json({ code: "sess.not_found" }, { status: 404 }),
+        true,
+      ],
+      ["no verdict", () => new Response(null, { status: 503 }), false],
+    ])("clears %s only when the server says it is dead", async (_label, check, cleared) => {
+      server(check);
+      const cookies = proxySessionCookies(
+        proxied({ ...SIGN_OUT, cookie: `${OWN}=current; __nextgen_session=earlier` }),
+        PROJECT,
+        UPSTREAM,
+      );
+
+      const { setCookies } = await cookies.toBrowser(answer(204, null, [CLEARED_SHARED]));
+
+      expect(setCookies.includes(CLEARED_SHARED)).toBe(cleared);
+    });
+
+    it("ends a session the app holds only under the server's name on sign-out", async () => {
+      const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
+      const cookies = proxySessionCookies(
+        proxied({ ...SIGN_OUT, cookie: "__nextgen_session=earlier" }),
+        PROJECT,
+        UPSTREAM,
+      );
+
+      // Nothing went up: the server's answer names no session.
+      const { setCookies } = await cookies.toBrowser(answer(401, { code: "auth.unauthorized" }));
+
+      expect(cookies.upstreamCookie).toBeNull();
+      expect(setCookies).toEqual([CLEARED_SHARED]);
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://auth.test/sessions/me",
+        expect.objectContaining({ method: "DELETE" }),
+      );
+    });
+
+    it("touches nothing when the sign-in fails", async () => {
+      const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
+      const cookies = proxySessionCookies(
+        proxied({ ...SIGN_IN, cookie: "__nextgen_session=earlier" }),
+        PROJECT,
+        UPSTREAM,
+      );
+
+      const { setCookies } = await cookies.toBrowser(answer(400, { code: "req.invalid" }));
+
+      expect(setCookies).toEqual([]);
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 });
@@ -739,6 +954,7 @@ describe("resolveSession", () => {
   }
 
   beforeEach(() => {
+    clearSessionCheckCache();
     vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
@@ -811,7 +1027,10 @@ describe("resolveSession", () => {
     );
   });
 
-  it("moves this project's session out of the server's cookie", async () => {
+  // The server's cookie keeps it: on a server without platform bootstrap the
+  // Console signs in to the app's project, and clearing it would sign the
+  // Console out. The proxy retires it at the next sign-in or sign-out.
+  it("copies this project's session out of the server's cookie", async () => {
     const expiresAt = new Date(Date.now() + 600_000).toISOString();
     backend(() => Response.json({ project_id: PROJECT, user_id: "u1", expires_at: expiresAt }));
 
@@ -820,9 +1039,25 @@ describe("resolveSession", () => {
     expect(resolved.auth.isAuthenticated).toBe(true);
     expect(resolved.cookies).toEqual([
       { name: OWN, value: "old", maxAge: expect.any(Number), secure: false },
-      { name: SERVER_SESSION_COOKIE, value: "", maxAge: 0, secure: false },
     ]);
     expect(resolved.cookies[0]?.maxAge).toBeGreaterThan(590);
+  });
+
+  it("copies with Secure behind a TLS proxy that talks to the app over loopback", async () => {
+    backend(() => Response.json({ project_id: PROJECT, user_id: "u1" }));
+
+    const resolved = await resolveSession(
+      {
+        ...request({ [SERVER_SESSION_COOKIE]: "old" }, null, "http://127.0.0.1:3000/"),
+        forwardedProto: "https, http",
+        forwardedHost: "app.example.com",
+      },
+      OPTIONS,
+    );
+
+    expect(resolved.cookies).toEqual([
+      { name: OWN, value: "old", maxAge: undefined, secure: true },
+    ]);
   });
 
   it("leaves another project's session in the server's cookie", async () => {
@@ -941,21 +1176,16 @@ describe("resolveSession", () => {
       });
     });
 
-    it("moves a JWT of this project out of the server's cookie, for as long as it lives", async () => {
+    it("copies a JWT of this project out of the server's cookie, for as long as it lives", async () => {
       backend(() => Response.json({ keys: [jwk] }));
       const token = jwt();
 
       const resolved = await resolveSession(request({ [SERVER_SESSION_COOKIE]: token }), OPTIONS);
 
       expect(resolved.auth).toMatchObject({ isAuthenticated: true, session: { token } });
+      expect(resolved.cookies).toHaveLength(1);
       expect(resolved.cookies[0]).toMatchObject({ name: OWN, value: token });
       expect(resolved.cookies[0]?.maxAge).toBeGreaterThan(590);
-      expect(resolved.cookies[1]).toEqual({
-        name: SERVER_SESSION_COOKIE,
-        value: "",
-        maxAge: 0,
-        secure: false,
-      });
     });
 
     // A Bearer token and the cookie are separate credentials: a Bearer token that
