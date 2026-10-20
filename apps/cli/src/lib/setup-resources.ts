@@ -1,6 +1,8 @@
 import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { consola } from "consola";
+
 import type {
   CreateFlowDefinition201,
   CreateIdpBodyIdp,
