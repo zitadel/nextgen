@@ -173,7 +173,9 @@ the corresponding resource permission.
 | `user.delete` | `DELETE /users/{id}` | **Not yet exposed**. |
 
 `/me` and `/me/memberships` are self-access and do not require system
-permissions — they are gated by the session/credential itself. A user changing
+permissions — they are gated by the session/credential itself. That includes
+`GET /users/me/schema` (the schema the caller's own record is validated
+against) and `GET /users/me/teams` (the caller's own roster). A user changing
 their **own** password/factors is self-service (`/me`-gated), **not**
 `user.set_password`.
 
