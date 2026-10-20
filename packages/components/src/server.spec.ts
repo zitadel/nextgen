@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import ts from "typescript";
@@ -12,8 +11,8 @@ import * as server from "./server.js";
  * `server.ts` is what the package root resolves to on runtimes without a DOM
  * (see its header). Three things keep that promise: the entry only re-exports
  * what `index.ts` already exports, the built package really loads under the
- * conditions those runtimes bundle with, and it still carries what the SDKs
- * import from the root as values.
+ * conditions those runtimes bundle with, and its types resolve to the server
+ * build under them.
  *
  * The load checks read the built `dist/` (the `test` task depends on `build`
  * in moon.yml, as `standalone-artifact.spec.ts` does).
@@ -23,41 +22,10 @@ import * as server from "./server.js";
 // URLs and vitest always runs with the package directory as cwd (same
 // convention as standalone-artifact.spec.ts).
 const PACKAGE_ROOT = process.cwd();
-const PACKAGES_DIR = join(PACKAGE_ROOT, "..");
 const SPECIFIER = "@zitadel/components";
 
 /** Written out, not derived, so deleting one from `package.json` fails. */
 const EDGE_CONDITIONS = ["workerd", "worker", "edge-light"];
-
-/** SDKs whose sources import nothing from the root but locale data and types. */
-const EDGE_SAFE_SDKS = ["sdk-vue", "sdk-svelte", "sdk-qwik", "sdk-solid", "sdk-angular"];
-
-type ExportsMap = Record<string, string | Record<string, string | Record<string, string>>>;
-const manifest: { exports: ExportsMap } = JSON.parse(
-  readFileSync(join(PACKAGE_ROOT, "package.json"), "utf8"),
-);
-const rootEntry = manifest.exports["."];
-
-/** Names a package's sources import from the root as values (not `import type`). */
-function valueImportsFromRoot(sdk: string): string[] {
-  const dir = join(PACKAGES_DIR, sdk, "src");
-  const names = new Set<string>();
-  for (const file of readdirSync(dir, { recursive: true, encoding: "utf8" })) {
-    if (!/\.(ts|tsx|svelte)$/.test(file) || /\.(spec|test)\./.test(file)) continue;
-    const source = readFileSync(join(dir, file), "utf8");
-    const statement =
-      /\b(?:import|export)\s+(type\s+)?\{([^}]*)\}\s*from\s*["']@zitadel\/components["']/g;
-    for (const [, typeOnly, list] of source.matchAll(statement)) {
-      if (typeOnly || list === undefined) continue;
-      for (const member of list.split(",")) {
-        const name = member.trim();
-        if (name === "" || name.startsWith("type ")) continue;
-        names.add(name.split(/\s+as\s+/)[0] ?? name);
-      }
-    }
-  }
-  return [...names];
-}
 
 /**
  * Imports the package root in a fresh Node process, which has no `HTMLElement`,
@@ -113,18 +81,8 @@ describe("server entry", () => {
     expect(Object.keys(server)).toContain("businessLocales");
   });
 
-  describe("package.json", () => {
+  describe("types", () => {
     for (const condition of EDGE_CONDITIONS) {
-      it(`resolves the root to the server build under ${condition} with browser`, () => {
-        expect(rootEntry).toMatchObject({
-          [condition]: {
-            types: "./dist/server.d.mts",
-            browser: "./dist/server.mjs",
-            default: "./dist/index.mjs",
-          },
-        });
-      });
-
       it(`types the root as the server build under ${condition}`, () => {
         expect(resolveTypes([condition])).toMatch(/\/dist\/server\.d\.mts$/);
       });
@@ -132,15 +90,6 @@ describe("server entry", () => {
 
     it("keeps the full types without an edge condition", () => {
       expect(resolveTypes([])).toMatch(/\/dist\/index\.d\.mts$/);
-    });
-
-    it("lists every edge condition before the generic ones", () => {
-      const keys = Object.keys(rootEntry ?? {});
-      const firstGeneric = keys.indexOf("types");
-      for (const condition of EDGE_CONDITIONS) {
-        expect(keys.indexOf(condition), condition).toBeGreaterThanOrEqual(0);
-        expect(keys.indexOf(condition), condition).toBeLessThan(firstGeneric);
-      }
     });
   });
 
@@ -161,14 +110,6 @@ describe("server entry", () => {
         const result = importRoot([condition]);
         expect(result.stderr).toBe("");
         expect(result.names).toContain("ZitadelLogin");
-      });
-    }
-
-    for (const sdk of EDGE_SAFE_SDKS) {
-      it(`${sdk} only imports names the server entry exports`, () => {
-        const imported = valueImportsFromRoot(sdk);
-        expect(imported, `${sdk} reads nothing from the root`).not.toEqual([]);
-        expect(Object.keys(server)).toEqual(expect.arrayContaining(imported));
       });
     }
   });

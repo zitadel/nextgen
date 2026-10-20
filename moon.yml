@@ -114,7 +114,6 @@ tasks:
       # by the TypeScript implicitInputs).
       - "vitest.config.ts"
       - "vitest.shared.mjs"
-      - "vitest.shared.test.mjs"
       - "vitest.shared.d.mts"
     options:
       cache: true

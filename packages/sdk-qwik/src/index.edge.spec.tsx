@@ -5,13 +5,6 @@ import { renderToString } from "@qwik.dev/core/server";
 import { ZitadelLogin, ZitadelLogout, ZitadelSession, businessLocales } from "@zitadel/sdk-qwik";
 import { describe, expect, it } from "vitest";
 
-/**
- * Loads the built package, as a consumer's bundler resolves it, inside the
- * `edge-runtime` VM (the `edge` project in `vitest.config.ts`), which has no
- * `HTMLElement`, `document` or `customElements`, with dependencies resolved the
- * way a bundler resolves them for the edge, and renders its widgets to markup.
- */
-
 const render = async <Props extends object>(
   component: Component<Props>,
   props: Parameters<Component<Props>>[0],
@@ -19,6 +12,12 @@ const render = async <Props extends object>(
   (await renderToString(jsx(component, props), { containerTagName: "div" })).html;
 
 // edge-entry:begin
+/**
+ * Loads the built package, as a consumer's bundler resolves it, inside the
+ * `edge-runtime` VM (the `edge` project in `vitest.config.ts`), which has no
+ * `HTMLElement`, `document` or `customElements`, with dependencies resolved the
+ * way a bundler resolves them for the edge.
+ */
 describe("the SDK entry in the edge runtime", () => {
   it("runs without a DOM", () => {
     expect(typeof HTMLElement).toBe("undefined");
