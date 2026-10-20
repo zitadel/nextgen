@@ -33,6 +33,21 @@ import type { RendererSpec } from "../types";
  * the neutral copy (the `project` prop tolerates this because
  * `configureZitadel()` registers a global fallback; `locales` has none).
  */
+/**
+ * The dark page surface `variant="page"` paints by default
+ * (`--zl-background` under `data-theme="dark"`). The widget loads client-only,
+ * so until it mounts only the server-rendered wrapper is on screen: the
+ * wrapper paints the same surface, or the first paint is the host page's own
+ * background (white under a light OS preference) and then flips to dark.
+ */
+export const PAGE_SURFACE_BACKGROUND = "#050505";
+
+const PAGE_WRAPPER_OPEN = `<main style={{ minHeight: "100vh", background: "${PAGE_SURFACE_BACKGROUND}", colorScheme: "dark" }}>`;
+
+const PAGE_WRAPPER_COMMENT = `  // The wrapper paints the widget's dark page surface before the client-only
+  // widget mounts, so the page does not flash the app's own background first.
+  // Change both when you pin another theme on the widget.`;
+
 export const reactRenderer: RendererSpec = {
   id: "react",
   displayName: "React (Next.js App Router)",
@@ -81,10 +96,11 @@ export const reactRenderer: RendererSpec = {
   // accessibility tree, and the card keeps no blank header band.`
         : `  // variant="page" makes the widget paint the full-page chrome itself
   // (viewport height, surface background) from design tokens; switch to
-  // variant="widget" to embed the sign-in card inside a layout you own.`;
+  // variant="widget" to embed the sign-in card inside a layout you own.
+${PAGE_WRAPPER_COMMENT}`;
       const wrapperOpen = widget
         ? `<div style={{ display: "flex", justifyContent: "center", padding: "4rem 1rem" }}>`
-        : `<main style={{ colorScheme: "dark" }}>`;
+        : PAGE_WRAPPER_OPEN;
       const wrapperClose = widget ? `</div>` : `</main>`;
       return {
         mode,
@@ -148,10 +164,11 @@ ${postureComment}
   // accessibility tree, and the card keeps no blank header band.`
         : `  // variant="page" makes the session card paint the full-page chrome itself
   // (viewport height, surface background) from design tokens; switch to
-  // variant="widget" to embed the card inside a layout you own.`;
+  // variant="widget" to embed the card inside a layout you own.
+${PAGE_WRAPPER_COMMENT}`;
       const wrapperOpen = widget
         ? `<div style={{ display: "flex", justifyContent: "center", padding: "4rem 1rem" }}>`
-        : `<main style={{ colorScheme: "dark" }}>`;
+        : PAGE_WRAPPER_OPEN;
       const wrapperClose = widget ? `</div>` : `</main>`;
       return {
         contents: `${MANAGED_MARKER}

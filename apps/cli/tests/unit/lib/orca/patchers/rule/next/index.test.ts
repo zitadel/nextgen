@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
@@ -6,6 +8,7 @@ import type {
   ScaffoldPlan,
 } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 import { NextPatcher } from "../../../../../../../src/lib/orca/patchers/rule/next";
+import { PAGE_SURFACE_BACKGROUND } from "../../../../../../../src/lib/orca/patchers/rule/next/renderers/react";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
@@ -56,11 +59,7 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('href="/register"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain("next/link");
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('href="/profile"');
-    // Page chrome comes from the widget itself now — the wrapper only pins
-    // the color scheme, and no token hex is duplicated into generated code.
     expect(writeContents(plan, "app/login/page.tsx")).toContain('variant="page"');
-    expect(writeContents(plan, "app/login/page.tsx")).not.toContain("#0f0f11");
-    expect(writeContents(plan, "app/login/page.tsx")).toContain('colorScheme: "dark"');
     // The embedding alternative is named where a developer will see it, and
     // a minimal scaffold keeps the widget's neutral built-in copy.
     expect(writeContents(plan, "app/login/page.tsx")).toContain('variant="widget"');
@@ -71,8 +70,6 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "app/register/page.tsx")).not.toContain('href="/login"');
     expect(writeContents(plan, "app/register/page.tsx")).not.toContain('href="/profile"');
     expect(writeContents(plan, "app/register/page.tsx")).toContain('variant="page"');
-    expect(writeContents(plan, "app/register/page.tsx")).not.toContain("#0f0f11");
-    expect(writeContents(plan, "app/register/page.tsx")).toContain('colorScheme: "dark"');
     expect(writeContents(plan, "middleware.ts")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "middleware.ts")).toContain("export function middleware(");
     expect(plan.ops.some((op) => op.kind === "add-dep")).toBe(true);
@@ -95,16 +92,33 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(consumer, "app/login/page.tsx")).not.toContain("businessLocales");
   });
 
-  it("leaves profile page chrome to the session card's page surface", () => {
+  it("paints the widget's dark page surface before the client-only widget mounts", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
-    const profile = writeContents(plan, "app/profile/page.tsx");
-    expect(profile).toContain('variant="page"');
-    // The card paints its own full-page chrome from design tokens — no
-    // duplicated token hex or forced viewport height in generated markup.
-    expect(profile).not.toContain("#0f0f11");
-    expect(profile).not.toContain("minHeight");
-    expect(profile).toContain('colorScheme: "dark"');
-    expect(profile).toContain('variant="widget"');
+    for (const path of ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"]) {
+      const page = writeContents(plan, path);
+      expect(page).toContain('variant="page"');
+      // The wrapper is server-rendered: without the surface on it, the first
+      // paint is the host page's background (white in light mode) until the
+      // widget mounts and paints dark.
+      expect(page).toContain(
+        `<main style={{ minHeight: "100vh", background: "${PAGE_SURFACE_BACKGROUND}", colorScheme: "dark" }}>`,
+      );
+      expect(page).toContain('variant="widget"');
+    }
+  });
+
+  it("pre-paints the page surface the design tokens give the dark theme", () => {
+    const tokensCss = readFileSync(
+      new URL(
+        "../../../../../../../../../packages/design-tokens/src/generated/tokens.css",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const darkTheme = tokensCss.slice(tokensCss.indexOf(':root[data-theme="dark"]'));
+    const background = /--zl-background:\s*([^;]+);/.exec(darkTheme)?.[1];
+
+    expect(background).toBe(PAGE_SURFACE_BACKGROUND);
   });
 
   it("replaces the starter home page for a freshly scaffolded Next app", () => {
@@ -124,6 +138,7 @@ describe("NextPatcher.plan", () => {
       // Layout-neutral wrapper: no forced color scheme, no <main> that would
       // nest inside the host app's own landmark.
       expect(page).not.toContain('colorScheme: "dark"');
+      expect(page).not.toContain(PAGE_SURFACE_BACKGROUND);
       expect(page).not.toContain("<main");
       expect(page).toContain('justifyContent: "center"');
       // The full-page alternative stays named for discoverability.
