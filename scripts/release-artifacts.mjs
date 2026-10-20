@@ -5,7 +5,7 @@ import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mapWithConcurrency, run } from "./dev-process.mjs";
+import { mapWithConcurrency, run, runBuffered } from "./dev-process.mjs";
 import {
   PUBLIC_PACKAGE_DIRS,
   PUBLIC_RELEASE_PACKAGES,
@@ -218,7 +218,7 @@ export async function packPublicPackages(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const version = options.version ?? (await readServerRelease(repoRoot)).version;
   const outDir = options.outDir ?? releaseDir(repoRoot, version);
-  const runFn = options.run ?? run;
+  const runFn = options.run ?? runBuffered;
   const tarballsDir = join(outDir, "npm");
   await rm(tarballsDir, { recursive: true, force: true });
   await mkdir(tarballsDir, { recursive: true });
@@ -229,13 +229,10 @@ export async function packPublicPackages(options = {}) {
   await mapWithConcurrency(PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
     const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
     await assertPublishDirectoryReady({ repoRoot, dir, manifest });
-    // --silent: pnpm 12 lists every packed file (over a thousand for the API
-    // package) and aborts with exit 134 when that burst hits a full output pipe.
-    await runFn(
-      "corepack",
-      ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir, "--silent"],
-      { cwd: repoRoot, env: process.env },
-    );
+    await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
+      cwd: repoRoot,
+      env: process.env,
+    });
   });
 
   return tarballsDir;
