@@ -63,3 +63,31 @@ export const baseTest = {
  * code. Spread into `resolve.conditions` for workspace-source consumers.
  */
 export const sourceConditions = ["@zitadel/source"];
+
+/**
+ * A Vitest project that runs specs inside Vercel's `edge-runtime` VM (the
+ * `@edge-runtime/vm` devDependency), whose globals are the WinterTC minimum
+ * set: no DOM, no `Buffer`, no Node built-ins. A spec that passes there also
+ * works on any runtime offering that subset, Cloudflare Workers included.
+ *
+ * Dependencies resolve with the `browser` condition, as Wrangler and Next
+ * bundle for the edge, so a dependency that only works with a DOM (Lit's
+ * browser build, for one) fails to load here instead of resolving to its Node
+ * build, which would hide it. Add it to a config's `projects`:
+ *
+ *   projects: [edgeProject({ include: ["src/jwt.spec.ts"] }), ...]
+ *
+ * `conditions` are extra resolve conditions, e.g. `sourceConditions`; `alias`
+ * is the package's own `resolve.alias`.
+ *
+ * @param {import("./vitest.shared.d.mts").EdgeProjectOptions} options
+ * @returns {import("./vitest.shared.d.mts").EdgeProject}
+ */
+export function edgeProject({ include, exclude = [], conditions = [], alias = {} }) {
+  return {
+    cacheDir: ".vitest/edge",
+    resolve: { conditions, alias },
+    ssr: { resolve: { conditions: ["browser", ...conditions] } },
+    test: { name: "edge", globals: true, environment: "edge-runtime", include, exclude },
+  };
+}

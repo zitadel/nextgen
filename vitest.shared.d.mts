@@ -22,3 +22,30 @@ export interface BaseTest {
 
 export declare const baseTest: BaseTest;
 export declare const sourceConditions: string[];
+
+export interface EdgeProjectOptions {
+  /** Spec files the project runs, relative to the package root. */
+  include: string[];
+  /** Spec files that read the filesystem or need Node built-ins. */
+  exclude?: string[];
+  /** Extra resolve conditions, for example `sourceConditions`. */
+  conditions?: string[];
+  /** The package's own `resolve.alias`. */
+  alias?: Record<string, string>;
+}
+
+export interface EdgeProject {
+  cacheDir: string;
+  resolve: { conditions: string[]; alias: Record<string, string> };
+  ssr: { resolve: { conditions: string[] } };
+  test: {
+    name: "edge";
+    globals: true;
+    environment: "edge-runtime";
+    include: string[];
+    exclude: string[];
+  };
+}
+
+/** A project that runs `include` inside the `edge-runtime` VM; see the implementation. */
+export declare function edgeProject(options: EdgeProjectOptions): EdgeProject;

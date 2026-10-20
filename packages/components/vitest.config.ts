@@ -1,14 +1,14 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
-import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, sourceConditions } from "../../vitest.shared.mjs";
 import { liquidRaw } from "./vite-liquid-plugin.ts";
 
 /** Shared plugins for every project in this config. */
 const sharedPlugins = () => [liquidRaw()];
 
 /**
- * Two projects in one config, selected per lane (no separate config files):
+ * Three projects in one config, selected per lane (no separate config files):
  *
  * - `unit` (jsdom): the bulk of the suite. The fast local lane is `test:unit`
  *   = `vitest run --project unit`. Skips the form-associated custom-element
@@ -16,8 +16,10 @@ const sharedPlugins = () => [liquidRaw()];
  * - `browser` (real Chromium via Playwright): `*.browser.spec.ts` — form
  *   participation, Enter-to-submit, focus management. Local-only selector
  *   `test:browser` = `vitest run --project browser` (heavy Chromium cold start).
+ * - `edge` (Vercel's edge-runtime VM): `*.edge.spec.ts`, which load the built
+ *   Lit-free `dist/server.mjs` where there is no DOM.
  *
- * The CI gate is `test:all` = `vitest run`, which runs both projects in one
+ * The CI gate is `test:all` = `vitest run`, which runs every project in one
  * process and emits one aggregated junit.xml.
  */
 export default defineConfig({
@@ -43,9 +45,11 @@ export default defineConfig({
           setupFiles: ["src/internal/lit-dev-mode.ts"],
           environment: "jsdom",
           include: ["src/**/*.spec.ts"],
-          exclude: ["src/**/*.browser.spec.ts"],
+          exclude: ["src/**/*.browser.spec.ts", "src/**/*.edge.spec.ts"],
         },
       },
+      // The Lit-free server entry, loaded from `dist/` inside the edge VM.
+      { ...edgeProject({ include: ["src/**/*.edge.spec.ts"] }), plugins: sharedPlugins() },
       {
         cacheDir: ".vitest/browser",
         plugins: sharedPlugins(),

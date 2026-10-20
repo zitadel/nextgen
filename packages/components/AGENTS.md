@@ -72,9 +72,12 @@ and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM.
 
 ## Tests
 
-- `pnpm test` runs both projects of `vitest.config.ts`: `unit` (jsdom) and
-  `browser` (Chromium, `*.browser.spec.ts`). `pnpm test:unit` is the fast lane;
+- `pnpm test` runs the projects of `vitest.config.ts`: `unit` (jsdom),
+  `edge` and `browser` (Chromium, `*.browser.spec.ts`). `pnpm test:unit` is the fast lane;
   `pnpm test:browser` runs the browser project alone.
+- The `edge` project runs `*.edge.spec.ts` inside the `edge-runtime` VM
+  (`edgeProject()` in `vitest.shared.mjs`). Only `src/server.ts`, which exists
+  for the edge, has one; it imports the built `dist/server.mjs`.
 - Put a test in the lowest project that proves it (the ladder in
   [`packages/testing/AGENTS.md`](../testing/AGENTS.md#which-layer-a-test-belongs-in)):
   form association and focus in `browser`, markup and ARIA in `unit`.

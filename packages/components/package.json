@@ -95,6 +95,7 @@
     "lucide": "catalog:"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@tsdown/css": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

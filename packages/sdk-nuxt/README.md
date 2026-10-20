@@ -16,6 +16,8 @@ for hand-rolled setups.
 
 Peer dependencies: `nuxt >=4` and `h3 >=1`.
 
+The Nitro middleware reads Node's `event.node.req`, so it runs on Node-based Nitro presets and is not an edge-runtime entry.
+
 TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
 
 ## Surface 1 — the Nuxt module (recommended, CLI-scaffolded)
