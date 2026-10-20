@@ -97,6 +97,10 @@ If your app renders on the server, mount the widget on the client only, after hy
 
 React 19 does not apply an object property such as `project` while hydrating a server-rendered custom element, so on a server-rendered page pass `project-id` and `proxy-path` as strings instead of a `project` handle.
 
+### Edge runtimes
+
+The wrapper loads on edge runtimes such as Cloudflare Workers and Vercel Edge, which have no DOM. It renders each widget by its tag name there and registers the elements only in the browser, so the markup a server sends is the same on every runtime.
+
 ## Proxying to the backend (deployment)
 
 The widgets call `${proxyPath}/…` same-origin (default `/__nextgen`). In

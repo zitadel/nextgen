@@ -48,10 +48,14 @@ export default defineConfig({
           globals: true,
           environment: "jsdom",
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
+          exclude: ["src/**/*.edge.test.{ts,tsx}"],
         },
       },
       // `/middleware` is the SDK's edge entry (see the README), and the JWT
-      // helpers it verifies sessions with: both must run in the edge VM.
+      // helpers it verifies sessions with: both must run in the edge VM. So must
+      // `/client`, which registers the elements in the browser: the components
+      // package resolves to its entry without the elements under `edge-light`
+      // (see its package.json).
       {
         ...edgeProject({
           include: [
@@ -59,6 +63,7 @@ export default defineConfig({
             "src/__tests__/lib/jwt.test.ts",
             "src/__tests__/index.test.ts",
             "src/__tests__/server.test.ts",
+            "src/__tests__/client.edge.test.ts",
           ],
           conditions: ["react-server", "edge-light"],
         }),

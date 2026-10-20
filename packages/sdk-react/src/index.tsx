@@ -6,13 +6,23 @@ import {
   type ZitadelConfig,
   type ZitadelProject,
 } from "@zitadel/api/config";
-import {
+import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
-import { isStandardAttributeName, standardAttributes, widgetTags } from "@zitadel/sdk-core/types";
+import {
+  isStandardAttributeName,
+  standardAttributes,
+  widgetTags,
+  type WidgetTag,
+} from "@zitadel/sdk-core/types";
 import * as React from "react";
+// Registers <zitadel-login> / <zitadel-logout> / <zitadel-session> with the
+// browser. On an edge runtime the package resolves to an entry without the
+// elements, so importing it there is harmless. No element class is imported
+// here: the components look the class up by tag name when they render.
+import "@zitadel/components";
 
 import type {
   ZitadelFlowCompleteDetail,
@@ -70,23 +80,38 @@ export { businessLocales } from "@zitadel/components";
  * are hidden too, so they are in the server markup; in the browser `createComponent`
  * keeps them, since it removes such an attribute when its prop goes, which React 19
  * does not do for a custom element.
+ *
+ * No element class is imported, because loading one needs a DOM and an edge
+ * runtime has none. In the browser the prototype is the one of the class
+ * registered under `tag`, looked up whenever a prop is classified. On the
+ * server there is no class to ask: a prop this wrapper passes is a property
+ * unless it is hidden, a standard attribute or a kebab-case attribute name.
  */
-function asAttributes<T extends typeof HTMLElement>(
-  elementClass: T,
+function asAttributes<Tag extends WidgetTag>(
+  tag: Tag,
   ...keys: readonly string[]
-): T {
+): { new (): HTMLElementTagNameMap[Tag]; prototype: HTMLElementTagNameMap[Tag] } {
   const hidden = new Set<PropertyKey>(keys);
-  const prototype = new Proxy(elementClass.prototype, {
-    has: (target, key) =>
-      !hidden.has(key) &&
-      !(
-        typeof document === "undefined" &&
-        typeof key === "string" &&
-        isStandardAttributeName(key)
-      ) &&
-      key in target,
-  });
-  return { name: elementClass.name, prototype } as unknown as T;
+  const prototype = new Proxy(
+    {},
+    {
+      has: (_target, key) => {
+        if (hidden.has(key)) return false;
+        if (typeof document !== "undefined")
+          return key in (customElements.get(tag)?.prototype ?? {});
+        return (
+          typeof key === "string" &&
+          !["children", "localName", "ref"].includes(key) &&
+          !isStandardAttributeName(key) &&
+          !key.includes("-")
+        );
+      },
+    },
+  );
+  return { name: tag, prototype } as unknown as {
+    new (): HTMLElementTagNameMap[Tag];
+    prototype: HTMLElementTagNameMap[Tag];
+  };
 }
 
 /**
@@ -116,13 +141,7 @@ function projectAttributes(props: {
 const ZitadelLoginElementReact = createComponent({
   react: React,
   tagName: widgetTags.login,
-  elementClass: asAttributes(
-    ZitadelLoginElement,
-    "purpose",
-    "resumeFlowId",
-    "postSignInUrl",
-    "url",
-  ),
+  elementClass: asAttributes(widgetTags.login, "purpose", "resumeFlowId", "postSignInUrl", "url"),
   events: {
     onZitadelFlowStep: "zitadel-flow-step" as EventName<CustomEvent<ZitadelFlowStepDetail>>,
     onZitadelFlowInput: "zitadel-flow-input" as EventName<CustomEvent<ZitadelFlowInputDetail>>,
@@ -139,7 +158,7 @@ const ZitadelLoginElementReact = createComponent({
 const ZitadelLogoutElementReact = createComponent({
   react: React,
   tagName: widgetTags.logout,
-  elementClass: asAttributes(ZitadelLogoutElement, "url"),
+  elementClass: asAttributes(widgetTags.logout, "url"),
   events: {
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
   },
@@ -148,7 +167,7 @@ const ZitadelLogoutElementReact = createComponent({
 const ZitadelSessionElementReact = createComponent({
   react: React,
   tagName: widgetTags.session,
-  elementClass: asAttributes(ZitadelSessionElement, "url"),
+  elementClass: asAttributes(widgetTags.session, "url"),
   events: {
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
   },
