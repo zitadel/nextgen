@@ -65,7 +65,16 @@ func Login(ctx context.Context, c *api.Client, t Target) (LoginResult, error) {
 	}
 	flow, ok := created.(*api.FlowResponseHeaders)
 	if !ok {
-		return LoginResult{}, classifyResponse(OpCreateFlow, http.StatusBadRequest, created)
+		switch r := created.(type) {
+		case *api.CreateFlowBadRequest:
+			return LoginResult{}, classifyResponse(OpCreateFlow, http.StatusBadRequest, (*api.ErrorDetails)(r))
+		case *api.CreateFlowForbidden:
+			return LoginResult{}, classifyResponse(OpCreateFlow, http.StatusForbidden, (*api.ErrorDetails)(r))
+		case *api.CreateFlowConflict:
+			return LoginResult{}, classifyResponse(OpCreateFlow, http.StatusConflict, (*api.ErrorDetails)(r))
+		default:
+			return LoginResult{}, classifyResponse(OpCreateFlow, http.StatusBadRequest, created)
+		}
 	}
 	zflow, err := cookieValue(flow.SetCookie, "_zflow")
 	if err != nil {
