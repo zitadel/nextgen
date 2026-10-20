@@ -2,10 +2,32 @@ import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { defaultSchema, loginFlow, setUpProject, withStdin } from "../../helpers/local-project";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
+
+/**
+ * The platform the credentials are published to. No test names a server, so
+ * the command publishes to the one it resolves by default, and msw answers in
+ * its place: every publish is accepted unless the test refuses it.
+ */
+const platform = setupServer(...setupPlatformHandlers());
+
+beforeAll(() => platform.listen({ onUnhandledRequest: "error" }));
+afterAll(() => platform.close());
+afterEach(() => {
+  platform.resetHandlers();
+  resetPlatformStore();
+});
+
+/** Makes every publish fail before it reaches the project, as an unreachable server would. */
+function refusePublishes(): void {
+  platform.use(http.patch("*/variables", () => HttpResponse.error()));
+}
 
 /**
  * Run the command with a secret on stdin, the way a scripted caller must:
@@ -254,8 +276,7 @@ describe("auth-method sso enable", () => {
       data: { connection: { action: string }; client_id: { variable: string } | null };
     };
     expect(json.data.connection.action).toBe("reuse");
-    // Attempted, not skipped. No server is listening here, so it reports the
-    // failure and the retry command rather than a publish.
+    // Attempted, not skipped: the payload names the variable it went to.
     expect(json.data.client_id?.variable).toBe("GOOGLE_CLIENT_ID");
   });
 
@@ -460,12 +481,13 @@ describe("auth-method sso enable secret handling", () => {
   });
 
   it("reports a publish the project never received, and how to retry it", async () => {
-    // No server is listening on the Project's own address here, which is the
-    // shape of every failure that matters: the connection references the
-    // secret as `${{ NAME }}`, so a button whose credential never arrived
-    // fails at token exchange rather than at enable time. The command must
-    // say so and hand back the command that fixes it, not exit 0 quietly.
+    // The platform cannot be reached here, which is the shape of every
+    // failure that matters: the connection references the secret as
+    // `${{ NAME }}`, so a button whose credential never arrived fails at
+    // token exchange rather than at enable time. The command must say so and
+    // hand back the command that fixes it, not exit 0 quietly.
     const cwd = await setUpProject();
+    refusePublishes();
 
     const result = await withStdin("piped-secret", () =>
       runCliForTest([
@@ -743,6 +765,7 @@ describe("auth-method sso enable preflight", () => {
 
   it("lists the credential to publish again first, with --cwd", async () => {
     const cwd = await setUpProject();
+    refusePublishes();
 
     const result = await enable(cwd, "--client-id", "abc");
 

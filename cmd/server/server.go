@@ -583,7 +583,9 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	// origins.shared_hosts is not SetDefault'd: viper merges map defaults with
 	// overrides, which would break replace-defaults. Nil after unmarshal means
 	// "use DefaultSharedHosts"; an explicit empty map disables the checks.
-	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
+	// default_ttl is the lifetime of a signed-in session, not of the
+	// anonymous shell POST /sessions mints (domain.SessionAnonymousTTL).
+	v.SetDefault("session.default_ttl", domain.SessionDefaultTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 	// Empty means "the deployment's first-created non-platform project is the
 	// default" (Console ADR 0004 §2; the built-in platform row is skipped by

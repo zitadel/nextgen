@@ -47,10 +47,13 @@ interface AstNodeLike {
  * Parses a config file with magicast, throwing a clean `E_VALIDATION` (instead
  * of a raw parse error) when the source is missing or unparseable. `filename` is
  * only used in the error message, so each patcher can name its own config file.
+ * `options` go to the parser, e.g. `{ tabWidth: 1 }` for node offsets that index
+ * the source even where it is indented with tabs.
  */
 export function parseConfigModule(
   source: string | undefined,
   filename: string,
+  options?: Parameters<typeof parseModule>[1],
 ): ReturnType<typeof parseModule> {
   if (source === undefined) {
     throw new ZitadelError("E_VALIDATION", `Cannot edit ${filename}: file not found`, {
@@ -59,7 +62,7 @@ export function parseConfigModule(
   }
   let mod: ReturnType<typeof parseModule>;
   try {
-    mod = parseModule(source);
+    mod = parseModule(source, options);
   } catch (error) {
     throw new ZitadelError("E_VALIDATION", `Could not parse ${filename}`, {
       hint: `Ensure ${filename} is valid, or apply the Zitadel changes manually.`,

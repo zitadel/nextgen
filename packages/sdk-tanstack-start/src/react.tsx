@@ -36,6 +36,15 @@ export { businessLocales } from "@zitadel/sdk-react";
 // shipping them. react.test.tsx fails when this list and sdk-react's drift.
 export type {
   CreateFlowBodyPurpose,
+  isStandardAttributeName,
+  StandardAttributeName,
+  StandardAttributeProps,
+  StandardAttributes,
+  standardAttributes,
+  WidgetName,
+  widgetNames,
+  WidgetTag,
+  widgetTags,
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGIN_EVENTS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
@@ -57,12 +66,15 @@ export type {
   ZitadelLogoutEventMap,
   ZitadelLogoutHandlers,
   ZitadelLogoutProps,
+  ZitadelLogoutReactProps,
   ZitadelProject,
   ZitadelSessionConfig,
   ZitadelSessionEventMap,
   ZitadelSessionHandlers,
   ZitadelSessionProps,
+  ZitadelSessionReactProps,
   ZitadelSignoutDetail,
+  ZitadelWidgetAttributes,
 } from "@zitadel/sdk-react";
 
 const subscribeNever = () => () => {};

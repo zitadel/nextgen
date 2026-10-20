@@ -73,9 +73,14 @@ try {
   // CLOUD_DEV_DEBUG=1: why a service did not start, which `vercel dev` logs
   // only at debug level.
   const debug = process.env.CLOUD_DEV_DEBUG === "1" ? ["--debug"] : [];
+  // `vercel dev` runs the nearest folder above the one it is given that holds
+  // a vercel.json, .vercel or .git, if that vercel.json has services. Given
+  // the repo root of a desktop-app worktree, which sits in the main
+  // checkout's .claude/worktrees/, that is the main checkout; given a folder
+  // in the repo root, it is the repo root.
   await runGroup(
     vercel.command,
-    [...vercel.args, "dev", "-L", "--yes", "--listen", port, ...debug],
+    [...vercel.args, "dev", join(repoRoot, "scripts"), "-L", "--yes", "--listen", port, ...debug],
     { cwd: repoRoot, env },
   );
 } catch (error) {

@@ -2,7 +2,7 @@ import { AngularDetector } from "./angular";
 import { NextDetector } from "./next";
 import { NuxtDetector } from "./nuxt";
 import { QwikDetector } from "./qwik";
-import { QwikCityDetector } from "./qwik-city";
+import { QwikRouterDetector } from "./qwik-router";
 import { ReactDetector } from "./react";
 import { SolidDetector } from "./solid";
 import { SolidStartDetector } from "./solid-start";
@@ -18,7 +18,7 @@ import type { Detector } from "./types";
  * orchestrator changes needed. Meta-frameworks run before their base so a
  * meta-framework project is never mistaken for a bare SPA: Next before React,
  * TanStack Start before React, Nuxt before Vue (Vue excludes Nuxt), SolidStart
- * before Solid, SvelteKit before Svelte, and Qwik City before Qwik (each base
+ * before Solid, SvelteKit before Svelte, and Qwik Router before Qwik (each base
  * SPA detector excludes its meta-framework).
  */
 export const detectors = [
@@ -31,7 +31,7 @@ export const detectors = [
   new SolidDetector(),
   new SvelteKitDetector(),
   new SvelteDetector(),
-  new QwikCityDetector(),
+  new QwikRouterDetector(),
   new QwikDetector(),
   new AngularDetector(),
 ] as const satisfies ReadonlyArray<Detector>;

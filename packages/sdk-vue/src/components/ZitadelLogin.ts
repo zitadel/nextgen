@@ -9,6 +9,7 @@ import type {
   ZitadelFlowStepDetail,
 } from "@zitadel/sdk-core/types";
 
+import { standardAttributes, widgetTags } from "@zitadel/sdk-core/types";
 import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 // Registers <zitadel-login> / <zitadel-logout> with the browser. Imported at
 // module load (before render) so the element is upgraded by the time Vue
@@ -16,31 +17,13 @@ import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 // stringified attribute).
 import "@zitadel/components";
 
+import type { WithZitadelWidgetAttributes } from "../types";
 import { forceAttr } from "./forceAttr";
 
-/**
- * Vue wrapper for the `<zitadel-login>` Lit web component.
- *
- * Render-function form (string tag) so Vue never tries to resolve
- * `zitadel-login` as a Vue component — no `compilerOptions.isCustomElement`
- * needed. Supply the SDK handle from `configureZitadel(...)` as `:project`, or
- * the discrete `:project-id` / `:proxy-path` the widget reads instead — the
- * widget uses whichever is present. All three are bound as DOM properties, and
- * the discrete values (and the handle's fields) are also written as
- * `project-id` / `proxy-path` / `url` attributes so a server-rendered page
- * carries them before hydration. The widget's `zitadel-*` events are re-emitted
- * with their detail as `flowStep`, `flowInput`, `flowComplete`,
- * `flowRedirect` and
- * `flowError` (the names declared in `emits`).
- *
- * A Vue `ref` on this component resolves to the component *instance*, not the
- * inner element, so the rendered `<zitadel-login>` DOM node is exposed as
- * `element` (a `Ref` whose `.value` is the {@link ZitadelLoginElement}, or
- * `null` before mount). A consumer with `<ZitadelLogin ref="r" />` reads it via
- * `r.value.element`.
- */
-export default defineComponent({
+const Base = defineComponent({
   name: "ZitadelLogin",
+  // The element takes only the standard attributes (see below), never the rest of `attrs`.
+  inheritAttrs: false,
   props: {
     project: { type: Object as PropType<ZitadelProject>, default: undefined },
     projectId: { type: String, default: undefined },
@@ -50,6 +33,7 @@ export default defineComponent({
       default: "login",
     },
     postSignInUrl: { type: String, default: undefined },
+    forcePostSignInUrl: { type: Boolean, default: undefined },
     resumeFlowId: { type: String as PropType<string | null>, default: undefined },
     locales: {
       type: Object as PropType<Record<string, Partial<Record<string, string>>>>,
@@ -63,15 +47,18 @@ export default defineComponent({
     suppressPasswordToggle: { type: Boolean, default: undefined },
   },
   emits: ["flowStep", "flowInput", "flowComplete", "flowRedirect", "flowError"],
-  setup(props, { emit, expose }) {
+  setup(props, { attrs, emit, expose }) {
     // Template ref to the rendered Lit element. Exposed so a consumer's
     // component `ref` (which resolves to this instance) can reach the DOM node.
     const element = ref<ZitadelLoginElement | null>(null);
     expose({ element });
 
     return () => {
+      // The standard HTML attributes are the only extra props the element takes.
+      const attributes = standardAttributes(attrs);
       const attr = forceAttr();
-      return h("zitadel-login", {
+      return h(widgetTags.login, {
+        ...attributes,
         ref: element,
         // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
         // the widget does identity checks on it (and `render` from test-utils
@@ -90,6 +77,7 @@ export default defineComponent({
         proxyPath: props.proxyPath,
         purpose: props.purpose,
         "post-sign-in-url": props.postSignInUrl,
+        forcePostSignInUrl: props.forcePostSignInUrl,
         "resume-flow-id": props.resumeFlowId,
         // Same raw-unwrap rationale as `project`: hand the widget the plain
         // dictionaries, not Vue's reactive proxy.
@@ -123,3 +111,28 @@ export default defineComponent({
     };
   },
 });
+
+/**
+ * Vue wrapper for the `<zitadel-login>` Lit web component.
+ *
+ * Render-function form (string tag) so Vue never tries to resolve
+ * `zitadel-login` as a Vue component — no `compilerOptions.isCustomElement`
+ * needed. Supply the SDK handle from `configureZitadel(...)` as `:project`, or
+ * the discrete `:project-id` / `:proxy-path` the widget reads instead — the
+ * widget uses whichever is present. All three are bound as DOM properties, and
+ * the discrete values (and the handle's fields) are also written as
+ * `project-id` / `proxy-path` / `url` attributes so a server-rendered page
+ * carries them before hydration. The widget's `zitadel-*` events are re-emitted
+ * with their detail as `flowStep`, `flowInput`, `flowComplete`,
+ * `flowRedirect` and
+ * `flowError` (the names declared in `emits`).
+ *
+ * A Vue `ref` on this component resolves to the component *instance*, not the
+ * inner element, so the rendered `<zitadel-login>` DOM node is exposed as
+ * `element` (a `Ref` whose `.value` is the {@link ZitadelLoginElement}, or
+ * `null` before mount). A consumer with `<ZitadelLogin ref="r" />` reads it via
+ * `r.value.element`.
+ */
+const ZitadelLogin: WithZitadelWidgetAttributes<typeof Base> = Base;
+
+export default ZitadelLogin;

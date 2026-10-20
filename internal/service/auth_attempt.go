@@ -257,15 +257,16 @@ type Proof interface {
 // UserProof identifies the user by login name.
 //
 // AttributeName names the property the login name is a value of. The flow path
-// sets it from the step it rendered, whose field must be the bound schema's
-// designated identifier. Left empty — the direct-API path, which renders
-// nothing — the login name resolves against the designated identifier of every
+// sets it from the step it rendered, and sets UserSchemaURL to the schema the
+// flow is bound to: the login name then matches only users of that schema's
+// revisions (ADR 058 §5). Left empty, the direct-API path, which renders
+// nothing, resolves the login name against the designated identifier of every
 // user schema in the project instead, and must match exactly one user. A
-// direct-API caller never chooses the property. See resolveIdentifier for how
-// the two paths are scoped today.
+// direct-API caller never chooses the property. See resolveIdentifier.
 type UserProof struct {
 	AttributeName string
 	LoginName     string
+	UserSchemaURL string
 }
 
 func (UserProof) proofCheckType() domain.AuthCheckType { return domain.AuthCheckTypeUser }
@@ -311,7 +312,7 @@ type SessionResolver interface {
 }
 
 type UserLookup interface {
-	GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error)
+	GetByAttributes(ctx context.Context, projectID string, schemaURLs []string, attrs []domain.Attribute) (*domain.User, error)
 }
 
 // ---- Implementation ----------------------------------------------------------
@@ -735,21 +736,37 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 
 // resolveIdentifier finds the user a login name identifies.
 //
-// With an attribute name — the flow path — it looks the value up in that
-// property across the project. That lookup is not yet scoped to the flow's
-// bound schema, which ADR 058 §5 asks for so a same-named team-unique property
-// on another schema cannot collide with it; that predates this resolution and
-// is left for a follow-up.
+// With an attribute name, the flow path, it looks the value up in that
+// property among the users of every revision of the flow's bound schema (ADR
+// 058 §5). Users keep the revision they were created under while the flow runs
+// on the newest one, and a same-named property on another schema can neither
+// match nor collide. The bound schema comes from the stored flow, so one the
+// project does not hold is an internal error, not a rejected proof. So is a
+// users read that fails for any reason other than finding no user or several.
 //
-// Without one — the direct-API path — the value resolves against the project's
-// designated identifiers. Any status, as the flow path: whether a login may
-// reach an inactive user is decided with status enforcement, not here.
+// Without one, the direct-API path, the value resolves against the designated
+// identifiers of every schema in the project. Any status, as the flow path:
+// whether a login may reach an inactive user is decided with status
+// enforcement, not here.
 func (s *authAttemptService) resolveIdentifier(ctx context.Context, projectID string, p UserProof) (*domain.User, error) {
 	if p.AttributeName != "" {
-		return s.users.GetByAttributes(ctx, projectID, []domain.Attribute{{
+		schemaURLs, err := userSchemaRevisionURLs(ctx, s.stmts.Statements(), projectID, p.UserSchemaURL)
+		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
+			return nil, domain.ErrInternal(err).WithMessage("user schema revision not found")
+		}
+		if err != nil {
+			return nil, err
+		}
+		user, err := s.users.GetByAttributes(ctx, projectID, schemaURLs, []domain.Attribute{{
 			Key:   domain.AttributeKey(p.AttributeName),
 			Value: p.LoginName,
 		}})
+		_, noRow := errors.AsType[*database.NoRowFoundError](err)
+		_, manyRows := errors.AsType[*database.MultipleRowsFoundError](err)
+		if err != nil && !noRow && !manyRows {
+			return nil, domain.ErrInternal(err).WithMessage("failed to look up the user")
+		}
+		return user, err
 	}
 	return resolveDesignatedUser(ctx, s.stmts.Statements(), projectID, p.LoginName, false, "auth_attempt")
 }
@@ -766,6 +783,11 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			return nil, nil, nil, err
 		}
 		user, err := s.resolveIdentifier(ctx, attempt.ProjectID, p)
+		if errors.Is(err, domain.ErrInternal(nil)) {
+			// A fault on the server's side says nothing about the login name:
+			// no failed check, and the flow must not route it as user not found.
+			return nil, nil, nil, err
+		}
 		if err != nil {
 			return userChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
