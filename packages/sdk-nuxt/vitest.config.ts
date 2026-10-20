@@ -1,21 +1,35 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject } from "../../vitest.shared.mjs";
+
+// Stub Nuxt's `#imports` virtual module so vitest can resolve sources that
+// pull from it (e.g. `useRuntimeConfig`) without bootstrapping Nuxt's module
+// resolver.
+const alias = {
+  "#imports": fileURLToPath(new URL("./src/__tests__/stubs/nuxt-imports.ts", import.meta.url)),
+};
 
 export default defineConfig({
   cacheDir: ".vitest",
-  resolve: {
-    alias: {
-      // Stub Nuxt's `#imports` virtual module so vitest can resolve sources
-      // that pull from it (e.g. `useRuntimeConfig`) without bootstrapping
-      // Nuxt's module resolver.
-      "#imports": fileURLToPath(new URL("./src/__tests__/stubs/nuxt-imports.ts", import.meta.url)),
-    },
-  },
   test: {
     ...baseTest,
     name: "@zitadel/sdk-nuxt",
-    environment: "node",
+    projects: [
+      {
+        cacheDir: ".vitest/node",
+        resolve: { alias },
+        test: {
+          name: "node",
+          globals: true,
+          environment: "node",
+          include: ["src/**/*.{test,spec}.{ts,tsx}"],
+          exclude: ["src/**/*.edge.spec.ts"],
+        },
+      },
+      // The server middleware runs on edge Nitro presets, so it must run in the
+      // edge VM too, which has no `node:` modules and no socket.
+      edgeProject({ include: ["src/**/*.edge.spec.ts"], alias }),
+    ],
   },
 });
