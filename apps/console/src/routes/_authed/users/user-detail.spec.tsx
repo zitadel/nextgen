@@ -287,6 +287,17 @@ describe("user detail", () => {
     expect(screen.getByLabelText("Verified")).toHaveValue("false");
   });
 
+  it("marks optional attributes beside their label, as the add-user sheet does", async () => {
+    stub();
+    await renderDetail();
+    await screen.findByLabelText("Company name");
+
+    // `companyName` is optional, `email` required and unmarked.
+    const markers = screen.getAllByText("Optional");
+    expect(markers).toHaveLength(1);
+    expect(markers[0]?.parentElement).toHaveTextContent("Company name");
+  });
+
   it("offers Save once a field has changed", async () => {
     stub();
     await renderDetail();
