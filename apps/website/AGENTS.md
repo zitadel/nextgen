@@ -1,11 +1,12 @@
 # Agent Instructions — `apps/website`
 
-The hosted cloud's front page at `/`. Shared app rules:
-[`apps/AGENTS.md`](../AGENTS.md).
+The hosted cloud's front page at `/` and its changelog at `/changelog`.
+Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
-- The page says the benefit, then proves it, and nothing else: the hero with
-  the commands, then the showcase's steps, ending on the quickstart. Feature
-  lists, ways in and roadmaps belong on the docs and zitadel.com.
+- The front page says the benefit, then proves it, and nothing else: the
+  hero with the commands, then the showcase's steps, ending on the
+  quickstart. Feature lists, ways in and roadmaps belong on the docs and
+  zitadel.com.
 - It ports `zitadel/new-website`'s narrative redesign
   (`docs/narrative-ia-proposal.md` on that repo's
   `claude/zitadel-narrative-redesign-377a49` branch) and follows that repo's
@@ -79,10 +80,24 @@ The hosted cloud's front page at `/`. Shared app rules:
 - Next resolves `@zitadel/components` to its `dist/`, so `build` and `dev`
   depend on `components:build` in moon and in turbo.
 
+## The changelog
+
+- `app/changelog/releases.ts` reads the newest GitHub Releases when the page
+  builds and when it regenerates (`revalidate` in `page.tsx`), never per
+  visit. It parses the body `scripts/release-github.mjs` writes: change the
+  two together, and the fixture in `releases.spec.ts` with them.
+- GitHub failing never fails a build (the page links to GitHub instead); a
+  regeneration rethrows, so the last page stays up.
+- Render release Markdown only through `app/changelog/markdown.tsx`, as
+  elements and never as HTML: this origin also serves the console's session.
+- `WEBSITE_GITHUB_TOKEN`, a token without permissions, lifts GitHub's
+  rate limit on Vercel's shared addresses ([runbook](../../docs/runbooks/cloud.md)).
+
 ## Routing
 
-The cloud routes only `/`, `/llms.txt`, `/_next/*`, `/favicon.ico` and
-`/favicons/*` here (repo-root [`vercel.json`](../../vercel.json)).
+The cloud routes only `/`, `/changelog`, `/llms.txt`, `/_next/*`,
+`/favicon.ico` and `/favicons/*` here (repo-root
+[`vercel.json`](../../vercel.json)).
 
 - A new page or `public/` file needs a rewrite of its own in `vercel.json`, or
   the server answers it with a 404.
@@ -95,7 +110,7 @@ The cloud routes only `/`, `/llms.txt`, `/_next/*`, `/favicon.ico` and
 ## Checks
 
 ```sh
-moon run website:typecheck website:lint website:build
+moon run website:typecheck website:lint website:test website:build
 moon run website:start   # the build on port 3004
 ```
 
