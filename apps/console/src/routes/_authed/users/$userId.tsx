@@ -1,9 +1,10 @@
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { GitCommitHorizontal, Key, type LucideIcon, Shield, User } from "lucide-react";
-import { useId } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
+import { FormError } from "@/components/form-error";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
 import {
   DETAIL_BODY,
@@ -21,6 +22,7 @@ import { Field, FieldContent, FieldGroup, FieldLabel } from "@/components/ui/fie
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSubmit } from "@/hooks/use-submit";
 import { formatDate } from "@/lib/date";
 import {
   type IdpConnection,
@@ -30,7 +32,13 @@ import {
 } from "@/lib/idp";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { displayValue, field } from "@/lib/record";
-import { type UserSchema, schemaDisplayName, schemaFields } from "@/lib/schema";
+import {
+  type SchemaField,
+  type UserSchema,
+  attributeValue,
+  schemaDisplayName,
+  schemaFields,
+} from "@/lib/schema";
 import { userAttributes, userIdentity, userIdentitySecondary, userMetadata } from "@/lib/user";
 
 /**
@@ -41,8 +49,6 @@ import { userAttributes, userIdentity, userIdentitySecondary, userMetadata } fro
  * and recorded here:
  *
  *   - **Last sign-in**: no such field anywhere on the user
- *   - **Save** on the profile form: no `PATCH`/`PUT /users/{user_id}` (#693), so
- *     the fields render read-only rather than offering an edit that cannot land
  *   - the **Password** row's "last changed": no timestamp is exposed
  *   - **unlinking** a provider account: links are written only by a sign-in
  *
@@ -107,7 +113,6 @@ function UserDetail() {
   const { user, schema, passkeys, identityLinks, idps } = Route.useLoaderData();
   const { userId } = Route.useParams();
   const router = useRouter();
-  const attributes = userAttributes(user);
   // The server-resolved identity chain (ADR 058): display → identifier → id.
   const name = userIdentity(user) ?? userId;
   const secondary = userIdentitySecondary(user);
@@ -115,6 +120,7 @@ function UserDetail() {
   const metadata = userMetadata(user);
   const schemaName = schema ? schemaDisplayName(schema, "Unknown") : "Unknown";
   const schemaId = field(user, "schema");
+  const [tab, setTab] = useState("overview");
 
   return (
     <DetailPage>
@@ -138,13 +144,20 @@ function UserDetail() {
         }
       />
 
-      <Tabs defaultValue="overview" className={`${DETAIL_BODY} gap-6`}>
+      <Tabs value={tab} onValueChange={setTab} className={`${DETAIL_BODY} gap-6`}>
         <TabsList aria-label="User detail sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="authentication">Authentication</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="flex flex-col gap-4">
+        {/* Kept mounted, and hidden while another tab is open, so the profile
+            draft survives a look at Authentication. */}
+        <TabsContent
+          value="overview"
+          forceMount
+          hidden={tab !== "overview"}
+          className="flex flex-col gap-4"
+        >
           <Card className={DETAIL_CARD}>
             {/* The row wraps rather than truncate the id, and the box grows
                 past its 24px when the id breaks across lines. */}
@@ -171,20 +184,12 @@ function UserDetail() {
                 </Button>
               )}
             </div>
-            {fields.length === 0 ? (
+            {!schema || fields.length === 0 ? (
               <p className="text-muted-foreground px-6 pb-5 text-sm">
                 This user&rsquo;s schema could not be read, so its attributes cannot be labelled.
               </p>
             ) : (
-              <FieldGroup className="gap-4 px-6 pb-5">
-                {fields.map((entry) => (
-                  <ProfileField
-                    key={entry.key}
-                    label={entry.label}
-                    value={displayValue(attributes, entry.key) ?? ""}
-                  />
-                ))}
-              </FieldGroup>
+              <ProfileForm userId={userId} user={user} schema={schema} />
             )}
           </Card>
 
@@ -301,21 +306,160 @@ function IdentityLinks({
 }
 
 /**
- * One attribute of the profile.
- *
- * Read-only until `PATCH /users/{user_id}` exists (#693): an editable field with
- * no Save promises more than a plain one.
+ * The profile form: one field per schema property, saved as a patch of the
+ * changed attributes only. A save re-runs the loader, and the draft resets
+ * when the stored values change, as in `RenameCard`.
  */
-function ProfileField({ label, value }: { label: string; value: string }) {
+function ProfileForm({
+  userId,
+  user,
+  schema,
+}: {
+  userId: string;
+  user: Record<string, unknown>;
+  schema: UserSchema;
+}) {
+  const router = useRouter();
+  // Keyed on the loader's objects, which change only when it re-runs, so the
+  // draft survives every render in between.
+  const fields = useMemo(() => schemaFields(schema), [schema]);
+  const { stored, locked } = useMemo(() => {
+    const attributes = userAttributes(user);
+    const stored: Record<string, string> = {};
+    const locked = new Set<string>();
+    for (const entry of fields) {
+      const value = displayValue(attributes, entry.key);
+      stored[entry.key] = value ?? "";
+      // Stored but not as text (an array or object under a union type): an
+      // empty box would invite typing over the structured value.
+      const raw = attributes[entry.key];
+      if (value === undefined && raw !== undefined && raw !== null) locked.add(entry.key);
+    }
+    return { stored, locked };
+  }, [fields, user]);
+  const [values, setValues] = useState(stored);
+  // An input that cannot read what it shows (a partly cleared date reports
+  // `""` with `validity.badInput`); saving would delete the stored value.
+  const [unreadable, setUnreadable] = useState<Record<string, boolean>>({});
+  const blocked = fields.some((entry) => unreadable[entry.key]);
+  // Compared as they would be sent, so a stored trailing space or `42.0` for a
+  // stored 42 is not a change.
+  const changed = fields.filter(
+    (entry) => patchValue(entry, values[entry.key]) !== patchValue(entry, stored[entry.key]),
+  );
+  // Only the changed fields: a required value the form cannot show (an array)
+  // reads as empty without being emptied.
+  const missingRequired = changed.some((entry) => entry.required && !values[entry.key]?.trim());
+
+  const save = useSubmit(async () => {
+    const attributes: Record<string, unknown> = {};
+    for (const entry of changed) attributes[entry.key] = patchValue(entry, values[entry.key]);
+    await api.patchUserByID(userId, { attributes });
+    await router.invalidate();
+  }, "Could not save the user.");
+  const { clearError } = save;
+
+  useEffect(() => {
+    setValues(stored);
+    setUnreadable({});
+    clearError();
+  }, [stored, clearError]);
+
+  return (
+    <FieldGroup className="gap-4 px-6 pb-5">
+      {fields.map((entry) => (
+        <ProfileField
+          key={entry.key}
+          field={entry}
+          value={values[entry.key] ?? ""}
+          onChange={(value) => setValues((current) => ({ ...current, [entry.key]: value }))}
+          onBadInput={(badInput) =>
+            setUnreadable((current) => ({ ...current, [entry.key]: badInput }))
+          }
+          // Marked, since it is the only reason on screen why Save is off.
+          invalid={unreadable[entry.key] ?? false}
+          readOnly={locked.has(entry.key)}
+          // The reload after a save resets the draft, so typing meanwhile
+          // would be lost.
+          disabled={save.pending}
+        />
+      ))}
+      <FormError message={save.error} />
+      <div className="flex justify-end">
+        {/* As `RenameCard`'s Save: secondary and small. */}
+        <Button
+          variant="secondary"
+          size="sm"
+          className="gap-1 px-2.5 text-xs"
+          onClick={() => void save.run()}
+          disabled={changed.length === 0 || missingRequired || blocked}
+          loading={save.pending}
+        >
+          Save
+        </Button>
+      </div>
+    </FieldGroup>
+  );
+}
+
+/**
+ * A field's draft as the patch carries it: the typed value, or `null` to
+ * delete an emptied attribute (the schema refuses that for a required one,
+ * which `missingRequired` catches first).
+ */
+function patchValue(entry: SchemaField, draft = ""): string | number | null {
+  const trimmed = draft.trim();
+  return trimmed === "" ? null : attributeValue(entry, trimmed);
+}
+
+/** One attribute of the profile, typed as its schema property declares. */
+function ProfileField({
+  field,
+  value,
+  onChange,
+  onBadInput,
+  invalid,
+  readOnly,
+  disabled,
+}: {
+  field: SchemaField;
+  value: string;
+  onChange: (value: string) => void;
+  /**
+   * Whether the input shows something its `value` cannot express. Read on
+   * every native `input` event: `onChange` skips one that leaves the value
+   * as it was, such as the last step of clearing a partial date.
+   */
+  onBadInput: (badInput: boolean) => void;
+  invalid: boolean;
+  readOnly: boolean;
+  disabled: boolean;
+}) {
   const id = useId();
+  // A number field is a text input: a number input reports text it cannot
+  // parse as empty, which would read as emptied and delete the value. No
+  // decimal keypad either, since iOS's has no minus key.
+  const number = field.inputType === "number";
 
   return (
     <Field orientation="responsive">
       <FieldLabel htmlFor={id} className={`text-foreground ${LABEL_HALF}`}>
-        {label}
+        {field.label}
       </FieldLabel>
       <FieldContent>
-        <Input id={id} readOnly value={value} />
+        <Input
+          id={id}
+          name={field.key}
+          type={number ? "text" : field.inputType}
+          required={field.required}
+          placeholder={field.placeholder}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onInput={(event) => onBadInput(event.currentTarget.validity.badInput)}
+          aria-invalid={invalid || undefined}
+          readOnly={readOnly}
+          disabled={disabled}
+        />
       </FieldContent>
     </Field>
   );

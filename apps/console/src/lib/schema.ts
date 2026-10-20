@@ -109,6 +109,25 @@ export function schemaFields(schema: UserSchema): SchemaField[] {
 }
 
 /**
+ * A field's trimmed, non-empty input as the JSON its property declares. An
+ * input always yields a string, but JSON Schema validates a `number`/`integer`
+ * property against a JSON number, and `"42"` would be rejected. A value that
+ * will not parse (typed into a text input; a number input reports it as empty)
+ * is sent through untouched so the server explains why, rather than becoming
+ * `NaN`, which `JSON.stringify` would silently turn into `null`. So is text
+ * `Number` would read differently than typed: hex, binary or octal (`0x10` is
+ * 16), and a whole number past 2^53, which it rounds.
+ */
+export function attributeValue(entry: SchemaField, value: string): string | number {
+  if (entry.inputType !== "number" || !DECIMAL.test(value)) return value;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return value;
+  return Number.isInteger(numeric) && !Number.isSafeInteger(numeric) ? value : numeric;
+}
+
+const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
+
+/**
  * The columns the users table shows, unioned across every schema the loaded
  * users actually reference.
  *

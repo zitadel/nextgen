@@ -17,6 +17,7 @@ import { useRequiredProjectScope } from "@/lib/project-scope";
 //   type ProjectOption,
 // } from "./project-access";
 import {
+  attributeValue,
   fetchAllSchemas,
   type SchemaField,
   schemaDisplayName,
@@ -125,23 +126,14 @@ function AddUserForm({
   const create = useSubmit(async () => {
     if (!selected) return;
     // Built from the field descriptors rather than the raw values so a
-    // property's declared type survives: an input always yields a string, but
-    // JSON Schema validates a `number`/`integer` property against a JSON
-    // number, and `"42"` would be rejected. A value that will not parse is
-    // sent through untouched so the server explains why, rather than becoming
-    // `NaN` — which `JSON.stringify` would silently turn into `null`.
+    // property's declared type survives (`attributeValue`).
     const attributes: Record<string, unknown> = {};
     for (const entry of fields) {
       // Optional properties are omitted rather than sent empty: an empty
       // string fails format validation (`email`) instead of reading as absent.
       const value = values[entry.key]?.trim() ?? "";
       if (value === "") continue;
-      if (entry.inputType === "number") {
-        const numeric = Number(value);
-        attributes[entry.key] = Number.isFinite(numeric) ? numeric : value;
-      } else {
-        attributes[entry.key] = value;
-      }
+      attributes[entry.key] = attributeValue(entry, value);
     }
     await api.createUser({ schema: selected.id, attributes }, { project_id: projectId });
     await onCreated();

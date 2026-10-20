@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
@@ -86,6 +86,48 @@ async function renderDetail(project?: string) {
   });
   render(<RouterProvider router={router} />);
   return router;
+}
+
+/** Serves `sch_business` with the given properties and required keys. */
+function stubSchema(properties: Record<string, unknown>, required: string[] = ["email"]) {
+  server.use(
+    http.get(`${SCHEMAS_URL}/sch_business`, () =>
+      HttpResponse.json({
+        id: "sch_business",
+        schema: { title: "Business", required, properties },
+      }),
+    ),
+  );
+}
+
+/**
+ * Waits until a save and the reload after it are done (the fields unlock), so
+ * no request is left in flight for MSW to report in a later test.
+ */
+async function waitForSaveToSettle(label: string) {
+  await waitFor(() => expect(screen.getByLabelText(label)).toBeEnabled());
+}
+
+/**
+ * One native `input` event on a date field, as a browser fires it per edit.
+ * jsdom has no date widget, so `validity.badInput` (the field shows a partial
+ * date its `value` cannot express) is stubbed.
+ */
+function inputDate(input: HTMLElement, value: string, badInput: boolean) {
+  Object.defineProperty(input, "validity", { configurable: true, value: { badInput } });
+  fireEvent.input(input, { target: { value } });
+}
+
+/** Accepts every `PATCH /users/{id}` and records its body. */
+function capturePatches(): unknown[] {
+  const bodies: unknown[] = [];
+  server.use(
+    http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+      bodies.push(await request.json());
+      return HttpResponse.json({ id: USER_ID });
+    }),
+  );
+  return bodies;
 }
 
 describe("user detail", () => {
@@ -229,16 +271,312 @@ describe("user detail", () => {
     expect(screen.getByLabelText("Verified")).toHaveValue("false");
   });
 
-  it("renders the profile read-only", async () => {
-    // There is no update endpoint (#693). An editable field with no Save would
-    // promise an edit the console cannot make, so the fields are inert and the
-    // design's Save is absent rather than disabled.
+  it("offers Save once a field has changed", async () => {
     stub();
     await renderDetail();
 
-    expect(await screen.findByLabelText("Company name")).toHaveAttribute("readonly");
-    expect(screen.getByLabelText("Email")).toHaveAttribute("readonly");
-    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    const company = await screen.findByLabelText("Company name");
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(save).toBeDisabled();
+
+    await userEvent.type(company, " Inc");
+    expect(save).toBeEnabled();
+  });
+
+  it("sends only the changed attribute, typed as its schema declares", async () => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", headcount: 42 } },
+    });
+    stubSchema({ email: { type: "string" }, headcount: { type: "integer", title: "Headcount" } });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const headcount = await screen.findByLabelText("Headcount");
+    await userEvent.clear(headcount);
+    await userEvent.type(headcount, "43");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    // No `schema`: moving the user to another revision is not this form's job.
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { headcount: 43 } }]));
+    await waitForSaveToSettle("Headcount");
+  });
+
+  it.each([
+    ["hex, which `Number` would read as 16", "0x10"],
+    ["a whole number past 2^53, which `Number` would round", "9007199254740993"],
+  ])("sends %s as typed", async (_, typed) => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", headcount: 42 } },
+    });
+    stubSchema({ email: { type: "string" }, headcount: { type: "integer", title: "Headcount" } });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const headcount = await screen.findByLabelText("Headcount");
+    await userEvent.clear(headcount);
+    await userEvent.type(headcount, typed);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { headcount: typed } }]));
+    await waitForSaveToSettle("Headcount");
+  });
+
+  it("deletes an optional attribute that was emptied", async () => {
+    stub();
+    const bodies = capturePatches();
+    await renderDetail();
+
+    await userEvent.clear(await screen.findByLabelText("Company name"));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { companyName: null } }]));
+    await waitForSaveToSettle("Company name");
+  });
+
+  it("keeps a date out of the patch while its input reports it unreadable", async () => {
+    // A partly cleared date input reports `""` with `validity.badInput`, while
+    // the screen still shows part of the date. Read as emptied, saving any
+    // change would delete the stored date.
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", companyName: "Acme", founded: "2020-01-02" },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      companyName: { type: "string", title: "Company name" },
+      founded: { type: "string", format: "date", title: "Founded" },
+    });
+    await renderDetail();
+
+    const founded = await screen.findByLabelText("Founded");
+    const save = screen.getByRole("button", { name: "Save" });
+    inputDate(founded, "", true);
+    await userEvent.type(screen.getByLabelText("Company name"), " Inc");
+    expect(save).toBeDisabled();
+    expect(founded).toHaveAttribute("aria-invalid", "true");
+
+    // Readable again: the other change can be saved.
+    inputDate(founded, "2020-01-02", false);
+    expect(save).toBeEnabled();
+  });
+
+  it("deletes a date cleared in steps, though its value stayed empty", async () => {
+    // Clearing the rest of a partly cleared date fires `input` with the same
+    // `""`, so React reports no change; the date must still read as emptied.
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", founded: "2020-01-02" },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      founded: { type: "string", format: "date", title: "Founded" },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const founded = await screen.findByLabelText("Founded");
+    inputDate(founded, "", true);
+    inputDate(founded, "", false);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { founded: null } }]));
+    await waitForSaveToSettle("Founded");
+  });
+
+  it("keeps the draft while another tab is open", async () => {
+    stub();
+    await renderDetail();
+
+    await userEvent.type(await screen.findByLabelText("Company name"), " Inc");
+    await userEvent.click(screen.getByRole("tab", { name: "Authentication" }));
+    // Hidden, not unmounted.
+    expect(screen.getByLabelText("Company name")).not.toBeVisible();
+    await userEvent.click(screen.getByRole("tab", { name: "Overview" }));
+
+    expect(screen.getByLabelText("Company name")).toHaveValue("Acme Inc");
+  });
+
+  it("leaves a stored value the form cannot show untouchable", async () => {
+    // Typing into an empty box would replace the structured value with text.
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", tags: ["a", "b"] },
+      },
+    });
+    stubSchema({ email: { type: "string" }, tags: { type: ["array", "string"], title: "Tags" } });
+    await renderDetail();
+
+    expect(await screen.findByLabelText("Tags")).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("Email")).not.toHaveAttribute("readonly");
+  });
+
+  it("keeps Save disabled while a required field is empty", async () => {
+    stub();
+    await renderDetail();
+
+    await userEvent.clear(await screen.findByLabelText("Email"));
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  it("never deletes a number that does not parse", async () => {
+    // A number input reports text it cannot parse as empty, which would read
+    // as an emptied field and send `null`. The text goes to the server instead,
+    // whose message says what is wrong with it.
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", headcount: 42 } },
+    });
+    stubSchema({ email: { type: "string" }, headcount: { type: "integer", title: "Headcount" } });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const headcount = await screen.findByLabelText("Headcount");
+    await userEvent.clear(headcount);
+    await userEvent.type(headcount, "4e");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { headcount: "4e" } }]));
+    await waitForSaveToSettle("Headcount");
+  });
+
+  it("checks only the changed fields for a missing required value", async () => {
+    // A required array has no field value to show, so it reads as empty
+    // without being emptied; it must not block saving another attribute.
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", tags: ["a"] },
+      },
+    });
+    stubSchema(
+      {
+        email: { type: "string" },
+        companyName: { type: "string", title: "Company name" },
+        tags: { type: "array", title: "Tags" },
+      },
+      ["email", "tags"],
+    );
+    await renderDetail();
+
+    await userEvent.type(await screen.findByLabelText("Company name"), "Acme");
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
+  it("counts a value as changed only when what would be sent differs", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", companyName: "Acme ", headcount: 42 },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      companyName: { type: "string", title: "Company name" },
+      headcount: { type: "integer", title: "Headcount" },
+    });
+    await renderDetail();
+
+    // Untouched: the stored trailing space and the number are not changes.
+    const save = await screen.findByRole("button", { name: "Save" });
+    expect(save).toBeDisabled();
+
+    // `42.0` is the number already stored.
+    await userEvent.type(screen.getByLabelText("Headcount"), ".0");
+    expect(save).toBeDisabled();
+  });
+
+  it("locks the fields while a save is in flight", async () => {
+    // A reload follows the save and resets the draft, so typing meanwhile
+    // would be lost.
+    stub();
+    let release: () => void = () => undefined;
+    let reached: () => void = () => undefined;
+    const handled = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    server.use(
+      http.patch(`${USERS_URL}/${USER_ID}`, async () => {
+        const held = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        reached();
+        await held;
+        return HttpResponse.json({ id: USER_ID });
+      }),
+    );
+    await renderDetail();
+
+    const company = await screen.findByLabelText("Company name");
+    await userEvent.type(company, " Inc");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(company).toBeDisabled());
+    // The handler holds `release` only once the request reaches it.
+    await handled;
+    release();
+    await waitFor(() => expect(screen.getByLabelText("Company name")).toBeEnabled());
+  });
+
+  it.each([
+    [400, "Attribute email must be an email address."],
+    [409, "A user with this email already exists."],
+    [403, "You are not allowed to update this user."],
+  ])("shows the API's own message when a save fails with %i", async (status, message) => {
+    stub();
+    server.use(
+      http.patch(`${USERS_URL}/${USER_ID}`, () => HttpResponse.json({ message }, { status })),
+    );
+    await renderDetail();
+
+    await userEvent.type(await screen.findByLabelText("Company name"), " Inc");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(await panel.findByRole("alert")).toHaveTextContent(message);
+    // The draft stays, so it can be corrected and saved again.
+    expect(screen.getByLabelText("Company name")).toHaveValue("Acme Inc");
+  });
+
+  it("shows the stored values once a save lands", async () => {
+    stub();
+    let attributes: Record<string, unknown> = { email: "maya@acme.com", companyName: "Acme" };
+    server.use(
+      http.get(`${USERS_URL}/${USER_ID}`, () =>
+        HttpResponse.json({
+          id: USER_ID,
+          schema: "sch_business",
+          identifier: "maya@acme.com",
+          identifier_property: "email",
+          attributes,
+        }),
+      ),
+      http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+        const body = (await request.json()) as { attributes: Record<string, unknown> };
+        attributes = { ...attributes, ...body.attributes };
+        return HttpResponse.json({ id: USER_ID, attributes });
+      }),
+    );
+    await renderDetail();
+
+    const company = await screen.findByLabelText("Company name");
+    await userEvent.type(company, " Inc  ");
+    const save = screen.getByRole("button", { name: "Save" });
+    await userEvent.click(save);
+
+    // The console sends the trimmed value, the reload brings back what the
+    // mock merged (the draft still had the trailing spaces), and with no
+    // difference left there is nothing to save.
+    await waitFor(() => expect(screen.getByLabelText("Company name")).toHaveValue("Acme Inc"));
+    expect(save).toBeDisabled();
   });
 
   it("shows the status and created date the server stamped", async () => {
