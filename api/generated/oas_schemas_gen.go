@@ -18431,6 +18431,7 @@ func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
+func (*ErrorDetails) revokeMySessionRes()      {}
 func (*ErrorDetails) submitFlowStepRes()       {}
 
 // Additional error-specific context.
@@ -28273,6 +28274,186 @@ func (s GetLiveOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetLiveOK) getLiveRes() {}
+
+// GetMySessionCsrfTokenErrorResponse represents sum type.
+type GetMySessionCsrfTokenErrorResponse struct {
+	Type                GetMySessionCsrfTokenErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessNotFound        SessNotFound
+	SessProjectMismatch SessProjectMismatch
+}
+
+// GetMySessionCsrfTokenErrorResponseType is oneOf type of GetMySessionCsrfTokenErrorResponse.
+type GetMySessionCsrfTokenErrorResponseType string
+
+// Possible values for GetMySessionCsrfTokenErrorResponseType.
+const (
+	AuthUnauthorizedGetMySessionCsrfTokenErrorResponse    GetMySessionCsrfTokenErrorResponseType = "auth.unauthorized"
+	InternalGetMySessionCsrfTokenErrorResponse            GetMySessionCsrfTokenErrorResponseType = "internal"
+	ReqInvalidGetMySessionCsrfTokenErrorResponse          GetMySessionCsrfTokenErrorResponseType = "req.invalid"
+	SessNotFoundGetMySessionCsrfTokenErrorResponse        GetMySessionCsrfTokenErrorResponseType = "sess.not_found"
+	SessProjectMismatchGetMySessionCsrfTokenErrorResponse GetMySessionCsrfTokenErrorResponseType = "sess.project_mismatch"
+)
+
+// IsAuthUnauthorized reports whether GetMySessionCsrfTokenErrorResponse is AuthUnauthorized.
+func (s GetMySessionCsrfTokenErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetMySessionCsrfTokenErrorResponse
+}
+
+// IsInternal reports whether GetMySessionCsrfTokenErrorResponse is Internal.
+func (s GetMySessionCsrfTokenErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetMySessionCsrfTokenErrorResponse
+}
+
+// IsReqInvalid reports whether GetMySessionCsrfTokenErrorResponse is ReqInvalid.
+func (s GetMySessionCsrfTokenErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetMySessionCsrfTokenErrorResponse
+}
+
+// IsSessNotFound reports whether GetMySessionCsrfTokenErrorResponse is SessNotFound.
+func (s GetMySessionCsrfTokenErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundGetMySessionCsrfTokenErrorResponse
+}
+
+// IsSessProjectMismatch reports whether GetMySessionCsrfTokenErrorResponse is SessProjectMismatch.
+func (s GetMySessionCsrfTokenErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchGetMySessionCsrfTokenErrorResponse
+}
+
+// SetAuthUnauthorized sets GetMySessionCsrfTokenErrorResponse to AuthUnauthorized.
+func (s *GetMySessionCsrfTokenErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetMySessionCsrfTokenErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetMySessionCsrfTokenErrorResponse is AuthUnauthorized.
+func (s GetMySessionCsrfTokenErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetMySessionCsrfTokenErrorResponse(v AuthUnauthorized) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetMySessionCsrfTokenErrorResponse to Internal.
+func (s *GetMySessionCsrfTokenErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetMySessionCsrfTokenErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetMySessionCsrfTokenErrorResponse is Internal.
+func (s GetMySessionCsrfTokenErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from Internal.
+func NewInternalGetMySessionCsrfTokenErrorResponse(v Internal) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetMySessionCsrfTokenErrorResponse to ReqInvalid.
+func (s *GetMySessionCsrfTokenErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetMySessionCsrfTokenErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetMySessionCsrfTokenErrorResponse is ReqInvalid.
+func (s GetMySessionCsrfTokenErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from ReqInvalid.
+func NewReqInvalidGetMySessionCsrfTokenErrorResponse(v ReqInvalid) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessNotFound sets GetMySessionCsrfTokenErrorResponse to SessNotFound.
+func (s *GetMySessionCsrfTokenErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundGetMySessionCsrfTokenErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if GetMySessionCsrfTokenErrorResponse is SessNotFound.
+func (s GetMySessionCsrfTokenErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from SessNotFound.
+func NewSessNotFoundGetMySessionCsrfTokenErrorResponse(v SessNotFound) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetSessNotFound(v)
+	return s
+}
+
+// SetSessProjectMismatch sets GetMySessionCsrfTokenErrorResponse to SessProjectMismatch.
+func (s *GetMySessionCsrfTokenErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchGetMySessionCsrfTokenErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if GetMySessionCsrfTokenErrorResponse is SessProjectMismatch.
+func (s GetMySessionCsrfTokenErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchGetMySessionCsrfTokenErrorResponse(v SessProjectMismatch) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// GetMySessionCsrfTokenErrorResponseStatusCode wraps GetMySessionCsrfTokenErrorResponse with StatusCode.
+type GetMySessionCsrfTokenErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetMySessionCsrfTokenErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetMySessionCsrfTokenErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetMySessionCsrfTokenErrorResponseStatusCode) GetResponse() GetMySessionCsrfTokenErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetMySessionCsrfTokenErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetMySessionCsrfTokenErrorResponseStatusCode) SetResponse(val GetMySessionCsrfTokenErrorResponse) {
+	s.Response = val
+}
+
+func (*GetMySessionCsrfTokenErrorResponseStatusCode) getMySessionCsrfTokenRes() {}
 
 // GetMySessionErrorResponse represents sum type.
 type GetMySessionErrorResponse struct {
@@ -63015,76 +63196,6 @@ func (s *RevokeMySessionErrorResponseStatusCode) SetResponse(val RevokeMySession
 }
 
 func (*RevokeMySessionErrorResponseStatusCode) revokeMySessionRes() {}
-
-// RevokeMySessionForbidden represents sum type.
-type RevokeMySessionForbidden struct {
-	Type                RevokeMySessionForbiddenType // switch on this field
-	SessProjectMismatch SessProjectMismatch
-	AuthCsrfInvalid     AuthCsrfInvalid
-}
-
-// RevokeMySessionForbiddenType is oneOf type of RevokeMySessionForbidden.
-type RevokeMySessionForbiddenType string
-
-// Possible values for RevokeMySessionForbiddenType.
-const (
-	SessProjectMismatchRevokeMySessionForbidden RevokeMySessionForbiddenType = "sess.project_mismatch"
-	AuthCsrfInvalidRevokeMySessionForbidden     RevokeMySessionForbiddenType = "auth.csrf_invalid"
-)
-
-// IsSessProjectMismatch reports whether RevokeMySessionForbidden is SessProjectMismatch.
-func (s RevokeMySessionForbidden) IsSessProjectMismatch() bool {
-	return s.Type == SessProjectMismatchRevokeMySessionForbidden
-}
-
-// IsAuthCsrfInvalid reports whether RevokeMySessionForbidden is AuthCsrfInvalid.
-func (s RevokeMySessionForbidden) IsAuthCsrfInvalid() bool {
-	return s.Type == AuthCsrfInvalidRevokeMySessionForbidden
-}
-
-// SetSessProjectMismatch sets RevokeMySessionForbidden to SessProjectMismatch.
-func (s *RevokeMySessionForbidden) SetSessProjectMismatch(v SessProjectMismatch) {
-	s.Type = SessProjectMismatchRevokeMySessionForbidden
-	s.SessProjectMismatch = v
-}
-
-// GetSessProjectMismatch returns SessProjectMismatch and true boolean if RevokeMySessionForbidden is SessProjectMismatch.
-func (s RevokeMySessionForbidden) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
-	if !s.IsSessProjectMismatch() {
-		return v, false
-	}
-	return s.SessProjectMismatch, true
-}
-
-// NewSessProjectMismatchRevokeMySessionForbidden returns new RevokeMySessionForbidden from SessProjectMismatch.
-func NewSessProjectMismatchRevokeMySessionForbidden(v SessProjectMismatch) RevokeMySessionForbidden {
-	var s RevokeMySessionForbidden
-	s.SetSessProjectMismatch(v)
-	return s
-}
-
-// SetAuthCsrfInvalid sets RevokeMySessionForbidden to AuthCsrfInvalid.
-func (s *RevokeMySessionForbidden) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
-	s.Type = AuthCsrfInvalidRevokeMySessionForbidden
-	s.AuthCsrfInvalid = v
-}
-
-// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if RevokeMySessionForbidden is AuthCsrfInvalid.
-func (s RevokeMySessionForbidden) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
-	if !s.IsAuthCsrfInvalid() {
-		return v, false
-	}
-	return s.AuthCsrfInvalid, true
-}
-
-// NewAuthCsrfInvalidRevokeMySessionForbidden returns new RevokeMySessionForbidden from AuthCsrfInvalid.
-func NewAuthCsrfInvalidRevokeMySessionForbidden(v AuthCsrfInvalid) RevokeMySessionForbidden {
-	var s RevokeMySessionForbidden
-	s.SetAuthCsrfInvalid(v)
-	return s
-}
-
-func (*RevokeMySessionForbidden) revokeMySessionRes() {}
 
 // RevokeMySessionNoContent is response for RevokeMySession operation.
 type RevokeMySessionNoContent struct {

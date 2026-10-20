@@ -121,10 +121,20 @@ func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (a
 // expired token come back as the auth.unauthorized verdict; the session
 // service's own errors, sess.not_found included, come back as they are, for
 // each caller to answer in its own way.
-func (h Handler) mySession(ctx context.Context, withUserIdentity bool) (*domain.Session, error) {
+//
+// With projectID, the /sessions/me operations hold the cookie's session to the
+// project the caller names: a session of any other project is refused with
+// sess.project_mismatch before it is looked up, whatever state it is in, because
+// a live session of another project on the same server is not one of the
+// caller's users. The refusal carries no Set-Cookie, so that session keeps its
+// cookie.
+func (h Handler) mySession(ctx context.Context, projectID api.OptProjectID, withUserIdentity bool) (*domain.Session, error) {
 	sessionToken, ok := sessionTokenFromContext(ctx)
 	if !ok {
 		return nil, invalidSessionCredential(domain.ErrSessionTokenInvalid())
+	}
+	if want, ok := projectID.Get(); ok && sessionToken.ProjectID != string(want) {
+		return nil, domain.ErrSessionProjectMismatch()
 	}
 	session, err := h.sessionService.Get(ctx, service.GetSessionInput{
 		ProjectID:        sessionToken.ProjectID,
@@ -140,29 +150,10 @@ func (h Handler) mySession(ctx context.Context, withUserIdentity bool) (*domain.
 	return session, nil
 }
 
-// requireSessionProject refuses the cookie's session, before it is looked up,
-// when it belongs to another project than the project_id the caller names: an
-// app acts only on its own users' sessions, and a live session of another
-// project on the same server is not one of them, whatever state it is in. The
-// refusal carries no Set-Cookie, so that session keeps its cookie.
-func requireSessionProject(ctx context.Context, projectID api.OptProjectID) error {
-	want, ok := projectID.Get()
-	if !ok {
-		return nil
-	}
-	if token, ok := sessionTokenFromContext(ctx); ok && token.ProjectID != string(want) {
-		return domain.ErrSessionProjectMismatch()
-	}
-	return nil
-}
-
 // GetMySession reads the cookie's session, held to project_id when the caller
-// names one (requireSessionProject).
+// names one (mySession).
 func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams) (api.GetMySessionRes, error) {
-	if err := requireSessionProject(ctx, params.ProjectID); err != nil {
-		return nil, err
-	}
-	session, err := h.mySession(ctx, true)
+	session, err := h.mySession(ctx, params.ProjectID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -181,10 +172,7 @@ func (h Handler) GetMySessionCsrfToken(ctx context.Context, params api.GetMySess
 	if !hasCookie {
 		return nil, invalidSessionCredential(domain.ErrSessionTokenInvalid())
 	}
-	if err := requireSessionProject(ctx, params.ProjectID); err != nil {
-		return nil, err
-	}
-	if _, err := h.mySession(ctx, false); err != nil {
+	if _, err := h.mySession(ctx, params.ProjectID, false); err != nil {
 		if errors.Is(err, domain.ErrSessionNotFound()) {
 			return nil, invalidSessionCredential(err)
 		}
@@ -252,13 +240,10 @@ func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionPara
 
 // RevokeMySession deletes the cookie's session and clears the cookie. With
 // project_id, a session of another project is neither deleted nor cleared
-// (requireSessionProject): signing out of one app must not end a session the
-// browser holds for another.
+// (mySession): signing out of one app must not end a session the browser holds
+// for another.
 func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySessionParams) (api.RevokeMySessionRes, error) {
-	if err := requireSessionProject(ctx, params.ProjectID); err != nil {
-		return nil, err
-	}
-	session, err := h.mySession(ctx, false)
+	session, err := h.mySession(ctx, params.ProjectID, false)
 	if err != nil {
 		if errors.Is(err, domain.ErrSessionNotFound()) {
 			// The session is already gone; logout is idempotent. Clear the cookie

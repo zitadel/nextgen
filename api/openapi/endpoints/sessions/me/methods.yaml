@@ -97,17 +97,7 @@ delete:
       content:
         application/json:
           schema:
-            # The explicit discriminator is required, not decorative: the two
-            # schemas differ only by a `const` code, so without it ogen cannot
-            # infer one and silently skips the whole operation.
-            oneOf:
-              - $ref: ../../../components/schemas/errors/sess-project_mismatch.yaml
-              - $ref: ../../../components/schemas/errors/auth-csrf_invalid.yaml
-            discriminator:
-              propertyName: code
-              mapping:
-                sess.project_mismatch: ../../../components/schemas/errors/sess-project_mismatch.yaml
-                auth.csrf_invalid: ../../../components/schemas/errors/auth-csrf_invalid.yaml
+            $ref: ../../../components/error-details.yaml
 
     default:
       $ref: revokeMySession-error-response.yaml

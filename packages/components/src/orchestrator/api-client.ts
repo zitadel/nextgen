@@ -119,16 +119,18 @@ export async function getSession(
  * Revokes the current session (`DELETE /sessions/me`) with credentials. The
  * server deletes the session and clears the cookie via `Set-Cookie: Max-Age=0`.
  *
- * The revoke names the element's project. A session of another project on the
- * same server, which the server refuses to revoke (`403 sess.project_mismatch`),
- * is not this app's: it stays live, keeps its cookie, and the call resolves.
- * Any other failure rejects.
+ * The revoke names the element's project. Two refusals leave nothing of this
+ * app's to revoke, so the call resolves: a session that is already gone, signed
+ * out in another tab or expired (`401 auth.unauthorized`), and a session of
+ * another project on the same server (`403 sess.project_mismatch`), which stays
+ * live and keeps its cookie. Any other failure rejects.
  */
 export async function revokeSession(api: ZitadelApi, projectId: string): Promise<void> {
   try {
     await api.revokeMySession(projectId ? { project_id: projectId } : undefined, apiRequestInit);
   } catch (error) {
-    if (apiErrorCode(error) === "sess.project_mismatch") {
+    const code = apiErrorCode(error);
+    if (code === "auth.unauthorized" || code === "sess.project_mismatch") {
       return;
     }
     throw error;

@@ -26,12 +26,6 @@ export class SessionController implements ReactiveController {
   // or after a framework assigns `project` post-mount.
   private identityRequested = false;
 
-  // The identity read found a live session of another project: not this app's
-  // to revoke. On a shared host (localhost) it is, for example, the Console's.
-  // The revoke names the project too, so a current server refuses it anyway;
-  // one that predates that check revokes whatever session the cookie holds.
-  private otherProjectSession = false;
-
   /**
    * @param resolve Returns the host's project and API handle, throwing while no
    *   project is resolvable.
@@ -73,10 +67,11 @@ export class SessionController implements ReactiveController {
   /**
    * Revokes the session in the host's project with credentials; the server
    * clears the cookie. Fires `zitadel-signout` (after `onRevoked`) and resolves
-   * `true` on success; on failure sets `errorMessage` and resolves `false`. When
-   * the session belongs to another project, found by the identity read or
-   * refused by the server's revoke, nobody is signed in here: that session is
-   * left alone and sign-out completes.
+   * `true` on success; on failure sets `errorMessage` and resolves `false`.
+   * The revoke is sent whatever the identity read found, since the cookie may
+   * have changed since: a session that is already gone, or one of another
+   * project that the server refuses to revoke, leaves nobody signed in here, so
+   * sign-out completes and the other project's session stays.
    */
   async signOut(onRevoked?: () => void): Promise<boolean> {
     this.loading = true;
@@ -84,10 +79,8 @@ export class SessionController implements ReactiveController {
     this.host.requestUpdate();
 
     try {
-      if (!this.otherProjectSession) {
-        const { api, project } = this.resolve();
-        await revokeSession(api, project.projectId);
-      }
+      const { api, project } = this.resolve();
+      await revokeSession(api, project.projectId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       this.errorMessage = message || "Sign-out failed. Please try again.";
@@ -118,10 +111,8 @@ export class SessionController implements ReactiveController {
   private async loadIdentity({ api, project }: Resolved): Promise<void> {
     try {
       const session = await getSession(api, project.projectId);
-      if (session === null) {
-        this.otherProjectSession = true;
-        return;
-      }
+      // A live session of another project: nobody to show here.
+      if (session === null) return;
       this.display = session.user?.display ?? "";
       this.identifier = session.user?.identifier ?? "";
       this.userId = session.user_id ?? "";

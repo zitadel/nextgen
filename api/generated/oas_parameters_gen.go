@@ -3474,7 +3474,7 @@ type GetMySessionParams struct {
 	// A session belongs to one project, while a browser sends its cookie to every
 	// app on the same host. An app passes its own project, so that a session of
 	// another project never reads as one of its users, and signing out of the app
-	// never ends it. The SDKs do this for you.
+	// never ends it. The SDKs pass it when they read the session or sign out.
 	// `sess.project_mismatch` does not mean the session is invalid: it is live in
 	// its own project, so keep its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
@@ -3569,7 +3569,7 @@ type GetMySessionCsrfTokenParams struct {
 	// A session belongs to one project, while a browser sends its cookie to every
 	// app on the same host. An app passes its own project, so that a session of
 	// another project never reads as one of its users, and signing out of the app
-	// never ends it. The SDKs do this for you.
+	// never ends it. The SDKs pass it when they read the session or sign out.
 	// `sess.project_mismatch` does not mean the session is invalid: it is live in
 	// its own project, so keep its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
@@ -9711,7 +9711,7 @@ type RevokeMySessionParams struct {
 	// A session belongs to one project, while a browser sends its cookie to every
 	// app on the same host. An app passes its own project, so that a session of
 	// another project never reads as one of its users, and signing out of the app
-	// never ends it. The SDKs do this for you.
+	// never ends it. The SDKs pass it when they read the session or sign out.
 	// `sess.project_mismatch` does not mean the session is invalid: it is live in
 	// its own project, so keep its cookie.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`

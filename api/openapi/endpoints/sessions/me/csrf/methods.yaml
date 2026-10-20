@@ -46,3 +46,5 @@ get:
         application/json:
           schema:
             $ref: ../../../../components/schemas/errors/sess-project_mismatch.yaml
+    default:
+      $ref: getMySessionCsrfToken-error-response.yaml

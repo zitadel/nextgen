@@ -83,6 +83,21 @@ afterAll(async () => {
 });
 
 /**
+ * The `__nextgen_session` cookie of a session belonging to `project`, active
+ * with a verified factor.
+ */
+async function sessionCookie(project: string): Promise<string> {
+  const handoff = await signHandoffToken({ sub: project, iss: BASE });
+  const exchange = await fetch(`${BASE}/sessions/exchange?project_id=${project}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ handoff_token: handoff }),
+  });
+  const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("__nextgen_session="));
+  return setCookie?.split(";")[0] ?? "";
+}
+
+/**
  * Helper: a valid flow-definition body that satisfies the spec's
  * `flow-definition.yaml` required fields. Used by the flow_definitions
  * tests so the response (which inlines this body) passes zod validation.
@@ -189,18 +204,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   // the project they name the way the read does, and a refused sign-out leaves
   // the session and its cookie alone.
   test("GET /sessions/me/csrf and DELETE /sessions/me with project_id refuse a session of another project", async () => {
-    const handoff = await signHandoffToken({ sub: "app-user@example.com", iss: BASE });
-    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me_signout`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ handoff_token: handoff }),
-    });
-    expect(exchange.status).toBe(200);
-    const cookie =
-      exchange.headers
-        .getSetCookie()
-        .find((c) => c.startsWith("__nextgen_session="))
-        ?.split(";")[0] ?? "";
+    const cookie = await sessionCookie("proj_me_signout");
     const headers = { cookie };
 
     const refusedToken = await fetch(`${BASE}/sessions/me/csrf?project_id=proj_me_other`, {
@@ -218,16 +222,19 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(await refusedSignOut.json()).toMatchObject({ code: "sess.project_mismatch" });
     expect(refusedSignOut.headers.getSetCookie()).toEqual([]);
 
-    for (const invalid of ["", "proj%20me"]) {
-      const rejectedToken = await fetch(`${BASE}/sessions/me/csrf?project_id=${invalid}`, {
-        headers,
-      });
+    // A project_id that is no project id is a bad request, one shaped as an
+    // object by the query parser too. The server authenticates first, so
+    // without a cookie the answer is the 401.
+    for (const query of ["project_id=", "project_id=proj%20me", "project_id[toString]=x"]) {
+      const rejectedToken = await fetch(`${BASE}/sessions/me/csrf?${query}`, { headers });
       expect(rejectedToken.status).toBe(400);
-      const rejectedSignOut = await fetch(`${BASE}/sessions/me?project_id=${invalid}`, {
+      const rejectedSignOut = await fetch(`${BASE}/sessions/me?${query}`, {
         method: "DELETE",
         headers,
       });
       expect(rejectedSignOut.status).toBe(400);
+      expect((await fetch(`${BASE}/sessions/me/csrf?${query}`)).status).toBe(401);
+      expect((await fetch(`${BASE}/sessions/me?${query}`, { method: "DELETE" })).status).toBe(401);
     }
 
     // The refusals ended nothing: its own project still gets its token and
@@ -912,22 +919,9 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     );
   }
 
-  // A session belonging to `project`, active with a verified factor. The claim
-  // page runs in the platform project, so an eligible claim session uses
-  // PLATFORM_PROJECT_ID; passing a customer project yields an ineligible one.
-  async function sessionCookie(project: string): Promise<string> {
-    const handoff = await signHandoffToken({ sub: project, iss: BASE });
-    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=${project}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ handoff_token: handoff }),
-    });
-    const setCookie = exchange.headers
-      .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="));
-    return setCookie?.split(";")[0] ?? "";
-  }
-
+  // The claim page runs in the platform project, so an eligible claim session
+  // uses PLATFORM_PROJECT_ID; passing a customer project yields an ineligible
+  // one.
   const platformSessionCookie = () => sessionCookie(PLATFORM_PROJECT_ID);
 
   /**
