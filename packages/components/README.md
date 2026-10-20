@@ -133,7 +133,7 @@ fixtures:
   response (presets include `font_url` for Inter).
 - **Framework demos (TCP server)** — `moon run api-mock:start`
   serves the same handlers on port 8080 (set `PORT` to override) with
-  `defaultDevBranding` (Arimo `font_url`) applied at boot. See
+  `defaultDevBranding` (dark theme, no font) applied at boot. See
   [`apps/demo-next`](../../apps/demo-next/README.md)
   and [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md).
 
@@ -210,7 +210,8 @@ full-page chrome:
 ```html
 <zitadel-login variant="page"></zitadel-login>
 <!-- claims the viewport, paints the surface background from tokens,
-     loads the brand font, focuses the first field -->
+     links the tenant's branding font_url if it has one,
+     focuses the first field -->
 ```
 
 Width-responsive chrome (the split designs' two-column collapse, the compact
@@ -219,6 +220,12 @@ narrow embed on a desktop viewport lays out like a phone. Fine-grained height
 control in either mode: `--zl-page-min-height` (inherits across the shadow
 boundaries, releasing the orchestrator mount and the `zl-page-shell` atom in
 one setting). `embedding.browser.spec.ts` pins this whole contract.
+
+**Fonts are opt-in.** The package fetches no typeface of its own: the token
+stacks name Arimo first and fall back to the system font, so an unbranded
+login sends no request to a font CDN. To render a face, load it in your app
+(`next/font`, `@fontsource/*`, your own `@font-face`), or set branding
+`typography.font_url`, which a `page` links into the document `<head>`.
 
 **Colour mode** ships light and dark. A `page` renders dark (the design
 system's primary surface); a `widget` follows the visitor's

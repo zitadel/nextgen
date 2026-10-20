@@ -59,8 +59,9 @@ export interface ColorRoleTokens {
 export interface FontTokens {
   family: {
     /**
-     * Brand sans-serif (Arimo). System fallbacks at the tail keep unbranded
-     * environments readable. Tenants override the face via branding URLs.
+     * Brand sans-serif (Arimo). No package loads it, so a page that has not
+     * self-hosted it falls through to the system fallbacks at the tail.
+     * Tenants opt in to a face via `typography.font_url`.
      */
     sans: string;
     /**
