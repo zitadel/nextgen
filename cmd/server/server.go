@@ -342,7 +342,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	)
 	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
 
-	flowService := service.NewFlowService(serviceDBPool, stateMachine)
+	flowService := service.NewFlowService(serviceDBPool, stateMachine, builtinBases)
 	tokenService := service.NewTokenService(keyService, serviceDBPool)
 
 	// ── Default project resolution ──

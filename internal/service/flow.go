@@ -75,16 +75,21 @@ type ResolveFlowHint struct {
 func NewFlowService(
 	v2Pool *DB,
 	stateMachine domain.FlowStateMachine,
+	builtinBases domain.BuiltinSchemaBases,
 ) FlowService {
 	return &flowService{
 		v2Pool:       v2Pool,
 		stateMachine: stateMachine,
+		builtinBases: builtinBases,
 	}
 }
 
 type flowService struct {
 	v2Pool       *DB
 	stateMachine domain.FlowStateMachine
+	// builtinBases resolves a definition's user schema given as a built-in
+	// schema's `$id` under whichever base the project stores it.
+	builtinBases domain.BuiltinSchemaBases
 }
 
 var _ FlowService = (*flowService)(nil)
@@ -231,11 +236,10 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (_ domain
 		return domain.FlowStepResult{}, domain.ErrRequestInvalid().WithMessage("session_id must not be empty")
 	}
 
-	// The definition names its schema by objectType, but the flow and the users
-	// it creates are validated against one revision, pinned here at start. A
-	// stored definition never names a schema by id (Create resolves the id to
-	// its objectType), so no built-in namespace is needed here.
-	userSchema, schemaErr := resolveUserSchema(ctx, s.v2Pool.Statements(), domain.BuiltinSchemaBases{}, req.Definition.ProjectID, req.Definition.UserSchema)
+	// The definition names its schema by objectType or id, but the flow and
+	// the users it creates are validated against one revision, pinned here at
+	// start.
+	userSchema, schemaErr := resolveUserSchema(ctx, s.v2Pool.Statements(), s.builtinBases, req.Definition.ProjectID, req.Definition.UserSchema)
 	if schemaErr != nil {
 		return domain.FlowStepResult{}, domain.ErrInternal(schemaErr).WithMessage(
 			fmt.Sprintf("failed to resolve user schema %q of flow definition %s", req.Definition.UserSchema, req.Definition.ID))

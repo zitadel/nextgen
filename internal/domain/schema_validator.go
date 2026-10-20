@@ -156,8 +156,9 @@ func (v *SchemaValidator) ValidateAgainstMetaSchema(schemaBs []byte) error {
 //
 // todo: support fetching compiled schema by version as well when multiple versions of the meta-schemas are available.
 func (v *SchemaValidator) GetBuiltinSchema(uri string) (*jsonschema.Schema, error) {
-	// The map is keyed by the canonical base; Canonicalize leaves every other
-	// URI alone, so one lookup serves both spellings.
+	// The map is keyed by the canonical base, and Canonicalize maps every
+	// spelling the resolver treats as a built-in (another base, another host
+	// spelling) onto it, so the validator accepts the same URIs.
 	compiledSchema, ok := v.compiledSchemas[v.builtinBases.Canonicalize(uri)]
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownSchemaURI, uri)

@@ -93,6 +93,8 @@ func TestBuiltinSchemaBases_HostSpelling(t *testing.T) {
 		// The asked spelling stays first, so an exact row still wins.
 		assert.Equal(t, spelling, b.Equivalents(spelling)[0])
 		assert.Contains(t, b.Equivalents(spelling), testCanonicalBase+"/user-schema.json")
+		// The validator's lookup key: one spelling per built-in.
+		assert.Equal(t, testCanonicalBase+"/user-schema.json", b.Canonicalize(spelling), spelling)
 	}
 
 	for _, outside := range []string{
@@ -105,6 +107,7 @@ func TestBuiltinSchemaBases_HostSpelling(t *testing.T) {
 	} {
 		_, ok := b.RelPath(outside)
 		assert.False(t, ok, outside)
+		assert.Equal(t, outside, b.Canonicalize(outside), outside)
 	}
 
 	// A query or fragment is part of the path and names no embedded document.
@@ -292,6 +295,17 @@ func TestSchemaValidator_LegacyMetaSchema(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, testCanonicalBase+"/user-schema.json", latest, "new documents are stamped with the canonical base")
 
+	t.Run("a host spelling of the canonical base names the same metaSchema", func(t *testing.T) {
+		for _, spelling := range []string{
+			"https://EXAMPLE.test/schemas/v1/user-schema.json",
+			"https://example.test:443/schemas/v1/user-schema.json",
+			"https://NEXTGEN.com/api/schemas/user-schema.json",
+		} {
+			schema, err := v.GetBuiltinSchema(spelling)
+			require.NoError(t, err, spelling)
+			require.NotNil(t, schema, spelling)
+		}
+	})
 	t.Run("a validator pinned to the former base accepts the current metaSchema", func(t *testing.T) {
 		pinned, err := domain.NewSchemaValidator("https://nextgen.com/api/schemas")
 		require.NoError(t, err)

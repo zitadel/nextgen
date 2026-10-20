@@ -83,13 +83,13 @@ func (b BuiltinSchemaBases) RelPath(schemaURL string) (string, bool) {
 	return "", false
 }
 
-// Canonicalize returns schemaURL with a legacy base replaced by the canonical
-// one. Any other URL is returned unchanged.
+// Canonicalize returns schemaURL spelled under the canonical base: a URL that
+// [BuiltinSchemaBases.RelPath] places under any of the bases, in any spelling
+// of its origin, maps to the same path under the canonical one. Any other URL
+// is returned unchanged.
 func (b BuiltinSchemaBases) Canonicalize(schemaURL string) string {
-	for _, base := range b.legacy {
-		if rel, ok := builtinSchemaURLPathAfterBase(base, schemaURL); ok && rel != "" {
-			return b.canonical + "/" + rel
-		}
+	if rel, ok := b.RelPath(schemaURL); ok && rel != "" {
+		return b.canonical + "/" + rel
 	}
 	return schemaURL
 }
