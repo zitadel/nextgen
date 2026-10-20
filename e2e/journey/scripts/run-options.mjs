@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import { frameworkForId, frameworkIds } from "./frameworks.mjs";
 
 // The pre-existing-app lane covers the widget posture (ADR 044), which is
@@ -15,6 +17,7 @@ const PREEXISTING_FRAMEWORK_IDS = ["next", "nuxt"];
 const ENV_VALUE_OPTIONS = [
   ["JOURNEY_CONCURRENCY", "--concurrency"],
   ["JOURNEY_MATRIX", "--matrix"],
+  ["JOURNEY_OIDC_MOCK_BINARY", "--oidc-mock-binary"],
   ["JOURNEY_RUNTIME", "--runtime"],
   ["JOURNEY_TARBALLS_DIR", "--tarballs-dir"],
   ["JOURNEY_WORK_DIR", "--work-dir"],
@@ -67,6 +70,25 @@ export function assertPrebuiltTarballs(options, env) {
   }
 }
 
+/**
+ * The framework lanes start the mock OIDC provider (tools/oidc-mock) when its
+ * binary is there; run by hand without it, the runner skips the mock and the
+ * specs that need it skip themselves. The e2e:journey-local lane builds the
+ * binary first (`oidc-mock:build`) and sets JOURNEY_OIDC_MOCK_REQUIRED, so a
+ * missing binary fails there instead of skipping those specs silently.
+ */
+export function assertOidcMock(options, env) {
+  if (env.JOURNEY_OIDC_MOCK_REQUIRED !== "1") {
+    return;
+  }
+  if (!options.oidcMockBinary || !existsSync(options.oidcMockBinary)) {
+    throw new Error(
+      `the mock OIDC provider binary is missing (${options.oidcMockBinary || "no path"}); ` +
+        "build it with `moon run oidc-mock:build` or pass --oidc-mock-binary",
+    );
+  }
+}
+
 export function parseLocalJourneyArgs(args) {
   const parsed = {
     ci: false,
@@ -75,6 +97,7 @@ export function parseLocalJourneyArgs(args) {
     image: "",
     keep: false,
     matrix: "full",
+    oidcMockBinary: "",
     preexistingApp: false,
     preset: "",
     remote: false,
@@ -142,6 +165,10 @@ export function parseLocalJourneyArgs(args) {
       }
       case "--runtime": {
         parsed.runtime = parseRuntime(readValue(args, ++index, arg));
+        break;
+      }
+      case "--oidc-mock-binary": {
+        parsed.oidcMockBinary = readValue(args, ++index, arg);
         break;
       }
       case "--tarballs-dir": {

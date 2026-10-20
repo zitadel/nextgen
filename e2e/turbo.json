@@ -83,8 +83,9 @@
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
-    // The journey harness drives the real CLI binary and imports the kit's
-    // virtual-passkey helper, and its claim suite the console copy in
+    // The journey harness drives the real CLI binary and the mock OIDC
+    // provider binary, imports the kit's virtual-passkey helper, and its claim
+    // suite the console copy in
     // console/support/copy.ts. The scripts default ZITADEL_TELEMETRY to 0.
     // `e2e-local` is the runner with caller-supplied flags (ci-turbo.yml passes
     // `--ci …`); `journey` is the by-hand alias; `journey-local` bakes in the
@@ -93,13 +94,13 @@
     // cli#build).
     "e2e-local": {
       "inputs": ["journey/**", "package.json", "console/support/copy.ts"],
-      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"],
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey": {
       "inputs": ["journey/**", "package.json", "console/support/copy.ts"],
-      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"],
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -108,6 +109,7 @@
       "dependsOn": [
         "@zitadel/cli#build",
         "@zitadel/testing#build",
+        "@zitadel/oidc-mock#build",
         "@zitadel/sdk-nuxt#build",
         "@zitadel/sdk-react#build",
         "@zitadel/sdk-vue#build",

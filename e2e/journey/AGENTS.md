@@ -85,6 +85,10 @@ ADR 044) — both shapes run the same CLI path and browser journeys.
   consumer suite from `fixtures/testkit/`, and runs it inside the app. It must
   never set `ZITADEL_SERVER_BINARY` or `NEXTGEN_*` env — proving that the
   published binary and its embedded UIs work unconfigured is the point.
+- Each framework lane starts `tools/oidc-mock` before prepare-app; specs read
+  `JOURNEY_OIDC_MOCK_URL`, `_SLUG`, `_CLIENT_ID` and `_CLIENT_SECRET`. Framework
+  lanes set `NEXTGEN_HTTPCLIENT_ALLOW_LIST` so the server may call it; the
+  testkit lane does not. Specs type the account names in `users.json`.
 - Keep each framework suite Playwright-serial and one-worker. Framework suites
   may run in parallel only when each suite gets its own generated app directory,
   npm cache/tmp directories, app port, Zitadel port, and backend runtime state.

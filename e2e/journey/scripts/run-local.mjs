@@ -1,4 +1,4 @@
-import { createWriteStream } from "node:fs";
+import { createWriteStream, existsSync } from "node:fs";
 import { appendFile, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -16,8 +16,15 @@ import {
   stopLocalRegistry,
   waitForHttp,
 } from "./local-registry.mjs";
+import {
+  OIDC_MOCK_CLIENT_ID,
+  OIDC_MOCK_CLIENT_SECRET,
+  OIDC_MOCK_REDIRECT_PATH,
+  OIDC_MOCK_SLUG,
+} from "./oidc-mock.mjs";
 import { canListen, createJourneyPortAllocator } from "./ports.mjs";
 import {
+  assertOidcMock,
   assertPrebuiltTarballs,
   journeyArgsFromEnv,
   parseLocalJourneyArgs,
@@ -100,6 +107,9 @@ try {
       .join(", ")}`,
   );
   log(`runtime: ${options.runtime}`);
+  if (!options.oidcMockBinary) {
+    log("no mock OIDC provider binary (moon run oidc-mock:build); the specs that need it skip");
+  }
   if (options.runtime === "docker") {
     await assertDockerAvailable();
   }
@@ -165,6 +175,12 @@ function parseArgsOrExit(args) {
     const parsed = parseLocalJourneyArgs(args);
     if (!parsed.help) {
       assertPrebuiltTarballs(parsed, process.env);
+      // By default the binary `moon run oidc-mock:build` writes, when it is there.
+      const builtOidcMock = join(repoRoot, "tools/oidc-mock/dist/oidc-mock");
+      if (!parsed.oidcMockBinary && existsSync(builtOidcMock)) {
+        parsed.oidcMockBinary = builtOidcMock;
+      }
+      assertOidcMock(parsed, process.env);
     }
     return parsed;
   } catch (error) {
@@ -199,6 +215,9 @@ Options:
                            app then reaches its server the way it reaches a
                            hosted deployment
   --tarballs-dir <path>    Use prebuilt release npm tarballs
+  --oidc-mock-binary <path> Mock OIDC provider the framework lanes start
+                           (default: tools/oidc-mock/dist/oidc-mock when built;
+                           without it the specs that need it skip)
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
 
@@ -206,10 +225,12 @@ Environment (the command line's arguments win):
   JOURNEY_CI=1             --ci
   JOURNEY_CONCURRENCY      --concurrency
   JOURNEY_MATRIX           --matrix
+  JOURNEY_OIDC_MOCK_BINARY --oidc-mock-binary
   JOURNEY_RUNTIME          --runtime
   JOURNEY_TARBALLS_DIR     --tarballs-dir
   JOURNEY_WORK_DIR         --work-dir
   JOURNEY_TARBALLS_REQUIRED=1  refuse to pack without --tarballs-dir
+  JOURNEY_OIDC_MOCK_REQUIRED=1 refuse to run without the mock OIDC provider binary
 `);
 }
 
@@ -276,9 +297,12 @@ function buildJourneyVariants() {
 
 function assertMatrixPortsAreDynamic(runsToRun) {
   if (runsToRun.length <= 1) return;
-  const fixedPorts = ["JOURNEY_APP_PORT", "JOURNEY_ZITADEL_PORT", "JOURNEY_EDGE_PORT"].filter(
-    (name) => process.env[name],
-  );
+  const fixedPorts = [
+    "JOURNEY_APP_PORT",
+    "JOURNEY_ZITADEL_PORT",
+    "JOURNEY_EDGE_PORT",
+    "JOURNEY_OIDC_MOCK_PORT",
+  ].filter((name) => process.env[name]);
   if (fixedPorts.length === 0) return;
   throw new Error(
     [
@@ -305,6 +329,11 @@ async function createJourneyContext(variant, framework) {
   );
   const zitadelPort = await resolveFrameworkPort("JOURNEY_ZITADEL_PORT");
   const edgePort = variant.remote ? await resolveFrameworkPort("JOURNEY_EDGE_PORT") : undefined;
+  // The testkit lane boots its own instance and never talks to the mock.
+  const oidcMockPort =
+    variant.suite !== "testkit" && options.oidcMockBinary
+      ? await resolveFrameworkPort("JOURNEY_OIDC_MOCK_PORT")
+      : undefined;
   const appUrl = `http://localhost:${appPort}`;
   const appDir = join(frameworkWorkDir, "myapp");
   const playwrightRoot = join(projectRoot, "test-output", "playwright", variant.id, framework.id);
@@ -317,6 +346,7 @@ async function createJourneyContext(variant, framework) {
     framework,
     frameworkWorkDir,
     logPath: join(contextDiagnosticsDir, `${framework.id}-app.log`),
+    oidcMockPort,
     playwrightOutputDir: join(playwrightRoot, "output"),
     playwrightReportDir: join(playwrightRoot, "report"),
     preexistingApp: variant.preexistingApp,
@@ -375,6 +405,9 @@ async function runFrameworkJourney(context) {
   try {
     await mkdir(context.diagnosticsDir, { recursive: true });
     const edge = context.remote ? await startLaneEdge(context, prefix) : undefined;
+    if (context.oidcMockPort) {
+      await timed("oidc-mock", () => startLaneOidcMock(context, prefix));
+    }
     log(`[${prefix}] preparing fresh ${framework.displayName} app`);
     await runPrepareApp(context, {
       ...process.env,
@@ -406,6 +439,9 @@ async function runFrameworkJourney(context) {
       // the framework lane, and it keeps the intent explicit here. Reaches
       // the server through prepare-app's `start` step env.
       NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true",
+      // The server's egress client refuses loopback hosts by default, and the
+      // mock OIDC provider runs on localhost. The testkit lane does not set it.
+      NEXTGEN_HTTPCLIENT_ALLOW_LIST: "localhost,127.0.0.0/8,::1/128",
       ...(localRuntimeImage ? { ZITADEL_LOCAL_IMAGE: localRuntimeImage } : {}),
     });
 
@@ -456,6 +492,15 @@ async function runFrameworkJourney(context) {
             // prepare-app note.
             JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
             JOURNEY_PRESET: context.preset,
+            // The mock OIDC provider, for the specs that sign in through it.
+            ...(context.oidcMock
+              ? {
+                  JOURNEY_OIDC_MOCK_URL: context.oidcMock.issuer,
+                  JOURNEY_OIDC_MOCK_SLUG: OIDC_MOCK_SLUG,
+                  JOURNEY_OIDC_MOCK_CLIENT_ID: OIDC_MOCK_CLIENT_ID,
+                  JOURNEY_OIDC_MOCK_CLIENT_SECRET: OIDC_MOCK_CLIENT_SECRET,
+                }
+              : {}),
           },
         },
       ),
@@ -504,6 +549,34 @@ async function startLaneEdge(context, prefix) {
     url: edge.url,
     env: remoteHostEnv({ certPath: edge.certPath, dir: context.frameworkWorkDir }),
   };
+}
+
+/**
+ * Starts the mock OIDC provider (tools/oidc-mock) for a framework lane, with
+ * the lane's app callback as its redirect URI; teardownJourney stops it.
+ */
+async function startLaneOidcMock(context, prefix) {
+  await mkdir(context.frameworkWorkDir, { recursive: true });
+  const issuer = `http://localhost:${context.oidcMockPort}/`;
+  const child = startChild(options.oidcMockBinary, [], {
+    cwd: context.frameworkWorkDir,
+    env: {
+      ...process.env,
+      PORT: String(context.oidcMockPort),
+      REDIRECT_URI: `${context.appUrl}${OIDC_MOCK_REDIRECT_PATH}`,
+      USERS_FILE: join(repoRoot, "tools/oidc-mock/users.json"),
+      CLIENT_ID: OIDC_MOCK_CLIENT_ID,
+      CLIENT_SECRET: OIDC_MOCK_CLIENT_SECRET,
+    },
+    logFile: join(context.diagnosticsDir, "oidc-mock.log"),
+  });
+  context.oidcMock = { child, issuer };
+  await waitForHttp(
+    `${issuer}.well-known/openid-configuration`,
+    "mock OIDC provider",
+    child,
+    (message) => log(`[${prefix}] ${message}`),
+  );
 }
 
 /**
@@ -738,6 +811,10 @@ function startChild(command, args, optionsForChild) {
   });
   child.detachedForCleanup = process.platform !== "win32";
   child.logFile = optionsForChild.logFile;
+  // waitForHttp reports a binary that could not start.
+  child.on("error", (error) => {
+    child.spawnError = error;
+  });
   child.stdout.pipe(output, { end: false });
   child.stderr.pipe(output, { end: false });
   child.on("exit", () => {
@@ -970,6 +1047,9 @@ async function teardownJourney(context) {
   }
   if (context.edge) {
     await context.edge.close();
+  }
+  if (context.oidcMock) {
+    await stopChild(context.oidcMock.child);
   }
   await resetLocalRuntime(context);
 }
