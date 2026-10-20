@@ -1,6 +1,6 @@
 import { type Parsed, parseScopes } from "@zitadel/config/idp";
 
-import { GoBack, type Wizard } from "../wizard";
+import type { Wizard } from "../wizard";
 
 /** What every connection asks for, so it is stated rather than offered. */
 const ALWAYS_ASKED = ["openid", "profile", "email"] as const;
@@ -39,8 +39,7 @@ export function parseScopeToken(value: string, taken: readonly string[]): Parsed
  * `profile` and `email` are stated as always asked for, and a person adds any
  * others the provider documents, one at a time, each checked as it is typed.
  * One at a time because a list typed into one line is easy to get wrong and
- * cannot be checked scope by scope. Going back from "any more?" re-asks the
- * scope just added.
+ * cannot be checked scope by scope.
  *
  * @param provider - How the provider is named in messages.
  */
@@ -64,57 +63,32 @@ export async function askScopes(
     `"${provider}" is always asked for the scopes ${ALWAYS_ASKED.slice(0, -1).join(", ")} and ${ALWAYS_ASKED.at(-1)}.`,
   );
   const added: string[] = [];
-  let reask: string | undefined;
   for (;;) {
-    if (reask === undefined) {
-      let more: boolean;
-      try {
-        more = await wizard.ask({
-          kind: "select",
-          name: "more scopes",
-          message:
-            added.length === 0
-              ? "Would you like to ask for any additional scopes?"
-              : "Would you like to ask for any more additional scopes?",
-          options: [
-            { value: false, label: "No" },
-            { value: true, label: "Yes, add a scope" },
-          ],
-          initialValue: false,
-        });
-      } catch (error) {
-        const last = added.pop();
-        if (!(error instanceof GoBack) || last === undefined) {
-          throw error;
-        }
-        reask = last;
-        continue;
-      }
-      if (!more) {
-        break;
-      }
+    const more = await wizard.ask({
+      kind: "select",
+      name: "more scopes",
+      message:
+        added.length === 0
+          ? "Would you like to ask for any additional scopes?"
+          : "Would you like to ask for any more additional scopes?",
+      options: [
+        { value: false, label: "No" },
+        { value: true, label: "Yes, add a scope" },
+      ],
+      initialValue: false,
+    });
+    if (!more) {
+      break;
     }
-    const previous = reask;
-    reask = undefined;
-    try {
-      added.push(
-        await wizard.ask({
-          kind: "text",
-          name: "scope",
-          message: "Which scope should be added?",
-          placeholder: "groups",
-          ...(previous === undefined ? {} : { initialValue: previous }),
-          parse: (value) => parseScopeToken(value, [...ALWAYS_ASKED, ...added]),
-        }),
-      );
-    } catch (error) {
-      if (!(error instanceof GoBack)) {
-        throw error;
-      }
-      if (previous !== undefined) {
-        added.push(previous);
-      }
-    }
+    added.push(
+      await wizard.ask({
+        kind: "text",
+        name: "scope",
+        message: "Which scope should be added?",
+        placeholder: "groups",
+        parse: (value) => parseScopeToken(value, [...ALWAYS_ASKED, ...added]),
+      }),
+    );
   }
   return [...ALWAYS_ASKED, ...added].join(" ");
 }

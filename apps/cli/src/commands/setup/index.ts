@@ -431,12 +431,9 @@ export default class Setup extends BaseCommand {
         ssoFromFlag: flags.sso !== undefined,
         developmentBuild: isDevelopmentBuild(),
       };
-      // Each question is a step a person can go back from, so a mistake three
-      // questions ago does not mean starting again.
-      answers = await wizard.steps(
-        answers,
-        SETUP_PROMPTS.map((prompt) => (state: SetupAnswers) => prompt.ask(state, promptCtx)),
-      );
+      for (const prompt of SETUP_PROMPTS) {
+        answers = await prompt.ask(answers, promptCtx);
+      }
       outro("Configuration captured");
     }
 

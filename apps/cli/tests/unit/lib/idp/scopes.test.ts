@@ -4,14 +4,13 @@ import { describe, expect, it } from "vitest";
 
 import { askScopes, parseScopeToken } from "../../../../src/lib/idp";
 import type { Asker } from "../../../../src/lib/input";
-import { GoBack, Wizard } from "../../../../src/lib/wizard";
+import { Wizard } from "../../../../src/lib/wizard";
 
 type Question = Parameters<Asker>[0];
 
 /**
  * A wizard whose questions are answered from a script. A text answer goes
- * through the question's own parser, as typing it would; a `"<back>"` answer
- * is the person going back.
+ * through the question's own parser, as typing it would.
  */
 function scripted(answers: unknown[]): { wizard: Wizard; asked: Question[]; drawn: () => string } {
   const asked: Question[] = [];
@@ -23,9 +22,6 @@ function scripted(answers: unknown[]): { wizard: Wizard; asked: Question[]; draw
   const ask = (async (question: Question) => {
     asked.push(question);
     const next = answers.shift();
-    if (next === "<back>") {
-      throw new GoBack();
-    }
     if (question.kind === "text") {
       const parsed = question.parse(question.given ?? String(next ?? ""));
       if (!parsed.ok) {
@@ -35,8 +31,6 @@ function scripted(answers: unknown[]): { wizard: Wizard; asked: Question[]; draw
     }
     return next;
   }) as Asker;
-  // The wizard adds its own back handling around `ask`; the script stands in
-  // for the prompt underneath it.
   return { wizard: new Wizard({ ask, output: sink }), asked, drawn: () => drawn };
 }
 
@@ -129,37 +123,6 @@ describe("askScopes", () => {
     await expect(askScopes(wizard, "Acme SSO", undefined)).rejects.toThrow(
       '"email" is already asked for.',
     );
-  });
-
-  it("goes back from the scope to the question before it", async () => {
-    const { wizard, asked } = scripted([true, "<back>", false]);
-
-    const scopes = await askScopes(wizard, "Acme SSO", undefined);
-
-    expect(scopes).toBe("openid profile email");
-    expect(asked.map((one) => one.name)).toEqual(["more scopes", "scope", "more scopes"]);
-  });
-
-  it("goes back from 'any more?' to the scope just added, shown again", async () => {
-    const { wizard, asked } = scripted([true, "groups", "<back>", "employee", false]);
-
-    const scopes = await askScopes(wizard, "Acme SSO", undefined);
-
-    const again = asked[3];
-    expect(again?.kind === "text" ? again.initialValue : undefined).toBe("groups");
-    expect(scopes).toBe("openid profile email employee");
-  });
-
-  it("puts the scope back when going back from its question again", async () => {
-    const { wizard } = scripted([true, "groups", "<back>", "<back>", false]);
-
-    expect(await askScopes(wizard, "Acme SSO", undefined)).toBe("openid profile email groups");
-  });
-
-  it("leaves the flow when going back from the first question", async () => {
-    const { wizard } = scripted(["<back>"]);
-
-    await expect(askScopes(wizard, "Acme SSO", undefined)).rejects.toBeInstanceOf(GoBack);
   });
 
   it("asks nothing when the scopes were given, and checks them", async () => {

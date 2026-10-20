@@ -141,7 +141,7 @@ describe("askClaims", () => {
     expect(names(asked)).not.toContain("claim type");
   });
 
-  it("offers only attributes whose type holds the claim, and a way back", async () => {
+  it("offers only attributes whose type holds the claim", async () => {
     const { ask, asked } = scripted([
       true,
       "employee_id",
@@ -157,7 +157,7 @@ describe("askClaims", () => {
     const property = asked.find((question) => question.name === "user attribute");
     const offered =
       property?.kind === "select" ? property.options.map((option) => option.label) : [];
-    expect(offered).toEqual(["staffNumber", "score", "Go back"]);
+    expect(offered).toEqual(["staffNumber", "score"]);
   });
 
   it("refuses, as it is typed, a claim that already fills a property", async () => {

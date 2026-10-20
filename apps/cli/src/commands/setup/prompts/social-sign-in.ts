@@ -1,6 +1,5 @@
 import {
   CUSTOM_PROVIDER,
-  type Credentials,
   idpProvider,
   IDP_PROVIDERS,
   RESERVED_SLUGS,
@@ -52,48 +51,33 @@ export async function askCustomSettings(
   given: CustomFlagValues,
   wizard: Wizard,
 ): Promise<Required<CustomFlagValues>> {
-  type Settings = Partial<Required<CustomFlagValues>>;
-  const settings = await wizard.steps<Settings>({}, [
-    async (state) => ({
-      ...state,
-      slug: await wizard.ask({
-        kind: "text",
-        name: "connection name",
-        message: "What should this connection be called?",
-        placeholder: "acme-sso",
-        parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
-        given: given.slug,
-      }),
-    }),
-    async (state) => ({
-      ...state,
-      displayName: await wizard.ask({
-        kind: "text",
-        name: "display name",
-        message: "What should the sign-in button say?",
-        placeholder: "Acme SSO",
-        parse: parseDisplayName,
-        given: given.displayName,
-      }),
-    }),
-    async (state) => ({
-      ...state,
-      issuer: await wizard.ask({
-        kind: "text",
-        name: "issuer",
-        message: "What is the provider's issuer URL?",
-        placeholder: "https://sso.acme.example",
-        parse: parseIssuer,
-        given: given.issuer,
-      }),
-    }),
-    // The settings carry the scopes as the one string a flag does.
-    async (state) => ({
-      ...state,
-      scopes: await askScopes(wizard, state.displayName ?? "", given.scopes),
-    }),
-  ]);
-  return settings as Required<CustomFlagValues>;
+  const slug = await wizard.ask({
+    kind: "text",
+    name: "connection name",
+    message: "What should this connection be called?",
+    placeholder: "acme-sso",
+    parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
+    given: given.slug,
+  });
+  const displayName = await wizard.ask({
+    kind: "text",
+    name: "display name",
+    message: "What should the sign-in button say?",
+    placeholder: "Acme SSO",
+    parse: parseDisplayName,
+    given: given.displayName,
+  });
+  const issuer = await wizard.ask({
+    kind: "text",
+    name: "issuer",
+    message: "What is the provider's issuer URL?",
+    placeholder: "https://sso.acme.example",
+    parse: parseIssuer,
+    given: given.issuer,
+  });
+  // The settings carry the scopes as the one string a flag does.
+  const scopes = await askScopes(wizard, displayName, given.scopes);
+  return { slug, displayName, issuer, scopes };
 }
 
 /**
@@ -141,9 +125,8 @@ export class SocialSignInPrompt implements SetupPrompt {
   }
 
   /**
-   * One provider's questions, in the order a person can answer them, as steps
-   * they can go back through: what the connection is, where it points, the
-   * credentials, and the claims it fills.
+   * One provider's questions, in the order a person can answer them: what the
+   * connection is, where it points, the credentials, and the claims it fills.
    */
   private async askProvider(
     wizard: Wizard,
@@ -152,30 +135,35 @@ export class SocialSignInPrompt implements SetupPrompt {
     answers: SetupAnswers,
     ctx: PromptContext,
   ): Promise<SsoDraft> {
-    type State = {
-      selection?: ProviderSelection;
-      endpoints?: SsoDraft["endpoints"];
-      clientId?: Credentials["clientId"];
-      secret?: Credentials["secret"];
-      claims?: SsoDraft["claims"];
-    };
     const attributes = defaultSchemaAttributes(answers.preset, answers.useCase);
     const given = flagged?.claims;
-    const selected = (state: State): ProviderSelection => {
-      if (state.selection === undefined) {
-        throw new Error("the provider is chosen before its credentials are asked for");
-      }
-      return state.selection;
-    };
 
-    // Flags are held to the schema before anything is typed: a mistake in the
-    // command line should not cost the person their credentials. Where the
+    // A custom connection is described before anything else about it can be
+    // said: the registration message names its issuer, and its slug names the
+    // secret.
+    let selection: ProviderSelection;
+    if (flagged?.selection !== undefined) {
+      selection = flagged.selection;
+    } else if (name === CUSTOM_PROVIDER) {
+      const values = await askCustomSettings({}, wizard);
+      selection = {
+        kind: "custom",
+        connection: {
+          slug: validated(parseConnectionSlug(values.slug, RESERVED_SLUGS)),
+          displayName: validated(parseDisplayName(values.displayName)),
+          issuer: validated(parseIssuer(values.issuer)),
+          scopes: validated(parseScopes(values.scopes)),
+        },
+      };
+    } else {
+      selection = { kind: "catalog", id: name };
+    }
+    const entry = providerOf(selection);
+
+    // Flags are held to the schema before anything else is typed: a mistake in
+    // the command line should not cost the person their credentials. Where the
     // connection points makes no difference to which properties it fills.
-    const holdFlagsToSchema = (selection: ProviderSelection): void => {
-      if (given === undefined || !asksForClaims(given)) {
-        return;
-      }
-      const entry = providerOf(selection);
+    if (given !== undefined && asksForClaims(given)) {
       claimsOrRefuse(
         applyRequest(
           seedMapping(
@@ -189,119 +177,70 @@ export class SocialSignInPrompt implements SetupPrompt {
         ),
         "",
       );
-    };
+    }
 
-    const state = await wizard.steps<State>({}, [
-      // A custom connection is described before anything else about it can be
-      // said: the registration message names its issuer, and its slug names the
-      // secret.
-      async (state) => {
-        if (flagged?.selection !== undefined) {
-          holdFlagsToSchema(flagged.selection);
-          return { ...state, selection: flagged.selection };
-        }
-        if (name !== CUSTOM_PROVIDER) {
-          const selection: ProviderSelection = { kind: "catalog", id: name };
-          holdFlagsToSchema(selection);
-          return { ...state, selection };
-        }
-        const values = await askCustomSettings({}, wizard);
-        return {
-          ...state,
-          selection: {
-            kind: "custom",
-            connection: {
-              slug: validated(parseConnectionSlug(values.slug, RESERVED_SLUGS)),
-              displayName: validated(parseDisplayName(values.displayName)),
-              issuer: validated(parseIssuer(values.issuer)),
-              scopes: validated(parseScopes(values.scopes)),
-            },
-          } satisfies ProviderSelection,
-        };
-      },
-      // Before the registration message, which names the vendor's console: on a
-      // development run (ZITADEL_CLI_DEV) the provider may not be the vendor at
-      // all. Not asked of a custom connection, whose issuer was just given.
-      async (state) => {
-        const selection = selected(state);
-        return {
-          ...state,
-          endpoints:
-            selection.kind === "custom"
-              ? undefined
-              : (flagged?.endpoints ??
-                (await askConnectionEndpoints({
-                  provider: selection.id,
-                  developmentBuild: ctx.developmentBuild === true,
-                  ask: wizard.ask,
-                }))),
-        };
-      },
-      // Said where the person needs it: just before they are asked for what
-      // registering the application gives them. The redirect URI is settled by
-      // now, and the vendor matches it literally.
-      async (state) => {
-        const entry = providerOf(selected(state));
-        wizard.say(
-          registrationLines(
-            entry,
-            callbackUriFor(issuerFromPort(answers.devPort), entry.slug),
-            state.endpoints?.issuer,
-          ),
-        );
-        return {
-          ...state,
-          clientId: await wizard.ask({
-            kind: "text",
-            name: "client id",
-            message: "What is the OAuth client ID?",
-            parse: parseClientId,
-            given: flagged?.credentials.clientId,
-          }),
-        };
-      },
-      async (state) => ({
-        ...state,
-        secret: await wizard.ask({
-          kind: "secret",
-          name: "client secret",
-          message: "What is the OAuth client secret?",
-          parse: parseClientSecret,
-          given: flagged?.credentials.secret,
-        }),
-      }),
-      // `--sso-claim` is the whole answer when given.
-      async (state) => {
-        const selection = selected(state);
-        const entry = providerOf(selection);
-        const seeded = seedMapping(
-          entry.connection({
-            schemaProperties: attributes.map((one) => one.name),
-            schemaRef: CONNECTION_SCHEMA_REF,
-            endpoints: state.endpoints,
-          }),
-          attributes,
-        );
-        if (given !== undefined && asksForClaims(given)) {
-          return { ...state, claims: given };
-        }
-        return { ...state, claims: await askClaims(seeded, wizard, entry.displayName) };
-      },
-    ]);
+    // Before the registration message, which names the vendor's console: on a
+    // development run (ZITADEL_CLI_DEV) the provider may not be the vendor at
+    // all. Not asked of a custom connection, whose issuer was just given.
+    const endpoints =
+      selection.kind === "custom"
+        ? undefined
+        : (flagged?.endpoints ??
+          (await askConnectionEndpoints({
+            provider: selection.id,
+            developmentBuild: ctx.developmentBuild === true,
+            ask: wizard.ask,
+          })));
 
-    const selection = selected(state);
+    // Said where the person needs it: just before they are asked for what
+    // registering the application gives them. The redirect URI is settled by
+    // now, and the vendor matches it literally.
+    wizard.say(
+      registrationLines(
+        entry,
+        callbackUriFor(issuerFromPort(answers.devPort), entry.slug),
+        endpoints?.issuer,
+      ),
+    );
+    const clientId = await wizard.ask({
+      kind: "text",
+      name: "client id",
+      message: "What is the OAuth client ID?",
+      parse: parseClientId,
+      given: flagged?.credentials.clientId,
+    });
+    const secret = await wizard.ask({
+      kind: "secret",
+      name: "client secret",
+      message: "What is the OAuth client secret?",
+      parse: parseClientSecret,
+      given: flagged?.credentials.secret,
+    });
+
+    // `--sso-claim` is the whole answer when given.
+    const claims =
+      given !== undefined && asksForClaims(given)
+        ? given
+        : await askClaims(
+            seedMapping(
+              entry.connection({
+                schemaProperties: attributes.map((one) => one.name),
+                schemaRef: CONNECTION_SCHEMA_REF,
+                endpoints,
+              }),
+              attributes,
+            ),
+            wizard,
+            entry.displayName,
+          );
+
     // A custom connection typed in here has not been through the flag checks.
     const loopback = flagged === undefined ? loopbackIssuerWarning(selection) : undefined;
     if (loopback !== undefined) {
       reportWarning(loopback);
     }
-    wizard.say(`"${providerOf(selection).displayName}" is set up.`, "success");
-    return {
-      selection,
-      credentials: { clientId: state.clientId, secret: state.secret },
-      endpoints: state.endpoints,
-      claims: state.claims,
-    };
+    wizard.say(`"${entry.displayName}" is set up.`, "success");
+    return { selection, credentials: { clientId, secret }, endpoints, claims };
   }
 
   /**
