@@ -206,6 +206,9 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   test("GET /sessions/me/csrf and DELETE /sessions/me with project_id refuse a session of another project", async () => {
     const cookie = await sessionCookie("proj_me_signout");
     const headers = { cookie };
+    // Sign-out is a write: it carries the session's CSRF token, which is
+    // checked before the project hold and the parameter, as on the server.
+    const signOutHeaders = { cookie, "x-zitadel-csrf": csrfTokenFor(cookie.split("=")[1] ?? "") };
 
     const refusedToken = await fetch(`${BASE}/sessions/me/csrf?project_id=proj_me_other`, {
       headers,
@@ -216,7 +219,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
     const refusedSignOut = await fetch(`${BASE}/sessions/me?project_id=proj_me_other`, {
       method: "DELETE",
-      headers,
+      headers: signOutHeaders,
     });
     expect(refusedSignOut.status).toBe(403);
     expect(await refusedSignOut.json()).toMatchObject({ code: "sess.project_mismatch" });
@@ -230,9 +233,14 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       expect(rejectedToken.status).toBe(400);
       const rejectedSignOut = await fetch(`${BASE}/sessions/me?${query}`, {
         method: "DELETE",
-        headers,
+        headers: signOutHeaders,
       });
       expect(rejectedSignOut.status).toBe(400);
+      const forgedSignOut = await fetch(`${BASE}/sessions/me?${query}`, {
+        method: "DELETE",
+        headers,
+      });
+      expect(forgedSignOut.status).toBe(403);
       expect((await fetch(`${BASE}/sessions/me/csrf?${query}`)).status).toBe(401);
       expect((await fetch(`${BASE}/sessions/me?${query}`, { method: "DELETE" })).status).toBe(401);
     }
@@ -247,7 +255,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
     const signedOut = await fetch(`${BASE}/sessions/me?project_id=proj_me_signout`, {
       method: "DELETE",
-      headers,
+      headers: signOutHeaders,
     });
     expect(signedOut.status).toBe(204);
     expect(signedOut.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
@@ -351,9 +359,21 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const before = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
     expect(before.status).toBe(200);
 
-    const revoke = await fetch(`${BASE}/sessions/me`, {
+    // Without the session's CSRF token, sign-out is refused and ends nothing.
+    const forged = await fetch(`${BASE}/sessions/me`, {
       method: "DELETE",
       headers: { cookie: sessionCookie },
+    });
+    expect(forged.status).toBe(403);
+    expect(await forged.json()).toMatchObject({ code: "auth.csrf_invalid" });
+    expect(forged.headers.getSetCookie()).toEqual([]);
+
+    const revoke = await fetch(`${BASE}/sessions/me`, {
+      method: "DELETE",
+      headers: {
+        cookie: sessionCookie,
+        "x-zitadel-csrf": csrfTokenFor(sessionCookie.split("=")[1] ?? ""),
+      },
     });
     expect(revoke.status).toBe(204);
     expect(revoke.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);

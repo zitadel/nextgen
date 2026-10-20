@@ -13,7 +13,8 @@ import type { ZitadelSession } from "./zitadel-session.js";
  * are covered here.
  */
 const API_BASE = "https://session.test.invalid";
-const deleteLog: { url: string; method: string; credentials: string }[] = [];
+const deleteLog: { url: string; method: string; credentials: string; csrf: string | null }[] = [];
+const CSRF_TOKEN = "csrf_test";
 
 function sessionBody(identifier: string, userId: string, projectId: string) {
   const body: Record<string, unknown> = {
@@ -40,6 +41,7 @@ let currentUserId = "user_test";
 let currentProjectId = "test";
 let sessionStatus = 200;
 let revokeStatus = 204;
+let csrfStatus = 200;
 const getLog: string[] = [];
 
 const getHandler = http.get(`${API_BASE}/sessions/me`, ({ request }) => {
@@ -56,11 +58,22 @@ const getHandler = http.get(`${API_BASE}/sessions/me`, ({ request }) => {
   return HttpResponse.json(sessionBody(currentEmail, currentUserId, currentProjectId));
 });
 
+const csrfHandler = http.get(`${API_BASE}/sessions/me/csrf`, () => {
+  if (csrfStatus === 403) {
+    return HttpResponse.json(
+      { code: "sess.project_mismatch", message: "The session belongs to a different project." },
+      { status: 403 },
+    );
+  }
+  return HttpResponse.json({ csrf_token: CSRF_TOKEN });
+});
+
 const deleteHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
   deleteLog.push({
     url: request.url,
     method: request.method,
     credentials: request.credentials,
+    csrf: request.headers.get("x-zitadel-csrf"),
   });
   if (revokeStatus === 401) {
     return HttpResponse.json(
@@ -77,7 +90,7 @@ const deleteHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
   return new HttpResponse(null, { status: 204 });
 });
 
-const server = setupServer(getHandler, deleteHandler);
+const server = setupServer(getHandler, csrfHandler, deleteHandler);
 
 beforeAll(() => {
   configureZitadel({ proxyPath: API_BASE, projectId: "test" });
@@ -92,7 +105,8 @@ afterEach(() => {
   currentProjectId = "test";
   sessionStatus = 200;
   revokeStatus = 204;
-  server.resetHandlers(getHandler, deleteHandler);
+  csrfStatus = 200;
+  server.resetHandlers(getHandler, csrfHandler, deleteHandler);
 });
 
 afterAll(() => {
@@ -229,7 +243,7 @@ describe("<zitadel-session>", () => {
     ).toBeNull();
   });
 
-  it("calls DELETE /sessions/me in its own project with credentials and fires zitadel-signout on Sign out", async () => {
+  it("calls DELETE /sessions/me in its own project with credentials and the CSRF token, and fires zitadel-signout on Sign out", async () => {
     const element = mount();
     await flush(element);
 
@@ -244,8 +258,32 @@ describe("<zitadel-session>", () => {
     expect(deleteLog[0]?.method).toBe("DELETE");
     expect(deleteLog[0]?.url).toBe(`${API_BASE}/sessions/me?project_id=test`);
     expect(deleteLog[0]?.credentials).toBe("include");
+    expect(deleteLog[0]?.csrf).toBe(CSRF_TOKEN);
     expect(events).toHaveLength(1);
     expect(events[0]?.detail).toEqual({ display: "", identifier: "alice@acme.com" });
+  });
+
+  // The token read names the project too, so a session of another project is
+  // refused before any revoke is sent: that session stays, and sign-out
+  // completes.
+  it("sends no revoke when the token read finds another project's session", async () => {
+    csrfStatus = 403;
+    const loc = stubLocation();
+    const element = mount();
+    element.postSignOutUrl = "https://app.test/login";
+    await flush(element);
+
+    const events: CustomEvent[] = [];
+    element.addEventListener("zitadel-signout", (e) => events.push(e as CustomEvent));
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    await element.updateComplete;
+
+    expect(deleteLog).toHaveLength(0);
+    expect(events).toHaveLength(1);
+    expect(element.shadowRoot?.querySelector(".error")).toBeNull();
+    expect(loc.current).toBe("https://app.test/login");
   });
 
   // On a shared host the cookie may hold another project's session (the
