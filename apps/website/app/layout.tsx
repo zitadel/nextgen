@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import og from "./og.jpg";
 import "./globals.css";
+import { THEME_SCRIPT } from "./theme";
 
 // The website's faces: Arimo for text, APK Futural (a licensed webfont) for
 // headings, Azeret Mono for code, all from ./fonts so the build fetches
@@ -38,10 +39,9 @@ const title = "Zitadel preview — your login in one minute";
 const description =
   "Open-source auth that lives in your repo: your user model, your flows, your look. For developers and the agents they work with.";
 
-// The share image is the website's own (zitadel/new-website's
-// public/cms/og-zitadel-homepage.jpg), imported so it loads from /_next/
-// (AGENTS.md); on Vercel, Next makes its URL absolute with the deployment's
-// host.
+// The share image, rendered from scripts/og.html (AGENTS.md), imported so it
+// loads from /_next/; on Vercel, Next makes its URL absolute with the
+// deployment's host.
 export const metadata: Metadata = {
   title,
   description,
@@ -91,7 +91,16 @@ const speedInsightsSampleRate = Number(process.env.WEBSITE_SPEED_INSIGHTS_SAMPLE
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${arimo.variable} ${apkFutural.variable} ${azeretMono.variable}`}>
+    // The theme script, inlined to run before the first paint, sets data-theme
+    // before React hydrates (theme.ts).
+    <html
+      lang="en"
+      className={`${arimo.variable} ${apkFutural.variable} ${azeretMono.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="bg-background text-foreground antialiased">
         {children}
         <Analytics />
