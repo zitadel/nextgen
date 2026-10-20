@@ -59,7 +59,7 @@ import "@zitadel/components";
     [attr.proxy-path]="project?.proxyPath ?? proxyPath ?? null"
     [attr.url]="project?.url ?? null"
     [locales]="locales"
-    [lang]="lang"
+    [attr.lang]="lang ?? null"
     [attr.purpose]="purpose"
     [attr.flow-name]="flowName"
     [attr.post-sign-in-url]="postSignInUrl"
