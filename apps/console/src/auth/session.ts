@@ -116,11 +116,14 @@ async function readSession(): Promise<ConsoleSession | null> {
 }
 
 /**
- * The `project_id` the token read and sign-out hold the cookie's session to:
- * the console's, once the runtime document names it. The server refuses an
- * app's session there too (`403 sess.project_mismatch`).
+ * The `project_id` the calls on the cookie's session and its user hold that
+ * session to: the token read, sign-out, `GET /users/me` and
+ * `GET /users/me/projects`. It is the console's, once the runtime document
+ * names it, and the server refuses an app's session there too
+ * (`403 sess.project_mismatch`). It is not a management scope: those name the
+ * selected project (`lib/project-scope.ts`).
  */
-function consoleProject(): { project_id: string } | undefined {
+export function consoleSessionProject(): { project_id: string } | undefined {
   const projectId = getConsoleProjectId();
   return projectId ? { project_id: projectId } : undefined;
 }
@@ -174,7 +177,7 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
 
 /** Reads the token; `undefined` when the read fails, for an app's session too. */
 function readCsrfToken(): Promise<string | undefined> {
-  return api.getMySessionCsrfToken(consoleProject(), withCredentials).then(
+  return api.getMySessionCsrfToken(consoleSessionProject(), withCredentials).then(
     (body) => body.csrf_token,
     () => undefined,
   );
@@ -247,7 +250,7 @@ setApiCsrfRejectionHandler(() => {
 export async function signOut(): Promise<void> {
   invalidateSessionCache();
   try {
-    await api.revokeMySession(consoleProject(), withCredentials);
+    await api.revokeMySession(consoleSessionProject(), withCredentials);
   } catch {
     // Already signed out (401), an app's session (403 sess.project_mismatch)
     // or unreachable — the redirect to /login is the user-visible outcome

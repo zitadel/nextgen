@@ -317,10 +317,15 @@ func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, 
 	return domainUserToApiUser(user)
 }
 
-func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest) (api.PatchMyUserRes, error) {
+// PatchMyUser updates the user of the cookie's session, held to project_id when
+// the caller names one (holdSessionToProject).
+func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest, params api.PatchMyUserParams) (api.PatchMyUserRes, error) {
 	sessionToken, ok := sessionTokenFromContext(ctx)
 	if !ok {
 		return nil, domain.ErrSessionTokenInvalid()
+	}
+	if err := holdSessionToProject(sessionToken, params.ProjectID); err != nil {
+		return nil, err
 	}
 
 	attributes, err := convertUsingJson[map[string]any](req.Attributes)
@@ -356,10 +361,15 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	return &api.SetUserPasswordNoContent{}, nil
 }
 
-func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
+// GetMyUser reads the user of the cookie's session, held to project_id when the
+// caller names one (holdSessionToProject).
+func (h *Handler) GetMyUser(ctx context.Context, params api.GetMyUserParams) (api.GetMyUserRes, error) {
 	sessionToken, ok := sessionTokenFromContext(ctx)
 	if !ok {
 		return nil, domain.ErrSessionTokenInvalid()
+	}
+	if err := holdSessionToProject(sessionToken, params.ProjectID); err != nil {
+		return nil, err
 	}
 	input := service.GetMyUserInput{
 		SessionToken: sessionToken,

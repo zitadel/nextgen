@@ -177,12 +177,10 @@ func TestSessionCSRF(t *testing.T) {
 
 		patch := &api.PatchMyUserRequest{}
 		require.NoError(t, patch.UnmarshalJSON([]byte(`{"attributes":{"nickname":"Myself"}}`)))
-		me, err := session.PatchMyUser(t.Context(), patch)
+		me, err := session.PatchMyUser(t.Context(), patch, api.PatchMyUserParams{})
 		require.NoError(t, err)
-		require.IsType(t, &api.PatchMyUserErrorResponseStatusCode{}, me, helpers.MustMarshal(t, me))
-		refused := me.(*api.PatchMyUserErrorResponseStatusCode)
-		assert.Equal(t, http.StatusForbidden, refused.StatusCode)
-		assert.True(t, refused.Response.IsAuthCsrfInvalid(), helpers.MustMarshal(t, me))
+		require.IsType(t, &api.PatchMyUserForbidden{}, me, helpers.MustMarshal(t, me))
+		assert.Equal(t, api.ErrorCode("auth.csrf_invalid"), me.(*api.PatchMyUserForbidden).Code)
 
 		claim, err := session.CompleteClaim(t.Context(), &api.CompleteClaimRequest{ChallengeID: "ch_any"},
 			api.CompleteClaimParams{ProjectID: api.ProjectID(home.ID)})

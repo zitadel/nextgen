@@ -7,12 +7,14 @@ content:
         - $ref: '../../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../../../components/schemas/errors/sess-project_mismatch.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../../components/schemas/errors/internal.yaml'
           req.invalid: '../../../../components/schemas/errors/req-invalid.yaml'
+          sess.project_mismatch: '../../../../components/schemas/errors/sess-project_mismatch.yaml'
     examples:
       auth.unauthorized:
         summary: auth.unauthorized
@@ -29,3 +31,8 @@ content:
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      sess.project_mismatch:
+        summary: sess.project_mismatch
+        value:
+          code: sess.project_mismatch
+          message: 'The session belongs to a different project.'

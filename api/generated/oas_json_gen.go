@@ -49083,6 +49083,22 @@ func (s GetMyUserErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SessProjectMismatchGetMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("sess.project_mismatch")
+		{
+			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case SessTokenInvalidGetMyUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("sess.token_invalid")
@@ -49150,6 +49166,9 @@ func (s *GetMyUserErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidGetMyUserErrorResponse
 					found = true
+				case "sess.project_mismatch":
+					s.Type = SessProjectMismatchGetMyUserErrorResponse
+					found = true
 				case "sess.token_invalid":
 					s.Type = SessTokenInvalidGetMyUserErrorResponse
 					found = true
@@ -49180,6 +49199,10 @@ func (s *GetMyUserErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidGetMyUserErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case SessProjectMismatchGetMyUserErrorResponse:
+		if err := s.SessProjectMismatch.Decode(d); err != nil {
 			return err
 		}
 	case SessTokenInvalidGetMyUserErrorResponse:
@@ -60060,6 +60083,22 @@ func (s ListMyProjectsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SessProjectMismatchListMyProjectsErrorResponse:
+		e.FieldStart("code")
+		e.Str("sess.project_mismatch")
+		{
+			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -60095,6 +60134,9 @@ func (s *ListMyProjectsErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidListMyProjectsErrorResponse
 					found = true
+				case "sess.project_mismatch":
+					s.Type = SessProjectMismatchListMyProjectsErrorResponse
+					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -60119,6 +60161,10 @@ func (s *ListMyProjectsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidListMyProjectsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case SessProjectMismatchListMyProjectsErrorResponse:
+		if err := s.SessProjectMismatch.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -78269,6 +78315,22 @@ func (s PatchMyUserErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SessProjectMismatchPatchMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("sess.project_mismatch")
+		{
+			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case SessTokenInvalidPatchMyUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("sess.token_invalid")
@@ -78390,6 +78452,9 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidPatchMyUserErrorResponse
 					found = true
+				case "sess.project_mismatch":
+					s.Type = SessProjectMismatchPatchMyUserErrorResponse
+					found = true
 				case "sess.token_invalid":
 					s.Type = SessTokenInvalidPatchMyUserErrorResponse
 					found = true
@@ -78439,6 +78504,10 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
+	case SessProjectMismatchPatchMyUserErrorResponse:
+		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
 	case SessTokenInvalidPatchMyUserErrorResponse:
 		if err := s.SessTokenInvalid.Decode(d); err != nil {
 			return err
@@ -78474,6 +78543,44 @@ func (s PatchMyUserErrorResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *PatchMyUserErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PatchMyUserForbidden as json.
+func (s *PatchMyUserForbidden) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes PatchMyUserForbidden from json.
+func (s *PatchMyUserForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PatchMyUserForbidden to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = PatchMyUserForbidden(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PatchMyUserForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PatchMyUserForbidden) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
