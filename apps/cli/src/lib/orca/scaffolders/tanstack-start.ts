@@ -15,9 +15,9 @@ import type { NodeEngines } from "./node-engines";
  * `@tanstack/react-start` (so the detector would not recognise it).
  * `--framework react` selects the React variant, `--deployment nitro` keeps the
  * Nitro target, and `--no-examples`/`--no-toolchain`/`--no-intent` keep the
- * output minimal. `vite.config.*` is left in place — auth is wired
- * through `src/start.ts` (the framework's server entry, which the patcher
- * writes), so no config edit is needed.
+ * output minimal. `vite.config.*` is left in place — auth is wired through
+ * `src/start.ts` (the framework's server entry, which the patcher writes), so
+ * no config edit is needed.
  */
 export class TanStackStartScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "TanStack Start";
