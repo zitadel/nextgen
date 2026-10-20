@@ -8,7 +8,7 @@ import _ "embed"
 // identifier, not an address: it is stamped into schema documents and stored
 // rows, and nothing under it is fetched. TypeScript's twin is
 // DEFAULT_BUILTIN_SCHEMA_BASE in packages/config/src/defaults.ts.
-const DefaultBuiltinSchemaBase = "https://preview.zitadel.com/schemas/v1"
+const DefaultBuiltinSchemaBase = "https://zitadel.com/schemas/v1"
 
 // DefaultFlowSchemaURI is the canonical flow definition authoring schema URI.
 const DefaultFlowSchemaURI = DefaultBuiltinSchemaBase + "/flow-definition.json"

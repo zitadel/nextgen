@@ -19,7 +19,7 @@ const SECRET = {
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
   objectType: "human-user",
-  metaSchema: "https://preview.zitadel.com/schemas/v1/user-schema.json",
+  metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
   "x-auth-methods": { password: { enabled: true } },
   properties: { email: { type: "string" } },
 };

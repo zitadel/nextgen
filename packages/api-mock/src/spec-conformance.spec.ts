@@ -434,7 +434,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         kind: "user-schema",
-        metaSchema: "https://preview.zitadel.com/schemas/v1/user-schema.json",
+        metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
         objectType: "conformance",
         // Mirrors the server's designation rule (ADR 058 §1): password
         // requires a designated project-unique identifier.
@@ -455,7 +455,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         kind: "user-schema",
-        metaSchema: "https://preview.zitadel.com/schemas/v1/user-schema.json",
+        metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
         objectType: "conformance",
         // Mirrors the server's designation rule (ADR 058 §1): password
         // requires a designated project-unique identifier.
@@ -487,7 +487,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // envelope.
     const doc = {
       kind: "user-schema",
-      metaSchema: "https://preview.zitadel.com/schemas/v1/user-schema.json",
+      metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
       objectType: "conformance",
       "x-auth-methods": { password: { enabled: true } },
       title: "CustomTitle",
@@ -515,7 +515,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   test("GET /schemas lists envelopes carrying the full document", async () => {
     const doc = {
       kind: "user-schema",
-      metaSchema: "https://preview.zitadel.com/schemas/v1/user-schema.json",
+      metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
       objectType: "conformance-list",
       "x-auth-methods": { password: { enabled: true } },
     };
@@ -546,7 +546,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           kind: "user-schema",
-          metaSchema: "https://preview.zitadel.com/schemas/v1/user-schema.json",
+          metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
           objectType: `paging-${i}`,
           "x-auth-methods": { password: { enabled: true } },
         }),
@@ -633,7 +633,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         kind: "user-schema",
-        metaSchema: "https://preview.zitadel.com/schemas/v1/user-schema.json",
+        metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
         objectType: "conformance-handle",
         "x-auth-methods": { passkey: { enabled: true } },
         properties: { email: { type: "string", format: "email", "x-unique": "project" } },

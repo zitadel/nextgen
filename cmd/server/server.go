@@ -584,7 +584,6 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	// An identifier namespace, not an address: it is stamped into documents
 	// and stored rows, so moving it means adding the new base to
 	// domain.KnownBuiltinSchemaBases, which keeps every earlier one resolving.
-	// It moves to zitadel.com when the preview does.
 	v.SetDefault("schema.builtin_public_base", configdefaults.DefaultBuiltinSchemaBase)
 	v.SetDefault("schema.resolve_timeout", domain.DefaultJSONSchemaResolveTimeout)
 	// Egress policy for user-injectable URLs (ADR 061). The deny list
