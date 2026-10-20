@@ -228,8 +228,8 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	if err != nil {
 		return nil, err
 	}
-	// Same permission as the embedded read, or this becomes the way around it.
-	if err := requireMembershipRead(ctx); err != nil {
+	// Same gate as the embedded read, or this becomes the way around it.
+	if err := h.requireMembershipReadIn(ctx, projectID); err != nil {
 		return nil, err
 	}
 
@@ -242,18 +242,39 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	if err != nil {
 		return nil, err
 	}
+	res := userTeamsResponse(teams)
+	return &res, nil
+}
 
-	res := &api.ListUserTeamsResponse{
-		Teams: make([]api.UserTeam, 0, len(teams.Items)),
+func (h *Handler) ListMyTeams(ctx context.Context, params api.ListMyTeamsParams) (api.ListMyTeamsRes, error) {
+	self, err := requireSelf(ctx)
+	if err != nil {
+		return nil, err
 	}
+	teams, err := h.userService.ListUserTeams(ctx, service.ListUserTeamsInput{
+		ProjectID: self.ProjectID(),
+		UserID:    self.UserID(),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &api.ListUserTeamsResponseHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     userTeamsResponse(teams),
+	}, nil
+}
+
+func userTeamsResponse(teams *service.ListUserTeamsOutput) api.ListUserTeamsResponse {
+	res := api.ListUserTeamsResponse{Teams: make([]api.UserTeam, 0, len(teams.Items))}
 	if teams.NextPageToken != "" {
 		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(teams.NextPageToken))
 	}
 	for _, team := range teams.Items {
 		res.Teams = append(res.Teams, apiUserTeam(*team))
 	}
-
-	return res, nil
+	return res
 }
 
 func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams) (api.GetUserByIDRes, error) {
@@ -263,14 +284,8 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 	}
 	var teamID *string
 	if params.TeamID.IsSet() {
-		// team_id answers "is this user an active member of that team", the
-		// membership read POST /users/query gates the same way: by scope for a
-		// project secret, by project-wide read for a session.
-		reads, err := h.userReadsProject(ctx, projectID)
-		if err != nil {
-			return nil, err
-		}
-		if err := requireMembershipReadUnless(ctx, reads); err != nil {
+		// team_id answers "is this user an active member of that team".
+		if err := h.requireMembershipReadIn(ctx, projectID); err != nil {
 			return nil, err
 		}
 		teamID = new(string(params.TeamID.Value))
@@ -318,9 +333,9 @@ func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, 
 }
 
 func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest) (api.PatchMyUserRes, error) {
-	sessionToken, ok := sessionTokenFromContext(ctx)
-	if !ok {
-		return nil, domain.ErrSessionTokenInvalid()
+	self, err := requireSelf(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	attributes, err := convertUsingJson[map[string]any](req.Attributes)
@@ -329,8 +344,8 @@ func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest) 
 	}
 
 	user, err := h.userService.PatchMyUser(ctx, service.PatchMyUserInput{
-		SessionToken: sessionToken,
-		Attributes:   *attributes,
+		Self:       self,
+		Attributes: *attributes,
 	})
 	if err != nil {
 		return nil, userAttributesRequestInvalid(err)
@@ -357,20 +372,34 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 }
 
 func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
-	sessionToken, ok := sessionTokenFromContext(ctx)
-	if !ok {
-		return nil, domain.ErrSessionTokenInvalid()
-	}
-	input := service.GetMyUserInput{
-		SessionToken: sessionToken,
-	}
-
-	user, err := h.userService.GetMyUser(ctx, input)
+	self, err := requireSelf(ctx)
 	if err != nil {
 		return nil, err
 	}
-
+	user, err := h.userService.GetMyUser(ctx, service.GetMyUserInput{Self: self})
+	if err != nil {
+		return nil, err
+	}
 	return domainUserToApiUser(user)
+}
+
+func (h *Handler) GetMyUserSchema(ctx context.Context) (api.GetMyUserSchemaRes, error) {
+	self, err := requireSelf(ctx)
+	if err != nil {
+		return nil, err
+	}
+	schema, err := h.userService.GetMyUserSchema(ctx, service.GetMyUserInput{Self: self})
+	if err != nil {
+		return nil, err
+	}
+	apiSchema, err := domainSchemaToApiSchema(schema)
+	if err != nil {
+		return nil, err
+	}
+	return &api.SchemaHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     *apiSchema,
+	}, nil
 }
 
 // ------------------ Mappers ---------------

@@ -49,16 +49,35 @@ type ListReleasesOutput struct {
 
 type ReleaseService interface {
 	Create(ctx context.Context, input CreateReleaseInput) (*CreateReleaseOutput, error)
+	Build(ctx context.Context, input BuildReleaseInput) (*CreateReleaseOutput, error)
 	Get(ctx context.Context, projectID, id string) (*domain.Release, error)
 	List(ctx context.Context, input ListReleasesInput) (*ListReleasesOutput, error)
 }
 
 type releaseService struct {
-	v2Pool *DB
+	v2Pool   *DB
+	schemas  *SchemaService
+	flows    *flowDefinitionService
+	branding *BrandingService
+	idps     *idpConnectionService
 }
 
-func NewReleaseService(v2Pool *DB) ReleaseService {
-	return &releaseService{v2Pool: v2Pool}
+// NewReleaseService wires Build's kind writers. flows and idps are the
+// concretes from NewFlowDefinitionService and NewIDPConnectionService.
+func NewReleaseService(
+	v2Pool *DB,
+	schemas *SchemaService,
+	flows *flowDefinitionService,
+	branding *BrandingService,
+	idps *idpConnectionService,
+) ReleaseService {
+	return &releaseService{
+		v2Pool:   v2Pool,
+		schemas:  schemas,
+		flows:    flows,
+		branding: branding,
+		idps:     idps,
+	}
 }
 
 // Create assembles a release from revisions that already exist.
@@ -68,20 +87,18 @@ func NewReleaseService(v2Pool *DB) ReleaseService {
 // revisions under a new message resolves to the release that already pins
 // them. That makes a re-run against unchanged content a no-op rather than a
 // growing pile of identical releases.
-func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (*CreateReleaseOutput, error) {
+func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (_ *CreateReleaseOutput, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.Create")
+	defer end(&err)
+
 	content, err := s.loadContent(ctx, input.ProjectID, input.Pointers)
 	if err != nil {
 		return nil, err
 	}
 
-	actor, _ := audit.ActorFromContext(ctx)
-	entity, err := domain.NewRelease(input.ProjectID, content, domain.ReleaseMetadata{
-		Message:       input.Message,
-		GitSHA:        input.GitSHA,
-		GitDirty:      input.GitDirty,
-		CreatedBy:     actor.ActorID,
-		CreatedByType: actor.ActorType,
-	})
+	// NewRelease first: it rejects duplicate handles and unpinnable revisions
+	// before ValidateRelease walks documents that may be incomplete for that case.
+	entity, err := s.newReleaseEntity(ctx, input.ProjectID, content, releaseMetadataFromCreate(input))
 	if err != nil {
 		return nil, err
 	}
@@ -89,6 +106,7 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	// Read before insert so the common re-deploy answers without burning an
 	// id. The unique index on (project_id, content_hash) is what makes this
 	// correct under concurrency; the read only spares the round trip.
+	// A set already released answers with that release; validation is skipped.
 	existing, err := s.getByContentHash(ctx, input.ProjectID, entity.ContentHash)
 	if err != nil {
 		return nil, err
@@ -101,36 +119,13 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().CreateRelease(ctx, entity); err != nil {
-			return err
-		}
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeReleaseCreated,
-			Category:   domain.EventCategoryAdmin,
-			ProjectID:  entity.ProjectID,
-			EntityType: "release",
-			EntityID:   entity.ID,
-			Payload:    domain.ReleasePayloadSnapshot(entity),
-		})
+		return insertRelease(ctx, tx.Statements(), entity)
 	})
 	if err != nil {
-		// Two callers pinned the same set at once and this one lost the race.
-		// The winner's release is the answer: the loser asked for a release
-		// pinning exactly that set, and one now exists.
-		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			raced, hashErr := s.getByContentHash(ctx, input.ProjectID, entity.ContentHash)
-			if hashErr != nil {
-				return nil, hashErr
-			}
-			if raced != nil {
-				return &CreateReleaseOutput{Release: raced}, nil
-			}
-		}
-		// project_id is the only foreign key on releases, and every pinned
-		// revision was read from this project a moment ago, so a violation
-		// means the project was deleted underneath the call.
-		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-			return nil, domain.ErrReleaseProjectNotFound().WithParent(err)
+		if out, mapped, mapErr := s.mapReleasePersistError(ctx, input.ProjectID, entity.ContentHash, err); mapErr != nil {
+			return nil, mapErr
+		} else if mapped {
+			return out, nil
 		}
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
@@ -141,7 +136,87 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	return &CreateReleaseOutput{Release: entity, Created: true}, nil
 }
 
-func (s *releaseService) Get(ctx context.Context, projectID, id string) (*domain.Release, error) {
+func releaseMetadataFromCreate(input CreateReleaseInput) domain.ReleaseMetadata {
+	return domain.ReleaseMetadata{
+		Message:  input.Message,
+		GitSHA:   input.GitSHA,
+		GitDirty: input.GitDirty,
+	}
+}
+
+func (s *releaseService) newReleaseEntity(
+	ctx context.Context,
+	projectID string,
+	content domain.ReleaseContent,
+	meta domain.ReleaseMetadata,
+) (*domain.Release, error) {
+	actor, _ := audit.ActorFromContext(ctx)
+	meta.CreatedBy = actor.ActorID
+	meta.CreatedByType = actor.ActorType
+	return domain.NewRelease(projectID, content, meta)
+}
+
+func insertRelease(ctx context.Context, stmts AllStatements, entity *domain.Release) error {
+	if err := stmts.CreateRelease(ctx, entity); err != nil {
+		return err
+	}
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeReleaseCreated,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  entity.ProjectID,
+		EntityType: "release",
+		EntityID:   entity.ID,
+		Payload:    domain.ReleasePayloadSnapshot(entity),
+	})
+}
+
+// finalizeReleaseOn looks up entity by content hash on stmts and inserts when
+// absent. Used inside Build's transaction so the hash check sees the same
+// snapshot as the resource writes.
+func finalizeReleaseOn(
+	ctx context.Context,
+	stmts AllStatements,
+	entity *domain.Release,
+) (*CreateReleaseOutput, error) {
+	existing, err := stmts.GetReleaseByContentHash(ctx, entity.ProjectID, entity.ContentHash)
+	if err == nil {
+		return &CreateReleaseOutput{Release: existing}, nil
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+		return nil, domain.ErrInternal(err).WithMessage("failed to look up release by content hash")
+	}
+	if err := insertRelease(ctx, stmts, entity); err != nil {
+		return nil, err
+	}
+	return &CreateReleaseOutput{Release: entity, Created: true}, nil
+}
+
+// mapReleasePersistError recovers a concurrent content-hash winner or a
+// missing project. mapped is true when out is the answer for that race/FK.
+func (s *releaseService) mapReleasePersistError(
+	ctx context.Context,
+	projectID, contentHash string,
+	err error,
+) (out *CreateReleaseOutput, mapped bool, mapErr error) {
+	if _, ok := errors.AsType[*database.UniqueError](err); ok && contentHash != "" {
+		raced, hashErr := s.getByContentHash(ctx, projectID, contentHash)
+		if hashErr != nil {
+			return nil, false, hashErr
+		}
+		if raced != nil {
+			return &CreateReleaseOutput{Release: raced}, true, nil
+		}
+	}
+	if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+		return nil, false, domain.ErrReleaseProjectNotFound().WithParent(err)
+	}
+	return nil, false, nil
+}
+
+func (s *releaseService) Get(ctx context.Context, projectID, id string) (_ *domain.Release, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.Get")
+	defer end(&err)
+
 	entity, err := s.v2Pool.Statements().GetReleaseByID(ctx, projectID, id)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -152,7 +227,10 @@ func (s *releaseService) Get(ctx context.Context, projectID, id string) (*domain
 	return entity, nil
 }
 
-func (s *releaseService) List(ctx context.Context, input ListReleasesInput) (*ListReleasesOutput, error) {
+func (s *releaseService) List(ctx context.Context, input ListReleasesInput) (_ *ListReleasesOutput, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.List")
+	defer end(&err)
+
 	opts := release.ListOptions(input.ProjectID, uint32(normalizeLimit(input.Limit)))
 	opts.Pagination.Cursor = []byte(input.PageToken)
 

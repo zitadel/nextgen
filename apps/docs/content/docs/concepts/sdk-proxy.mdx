@@ -7,6 +7,8 @@ Framework SDKs keep auth traffic same-origin where possible.
 
 For Next.js and Nuxt, the SDK middleware proxies `/__nextgen/*` requests to the Zitadel backend, validates the session token, and redirects unauthenticated users away from protected routes. Zitadel issues encrypted session tokens, so the middleware checks each one against `GET /sessions/me`.
 
+Only Zitadel's refusal signs a user out. When that check answers `401`, or `404` for a session that is gone, the middleware clears the session cookie. When it gets no answer it can act on (Zitadel answers `5xx`, does not answer in time, or cannot be reached), the middleware keeps the cookie and renders the request signed out, and a protected route answers `503 Service Unavailable` instead of sending a user who may well be signed in to the login page. The next request checks again.
+
 This keeps the app in control of browser-visible routes and cookies while Zitadel remains the backend API.
 
 The default proxy path is:
@@ -20,6 +22,20 @@ The login and logout components call the same-origin proxy path by default when 
 ## The project secret
 
 Only one call in the browser flow needs a project credential: `POST /sessions/exchange`, which turns a completed sign-in into a session. The other calls need none, or only the session cookie the browser already holds. The proxy adds the project secret (`ZITADEL_PROJECT_SECRET`, which setup writes to `.env.local`) to that call as a bearer token, unless the call already carries an `Authorization` header, and to no other call. The secret stays on the server side of the proxy and never reaches the browser.
+
+## Sessions belong to one project
+
+A session belongs to the project it was signed in to, while a browser sends a host's cookies to every app on it: on `localhost`, to every port, including the Console of a local server. So the server middleware counts a session as signed in only when it belongs to the app's own project. It reads the session with `GET /sessions/me?project_id=…`, which refuses a session of another project with `403 sess.project_mismatch`, and it checks the project the answer names as well. A JWT must name the project in its `aud` claim.
+
+The project comes from the middleware's `projectId` option, else from `ZITADEL_PROJECT_ID`, which setup writes to `.env.local`, else from the framework's public project id variable. With none, no session counts as signed in. A session of another project reads as signed out, and its cookie stays: it is live in the app it belongs to.
+
+## One session cookie per project
+
+Zitadel sets and reads one session cookie, `__nextgen_session`. Under that name alone, the apps and the Console on one host would share a single cookie, and each sign-in would sign the others out. So the proxy keeps the app's session in a cookie named after its project, `__nextgen_session_<project id>`. It renames the cookie Zitadel sets on its way to the browser, and sends the app's cookie to Zitadel under Zitadel's name. It passes no other project's session cookie on. On `localhost`, signing in to an app leaves the Console of a local server and every other app signed in.
+
+A user who signed in before an app moved to this cookie holds the session under `__nextgen_session`. The first time the middleware or the session check of the widgets reads it, and it signs in a user of the app's project, it is copied to the app's cookie. The old cookie stays, because on a server without platform bootstrap the Console signs in to the app's project and keeps its session there. When the user next signs in or out through the app, the proxy clears the old cookie if it holds a session of the app's project, and on sign-out ends that session too, so it cannot sign the user back in. A session of another project in that cookie stays where it is. A response that sets a session cookie sends `Cache-Control: private, no-store`. With no project configured, the proxy passes the cookies through unchanged.
+
+The dev proxies the CLI writes for single-page apps keep the session the same way, reading the project from `ZITADEL_PROJECT_ID` in `.env.local`. They do not move a session kept under `__nextgen_session`, so a developer who was signed in to an SPA signs in once more after the upgrade. `zitadel doctor --fix` adds this to a dev proxy an earlier setup wrote, and `zitadel doctor` warns until then; it says the hooks must be added by hand to a dev proxy changed since. In production, an SPA's own proxy passes `__nextgen_session` through, which is fine there: a production host serves one project.
 
 ## SPAs in production
 

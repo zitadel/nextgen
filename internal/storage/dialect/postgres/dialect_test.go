@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -53,4 +54,17 @@ func TestDecodeConfig(t *testing.T) {
 		_, err := DecodeConfig(123)
 		assert.Error(t, err)
 	})
+}
+
+func TestConfigConnect_setsPGXTracer(t *testing.T) {
+	t.Parallel()
+
+	// pgxpool connects lazily, so no server is needed.
+	dialect, err := DecodeConfig("postgres://user:pass@localhost:1/dbname?sslmode=disable")
+	require.NoError(t, err)
+	pool, err := dialect.Connect(t.Context())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = pool.Close(context.Background()) })
+
+	assert.Equal(t, pgxTracer{}, dialect.(*Config).ConnConfig.Tracer)
 }

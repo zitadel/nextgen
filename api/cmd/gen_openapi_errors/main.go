@@ -934,7 +934,13 @@ var remappedErrors = []string{
 // error union when the API handler intentionally remaps them to a different
 // public code before the response is written.
 var operationExcludedErrors = map[string][]string{
-	"listMyProjects": {"domain.ErrSessionTokenInvalid"},
+	// Self-access operations answer any refused session as auth.unauthorized
+	// (requireSelf, #553).
+	"getMyUser":       {"domain.ErrSessionTokenInvalid"},
+	"patchMyUser":     {"domain.ErrSessionTokenInvalid"},
+	"getMyUserSchema": {"domain.ErrSessionTokenInvalid"},
+	"listMyTeams":     {"domain.ErrSessionTokenInvalid"},
+	"listMyProjects":  {"domain.ErrSessionTokenInvalid"},
 	// The flow engine catches a stale parked SSO row with errors.Is and renders
 	// the step; the analysis cannot see that check prune the error. The SSO
 	// resolver turns a user schema the project does not hold into
@@ -947,6 +953,12 @@ var operationExcludedErrors = map[string][]string{
 	// gone renders the step again. sch.not_found is remapped as for
 	// getFlowStep.
 	"submitFlowStep": {"domain.ErrFlowSSOUnavailable", "domain.ErrIDPConnectionNotFound", "domain.ErrJSONSchemaNotFound", "domain.ErrSSOStateInvalid"},
+	// The identifier lookup of the flow path turns a bound user schema the
+	// project does not hold into domain.ErrInternal (resolveIdentifier), so
+	// sch.not_found never reaches the response.
+	"verifyChallengeProof": {"domain.ErrJSONSchemaNotFound"},
+	// sch.not_found is remapped as for verifyChallengeProof.
+	"finishUserPasskeyRegistration": {"domain.ErrJSONSchemaNotFound"},
 	// Create and revise run the engine's connection parse after the schema
 	// check. The schema already refuses a missing protocol block, scopes
 	// without openid, and a cleartext endpoint as req.invalid, so only the

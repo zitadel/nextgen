@@ -163,6 +163,42 @@ func TestRunExchange_stepUpExistingSession(t *testing.T) {
 	assert.Equal(t, "tok-rotated", got.TokenID)
 }
 
+// An exchange without a TTL leaves a session with the signed-in default,
+// whether it creates the session or upgrades an anonymous shell; neither may
+// keep the shell's short lifetime.
+func TestRunExchange_withoutTTLUsesSessionDefault(t *testing.T) {
+	t.Parallel()
+	verified := []session.StoredCheck{
+		{ID: "c1", Type: domain.AuthCheckTypePassword, LastVerifiedAt: time.Now(), OnAttempt: true},
+	}
+
+	t.Run("new session", func(t *testing.T) {
+		t.Parallel()
+		store := &fakeExchangeStore{attempt: completedAttempt("proj", nil), attemptChecks: verified}
+		got, err := session.RunExchange(t.Context(), store, "proj", "plain", 0)
+		require.NoError(t, err)
+		assert.Equal(t, domain.SessionDefaultTTL, got.TimeToLive)
+		assert.Equal(t, domain.SessionDefaultTTL, store.updatedTTL)
+	})
+
+	t.Run("upgraded anonymous shell", func(t *testing.T) {
+		t.Parallel()
+		sid := "sess-shell"
+		store := &fakeExchangeStore{
+			attempt: completedAttempt("proj", &sid),
+			sessions: map[string]*domain.Session{
+				sid: {ProjectID: "proj", ID: sid, TokenID: "tok-shell", TimeToLive: domain.SessionAnonymousTTL},
+			},
+			attemptChecks: verified,
+		}
+		got, err := session.RunExchange(t.Context(), store, "proj", "plain", 0)
+		require.NoError(t, err)
+		assert.Equal(t, sid, got.ID)
+		assert.Nil(t, store.inserted, "the shell is upgraded in place")
+		assert.Equal(t, domain.SessionDefaultTTL, store.updatedTTL)
+	})
+}
+
 func TestRunExchange_invalidHandoff(t *testing.T) {
 	t.Parallel()
 	store := &fakeExchangeStore{attemptErr: domain.ErrAuthAttemptNotFound()}

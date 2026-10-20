@@ -1,0 +1,742 @@
+{
+ "accepts": [
+  {
+   "name": "a page with a flow handle",
+   "raw": "https://app.test/login?flow=f1",
+   "host": "app.test"
+  },
+  {
+   "name": "the root with a path",
+   "raw": "https://app.test/",
+   "host": "app.test"
+  },
+  {
+   "name": "no path at all",
+   "raw": "https://app.test",
+   "host": "app.test"
+  },
+  {
+   "name": "a hash-routed page keeps its fragment",
+   "raw": "http://localhost:5173/#/profile",
+   "host": "localhost:5173"
+  },
+  {
+   "name": "an uppercase scheme and host",
+   "raw": "HTTPS://App.Test/x",
+   "host": "App.Test"
+  },
+  {
+   "name": "an IPv6 literal with a port",
+   "raw": "https://[::1]:8443/x",
+   "host": "[::1]:8443"
+  },
+  {
+   "name": "a double slash deeper in the path",
+   "raw": "https://app.test/app//login",
+   "host": "app.test"
+  },
+  {
+   "name": "an encoded slash inside a segment",
+   "raw": "https://app.test/a%2Fb",
+   "host": "app.test"
+  },
+  {
+   "name": "an encoded percent sign at the end",
+   "raw": "https://app.test/discount/100%25",
+   "host": "app.test"
+  },
+  {
+   "name": "an encoded percent sign before letters",
+   "raw": "https://app.test/a%25zz",
+   "host": "app.test"
+  },
+  {
+   "name": "only an encoded percent sign",
+   "raw": "https://app.test/%25",
+   "host": "app.test"
+  },
+  {
+   "name": "a percent sign that starts no escape in the path",
+   "raw": "https://app.test/50%off",
+   "host": "app.test"
+  },
+  {
+   "name": "two letters after a percent sign in the path",
+   "raw": "https://app.test/%zz",
+   "host": "app.test"
+  },
+  {
+   "name": "a lone percent sign as the path",
+   "raw": "https://app.test/%",
+   "host": "app.test"
+  },
+  {
+   "name": "a percent sign at the end of a fragment",
+   "raw": "https://app.test/#100%",
+   "host": "app.test"
+  },
+  {
+   "name": "a percent sign before letters in a fragment",
+   "raw": "https://app.test/#/a%zz",
+   "host": "app.test"
+  },
+  {
+   "name": "a lone percent sign in a fragment",
+   "raw": "https://app.test/#%",
+   "host": "app.test"
+  },
+  {
+   "name": "a percent sign and one digit in a fragment",
+   "raw": "https://app.test/a?b#c%2",
+   "host": "app.test"
+  },
+  {
+   "name": "a parent segment that stays on the path",
+   "raw": "https://app.test/a/../b",
+   "host": "app.test"
+  },
+  {
+   "name": "a dot segment at the end",
+   "raw": "https://app.test/a/.",
+   "host": "app.test"
+  },
+  {
+   "name": "a parent segment that returns to the root",
+   "raw": "https://app.test/app/../",
+   "host": "app.test"
+  },
+  {
+   "name": "a backslash in the query",
+   "raw": "https://app.test/x?next=\\evil",
+   "host": "app.test"
+  },
+  {
+   "name": "a double slash in the query",
+   "raw": "https://app.test/x?next=//evil.example",
+   "host": "app.test"
+  },
+  {
+   "name": "a double slash in the fragment",
+   "raw": "https://app.test/x#//evil.example",
+   "host": "app.test"
+  },
+  {
+   "name": "an underscore in the host",
+   "raw": "https://my_app.test/x",
+   "host": "my_app.test"
+  },
+  {
+   "name": "the highest port",
+   "raw": "https://app.test:65535/x",
+   "host": "app.test:65535"
+  },
+  {
+   "name": "the authority followed by a query",
+   "raw": "https://app.test?x=1",
+   "host": "app.test"
+  },
+  {
+   "name": "the authority followed by a fragment",
+   "raw": "https://app.test#f",
+   "host": "app.test"
+  },
+  {
+   "name": "the authority followed by a query with slashes",
+   "raw": "https://app.test?/..//x",
+   "host": "app.test"
+  },
+  {
+   "name": "a semicolon segment is an ordinary segment",
+   "raw": "https://app.test/..;/x",
+   "host": "app.test"
+  },
+  {
+   "name": "stray percent signs around an escape",
+   "raw": "https://app.test/%%41/%4/%41%",
+   "host": "app.test"
+  },
+  {
+   "name": "a stray percent sign in the query is left alone",
+   "raw": "https://app.test/x?q=%zz&flow=1",
+   "host": "app.test"
+  },
+  {
+   "name": "a character a Go parser would re-encode",
+   "raw": "https://app.test/a%2Fb|c",
+   "host": "app.test"
+  },
+  {
+   "name": "encoded dots between slashes that never reach the host",
+   "raw": "https://app.test/%2e%2e//.%2E",
+   "host": "app.test"
+  },
+  {
+   "name": "parent segments that stay on the path",
+   "raw": "https://app.test/..//.%2e/",
+   "host": "app.test"
+  },
+  {
+   "name": "a dot segment then a parent segment",
+   "raw": "https://app.test/.//%2e%2e",
+   "host": "app.test"
+  },
+  {
+   "name": "encoded dots after two slashes",
+   "raw": "https://app.test/%2e//%2e.",
+   "host": "app.test"
+  },
+  {
+   "name": "an encoded newline in the query",
+   "raw": "https://app.test/x?q=a%0Ab",
+   "host": "app.test"
+  },
+  {
+   "name": "an encoded newline in the fragment",
+   "raw": "https://app.test/x#a%0Ab",
+   "host": "app.test"
+  },
+  {
+   "name": "a query mark in the fragment before a stray percent sign",
+   "raw": "https://app.test/#/a?b%zz",
+   "host": "app.test"
+  },
+  {
+   "name": "a backslash in the fragment",
+   "raw": "https://app.test/#\\x",
+   "host": "app.test"
+  },
+  {
+   "name": "an encoded question mark in an honest path",
+   "raw": "https://app.test/a%3Fb/c",
+   "host": "app.test"
+  },
+  {
+   "name": "an empty port",
+   "raw": "https://app.test:/x",
+   "host": "app.test:"
+  }
+ ],
+ "refuses": [
+  {
+   "name": "nothing",
+   "raw": "",
+   "why": "empty"
+  },
+  {
+   "name": "too long",
+   "raw": "https://app.test/",
+   "repeat": {
+    "unit": "a",
+    "count": 2048
+   },
+   "why": "too long: over"
+  },
+  {
+   "name": "too long once a fragment is escaped",
+   "raw": "https://app.test/x#",
+   "repeat": {
+    "unit": "\\",
+    "count": 700
+   },
+   "why": "once its escapes"
+  },
+  {
+   "name": "too long once escapes are written out",
+   "raw": "https://app.test/",
+   "repeat": {
+    "unit": "|",
+    "count": 700
+   },
+   "why": "once its escapes"
+  },
+  {
+   "name": "too long once stray percent signs are escaped",
+   "raw": "https://app.test/",
+   "repeat": {
+    "unit": "%",
+    "count": 700
+   },
+   "why": "once its escapes"
+  },
+  {
+   "name": "a relative path",
+   "raw": "/login",
+   "why": "scheme"
+  },
+  {
+   "name": "a scheme-relative URL",
+   "raw": "//app.test/x",
+   "why": "scheme"
+  },
+  {
+   "name": "no scheme",
+   "raw": "app.test/login",
+   "why": "scheme"
+  },
+  {
+   "name": "javascript",
+   "raw": "javascript:alert(1)",
+   "why": "scheme"
+  },
+  {
+   "name": "a data URL",
+   "raw": "data:text/html,x",
+   "why": "scheme"
+  },
+  {
+   "name": "ftp",
+   "raw": "ftp://app.test/x",
+   "why": "scheme"
+  },
+  {
+   "name": "an opaque URL",
+   "raw": "https:evil.example",
+   "why": "no host"
+  },
+  {
+   "name": "no host",
+   "raw": "https:///x",
+   "why": "no host"
+  },
+  {
+   "name": "a bracketed host that is not an IP",
+   "raw": "https://[evil]/x",
+   "why": "not a URL"
+  },
+  {
+   "name": "a port and no host",
+   "raw": "https://:80/x",
+   "why": "no host"
+  },
+  {
+   "name": "userinfo",
+   "raw": "https://user@app.test/x",
+   "why": "userinfo"
+  },
+  {
+   "name": "the origin as userinfo",
+   "raw": "https://app.test@evil.example/x",
+   "why": "userinfo"
+  },
+  {
+   "name": "userinfo with a password",
+   "raw": "https://user:pw@app.test/x",
+   "why": "userinfo"
+  },
+  {
+   "name": "a backslash before an at sign",
+   "raw": "https://evil.example\\@app.test/x",
+   "why": "backslash"
+  },
+  {
+   "name": "a backslash after the host",
+   "raw": "https://app.test\\evil.example/x",
+   "why": "backslash"
+  },
+  {
+   "name": "a space in the host",
+   "raw": "https://app test/x",
+   "why": "control, space or non-ASCII"
+  },
+  {
+   "name": "a tab in the path",
+   "raw": "https://app.test/\t/evil.example",
+   "why": "control, space or non-ASCII"
+  },
+  {
+   "name": "a newline in the path",
+   "raw": "https://app.test/\n/evil.example",
+   "why": "control, space or non-ASCII"
+  },
+  {
+   "name": "a carriage return in the query",
+   "raw": "https://app.test/x?a=\r",
+   "why": "control, space or non-ASCII"
+  },
+  {
+   "name": "a NUL byte",
+   "raw": "https://app.test/\u0000",
+   "why": "control, space or non-ASCII"
+  },
+  {
+   "name": "a delete character",
+   "raw": "https://app.test/",
+   "why": "control, space or non-ASCII"
+  },
+  {
+   "name": "a non-ASCII query",
+   "raw": "https://app.test/x?q=é",
+   "why": "control, space or non-ASCII"
+  },
+  {
+   "name": "a fullwidth host",
+   "raw": "https://ａpp.test/x",
+   "why": "control, space or non-ASCII"
+  },
+  {
+   "name": "a fullwidth slash",
+   "raw": "https://app.test／evil.example",
+   "why": "control, space or non-ASCII"
+  },
+  {
+   "name": "an encoded dot in the host",
+   "raw": "https://app%2etest/x",
+   "why": "not a URL"
+  },
+  {
+   "name": "a host with an exclamation mark",
+   "raw": "https://app!test/x",
+   "why": "character other than"
+  },
+  {
+   "name": "an IPv6 zone",
+   "raw": "https://[fe80::1%25eth0]/x",
+   "why": "plain IP literal"
+  },
+  {
+   "name": "a port out of range",
+   "raw": "https://app.test:65536/x",
+   "why": "port"
+  },
+  {
+   "name": "a huge port",
+   "raw": "https://app.test:99999999999/x",
+   "why": "port"
+  },
+  {
+   "name": "two slashes",
+   "raw": "https://app.test//evil.example/login",
+   "why": "empty segment"
+  },
+  {
+   "name": "three slashes",
+   "raw": "https://app.test///evil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "only two slashes",
+   "raw": "https://app.test//",
+   "why": "empty segment"
+  },
+  {
+   "name": "a slash and a backslash",
+   "raw": "https://app.test/\\evil.example/login",
+   "why": "backslash"
+  },
+  {
+   "name": "a dot segment before two slashes",
+   "raw": "https://app.test/.//evil.example/login",
+   "why": "empty segment"
+  },
+  {
+   "name": "a parent segment before two slashes",
+   "raw": "https://app.test/app/..//evil.example/login",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded dot before two slashes",
+   "raw": "https://app.test/%2e//evil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "an uppercase encoded dot",
+   "raw": "https://app.test/%2E//evil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded parent segment",
+   "raw": "https://app.test/app/%2e%2e//evil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "a half-encoded parent segment",
+   "raw": "https://app.test/app/.%2e//evil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "the other half-encoded parent segment",
+   "raw": "https://app.test/app/%2e.//evil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded slash first",
+   "raw": "https://app.test/%2Fevil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded backslash first",
+   "raw": "https://app.test/%5Cevil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "a lowercase encoded backslash",
+   "raw": "https://app.test/%5cevil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "a double-encoded slash",
+   "raw": "https://app.test/%252Fevil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "a double-encoded backslash",
+   "raw": "https://app.test/%255Cevil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded slash that survives a parent segment",
+   "raw": "https://app.test/a%2Fb/../%2Fevil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded backslash that survives a parent segment",
+   "raw": "https://app.test/a%5Cb/../%5Cevil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "a double-encoded slash that survives a parent segment",
+   "raw": "https://app.test/a%252Fb/../%252Fevil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "several encoded slashes before parent segments",
+   "raw": "https://app.test/x%2Fy%2Fz/../../%2Fevil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded slash followed by encoded parent segments",
+   "raw": "https://app.test/%2Fevil.example%2F..%2F..%2F",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded slash then parent segments with a literal slash",
+   "raw": "https://app.test/%2Fevil.example/..%2F..%2F",
+   "why": "empty segment"
+  },
+  {
+   "name": "encoded backslashes and parent segments",
+   "raw": "https://app.test/%5Cevil.example%5C..%5C..%5C",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded slash then a parent segment",
+   "raw": "https://app.test/%2F..",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded slash then an encoded parent segment",
+   "raw": "https://app.test/%2F%2e%2e/",
+   "why": "empty segment"
+  },
+  {
+   "name": "a character Go re-encodes before encoded slashes",
+   "raw": "https://app.test/{%2F%2F/../%2Fevil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "two slashes with odd characters after them",
+   "raw": "https://app.test//%2e.%2f\":80",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded slash with a parent segment after it",
+   "raw": "https://app.test/%2Fx/../y",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded tab",
+   "raw": "https://app.test/%09/evil.example",
+   "why": "control character"
+  },
+  {
+   "name": "an encoded newline",
+   "raw": "https://app.test/a%0Ab",
+   "why": "control character"
+  },
+  {
+   "name": "an encoded NUL",
+   "raw": "https://app.test/%00",
+   "why": "control character"
+  },
+  {
+   "name": "a double-encoded tab",
+   "raw": "https://app.test/%2509/x",
+   "why": "control character"
+  },
+  {
+   "name": "an uppercase scheme before two slashes",
+   "raw": "HTTPS://app.test//evil",
+   "why": "empty segment"
+  },
+  {
+   "name": "a double-encoded dot segment",
+   "raw": "https://app.test/%252e%252e//evil",
+   "why": "empty segment"
+  },
+  {
+   "name": "everything encoded",
+   "raw": "https://app.test/a/%2e%2e%2f%2fevil",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded carriage return",
+   "raw": "https://app.test/a%0Db",
+   "why": "control character"
+  },
+  {
+   "name": "an encoded delete character",
+   "raw": "https://app.test/a%7Fb",
+   "why": "control character"
+  },
+  {
+   "name": "a slash that appears after a decode, a resolve and a decode",
+   "raw": "https://app.test/.%2f%252F..",
+   "why": "empty segment"
+  },
+  {
+   "name": "another decode, resolve, decode order",
+   "raw": "https://app.test/..%2F%255C..%252F",
+   "why": "empty segment"
+  },
+  {
+   "name": "a slash that appears after three decodes",
+   "raw": "https://app.test/%25252Fevil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "a re-encoded character before encoded slashes",
+   "raw": "https://app.test/..%2F%252F..%252F^b",
+   "why": "empty segment"
+  },
+  {
+   "name": "a slash that appears after a decode, a normalization and a decode",
+   "raw": "https://app.test/a%252Fb%5C..%5C%252Fevil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded dot, then slashes, then an encoded slash",
+   "raw": "https://app.test/%2e//..%2F",
+   "why": "empty segment"
+  },
+  {
+   "name": "an uppercase encoded dot, then slashes",
+   "raw": "https://app.test/%2E//..%2F",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded parent segment, then slashes",
+   "raw": "https://app.test/%2e%2e//..%2F",
+   "why": "empty segment"
+  },
+  {
+   "name": "an uppercase encoded parent segment",
+   "raw": "https://app.test/%2E%2E//..%2F",
+   "why": "empty segment"
+  },
+  {
+   "name": "a half-encoded parent segment, then slashes",
+   "raw": "https://app.test/.%2e//..%2F",
+   "why": "empty segment"
+  },
+  {
+   "name": "the other half-encoded parent segment, then slashes",
+   "raw": "https://app.test/%2e.//..%2F",
+   "why": "empty segment"
+  },
+  {
+   "name": "a single dot at the end after two slashes",
+   "raw": "https://app.test/.//.",
+   "why": "empty segment"
+  },
+  {
+   "name": "a parent segment at the end after slashes",
+   "raw": "https://app.test/.///%2e%2e",
+   "why": "empty segment"
+  },
+  {
+   "name": "two slashes then a parent segment",
+   "raw": "https://app.test//..",
+   "why": "empty segment"
+  },
+  {
+   "name": "a resolve, a slash reading and a resolve",
+   "raw": "https://app.test/.%255C%252F..%5C/../",
+   "why": "empty segment"
+  },
+  {
+   "name": "a decode, resolves and slash readings in a long chain",
+   "raw": "https://app.test/..%5C%2F%2e%2e%5C%2e%2e/.%2e",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded slash, backslash and parent segment",
+   "raw": "https://app.test/.%2F%5C%2e%2e/",
+   "why": "empty segment"
+  },
+  {
+   "name": "a parameter-bearing parent segment before two slashes",
+   "raw": "https://app.test/a/..;//evil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded parent segment with an encoded semicolon",
+   "raw": "https://app.test/a/%2e%2e%3b//evil",
+   "why": "empty segment"
+  },
+  {
+   "name": "a parameter on a segment before two slashes",
+   "raw": "https://app.test/a/..;x=1/..//evil",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded question mark ends the path before dot segments",
+   "raw": "https://app.test/.%2F%2Fevil.example%3F%2F..%2F..",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded hash ends the path before dot segments",
+   "raw": "https://app.test/.%2F%2Fx%23%2F..%2F..",
+   "why": "empty segment"
+  },
+  {
+   "name": "an encoded question mark after an encoded dot",
+   "raw": "https://app.test/%2e%2F%2Fevil.example%3F/../..",
+   "why": "empty segment"
+  },
+  {
+   "name": "resolve, then a backslash reading, then resolve",
+   "raw": "https://app.test/a%2Fb%5C%2F../..%5C/evil.example",
+   "why": "empty segment"
+  },
+  {
+   "name": "a decoded question mark ends the path for one reader and not the next",
+   "raw": "https://app.test/.;//..;%25253f",
+   "why": "empty segment"
+  },
+  {
+   "name": "a decoded hash ends the path for one reader and not the next",
+   "raw": "https://app.test/a/b/..%23/../..//",
+   "why": "empty segment"
+  },
+  {
+   "name": "a parameter-only first segment",
+   "raw": "https://app.test/;jsessionid=ABC123/orders",
+   "why": "empty segment"
+  },
+  {
+   "name": "a stray percent sign after a double-encoded slash",
+   "raw": "https://app.test/%252F%25zz",
+   "why": "empty segment"
+  },
+  {
+   "name": "a path with too many readings",
+   "raw": "https://app.test/x%",
+   "repeat": {
+    "unit": "25",
+    "count": 100
+   },
+   "rawAfter": "2F",
+   "why": "too many readings"
+  }
+ ]
+}

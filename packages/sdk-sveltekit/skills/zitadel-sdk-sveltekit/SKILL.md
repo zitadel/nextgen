@@ -54,7 +54,9 @@ Read config from `process.env`, not SvelteKit's `$env` modules — their import
 paths moved between SvelteKit 2 and 3. SvelteKit does not surface `.env` files
 on `process.env`, so in dev load `.env.local` first with
 `process.loadEnvFile?.('.env.local')`. Compose with other hooks via
-`sequence()` from `@sveltejs/kit/hooks`.
+`sequence()` from `@sveltejs/kit/hooks`. Sessions count only in the app's own
+project: `projectId`, else `ZITADEL_PROJECT_ID`, else
+`VITE_ZITADEL_PROJECT_ID`. With none set, nobody is signed in.
 
 **2. Read auth server-side** with `getAuth(event)` in a load function or
 endpoint, and forward only client-safe fields to the page — never the raw token:

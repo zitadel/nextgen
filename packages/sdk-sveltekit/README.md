@@ -1,6 +1,6 @@
 # @zitadel/sdk-sveltekit
 
-SvelteKit handle hook and helpers for Nextgen Auth.
+SvelteKit handle hook and helpers for Zitadel.
 
 ## Installation
 
@@ -45,7 +45,7 @@ The hook runs on every request and does three things in one pass:
    never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and writes the
    result to `event.locals.nextgenAuth`.
-3. **Redirects** unauthenticated requests to `loginPath` for protected routes.
+3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in.
 
 Compose it with your existing hooks via `sequence()`:
 
@@ -168,8 +168,9 @@ work-email copy for a business audience.
 
 | Option              | Type                 | Default              | Description                                                                                    |
 | ------------------- | -------------------- | -------------------- | ---------------------------------------------------------------------------------------------- |
-| `url`               | `string`             | `ZITADEL_URL` env    | Full URL of the Zitadel auth backend                                                           |
+| `url`               | `string`             | `ZITADEL_URL` env    | Full URL of the Zitadel auth backend. A trailing slash is ignored.                             |
 | `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project secret, sent as the bearer on the handoff exchange only (server-only)               |
+| `projectId`         | `string`             | `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID` env | The project this app signs its users in to. A session of any other project on the server reads as signed out and keeps its cookie; with no project, no session counts |
 | `proxyPath`         | `string`             | `"/__nextgen"`       | Path prefix proxied to the auth backend                                                        |
 | `protectedRoutes`   | `string[]`           | `[]`                 | Paths requiring a valid session. Trailing `*` matches sub-paths                                |
 | `ignoredRoutes`     | `string[]`           | `[]`                 | Paths skipped entirely — no JWT check. Trailing `*` matches sub-paths                          |
@@ -183,7 +184,7 @@ work-email copy for a business audience.
 
 ## How JWT verification works
 
-1. Bearer token from `Authorization` header is checked first; `__nextgen_session` cookie is the fallback
+1. Bearer token from `Authorization` header is checked first; the app's session cookie, `__nextgen_session_<projectId>`, is the fallback
 2. Tokens with an `alg` not in `allowedAlgorithms` (`RS256`, `ES256` by default) are rejected before any JWKS fetch
 3. Tokens with a `typ` not in `allowedTokenTypes` are rejected immediately
 4. The public key is fetched from `{url}/auth/keys` (JWKS) via the Web Crypto API, cached for 5 minutes per `kid`
