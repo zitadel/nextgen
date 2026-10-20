@@ -1,5 +1,7 @@
 import { createMDX } from "fumadocs-mdx/next";
 
+import moved from "./lib/moved.json" with { type: "json" };
+
 const withMDX = createMDX();
 
 // The share of page loads that send Speed Insights (app/layout.tsx), from 0
@@ -28,14 +30,13 @@ const config = {
     // docs. On the cloud's host the root is the website's start page.
     return [
       { source: "/", destination: "/docs", permanent: false },
-      // The Qwik meta-framework SDK's page, from before the SDK took Qwik 2's
-      // name for its router (Qwik Router, formerly Qwik City).
-      { source: "/docs/sdks/qwik-city", destination: "/docs/sdks/qwik-router", permanent: true },
-      {
-        source: "/docs/sdks/qwik-city.md",
-        destination: "/docs/sdks/qwik-router.md",
-        permanent: true,
-      },
+      // A page that moved, and its Markdown twin, such as the Qwik Router
+      // SDK's page from before the SDK took Qwik 2's name for its router
+      // (formerly Qwik City), or the CLI section's guides, now under Guides.
+      ...Object.entries(moved).flatMap(([source, destination]) => [
+        { source, destination, permanent: true },
+        { source: `${source}.md`, destination: `${destination}.md`, permanent: true },
+      ]),
     ];
   },
 };

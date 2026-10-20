@@ -10,8 +10,9 @@ import type { RequestData } from "fumadocs-openapi/requests";
 import { pathnameFromRequest } from "fumadocs-openapi/requests/generators";
 import { curl } from "fumadocs-openapi/requests/generators/curl";
 
+import { cliCommandUrl, cliSidebarNames, cliSource } from "./cli-reference";
 import { codeThemes } from "./code-theme";
-import { cliSample } from "./cli-sample";
+import { cliCommand, cliSample } from "./cli-sample";
 import { defaultRequest, withRefValues } from "./default-request";
 import { firstSentence, shortDescription } from "./description";
 import { openapi } from "./openapi";
@@ -62,10 +63,12 @@ export const source = loader(
         };
       })
       .build(),
+    // A page per command of the CLI, under reference/cli (lib/cli-reference.ts).
+    cli: cliSource,
   },
   {
     baseUrl: docsRoute,
-    plugins: [lucideIconsPlugin(), openapi.loaderPlugin()],
+    plugins: [lucideIconsPlugin(), openapi.loaderPlugin(), cliSidebarNames()],
   },
 );
 
@@ -85,8 +88,21 @@ function sourceLlms(input: typeof source) {
     },
     renderPage: async (page) => `# ${page.data.title} (${page.url})
 
-${page.type === "openapi" ? operationText(page) : await page.data.getText("processed")}`,
+${await pageText(page)}`,
   });
+}
+
+// A CLI reference page is Markdown already; a content page's is its processed
+// MDX.
+async function pageText(page: Page) {
+  switch (page.type) {
+    case "openapi":
+      return operationText(page);
+    case "cli":
+      return page.data.markdown;
+    default:
+      return page.data.getText("processed");
+  }
 }
 
 // The pages, llms-full.txt, and MCP, whose get_page takes the page URL its
@@ -168,8 +184,11 @@ function operationText(page: OpenAPIPage) {
     return [
       "Called through [`@zitadel/api`](/docs/sdks/api-client), with the request the page shows:",
       `\`\`\`ts\n${sample.typescript}\n\`\`\``,
-      ...(sample.cli
-        ? ["Run with [the CLI](/docs/cli):", `\`\`\`bash\n${sample.cli}\n\`\`\``]
+      ...(sample.cli && sample.command
+        ? [
+            `Run with [\`zitadel ${sample.command}\`](${cliCommandUrl(sample.command)}):`,
+            `\`\`\`bash\n${sample.cli}\n\`\`\``,
+          ]
         : []),
       "With cURL, against a local server:",
       `\`\`\`bash\n${sample.curl}\n\`\`\``,
@@ -208,6 +227,7 @@ function operationSamples(
   const request = defaultRequest(operation, pathItem, method);
   return {
     typescript: sdkSample(operation, path, pathItem, request),
+    command: cliCommand(operation),
     cli: cliSample(operation, path, request),
     curl: curlSample(operation, path, request),
   };

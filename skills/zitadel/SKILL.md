@@ -51,8 +51,8 @@ The CLI can **scaffold** a fresh app for every framework above and **integrate
 writes the routes, request boundary or root component, and stops with
 `E_CONFLICT` rather than overwrite a file of the app's. It leaves an app it does
 not support unchanged: a Next.js Pages Router app, a React app without Vite, or
-a framework older than setup supports (the quickstart's
-[Add Zitadel to an existing app](https://preview.zitadel.com/docs/get-started/quickstart.md)
+a framework older than setup supports
+([Add Zitadel to an existing app](https://preview.zitadel.com/docs/get-started/existing-app.md)
 lists the versions). For those, reach for that framework's SDK skill and add
 auth by hand: install `@zitadel/sdk-<framework>@alpha`, configure it, add the
 provider/guard/routes, and drop in the login component.
@@ -70,13 +70,14 @@ product is in preview and changes quickly.
 
 The docs are organised into these sections:
 
-| Section       | What it covers                                                         |
-| ------------- | ---------------------------------------------------------------------- |
-| Get started   | The quickstart, and driving the CLI as an agent                        |
-| Concepts      | Projects, teams, users, flows, schemas, sessions, databases, SDK proxy |
-| CLI           | Local runtime, `plan`/`apply`, login design and copy, troubleshooting  |
-| SDKs          | One page per framework SDK, the API client, the login web component    |
-| API reference | Every REST endpoint, grouped by resource                               |
+| Section       | What it covers                                                              |
+| ------------- | --------------------------------------------------------------------------- |
+| Get started   | The quickstart, an existing app, and driving the CLI as an agent            |
+| Guides        | Local runtime, `plan`/`apply`, social sign-in, login design and copy        |
+| Concepts      | Projects, teams, users, config as code, flows, schemas, sessions, databases |
+| SDKs          | One page per framework SDK, the SDK proxy, the API client, components       |
+| CLI reference | Every `zitadel` command with its flags and examples, by command group       |
+| API reference | Every REST endpoint, grouped by resource                                    |
 
 ### Finding the right page
 

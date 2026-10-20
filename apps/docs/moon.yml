@@ -12,7 +12,8 @@ workspace:
       - "test"
 
 tasks:
-  # Bundles api/openapi into .generated/, which lib/openapi.ts imports. The
+  # Bundles api/openapi into .generated/, which lib/openapi.ts imports, and
+  # the CLI's command reference, which lib/cli-reference.ts imports. The
   # content needs no generation step: lib/source.ts defines its collection
   # with Fumadocs MDX's macro.
   generate:
@@ -22,9 +23,13 @@ tasks:
       - "/api/openapi/**/*.yaml"
       # The bundle applies the repo's Redocly config.
       - "/redocly.yaml"
+      # Written by the CLI's reference test from its command table.
+      - "/apps/cli/command-reference.json"
     outputs:
       - ".generated/openapi.mjs"
       - ".generated/openapi.d.mts"
+      - ".generated/cli.mjs"
+      - ".generated/cli.d.mts"
 
   typecheck:
     deps:

@@ -973,6 +973,9 @@ importers:
       '@zitadel/api':
         specifier: workspace:*
         version: link:../../packages/api
+      '@zitadel/cli':
+        specifier: workspace:*
+        version: link:../cli
       tailwindcss:
         specifier: 'catalog:'
         version: 4.2.4
