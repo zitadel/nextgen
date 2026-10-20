@@ -57,6 +57,7 @@
     "@angular/platform-browser": "^22.2.3",
     "@angular/platform-server": "catalog:",
     "@angular/router": "^22.2.3",
+    "@babel/core": "^8.0.1",
     "@testing-library/angular": "^19.4.1",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",

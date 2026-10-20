@@ -27,8 +27,11 @@ import {
   sendRedirect,
   getRequestURL,
   getRequestHeader,
+  getRequestHeaders,
+  getRequestIP,
+  getMethod,
   setResponseStatus,
-  readRawBody,
+  toWebRequest,
 } from "h3";
 
 import { resolveProjectSecret, resolveUrl } from "../lib/settings";
@@ -56,20 +59,20 @@ declare module "h3" {
  * receives origin information. `X-Forwarded-Host` and `X-Forwarded-Proto` are set
  * only when absent, preserving values injected by an upstream CDN.
  *
- * Node.js header values may be a string or an array of strings; arrays are
- * joined with `", "` to produce a single header value.
+ * The request is read through h3's accessors, never `event.node`, so this runs
+ * wherever Nitro does: h3 joins a repeated header with `", "` into one value.
  *
  * @param event - The current H3 event.
  * @returns A `Headers` instance safe to forward to the upstream service.
  */
 function buildUpstreamHeaders(event: H3Event): Headers {
   const headers = new Headers();
-  for (const [key, value] of Object.entries(event.node.req.headers)) {
+  for (const [key, value] of Object.entries(getRequestHeaders(event))) {
     const lower = key.toLowerCase();
     if (!value || HOP_BY_HOP.has(lower) || INTERNAL_HEADERS.has(lower)) {
       continue;
     }
-    headers.set(key, Array.isArray(value) ? value.join(", ") : value);
+    headers.set(key, value);
   }
 
   const url = getRequestURL(event);
@@ -78,7 +81,9 @@ function buildUpstreamHeaders(event: H3Event): Headers {
   // upstream auth server sees the full proxy path. We never skip this even when
   // a chain is already present — a load balancer may have set XFF before the
   // request reached this Nitro server, and our hop must still be recorded.
-  const socketIp = (event.node.req.socket as { remoteAddress?: string } | undefined)?.remoteAddress;
+  // `getRequestIP` without `xForwardedFor` answers the address the runtime
+  // reports for the connection, never a client-supplied header.
+  const socketIp = getRequestIP(event);
   if (socketIp) {
     const existingXff = headers.get("x-forwarded-for");
     headers.set("x-forwarded-for", existingXff ? `${existingXff}, ${socketIp}` : socketIp);
@@ -209,10 +214,12 @@ async function proxyRequest(
   const suffix = url.pathname.slice(proxyPath.length);
   const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
-  const method = event.node.req.method ?? "GET";
+  const method = getMethod(event);
   const hasBody = !["GET", "HEAD"].includes(method);
-  const rawBody = hasBody ? await readRawBody(event, false) : undefined;
-  const body = rawBody != null ? new Uint8Array(rawBody) : undefined;
+  // Read through the web Request, as `Buffer` is not there on every runtime.
+  const rawBody = hasBody ? await toWebRequest(event).arrayBuffer() : undefined;
+  const body =
+    rawBody !== undefined && rawBody.byteLength > 0 ? new Uint8Array(rawBody) : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event);
   const sessionCookies = proxySessionCookies(
@@ -240,9 +247,7 @@ async function proxyRequest(
   // the future publishable-key exchange path.
   if (requiresProjectSecret(method, suffix) && !upstreamHeaders.has("authorization")) {
     const config = useRuntimeConfig();
-    const projectSecret = resolveProjectSecret(
-      config.nextgen as Record<string, unknown> | undefined,
-    );
+    const projectSecret = resolveProjectSecret(config.nextgen);
     if (projectSecret) {
       upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
     }
@@ -257,7 +262,7 @@ async function proxyRequest(
   });
 
   // Build a web-standard Response with filtered headers. This is the
-  // canonical representation — we write it to event.node.res at the end.
+  // canonical representation — we write it to the h3 event at the end.
   // The app's own request URL: the origin a proxied redirect may name, and
   // the base a relative one resolves against.
   const responseHeaders = filterResponseHeaders(upstream.headers, getRequestURL(event).toString());
@@ -276,15 +281,15 @@ async function proxyRequest(
   });
 
   // Write the response to the H3 event.
-  event.node.res.statusCode = response.status;
+  setResponseStatus(event, response.status);
   for (const [key, value] of response.headers.entries()) {
     if (key.toLowerCase() === "set-cookie") continue;
-    event.node.res.setHeader(key, value);
+    setResponseHeader(event, key, value);
   }
   // Use getSetCookie() so multiple Set-Cookie values aren't collapsed.
   const finalCookies = response.headers.getSetCookie?.() ?? [];
   for (const cookie of finalCookies) {
-    event.node.res.appendHeader("set-cookie", cookie);
+    appendResponseHeader(event, "set-cookie", cookie);
   }
 
   return response.body;
