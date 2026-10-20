@@ -49,7 +49,7 @@ export default defineConfig({
         },
       },
       // The Lit-free server entry, loaded from `dist/` inside the edge VM.
-      { ...edgeProject({ include: ["src/**/*.edge.spec.ts"] }), plugins: sharedPlugins() },
+      edgeProject({ include: ["src/**/*.edge.spec.ts"], plugins: sharedPlugins() }),
       {
         cacheDir: ".vitest/browser",
         plugins: sharedPlugins(),

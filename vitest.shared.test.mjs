@@ -15,6 +15,23 @@ describe("edgeProject", () => {
     });
   });
 
+  it("keeps the package's own plugins ahead of the built-in check", () => {
+    const own = { name: "own" };
+    const { plugins } = edgeProject({ include: ["vitest.shared.test.mjs"], plugins: [own] });
+    expect(plugins.map((entry) => entry.name)).toEqual(["own", "edge-reject-node-builtins"]);
+  });
+
+  it("lets a polyfilled dependency keep its built-ins", () => {
+    const { plugins } = edgeProject({
+      include: ["vitest.shared.test.mjs"],
+      polyfilledPackages: ["svelte"],
+    });
+    const check = plugins.at(-1);
+    const code = 'import { AsyncLocalStorage } from "node:async_hooks";';
+    expect(check.transform(code, "/r/node_modules/svelte/src/ctx.js")).toBeNull();
+    expect(() => check.transform(code, "/r/node_modules/other/src/ctx.js")).toThrow(/edge/);
+  });
+
   it("fails at config load when no spec matches", () => {
     expect(() => edgeProject({ include: ["nothing/**/*.spec.ts"] })).toThrow(/no spec matches/);
   });

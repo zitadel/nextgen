@@ -129,7 +129,8 @@ function rejectNodeBuiltins(allowedPackages) {
  *   projects: [edgeProject({ include: ["src/jwt.spec.ts"] }), ...]
  *
  * `conditions` are extra resolve conditions, e.g. `sourceConditions`; `alias`
- * is the package's own `resolve.alias`. A Node built-in imported by anything
+ * is the package's own `resolve.alias`; `plugins` are its own Vite plugins,
+ * which go here rather than over the result, or the built-in check is lost. A Node built-in imported by anything
  * but a spec or its fixtures fails the run, unless the importing dependency
  * is in `polyfilledPackages` (Nitro polyfills it on the edge).
  *
@@ -144,6 +145,7 @@ export function edgeProject({
   conditions = [],
   alias = {},
   polyfilledPackages = [],
+  plugins = [],
 }) {
   // A pattern that matches nothing would leave the project running no spec
   // and every run green, so fail when the config loads instead.
@@ -152,7 +154,7 @@ export function edgeProject({
   }
   return {
     cacheDir: ".vitest/edge",
-    plugins: [rejectNodeBuiltins(polyfilledPackages)],
+    plugins: [...plugins, rejectNodeBuiltins(polyfilledPackages)],
     resolve: { conditions, alias },
     ssr: { resolve: { conditions: ["browser", ...conditions] } },
     test: {

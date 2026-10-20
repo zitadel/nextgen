@@ -56,19 +56,17 @@ export default defineConfig({
       // `/client`, which registers the elements in the browser: the components
       // package resolves to its entry without the elements under `edge-light`
       // (see its package.json).
-      {
-        ...edgeProject({
-          include: [
-            "src/__tests__/middleware.test.ts",
-            "src/__tests__/lib/jwt.test.ts",
-            "src/__tests__/index.test.ts",
-            "src/__tests__/server.test.ts",
-            "src/__tests__/client.edge.test.ts",
-          ],
-          conditions: ["react-server", "edge-light"],
-        }),
+      edgeProject({
+        include: [
+          "src/__tests__/middleware.test.ts",
+          "src/__tests__/lib/jwt.test.ts",
+          "src/__tests__/index.test.ts",
+          "src/__tests__/server.test.ts",
+          "src/__tests__/client.edge.test.ts",
+        ],
+        conditions: ["react-server", "edge-light"],
         plugins: [clientReferences()],
-      },
+      }),
     ],
   },
 });

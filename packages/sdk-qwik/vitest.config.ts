@@ -59,10 +59,14 @@ export default defineConfig({
           include: ["src/**/*.ssr.spec.tsx"],
         },
       },
-      {
-        ...edgeProject({ include: ["src/index.ssr.spec.tsx"], conditions: ["edge-light"] }),
+      edgeProject({
+        include: ["src/index.ssr.spec.tsx"],
+        conditions: ["edge-light"],
         plugins: [qwikVite()],
-      },
+        // Qwik keeps its request context in an AsyncLocalStorage, which Workers
+        // (`nodejs_compat`) and Vercel Edge both provide.
+        polyfilledPackages: ["@qwik.dev/core"],
+      }),
     ],
   },
 });

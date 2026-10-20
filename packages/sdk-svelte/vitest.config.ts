@@ -46,10 +46,14 @@ export default defineConfig({
           exclude: [...configDefaults.exclude, ".svelte-kit/**"],
         },
       },
-      {
-        ...edgeProject({ include: ["src/index.ssr.spec.ts"], conditions: ["worker"] }),
+      edgeProject({
+        include: ["src/index.ssr.spec.ts"],
+        conditions: ["worker"],
         plugins: [svelte()],
-      },
+        // Svelte loads `node:async_hooks` for its async server rendering, which
+        // Workers (`nodejs_compat`) and Vercel Edge both provide.
+        polyfilledPackages: ["svelte"],
+      }),
     ],
   },
 });

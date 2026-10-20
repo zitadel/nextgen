@@ -43,10 +43,11 @@ export default defineConfig({
           include: ["src/**/*.ssr.spec.tsx"],
         },
       },
-      {
-        ...edgeProject({ include: ["src/index.ssr.spec.tsx"], conditions: ["worker"] }),
+      edgeProject({
+        include: ["src/index.ssr.spec.tsx"],
+        conditions: ["worker"],
         plugins: [solid({ ssr: true })],
-      },
+      }),
       {
         cacheDir: ".vitest/hydrate",
         plugins: [solid({ solid: { hydratable: true } })],

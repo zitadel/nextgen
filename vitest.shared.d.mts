@@ -34,10 +34,13 @@ export interface EdgeProjectOptions {
   alias?: Record<string, string>;
   /** Dependencies allowed to import Node built-ins, because the edge platform polyfills them. */
   polyfilledPackages?: string[];
+  /** The package's own Vite plugins, run before the built-in check. */
+  plugins?: import("vite").PluginOption[];
 }
 
 export interface EdgeProject {
   cacheDir: string;
+  plugins: import("vite").PluginOption[];
   resolve: { conditions: string[]; alias: Record<string, string> };
   ssr: { resolve: { conditions: string[] } };
   test: {
