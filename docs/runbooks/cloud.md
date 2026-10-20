@@ -3,10 +3,10 @@
 > **Code:** [`apps/cloud/`](../../apps/cloud/) and the repo-root
 > [`vercel.json`](../../vercel.json)
 > **Vercel project:** `zitadel/cloud` (renamed from `nextgen-preview-cloud`).
-> Production answers at `nextgen-preview-cloud.vercel.app` and at
-> `nextgen-docs-zitadel.vercel.app`, the docs' address that
-> [`skills/zitadel/SKILL.md`](../../skills/zitadel/SKILL.md) gives agents,
-> until a domain of our own is attached
+> Production answers at `preview.zitadel.com`, the docs' address that
+> [`skills/zitadel/SKILL.md`](../../skills/zitadel/SKILL.md) gives agents;
+> `nextgen-preview-cloud.vercel.app` and `nextgen-docs-zitadel.vercel.app`
+> redirect there
 > **PlanetScale:** organization `zitadel`, Postgres databases `production`
 > and `preview`, both in AWS `eu-central-1`
 

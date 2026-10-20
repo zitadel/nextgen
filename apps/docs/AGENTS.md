@@ -59,7 +59,8 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
   Markdown link to one: link prose to the section's page.
 - An operation's samples are its `@zitadel/api` call (`lib/sdk-sample.ts`),
   its `zitadel` command (`x-zitadel-cli`, `lib/cli-sample.ts`) and cURL
-  (`components/api-page.tsx`).
+  (`components/api-page.tsx`); its Markdown repeats all three for the default
+  request (`lib/source.ts`).
 - `typecheck` compiles every sample against `@zitadel/api`
   (`scripts/sdk-samples.ts`). A new security scheme fails it until
   `lib/sdk-sample.ts` can authenticate with it.
