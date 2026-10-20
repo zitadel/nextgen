@@ -491,8 +491,8 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	case domain.ErrUserNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrUserAlreadyExists().Code:
-		if _, ok := err.Details.(domain.UserAttributesDetails); ok {
-			err = err.WithDetails(userAttributeFieldPaths(err.Details))
+		if taken, ok := err.Details.(domain.UserAttributesDetails); ok {
+			err = err.WithDetails(userAttributeFieldPaths(taken))
 		}
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrUserConflict().Code:
@@ -509,16 +509,22 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 // whether ogen or the user schema refused them, named by their path from the
 // request body.
 func userAttributesRequestInvalid(err error) error {
-	if invalid, ok := errors.AsType[domain.Error](err); ok && invalid.Code == domain.ErrUserAttributesInvalid(nil).Code {
-		return domain.ErrRequestInvalid().WithParent(err).WithDetails(userAttributeFieldPaths(invalid.Details))
+	invalid, ok := errors.AsType[domain.Error](err)
+	if !ok || invalid.Code != domain.ErrUserAttributesInvalid(nil).Code {
+		return err
 	}
-	return err
+	attrs, ok := invalid.Details.(domain.UserAttributesDetails)
+	if !ok {
+		// Without the keys there are no fields to name: userErrorResponse
+		// answers it as a schema failure instead.
+		return err
+	}
+	return domain.ErrRequestInvalid().WithParent(err).WithDetails(userAttributeFieldPaths(attrs))
 }
 
-// userAttributeFieldPaths names the attributes in details by their path from
+// userAttributeFieldPaths names the attributes in attrs by their path from
 // the request body, which carries them under attributes.
-func userAttributeFieldPaths(details any) domain.InvalidFieldPathsDetails {
-	attrs, _ := details.(domain.UserAttributesDetails)
+func userAttributeFieldPaths(attrs domain.UserAttributesDetails) domain.InvalidFieldPathsDetails {
 	fields := make([]string, 0, len(attrs.Keys))
 	for _, key := range attrs.Keys {
 		path := domain.AttributeKey("attributes")

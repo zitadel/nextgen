@@ -496,6 +496,17 @@ func TestErrorResponseUserAttributesAreNamedByBodyPath(t *testing.T) {
 	require.JSONEq(t, `{"fields":["attributes","attributes.address.zip"]}`, string(invalid.Response.Details.Value["details"]))
 }
 
+// A schema failure that names no attributes has no fields to report, so it is
+// answered as a schema failure, never as req.invalid with an empty list.
+func TestErrorResponseUserAttributesInvalidWithoutKeysStaysUserInvalid(t *testing.T) {
+	t.Parallel()
+
+	got := errorResponse(userAttributesRequestInvalid(domain.ErrUserAttributesInvalid(nil)))
+	require.Equal(t, http.StatusBadRequest, got.StatusCode)
+	require.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), got.Response.Code)
+	require.False(t, got.Response.Details.Set)
+}
+
 // A credential IntrospectToken refuses is a 401; an introspection that could
 // not reach the token store is a 500. Answering the outage with 401 would tell
 // every SDK its session is dead, and they clear the session cookie on a 401.
