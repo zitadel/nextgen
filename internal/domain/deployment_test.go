@@ -168,8 +168,51 @@ func TestResolveDeploymentTargets(t *testing.T) {
 		}
 	})
 
-	t.Run("any other origin is not served yet", func(t *testing.T) {
-		_, _, err := ResolveDeploymentTargets(projectOrigins, []string{"https://acme-git-sso-acmeinc.vercel.app"})
-		assert.ErrorIs(t, err, ErrNotImplemented())
+	t.Run("preview URLs a pattern admits", func(t *testing.T) {
+		targets := []string{"https://acme-git-sso-acmeinc.vercel.app", "https://acme-k3x9v2-acmeinc.vercel.app"}
+		kind, origins, err := ResolveDeploymentTargets(projectOrigins, targets)
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentOriginKindPreview, kind)
+		assert.Equal(t, targets, origins)
 	})
+
+	t.Run("a URL no pattern admits", func(t *testing.T) {
+		_, _, err := ResolveDeploymentTargets(projectOrigins, []string{"https://acme-git-sso-acmeinc.vercel.app", "https://acme.example"})
+		assert.ErrorIs(t, err, ErrProjectOriginNotAllowed(""))
+		assert.Equal(t, map[string]string{"origin": "https://acme.example"}, err.(Error).Details)
+	})
+}
+
+func TestOriginMatches(t *testing.T) {
+	pattern := Origin{Pattern: "https://*-acmeinc.vercel.app", Kind: OriginKindPreview}
+	for origin, want := range map[string]bool{
+		"https://acme-git-sso-acmeinc.vercel.app":   true,
+		"https://a-acmeinc.vercel.app":              true,
+		"https://-acmeinc.vercel.app":               false,
+		"https://a.b-acmeinc.vercel.app":            false,
+		"http://acme-git-sso-acmeinc.vercel.app":    false,
+		"https://acme-git-sso-acmeinc.vercel.app:1": false,
+		"https://acme-git-sso-other.vercel.app":     false,
+	} {
+		assert.Equal(t, want, pattern.Matches(origin), origin)
+	}
+	exact := Origin{Pattern: "http://localhost:3000", Kind: OriginKindPreview}
+	assert.True(t, exact.Matches("http://localhost:3000"))
+	assert.False(t, exact.Matches("http://localhost:3001"))
+}
+
+func TestParsePreviewTTL(t *testing.T) {
+	for ttl, want := range map[string]time.Duration{
+		"30m":  30 * time.Minute,
+		"168h": 168 * time.Hour,
+		"7d":   7 * 24 * time.Hour,
+	} {
+		got, err := ParsePreviewTTL(ttl)
+		require.NoError(t, err, ttl)
+		assert.Equal(t, want, got, ttl)
+	}
+	for _, ttl := range []string{"", "h", "0h", "7w", "-1h", "1.5h"} {
+		_, err := ParsePreviewTTL(ttl)
+		assert.ErrorIs(t, err, ErrDeploymentInvalid(), ttl)
+	}
 }

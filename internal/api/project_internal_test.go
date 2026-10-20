@@ -64,6 +64,7 @@ func TestProjectErrorResponse(t *testing.T) {
 	}{
 		{"not_found", domain.ErrProjectNotFound(), http.StatusNotFound},
 		{"permission_denied", domain.ErrProjectPermissionDenied(), http.StatusForbidden},
+		{"origin_not_allowed", domain.ErrProjectOriginNotAllowed("https://acme.example"), http.StatusForbidden},
 		{"name_invalid", domain.ErrProjectNameInvalid(), http.StatusBadRequest},
 		{"missing_id", domain.ErrProjectMissingID(), http.StatusBadRequest},
 		{"already_claimed", domain.ErrProjectAlreadyClaimed(), http.StatusConflict},

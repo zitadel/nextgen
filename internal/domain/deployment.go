@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -232,14 +233,58 @@ func ResolveDeploymentTargets(projectOrigins []Origin, deploymentTargets []strin
 		return 0, nil, ErrDeploymentInvalid().WithMessage("primary origins and preview URLs cannot be mixed")
 	}
 	if len(previews) > 0 {
-		// TODO(#1572): match previews against the project's preview patterns.
-		return 0, nil, ErrNotImplemented()
+		for _, target := range previews {
+			if !previewAllowed(projectOrigins, target) {
+				return 0, nil, ErrProjectOriginNotAllowed(target)
+			}
+		}
+		return DeploymentOriginKindPreview, previews, nil
 	}
 	if len(primary) == 0 {
 		return 0, nil, ErrDeploymentInvalid().WithMessage("the project has no primary origin")
 	}
 	// TODO(#1572): cap primary origins at MaxDeploymentTargets.
 	return DeploymentOriginKindPrimary, primary, nil
+}
+
+// previewAllowed reports whether one of the project's preview patterns admits
+// the URL.
+func previewAllowed(projectOrigins []Origin, origin string) bool {
+	for _, o := range projectOrigins {
+		if o.Kind == OriginKindPreview && o.Matches(origin) {
+			return true
+		}
+	}
+	return false
+}
+
+// DefaultPreviewTTL is how long a preview stays live when the deployment
+// gives no ttl.
+const DefaultPreviewTTL = 7 * 24 * time.Hour
+
+// ParsePreviewTTL parses a ttl as the API takes it: a positive whole number
+// of minutes, hours or days, such as 30m, 168h or 7d.
+func ParsePreviewTTL(ttl string) (time.Duration, error) {
+	invalid := ErrDeploymentInvalid().WithMessage("ttl must be a positive whole number followed by m, h or d")
+	if len(ttl) < 2 {
+		return 0, invalid
+	}
+	n, err := strconv.ParseUint(ttl[:len(ttl)-1], 10, 32)
+	if err != nil || n == 0 {
+		return 0, invalid
+	}
+	var unit time.Duration
+	switch ttl[len(ttl)-1] {
+	case 'm':
+		unit = time.Minute
+	case 'h':
+		unit = time.Hour
+	case 'd':
+		unit = 24 * time.Hour
+	default:
+		return 0, invalid
+	}
+	return time.Duration(n) * unit, nil
 }
 
 // PrimaryOrigins returns the patterns of the project's primary origins, which

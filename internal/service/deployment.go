@@ -35,12 +35,16 @@ type CreateDeploymentInput struct {
 type CreateDeploymentOutput struct {
 	Deployment *domain.Deployment
 	Created    bool
+	// PreviewExpiresAt is the expiry a written preview deployment set on its
+	// previews. Nil for a primary deployment or when nothing was written.
+	PreviewExpiresAt *time.Time
 }
 
 // DeployInput carries the targets as the request gives them.
 type DeployInput struct {
-	// HasTTL reports a ttl in the request, which only a preview deploy takes.
-	HasTTL               bool
+	// TTL is how long the previews a preview deploy renews stay live; nil
+	// takes the default. Only a preview deploy takes one.
+	TTL                  *time.Duration
 	ProjectID            string
 	ReleaseID            string
 	Targets              []string
@@ -139,8 +143,14 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 	if err != nil {
 		return nil, err
 	}
-	if input.HasTTL && kind == domain.DeploymentOriginKindPrimary {
+	var ttl time.Duration
+	switch {
+	case kind == domain.DeploymentOriginKindPrimary && input.TTL != nil:
 		return nil, domain.ErrDeploymentInvalid().WithMessage("ttl is only valid for preview URLs")
+	case kind == domain.DeploymentOriginKindPreview && input.TTL != nil:
+		ttl = *input.TTL
+	case kind == domain.DeploymentOriginKindPreview:
+		ttl = domain.DefaultPreviewTTL
 	}
 	return s.Create(ctx, CreateDeploymentInput{
 		ProjectID:            input.ProjectID,
@@ -150,6 +160,7 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 		Reason:               input.Reason,
 		Message:              input.Message,
 		ExpectedDeploymentID: input.ExpectedDeploymentID,
+		PreviewTTL:           ttl,
 	})
 }
 
@@ -229,18 +240,16 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
+		output = &CreateDeploymentOutput{Deployment: &written, Created: true}
 		// TODO(#1781): freeze the deployment's variables here, in this transaction.
 		if written.OriginKind == domain.DeploymentOriginKindPreview {
-			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
-				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {
+			expiresAt := written.DeployedAt.Add(input.PreviewTTL)
+			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(), expiresAt, written.DeployedAt); err != nil {
 				return err
 			}
+			output.PreviewExpiresAt = &expiresAt
 		}
-		if err := emitDeploymentCreated(ctx, stmts, &written); err != nil {
-			return err
-		}
-		output = &CreateDeploymentOutput{Deployment: &written, Created: true}
-		return nil
+		return emitDeploymentCreated(ctx, stmts, &written)
 	})
 	return output, err
 }

@@ -292,14 +292,61 @@ func TestDeploymentServiceDeployExpandsPrimary(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, result.Created)
 	assert.Equal(t, []string{appOrigin}, result.Deployment.Origins())
+	assert.Nil(t, result.PreviewExpiresAt)
+}
+
+var acmePreviews = domain.Origin{Pattern: "https://*-acmeinc.vercel.app", Kind: domain.OriginKindPreview}
+
+const previewOrigin = "https://acme-git-sso-acmeinc.vercel.app"
+
+// expectPreviewWrite sets up one preview deploy to previewOrigin, which no
+// deployment has reached yet, and the renewal of its preview to expiresAt.
+func expectPreviewWrite(statements *servicemocks.MockAllStatements, expiresAt time.Time) {
+	expectProjectOrigins(statements, appPrimary, acmePreviews)
+	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
+	statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{previewOrigin}).Return(nil, nil)
+	expectInsert(statements, nil)
+	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", []string{previewOrigin}, expiresAt, deployedAt).Return(nil)
+}
+
+func TestDeploymentServiceDeployToPreviewURLs(t *testing.T) {
+	t.Run("renews the previews for the ttl", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectPreviewWrite(statements, deployedAt.Add(time.Hour))
+
+		result, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{previewOrigin}, TTL: new(time.Hour)})
+		require.NoError(t, err)
+		assert.True(t, result.Created)
+		assert.Equal(t, domain.DeploymentOriginKindPreview, result.Deployment.OriginKind)
+		assert.Equal(t, []string{previewOrigin}, result.Deployment.Origins())
+		require.NotNil(t, result.PreviewExpiresAt)
+		assert.Equal(t, deployedAt.Add(time.Hour), *result.PreviewExpiresAt)
+	})
+
+	t.Run("without a ttl takes the default", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectPreviewWrite(statements, deployedAt.Add(domain.DefaultPreviewTTL))
+
+		result, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{previewOrigin}})
+		require.NoError(t, err)
+		assert.Equal(t, deployedAt.Add(domain.DefaultPreviewTTL), *result.PreviewExpiresAt)
+	})
 }
 
 func TestDeploymentServiceDeployRejects(t *testing.T) {
 	t.Run("a ttl for primary origins", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, appPrimary)
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, HasTTL: true})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, TTL: new(time.Hour)})
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+	})
+
+	t.Run("a URL no preview pattern admits", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectProjectOrigins(statements, appPrimary, acmePreviews)
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"https://acme.example"}})
+		de := assertServiceDomainCode(t, err, domain.ErrProjectOriginNotAllowed("").Code)
+		assert.Equal(t, map[string]string{"origin": "https://acme.example"}, de.Details)
 	})
 
 	t.Run("an exact primary origin", func(t *testing.T) {

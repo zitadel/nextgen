@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -209,10 +210,9 @@ func TestCreateDeployment(t *testing.T) {
 			body:       `{"release_id":"` + string(releaseID) + `","targets":["` + appOrigin + `"]}`,
 			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
-		// Deploying to preview URLs lands on top of this.
-		"a preview URL": {
-			body:       `{"release_id":"` + string(releaseID) + `","targets":["` + previewOrigin + `"]}`,
-			wantStatus: http.StatusNotImplemented, wantCode: domain.ErrNotImplemented().Code,
+		"a URL no preview pattern admits": {
+			body:       `{"release_id":"` + string(releaseID) + `","targets":["` + previewOrigin + `","https://acme.example"]}`,
+			wantStatus: http.StatusForbidden, wantCode: domain.ErrProjectOriginNotAllowed("").Code,
 		},
 		"an unknown release": {
 			body:       `{"release_id":"rel_01KX5N7C9D2E7F0N9WD3P2E4YM6","targets":["primary"]}`,
@@ -233,6 +233,69 @@ func TestCreateDeployment(t *testing.T) {
 		status, code := bare.postDeployment(t, `{"release_id":"`+string(created.(*api.CreateReleaseCreated).ID)+`","targets":["primary"]}`)
 		assert.Equal(t, http.StatusBadRequest, status)
 		assert.Equal(t, domain.ErrDeploymentInvalid().Code, code)
+	})
+}
+
+// TestPreviewDeployment deploys to preview URLs: every deploy writes a record
+// and renews the previews, the response carries the expiry, and the live
+// view serves the deployment beside the primary one.
+func TestPreviewDeployment(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	project := api.ProjectID(fixture.project)
+	const otherPreview = "https://acme-k3x9v2-acmeinc.vercel.app"
+
+	deployPreview := func(t *testing.T, req *api.CreateDeploymentRequest) *api.CreateDeploymentCreated {
+		t.Helper()
+		resp, err := fixture.client.CreateDeployment(t.Context(), req, api.CreateDeploymentParams{ProjectID: project})
+		require.NoError(t, err)
+		require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.CreateDeploymentCreated)
+	}
+
+	before := time.Now()
+	first := deployPreview(t, &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(fixture.release.ID),
+		Targets:   api.DeploymentTargetsRequest{previewOrigin, otherPreview},
+		TTL:       api.NewOptPreviewTTL("1h"),
+	})
+	assert.Equal(t, api.DeploymentKindPreview, first.Kind)
+	assert.Equal(t, api.DeploymentStatusLive, first.Status)
+	assert.Equal(t, []string{previewOrigin, otherPreview}, origins(first.Targets))
+	for _, target := range first.Targets {
+		require.True(t, target.ExpiresAt.Set, helpers.MustMarshal(t, first))
+		assert.WithinDuration(t, before.Add(time.Hour), target.ExpiresAt.Value, time.Minute)
+	}
+
+	t.Run("the same deploy writes again and takes the default ttl", func(t *testing.T) {
+		again := deployPreview(t, &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(fixture.release.ID),
+			Targets:   api.DeploymentTargetsRequest{previewOrigin, otherPreview},
+		})
+		assert.NotEqual(t, first.ID, again.ID)
+		assert.WithinDuration(t, time.Now().Add(domain.DefaultPreviewTTL), again.Targets[0].ExpiresAt.Value, time.Minute)
+	})
+
+	t.Run("live beside the primary deployment", func(t *testing.T) {
+		primary := fixture.deploy(t, fixture.release.ID)
+		require.IsType(t, &api.CreateDeploymentCreated{}, primary, helpers.MustMarshal(t, primary))
+		preview := deployPreview(t, &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(fixture.otherRelease(t)),
+			Targets:   api.DeploymentTargetsRequest{previewOrigin},
+		})
+
+		resp, err := fixture.client.ListDeployments(t.Context(), api.ListDeploymentsParams{ProjectID: project, Live: api.NewOptBool(true)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListDeploymentsResponse{}, resp, helpers.MustMarshal(t, resp))
+		var live []api.DeploymentID
+		for _, d := range resp.(*api.ListDeploymentsResponse).Deployments {
+			assert.Equal(t, api.DeploymentStatusLive, d.Status)
+			live = append(live, d.ID)
+		}
+		assert.Contains(t, live, primary.(*api.CreateDeploymentCreated).ID)
+		assert.Contains(t, live, preview.ID)
+		assert.NotContains(t, live, first.ID)
 	})
 }
 
@@ -363,7 +426,6 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 	fixture := newReleaseFixture(t)
 	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: fixture.pointers()})
 	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
-	releaseID := created.(*api.CreateReleaseCreated).ID
 	project := api.ProjectID(fixture.project)
 
 	expectNotImplemented := func(t *testing.T, resp any) {
@@ -403,18 +465,6 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 			ProjectID:    project,
 			DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
 		})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("create to preview URLs", func(t *testing.T) {
-		resp, err := fixture.client.CreateDeployment(t.Context(),
-			&api.CreateDeploymentRequest{
-				ReleaseID: api.NewOptReleaseID(releaseID),
-				Targets:   api.DeploymentTargetsRequest{"https://acme-git-sso-acmeinc.vercel.app"},
-				TTL:       api.NewOptPreviewTTL("168h"),
-			},
-			api.CreateDeploymentParams{ProjectID: project})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
 	})

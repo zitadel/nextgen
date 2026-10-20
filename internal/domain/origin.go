@@ -59,6 +59,21 @@ func ErrOriginNotFound() Error {
 	return newError(PrefixOrigin.ErrorCodePrefix("not_found"), "origin: not found", nil, nil)
 }
 
+// Matches reports whether the pattern admits origin: an exact pattern its
+// own URL, a wildcard pattern any URL whose wildcard part is one or more
+// characters inside a single host label.
+func (o Origin) Matches(origin string) bool {
+	if o.Pattern == origin {
+		return true
+	}
+	prefix, suffix, ok := strings.Cut(o.Pattern, "*")
+	if !ok || len(origin) <= len(prefix)+len(suffix) ||
+		!strings.HasPrefix(origin, prefix) || !strings.HasSuffix(origin, suffix) {
+		return false
+	}
+	return !strings.ContainsAny(origin[len(prefix):len(origin)-len(suffix)], "./:")
+}
+
 // NormalizeOrigins returns a non-nil copy with trimmed patterns.
 func NormalizeOrigins(origins []Origin) []Origin {
 	if origins == nil {

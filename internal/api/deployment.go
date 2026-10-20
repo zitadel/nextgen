@@ -28,7 +28,13 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 		ProjectID: string(params.ProjectID),
 		ReleaseID: string(req.ReleaseID.Value),
 		Targets:   req.Targets,
-		HasTTL:    req.TTL.Set,
+	}
+	if ttl, ok := req.TTL.Get(); ok {
+		parsed, err := domain.ParsePreviewTTL(string(ttl))
+		if err != nil {
+			return nil, err
+		}
+		input.TTL = &parsed
 	}
 	if reason, ok := req.Reason.Get(); ok {
 		parsed, err := domain.DeploymentReasonString(string(reason))
@@ -51,8 +57,8 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 	if err != nil {
 		return nil, err
 	}
-	// Created or not, the deployment is the project's newest primary one.
-	resp := toAPIDeployment(result.Deployment, api.DeploymentStatusLive)
+	// Created or not, the deployment is the newest one to its targets.
+	resp := toAPIDeploymentWritten(result)
 	if result.Created {
 		created := api.CreateDeploymentCreated(resp)
 		return &created, nil
@@ -189,6 +195,18 @@ func toAPIDeploymentStatus(live bool) api.DeploymentStatus {
 		return api.DeploymentStatusLive
 	}
 	return api.DeploymentStatusInactive
+}
+
+// toAPIDeploymentWritten converts a deploy's result: live, and every target
+// of a written preview deployment carries the expiry it set.
+func toAPIDeploymentWritten(result *service.CreateDeploymentOutput) api.Deployment {
+	resp := toAPIDeployment(result.Deployment, api.DeploymentStatusLive)
+	if result.PreviewExpiresAt != nil {
+		for i := range resp.Targets {
+			resp.Targets[i].ExpiresAt = api.NewOptDateTime(*result.PreviewExpiresAt)
+		}
+	}
+	return resp
 }
 
 // toAPIDeployment converts a deployment.
