@@ -124,7 +124,7 @@ amendment above changed them.
   Arimo from a Google Fonts `<link>`. Since the amendment, only the first-party
   shells (console, the server's hosted login) paint Arimo, from their own
   origin; the components render Arimo only where the page or the OS has it.
-- **Override preserved.** `branding.font_url` still wins, and is now the only
+- **Override preserved.** `typography.font_url` still wins, and is now the only
   font request the components make.
 - **Third-party request by default** *(resolved by the amendment)*. The
   default fetched Arimo from Google Fonts and exposed each visitor's IP to the
