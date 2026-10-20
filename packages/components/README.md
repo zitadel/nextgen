@@ -306,14 +306,15 @@ not composed, so they never leave the widget, and the `input` event a field re-p
 carries no `data` for a secret field.
 
 The widget's state is kept out of the host as well: the typed values and the
-flow's session token live in ES-private fields, so nothing reachable from the
-`<zitadel-login>` element, or from the target of an event it emitted, returns
-them. This keeps the widget's own events and properties clean; it does not make
+flow's session token, and the helpers that return or derive them, are ES-private
+on the three widgets, so no property or method of the element, or of the target of
+an event it emitted, returns them. This keeps the widget's own events and properties clean; it does not make
 the widget opaque to the page. An open shadow root lets a page script read an
 atom's `value` and its `<input>`, including through an event's `composedPath()`;
-the browser's own keyboard, `beforeinput`, `textInput` and `input` events are
-composed and reach page scripts (the `data` removed from a re-published `input`
-gives nothing against a script listening to those); `getSelection().toString()`
+the browser's own keyboard events are composed and reach page scripts, so a
+`keydown` listener's `key` rebuilds a typed password and host hardening does not
+stop it, and the `data` removed from a re-published `input` gives nothing
+against a script listening to `beforeinput`, `textInput` or `keydown`; `getSelection().toString()`
 reads a non-password text field, a PIN or a card number, once its text is
 selected; and `zitadel-flow-complete` carries the `handoff_token`. Only a
 cross-origin iframe isolates the widget from the page it is on.

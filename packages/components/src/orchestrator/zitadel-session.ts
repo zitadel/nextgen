@@ -108,7 +108,7 @@ export class ZitadelSession extends ZitadelSurface {
   /** Sign-out action label. */
   @property({ type: String, attribute: "logout-label" }) accessor logoutLabel = "Sign out";
 
-  private readonly session = new SessionController(this, () =>
+  readonly #session = new SessionController(this, () =>
     resolveApi(this.project, this.projectAttrs, "<zitadel-session>"),
   );
 
@@ -119,16 +119,16 @@ export class ZitadelSession extends ZitadelSurface {
   }
 
   /** Signs out, then optionally navigates to `postSignOutUrl`; a failure stays put. */
-  private async doLogout(): Promise<void> {
-    if (!(await this.session.signOut())) return;
+  async #doLogout(): Promise<void> {
+    if (!(await this.#session.signOut())) return;
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.assign(this.postSignOutUrl);
     }
   }
 
-  private handleLogout(event: Event): void {
+  #handleLogout(event: Event): void {
     event.preventDefault();
-    void this.doLogout();
+    void this.#doLogout();
   }
 
   override render() {
@@ -142,9 +142,9 @@ export class ZitadelSession extends ZitadelSurface {
             ${this.heading}
           </h1>
           ${
-            this.session.label
+            this.#session.label
               ? html`<p slot=${this.suppressHeader ? nothing : "header"} class="identity">
-                ${this.session.label}
+                ${this.#session.label}
               </p>`
               : nothing
           }
@@ -153,15 +153,15 @@ export class ZitadelSession extends ZitadelSurface {
             hierarchy="primary"
             size="medium"
             block
-            ?loading=${this.session.loading}
+            ?loading=${this.#session.loading}
             data-testid="zitadel-session-logout"
             label=${this.logoutLabel}
-            @zl-submit=${this.handleLogout}
+            @zl-submit=${this.#handleLogout}
           ></zl-button>
 
           ${
-            this.session.errorMessage
-              ? html`<p class="error" role="alert">${this.session.errorMessage}</p>`
+            this.#session.errorMessage
+              ? html`<p class="error" role="alert">${this.#session.errorMessage}</p>`
               : nothing
           }
         </zl-card>

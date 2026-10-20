@@ -2,12 +2,15 @@ import type { CreateFlow201, CreateFlow201Step } from "@zitadel/api/generated/mo
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LitElement } from "lit";
 import { userEvent } from "vitest/browser";
 
 import { DISPATCHED_EVENTS } from "../events.js";
 import { manifestRegistry } from "../manifests.js";
 
 import "./zitadel-login.js";
+import "./zitadel-logout.js";
+import "./zitadel-session.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
 
 /**
@@ -861,10 +864,108 @@ describe("reachableStrings", () => {
  * `input` of a keystroke) are not the widget's to withhold, so they are left
  * out; everything the widget dispatches itself must carry no secret.
  */
+/** The own member names of every prototype from `start` up to, not including, `HTMLElement`. */
+function memberNames(start: object): Set<string> {
+  const names = new Set<string>();
+  for (
+    let proto: object | null = start;
+    proto && proto !== HTMLElement.prototype;
+    proto = Object.getPrototypeOf(proto)
+  ) {
+    for (const name of Object.getOwnPropertyNames(proto)) names.add(name);
+  }
+  return names;
+}
+
+/** What every Lit element has; a widget's own members are the ones beyond it. */
+const LIT_MEMBERS = memberNames(LitElement.prototype);
+
+/**
+ * What a widget host may expose beyond Lit's own members: its public properties
+ * and the reactive state that has no secret in it. A new name fails the guard
+ * below until a person decides it is safe to put here. No method is listed, so
+ * nothing a page can call returns the widget's state; `applySurfaceTheme` takes
+ * a branding argument and returns nothing.
+ */
+const WIDGET_MEMBERS = {
+  "zitadel-login": [
+    "applySurfaceTheme",
+    "branding",
+    "completing",
+    "flowName",
+    "forcePostSignInUrl",
+    "lang",
+    "loading",
+    "locales",
+    "postSignInUrl",
+    "previewState",
+    "previewSuccessStep",
+    "project",
+    "projectAttrs",
+    "projectId",
+    "proxyPath",
+    "publishableKey",
+    "purpose",
+    "resumeFlowId",
+    "startupError",
+    "suppressHeader",
+    "suppressPasswordToggle",
+    "theme",
+    "url",
+    "variant",
+  ],
+  "zitadel-session": [
+    "applySurfaceTheme",
+    "heading",
+    "logoutLabel",
+    "postSignOutUrl",
+    "project",
+    "projectAttrs",
+    "projectId",
+    "proxyPath",
+    "publishableKey",
+    "suppressHeader",
+    "theme",
+    "url",
+    "variant",
+  ],
+  "zitadel-logout": [
+    "open",
+    "postSignOutUrl",
+    "project",
+    "projectAttrs",
+    "projectId",
+    "proxyPath",
+    "publishableKey",
+    "theme",
+    "url",
+  ],
+} as const;
+
+/** Methods a page could call on `target` that are neither Lit's nor listed: none, or the guard fails. */
+function callUnlistedMethods(target: object): unknown[] {
+  const listed = new Set<string>([...LIT_MEMBERS, ...Object.values(WIDGET_MEMBERS).flat()]);
+  const results: unknown[] = [];
+  for (
+    let proto = Object.getPrototypeOf(target);
+    proto && proto !== HTMLElement.prototype && proto !== Object.prototype;
+    proto = Object.getPrototypeOf(proto)
+  ) {
+    for (const name of Object.getOwnPropertyNames(proto)) {
+      const method = Object.getOwnPropertyDescriptor(proto, name)?.value;
+      if (typeof method === "function" && method.length === 0 && !listed.has(name)) {
+        results.push(method.call(target));
+      }
+    }
+  }
+  return results;
+}
+
 describe("<zitadel-login> what the page can observe while signing in (chromium)", () => {
   const PASSWORD = "Zq9#vLx!k2";
   const NEW_PASSWORD = "Wm4$pTn@8d";
   const PIN = "7391-Rk5";
+  const FAMILY_NAME = "Fam7Canary";
   const PASTED = "Pa5ted&Secret1";
   const AUTOFILLED = "Au7ofill%Sec2";
   const REVEALED = "Rv6ealed^Ty3";
@@ -873,6 +974,7 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
     PASSWORD,
     NEW_PASSWORD,
     PIN,
+    FAMILY_NAME,
     PASTED,
     AUTOFILLED,
     REVEALED,
@@ -942,6 +1044,7 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
       required: true,
     },
     { name: "pin", type: "text", text_key: "identifier.field.email" },
+    { name: "family_name", type: "text", text_key: "identifier.field.email" },
     {
       name: "nickname",
       type: "text",
@@ -1048,8 +1151,8 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
 
   /** The secrets and tokens a script holding `target` can reach. */
   function canaryHits(target: object): Reached[] {
-    return reachableStrings(target).filter((entry) =>
-      [...SECRETS, ...SESSION_TOKENS].some((canary) => entry.value.includes(canary)),
+    return [...reachableStrings(target), ...reachableStrings(callUnlistedMethods(target))].filter(
+      (entry) => [...SECRETS, ...SESSION_TOKENS].some((canary) => entry.value.includes(canary)),
     );
   }
 
@@ -1071,25 +1174,17 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
     );
   }
 
-  it("exposes no member on the host that hands back the values, the atoms or the flow", () => {
-    const element = document.createElement("zitadel-login");
-    const names = Object.getOwnPropertyNames(element);
-    for (
-      let proto = Object.getPrototypeOf(element);
-      proto && proto !== HTMLElement.prototype;
-      proto = Object.getPrototypeOf(proto)
-    ) {
-      names.push(...Object.getOwnPropertyNames(proto));
-    }
+  it.each(Object.entries(WIDGET_MEMBERS))(
+    "%s exposes only Lit's members and its listed public API",
+    (tag, listed) => {
+      const element = document.createElement(tag);
+      const own = [...memberNames(Object.getPrototypeOf(element))].filter(
+        (name) => !LIT_MEMBERS.has(name),
+      );
 
-    expect(
-      names.filter((name) =>
-        /^(response|formValues?|fieldAtoms|collect.*|(get|read|serialize).*(Values?|Fields))$|Atoms?$/.test(
-          name,
-        ),
-      ),
-    ).toEqual([]);
-  });
+      expect(own.sort()).toEqual([...listed].sort());
+    },
+  );
 
   it("shows the page no secret across a whole sign-in and sign-up", async () => {
     const element = document.createElement("zitadel-login");
@@ -1138,6 +1233,8 @@ describe("<zitadel-login> what the page can observe while signing in (chromium)"
     await userEvent.keyboard(NEW_PASSWORD);
     await focusField(element, "pin");
     await userEvent.keyboard(PIN);
+    await focusField(element, "family_name");
+    await userEvent.keyboard(FAMILY_NAME);
     stage = "nickname";
     await focusField(element, "nickname");
     await userEvent.keyboard("ally");
