@@ -30,6 +30,11 @@ To change the user model or the login flow, edit those files, then publish the c
 
 Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 
+## Not supported yet
+
+- Account linking: a social sign-in never links to an existing account. A user with a password account who signs in with Google lands on "You already have an account" every time.
+- Password recovery: the login has no "forgot password" step, because the server sends no email yet (the dev inbox, ADR 050, and recovery, ADR 038, are still proposals).
+
 ## Docs
 
 - [Docs index](/docs/llms.txt): every page of the docs, with its Markdown URL
@@ -38,6 +43,7 @@ Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 - [Agent setup](/docs/get-started/agents.md): the CLI's JSON contract and the browser proof
 - [Flows and schemas](/docs/concepts/flows-and-schemas.md): how login flows, user schemas and the generated UI relate
 - [Plan and apply](/docs/cli/plan-apply.md): edit the local configuration and sync it
+- [Add social sign-in](/docs/cli/social-sign-in.md): "Sign in with Google" or any OpenID Connect provider, with \`zitadel auth-method sso enable\`
 - [Customize the login design](/docs/cli/customize-design.md): a starter design, your branding, published as a revision
 - [Docs MCP server](/docs/api/mcp): the tools search, list_pages and get_page
 

@@ -55,11 +55,11 @@ vi.mock("@zitadel/sdk-react", () => ({
  * need its data call answered — an empty list is enough to prove the redirect
  * landed.
  */
-// `/` lands on Teams and the redirect test asks for `/schemas`; both are
+// `/` lands on Users and the redirect test asks for `/schemas`; both are
 // project-scoped, so the guard selects the visitor's only project.
 beforeEach(() =>
   server.use(
-    http.post("*/api/teams/query", () => HttpResponse.json({ teams: [] })),
+    http.post("*/api/users/query", () => HttpResponse.json({ users: [] })),
     http.get("*/api/schemas", () => HttpResponse.json({ schemas: [] })),
     http.get("*/api/users/me/projects", () =>
       HttpResponse.json({ projects: [{ id: "proj_test", name: "Test" }] }),

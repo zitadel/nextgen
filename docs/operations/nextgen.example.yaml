@@ -102,7 +102,8 @@ httpclient:
   # Exceptions carved out of the deny list: a matching target is allowed even
   # when a deny entry covers it. A hostname entry only counters a hostname
   # deny entry; countering an IP-range denial needs an IP or CIDR entry.
-  # For local development against loopback schema hosts:
+  # For local development against loopback hosts (a server `zitadel start`
+  # runs sets this by default):
   # allow_list: [localhost, 127.0.0.0/8, "::1/128"]
   allow_list: []
 

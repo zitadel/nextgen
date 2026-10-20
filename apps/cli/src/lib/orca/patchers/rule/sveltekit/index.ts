@@ -38,6 +38,10 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
     return framework === "sveltekit";
   }
 
+  protected devPortOps(ctx: PatchContext): FileOp[] {
+    return [devScriptPortOp(ctx.issuer, { strictPort: true })];
+  }
+
   protected routeOps(ctx: PatchContext): FileOp[] {
     const src = (rel: string) => join(ctx.framework.appDir, rel);
     return [

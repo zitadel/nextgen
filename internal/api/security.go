@@ -165,6 +165,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	// (ADR 053 §5, csrf.go).
 	api.CreateUserOperation:            true,
 	api.GetUserByIDOperation:           true,
+	api.PatchUserByIDOperation:         true,
 	api.ListUserTeamsOperation:         true,
 	api.ListUserPasskeysOperation:      true,
 	api.ListUserIdentityLinksOperation: true,

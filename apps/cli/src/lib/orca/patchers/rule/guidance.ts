@@ -54,6 +54,7 @@ export function removeGuidanceSection(source: string): string {
 export function agentsGuidanceSection(ctx: PatchContext): string {
   const plan = publicCliCommand("plan", ctx.cliVersion);
   const apply = publicCliCommand("apply", ctx.cliVersion);
+  const movePort = movePortCommand(ctx);
   // WebAuthn ceremonies need an OS-level authenticator, so an agent driving
   // an automated browser stalls on the primary action of a passkey-first
   // flow unless told how to verify around it.
@@ -95,6 +96,7 @@ This app's login is managed by Zitadel. Local config is the source of truth; nev
 The golden path:
 
 1. Start the dev server and open ${ctx.issuer}/login — **exactly this origin, not 127.0.0.1**. Passkeys and the origin allowlist are bound to it. (Freshly scaffolded apps also redirect / there; pre-existing apps keep their homepage.)
+   - Port taken (\`EADDRINUSE\`) or another port wanted: run \`${movePort}\`. It moves the dev script or dev-server config, \`ZITADEL_ISSUER\` and the project's allowed origin together; changing only one of them breaks sign-in.
 2. Prove the loop in a real browser: register a user → sign out → sign in → /profile shows signed in.${passkeyVerifyNote}
 3. Customize by editing local config:
    - \`.zitadel/schemas/*.json\` — what a user is (fields, required, auth methods). See \`.zitadel/schemas/README.md\`.
@@ -112,6 +114,7 @@ ${sessionStateParagraph}
 
 Machine-readable dialect (read these before authoring flow or schema edits):
 
+- \`zitadel.json\` carries \`"$schema": "./.zitadel/meta/project.json"\`, the schema of the project configuration.
 - Flow files carry \`"$schema": "../meta/flow-definition.json"\` — the flow dialect spec (steps, actions and their kinds, transitions, reserved outcomes like \`user_not_found\`). Editors validate against it.
 - \`.zitadel/meta/user-schema.json\` (with its companions \`user-property.json\`, \`auth-methods.json\`, \`auth-method.json\`, \`sso-auth-method.json\`) specifies the user-schema dialect (\`x-auth-methods\`, \`x-unique\`, property constraints).
 - \`.zitadel/meta/idp-connection.json\` specifies a provider connection file under \`.zitadel/idps/\` (protocol block, credentials as \`\${{ NAME }}\` variable references, claim mapping). A user schema lists the connection slugs it allows under \`x-auth-methods.sso.providers\`.
@@ -124,9 +127,12 @@ Never edit \`.zitadel/state.json\` (sync bookkeeping) or \`.zitadel/secret\` (cr
 export function readmeGuidanceSection(ctx: PatchContext): string {
   const plan = publicCliCommand("plan", ctx.cliVersion);
   const apply = publicCliCommand("apply", ctx.cliVersion);
+  const movePort = movePortCommand(ctx);
   return `## Authentication (Zitadel)
 
 Login for this app is managed by [Zitadel](https://zitadel.com). Try it: start the dev server, open ${ctx.issuer}/login (use this exact origin — passkeys are bound to it), register a user, sign out, and sign in again.
+
+If the dev server's port is taken (\`EADDRINUSE\`), or you want another one, move the app with \`${movePort}\`: it updates the dev script, \`ZITADEL_ISSUER\` and the project's allowed origin together.
 
 The dev server keeps its terminal busy, so run the commands below from a second terminal in this directory.
 
@@ -136,6 +142,11 @@ To change what the login collects or how sign-in works, edit the files under \`.
 ${plan}
 ${apply}
 \`\`\``;
+}
+
+/** The command that moves the app to another dev port, `<port>` left to fill in. */
+function movePortCommand(ctx: PatchContext): string {
+  return publicCliCommand("setup --dev-port <port>", ctx.cliVersion);
 }
 
 /** Full-file header used when `AGENTS.md` does not exist yet. */

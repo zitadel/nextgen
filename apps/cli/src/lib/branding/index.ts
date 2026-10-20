@@ -1,9 +1,5 @@
 import { ZitadelError } from "../errors";
-import {
-  type FileReferenceContext,
-  inlineFileReferences,
-  restoreFileReferences,
-} from "../local-files";
+import { type FileReferenceContext, inlineFileReferences } from "../local-files";
 
 /**
  * Relative directory (from the project root) where local branding files live:
@@ -62,17 +58,4 @@ export function toBrandingWireBody(cwd: string, data: object): object {
   const { $schema, ...rest } = data as { $schema?: unknown };
   void $schema;
   return inlineFileReferences(rest, referenceContext(cwd), { onMissing: "omit" });
-}
-
-/**
- * Converts the server's canonical wire body back to the local descriptor form:
- * wherever the local descriptor holds a `$file` reference, the canonical value
- * is written to that file when it differs and the JSON keeps the reference.
- */
-export function toLocalBrandingBody(
-  cwd: string,
-  canonicalWire: object,
-  localData: object,
-): { document: object; written: string[] } {
-  return restoreFileReferences(canonicalWire, localData, referenceContext(cwd));
 }
