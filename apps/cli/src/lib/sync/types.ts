@@ -127,9 +127,10 @@ export interface ResourceSyncer {
    * Throws `E_VALIDATION` (a `ZitadelError`) on the first invalid input.
    * The sync engine calls this for every file it reads, so a malformed
    * schema or flow fails the run before any platform mutation — `plan`
-   * and `apply` both go through here.
+   * and `apply` both go through here. `path` is the file's project-relative
+   * path, for messages that name it.
    */
-  validate(data: object): void;
+  validate(data: object, path?: string): void;
   /**
    * Create the resource on the platform. `canonical` is the server's
    * stored representation when the response (or a follow-up fetch)

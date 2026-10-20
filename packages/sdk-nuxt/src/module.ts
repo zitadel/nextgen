@@ -2,6 +2,7 @@ import {
   defineNuxtModule,
   addPlugin,
   addServerHandler,
+  addTypeTemplate,
   addImportsDir,
   createResolver,
 } from "@nuxt/kit";
@@ -11,8 +12,6 @@ import { resolve as resolvePath } from "node:path";
 import type { NuxtModule } from "@nuxt/schema";
 import type { NextgenMiddlewareOptions } from "./runtime/types";
 
-/** Where `zitadel start` runs the local server by default. */
-const DEFAULT_URL = "http://localhost:8080";
 const DEFAULT_PROXY_PATH = "/__nextgen";
 
 /**
@@ -37,6 +36,27 @@ function parseEnvLocal(rootDir: string): Record<string, string> {
   }
   return values;
 }
+
+/**
+ * The copy overlay the client plugin provides, as `useNuxtApp().$zitadelBusinessLocales`:
+ * extra locale strings keyed by primary language subtag.
+ */
+const BUSINESS_LOCALES_TYPES = `type ZitadelBusinessLocales = Record<string, Partial<Record<string, string>>>;
+
+declare module "#app" {
+  interface NuxtApp {
+    $zitadelBusinessLocales: ZitadelBusinessLocales;
+  }
+}
+
+declare module "vue" {
+  interface ComponentCustomProperties {
+    $zitadelBusinessLocales: ZitadelBusinessLocales;
+  }
+}
+
+export {};
+`;
 
 /**
  * Returns a lookup for the app's Zitadel settings: the process environment
@@ -68,8 +88,17 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
       const proxyPath = options.proxyPath ?? DEFAULT_PROXY_PATH;
 
       nuxt.options.runtimeConfig.nextgen = {
-        // A `nextgen.url` in nuxt.config wins over `ZITADEL_URL`.
-        url: options.url || setting("ZITADEL_URL") || DEFAULT_URL,
+        // Only a URL the app set in nuxt.config is kept. The key exists (empty)
+        // so `NUXT_NEXTGEN_URL` can set it at runtime; `ZITADEL_URL` is read by
+        // the running server and never baked into the build.
+        url: options.url || (nuxt.options.dev ? setting("ZITADEL_URL") : undefined) || "",
+        // The project a session must belong to for its user to count as signed
+        // in, when set here or through NUXT_NEXTGEN_PROJECT_ID. Unset, the
+        // handler takes the public project id the widgets sign users in to,
+        // which NUXT_PUBLIC_ZITADEL_PROJECT_ID sets at runtime, then
+        // ZITADEL_PROJECT_ID at runtime. Nothing is read from the build's
+        // environment here, so a built server is not pinned to it.
+        projectId: options.projectId,
         // The server middleware proxies this prefix; the plugin hands the same
         // one to the widgets, so the browser calls the path the server serves.
         proxyPath,
@@ -86,11 +115,12 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
         proxyTimeoutMs: options.proxyTimeoutMs,
         opaqueTokenTimeoutMs: options.opaqueTokenTimeoutMs,
         jwtKey: options.jwtKey,
-        // Server-only — never exposed to the client. Override at deploy time via
-        // `NUXT_NEXTGEN_PROJECT_SECRET`. Left undefined when the env var (and
-        // `.env.local`) provide no value, so the middleware surfaces a missing
-        // exchange bearer instead of silently sending an empty one.
-        projectSecret: setting("ZITADEL_PROJECT_SECRET"),
+        // Server-only. Never filled from the build environment, which would
+        // copy it into `.output/`: the running server reads it from
+        // `NUXT_NEXTGEN_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET`. Only
+        // `nuxt dev`, which writes no build output, fills it from `.env.local`
+        // that the dev server would not otherwise see.
+        projectSecret: (nuxt.options.dev ? setting("ZITADEL_PROJECT_SECRET") : undefined) ?? "",
       };
 
       // Expose SDK-initializer values to the client-side plugin so it can
@@ -104,6 +134,17 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
       publicConfig.zitadelProjectId ||= setting("NUXT_PUBLIC_ZITADEL_PROJECT_ID") ?? "";
 
       addPlugin(resolve("./runtime/plugin"));
+      // Loads the widget elements in the browser, so the app does not depend on
+      // `@zitadel/components` itself. Client-only: registering custom elements
+      // during SSR would break.
+      addPlugin({ src: resolve("./runtime/components.client"), mode: "client" });
+      // Types the value the plugin above provides. Written into the app's own
+      // `.nuxt/types`, with the locale map spelled out, because the app does not
+      // install `@zitadel/components`, so a type import from it would not resolve.
+      addTypeTemplate({
+        filename: "types/zitadel-business-locales.d.ts",
+        getContents: () => BUSINESS_LOCALES_TYPES,
+      });
       addServerHandler({
         middleware: true,
         handler: resolve("./runtime/server/handler"),

@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -58,7 +57,10 @@ func NewFlowDefinitionService(
 	}
 }
 
-func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
+func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionRequest) (_ *domain.FlowDefinition, err error) {
+	ctx, end := startSpan(ctx, "FlowDefinitionService.Create")
+	defer end(&err)
+
 	purposes, err := mapPurposesToDomain(req.Purposes)
 	if err != nil {
 		return nil, err
@@ -120,8 +122,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 }
 
 func (fd *flowDefinitionService) validate(ctx context.Context, flowDefinition *domain.FlowDefinition, sch *domain.JSONSchema) error {
-	var userSchema *jsonschema.Schema
-	err := json.Unmarshal(sch.Schema, &userSchema)
+	userSchema, err := sch.Document()
 	if err != nil {
 		return domain.ErrSchemaFetchFailed("failed to unmarshal user schema", err)
 	}
@@ -169,7 +170,10 @@ func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefiniti
 	return purposes, nil
 }
 
-func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
+func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) (_ *domain.FlowDefinition, err error) {
+	ctx, end := startSpan(ctx, "FlowDefinitionService.Get")
+	defer end(&err)
+
 	// todo (grvijayan): get the project ID from the context when the functionality is implemented
 	if projectID == "" {
 		return nil, domain.ErrMissingProjectID()
@@ -202,7 +206,10 @@ type ListFlowDefinitionsResponse struct {
 	NextPageToken string
 }
 
-func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitionsRequest) (*ListFlowDefinitionsResponse, error) {
+func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitionsRequest) (_ *ListFlowDefinitionsResponse, err error) {
+	ctx, end := startSpan(ctx, "FlowDefinitionService.List")
+	defer end(&err)
+
 	// todo (grvijayan): get the project ID from the context when the functionality is implemented
 	if req.ProjectID == "" {
 		return nil, domain.ErrMissingProjectID()

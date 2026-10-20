@@ -1036,6 +1036,12 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 		return r.processSSO(pc)
 	}
 	actionKind := stepActionKind(currentStep, in.Action)
+	// Only an action the step declares can be submitted. The outcome names
+	// (user_not_found, sso_authenticated, ...) are routed by the engine
+	// alone; a client naming one would otherwise take that route.
+	if actionKind == FlowActionKindUnset {
+		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrFlowInvalidAction(), in.Action, currentStep.Name)
+	}
 
 	// Back and Navigate both skip the input pipeline entirely.
 	if actionKind == FlowActionKindBack {
@@ -1069,7 +1075,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	// If a ceremony is pending and the user picked a different action,
 	// drop it so we don't re-emit the abandoned prompt.
 	if state.PendingChallenge != nil && in.ChallengeResponse == nil &&
-		!pendingMatchesKind(state.PendingChallenge.Method, in.Action, actionKind) {
+		!pendingMatchesKind(state.PendingChallenge.Method, actionKind) {
 		state.ClearPendingChallenge()
 	}
 
@@ -1079,8 +1085,6 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	case FlowActionKindPasskeyRegister:
 		return r.processPasskeyRegister(pc, resolved)
 	default:
-		// Submit and unset-kind actions both go here. An unknown
-		// user-supplied action lands here too and fails inside routeOutcome.
 		return r.processSubmit(pc, resolved)
 	}
 }
@@ -1793,6 +1797,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				AttemptID:     state.AuthAttemptID,
 				AttributeName: name,
 				Value:         value,
+				UserSchemaURL: state.UserSchemaURL,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				if state.CurrentPurpose == FlowDefinitionPurposeRegister {
@@ -1908,7 +1913,7 @@ type passkeyPhaseResult struct {
 // processPasskey runs all two-phase WebAuthn ceremonies (authentication and
 // registration) for the current step:
 //   - resume/abandon leg: a challenge is pending and no proof has arrived. If
-//     the submission targets the same ceremony (or is action-less), re-emit
+//     the submission targets the same ceremony, re-emit
 //     the pending challenge. Otherwise the user picked a different action;
 //     drop the pending challenge and let normal routing run.
 //   - verify leg: a ChallengeResponse arrived → dispatch to the right service
@@ -1925,7 +1930,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 	switch {
 	// A ceremony is in flight but no proof arrived: resume or abandon.
 	case state.PendingChallenge != nil && in.ChallengeResponse == nil:
-		if !pendingMatchesKind(state.PendingChallenge.Method, in.Action, actionKind) {
+		if !pendingMatchesKind(state.PendingChallenge.Method, actionKind) {
 			state.ClearPendingChallenge()
 			return passkeyPhaseResult{}, nil
 		}
@@ -1995,6 +2000,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 						AttemptID:     state.AuthAttemptID,
 						AttributeName: candidate[0],
 						Value:         candidate[1],
+						UserSchemaURL: state.UserSchemaURL,
 					})
 					if rerr == nil {
 						recordResolvedUser(state, userID)
@@ -2157,13 +2163,9 @@ func passkeyRegistrationDisplay(resolved FlowResolvedFields, collected map[strin
 }
 
 // pendingMatchesKind reports whether a no-proof POST should resume the
-// pending ceremony (vs. abandon it). An empty submitted action covers
-// passive POSTs; otherwise the submitted action's kind must match the
-// pending ceremony's method.
-func pendingMatchesKind(pendingMethod, submittedAction string, submittedKind FlowActionKind) bool {
-	if submittedAction == "" {
-		return true
-	}
+// pending ceremony (vs. abandon it): the submitted action's kind must match
+// the pending ceremony's method.
+func pendingMatchesKind(pendingMethod string, submittedKind FlowActionKind) bool {
 	switch pendingMethod {
 	case FlowChallengeMethodPasskey:
 		return submittedKind == FlowActionKindPasskey
@@ -2547,11 +2549,8 @@ func stepHasActionKind(step *FlowDefinitionStep, kind FlowActionKind) bool {
 
 // stepActionKind returns the kind of the step's action with the given name.
 // Returns the zero value (unset) when name does not match any action on the
-// step — including the empty action submitted by passive POSTs.
+// step.
 func stepActionKind(step *FlowDefinitionStep, actionName string) FlowActionKind {
-	if actionName == "" {
-		return FlowActionKindUnset
-	}
 	for _, a := range step.Actions {
 		if a.Name == actionName {
 			return a.Kind

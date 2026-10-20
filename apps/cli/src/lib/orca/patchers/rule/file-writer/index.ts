@@ -376,7 +376,24 @@ async function addDependency(
   const current = parseJsonObject(existing, path);
   const key = op.dev ? "devDependencies" : "dependencies";
   const deps = isObject(current[key]) ? (current[key] as Record<string, unknown>) : {};
-  if (deps[op.name] === op.version) {
+  // A package the app needs at runtime stays in `dependencies`: a dev add never
+  // demotes it, because that would break `--omit=dev` installs.
+  if (
+    op.dev &&
+    isObject(current.dependencies) &&
+    Object.hasOwn(current.dependencies as Record<string, unknown>, op.name)
+  ) {
+    result.filesSkipped.push(path);
+    return;
+  }
+  // Only devDependencies -> dependencies moves. peerDependencies and
+  // optionalDependencies entries are the developer's and are left alone.
+  const other =
+    !op.dev && isObject(current.devDependencies)
+      ? (current.devDependencies as Record<string, unknown>)
+      : undefined;
+  const listedInOther = other !== undefined && Object.hasOwn(other, op.name);
+  if (deps[op.name] === op.version && !listedInOther) {
     result.filesSkipped.push(path);
     return;
   }
@@ -384,12 +401,24 @@ async function addDependency(
   // the document. Every byte outside it — key order, blank lines, inline
   // objects, line endings — stays untouched; the touched map itself is
   // name-sorted, matching what a package manager writes.
-  const contents = setTopLevelJsonKey(
+  let contents = setTopLevelJsonKey(
     existing,
     path,
     key,
     sortByKey({ ...deps, [op.name]: op.version }),
   );
+  // A package listed in both sections is never intended, and some toolchains
+  // refuse it outright (Qwik's starter vite.config.ts throws on start). Move a
+  // devDependencies entry the developer already has into dependencies instead
+  // of duplicating it.
+  if (listedInOther) {
+    contents = setTopLevelJsonKey(
+      contents,
+      path,
+      "devDependencies",
+      Object.fromEntries(Object.entries(other).filter(([name]) => name !== op.name)),
+    );
+  }
   if (dryRun) {
     record(result, path, "file", "update");
     result.depsAdded.push(op.name);

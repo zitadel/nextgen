@@ -1,11 +1,14 @@
 import { type APIRequestContext, expect, test } from "@playwright/test";
 
 import {
+  descriptionProblem,
   escapeHtml,
   failures,
   type IndexedPage,
+  indexStrays,
   mapLimit,
   markdownUrl,
+  metaContent,
   parseIndex,
   siteLinks,
 } from "./support";
@@ -19,6 +22,10 @@ import {
 
 // Requests in flight at once over the page list.
 const concurrency = 8;
+
+// An operation page is /docs/reference/api/<tag>/<operation>; the tag's own
+// page, one level up, is content like any other.
+const operationPage = /^\/docs\/reference\/api\/[^/]+\/[^/]+$/;
 
 async function indexedPages(request: APIRequestContext): Promise<IndexedPage[]> {
   const response = await request.get("/docs/llms.txt");
@@ -49,20 +56,40 @@ test("the index lists every section, each page once, under /docs", async ({ requ
     "index entries outside /docs",
   ).toEqual([]);
   expect(new Set(urls).size).toBe(urls.length);
+
+  // An entry is one line: an API page's OpenAPI description, of several
+  // paragraphs, is not its description (lib/description.ts).
+  expect(indexStrays(index), "lines of the index where the page tree puts none").toEqual([]);
 });
 
-test("every page answers as HTML, titled", async ({ request }) => {
+test("every page answers as HTML, titled, described and in its size", async ({ request }) => {
   test.setTimeout(120_000);
   const pages = await indexedPages(request);
 
-  const results = await mapLimit(pages, concurrency, async ({ title, url }) => {
+  // One request a page, for all the checks a page's HTML answers. A
+  // description the index has, the page has, as one line of plain text
+  // (lib/description.ts); every operation and webhook has one (redocly.yaml).
+  // Fumadocs hands each API page the whole OpenAPI document, which put every
+  // operation and schema of the API, about 900 KB of HTML, on every one of
+  // them; lib/source.ts passes the page its operations and what they
+  // reference, and the largest page is now about 300 KB.
+  const budget = 500_000;
+  const results = await mapLimit(pages, concurrency, async ({ title, url, description }) => {
     const response = await request.get(url);
     const type = response.headers()["content-type"] ?? "";
     if (response.status() !== 200) return `${url}: ${response.status()}`;
     if (!type.startsWith("text/html")) return `${url}: ${type}`;
-    const html = await response.text();
+    const body = await response.body();
+    if (operationPage.test(url) && body.length > budget) return `${url}: ${body.length} bytes`;
+    const html = body.toString("utf8");
     const expected = `<title>${escapeHtml(title)}</title>`;
     if (!html.includes(expected)) return `${url}: no ${expected}`;
+    const meta = metaContent(html, "description");
+    if (meta === undefined) {
+      return description || operationPage.test(url) ? `${url}: no description` : null;
+    }
+    const problem = descriptionProblem(meta);
+    if (problem) return `${url}: description "${meta}" has ${problem}`;
     return null;
   });
   expect(failures(results), "pages whose HTML is wrong").toEqual([]);
@@ -116,6 +143,38 @@ test("every page negotiates Markdown through Accept", async ({ request }) => {
   expect(failures(results), "pages that do not negotiate Markdown").toEqual([]);
 });
 
+test("every API operation shows its call through @zitadel/api and its CLI command", async ({
+  request,
+}) => {
+  test.setTimeout(120_000);
+  const pages = (await indexedPages(request)).filter((page) => operationPage.test(page.url));
+
+  // The TypeScript sample comes first (components/api-page.tsx), so the page
+  // renders it; the Markdown has it in a code block (lib/source.ts). A
+  // webhook's page, under the same paths, shows its payload instead: the
+  // Markdown says which of the two a page is.
+  const call =
+    /```ts\nimport \{ [^}]+ \} from "@zitadel\/api\/(?:client|config)";\n[\s\S]*?await client\.\w+\(/;
+  let operations = 0;
+  const results = await mapLimit(pages, concurrency, async ({ url }) => {
+    const markdown = await (await request.get(markdownUrl(url))).text();
+    if (!markdown.includes("The operation and every component it references")) return null;
+    operations++;
+    if (!call.test(markdown)) return `${markdownUrl(url)}: no call through @zitadel/api`;
+    // An operation the spec names a CLI command for (`x-zitadel-cli`, which
+    // its OpenAPI shows) is also run with that command (lib/cli-sample.ts).
+    const command = /"x-zitadel-cli": "([^"]+)"/.exec(markdown)?.[1];
+    if (command && !markdown.includes(`npx @zitadel/cli@alpha ${command}`)) {
+      return `${markdownUrl(url)}: no \`${command}\` command`;
+    }
+    const html = await (await request.get(url)).text();
+    if (!html.includes("@zitadel/api/")) return `${url}: no @zitadel/api sample`;
+    return null;
+  });
+  expect(operations).toBeGreaterThan(0);
+  expect(failures(results), "operations without their @zitadel/api call").toEqual([]);
+});
+
 test("a page that does not exist is a 404, as HTML and as Markdown", async ({ request }) => {
   expect((await request.get("/docs/no-such-page")).status()).toBe(404);
   expect((await request.get("/docs/no-such-page.md")).status()).toBe(404);
@@ -131,16 +190,14 @@ test("llms-full.txt carries every page but the API operations", async ({ request
   expect(response.status()).toBe(200);
   const full = await response.text();
 
-  // An operation page is /docs/reference/api/<tag>/<operation>; the tag's own
-  // page, one level up, is content like any other. With the operations and
-  // the schemas they reference the file was twenty times this size (#1685).
-  const operation = /^\/docs\/reference\/api\/[^/]+\/[^/]+$/;
+  // With the operations and the schemas they reference the file was twenty
+  // times this size (#1685).
   const missing = pages
-    .filter((page) => !operation.test(page.url))
+    .filter((page) => !operationPage.test(page.url))
     .filter((page) => !full.includes(`# ${page.title} (${page.url})`))
     .map((page) => page.url);
   expect(missing, "pages missing from llms-full.txt").toEqual([]);
-  const operations = pages.filter((page) => operation.test(page.url));
+  const operations = pages.filter((page) => operationPage.test(page.url));
   expect(operations.length).toBeGreaterThan(0);
   expect(
     operations.filter((page) => full.includes(`(${page.url})`)).map((page) => page.url),

@@ -1,13 +1,19 @@
 import { ZitadelError } from "../../../../errors";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../../json";
-import { npmDistTagForCliVersion } from "../../../../public-cli";
+import { sdkVersionForCli } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
 import { angularEntry, assertMountsRootComponent, type RootMount } from "../root-component";
 import { angularProxyEdit } from "./angular-json";
 import { angularRoutesEdit } from "./angular-routes";
-import { appComponentTemplate, appTemplateHtml, proxyConfEdit } from "./templates";
+import {
+  appComponentTemplate,
+  appTemplateHtml,
+  proxyConfEdit,
+  proxyConfSessionCookieEdit,
+  proxyConfSessionCookieVerdict,
+} from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-angular";
 
@@ -100,6 +106,16 @@ export class AngularPatcher extends AbstractRulePatcher {
       },
       {
         kind: "edit",
+        path: "proxy.conf.cjs",
+        edit: proxyConfSessionCookieEdit(),
+        // A session cookie per project (ADR 073) keeps the Console and the app
+        // from signing each other out on localhost. Sign-in works without it,
+        // so the doctor only warns while it is missing.
+        wiring: "convenience",
+        verify: proxyConfSessionCookieVerdict,
+      },
+      {
+        kind: "edit",
         path: "angular.json",
         edit: angularProxyEdit({ proxyConfig: "proxy.conf.cjs", port: ctx.framework.devPort }),
         // The serve target's proxyConfig is what attaches proxy.conf.cjs —
@@ -116,7 +132,7 @@ export class AngularPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: npmDistTagForCliVersion(ctx.cliVersion),
+        version: sdkVersionForCli(ctx.cliVersion),
       },
     ];
   }

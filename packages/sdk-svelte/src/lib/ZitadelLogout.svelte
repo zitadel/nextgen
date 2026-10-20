@@ -1,8 +1,11 @@
 <script lang="ts">
   import '@zitadel/components';
+  import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelLogout as ZitadelLogoutElement } from '@zitadel/components';
 
-  import type { ZitadelLogoutProps, ZitadelSignoutDetail } from './types';
+  import type { ZitadelLogoutSvelteProps, ZitadelSignoutDetail } from './types';
+  import { assignGiven } from './given';
+  import { onClient, proxyPathAttr } from './attributes';
 
   let {
     project,
@@ -11,7 +14,11 @@
     postSignOutUrl,
     theme,
     onSignout,
-  }: ZitadelLogoutProps = $props();
+    ...rest
+  }: ZitadelLogoutSvelteProps = $props();
+
+  // The standard HTML attributes are the only extra props the element takes.
+  const attributes = $derived(standardAttributes(rest));
 
   let el: ZitadelLogoutElement | undefined = $state();
 
@@ -23,6 +30,14 @@
   export function getElement(): ZitadelLogoutElement | undefined {
     return el;
   }
+
+  // Props the element has defaults for are assigned only when given; a
+  // binding would assign `undefined` and overwrite the default.
+  $effect(() => {
+    if (el) {
+      assignGiven(el, { theme });
+    }
+  });
 
   $effect(() => {
     const node = el;
@@ -39,10 +54,11 @@
 </script>
 
 <zitadel-logout
+  {...attributes}
   bind:this={el}
-  {project}
-  project-id={projectId}
-  proxy-path={proxyPath}
+  project={onClient(project)}
+  project-id={project?.projectId ?? projectId}
+  proxy-path={proxyPathAttr(project?.proxyPath ?? proxyPath)}
+  url={project?.url}
   post-sign-out-url={postSignOutUrl}
-  {theme}
 ></zitadel-logout>

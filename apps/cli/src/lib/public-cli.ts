@@ -15,12 +15,23 @@ export function npmSelectorForCliVersion(cliVersion: string): string {
 }
 
 /**
+ * The version a scaffold writes for the `@zitadel/*` packages it adds: the
+ * CLI's own exact version on an alpha train, else its dist-tag (`latest` for a
+ * stable CLI). The packages publish as one lockstep train, so the exact pin
+ * keeps the app on the SDK that matches the files this CLI wrote, and lets
+ * doctor's `dependency-version` check compare it against the CLI.
+ */
+export function sdkVersionForCli(cliVersion: string): string {
+  return npmSelectorForCliVersion(cliVersion);
+}
+
+/**
  * Whether a value can sit in a suggested command unquoted on every shell the
  * CLI runs under (POSIX shells, PowerShell and cmd.exe). Quoting differs
  * between them, so a value that needs quoting is not put in a suggested
  * command at all; callers hand it over as an argument list instead.
  */
-function isPortableShellWord(value: string): boolean {
+export function isPortableShellWord(value: string): boolean {
   // `/` is included so a POSIX-style --cwd path can be suggested as written.
   return /^[A-Za-z0-9_./-]+$/.test(value);
 }

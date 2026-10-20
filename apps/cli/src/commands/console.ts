@@ -5,11 +5,8 @@ import { openInBrowser } from "../lib/browser";
 import { ZitadelError } from "../lib/errors";
 import { findLocalAdminDir, readLocalAdmin } from "../lib/local-server/admin-credential";
 import { consoleSignInUrl } from "../lib/local-server/sign-in";
-import {
-  DEFAULT_LOCAL_SERVER_URL,
-  readRuntimeMetadata,
-  resolveLocalServer,
-} from "../lib/local-server/runtime";
+import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "../lib/local-server/runtime";
+import { LocalServer } from "../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
 import { publicCliCommand } from "../lib/public-cli";
@@ -71,7 +68,7 @@ export default class Console extends BaseCommand {
       });
     }
 
-    const serverUrl = await resolveLocalServer(localDir);
+    const serverUrl = await LocalServer.resolveUrl(localDir);
     const signInUrl = await consoleSignInUrl(serverUrl, admin);
 
     consola.log(`Signed in to the local console as ${admin.email}:`);

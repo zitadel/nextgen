@@ -197,9 +197,6 @@ func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, code string, 
 		RedirectURI:  pending.RedirectURI,
 		RevisionID:   pending.ConnectionRevisionID,
 		ClientSecret: secret,
-		// No strategy registry exists yet; a connection whose
-		// verified_claims need one fails the ceremony (requireStrategy).
-		SupplementaryFetch: nil,
 	})
 }
 
@@ -213,7 +210,10 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID str
 		// logged.
 		return "", errors.New("client_secret is not a variable reference")
 	}
-	vars, err := c.variables.GetDecryptedVariables(ctx, domain.VariableOwner{ProjectID: projectID}, name)
+	// The primary value, as the redirect resolved the client_id.
+	// TODO: take the kind from the origin the request came in on once the
+	// release runtime resolves it, so a preview sign-in reads preview values.
+	vars, err := c.variables.GetDecryptedVariables(ctx, domain.VariableOwner{ProjectID: projectID}, new(domain.DeploymentOriginKindPrimary), name)
 	if err != nil {
 		return "", err
 	}

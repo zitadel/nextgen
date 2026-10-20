@@ -565,6 +565,18 @@ func TestNewJSONSchema_Kind(t *testing.T) {
 	}
 }
 
+// pastDeadlineContext reports a deadline that has already passed while its
+// Done channel stays open: the state a context is in between its deadline and
+// the runtime firing the deadline's timer, held for as long as the test runs.
+type pastDeadlineContext struct {
+	context.Context
+	deadline time.Time
+}
+
+func (c pastDeadlineContext) Deadline() (time.Time, bool) {
+	return c.deadline, true
+}
+
 // TestJSONSchemaResolver_EgressGuards covers #1114's acceptance criteria:
 // distinct errors for a denied address, an oversized document, a slow origin,
 // and a $ref chain that exceeds the whole-resolution envelope.
@@ -695,6 +707,22 @@ func TestJSONSchemaResolver_EgressGuards(t *testing.T) {
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 
 		_, err = resolver.Resolve(ctx, newStore(ctrl), projectID, "https://example.test/inline.json", []byte(simpleSchema))
+		require.ErrorIs(t, err, context.DeadlineExceeded, "the expired result must not have been cached")
+	})
+
+	t.Run("a deadline that passed before its timer fired is not cached as success", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		// ctx.Err stays nil until the runtime fires a deadline's timer, which
+		// the 1ns envelope above reaches only some of the time. This context
+		// never leaves that gap, so only a check that reads the clock fails
+		// the resolve.
+		expired := pastDeadlineContext{Context: ctx, deadline: time.Now().Add(-time.Second)}
+		resolver := newTestResolver(t, newEgressClient(t, httputil.ClientConfig{}))
+
+		_, err := resolver.Resolve(expired, newStore(ctrl), projectID, "https://example.test/inline.json", []byte(simpleSchema))
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+
+		_, err = resolver.Resolve(expired, newStore(ctrl), projectID, "https://example.test/inline.json", []byte(simpleSchema))
 		require.ErrorIs(t, err, context.DeadlineExceeded, "the expired result must not have been cached")
 	})
 

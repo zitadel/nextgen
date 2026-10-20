@@ -20,24 +20,27 @@ not run them.
 
 ## Layout
 
-One Vercel deployment, five [services](https://vercel.com/docs/services):
+One Vercel deployment, six [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/cloud/launcher`, then migrates | every path except the console's, the storybook's, the docs' and the website's, including `/console/runtime.json` and the login UI at `/ui/login/` |
+| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then migrates | every path except the console's, the storybook's, the docs' and the website's, including `/console/runtime.json` and the login UI at `/ui/login/` |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `storybook` | Storybook; `turbo run build` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
-| `website` | Next.js; `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the coming-soon page, and its assets at `/_next/*`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
+| `website` | Next.js; `turbo run build --filter=@zitadel/components`, for the atoms its showcase renders, then `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the front page, and its assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
+| `schemas` | Static files: Node runs [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs), which needs no install, into `dist/cloud-schemas`. The service is rooted at `apps/cloud`, which holds no `package.json`, so Vercel detects no framework | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
 
 The console lives on the same origin, at `/console/` rather than a
 self-hosted server's `/ui/console/`. The server's own console is switched
 off and its console path set to `/console`, so the console links it derives
 (claim, dashboard) point there; the session cookie and CSRF protection work
-as in a self-hosted install. The server's `/console/runtime.json` lies
-under the console's path, so its rewrite comes first in `vercel.json`, and a
-launcher test holds the mount, the build's base and the console path
-together.
+as in a self-hosted install. The function does not carry the console either:
+the console service's build lands in the server's embed directory of the
+same checkout, so `build.sh` compiles the launcher with `-tags noconsole`.
+The server's `/console/runtime.json` lies under the console's path, so its
+rewrite comes first in `vercel.json`, and a launcher test holds the mount,
+the build's base and the console path together.
 
 The storybook, the login surface's component workbench, is deployed only
 here. Its orchestrator stories mock the API in the browser with a service
@@ -48,6 +51,44 @@ The launcher pins what follows from this layout (listen address from
 `PORT`, console off with its links at `/console`, login UI on) and defaults the rest
 (platform project bootstrapped, JSON logs, public base from Vercel's URL).
 Any `NEXTGEN_*` variable overrides a default.
+
+## Built-in schemas
+
+The server names its built-in schemas (the user schema, the flow definition,
+the IdP connection, branding and the documents they `$ref`) by URL under its
+`schema.builtin_public_base`, `https://preview.zitadel.com/schemas/v1`. The
+base is an identifier namespace: the server resolves these documents from the
+copies it embeds and never fetches them. The `schemas` service makes each
+identifier resolve for editors and people:
+`https://preview.zitadel.com/schemas/v1/user-schema.json` answers with the
+document whose `$id` it is.
+
+- **The build** renders every file in `api/openapi/endpoints/schemas/` the
+  way the server renders it for its own validator
+  (`domain.WriteBuiltinJSONSchema`): `$id` set to the document's URL, every
+  relative `$ref` resolved against it, nothing else changed. It fails when a
+  `$ref` names a document under the base that is no built-in, so an editor
+  that follows one never meets a 404. The renderer is Node rather than the
+  server's Go because only a Go service's build has a Go toolchain on Vercel,
+  and the services build in no fixed order. A change to one renderer belongs
+  in the other.
+- **The routes:** the top-level rewrite sends `/schemas/v1/*` to the service,
+  ahead of the server's catch-all; a name that is no built-in is the
+  service's 404. The API keeps `/schemas` and `/schemas/{id}`: a schema id
+  never holds a slash.
+- **Previews** serve the same documents. One fetched from
+  `cloud-….vercel.app` still says it is
+  `https://preview.zitadel.com/schemas/v1/<name>`, and its `$ref`s lead there.
+- **Versions:** through alpha, `/schemas/v1/` serves main's latest, while
+  editors validate against the copies `zitadel setup` writes into a project's
+  `.zitadel/meta/`. What `v1` promises across releases is decided before 1.0
+  ([schema versioning](../design/schema-engine/versioning.md#published-copies)).
+- **Moving the namespace** to `https://zitadel.com/schemas/v1`, when the
+  preview moves: change `HOSTED_BASE` in the renderer together with the
+  server's default base, and let zitadel.com, also on Vercel, serve the same
+  files, by running
+  `node scripts/render-builtin-schemas.mjs --base https://zitadel.com/schemas/v1`
+  in its build or by rewriting `/schemas/v1/:path*` to this project.
 
 ## Database
 
@@ -222,22 +263,28 @@ Every deployment is tested once Vercel built it, on its own URL
 (`cloud-<hash>-zitadel.vercel.app`, never a production alias):
 [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs each
 service's contract suite against the deployment, today the docs'
-([`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md)) and the console's
-([`e2e/console/README.md`](../../e2e/console/README.md)), as the turbo tasks
+([`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md)), the console's
+([`e2e/console/README.md`](../../e2e/console/README.md)) and the built-in
+schemas' ([`e2e/schemas/`](../../e2e/schemas/)), as the turbo tasks
 `pnpm check:cloud` runs [by hand](#checking-a-deployment-by-hand). The console's
 signs nobody in: it checks how `vercel.json` routes the console's paths and
 that the signed-out console comes up, down to the login widget's first step,
-which needs the server and its database behind it.
+which needs the server and its database behind it. The schemas' fetches every
+built-in from `/schemas/v1/` and compares it with the deployed commit's own
+rendering, checks the headers `vercel.json` gives them, and that `/schemas`
+still reaches the API; it needs no browser.
 What starts it, and where the result lands, depends on the environment:
 
 - **A preview:** the `deployment_status` event Vercel posts to GitHub. The
-  checks land on the pull request: `deployment-checks / docs (Preview)` and
-  `deployment-checks / console (Preview)`.
+  checks land on the pull request: `deployment-checks / docs (Preview)`,
+  `deployment-checks / console (Preview)` and
+  `deployment-checks / schemas (Preview)`.
 - **Production:** [`production-checks.yml`](../../.github/workflows/production-checks.yml),
   on the `vercel.deployment.ready` dispatch Vercel sends once the deployment
   is built, before its Deployment Checks run. It calls the same jobs and sets
-  one commit status per suite on the deployed commit, `docs (Production)` and
-  `console (Production)`. A dispatch runs the workflow as it is on `main`: a
+  one commit status per suite on the deployed commit, `docs (Production)`,
+  `console (Production)` and `schemas (Production)`. A deployed commit from
+  before the schemas service passes the last with nothing to check. A dispatch runs the workflow as it is on `main`: a
   change to it takes effect once merged.
 - The suites reach the protected deployment with the project's Protection
   Bypass for Automation secret, which the workflow expects as the repository
@@ -269,18 +316,19 @@ What starts it, and where the result lands, depends on the environment:
   name the failing contract (the test's title) and list every URL that
   failed; the run's summary names the deployment and the command that
   reproduces the run; a failed browser test's screenshots are the
-  `docs-deployment-screenshots` or `console-deployment-screenshots` artifact.
+  `docs-deployment-screenshots` or `console-deployment-screenshots` artifact
+  (the schemas' suite runs no browser and uploads nothing).
   A flaky production run is run
   again from that run's page: it reports on the same commit again.
 - `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
-  runs the workflow without a new deployment; it reports `docs (dispatch)`
-  and `console (dispatch)`, never production's statuses. A change to
+  runs the workflow without a new deployment; it reports `docs (dispatch)`,
+  `console (dispatch)` and `schemas (dispatch)`, never production's statuses. A change to
   `deployment-checks.yml` needs no dispatch: a `deployment_status` run uses
   the file as it is on the deployed commit, so the branch's own preview
   checks it.
 - **Holding production back on it:** in the project's Build & Deployment
-  settings, Deployment Checks, add the GitHub checks `docs (Production)` and
-  `console (Production)` and let them block. Vercel then assigns the
+  settings, Deployment Checks, add the GitHub checks `docs (Production)`,
+  `console (Production)` and `schemas (Production)` and let them block. Vercel then assigns the
   production domains only once the statuses pass, so a red deployment never
   replaces the one serving (Force
   Promote on the deployment's page bypasses it). Until then a red status
@@ -304,10 +352,81 @@ export VERCEL_AUTOMATION_BYPASS_SECRET="$(npx -y vercel@63.1.2 api "/v9/projects
 CLOUD_URL=https://cloud-….vercel.app pnpm check:cloud
 ```
 
-`--filter=@zitadel/docs` or `--filter=@zitadel/e2e` runs one suite; that is
-the command a red check's summary names. A new suite is a turbo task that
+`--filter=@zitadel/docs` runs the docs' suite, `--filter=@zitadel/e2e` the
+console's and the schemas'; a red check's summary names the command that runs
+its suite alone. A new suite is a turbo task that
 `check:cloud` lists, a job in `deployment-checks.yml` and a status in
 `production-checks.yml`'s `SUITES`.
+
+## Running the cloud locally
+
+`pnpm run cloud` (`moon run workspace:cloud`) runs this deployment at
+http://localhost:3000: `vercel dev -L` over `vercel.json`, every service behind
+the deployment's own routes on one origin, the server on SQLite. No Vercel
+account, link or secret is involved, and Go need not be installed: Vercel's Go
+builder downloads the version `go.mod` names. `CLOUD_DEV_PORT` moves the port;
+`CLOUD_DEV_DEBUG=1` shows why a service did not start, which `vercel dev` logs
+only at debug level.
+
+[`scripts/run-cloud.mjs`](../../scripts/run-cloud.mjs) builds what the
+services read from disk (the login UI the server embeds, the packages the
+console's and storybook's builds import, the docs' generated sources), mints a
+throwaway master key and root admin under `.zitadel/local/cloud/` on the first
+run, and starts `vercel dev`. Sign in to `/console/` with the login in
+`.zitadel/local/cloud/admin.json`. The SQLite database lives beside it, so a
+restart keeps its state; deleting the directory starts over.
+
+`vercel dev` reads `vercel.json` and nothing else (it ignores
+`--local-config`), so what it needs lives there, in fields a deployment does
+not use:
+
+- The `server` service's `entrypoint` names `apps/cloud/launcher`. In dev,
+  Vercel's Go builder builds that package and starts it on `$PORT`; a
+  deployment runs `build.sh`, which compiles the same package, and the
+  builder takes the build command's binary instead. Without
+  `CLOUD_DATABASE_URL` and outside a deployment, the launcher serves from
+  SQLite and migrates it at startup.
+- The `console` and `storybook` services' `devCommand` builds them and serves
+  the build behind the same service rewrites a deployment serves it behind.
+  Their dev servers cannot sit behind those rewrites, so their live loops stay
+  `moon run console:dev-real` and `moon run storybook:dev`. `NODE_ENV` is set
+  because `vercel dev` runs dev commands under `development`, which makes
+  `vite build` a development build.
+- The `schemas` service's `devCommand` renders the built-in schemas and serves
+  them (`--serve`): `vercel dev` wants a dev server for every service, a
+  static one too, and refuses to start without one.
+- The console's fallback to its `index.html` leaves `assets/` out. `vercel dev`
+  cannot see a service's files, so a fallback for every path would answer the
+  console's scripts with the page. A deployment answers a missing asset with a
+  404 instead of the page.
+
+The docs and the website run `next dev`. `.vercelignore` keeps `vercel dev`
+from watching what no deployment is built from, the desktop app's worktrees
+among them, and keeps a CLI deployment from uploading it.
+
+In a desktop-app worktree, which sits in the main checkout's
+`.claude/worktrees/`, it runs the worktree's `vercel.json` and services.
+`vercel dev` runs the nearest folder above the one it is given that holds a
+`vercel.json`, `.vercel` or `.git`, if that `vercel.json` has services: given
+a worktree's root, the main checkout. The script gives it `scripts/`.
+`CLOUD_DEV_DEBUG=1` logs the folder it runs as `Running from project root:`;
+in a worktree a second such line names the main checkout, where the CLI only
+looks for a `vercel link`.
+
+Where it differs from a deployment:
+
+- `vercel dev` drops a redirect's query, so an old
+  `/ui/console/claim?challenge_id=…` link arrives without its challenge; open
+  `/console/claim?…` instead.
+- `CLOUD_URL=http://localhost:3000 pnpm check:cloud` runs the deployment
+  checks against it. Three fail by design: the redirect's query above; the
+  docs' assets, which `next dev` serves without the deployment's immutable
+  caching; and the schemas' headers, which `vercel dev` replaces with its own
+  (`application/json`, revalidated on every request).
+- Services is a beta of the Vercel CLI, and `vercel dev` changes from one
+  major to the next. The script drives a `vercel` on `PATH` of the major it
+  pins and otherwise runs the pinned version through npx; its first lines say
+  which.
 
 ## Rotating the master key
 
@@ -395,7 +514,16 @@ project and imports the root admin.
   pnpm compares the lockfile with the one that `node_modules` was installed
   from and installs when they differ. Go would keep each rebuild's compiled
   packages for five days, so `build.sh` drops those no build used in the
-  last two hours. Each build log ends with the cache's size:
+  last two hours. A new Go version starts the Go caches over: when the
+  toolchain Vercel picks from `go.mod`'s `toolchain` line differs from the
+  restored one, its Go builder downloads it and deletes
+  `.vercel/cache/golang`, module cache included. The next build of each
+  branch then downloads every module and compiles the server from nothing:
+  the Go step took 74 s after
+  [zitadel/nextgen#1845](https://github.com/zitadel/nextgen/pull/1845)
+  instead of the usual 7–27 s. A new compiler could not reuse the old build
+  cache anyway; the deletion costs only the module downloads, a few seconds.
+  Each build log ends with the cache's size:
   `Uploading build cache [...]`.
 
 ## Later: read replicas in other regions

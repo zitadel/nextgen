@@ -189,7 +189,8 @@ func releaseErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrReleaseInvalid(nil, nil).Code,
 		domain.ErrReleaseRevisionNotFound(nil).Code,
-		domain.ErrReleaseRevisionUnpinnable(nil).Code:
+		domain.ErrReleaseRevisionUnpinnable(nil).Code,
+		domain.ErrReleaseUnresolvedReference().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrReleasePermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)

@@ -2,6 +2,9 @@ id: "website"
 language: "typescript"
 layer: "application"
 stack: "frontend"
+dependsOn:
+  # The showcase's login previews render the atoms of @zitadel/components.
+  - "components"
 
 workspace:
   inheritedTasks:
@@ -23,6 +26,9 @@ tasks:
       - "build"
 
   build:
+    deps:
+      # Next resolves @zitadel/components to its dist/.
+      - "components:build"
     outputs:
       - ".next/**/*"
     options:
@@ -31,6 +37,8 @@ tasks:
 
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      - "components:build"
     options:
       persistent: true
       runInCI: false

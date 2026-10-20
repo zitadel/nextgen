@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-nuxt",
-  "version": "1.0.0-alpha.25",
+  "version": "1.0.0-alpha.27",
   "description": "Nuxt proxy middleware and helpers for the pre-release Zitadel preview.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt#readme",
   "bugs": {
@@ -34,7 +34,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup --tsconfig tsconfig.lib.json src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean --external '#imports' && tsup --tsconfig tsconfig.lib.json src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports' && tsup --tsconfig tsconfig.lib.json src/module.ts --format esm --dts-only --no-clean --external @nuxt/kit",
+    "build": "tsup --tsconfig tsconfig.lib.json src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean --external '#imports' && tsup --tsconfig tsconfig.lib.json src/runtime/plugin.ts src/runtime/components.client.ts 'src/runtime/composables/*.ts' src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports' && tsup --tsconfig tsconfig.lib.json src/module.ts 'src/runtime/composables/*.ts' --format esm --dts-only --no-clean --external @nuxt/kit --external '#imports'",
     "dev": "tsup src/index.ts src/server.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
@@ -46,13 +46,15 @@
   "dependencies": {
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
-    "@zitadel/sdk-core": "workspace:*"
+    "@zitadel/sdk-core": "workspace:*",
+    "ufo": "catalog:"
   },
   "peerDependencies": {
     "h3": ">=1",
     "nuxt": ">=4"
   },
   "devDependencies": {
+    "@babel/core": "catalog:",
     "@nuxt/kit": "catalog:",
     "@nuxt/schema": "catalog:",
     "@types/node": "catalog:",

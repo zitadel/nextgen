@@ -6,10 +6,12 @@ package integration_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -743,6 +745,164 @@ func TestPatchUser(t *testing.T) {
 	})
 }
 
+// TestPatchUserFailedMigration pins the guarantee #1507 makes: a patch that
+// moves a user to another schema and fails changes neither the user's
+// attributes nor its schema reference. Three of the failures are decided in
+// Prepare, before the write transaction, so nothing is written for them; the
+// unknown schema reference is kept to match #1659 one to one, its 400 is also
+// covered by TestPatchUser. The unique collision is decided by the registry
+// insert inside the transaction, after the old rows were already deleted, so
+// it is the case that would leak a partial write.
+func TestPatchUserFailedMigration(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	// Every revision shares the object type and declares the same uniqueness
+	// rules, since #1507 rejects a migration that changes them. Each one
+	// changes a single rule of the first: a property it requires, an enum, or
+	// an optional property it adds.
+	revision := func(t *testing.T, required []string, properties string) string {
+		t.Helper()
+		return harness.CreateUserSchema(t, project, fmt.Sprintf(`{
+			"title": "MigrationUser",
+			"$schema": "https://json-schema.org/draft/2020-12/schema",
+			"metaSchema": "%s/user-schema.json",
+			"kind": "user-schema",
+			"objectType": "migration-user",
+			"type": "object",
+			"x-auth-methods": {"passkey": {"enabled": true}},
+			"required": %s,
+			"properties": {
+				"username": {"type": "string", "x-unique": "project"},
+				"nickname": {"type": "string"},
+				%s
+			}
+		}`, helpers.BuiltinSchemaBaseURL, helpers.MustMarshal(t, required), properties))
+	}
+	initialSchema := revision(t, []string{"username"}, `
+		"color": {"type": "string"}`)
+	requiresGivenName := revision(t, []string{"username", "givenName"}, `
+		"color": {"type": "string"},
+		"givenName": {"type": "string"}`)
+	restrictsColor := revision(t, []string{"username"}, `
+		"color": {"type": "string", "enum": ["red", "blue"]}`)
+	addsLanguage := revision(t, []string{"username"}, `
+		"color": {"type": "string"},
+		"preferredLanguage": {"type": "string"}`)
+
+	users := harness.EnsureUserService(t)
+	createUser := func(t *testing.T, attributes map[string]any) (*domain.User, error) {
+		t.Helper()
+		return users.CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  project.ID,
+			SchemaURL:  initialSchema,
+			Attributes: attributes,
+		})
+	}
+
+	// stored is what a failed migration must leave alone, read from storage
+	// rather than from the response.
+	type stored struct {
+		schemaURL  string
+		attributes map[string]any
+		updatedAt  time.Time
+	}
+	readStored := func(t *testing.T, userID string) stored {
+		t.Helper()
+		user, err := users.GetUserByID(t.Context(), service.GetUserInput{ProjectID: project.ID, UserID: userID})
+		require.NoError(t, err)
+		attributes, err := user.Attributes.ToMap()
+		require.NoError(t, err)
+		return stored{
+			schemaURL:  user.SchemaURL,
+			attributes: attributes,
+			updatedAt:  user.Metadata.UpdatedAt,
+		}
+	}
+
+	for _, tc := range []struct {
+		name         string
+		targetSchema string
+		// collide has another user claim a username first, and the patch
+		// takes it over in the same request as the move.
+		collide    bool
+		wantStatus any
+		wantCode   string
+	}{
+		{
+			name:         "a required attribute of the target revision is missing",
+			targetSchema: requiresGivenName,
+			wantStatus:   &api.PatchUserByIDBadRequest{},
+			wantCode:     domain.ErrUserInvalid().Code,
+		},
+		{
+			name:         "a value violates a tightened rule",
+			targetSchema: restrictsColor,
+			wantStatus:   &api.PatchUserByIDBadRequest{},
+			wantCode:     domain.ErrUserInvalid().Code,
+		},
+		{
+			name:         "a value collides with another user's unique attribute",
+			targetSchema: addsLanguage,
+			collide:      true,
+			wantStatus:   &api.PatchUserByIDConflict{},
+			wantCode:     domain.ErrUserAlreadyExists().Code,
+		},
+		{
+			name:         "the target schema reference does not exist",
+			targetSchema: "https://example.com/schemas/migration-user-does-not-exist",
+			wantStatus:   &api.PatchUserByIDBadRequest{},
+			wantCode:     domain.ErrUserInvalid().Code,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			suffix := helpers.RandString(8)
+			taken := "holder-" + suffix
+			if tc.collide {
+				_, err := createUser(t, map[string]any{"username": taken})
+				require.NoError(t, err)
+			}
+			username := "migrant-" + suffix
+			user, err := createUser(t, map[string]any{
+				"username": username,
+				"nickname": "nick-" + suffix,
+				"color":    "green",
+			})
+			require.NoError(t, err)
+			before := readStored(t, user.ID)
+
+			body := map[string]any{"schema": tc.targetSchema}
+			if tc.collide {
+				body["attributes"] = map[string]any{"username": taken, "preferredLanguage": "en"}
+			}
+			req := &api.PatchUserRequest{}
+			require.NoError(t, req.UnmarshalJSON([]byte(helpers.MustMarshal(t, body))))
+
+			resp, err := client.PatchUserByID(t.Context(), req, api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
+			require.NoError(t, err)
+			require.IsType(t, tc.wantStatus, resp, helpers.MustMarshal(t, resp))
+			assertAuthzError(t, resp, tc.wantCode)
+
+			after := readStored(t, user.ID)
+			assert.Equal(t, before.schemaURL, after.schemaURL, "schema reference")
+			assert.Equal(t, before.attributes, after.attributes, "attributes")
+			assert.True(t, before.updatedAt.Equal(after.updatedAt), "updated_at moved from %s to %s", before.updatedAt, after.updatedAt)
+
+			// The unique attribute registry must still hold the original
+			// username for this user, so a second user cannot take it.
+			_, err = createUser(t, map[string]any{"username": username})
+			assert.ErrorIs(t, err, domain.ErrUserAlreadyExists(), "the original username must still be claimed")
+		})
+	}
+}
+
 func TestPatchMyUser(t *testing.T) {
 	t.Parallel()
 
@@ -1082,6 +1242,19 @@ func TestListPasskeys(t *testing.T) {
 		})
 	})
 
+	t.Run("a malformed page token is the caller's error", func(t *testing.T) {
+		t.Parallel()
+
+		_, user, client := dependencies(t)
+		resp, err := client.ListUserPasskeys(t.Context(), api.ListUserPasskeysParams{
+			UserID:    api.UserID(user.ID),
+			PageToken: api.NewOptPageToken("not-a-token"),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserPasskeysBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("req.invalid"), resp.(*api.ListUserPasskeysBadRequest).Code)
+	})
+
 	t.Run("unknown user returns 404", func(t *testing.T) {
 		t.Parallel()
 
@@ -1097,5 +1270,114 @@ func TestListPasskeys(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.IsType(t, &api.ListUserPasskeysNotFound{}, resp, helpers.MustMarshal(t, resp))
+	})
+}
+
+func TestListUserIdentityLinks(t *testing.T) {
+	t.Parallel()
+
+	dependencies := func(t *testing.T) (fixture idpFixture, user *domain.User) {
+		fixture = newIdpFixture(t)
+		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  fixture.project.ID,
+			SchemaURL:  test_data.UserSchemaURL,
+			Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "linked@example.com"),
+		})
+		require.NoError(t, err)
+		return fixture, user
+	}
+
+	link := func(t *testing.T, projectID, connectionID, subject, userID string) *domain.IDPIdentityLink {
+		t.Helper()
+		link := &domain.IDPIdentityLink{ProjectID: projectID, ConnectionID: connectionID, Subject: subject, UserID: userID}
+		require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateIDPIdentityLink(t.Context(), link))
+		return link
+	}
+
+	t.Run("lists the linked accounts oldest first, without the subject", func(t *testing.T) {
+		t.Parallel()
+
+		fixture, user := dependencies(t)
+		google := fixture.create(t, helpers.OIDCConnection("google"))
+		github := fixture.create(t, helpers.OIDCConnection("github"))
+		first := link(t, fixture.project.ID, google.ID, "google-subject", user.ID)
+		second := link(t, fixture.project.ID, github.ID, "github-subject", user.ID)
+
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: api.UserID(user.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksResponse{}, resp, helpers.MustMarshal(t, resp))
+		links := resp.(*api.ListUserIdentityLinksResponse).IdentityLinks
+		require.Len(t, links, 2)
+		assert.Equal(t, first.ID, links[0].ID)
+		assert.Equal(t, google.ID, links[0].ConnectionID)
+		assert.Equal(t, second.ID, links[1].ID)
+		assert.Equal(t, github.ID, links[1].ConnectionID)
+		assert.False(t, links[0].CreatedAt.IsZero())
+		assert.NotContains(t, helpers.MustMarshal(t, resp), "google-subject")
+	})
+
+	t.Run("pages", func(t *testing.T) {
+		t.Parallel()
+
+		fixture, user := dependencies(t)
+		google := fixture.create(t, helpers.OIDCConnection("google"))
+		github := fixture.create(t, helpers.OIDCConnection("github"))
+		link(t, fixture.project.ID, google.ID, "google-subject", user.ID)
+		link(t, fixture.project.ID, github.ID, "github-subject", user.ID)
+
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{
+			UserID: api.UserID(user.ID),
+			Limit:  api.NewOptLimit(1),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksResponse{}, resp, helpers.MustMarshal(t, resp))
+		page := resp.(*api.ListUserIdentityLinksResponse)
+		require.Len(t, page.IdentityLinks, 1)
+		require.True(t, page.NextPageToken.IsSet())
+
+		resp, err = fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{
+			UserID:    api.UserID(user.ID),
+			Limit:     api.NewOptLimit(1),
+			PageToken: api.NewOptPageToken(page.NextPageToken.Value),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksResponse{}, resp, helpers.MustMarshal(t, resp))
+		next := resp.(*api.ListUserIdentityLinksResponse)
+		require.Len(t, next.IdentityLinks, 1)
+		assert.NotEqual(t, page.IdentityLinks[0].ID, next.IdentityLinks[0].ID)
+		assert.False(t, next.NextPageToken.IsSet())
+	})
+
+	t.Run("no links", func(t *testing.T) {
+		t.Parallel()
+
+		fixture, user := dependencies(t)
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: api.UserID(user.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksResponse{}, resp, helpers.MustMarshal(t, resp))
+		assert.Empty(t, resp.(*api.ListUserIdentityLinksResponse).IdentityLinks)
+	})
+
+	t.Run("unknown user returns 404", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := newIdpFixture(t)
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: "user_does_not_exist"})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.ListUserIdentityLinksNotFound).Code)
+	})
+
+	t.Run("a malformed page token is the caller's error", func(t *testing.T) {
+		t.Parallel()
+
+		fixture, user := dependencies(t)
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{
+			UserID:    api.UserID(user.ID),
+			PageToken: api.NewOptPageToken("not-a-token"),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("req.invalid"), resp.(*api.ListUserIdentityLinksBadRequest).Code)
 	})
 }

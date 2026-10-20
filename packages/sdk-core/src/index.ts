@@ -10,8 +10,41 @@ export {
   INTERNAL_HEADERS,
   matchesRoutes,
   filterResponseHeaders,
+  requiresProjectSecret,
+  checkOpaqueSessionToken,
+  validateOpaqueSessionToken,
+  jwtNamesProject,
+  resolveSession,
+  SESSION_PROJECT_MISMATCH,
+  SERVER_SESSION_COOKIE,
+  sessionCookieName,
+  serializeSessionCookie,
+  proxySessionCookies,
+  clearSessionCheckCache,
+  SESSION_COOKIE_CACHE_CONTROL,
 } from "./middleware.js";
-export { verifyJwt, decodeJwt, isJwtShaped, base64UrlDecode, JWKS_TTL_MS } from "./jwt.js";
+export type {
+  OpaqueSession,
+  OpaqueSessionCheck,
+  SessionRequest,
+  SessionCookie,
+  ResolveSessionOptions,
+  ResolvedSession,
+  ProxiedRequest,
+  ProxiedAnswer,
+  ProxiedSessionCookies,
+  ProxyUpstream,
+  BrowserRequest,
+} from "./middleware.js";
+export {
+  verifyJwt,
+  decodeJwt,
+  isJwtShaped,
+  base64UrlDecode,
+  JWKS_TTL_MS,
+  JWKS_MIN_REFRESH_MS,
+  clearJwksCache,
+} from "./jwt.js";
 export type { JwtPayload, JwtHeader, DecodedJwt, VerifyJwtOptions } from "./jwt.js";
 
 export type ZitadelEnvironment = "development" | "preview" | "production";

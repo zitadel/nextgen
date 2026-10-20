@@ -148,6 +148,43 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
   });
 
+  // Mirrors the server: a read that names a project refuses a session of any
+  // other project, and serves its own as before.
+  test("GET /sessions/me with project_id refuses a session of another project", async () => {
+    const handoff = await signHandoffToken({ sub: "app-user@example.com", iss: BASE });
+    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me_app`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handoff_token: handoff }),
+    });
+    expect(exchange.status).toBe(200);
+    const cookie = exchange.headers
+      .getSetCookie()
+      .find((c) => c.startsWith("__nextgen_session="))
+      ?.split(";")[0];
+
+    const refused = await fetch(`${BASE}/sessions/me?project_id=proj_me_other`, {
+      headers: { cookie: cookie ?? "" },
+    });
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({ code: "sess.project_mismatch" });
+
+    const served = await fetch(`${BASE}/sessions/me?project_id=proj_me_app`, {
+      headers: { cookie: cookie ?? "" },
+    });
+    expect(served.status).toBe(200);
+    expect(await served.json()).toMatchObject({ project_id: "proj_me_app" });
+
+    // Like the server, a project_id outside the project-id pattern is a bad
+    // request, not a verdict on the session.
+    for (const invalid of ["", "proj%20me"]) {
+      const rejected = await fetch(`${BASE}/sessions/me?project_id=${invalid}`, {
+        headers: { cookie: cookie ?? "" },
+      });
+      expect(rejected.status).toBe(400);
+    }
+  });
+
   test("GET /sessions/me returns body parseable by GetMySessionResponse with a user ref", async () => {
     const handoff = await signHandoffToken({ sub: "me@example.com", iss: BASE });
     const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me`, {
@@ -1258,6 +1295,77 @@ describe("api-mock idp connections and variables", () => {
     expect(body.id).toBe(first.id);
     expect(body.revision_id).not.toBe(first.revision_id);
     expect((body.definition as Record<string, unknown>).display_name).toBe("Google Workspace");
+  });
+
+  describe("an oidc block that names only some endpoints", () => {
+    // The server's rule: none (discovery), or authorization_endpoint, jwks_uri,
+    // token_endpoint, and userinfo_endpoint unless id_token_mapping is true.
+    const endpoints = {
+      authorization_endpoint: "https://idp.test/authorize",
+      jwks_uri: "https://idp.test/jwks",
+      token_endpoint: "https://idp.test/token",
+      userinfo_endpoint: "https://idp.test/userinfo",
+    };
+    const withOidc = (over: object) =>
+      connection({
+        oidc: {
+          issuer: "https://idp.test",
+          scopes: ["openid"],
+          client_id: "${{ GOOGLE_CLIENT_ID }}",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          ...over,
+        },
+      });
+
+    test.each<[string, object, string[]]>([
+      [
+        "one endpoint",
+        { token_endpoint: endpoints.token_endpoint },
+        ["authorization_endpoint", "jwks_uri", "userinfo_endpoint"],
+      ],
+      ["all but jwks_uri", { ...endpoints, jwks_uri: undefined }, ["jwks_uri"]],
+      [
+        "userinfo_endpoint alone under id_token_mapping",
+        { userinfo_endpoint: endpoints.userinfo_endpoint, id_token_mapping: true },
+        ["authorization_endpoint", "jwks_uri", "token_endpoint"],
+      ],
+    ])(
+      "refuses %s with idp.endpoints_partial, listing what is missing",
+      async (_case, over, missing) => {
+        const projectId = await newProject("idp-endpoints-partial");
+
+        const res = await putIdp(projectId, withOidc(over));
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({
+          code: "idp.endpoints_partial",
+          message: "identity provider connection: the endpoints are partially set",
+          details: { details: { missing } },
+        });
+      },
+    );
+
+    test("refuses a revision too, before the slug is looked up", async () => {
+      const projectId = await newProject("idp-endpoints-partial-revise");
+      expect((await putIdp(projectId, connection())).status).toBe(201);
+
+      const res = await putIdp(projectId, withOidc({ jwks_uri: endpoints.jwks_uri }));
+
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { code: string }).code).toBe("idp.endpoints_partial");
+    });
+
+    test.each<[string, object]>([
+      ["every endpoint", endpoints],
+      [
+        "every endpoint but userinfo under id_token_mapping",
+        { ...endpoints, userinfo_endpoint: undefined, id_token_mapping: true },
+      ],
+    ])("accepts %s", async (_case, over) => {
+      const projectId = await newProject("idp-endpoints-full");
+
+      expect((await putIdp(projectId, withOidc(over))).status).toBe(201);
+    });
   });
 
   test("reads one back by id, and 404s an id the project does not own", async () => {

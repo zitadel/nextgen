@@ -1,0 +1,7 @@
+name: team_id
+in: path
+required: true
+description: The unique identifier of the team.
+schema:
+  $ref: '../schemas/team-id.yaml'
+example: team_01KZZY8PX8K8ATNVDSMRCZY4N1

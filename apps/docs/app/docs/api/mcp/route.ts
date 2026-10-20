@@ -3,10 +3,10 @@ import { registerSearchTool, registerSourceTools } from "fumadocs-core/mcp";
 import { createFromSource } from "fumadocs-core/search/server";
 
 import { appName } from "@/lib/shared";
-import { docsLlms, source } from "@/lib/source";
+import { docsLlms, searchIndex, source } from "@/lib/source";
 
 // One search index per function instance, not one per request.
-const search = createFromSource(source);
+const search = createFromSource(source, { buildIndex: searchIndex });
 
 const handler = createMcpHandler(() => {
   const mcp = new McpServer({
