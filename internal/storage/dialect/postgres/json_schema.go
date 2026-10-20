@@ -46,25 +46,6 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 
 const deleteByIDJSONSchemaStmt = `DELETE FROM zitadel_nextgen.json_schemas WHERE project_id = $1 AND url = $2`
 
-// jsonSchemaURLsInUseQuery probes users once per listed schema through
-// idx_users_schema_url, so its cost follows the page, not the user count.
-const jsonSchemaURLsInUseQuery = `SELECT s.url FROM zitadel_nextgen.json_schemas s
-WHERE s.project_id = $1 AND s.url = ANY ($2::text[])
-  AND EXISTS (SELECT 1 FROM zitadel_nextgen.users u WHERE u.project_id = s.project_id AND u.schema_url = s.url)`
-
-// JSONSchemaURLsInUse implements [service.JSONSchemaStatements].
-func (js jsonSchemaStatements) JSONSchemaURLsInUse(ctx context.Context, projectID string, schemaURLs []string) ([]string, error) {
-	rows, err := js.client.Query(ctx, jsonSchemaURLsInUseQuery, projectID, schemaURLs)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	urls, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	return urls, nil
-}
-
 // DeleteJSONSchemaByID implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error {
 	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
@@ -81,6 +62,13 @@ func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, project
 }
 
 const jsonSchemaQuery = "SELECT project_id, url, object_type, kind, created_at, payload FROM zitadel_nextgen.json_schemas"
+
+// jsonSchemaInUseQuery is jsonSchemaQuery plus whether any user is on the row's
+// revision. The EXISTS is one probe of idx_users_schema_url per listed row, so
+// its cost follows the page, not the user count, and it adds no rows.
+const jsonSchemaInUseQuery = "SELECT project_id, url, object_type, kind, created_at, payload," +
+	" EXISTS (SELECT 1 FROM zitadel_nextgen.users u WHERE u.project_id = zitadel_nextgen.json_schemas.project_id AND u.schema_url = zitadel_nextgen.json_schemas.url)" +
+	" FROM zitadel_nextgen.json_schemas"
 
 // latestRevisionPerObjectType keeps only the newest revision of each
 // object_type. It is an anti-join rather than `created_at = (SELECT MAX(…))`
@@ -119,7 +107,7 @@ func (js jsonSchemaStatements) GetJSONSchemaByID(ctx context.Context, projectID,
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	schema, err := pgx.CollectExactlyOneRow(rows, js.scanJSONSchema)
+	schema, err := pgx.CollectExactlyOneRow(rows, jsonSchemaScanner(false))
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -135,8 +123,13 @@ func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *data
 			conjuncts = append(conjuncts, latestRevisionPerObjectType)
 		}
 
+		query := jsonSchemaQuery
+		if opts.IncludeInUse {
+			query = jsonSchemaInUseQuery
+		}
+
 		var compiler statementCompiler
-		if err := compileList(ctx, &compiler, jsonSchemaQuery, filter, jsonSchemaSchema, "zitadel_nextgen.json_schemas", "url", conjuncts...); err != nil {
+		if err := compileList(ctx, &compiler, query, filter, jsonSchemaSchema, "zitadel_nextgen.json_schemas", "url", conjuncts...); err != nil {
 			return nil, err
 		}
 
@@ -145,7 +138,7 @@ func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *data
 			return nil, wrapError(err)
 		}
 
-		schemas, err := pgx.CollectRows(rows, js.scanJSONSchema)
+		schemas, err := pgx.CollectRows(rows, jsonSchemaScanner(opts.IncludeInUse))
 		if err != nil {
 			return nil, wrapError(err)
 		}
@@ -161,18 +154,25 @@ func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *data
 	}, nil
 }
 
-func (js jsonSchemaStatements) scanJSONSchema(row pgx.CollectableRow) (*domain.JSONSchema, error) {
-	schema := new(domain.JSONSchema)
-	var kind string
-	if err := row.Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &kind, &schema.CreatedAt, &schema.Schema); err != nil {
-		return nil, err
+func jsonSchemaScanner(withInUse bool) pgx.RowToFunc[*domain.JSONSchema] {
+	return func(row pgx.CollectableRow) (*domain.JSONSchema, error) {
+		schema := new(domain.JSONSchema)
+		var kind string
+		dest := []any{&schema.ProjectID, &schema.URL, &schema.ObjectType, &kind, &schema.CreatedAt, &schema.Schema}
+		if withInUse {
+			schema.InUse = new(bool)
+			dest = append(dest, schema.InUse)
+		}
+		if err := row.Scan(dest...); err != nil {
+			return nil, err
+		}
+		parsedKind, err := domain.JSONSchemaKindString(kind)
+		if err != nil {
+			return nil, err
+		}
+		schema.Kind = parsedKind
+		return schema, nil
 	}
-	parsedKind, err := domain.JSONSchemaKindString(kind)
-	if err != nil {
-		return nil, err
-	}
-	schema.Kind = parsedKind
-	return schema, nil
 }
 
 var _ service.JSONSchemaStatements = (*jsonSchemaStatements)(nil)

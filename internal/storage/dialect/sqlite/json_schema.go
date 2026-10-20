@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -18,6 +17,12 @@ VALUES (?, ?, ?, ?, ?, ?) RETURNING project_id, url, object_type, kind, created_
 	deleteByIDJSONSchemaStmt = `DELETE FROM json_schemas WHERE project_id = ? AND url = ?`
 
 	jsonSchemaQuery = `SELECT project_id, url, object_type, kind, created_at, payload FROM json_schemas`
+
+	// jsonSchemaInUseQuery is jsonSchemaQuery plus whether any user is on the
+	// row's revision. See the postgres peer.
+	jsonSchemaInUseQuery = `SELECT project_id, url, object_type, kind, created_at, payload,` +
+		` EXISTS (SELECT 1 FROM users u WHERE u.project_id = json_schemas.project_id AND u.schema_url = json_schemas.url)` +
+		` FROM json_schemas`
 
 	// latestRevisionPerObjectType keeps only the newest revision of each
 	// object_type. It is an anti-join rather than `created_at = (SELECT MAX(…))`
@@ -71,34 +76,6 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 	})
 }
 
-// jsonSchemaURLsInUseQuery probes users once per listed schema through
-// idx_users_schema_url, so its cost follows the page, not the user count.
-const jsonSchemaURLsInUseQuery = `SELECT s.url FROM json_schemas s
-WHERE s.project_id = ? AND s.url IN (SELECT value FROM json_each(?))
-  AND EXISTS (SELECT 1 FROM users u WHERE u.project_id = s.project_id AND u.schema_url = s.url)`
-
-// JSONSchemaURLsInUse implements [service.JSONSchemaStatements].
-func (js jsonSchemaStatements) JSONSchemaURLsInUse(ctx context.Context, projectID string, schemaURLs []string) ([]string, error) {
-	urlsJSON, err := json.Marshal(schemaURLs)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := js.client.Query(ctx, jsonSchemaURLsInUseQuery, projectID, string(urlsJSON))
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	defer rows.Close()
-	var urls []string
-	for rows.Next() {
-		var url string
-		if err := rows.Scan(&url); err != nil {
-			return nil, wrapError(err)
-		}
-		urls = append(urls, url)
-	}
-	return urls, wrapError(rows.Err())
-}
-
 // DeleteJSONSchemaByID implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error {
 	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
@@ -130,7 +107,7 @@ func (js jsonSchemaStatements) GetJSONSchemaByID(ctx context.Context, projectID,
 		return nil, wrapError(err)
 	}
 	defer rows.Close()
-	schema, err := collectExactlyOneRow(rows, scanJSONSchema)
+	schema, err := collectExactlyOneRow(rows, jsonSchemaScanner(false))
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -146,8 +123,13 @@ func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *data
 			conjuncts = append(conjuncts, latestRevisionPerObjectType)
 		}
 
+		query := jsonSchemaQuery
+		if opts.IncludeInUse {
+			query = jsonSchemaInUseQuery
+		}
+
 		var compiler statementCompiler
-		if err := compileList(ctx, &compiler, jsonSchemaQuery, filter, jsonSchemaSchema, "json_schemas", "url", conjuncts...); err != nil {
+		if err := compileList(ctx, &compiler, query, filter, jsonSchemaSchema, "json_schemas", "url", conjuncts...); err != nil {
 			return nil, err
 		}
 		rows, err := js.client.Query(ctx, compiler.String(), compiler.args...)
@@ -155,7 +137,7 @@ func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *data
 			return nil, wrapError(err)
 		}
 		defer rows.Close()
-		schemas, err := collectRows(rows, scanJSONSchema)
+		schemas, err := collectRows(rows, jsonSchemaScanner(opts.IncludeInUse))
 		if err != nil {
 			return nil, wrapError(err)
 		}
@@ -192,29 +174,38 @@ func scanJSONSchemaRow(row *sql.Row) (*domain.JSONSchema, error) {
 	return schema, nil
 }
 
-func scanJSONSchema(rows *sql.Rows) (*domain.JSONSchema, error) {
-	schema := new(domain.JSONSchema)
-	var (
-		objectType  sql.NullString
-		kind        string
-		createdNano int64
-		payloadStr  sql.NullString
-	)
-	if err := rows.Scan(&schema.ProjectID, &schema.URL, &objectType, &kind, &createdNano, &payloadStr); err != nil {
-		return nil, err
+// jsonSchemaScanner reads a row of jsonSchemaQuery, or of jsonSchemaInUseQuery
+// when withInUse is set.
+func jsonSchemaScanner(withInUse bool) func(rows *sql.Rows) (*domain.JSONSchema, error) {
+	return func(rows *sql.Rows) (*domain.JSONSchema, error) {
+		schema := new(domain.JSONSchema)
+		var (
+			objectType  sql.NullString
+			kind        string
+			createdNano int64
+			payloadStr  sql.NullString
+		)
+		dest := []any{&schema.ProjectID, &schema.URL, &objectType, &kind, &createdNano, &payloadStr}
+		if withInUse {
+			schema.InUse = new(bool)
+			dest = append(dest, schema.InUse)
+		}
+		if err := rows.Scan(dest...); err != nil {
+			return nil, err
+		}
+		parsedKind, err := domain.JSONSchemaKindString(kind)
+		if err != nil {
+			return nil, err
+		}
+		schema.Kind = parsedKind
+		schema.CreatedAt = timeFromUnixNano(createdNano)
+		if objectType.Valid {
+			v := objectType.String
+			schema.ObjectType = &v
+		}
+		schema.Schema = nullJSONBytes(payloadStr)
+		return schema, nil
 	}
-	parsedKind, err := domain.JSONSchemaKindString(kind)
-	if err != nil {
-		return nil, err
-	}
-	schema.Kind = parsedKind
-	schema.CreatedAt = timeFromUnixNano(createdNano)
-	if objectType.Valid {
-		v := objectType.String
-		schema.ObjectType = &v
-	}
-	schema.Schema = nullJSONBytes(payloadStr)
-	return schema, nil
 }
 
 var _ service.JSONSchemaStatements = (*jsonSchemaStatements)(nil)

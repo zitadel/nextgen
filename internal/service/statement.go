@@ -142,6 +142,7 @@ type JSONSchemaQueryOptions struct {
 	// object_type. Rows without an object_type are revisions of nothing and
 	// pass through untouched.
 	LatestRevisionPerObjectType bool
+	IncludeInUse                bool
 }
 
 type JSONSchemaStatements interface {
@@ -149,7 +150,6 @@ type JSONSchemaStatements interface {
 	CreateJSONSchema(ctx context.Context, entity *domain.JSONSchema) error
 	GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*domain.JSONSchema, error)
 	ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error)
-	JSONSchemaURLsInUse(ctx context.Context, projectID string, schemaURLs []string) ([]string, error)
 	DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error
 }
 
