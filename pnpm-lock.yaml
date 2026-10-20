@@ -461,6 +461,9 @@ catalogs:
     typescript:
       specifier: ^6.0.3
       version: 6.0.3
+    ufo:
+      specifier: ^1.6.4
+      version: 1.6.4
     vite:
       specifier: ^8.3.1
       version: 8.3.1
@@ -1505,6 +1508,9 @@ importers:
       '@zitadel/api':
         specifier: workspace:*
         version: link:../api
+      ufo:
+        specifier: 'catalog:'
+        version: 1.6.4
     devDependencies:
       '@types/node':
         specifier: ^24.19.1
@@ -1545,6 +1551,9 @@ importers:
       server-only:
         specifier: ^0.0.1
         version: 0.0.1
+      ufo:
+        specifier: 'catalog:'
+        version: 1.6.4
     devDependencies:
       '@testing-library/react':
         specifier: 'catalog:'
@@ -1591,6 +1600,9 @@ importers:
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
+      ufo:
+        specifier: 'catalog:'
+        version: 1.6.4
     devDependencies:
       '@babel/core':
         specifier: 'catalog:'
@@ -1680,6 +1692,9 @@ importers:
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
+      ufo:
+        specifier: 'catalog:'
+        version: 1.6.4
     devDependencies:
       '@qwik.dev/core':
         specifier: 'catalog:'
@@ -1824,6 +1839,9 @@ importers:
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
+      ufo:
+        specifier: 'catalog:'
+        version: 1.6.4
     devDependencies:
       '@solidjs/router':
         specifier: ^1.0.0
@@ -1913,6 +1931,9 @@ importers:
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
+      ufo:
+        specifier: 'catalog:'
+        version: 1.6.4
     devDependencies:
       '@sveltejs/kit':
         specifier: ^3.0.1
@@ -1956,6 +1977,9 @@ importers:
       '@zitadel/sdk-react':
         specifier: workspace:*
         version: link:../sdk-react
+      ufo:
+        specifier: 'catalog:'
+        version: 1.6.4
     devDependencies:
       '@types/node':
         specifier: ^24.19.1

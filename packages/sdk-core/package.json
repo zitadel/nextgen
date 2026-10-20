@@ -51,7 +51,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@zitadel/api": "workspace:*"
+    "@zitadel/api": "workspace:*",
+    "ufo": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

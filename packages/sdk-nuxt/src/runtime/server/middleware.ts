@@ -3,6 +3,7 @@ import type {
   NextgenMiddlewareOptions,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
+import { joinURL } from "ufo";
 import type { EventHandler, H3Event } from "h3";
 
 import { useRuntimeConfig } from "#imports";
@@ -206,7 +207,7 @@ async function proxyRequest(
   proxyTimeoutMs: number,
 ): Promise<ReadableStream<Uint8Array> | null> {
   const suffix = url.pathname.slice(proxyPath.length);
-  const target = `${authUrl}${suffix}${url.search}`;
+  const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const method = event.node.req.method ?? "GET";
   const hasBody = !["GET", "HEAD"].includes(method);
