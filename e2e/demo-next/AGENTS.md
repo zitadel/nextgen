@@ -1,68 +1,62 @@
-# Agent Instructions — `e2e/demo-next/`
+# Agent Instructions — the demo lanes (`e2e/demo-next`, `e2e/demo-nuxt`)
 
-Playwright project that exercises `apps/demo-next/` end-to-end. It has two
-suites: the **mock lane** (`demo-next-mock`, against the standalone
-`@zitadel/api-mock` TCP server, specs under `src/`) and the **real lane**
-(`demo-next-real`, specs under `src-real/` with
-`playwright.real.config.mts`), which boots a real server
-instance through `@zitadel/testing` (`ZITADEL_SERVER_BINARY`,
-`NEXTGEN_SERVER_{LOGIN,CONSOLE}_ENABLED=false`) and covers registration,
-password sign-in, and authenticated navigation against real storage. It does
-not cover passkeys: the lane seeds the shipped `password-first` default flow,
-which offers no passkey action, and the real-server passkey round trip is
-covered by the journey's (`e2e/journey`) `passkey-first` preset lane. This project is the flagship Playwright consumer of the test kit —
-see [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md). Both
-lanes run in CI as dependencies of `e2e:all` (the `full-pr` job's e2e step),
-whenever one of them, the demo app or a dependency is affected. Defer to root
-[`AGENTS.md`](../../AGENTS.md) for repo-wide rules.
+The demo lanes drive `apps/demo-next` and `apps/demo-nuxt` end to end, and
+cover only what Vitest cannot reach: the framework integration. Both
+frameworks have lanes because each SDK implements the proxy and route
+protection differently, so a regression in one does not show in the other.
 
-## Scope
+| Lane | Specs | Backend | App |
+| --- | --- | --- | --- |
+| `moon run e2e:demo-next-mock` | `demo-next/src/` | `@zitadel/api-mock` on `:8080` | `:3002` |
+| `moon run e2e:demo-next-real` | `demo-next/src-real/` | a real instance on `:8092` (`@zitadel/testing`) | `:3002` |
+| `moon run e2e:demo-nuxt-mock` | `demo-nuxt/src/` | `@zitadel/api-mock` on `:8081` | `:3001` |
 
-The mock lane covers the boundary that Vitest cannot reach:
+The Nuxt lane's mock gets its own port so both mock lanes run side by side.
+Install browsers once with
+`corepack pnpm --filter @zitadel/e2e exec playwright install`. How the lanes
+run in CI and locally:
+[`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#moon-and-the-e2e-lanes).
 
-- `<zitadel-login>` mounted inside Next.js `dynamic({ ssr: false })`.
-- The Lit orchestrator's internal `POST /sessions/exchange` traversing
-  the Next.js `/__nextgen` proxy installed by `@zitadel/sdk-next`.
-- The demo project's session cookie (`__nextgen_session_proj_demo`, the
-  server's cookie renamed by the SDK proxy, ADR 073) being set on the demo
-  origin and surviving the full-page navigation triggered by
-  `post-sign-in-url`.
-- `nextgenMiddleware` accepting that cookie on the next request and
-  bouncing unauthenticated traffic back to `/login`.
+## What belongs here
 
-## Non-Goals — Do Not Add Tests Here For…
+On each framework, the lanes prove that:
 
-- Atom rendering, ARIA, focus delegation, form participation, Enter-to-submit
-  → `packages/components` Vitest unit / browser projects.
-- Step transitions, error rendering, exchange call shape, focus management
-  → `packages/components/src/orchestrator/zitadel-login.spec.ts` (Vitest).
-- Mock handler logic, RS256 token contract, JWKS shape
-  → `packages/api-mock` Vitest projects.
-- Visual regression / accessibility audits
-  → not yet wired.
+- `<zitadel-login>` mounts inside the client-only boundary (Next's
+  `dynamic({ ssr: false })`, Nuxt's `<ClientOnly>`);
+- the orchestrator's `POST /sessions/exchange` passes the SDK's `/__nextgen`
+  proxy;
+- the demo project's session cookie (`__nextgen_session_proj_demo`, the
+  server's cookie renamed by the SDK proxy, ADR 073) is set on the demo origin
+  and survives the full-page navigation to `post-sign-in-url`;
+- the SDK's middleware accepts it on the next request and sends
+  unauthenticated traffic back to `/login`.
 
-If a property can be proven without booting Next, it does not belong in
-this project.
+The real lane adds registration, password sign-in and authenticated
+navigation against real storage. It covers no passkeys: it seeds the shipped
+`password-first` flow, and the journey's `passkey-first` lane covers the
+passkey round trip.
 
-## Running
+## What does not
 
-```sh
-corepack pnpm exec playwright install        # one-time, browsers
-moon run e2e:demo-next-mock                  # mock lane
-moon run e2e:demo-next-real                  # real-instance lane (@zitadel/testing)
-```
+A property that can be proven without booting the framework does not belong
+here.
 
-Moon rebuilds `@zitadel/components` first through task dependencies, then
-Playwright boots `api-mock` (`:8080`) and `demo-next` (`:3002`) through
-direct `pnpm --filter` commands.
+- Atom rendering, ARIA, focus, form participation, Enter-to-submit:
+  `packages/components`' Vitest projects.
+- Step transitions, error rendering, the exchange call's shape:
+  `packages/components/src/orchestrator/zitadel-login.spec.ts`.
+- Mock handlers, the RS256 token contract, the JWKS shape:
+  `packages/api-mock`.
+- Accessibility audits: Storybook (`addon-a11y` with `test: "error"`). Visual
+  regression is not wired.
+- Vue specifics (composables, reactive bindings, `useState`):
+  `packages/sdk-nuxt`'s unit suite.
 
-## When Adding A Spec
+## Writing a spec
 
-- One terminal assertion per behaviour. Most checks should use
-  Playwright web-first locators (`getByRole`, `getByLabel`) rather than
-  raw selectors so shadow DOM is pierced consistently.
-- Mirror the spec in `e2e/demo-nuxt/` if and only if the property
-  depends on framework-specific middleware. Component-level behaviour
-  goes in Vitest.
-- Specs are paired (one spec per behaviour, identifiable filename) so
-  individual failures point straight at the affected boundary.
+- Mirror a spec in the other demo only when the property depends on that
+  framework's middleware.
+- One behaviour per spec file, named so a failure points at its boundary, and
+  one terminal assertion per behaviour.
+- Use web-first locators (`getByRole`, `getByLabel`), so shadow DOM is
+  pierced the same way everywhere.
