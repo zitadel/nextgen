@@ -1,5 +1,6 @@
 import type { ZitadelProject } from "@zitadel/api/config";
 import type { NextgenMiddlewareOptions, ResolveSessionOptions } from "@zitadel/sdk-core/middleware";
+import { joinURL } from "ufo";
 import type { NextRequest } from "next/server";
 
 import {
@@ -168,7 +169,7 @@ async function proxyRequest(
 ): Promise<Response> {
   const url = new URL(req.url);
   const suffix = url.pathname.slice(proxyPath.length);
-  const target = `${authUrl}${suffix}${url.search}`;
+  const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const upstreamHeaders = new Headers();
   for (const [key, value] of req.headers.entries()) {

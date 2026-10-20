@@ -375,6 +375,12 @@ than one:
   Interactively, with none of these given, both commands list what is mapped
   and ask for more claims until the person continues; a claim can fill an attribute with no claim yet, or a new attribute, which is added to the user schema and the register steps of the login flow. A connection that
   already exists keeps the mapping in its file; edit `claim_mapping` there.
+  An issuer on `http://localhost:<port>` (a test provider on this machine)
+  works against a server `zitadel start` runs as a process: `start` sets
+  `NEXTGEN_HTTPCLIENT_ALLOW_LIST=localhost,127.0.0.0/8,::1/128` unless
+  `.env.local`, `.env` or the shell sets it, and setting it empty turns it off.
+  Under `--runtime docker` localhost is the container, so the provider is not
+  reachable. Otherwise `sso enable` warns in `warnings` that sign-in will fail.
   `auth-method sso disable --provider google` removes a provider; a custom one
   is named by its slug, as in `auth-method sso disable --provider acme-sso`.
 

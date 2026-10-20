@@ -3,11 +3,20 @@ title: Quickstart
 description: Add the Zitadel preview to a local app with the alpha CLI and npm-binary runtime.
 ---
 
-Use this path when you want to add Zitadel auth to a local app without a source checkout.
+Use this path when you want to add Zitadel auth to a local app without a source checkout. In a new, empty folder, or in your app's (see [Add Zitadel to an existing app](#add-zitadel-to-an-existing-app)):
+
+```sh
+npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --server local
+npm run dev
+```
+
+`doctor` checks your machine, `start` runs Zitadel locally, `setup` scaffolds an app with login, registration and profile pages, and `npm run dev` serves it. The sections below explain each step.
 
 ## Prerequisites
 
-- Node.js 24 or newer. When setup creates a new app it checks your Node against the range the framework's CLI publishes before it starts. To create an Angular app, use a Node version the Angular CLI accepts: 22.22.3 or newer 22.x, 24.15.0 or newer 24.x, or 26.x (the Angular CLI publishes `^22.22.3 || ^24.15.0 || >=26.0.0`, but it checks each major on its own, so Node 27 and later are refused). Node 23 and 25 run with a warning. Setup refuses any other Node and names the range. For the other frameworks, setup warns if your Node is outside the range and carries on.
+- Node.js 24 or newer. Setup checks your Node against the framework's own range; an Angular app needs a narrower one (see [Node versions](#node-versions)).
 - A package manager supported by your app.
 - Docker only if you intentionally choose the Docker runtime backend.
 
@@ -125,3 +134,9 @@ Delete local runtime data:
 ```sh
 npx @zitadel/cli@alpha reset --force
 ```
+
+## Node versions
+
+When setup creates a new app, it checks your Node against the range the framework's CLI publishes before it starts. For the frameworks other than Angular, setup warns if your Node is outside that range and carries on.
+
+To create an Angular app, use a Node version the Angular CLI accepts: 22.22.3 or newer 22.x, 24.15.0 or newer 24.x, or 26.x. The Angular CLI publishes `^22.22.3 || ^24.15.0 || >=26.0.0`, but it checks each major on its own, so Node 27 and later are refused. Node 23 and 25 run with a warning. Setup refuses any other Node and names the range.

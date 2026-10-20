@@ -1718,6 +1718,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
   ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
   ".zitadel/meta/branding.json": { subject: "the branding dialect spec" },
+  ".zitadel/meta/project.json": { subject: "the zitadel.json spec (editor $schema)" },
   "AGENTS.md": { subject: "the agent guidance (golden journey + config dialect)" },
   "README.md": { subject: "the README's Zitadel section" },
   "app/page.tsx": { subject: "the home page redirect" },

@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
+	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -60,9 +60,8 @@ type PatchUserInput struct {
 }
 
 type PatchMyUserInput struct {
-	// SessionToken is the parsed session token, already verified at the API
-	// security boundary.
-	SessionToken *domain.Token
+	// Self is the caller, from their verified session (domain.SelfFromSession).
+	Self domain.Self
 	// Attributes is the partial attribute patch; nil values delete. The
 	// schema pointer is not self-service: it stays where it is.
 	Attributes map[string]any
@@ -103,9 +102,8 @@ type ListUserTeamsInput struct {
 }
 
 type GetMyUserInput struct {
-	// SessionToken is the parsed session token, already verified at the API
-	// security boundary.
-	SessionToken *domain.Token
+	// Self is the caller, from their verified session (domain.SelfFromSession).
+	Self domain.Self
 }
 
 type DeleteUserInput struct {
@@ -137,6 +135,7 @@ type UserService interface {
 	PatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error)
 	SetPassword(ctx context.Context, input SetPasswordInput) (err error)
 	GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error)
+	GetMyUserSchema(ctx context.Context, input GetMyUserInput) (*domain.JSONSchema, error)
 	PatchMyUser(ctx context.Context, input PatchMyUserInput) (*domain.User, error)
 }
 
@@ -147,6 +146,9 @@ type userService struct {
 	schemaStore domain.JSONSchemaStore
 	hashers     ProjectHasherResolver
 	refs        UserRefResolver
+	// builtinBases lets a filter on a built-in schema's `$id` match the users
+	// stored under any of its bases, the way schemaStore resolves one.
+	builtinBases domain.BuiltinSchemaBases
 }
 
 // NewUserService returns the interface rather than *userService, deliberately
@@ -160,12 +162,14 @@ func NewUserService(
 	schemaStore domain.JSONSchemaStore,
 	hashers ProjectHasherResolver,
 	refs UserRefResolver,
+	builtinBases domain.BuiltinSchemaBases,
 ) UserService {
 	return &userService{
-		v2Pool:      v2Pool,
-		schemaStore: schemaStore,
-		hashers:     hashers,
-		refs:        refs,
+		v2Pool:       v2Pool,
+		schemaStore:  schemaStore,
+		hashers:      hashers,
+		refs:         refs,
+		builtinBases: builtinBases,
 	}
 }
 
@@ -285,7 +289,7 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *L
 	filters := make([]database.Filter[domain.UserField], 0, len(columnFilters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID))
 	for _, f := range columnFilters {
-		filter, err := userFilter(f)
+		filter, err := userFilter(f, s.builtinBases)
 		if err != nil {
 			return nil, err
 		}
@@ -357,8 +361,10 @@ func splitUserFilters(filters []Filter) ([]Filter, UserQueryOptions, error) {
 // userFilter maps an API filter predicate to a storage filter. Operations the
 // v2 filter layer cannot express return [domain.ErrNotImplemented];
 // invalid field/operation/value combinations return [domain.ErrRequestInvalid].
-// [splitUserFilters] has already taken team_id out.
-func userFilter(f Filter) (database.Filter[domain.UserField], error) {
+// [splitUserFilters] has already taken team_id out. A `schema` equality names
+// a built-in schema's `$id` under any of its bases: users are stored under
+// the base their project holds the row at, whichever one the caller used.
+func userFilter(f Filter, builtinBases domain.BuiltinSchemaBases) (database.Filter[domain.UserField], error) {
 	switch f.Field {
 	case userFieldCreatedAt:
 		return createdAtFilter(f.Operation, database.Col(domain.UserFieldCreatedAt), f.Value)
@@ -372,6 +378,13 @@ func userFilter(f Filter) (database.Filter[domain.UserField], error) {
 		value, err := stringFilterValue(f)
 		if err != nil {
 			return nil, err
+		}
+		if equivalents := builtinBases.Equivalents(value); f.Operation == filterOpEquals && len(equivalents) > 1 {
+			spellings := make([]database.Filter[domain.UserField], 0, len(equivalents))
+			for _, url := range equivalents {
+				spellings = append(spellings, database.StringEqual(database.Col(domain.UserFieldSchemaURL), url))
+			}
+			return database.Or(spellings...), nil
 		}
 		return stringFilter(f.Operation, database.Col(domain.UserFieldSchemaURL), value)
 	case userFieldStatus:
@@ -626,16 +639,9 @@ func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (
 	ctx, end := startSpan(ctx, "UserService.PatchMyUser")
 	defer end(&err)
 
-	sessionToken := input.SessionToken
-	if !validSessionToken(sessionToken) {
-		return nil, domain.ErrSessionTokenInvalid()
-	}
-
-	// Identity and project both come from the token, so a caller can only
-	// ever patch themself — the same containment GetMyUser relies on.
 	return s.PatchUser(ctx, PatchUserInput{
-		ProjectID:  sessionToken.ProjectID,
-		UserID:     sessionToken.UserID,
+		ProjectID:  input.Self.ProjectID(),
+		UserID:     input.Self.UserID(),
 		Attributes: input.Attributes,
 	})
 }
@@ -652,14 +658,38 @@ func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (_ *d
 	ctx, end := startSpan(ctx, "UserService.GetMyUser")
 	defer end(&err)
 
-	sessionToken := input.SessionToken
-	if !validSessionToken(sessionToken) {
-		return nil, domain.ErrSessionTokenInvalid()
+	user, err := s.ownUser(ctx, input.Self)
+	if err != nil {
+		return nil, err
 	}
+	if err := s.attachUserRefs(ctx, input.Self.ProjectID(), user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
 
+// GetMyUserSchema returns the schema the caller's own record is validated
+// against — the one PatchMyUser validates against.
+func (s *userService) GetMyUserSchema(ctx context.Context, input GetMyUserInput) (_ *domain.JSONSchema, err error) {
+	ctx, end := startSpan(ctx, "UserService.GetMyUserSchema")
+	defer end(&err)
+
+	user, err := s.ownUser(ctx, input.Self)
+	if err != nil {
+		return nil, err
+	}
+	schema, err := s.v2Pool.Statements().GetJSONSchemaByID(ctx, input.Self.ProjectID(), user.SchemaURL)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to get the user's schema from database")
+	}
+	return schema, nil
+}
+
+// ownUser reads the caller's own record.
+func (s *userService) ownUser(ctx context.Context, self domain.Self) (*domain.User, error) {
 	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
-		database.Equal(database.Col(domain.UserFieldProjectID), sessionToken.ProjectID),
-		database.Equal(database.Col(domain.UserFieldID), sessionToken.UserID),
+		database.Equal(database.Col(domain.UserFieldProjectID), self.ProjectID()),
+		database.Equal(database.Col(domain.UserFieldID), self.UserID()),
 	), UserQueryOptions{})
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -667,10 +697,6 @@ func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (_ *d
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
 	}
-	if err := s.attachUserRefs(ctx, sessionToken.ProjectID, user); err != nil {
-		return nil, err
-	}
-
 	return user, nil
 }
 
@@ -713,10 +739,12 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 
 	o.schemaJSON = schemaEntity.Schema
 	o.CreateUser, err = domain.NewCreateUser(domain.CreateUserParams{
-		ProjectID:  o.ProjectID,
-		TeamID:     o.TeamID,
-		ID:         o.ID,
-		SchemaURL:  o.SchemaURL,
+		ProjectID: o.ProjectID,
+		TeamID:    o.TeamID,
+		ID:        o.ID,
+		// The row that was found, which can sit under another built-in base
+		// than the one the caller named (domain.BuiltinSchemaBases).
+		SchemaURL:  schemaEntity.URL,
 		Schema:     schemaEntity.Schema,
 		Attributes: o.Attributes,
 	})
@@ -814,11 +842,12 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get unique attribute scopes from database")
 	}
 
-	targetSchemaURL := user.SchemaURL
-	if o.SchemaURL != nil {
-		targetSchemaURL = *o.SchemaURL
+	targetSchemaURL := gu.Value(o.SchemaURL)
+	if targetSchemaURL == "" {
+		targetSchemaURL = user.SchemaURL
 	}
-	schemaEntity, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, targetSchemaURL)
+
+	targetSchema, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, targetSchemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return domain.ErrUserInvalid().
@@ -828,11 +857,23 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
-	o.schemaJSON = schemaEntity.Schema
+	// Compare rows, not spellings: the store resolves a built-in schema named
+	// under another base to the row the user may already be stored under.
+	if targetSchema.URL != user.SchemaURL {
+		currentSchema, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, user.SchemaURL)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to get the user's current schema from database")
+		}
+		if err := domain.CheckUserSchemaMigration(currentSchema, targetSchema); err != nil {
+			return err
+		}
+	}
+
+	o.schemaJSON = targetSchema.Schema
 	o.patch, err = domain.NewPatchUser(domain.PatchUserParams{
 		Current:              user,
-		SchemaURL:            targetSchemaURL,
-		Schema:               schemaEntity.Schema,
+		SchemaURL:            targetSchema.URL,
+		Schema:               targetSchema.Schema,
 		AttributesPatch:      o.Attributes,
 		StoredRegistryScopes: storedScopes,
 	})
@@ -958,11 +999,6 @@ func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		EntityType: "user",
 		EntityID:   o.UserID,
 	})
-}
-
-// validSessionToken reports whether the token is present and not expired.
-func validSessionToken(token *domain.Token) bool {
-	return token != nil && (token.ExpiresAt == nil || !time.Now().After(*token.ExpiresAt))
 }
 
 // UserStatementsLookup adapts [UserStatements] to [UserLookup] for AuthAttemptService.

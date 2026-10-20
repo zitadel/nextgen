@@ -15,7 +15,7 @@
  * - `startMockServer(port)` (from `./server.js`) — Express + MSW middleware
  *   for `apps/demo-next` and `apps/demo-nuxt`, and the console's mock dev loop
  *   (`apps/console/README.md`), which alone uses `/console/runtime.json`.
- *   Applies `defaultDevBranding` (Arimo `font_url`) on boot; see
+ *   Applies `defaultDevBranding` (dark theme, no font) on boot; see
  *   `default-dev-branding.ts`.
  *
  * Helpers:

@@ -331,6 +331,23 @@ func NewClaimTeamAssignment(projectID, teamID string) *AuthzAssignment {
 	return a
 }
 
+// NewPersonalTeamOwnerAssignment lets the user a personal team was created for
+// read and rename it: editor scoped to that one team, so it reaches no other
+// resource in the project and cannot delete the team. It stands in for ADR 054
+// §2's team.owner relation, which is not seeded yet.
+func NewPersonalTeamOwnerAssignment(projectID, teamID, userID string) *AuthzAssignment {
+	a := &AuthzAssignment{
+		ProjectID:     projectID,
+		CatalogID:     SystemCatalogID,
+		PrincipalType: AuthzPrincipalTypeUser,
+		PrincipalID:   userID,
+		ObjectType:    "project",
+		Relation:      "editor",
+	}
+	a.ApplyScope(NewTeamAssignmentScope(teamID))
+	return a
+}
+
 // AuthzMembershipEdge is the authz projection of set membership (not lifecycle).
 // The resolver expands team grants through these edges; team_memberships remains
 // the roster table and is not read at check time.

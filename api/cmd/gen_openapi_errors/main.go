@@ -921,7 +921,13 @@ func acceptsSessionCookie(op methodsFileOperation) bool {
 // error union when the API handler intentionally remaps them to a different
 // public code before the response is written.
 var operationExcludedErrors = map[string][]string{
-	"listMyProjects": {"domain.ErrSessionTokenInvalid"},
+	// Self-access operations answer any refused session as auth.unauthorized
+	// (requireSelf, #553).
+	"getMyUser":       {"domain.ErrSessionTokenInvalid"},
+	"patchMyUser":     {"domain.ErrSessionTokenInvalid"},
+	"getMyUserSchema": {"domain.ErrSessionTokenInvalid"},
+	"listMyTeams":     {"domain.ErrSessionTokenInvalid"},
+	"listMyProjects":  {"domain.ErrSessionTokenInvalid"},
 	// The flow engine catches a stale parked SSO row with errors.Is and renders
 	// the step; the analysis cannot see that check prune the error. The SSO
 	// resolver turns a user schema the project does not hold into

@@ -25,7 +25,7 @@ that way to get the CLI and per-framework skills alongside this router.
 - **Create a project, scaffold a new app, change config, deploy, or run a local
   Zitadel server** → use **`zitadel-cli`**. It drives the `zitadel` CLI
   (`setup`, `plan`, `apply`, resource commands). It can scaffold a fresh app for
-  any supported framework and integrate an **existing Next.js** app.
+  any framework below and integrate an **existing** app on any of them.
 
 - **Integrate the auth UI into an app** → use the SDK skill for that framework:
   - Next.js → **`zitadel-sdk-next`**
@@ -46,12 +46,16 @@ that way to get the CLI and per-framework skills alongside this router.
 
 ## The rule that spans all of them
 
-The CLI can **scaffold** a fresh app for every framework above, but it can only
-**integrate (patch) an existing project for Next.js**. For an existing app in any
-other framework, the CLI cannot wire it up on its own — reach for that framework's
-SDK skill and add auth by hand: install `@zitadel/sdk-<framework>@alpha`, configure it,
-add the provider/guard/routes, and drop in the login component. That SDK skill is
-the authoritative path for the existing-app case.
+The CLI can **scaffold** a fresh app for every framework above and **integrate
+(patch) an existing app** on each of them: `setup` detects the framework and
+writes the routes, request boundary or root component, and stops with
+`E_CONFLICT` rather than overwrite a file of the app's. It leaves an app it does
+not support unchanged: a Next.js Pages Router app, a React app without Vite, or
+a framework older than setup supports (the quickstart's
+[Add Zitadel to an existing app](https://preview.zitadel.com/docs/get-started/quickstart.md)
+lists the versions). For those, reach for that framework's SDK skill and add
+auth by hand: install `@zitadel/sdk-<framework>@alpha`, configure it, add the
+provider/guard/routes, and drop in the login component.
 
 Each skill points you at the package's real README and TypeScript types for exact
 APIs — read those rather than guessing, since they move with the package version.
@@ -77,21 +81,22 @@ The docs are organised into these sections:
 ### Finding the right page
 
 Look the page up before you fetch it — don't guess URLs. The index lists every
-page with a one-line description:
+page's Markdown URL with a one-line description:
 
 ```
-https://nextgen-docs-zitadel.vercel.app/docs/llms.txt
+https://preview.zitadel.com/docs/llms.txt
 ```
 
 Links in the index are relative to the docs site, so prefix them with
-`https://nextgen-docs-zitadel.vercel.app`. Fetch only the pages you need. Do not
+`https://preview.zitadel.com`. Fetch only the pages you need. Do not
 fetch `llms-full.txt`: it is the whole site in one file and costs far more
 context than the one or two pages a question needs.
 
 ### Fetching a page as Markdown
 
-Add `.md` to a page's URL to get it as Markdown instead of HTML, for example
-`https://nextgen-docs-zitadel.vercel.app/docs/concepts/databases.md`.
+The index's links are already the Markdown. For a page URL from elsewhere, add
+`.md` to get it as Markdown instead of HTML, for example
+`https://preview.zitadel.com/docs/concepts/databases.md`.
 
 ### How far to trust the docs
 

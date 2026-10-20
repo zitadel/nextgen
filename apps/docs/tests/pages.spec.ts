@@ -15,9 +15,9 @@ import {
 
 /**
  * Every page, through the index agents read first: /docs/llms.txt lists each
- * page with its site-relative URL (skills/zitadel/SKILL.md tells agents to
- * prefix it with the docs' origin). The suite keeps no list of its own, so a
- * page is covered the moment it is written.
+ * page with its site-relative Markdown URL (skills/zitadel/SKILL.md tells
+ * agents to prefix it with the docs' origin). The suite keeps no list of its
+ * own, so a page is covered the moment it is written.
  */
 
 // Requests in flight at once over the page list.
@@ -47,6 +47,11 @@ test("the index lists every section, each page once, under /docs", async ({ requ
   }
 
   const pages = parseIndex(index);
+  // Each entry is the page's Markdown URL, which answers as listed.
+  expect(
+    pages.filter((page) => page.markdown !== markdownUrl(page.url)).map((page) => page.markdown),
+    "index entries that are not a page's Markdown URL",
+  ).toEqual([]);
   const urls = pages.map((page) => page.url);
   expect(urls).toEqual(
     expect.arrayContaining(["/docs", "/docs/get-started/quickstart", "/docs/cli"]),
@@ -143,7 +148,7 @@ test("every page negotiates Markdown through Accept", async ({ request }) => {
   expect(failures(results), "pages that do not negotiate Markdown").toEqual([]);
 });
 
-test("every API operation shows its call through @zitadel/api and its CLI command", async ({
+test("every API operation shows its call through @zitadel/api, its CLI command and cURL", async ({
   request,
 }) => {
   test.setTimeout(120_000);
@@ -166,6 +171,10 @@ test("every API operation shows its call through @zitadel/api and its CLI comman
     const command = /"x-zitadel-cli": "([^"]+)"/.exec(markdown)?.[1];
     if (command && !markdown.includes(`npx @zitadel/cli@alpha ${command}`)) {
       return `${markdownUrl(url)}: no \`${command}\` command`;
+    }
+    // And with cURL, as the page's last sample (lib/source.ts).
+    if (!/```bash\ncurl -X [A-Z]+ 'http:\/\/localhost:8080\//.test(markdown)) {
+      return `${markdownUrl(url)}: no cURL command`;
     }
     const html = await (await request.get(url)).text();
     if (!html.includes("@zitadel/api/")) return `${url}: no @zitadel/api sample`;

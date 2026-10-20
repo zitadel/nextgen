@@ -12,7 +12,7 @@ import { HOSTED_BASE, renderBuiltinSchemas } from "../../../scripts/render-built
  *
  * A deployment's own URL is not the namespace's: the document fetched from
  * <deployment>/schemas/v1/user-schema.json says it is
- * https://preview.zitadel.com/schemas/v1/user-schema.json.
+ * https://zitadel.com/schemas/v1/user-schema.json.
  */
 const documents = renderBuiltinSchemas();
 const path = new URL(HOSTED_BASE).pathname;

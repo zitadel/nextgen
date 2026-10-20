@@ -45,7 +45,8 @@
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
-    "@zitadel/sdk-core": "workspace:*"
+    "@zitadel/sdk-core": "workspace:*",
+    "ufo": "catalog:"
   },
   "peerDependencies": {
     "@solidjs/start": "^2.0.0",

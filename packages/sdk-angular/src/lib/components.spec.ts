@@ -7,7 +7,7 @@ import type {
 import { Component, type Type } from "@angular/core";
 import { bootstrapApplication, provideClientHydration } from "@angular/platform-browser";
 import { provideServerRendering, renderApplication } from "@angular/platform-server";
-import { render } from "@testing-library/angular";
+import { render, waitFor } from "@testing-library/angular";
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
@@ -300,6 +300,22 @@ describe("server-rendered widget config", () => {
     });
   });
 
+  it("writes the login language into the server markup only when one is set", async () => {
+    const unset = await serverRender(`<zitadel-auth-login />`, [ZitadelLoginComponent]);
+    expect(attributesOf(unset, widgetTags.login)).not.toHaveProperty("lang");
+    const set = await serverRender(`<zitadel-auth-login lang="de" />`, [ZitadelLoginComponent]);
+    expect(attributesOf(set, widgetTags.login)).toMatchObject({ lang: "de" });
+  });
+
+  it("leaves the properties and the callbacks out of the server markup", async () => {
+    const html = await serverRender(
+      `<zitadel-auth-login [project]="{ projectId: 'p1', proxyPath: '/px' }" [locales]="{ en: {} }" />`,
+      [ZitadelLoginComponent],
+    );
+    expect(attributesOf(html, widgetTags.login)).not.toHaveProperty("locales");
+    expect(html).not.toMatch(/locales|flowStep|object Object/i);
+  });
+
   it("puts the session config into the server markup", async () => {
     const html = await serverRender(`<zitadel-auth-session postSignOutUrl="/bye" heading="Hi" />`, [
       ZitadelSessionComponent,
@@ -355,6 +371,44 @@ describe("hydrating a server-rendered login", () => {
     expect(created).toHaveLength(1);
     expect(created[0]).toMatchObject({ purpose: "register" });
     expect(globalProject.projectId).toBe("proj-global");
+  });
+
+  it("loads the supplied flow on its first request instead of creating one", async () => {
+    configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const template = `<zitadel-auth-login resumeFlowId="flow_123" />`;
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const html = await serverRender(template, [ZitadelLoginComponent]);
+    const host = document.body;
+    host.innerHTML = html
+      .slice(html.indexOf("<body"), html.indexOf("</body>"))
+      .replace(/^<body[^>]*>/, "");
+    const rendered = host.querySelector(widgetTags.login);
+    expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
+    const firstStep = new Promise((resolve) =>
+      rendered?.addEventListener("zitadel-flow-step", resolve, { once: true }),
+    );
+
+    @Component({
+      selector: "app-root",
+      standalone: true,
+      imports: [ZitadelLoginComponent],
+      template,
+    })
+    class Root {}
+    await bootstrapApplication(Root, { providers: [provideClientHydration()] });
+
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
+    expect(first.method).toBe("GET");
+    expect(first.url).toContain("flow_123");
+    expect(host.querySelector(widgetTags.login)).toBe(rendered);
+    await firstStep;
+    await rendered?.updateComplete;
+    await Promise.all(fetched.mock.results.map((result) => result.value));
+    expect(fetched).toHaveBeenCalledTimes(1);
   });
 });
 

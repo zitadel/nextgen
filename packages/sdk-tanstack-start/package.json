@@ -51,7 +51,8 @@
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/sdk-core": "workspace:*",
-    "@zitadel/sdk-react": "workspace:*"
+    "@zitadel/sdk-react": "workspace:*",
+    "ufo": "catalog:"
   },
   "peerDependencies": {
     "@tanstack/react-start": ">=1",
