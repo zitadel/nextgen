@@ -21,7 +21,7 @@ Auth runs in framework middleware: it proxies `/__nextgen/*`, verifies the sessi
   <Card title="Nuxt" href="/docs/sdks/nuxt" description="Nitro middleware, runtime config, plugins, and server-side session access." />
   <Card title="SvelteKit" href="/docs/sdks/sveltekit" description="A server hook for proxying, session checks, and protected routes." />
   <Card title="SolidStart" href="/docs/sdks/solid-start" description="Request middleware for SolidStart 2, with client-only widgets." />
-  <Card title="Qwik City" href="/docs/sdks/qwik-city" description="An onRequest plugin for Qwik Router on Qwik 2." />
+  <Card title="Qwik Router" href="/docs/sdks/qwik-router" description="An onRequest plugin for Qwik Router on Qwik 2." />
   <Card title="TanStack Start" href="/docs/sdks/tanstack-start" description="Global request middleware, route guards, and typed React widgets." />
 </Cards>
 
@@ -57,7 +57,7 @@ All packages ship on the `@alpha` dist-tag and move together as one release trai
 | Nuxt | `@zitadel/sdk-nuxt` | Server (Nitro) | Nitro server middleware | pages + plugins + module in `nuxt.config` |
 | SvelteKit | `@zitadel/sdk-sveltekit` + `@zitadel/sdk-svelte` | Server (SSR) | `handle` server hook | `src/hooks.server.ts` + routes |
 | SolidStart | `@zitadel/sdk-solid-start` + `@zitadel/sdk-solid` | Server (SSR) | SolidStart request middleware | `src/middleware.ts` registered in `vite.config.ts` + routes |
-| Qwik City | `@zitadel/sdk-qwik-city` + `@zitadel/sdk-qwik` | Server (SSR) | Root `onRequest` plugin | `src/routes/plugin@nextgen.ts` + routes |
+| Qwik Router | `@zitadel/sdk-qwik-router` + `@zitadel/sdk-qwik` | Server (SSR) | Root `onRequest` plugin | `src/routes/plugin@nextgen.ts` + routes |
 | TanStack Start | `@zitadel/sdk-tanstack-start` | Server (SSR) | Global request middleware | `src/start.ts` + routes |
 | React | `@zitadel/sdk-react` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
 | Vue | `@zitadel/sdk-vue` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |

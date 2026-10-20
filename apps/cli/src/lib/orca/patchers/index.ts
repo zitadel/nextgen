@@ -2,7 +2,7 @@ import { AngularPatcher } from "./rule/angular";
 import { NextPatcher } from "./rule/next";
 import { NuxtPatcher } from "./rule/nuxt";
 import { QwikPatcher } from "./rule/qwik";
-import { QwikCityPatcher } from "./rule/qwik-city";
+import { QwikRouterPatcher } from "./rule/qwik-router";
 import { ReactPatcher } from "./rule/react";
 import { SolidPatcher } from "./rule/solid";
 import { SolidStartPatcher } from "./rule/solid-start";
@@ -31,7 +31,7 @@ export const patchers = [
   new SolidPatcher(),
   new SvelteKitPatcher(),
   new SveltePatcher(),
-  new QwikCityPatcher(),
+  new QwikRouterPatcher(),
   new QwikPatcher(),
   new AngularPatcher(),
 ] as const satisfies ReadonlyArray<Patcher>;

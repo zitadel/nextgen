@@ -25,7 +25,7 @@
       "@zitadel/sdk-qwik",
       "@zitadel/sdk-sveltekit",
       "@zitadel/sdk-solid-start",
-      "@zitadel/sdk-qwik-city",
+      "@zitadel/sdk-qwik-router",
       "@zitadel/sdk-tanstack-start",
       "@zitadel/testing"
     ]

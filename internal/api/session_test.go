@@ -204,7 +204,9 @@ func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
 				if !tc.refused {
 					require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 					if op.path == "/users/me" {
-						require.Equal(t, []*domain.Token{token}, users.served, "the user is the session's")
+						self, err := domain.SelfFromSession(token, time.Now())
+						require.NoError(t, err)
+						require.Equal(t, []domain.Self{self}, users.served, "the user is the session's")
 					}
 					return
 				}
@@ -221,26 +223,26 @@ func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
 }
 
 // myUserService answers the reads and patches of the cookie's user and records
-// the session token each was asked for. Any other method panics.
+// the caller each was asked for. Any other method panics.
 type myUserService struct {
 	service.UserService
-	served []*domain.Token
+	served []domain.Self
 }
 
 func (s *myUserService) GetMyUser(_ context.Context, input service.GetMyUserInput) (*domain.User, error) {
-	s.served = append(s.served, input.SessionToken)
-	return myUser(input.SessionToken), nil
+	s.served = append(s.served, input.Self)
+	return myUser(input.Self), nil
 }
 
 func (s *myUserService) PatchMyUser(_ context.Context, input service.PatchMyUserInput) (*domain.User, error) {
-	s.served = append(s.served, input.SessionToken)
-	return myUser(input.SessionToken), nil
+	s.served = append(s.served, input.Self)
+	return myUser(input.Self), nil
 }
 
-func myUser(token *domain.Token) *domain.User {
+func myUser(self domain.Self) *domain.User {
 	return &domain.User{
-		ProjectID: token.ProjectID,
-		ID:        token.UserID,
+		ProjectID: self.ProjectID(),
+		ID:        self.UserID(),
 		SchemaURL: "sch_1",
 		Metadata:  domain.UserMetadata{Status: domain.UserStatusActive},
 	}

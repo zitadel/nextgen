@@ -679,6 +679,15 @@ func (UnimplementedHandler) GetMyUser(ctx context.Context, params GetMyUserParam
 	return r, ht.ErrNotImplemented
 }
 
+// GetMyUserSchema implements getMyUserSchema operation.
+//
+// The schema the signed-in user's own record is validated against.
+//
+// GET /users/me/schema
+func (UnimplementedHandler) GetMyUserSchema(ctx context.Context) (r GetMyUserSchemaRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetProject implements getProject operation.
 //
 // Returns the current state of a project.
@@ -905,6 +914,15 @@ func (UnimplementedHandler) ListIdpRevisions(ctx context.Context, params ListIdp
 //
 // GET /users/me/projects
 func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyProjectsParams) (r ListMyProjectsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListMyTeams implements listMyTeams operation.
+//
+// The signed-in user's own team roster, ordered by team name.
+//
+// GET /users/me/teams
+func (UnimplementedHandler) ListMyTeams(ctx context.Context, params ListMyTeamsParams) (r ListMyTeamsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

@@ -26,7 +26,17 @@ const config = {
   async redirects() {
     // The root serves nothing; locally (next dev, next start) it opens the
     // docs. On the cloud's host the root is the website's start page.
-    return [{ source: "/", destination: "/docs", permanent: false }];
+    return [
+      { source: "/", destination: "/docs", permanent: false },
+      // The Qwik meta-framework SDK's page, from before the SDK took Qwik 2's
+      // name for its router (Qwik Router, formerly Qwik City).
+      { source: "/docs/sdks/qwik-city", destination: "/docs/sdks/qwik-router", permanent: true },
+      {
+        source: "/docs/sdks/qwik-city.md",
+        destination: "/docs/sdks/qwik-router.md",
+        permanent: true,
+      },
+    ];
   },
 };
 

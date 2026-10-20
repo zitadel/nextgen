@@ -17,6 +17,7 @@ import type {
 import "./early-events";
 import "@zitadel/components";
 import { component$, useSignal, useVisibleTask$, type QRL, type Signal } from "@qwik.dev/core";
+import { standardAttributes } from "@zitadel/sdk-core/types";
 import {
   configureZitadel,
   getApi,
@@ -26,6 +27,7 @@ import {
 } from "@zitadel/api/config";
 
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
+import type { ZitadelWidgetAttributes } from "./types";
 
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
@@ -206,6 +208,7 @@ type Qrlify<H> = {
  * signal to obtain the underlying `<zitadel-login>` element imperatively.
  */
 export type ZitadelLoginProps = ZitadelLoginConfig &
+  ZitadelWidgetAttributes &
   Qrlify<ZitadelLoginHandlers> & {
     /**
      * Optional signal populated with the underlying `<zitadel-login>` element
@@ -226,6 +229,8 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
  * declarative `useOn` does not catch.
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
+  // The standard HTML attributes are the only extra props the element takes.
+  const attributes = standardAttributes(props);
   const host = useSignal<ZitadelLoginElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
@@ -256,6 +261,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   );
   return (
     <zitadel-login
+      {...attributes}
       {...{ [WRAPPER_MARKER]: "" }}
       ref={(el) => {
         host.value = el;
@@ -277,6 +283,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
  * signal to obtain the underlying `<zitadel-logout>` element imperatively.
  */
 export type ZitadelLogoutProps = ZitadelLogoutConfig &
+  ZitadelWidgetAttributes &
   Qrlify<ZitadelLogoutHandlers> & {
     /**
      * Optional signal populated with the underlying `<zitadel-logout>` element
@@ -294,6 +301,8 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
  * forwards the widget's `zitadel-signout` event as an optional callback.
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
+  // The standard HTML attributes are the only extra props the element takes.
+  const attributes = standardAttributes(props);
   const host = useSignal<ZitadelLogoutElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
@@ -311,6 +320,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   );
   return (
     <zitadel-logout
+      {...attributes}
       {...{ [WRAPPER_MARKER]: "" }}
       ref={(el) => {
         host.value = el;
@@ -332,6 +342,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
  * `<zitadel-session>` element imperatively.
  */
 export type ZitadelSessionProps = ZitadelSessionConfig &
+  ZitadelWidgetAttributes &
   Qrlify<ZitadelSessionHandlers> & {
     /**
      * Optional signal populated with the underlying `<zitadel-session>` element
@@ -349,6 +360,8 @@ export type ZitadelSessionProps = ZitadelSessionConfig &
  * `zitadel-signout` event as an optional callback.
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
+  // The standard HTML attributes are the only extra props the element takes.
+  const attributes = standardAttributes(props);
   const host = useSignal<ZitadelSessionElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
@@ -366,6 +379,7 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   );
   return (
     <zitadel-session
+      {...attributes}
       {...{ [WRAPPER_MARKER]: "" }}
       ref={(el) => {
         host.value = el;

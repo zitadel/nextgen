@@ -18,7 +18,7 @@ afterEach(async () => {
 /** A project a detector would recognise, declaring `spec` for its framework package. */
 /** What a detector needs besides the package it floors before it recognises a project. */
 const COMPANION_DEPENDENCIES: Record<string, Record<string, string>> = {
-  "qwik-city": { "@qwik.dev/core": "^2.0.0-beta.45" },
+  "qwik-router": { "@qwik.dev/core": "^2.0.0-beta.45" },
   "solid-start": { "solid-js": "^1" },
   "tanstack-start": { react: "^19" },
 };

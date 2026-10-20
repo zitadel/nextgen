@@ -242,18 +242,39 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	if err != nil {
 		return nil, err
 	}
+	res := userTeamsResponse(teams)
+	return &res, nil
+}
 
-	res := &api.ListUserTeamsResponse{
-		Teams: make([]api.UserTeam, 0, len(teams.Items)),
+func (h *Handler) ListMyTeams(ctx context.Context, params api.ListMyTeamsParams) (api.ListMyTeamsRes, error) {
+	self, err := requireSelf(ctx)
+	if err != nil {
+		return nil, err
 	}
+	teams, err := h.userService.ListUserTeams(ctx, service.ListUserTeamsInput{
+		ProjectID: self.ProjectID(),
+		UserID:    self.UserID(),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &api.ListUserTeamsResponseHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     userTeamsResponse(teams),
+	}, nil
+}
+
+func userTeamsResponse(teams *service.ListUserTeamsOutput) api.ListUserTeamsResponse {
+	res := api.ListUserTeamsResponse{Teams: make([]api.UserTeam, 0, len(teams.Items))}
 	if teams.NextPageToken != "" {
 		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(teams.NextPageToken))
 	}
 	for _, team := range teams.Items {
 		res.Teams = append(res.Teams, apiUserTeam(*team))
 	}
-
-	return res, nil
+	return res
 }
 
 func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams) (api.GetUserByIDRes, error) {
@@ -318,13 +339,10 @@ func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, 
 }
 
 // PatchMyUser updates the user of the cookie's session, held to project_id when
-// the caller names one (holdSessionToProject).
+// the caller names one (requireSelfInProject).
 func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest, params api.PatchMyUserParams) (api.PatchMyUserRes, error) {
-	sessionToken, ok := sessionTokenFromContext(ctx)
-	if !ok {
-		return nil, domain.ErrSessionTokenInvalid()
-	}
-	if err := holdSessionToProject(sessionToken, params.ProjectID); err != nil {
+	self, err := requireSelfInProject(ctx, params.ProjectID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -334,8 +352,8 @@ func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest, 
 	}
 
 	user, err := h.userService.PatchMyUser(ctx, service.PatchMyUserInput{
-		SessionToken: sessionToken,
-		Attributes:   *attributes,
+		Self:       self,
+		Attributes: *attributes,
 	})
 	if err != nil {
 		return nil, err
@@ -362,25 +380,36 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 }
 
 // GetMyUser reads the user of the cookie's session, held to project_id when the
-// caller names one (holdSessionToProject).
+// caller names one (requireSelfInProject).
 func (h *Handler) GetMyUser(ctx context.Context, params api.GetMyUserParams) (api.GetMyUserRes, error) {
-	sessionToken, ok := sessionTokenFromContext(ctx)
-	if !ok {
-		return nil, domain.ErrSessionTokenInvalid()
-	}
-	if err := holdSessionToProject(sessionToken, params.ProjectID); err != nil {
-		return nil, err
-	}
-	input := service.GetMyUserInput{
-		SessionToken: sessionToken,
-	}
-
-	user, err := h.userService.GetMyUser(ctx, input)
+	self, err := requireSelfInProject(ctx, params.ProjectID)
 	if err != nil {
 		return nil, err
 	}
-
+	user, err := h.userService.GetMyUser(ctx, service.GetMyUserInput{Self: self})
+	if err != nil {
+		return nil, err
+	}
 	return domainUserToApiUser(user)
+}
+
+func (h *Handler) GetMyUserSchema(ctx context.Context) (api.GetMyUserSchemaRes, error) {
+	self, err := requireSelf(ctx)
+	if err != nil {
+		return nil, err
+	}
+	schema, err := h.userService.GetMyUserSchema(ctx, service.GetMyUserInput{Self: self})
+	if err != nil {
+		return nil, err
+	}
+	apiSchema, err := domainSchemaToApiSchema(schema)
+	if err != nil {
+		return nil, err
+	}
+	return &api.SchemaHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     *apiSchema,
+	}, nil
 }
 
 // ------------------ Mappers ---------------

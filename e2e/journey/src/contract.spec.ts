@@ -20,7 +20,7 @@ test("setup completed and installed local registry packages", async () => {
   const packageJson = JSON.parse(await readFile(join(appDir, "package.json"), "utf8"));
   // The framework SDK must be declared, but the section depends on the
   // framework's bundling model: most apps externalise runtime deps and list it
-  // under `dependencies`, whereas Qwik City's Vite config bundles its
+  // under `dependencies`, whereas Qwik Router's Vite config bundles its
   // ecosystem packages and so requires them in `devDependencies`. Accept
   // either — the contract is "declared as a dependency", not which section.
   const sdkVersion =
