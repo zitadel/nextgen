@@ -14,7 +14,7 @@ const BACKEND = "http://localhost:4000";
  * presets do, over a web `Request`; the middleware reaches the request only
  * through h3's accessors, so it runs here as it does on Node.
  */
-async function serve(request: Request, context: Record<string, unknown> = {}): Promise<Response> {
+async function serve(request: Request, context: Record<string, string> = {}): Promise<Response> {
   setRuntimeConfig({ nextgen: {} });
   const app = createApp();
   app.use(
@@ -53,7 +53,7 @@ describe("server middleware in the edge runtime", () => {
   });
 
   it("proxies to the backend with its status, headers and cookies", async () => {
-    const calls: { url: string; headers: Headers; body: unknown }[] = [];
+    const calls: { url: string; headers: Headers; body: BodyInit | null | undefined }[] = [];
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string, init: RequestInit) => {
@@ -84,7 +84,7 @@ describe("server middleware in the edge runtime", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toBe(`${BACKEND}/flows?x=1`);
     expect(calls[0]?.headers.get("x-forwarded-for")).toBeNull();
-    expect(new TextDecoder().decode(calls[0]?.body as Uint8Array)).toBe('{"a":1}');
+    expect(await new Response(calls[0]?.body).text()).toBe('{"a":1}');
   });
 
   it("appends the address the runtime reports to the forwarded chain", async () => {
