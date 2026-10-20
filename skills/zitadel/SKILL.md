@@ -76,6 +76,7 @@ The docs are organised into these sections:
 | Concepts      | Projects, teams, users, flows, schemas, sessions, databases, SDK proxy |
 | CLI           | Local runtime, `plan`/`apply`, login design and copy, troubleshooting  |
 | SDKs          | One page per framework SDK, the API client, the login web component    |
+| CLI reference | Every `zitadel` command with its flags and examples, by command group  |
 | API reference | Every REST endpoint, grouped by resource                               |
 
 ### Finding the right page

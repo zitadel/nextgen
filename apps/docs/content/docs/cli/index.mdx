@@ -1,6 +1,6 @@
 ---
 title: CLI
-description: Command groups for setup, local runtime management, and repo configuration.
+description: Scaffold auth with the alpha CLI, and give coding agents its Agent Skills.
 ---
 
 The `@zitadel/cli` package scaffolds auth into Next.js, Nuxt, SvelteKit, SolidStart, Qwik Router, TanStack Start, and Angular apps, and into React, Vue, Solid, Svelte, and Qwik apps built with Vite.
@@ -41,13 +41,6 @@ skill, and the per-framework SDK and component skills. Without it, only the
 top-level router skill is installed. The CLI skill also ships inside the
 `@zitadel/cli` package.
 
-## Command groups
+## Commands
 
-- `doctor` checks prerequisites and generated app state.
-- `start`, `stop`, `logs`, and `reset` manage local runtime state.
-- `console` prints a one-time link that signs you in to the local management console as the local admin `start` created.
-- `setup` creates a Zitadel project and scaffolds app auth.
-- `claim` attaches a project to your team. On the default local runtime, setup already did that, so `claim` reports the project as already owned; `claim` is the fallback when that step failed.
-- `plan` and `apply` validate and sync repo configuration.
-- `status` summarizes local runtime and project state.
-- `eject` or `uninstall` removes managed files and local Zitadel state.
+Every command, with its flags and examples, is in the [CLI reference](/docs/reference/cli).

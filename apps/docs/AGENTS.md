@@ -49,6 +49,9 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - A page's URL is its path under `content/docs/`. The API reference pages per
   operation and per webhook come from the OpenAPI document (`lib/source.ts`);
   `moon run docs:generate` bundles it into `.generated/openapi.mjs`.
+- The CLI reference pages come from the CLI's `command-reference.json`
+  (`lib/cli-reference.ts`), which the CLI's reference test writes: change the
+  command, never the page ([`apps/cli/AGENTS.md`](../cli/AGENTS.md)).
 - An operation's description is its page body; its first sentence is the
   page's description everywhere else (`lib/description.ts`). The spec's side
   is in [`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone).

@@ -42,7 +42,14 @@ test("the index lists every section, each page once, under /docs", async ({ requ
   const index = await response.text();
 
   // The sections skills/zitadel/SKILL.md describes to agents.
-  for (const section of ["Get started", "Concepts", "CLI", "SDKs", "API reference"]) {
+  for (const section of [
+    "Get started",
+    "Concepts",
+    "CLI",
+    "SDKs",
+    "CLI reference",
+    "API reference",
+  ]) {
     expect(index, `section ${section}`).toMatch(new RegExp(`^- ${section}$`, "m"));
   }
 
