@@ -12,7 +12,7 @@ import {
  * E2E coverage for the embedded sign-in path on Nuxt:
  *
  *   demo-nuxt /login → <zitadel-login> → /__nextgen proxy
- *                    → api-mock TCP server → __nextgen_session cookie
+ *                    → api-mock TCP server → the project's session cookie
  *                    → /admin (server-rendered, authenticated)
  *
  * The Vue / Nitro story is structurally similar to the demo-next lanes but the
@@ -22,7 +22,8 @@ import {
  * regression in one SDK without the other.
  *
  * Component / orchestrator behaviour is covered by `packages/components`'s
- * Vitest suite — do not duplicate it here. See `e2e/demo-nuxt/AGENTS.md`.
+ * Vitest suite — do not duplicate it here. See `e2e/demo-next/AGENTS.md`,
+ * the guide to both demo lanes.
  */
 export default defineConfig({
   ...e2eTimeouts,

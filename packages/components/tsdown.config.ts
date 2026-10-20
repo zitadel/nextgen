@@ -63,6 +63,9 @@ export default defineConfig([
     plugins: [liquidRaw()],
     entry: {
       index: "src/index.ts",
+      // Resolved instead of `index` under the edge export conditions (see
+      // package.json); it must never import Lit.
+      server: "src/server.ts",
       "atoms/index": "src/atoms/index.ts",
       manifests: "src/manifests.ts",
       events: "src/events.ts",

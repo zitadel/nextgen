@@ -4,7 +4,7 @@ description: >-
   Set up and manage Zitadel authentication in a local project with the
   agent-friendly `zitadel` CLI. Use when the user wants to add login,
   registration, or session handling, create a Zitadel project, scaffold auth
-  for a Next.js, Nuxt, SvelteKit, SolidStart, Qwik City, TanStack Start, React,
+  for a Next.js, Nuxt, SvelteKit, SolidStart, Qwik Router, TanStack Start, React,
   Vue, Angular, Solid, Svelte, or Qwik app, or plan and apply Zitadel config
   changes from repo state.
 ---

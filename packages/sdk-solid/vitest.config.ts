@@ -1,7 +1,7 @@
 import solid from "vite-plugin-solid";
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
 
 /**
  * Three projects in one config, one per way Solid compiles the wrappers:
@@ -30,7 +30,7 @@ export default defineConfig({
           environment: "jsdom",
           setupFiles: ["src/test-setup.ts"],
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/*.ssr.spec.tsx", "src/**/*.hydrate.spec.tsx"],
+          exclude: ["src/**/*.ssr.spec.tsx", "src/**/*.hydrate.spec.tsx", edgeSpecs],
         },
       },
       {
@@ -54,6 +54,12 @@ export default defineConfig({
           include: ["src/**/*.hydrate.spec.tsx"],
         },
       },
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
+      edgeProject({
+        // Solid ships its server build under `worker`.
+        conditions: ["worker"],
+        plugins: [solid({ ssr: true })],
+      }),
     ],
   },
 });

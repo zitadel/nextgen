@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
 
 /**
  * `resolve.conditions: ['browser']` makes Vitest resolve the *browser* build of
@@ -18,14 +18,25 @@ import { baseTest } from "../../vitest.shared.mjs";
  */
 export default defineConfig({
   cacheDir: ".vitest",
-  resolve: {
-    conditions: ["browser"],
-  },
   test: {
     ...baseTest,
     name: "@zitadel/sdk-react",
-    environment: "jsdom",
-    setupFiles: ["src/test-setup.ts"],
     dangerouslyIgnoreUnhandledErrors: true,
+    projects: [
+      {
+        cacheDir: ".vitest/jsdom",
+        resolve: { conditions: ["browser"] },
+        test: {
+          name: "jsdom",
+          globals: true,
+          environment: "jsdom",
+          include: ["src/**/*.{test,spec}.{ts,tsx}"],
+          exclude: [edgeSpecs],
+          setupFiles: ["src/test-setup.ts"],
+        },
+      },
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
+      edgeProject({}),
+    ],
   },
 });

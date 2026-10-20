@@ -360,6 +360,34 @@ describe("auth()", () => {
     );
   });
 
+  it("verifies a JWT against a backend url given with a trailing slash", async () => {
+    const kid = nextKid();
+    routeFetch(kid, () => jsonResponse({}, 500));
+    const token = makeSignedJwt({ sub: "user-abc", iss: ISSUER, aud: PROJECT, exp: ts(3600) }, kid);
+    mockHeadersMap.set("x-nextgen-auth-token", token);
+
+    const auth = await importAuth();
+    const result = await auth({ ...OPTIONS, url: `${ISSUER}/` });
+
+    expect(result.isAuthenticated).toBe(true);
+  });
+
+  it("asks the session probe at a backend url given with a trailing slash", async () => {
+    routeFetch(nextKid(), () =>
+      jsonResponse({ session_id: "sess-3", project_id: PROJECT, state: "active", user_id: "u3" }),
+    );
+    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+
+    const auth = await importAuth();
+    const result = await auth({ ...OPTIONS, url: `${ISSUER}/` });
+
+    expect(result.isAuthenticated).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${ISSUER}/sessions/me?project_id=${PROJECT}`,
+      expect.anything(),
+    );
+  });
+
   // ── Project binding: a session counts only in the app's own project ──
 
   it("rejects a correctly signed JWT issued for another project", async () => {

@@ -3,6 +3,7 @@ import type {
   NextgenMiddlewareOptions,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
+import { joinURL } from "ufo";
 
 import {
   HOP_BY_HOP,
@@ -10,8 +11,11 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  proxySessionCookies,
+  SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
+  serializeSessionCookie,
 } from "@zitadel/sdk-core/middleware";
 
 /**
@@ -37,9 +41,11 @@ export interface SolidFetchEvent {
   readonly clientAddress?: string;
   /**
    * The response stub SolidStart merges into the response it eventually sends;
-   * a middleware that continues sets headers (here, clearing cookies) on it.
+   * a middleware that continues sets headers (here, session cookies) on it.
+   * On SolidStart 2 it is h3 v2's response, which sends `errHeaders` instead
+   * of `headers` with an answer of status 400 or above and a thrown error.
    */
-  readonly response?: { readonly headers: Headers };
+  readonly response?: { readonly headers: Headers; readonly errHeaders?: Headers };
 }
 
 /**
@@ -104,26 +110,46 @@ function buildUpstreamHeaders(event: SolidFetchEvent, url: URL): Headers {
 
 /**
  * Forwards a `/__nextgen/*` request to the upstream auth backend and returns the
- * upstream response verbatim, including `Set-Cookie` headers. Hop-by-hop
- * headers are stripped in both directions, and a `location` is kept only as a
- * redirect onto this app.
+ * upstream response, including its `Set-Cookie` headers. Hop-by-hop headers are
+ * stripped in both directions, a `location` is kept only as a redirect onto this
+ * app, and the session cookie travels under this project's name in the browser
+ * and the server's name upstream ({@link proxySessionCookies}).
  */
 async function proxyRequest(
   event: SolidFetchEvent,
   url: URL,
   authUrl: string,
   proxyPath: string,
+  projectId: string | undefined,
   projectSecret: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
   const suffix = url.pathname.slice(proxyPath.length);
-  const target = `${authUrl}${suffix}${url.search}`;
+  const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const method = event.request.method;
   const hasBody = !["GET", "HEAD"].includes(method);
   const body = hasBody ? await event.request.arrayBuffer() : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event, url);
+  const sessionCookies = proxySessionCookies(
+    {
+      method,
+      path: suffix,
+      search: url.search,
+      cookie: event.request.headers.get("cookie"),
+      requestUrl: url,
+      forwardedProto: event.request.headers.get("x-forwarded-proto"),
+      forwardedHost: event.request.headers.get("x-forwarded-host"),
+    },
+    projectId,
+    { url: authUrl, timeoutMs: proxyTimeoutMs },
+  );
+  if (sessionCookies.upstreamCookie === null) {
+    upstreamHeaders.delete("cookie");
+  } else {
+    upstreamHeaders.set("cookie", sessionCookies.upstreamCookie);
+  }
 
   // ADR 036: attach the project secret only to the handoff exchange — on every
   // operation it would make this public boundary an open relay with project
@@ -147,20 +173,18 @@ async function proxyRequest(
   // The app's own request URL: the origin a proxied redirect may name, and the
   // base a relative one resolves against (the IdP callback's 303 needs it).
   const responseHeaders = filterResponseHeaders(upstream.headers, url.toString());
-  const setCookies = upstream.headers.getSetCookie?.() ?? [];
-  for (const cookie of setCookies) {
+  const answer = await sessionCookies.toBrowser(upstream);
+  for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
   }
+  if (answer.setCookies.length > 0) {
+    responseHeaders.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
+  }
 
-  return new Response(upstream.body, {
+  return new Response(answer.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
-}
-
-/** A `Set-Cookie` value that clears `name` on the root path. */
-function clearCookie(name: string): string {
-  return `${name}=; Path=/; Max-Age=0`;
 }
 
 /**
@@ -175,9 +199,9 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
 /**
  * Judges the session, writes the auth result to `event.locals`, and returns a
  * redirect `Response` on a protected route when nobody is signed in (otherwise
- * `undefined` to continue). Stale `__nextgen*` cookies are cleared when they
- * hold dead credentials. When the backend cannot say whether the session is
- * live, the cookies stay and a protected route answers `503`.
+ * `undefined` to continue). Either way the response carries the session
+ * cookies the judgement asks for. When the backend cannot say whether the
+ * session is live, a protected route answers `503` instead.
  */
 async function handleAuth(
   event: SolidFetchEvent,
@@ -190,16 +214,29 @@ async function handleAuth(
   const cookies = parseCookieHeader(event.request.headers.get("cookie"));
   const authHeader = event.request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cookieToken = cookies.get("__nextgen_session") ?? null;
-  const { auth, clearCookies, undecided } = await resolveSession(
-    { bearer: bearerToken, cookie: cookieToken },
+  const {
+    auth,
+    undecided,
+    cookies: sessionCookies,
+  } = await resolveSession(
+    {
+      bearer: bearerToken,
+      cookie: (name) => cookies.get(name),
+      requestUrl: url2,
+      forwardedProto: event.request.headers.get("x-forwarded-proto"),
+      forwardedHost: event.request.headers.get("x-forwarded-host"),
+    },
     verification,
   );
 
   event.locals.nextgenAuth = auth;
-  if (auth.isAuthenticated) {
-    return;
-  }
+  // A dead session's cookie is cleared so the browser stops replaying it (each
+  // replay costs a backend session check), and a session of this project still
+  // under the shared name is copied to the project's own cookie. A live session
+  // that signs no one in here (an anonymous one, whose sign-in may still
+  // complete, or one of another project) keeps its cookie, and so does one the
+  // backend gave no verdict on.
+  const setCookies = sessionCookies.map(serializeSessionCookie);
 
   // The backend could not say whether the session is live. The user may well
   // be signed in, so a protected route answers 503 rather than send them to
@@ -208,27 +245,27 @@ async function handleAuth(
     return new Response("Service Unavailable", { status: 503 });
   }
 
-  // Dead credentials are cleared on every unauthenticated response so the
-  // browser stops replaying them (each replay costs a backend session check).
-  // A live session that signs no one in here (an anonymous one, whose sign-in
-  // may still complete, or one of another project) keeps its cookie, and so
-  // does one the backend gave no verdict on.
-  const staleCookies = clearCookies
-    ? [...cookies.keys()].filter((name) => name.startsWith("__nextgen"))
-    : [];
-
-  if (matchesRoutes(pathname, protectedRoutes)) {
+  if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
     const headers = new Headers({ location: loginRedirectUrl(loginPath, url2).toString() });
-    for (const name of staleCookies) {
-      headers.append("set-cookie", clearCookie(name));
+    for (const cookie of setCookies) {
+      headers.append("set-cookie", cookie);
+    }
+    if (setCookies.length > 0) {
+      headers.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
     }
     return new Response(null, { status: 302, headers });
   }
 
-  // Unprotected route: continue the SolidStart pipeline, which merges the
-  // response stub's headers into the response it sends.
-  for (const name of staleCookies) {
-    event.response?.headers.append("set-cookie", clearCookie(name));
+  // Continue the SolidStart pipeline, which merges the response stub's headers
+  // into the response it sends: `headers`, or with an error answer h3 v2's
+  // `errHeaders`, so both carry the cookies.
+  for (const target of [event.response?.headers, event.response?.errHeaders]) {
+    if (target && setCookies.length > 0) {
+      for (const cookie of setCookies) {
+        target.append("set-cookie", cookie);
+      }
+      target.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
+    }
   }
   return undefined;
 }
@@ -312,7 +349,7 @@ export function createNextgenMiddleware(
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, url2, url, proxyPath, projectSecret, proxyTimeoutMs);
+      return proxyRequest(event, url2, url, proxyPath, projectId, projectSecret, proxyTimeoutMs);
     }
 
     return handleAuth(event, url2, {

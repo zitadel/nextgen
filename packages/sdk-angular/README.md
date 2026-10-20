@@ -12,6 +12,8 @@ pnpm add @zitadel/sdk-angular@alpha
 
 Peer dependencies: `@angular/core` and `@angular/common`, both `>=17`.
 
+Edge support follows Angular's own: its server rendering targets Node, and the application builder produces a bundle without Node APIs only through the experimental `ssr.platform: "neutral"` option. In an Angular 22.2.3 app built with that option and `conditions: ["workerd", "browser"]`, the three wrappers bundle, load and server-render inside the `edge-runtime` VM, each as its custom element tag with its attributes. The package's tests cover the built package in that VM with the Angular linker applied, as a consumer's build applies it: they load it without a DOM, render each widget by its tag name, and check the attributes written into the login markup and that `lang` is left out when unset. Without those `conditions` the build stops while extracting routes with `document is not defined`, because the components root then loads Lit. The builder applies `conditions` to the browser bundle too, and the edge build of `@zitadel/components` registers no elements, so that bundle does not register the widgets; the browser side of an edge deployment has not been verified.
+
 TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
 
 ## Usage
@@ -84,6 +86,14 @@ Each widget event reaches the callback in the last column, which receives the ev
 
 ```html
 <zitadel-auth-login [project]="project" theme="light" (flowComplete)="track($event)" />
+```
+
+## Standard HTML attributes
+
+The Angular components are tags (`zitadel-auth-login`, `zitadel-auth-logout` and `zitadel-auth-session`), and a tag already carries the standard HTML attributes: put `class`, `style`, `id`, `data-*` or `aria-*` on it and Angular applies them to the tag, not to the widget inside it.
+
+```html
+<zitadel-auth-login [project]="project" class="login" data-testid="login" aria-label="Sign in" />
 ```
 
 ## Server rendering

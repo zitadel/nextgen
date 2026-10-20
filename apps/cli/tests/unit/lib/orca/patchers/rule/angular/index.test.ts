@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { runInNewContext } from "node:vm";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import { AngularPatcher } from "../../../../../../../src/lib/orca/patchers/rule/angular";
@@ -6,9 +8,11 @@ import type {
   FileOp,
   ScaffoldPlan,
 } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
+import { SESSION_COOKIE_MARKER } from "../../../../../../../src/lib/orca/patchers/rule/session-cookie";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 import { REMOTE_HOST, useRemoteServer } from "../../../../../../helpers/remote-server";
+import { bearerOnlyProxyConf } from "../../../../../../helpers/proxy-conf";
 import { aProxyConfApp, type DevApp } from "../../../../../../helpers/vite";
 
 function ctx(): PatchContext {
@@ -58,6 +62,91 @@ function proxyConfigEdit(): (source: string | undefined) => string {
     );
   if (!op) {
     throw new Error("expected a proxy.conf.cjs edit op in the Angular plan");
+  }
+  return op.edit;
+}
+
+/** The session-cookie op's own doctor verdict. */
+function sessionCookieVerdict(): NonNullable<Extract<FileOp, { kind: "edit" }>["verify"]> {
+  const op = new AngularPatcher()
+    .plan(ctx())
+    .ops.filter(
+      (candidate): candidate is Extract<FileOp, { kind: "edit" }> =>
+        candidate.kind === "edit" && candidate.path === "proxy.conf.cjs",
+    )
+    .find((candidate) => candidate.wiring === "convenience");
+  if (!op?.verify) {
+    throw new Error("expected the session-cookie op to bring its own verify");
+  }
+  return op.verify;
+}
+
+/** The managed proxy.conf.cjs the first CLI alphas wrote: it read zitadel.json, and had no `env`. */
+const FIRST_ALPHA_PROXY_CONF = `${MANAGED_MARKER}
+const { readFileSync } = require("node:fs");
+
+const config = JSON.parse(readFileSync("zitadel.json", "utf8"));
+if (!config.project || !config.server) {
+  throw new Error("zitadel.json is missing \\"project\\" or \\"server\\"; re-run zitadel setup.");
+}
+const bearer = \`Bearer sk_\${config.project}\`;
+
+function setBearer(proxyReq) {
+  proxyReq.setHeader("authorization", bearer);
+}
+
+function stripPrefix(path) {
+  return path.replace(/^\\/__nextgen/, "").replace(/^(?!\\/)/, "/");
+}
+
+module.exports = {
+  "/__nextgen": {
+    target: config.server,
+    changeOrigin: false,
+    pathRewrite: stripPrefix,
+    rewrite: stripPrefix,
+    onProxyReq: setBearer,
+    configure: (proxy) => proxy.on("proxyReq", setBearer),
+  },
+};
+`;
+
+/** Runs a `proxy.conf.cjs` as Node would load it, with `files` as the only ones `node:fs` sees. */
+function loadProxyConf(source: string, files: Record<string, string>): Record<string, unknown> {
+  const module = { exports: {} as Record<string, unknown> };
+  const fs = {
+    existsSync: (path: string) => path in files,
+    readFileSync: (path: string) => {
+      const contents = files[path];
+      if (contents === undefined) {
+        throw new Error(`ENOENT: ${path}`);
+      }
+      return contents;
+    },
+  };
+  runInNewContext(source, {
+    module,
+    exports: module.exports,
+    require: (id: string) => (id === "node:fs" ? fs : undefined),
+    process: { env: {} },
+    URL,
+    TextEncoder,
+  });
+  return module.exports;
+}
+
+/** The `proxy.conf.cjs` edit that gives the managed proxy its session-cookie hooks. */
+function sessionCookieEdit(): (source: string | undefined) => string {
+  const op = new AngularPatcher()
+    .plan(ctx())
+    .ops.find(
+      (candidate): candidate is Extract<FileOp, { kind: "edit" }> =>
+        candidate.kind === "edit" &&
+        candidate.path === "proxy.conf.cjs" &&
+        candidate.wiring === "convenience",
+    );
+  if (!op) {
+    throw new Error("expected a convenience proxy.conf.cjs edit op in the Angular plan");
   }
   return op.edit;
 }
@@ -117,6 +206,104 @@ describe("AngularPatcher.plan", () => {
     // The backend by its own name, the app's origin in X-Forwarded-*.
     expect(proxy).toContain("    changeOrigin: true,\n    xfwd: true,\n");
     expect(plan.ops.some((op) => op.kind === "edit" && op.path === "angular.json")).toBe(true);
+  });
+
+  it("keeps the app's session cookie under its project's name", () => {
+    const proxy = proxyConfigEdit()(undefined);
+
+    expect(proxy).toContain(SESSION_COOKIE_MARKER);
+    expect(proxy).toContain(
+      'process.env.ZITADEL_PROJECT_ID ?? (typeof env === "undefined" ? undefined : env.ZITADEL_PROJECT_ID)',
+    );
+    expect(proxy).toContain("onProxyRes: renameSessionCookie,");
+  });
+
+  // A file saved on Windows: the exact text the edits look for has LF line ends.
+  it("gives a CRLF managed proxy the session-cookie hooks with CRLF line ends", () => {
+    const crlf = bearerOnlyProxyConf().replace(/\n/g, "\r\n");
+
+    const out = sessionCookieEdit()(crlf);
+
+    expect(out).toBe(proxyConfigEdit()(undefined).replace(/\n/g, "\r\n"));
+    expect(sessionCookieEdit()(out)).toBe(out);
+    expect(sessionCookieVerdict()(crlf)).toBe("detached");
+    expect(sessionCookieVerdict()(out)).toBe("applied");
+  });
+
+  it("migrates a CRLF legacy managed proxy's bearer hook", () => {
+    const legacy = proxyConfigEdit()(undefined).replace(
+      /\/\* zitadel:proxy:v2 \*\/\nfunction setBearer\(proxyReq\) \{[\s\S]*?\n\}/,
+      'function setBearer(proxyReq) {\n  proxyReq.setHeader("authorization", bearer);\n}',
+    );
+    expect(legacy).not.toContain("zitadel:proxy:v2");
+
+    const out = proxyConfigEdit()(legacy.replace(/\n/g, "\r\n"));
+
+    expect(out).toBe(proxyConfigEdit()(undefined).replace(/\n/g, "\r\n"));
+  });
+
+  // The first alphas read zitadel.json, not .env.local into `env`. Their
+  // bearer hook migrates to the current one, after which the session-cookie
+  // edit recognizes the file; the hooks must not assume `env`.
+  it("upgrades a managed proxy from before it read .env.local into a file that loads", () => {
+    const upgraded = sessionCookieEdit()(proxyConfigEdit()(FIRST_ALPHA_PROXY_CONF));
+    expect(upgraded).toContain(SESSION_COOKIE_MARKER);
+
+    const loaded = loadProxyConf(upgraded, {
+      "zitadel.json": '{"project":"p","server":"http://s"}',
+    });
+    const proxyReq = {
+      path: "/sessions/me",
+      method: "GET",
+      getHeader: () => "a=1",
+      setHeader: vi.fn(),
+    };
+    (loaded["/__nextgen"] as { onProxyReq(proxyReq: unknown): void }).onProxyReq(proxyReq);
+
+    // No project id in the environment: the cookies pass through.
+    expect(proxyReq.setHeader).not.toHaveBeenCalled();
+  });
+
+  it("reads a managed proxy changed by hand as unknown, not applied", () => {
+    const custom = bearerOnlyProxyConf().replace(
+      "    onProxyReq: setBearer,\n",
+      "    onProxyReq: (proxyReq) => setBearer(proxyReq),\n",
+    );
+
+    expect(sessionCookieEdit()(custom)).toBe(custom);
+    expect(sessionCookieVerdict()(custom)).toEqual({
+      unknown: expect.stringContaining("must be added by hand"),
+    });
+  });
+
+  it("gives the managed proxy it wrote before the session-cookie hooks", () => {
+    expect(sessionCookieEdit()(bearerOnlyProxyConf())).toBe(proxyConfigEdit()(undefined));
+  });
+
+  it("leaves a managed proxy whose hooks were attached by hand alone", () => {
+    const custom = bearerOnlyProxyConf().replace(
+      "    onProxyReq: setBearer,\n",
+      "    onProxyReq: (proxyReq) => setBearer(proxyReq),\n",
+    );
+
+    expect(sessionCookieEdit()(custom)).toBe(custom);
+  });
+
+  it("leaves an unmanaged proxy without the session-cookie hooks", () => {
+    const custom = bearerOnlyProxyConf().replace(`${MANAGED_MARKER}\n`, "");
+
+    expect(sessionCookieEdit()(custom)).toBe(custom);
+  });
+
+  it("only warns in the doctor while the session-cookie hooks are missing", () => {
+    const ops = new AngularPatcher()
+      .plan(ctx())
+      .ops.filter((op) => op.kind === "edit" && op.path === "proxy.conf.cjs");
+
+    expect(ops.map((op) => (op.kind === "edit" ? op.wiring : undefined))).toEqual([
+      "infrastructure",
+      "convenience",
+    ]);
   });
 
   it("moves the proxy entry it wrote before onto the origin-forwarding shape", () => {
@@ -248,12 +435,14 @@ describe("the generated proxy.conf.cjs, run by Vite against a remote https serve
   afterEach(async () => {
     await app?.close();
     app = undefined;
+    remote.answerWith(undefined);
   });
 
-  async function serve(proxyConf: string): Promise<DevApp> {
+  async function serve(proxyConf: string, projectId = ""): Promise<DevApp> {
     app = await aProxyConfApp(proxyConf, {
       ZITADEL_URL: remote.url,
       ZITADEL_PROJECT_SECRET: "sk_proj_test",
+      ZITADEL_PROJECT_ID: projectId,
     });
     return app;
   }
@@ -301,6 +490,42 @@ describe("the generated proxy.conf.cjs, run by Vite against a remote https serve
 
     expect(response.ok).toBe(false);
     expect(remote.requests).toHaveLength(reached);
+  });
+
+  it("sends the app's session cookie to the server under the server's name", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined), "proj_spa");
+
+    await fetch(`${origin}/__nextgen/users/me`, {
+      headers: {
+        cookie:
+          "theme=dark; __nextgen_session=console; __nextgen_session_proj_other=other; __nextgen_session_proj_spa=mine",
+      },
+    });
+
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("theme=dark; __nextgen_session=mine");
+  });
+
+  it("keeps the session cookie the server sets under the app's project's name", async () => {
+    remote.answerWith({ "set-cookie": "__nextgen_session=minted; Path=/; HttpOnly; SameSite=Lax" });
+    const { origin } = await serve(proxyConfigEdit()(undefined), "proj_spa");
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(response.headers.getSetCookie()).toEqual([
+      "__nextgen_session_proj_spa=minted; Path=/; HttpOnly; SameSite=Lax",
+    ]);
+  });
+
+  it("passes the cookies through when no project is configured", async () => {
+    remote.answerWith({ "set-cookie": "__nextgen_session=minted; Path=/" });
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/me`, {
+      headers: { cookie: "__nextgen_session=tok" },
+    });
+
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("__nextgen_session=tok");
+    expect(response.headers.getSetCookie()).toEqual(["__nextgen_session=minted; Path=/"]);
   });
 });
 

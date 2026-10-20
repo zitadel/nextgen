@@ -13,8 +13,9 @@
       "dependsOn": ["@zitadel/api#build-release"]
     },
     // contract.spec.ts reads these SDK specs to check their copied
-    // SERVER_RENDER_CASES tables for drift, and every SDK's manifest and docs and
-    // the demo apps' manifests and sources to check that apps go through their SDK.
+    // SERVER_RENDER_CASES tables and standard-attribute test titles and bodies for drift,
+    // and every SDK's manifest and docs and the demo apps' manifests and sources
+    // to check that apps go through their SDK.
     "test": {
       "dependsOn": ["@zitadel/components#build"],
       "inputs": [
@@ -23,6 +24,22 @@
         "$TURBO_ROOT$/packages/sdk-vue/src/components.spec.ts",
         "$TURBO_ROOT$/packages/sdk-angular/src/lib/components.spec.ts",
         "$TURBO_ROOT$/packages/sdk-svelte/src/index.spec.ts",
+        "$TURBO_ROOT$/packages/sdk-svelte/src/index.ssr.spec.ts",
+        "$TURBO_ROOT$/packages/sdk-solid/src/index.spec.tsx",
+        "$TURBO_ROOT$/packages/sdk-solid/src/index.ssr.spec.tsx",
+        "$TURBO_ROOT$/packages/sdk-qwik/src/index.spec.tsx",
+        "$TURBO_ROOT$/packages/sdk-qwik/src/index.ssr.spec.tsx",
+        "$TURBO_ROOT$/packages/sdk-react/src/index.tsx",
+        "$TURBO_ROOT$/packages/sdk-vue/src/index.ts",
+        "$TURBO_ROOT$/packages/sdk-angular/src/public-api.ts",
+        "$TURBO_ROOT$/packages/sdk-svelte/src/lib/index.ts",
+        "$TURBO_ROOT$/packages/sdk-solid/src/index.tsx",
+        "$TURBO_ROOT$/packages/sdk-qwik/src/index.tsx",
+        "$TURBO_ROOT$/packages/sdk-next/src/client.ts",
+        "$TURBO_ROOT$/packages/sdk-nuxt/src/index.ts",
+        "$TURBO_ROOT$/packages/sdk-tanstack-start/src/react.tsx",
+        "$TURBO_ROOT$/packages/sdk-*/src/*.edge.spec.{ts,tsx}",
+        "$TURBO_ROOT$/packages/*/vitest.config.ts",
         "$TURBO_ROOT$/packages/sdk-*/src/__tests__/*.test.ts",
         "$TURBO_ROOT$/packages/sdk-*/src/__tests__/*/*.test.ts",
         "$TURBO_ROOT$/packages/sdk-*/package.json",

@@ -1,8 +1,9 @@
 <script lang="ts">
   import '@zitadel/components';
+  import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelSession as ZitadelSessionElement } from '@zitadel/components';
 
-  import type { ZitadelSessionProps, ZitadelSessionErrorDetail, ZitadelSignoutDetail } from './types';
+  import type { ZitadelSessionSvelteProps } from './types';
   import { assignGiven } from './given';
   import { onClient, proxyPathAttr } from './attributes';
 
@@ -18,7 +19,11 @@
     suppressHeader,
     onSignout,
     onSessionError,
-  }: ZitadelSessionProps = $props();
+    ...rest
+  }: ZitadelSessionSvelteProps = $props();
+
+  // The standard HTML attributes are the only extra props the element takes.
+  const attributes = $derived(standardAttributes(rest));
 
   let el: ZitadelSessionElement | undefined = $state();
 
@@ -45,11 +50,14 @@
 </script>
 
 <zitadel-session
+  {...attributes}
   bind:this={el}
-  onzitadel-signout={(event: Event) =>
-    onSignout?.((event as CustomEvent<ZitadelSignoutDetail>).detail)}
-  onzitadel-session-error={(event: Event) =>
-    onSessionError?.((event as CustomEvent<ZitadelSessionErrorDetail>).detail)}
+  onzitadel-signout={(event: Event) => {
+    if (event instanceof CustomEvent) onSignout?.(event.detail);
+  }}
+  onzitadel-session-error={(event: Event) => {
+    if (event instanceof CustomEvent) onSessionError?.(event.detail);
+  }}
   project={onClient(project)}
   project-id={project?.projectId ?? projectId}
   proxy-path={proxyPathAttr(project?.proxyPath ?? proxyPath)}
