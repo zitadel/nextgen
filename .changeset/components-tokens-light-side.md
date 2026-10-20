@@ -1,5 +1,5 @@
 ---
-"@zitadel/components": patch
+"@zitadel/components": minor
 ---
 
 `@zitadel/components/tokens` also re-exports `tokensCss` and `THEME_SELECTORS`
