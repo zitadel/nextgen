@@ -1,13 +1,11 @@
-import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 import { expect, test } from "@playwright/test";
 import { identity, registerWithPassword } from "@zitadel/testing/playwright";
 
 import { ERROR_BOUNDARY_TITLE, NEUTRAL_MESSAGE } from "../../console/support/copy";
-import { requiredEnv } from "./support";
+import { journeyMetadataOrSkip, runCli } from "./support";
 
 /**
  * The local ownership journey. `zitadel start` boots the server with the
@@ -28,21 +26,10 @@ import { requiredEnv } from "./support";
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
 
-type JourneyMetadata = {
-  appDir: string;
-  cliPackage: string;
-  framework: string;
-  localRuntimeUrl: string | null;
-  outputDir: string;
-  preset: string | null;
-  registryUrl: string;
-  runtime: string;
-};
-
 test("a local project is owned from setup, and the console signs the local admin in", async ({
   page,
 }) => {
-  const metadata = await journeyMetadataOrSkip();
+  const metadata = await journeyMetadataOrSkip("local ownership");
   const serverOrigin = new URL(metadata.localRuntimeUrl).origin;
 
   // setup already attached the project to the local admin's team.
@@ -88,7 +75,7 @@ test("the setup admin can add and remove a project admin, and the colleague sees
   browser,
   page,
 }) => {
-  const metadata = await journeyMetadataOrSkip();
+  const metadata = await journeyMetadataOrSkip("local ownership");
   const serverOrigin = new URL(metadata.localRuntimeUrl).origin;
   const secret = JSON.parse(await readFile(join(metadata.appDir, ".zitadel/secret"), "utf8")) as {
     project_id: string;
@@ -160,56 +147,3 @@ test("the setup admin can add and remove a project admin, and the colleague sees
     await colleagueContext.close();
   }
 });
-
-/**
- * The journey's own metadata, plus the lanes this suite stays out of: local
- * ownership is framework- and preset-independent, the fresh-app lane already
- * covers it, and the docker lane keeps to the scaffold journey.
- */
-async function journeyMetadataOrSkip(): Promise<JourneyMetadata & { localRuntimeUrl: string }> {
-  const metadata = JSON.parse(
-    await readFile(join(requiredEnv("JOURNEY_OUTPUT_DIR"), "metadata.json"), "utf8"),
-  ) as JourneyMetadata;
-  test.skip(
-    metadata.framework !== "next",
-    "local ownership is framework-independent; next lane only",
-  );
-  test.skip(
-    metadata.preset !== null,
-    "the fresh-app lane already proves local ownership; a preset lane keeps to its sign-in journey",
-  );
-  test.skip(
-    process.env.JOURNEY_PREEXISTING_APP === "1",
-    "the fresh-app lane already proves local ownership; keep the preexisting lane lean",
-  );
-  test.skip(
-    metadata.runtime === "docker",
-    "the binary lane proves local ownership; the docker lane keeps to the scaffold journey",
-  );
-  if (!metadata.localRuntimeUrl) throw new Error("metadata.json has no localRuntimeUrl");
-  return { ...metadata, localRuntimeUrl: metadata.localRuntimeUrl };
-}
-
-/**
- * Same npx invocation shape as prepare-app's steps (same registry and cache, so
- * the package resolves warm), returning the parsed `--json` envelope.
- */
-async function runCli(metadata: JourneyMetadata, args: string[]): Promise<unknown> {
-  const { stdout } = await promisify(execFile)(
-    "npx",
-    ["--yes", `${metadata.cliPackage}@alpha`, ...args, "--cwd", metadata.appDir],
-    {
-      cwd: metadata.appDir,
-      env: {
-        ...process.env,
-        npm_config_audit: "false",
-        npm_config_cache: join(metadata.outputDir, ".npm-cache"),
-        npm_config_fund: "false",
-        npm_config_registry: metadata.registryUrl,
-        npm_config_yes: "true",
-      },
-      maxBuffer: 10 * 1024 * 1024,
-    },
-  );
-  return JSON.parse(stdout) as unknown;
-}

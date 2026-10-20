@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   clickFlowAction,
   enableVirtualPasskey,
@@ -14,7 +14,13 @@ import {
   type ProfileEntry,
 } from "@zitadel/testing/playwright";
 
-import { frameworkForId } from "../scripts/frameworks.mjs";
+import {
+  expectSignedIn,
+  expectsProtectedRouteRedirect,
+  gotoLogin,
+  loginUrl,
+  logout,
+} from "./support";
 
 test.describe.configure({ mode: "serial" });
 test.setTimeout(60_000);
@@ -26,11 +32,6 @@ const framework = process.env.JOURNEY_FRAMEWORK ?? "next";
 // `??`: the runner passes an empty string for "default preset", and an
 // empty preset must still register the password-first journeys.
 const preset = process.env.JOURNEY_PRESET || "password-first";
-// Frameworks whose server SDK guards /profile (the registry's flag) must
-// redirect a signed-out visit to /login; the SPA families have no server.
-const expectsProtectedRouteRedirect = frameworkForId(framework).expectsProtectedRouteRedirect;
-const loginUrl = /\/login(?:[/?#]|$)/;
-const profileUrl = /\/profile(?:[/?#]|$)/;
 
 // Fields some presets require at registration; the kit fills them only when
 // the flow renders them.
@@ -145,31 +146,6 @@ async function expectProtectedRouteToRedirect(page: Page): Promise<void> {
   await expect(page).toHaveURL(loginUrl);
 }
 
-async function gotoLogin(page: Page): Promise<void> {
-  if (loginUrl.test(page.url())) {
-    return;
-  }
-
-  await page.waitForLoadState("load", { timeout: 5000 }).catch(() => undefined);
-  if (loginUrl.test(page.url())) {
-    return;
-  }
-
-  await page.goto("/login").catch(async (error: unknown) => {
-    if (!isInterruptedByLoginNavigation(error) && !loginUrl.test(page.url())) {
-      throw error;
-    }
-    if (!loginUrl.test(page.url())) {
-      await page.waitForURL(loginUrl, { timeout: 5000 });
-    }
-  });
-}
-
-async function expectSignedIn(page: Page): Promise<void> {
-  await expect(page).toHaveURL(profileUrl, { timeout: 30_000 });
-  await expect(signedInLocator(page).first()).toBeVisible({ timeout: 30_000 });
-}
-
 async function expectSessionCookie(page: Page): Promise<void> {
   await expect
     .poll(
@@ -186,63 +162,4 @@ async function expectSessionCookie(page: Page): Promise<void> {
     (cookie) => cookie.name === SESSION_COOKIE_NAME,
   );
   expect(sessionCookie?.httpOnly).toBe(true);
-}
-
-async function logout(page: Page): Promise<void> {
-  const logout = logoutLocator(page);
-  const userMenu = page.getByRole("button", { name: /open user menu/i });
-
-  // `<zitadel-session>` exposes Sign out directly; `<zitadel-logout>` hides it
-  // behind an avatar menu. Wait for either surface, and only open the menu when
-  // the direct logout control is not already visible.
-  await Promise.race([
-    logout.waitFor({ state: "visible", timeout: 30_000 }),
-    userMenu.waitFor({ state: "visible", timeout: 30_000 }),
-  ]);
-  if (!(await logout.isVisible().catch(() => false))) {
-    await userMenu.click();
-    await logout.waitFor({ state: "visible", timeout: 5_000 });
-  }
-  await logout.click();
-  const loggedOutUrl = expectsProtectedRouteRedirect ? loginUrl : /\/(?:login)?(?:[/?#]|$)/;
-  await expect(page).toHaveURL(loggedOutUrl);
-  await expectSessionCleared(page);
-}
-
-async function expectSessionCleared(page: Page): Promise<void> {
-  await expect
-    .poll(
-      async () =>
-        (await page.context().cookies()).some((cookie) => cookie.name === SESSION_COOKIE_NAME),
-      { timeout: 5000 },
-    )
-    .toBe(false);
-}
-
-function isInterruptedByLoginNavigation(error: unknown): boolean {
-  return error instanceof Error && isExpectedNavigationRace(error.message, "/login");
-}
-
-function isExpectedNavigationRace(message: string, path: string): boolean {
-  return (
-    (message.includes('interrupted by another navigation to "') ||
-      message.includes("net::ERR_ABORTED at ")) &&
-    message.includes(path)
-  );
-}
-
-function profileActionLocator(page: Page): Locator {
-  return logoutLocator(page).or(page.getByRole("button", { name: /open user menu/i }));
-}
-
-function signedInLocator(page: Page): Locator {
-  return page.getByRole("heading", { name: /signed in/i }).or(profileActionLocator(page));
-}
-
-function logoutLocator(page: Page) {
-  return page
-    .locator("zitadel-logout .signout-btn")
-    .or(page.locator('zl-button[action="logout"], [data-action="logout"]'))
-    .or(page.getByRole("button", { name: /logout|sign out/i }))
-    .or(page.getByRole("link", { name: /logout|sign out/i }));
 }

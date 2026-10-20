@@ -564,10 +564,10 @@ importers:
         version: 1.166.13(@tanstack/react-router@1.168.23(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tanstack/router-core@1.171.37)(csstype@3.2.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@vercel/analytics':
         specifier: 'catalog:'
-        version: 2.0.1(next@16.4.1(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))
+        version: 2.0.1(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))
       '@vercel/speed-insights':
         specifier: 'catalog:'
-        version: 2.0.0(next@16.4.1(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))
+        version: 2.0.0(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))
       '@zitadel/api':
         specifier: workspace:*
         version: link:../../packages/api
@@ -738,10 +738,10 @@ importers:
         version: 2.3.1
       '@vercel/analytics':
         specifier: 'catalog:'
-        version: 2.0.1(next@16.4.1(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))
+        version: 2.0.1(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))
       '@vercel/speed-insights':
         specifier: 'catalog:'
-        version: 2.0.0(next@16.4.1(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))
+        version: 2.0.0(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))
       '@zitadel/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
@@ -983,10 +983,10 @@ importers:
     dependencies:
       '@vercel/analytics':
         specifier: 'catalog:'
-        version: 2.0.1(next@16.4.1(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))
+        version: 2.0.1(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))
       '@vercel/speed-insights':
         specifier: 'catalog:'
-        version: 2.0.0(next@16.4.1(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))
+        version: 2.0.0(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))
       next:
         specifier: 'catalog:'
         version: 16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1)
@@ -1024,6 +1024,9 @@ importers:
       '@types/node':
         specifier: ^24.19.1
         version: 24.19.1
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../packages/api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../packages/api-mock
@@ -22483,7 +22486,7 @@ snapshots:
       - rollup
       - unloader
 
-  '@vercel/analytics@2.0.1(next@16.4.1(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))':
+  '@vercel/analytics@2.0.1(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))':
     optionalDependencies:
       next: 16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1)
       react: 19.2.8
@@ -22509,7 +22512,7 @@ snapshots:
       - rollup
       - supports-color
 
-  '@vercel/speed-insights@2.0.0(next@16.4.1(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))':
+  '@vercel/speed-insights@2.0.0(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(svelte@5.57.2(@typescript-eslint/types@8.59.3))(vue@3.5.44(typescript@6.0.3))':
     optionalDependencies:
       next: 16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1)
       react: 19.2.8
