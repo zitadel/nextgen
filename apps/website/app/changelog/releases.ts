@@ -224,3 +224,49 @@ function newestFirst(a: Release, b: Release): number {
   if (left || right) return left ? -1 : 1;
   return b.publishedAt.localeCompare(a.publishedAt);
 }
+
+/** What the page filters by: a package, or the SDKs, one package each. */
+export type Component = { id: string; label: string };
+
+// The filter's components, in the order the release notes list their
+// packages (the fixed group in .changeset/config.json), named after the
+// packages' descriptions. A package not listed here is a component of its
+// own, under its name, after these.
+const COMPONENTS: Component[] = [
+  { id: "cli", label: "CLI" },
+  { id: "server", label: "Server" },
+  { id: "api", label: "API client" },
+  { id: "config", label: "Config" },
+  { id: "components", label: "Web components" },
+  { id: "sdks", label: "SDKs" },
+  { id: "testing", label: "Test kit" },
+];
+
+export function componentOf(pkg: string): Component {
+  const name = pkg.replace(/^@zitadel\//, "");
+  const id = name.startsWith("sdk-") ? "sdks" : name;
+  return COMPONENTS.find((component) => component.id === id) ?? { id, label: name };
+}
+
+/** The components a change touches, each once. */
+export function componentIds(change: Pick<Change, "packages">): string[] {
+  return [...new Set(change.packages.map((pkg) => componentOf(pkg).id))];
+}
+
+/** Every component the releases change, with how many of their changes touch it. */
+export function componentsIn(releases: Release[]): (Component & { count: number })[] {
+  const found = new Map<string, Component & { count: number }>();
+  for (const change of releases.flatMap((release) => release.changes)) {
+    const touched = new Map(change.packages.map(componentOf).map((c) => [c.id, c]));
+    for (const component of touched.values()) {
+      const known = found.get(component.id);
+      if (known) known.count += 1;
+      else found.set(component.id, { ...component, count: 1 });
+    }
+  }
+  const rank = (id: string) => {
+    const index = COMPONENTS.findIndex((component) => component.id === id);
+    return index === -1 ? COMPONENTS.length : index;
+  };
+  return [...found.values()].sort((a, b) => rank(a.id) - rank(b.id) || a.id.localeCompare(b.id));
+}

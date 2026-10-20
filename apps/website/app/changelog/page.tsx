@@ -4,12 +4,22 @@ import { links } from "../links";
 import og from "../og.jpg";
 import { SiteFooter } from "../site-footer";
 import { SiteHeader } from "../site-header";
+import {
+  ChangeCount,
+  ComponentFilter,
+  ComponentFilterProvider,
+  Filtered,
+  NoneFiltered,
+} from "./component-filter";
 import { Markdown } from "./markdown";
 import { OpenLinkedRelease } from "./open-linked-release";
 import {
   BUMPS,
   type Bump,
   type Change,
+  componentIds,
+  componentOf,
+  componentsIn,
   fetchReleases,
   RELEASE_COUNT,
   type Release,
@@ -76,6 +86,7 @@ async function loadReleases(): Promise<Release[] | undefined> {
 
 export default async function ChangelogPage() {
   const releases = await loadReleases();
+  const components = releases ? componentsIn(releases) : [];
   const github = (
     <a href={links.releases} className={LINK}>
       GitHub
@@ -93,8 +104,16 @@ export default async function ChangelogPage() {
             What each release of the preview changes, from its release notes on {github}.
           </p>
           {releases ? (
-            <>
-              <ol className="mt-12 border-border-primary border-b">
+            <ComponentFilterProvider components={components}>
+              <div className="mt-10">
+                <ComponentFilter />
+                {components.some(({ id }) => id === "server") && (
+                  <p className="mt-3 text-text-muted text-xs leading-5">
+                    The console and the login ship in the server: their changes are under Server.
+                  </p>
+                )}
+              </div>
+              <ol className="mt-10 border-border-primary border-b">
                 {releases.map((release, index) => (
                   <ReleaseEntry key={release.tag} release={release} open={index === 0} />
                 ))}
@@ -103,7 +122,7 @@ export default async function ChangelogPage() {
                 The last {RELEASE_COUNT} releases; {github} has every one.
               </p>
               <OpenLinkedRelease />
-            </>
+            </ComponentFilterProvider>
           ) : (
             <p className="mt-12 rounded-xl border border-window-border bg-window px-5 py-4 text-sm text-text-secondary leading-6">
               The release notes did not load. Read them on {github}.
@@ -119,10 +138,11 @@ export default async function ChangelogPage() {
 /**
  * One release, the newest open and the others folded to their version, date
  * and count: the maintainers' notes, the changes by bump, then what the
- * release body says of changes it left out.
+ * release body says of changes it left out. The filter shows the changes,
+ * and the pointers to left-out ones, of the chosen component only.
  */
 function ReleaseEntry({ release, open }: { release: Release; open: boolean }) {
-  const count = release.changes.length;
+  const components = release.changes.map(componentIds);
   return (
     <li id={release.tag} className="scroll-mt-20 border-border-primary border-t">
       <details open={open} className="group">
@@ -150,15 +170,16 @@ function ReleaseEntry({ release, open }: { release: Release; open: boolean }) {
                 {DATE.format(new Date(release.publishedAt))}
               </time>
             )}
-            {count > 0 && (
+            {components.length > 0 && (
               <span className="ml-auto font-mono text-text-muted text-xs leading-6">
-                {count === 1 ? "1 change" : `${count} changes`}
+                <ChangeCount changes={components} />
               </span>
             )}
           </div>
         </summary>
         <div className="flex flex-col gap-8 pb-10 sm:pl-7">
           {release.notes && <Markdown>{release.notes}</Markdown>}
+          <NoneFiltered changes={components} />
           {BUMPS.map((bump) => (
             <ChangeGroup
               key={bump}
@@ -166,11 +187,20 @@ function ReleaseEntry({ release, open }: { release: Release; open: boolean }) {
               changes={release.changes.filter((change) => change.bump === bump)}
             />
           ))}
-          {release.notices.map((notice) => (
-            <Markdown key={`${notice.package} ${notice.text}`} className="text-sm text-text-muted">
-              {notice.package ? `\`${notice.package}\`: ${notice.text}` : notice.text}
-            </Markdown>
-          ))}
+          {release.notices.map((notice) =>
+            notice.package ? (
+              <Filtered
+                key={`${notice.package} ${notice.text}`}
+                components={[componentOf(notice.package).id]}
+              >
+                <Markdown className="text-sm text-text-muted">{`\`${notice.package}\`: ${notice.text}`}</Markdown>
+              </Filtered>
+            ) : (
+              <Markdown key={notice.text} className="text-sm text-text-muted">
+                {notice.text}
+              </Markdown>
+            ),
+          )}
           <a href={release.url} className={`self-start text-sm ${LINK}`}>
             {release.tag} on GitHub
           </a>
@@ -183,14 +213,21 @@ function ReleaseEntry({ release, open }: { release: Release; open: boolean }) {
 function ChangeGroup({ bump, changes }: { bump: Bump; changes: Change[] }) {
   if (changes.length === 0) return null;
   return (
-    <div>
-      <h3 className="font-mono text-text-muted text-xs leading-4">{BUMP_TITLES[bump]}</h3>
-      <ul className="mt-2">
-        {changes.map((change) => (
-          <ChangeEntry key={`${change.source?.href} ${change.summary}`} change={change} />
-        ))}
-      </ul>
-    </div>
+    <Filtered components={[...new Set(changes.flatMap(componentIds))]}>
+      <div>
+        <h3 className="font-mono text-text-muted text-xs leading-4">{BUMP_TITLES[bump]}</h3>
+        <ul className="mt-2">
+          {changes.map((change) => (
+            <Filtered
+              key={`${change.source?.href} ${change.summary}`}
+              components={componentIds(change)}
+            >
+              <ChangeEntry change={change} />
+            </Filtered>
+          ))}
+        </ul>
+      </div>
+    </Filtered>
   );
 }
 

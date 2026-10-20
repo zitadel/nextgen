@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  componentIds,
+  componentOf,
+  componentsIn,
   fetchReleases,
   type GitHubRelease,
   parseRelease,
@@ -191,6 +194,66 @@ describe("parseRelease", () => {
         packages: ["@zitadel/cli"],
         authors: [],
       },
+    ]);
+  });
+});
+
+describe("components", () => {
+  it("names a package as its description does, and every SDK as one component", () => {
+    expect(
+      [
+        "@zitadel/cli",
+        "@zitadel/server",
+        "@zitadel/api",
+        "@zitadel/config",
+        "@zitadel/components",
+        "@zitadel/sdk-next",
+        "@zitadel/testing",
+        "@zitadel/new-package",
+      ].map(componentOf),
+    ).toEqual([
+      { id: "cli", label: "CLI" },
+      { id: "server", label: "Server" },
+      { id: "api", label: "API client" },
+      { id: "config", label: "Config" },
+      { id: "components", label: "Web components" },
+      { id: "sdks", label: "SDKs" },
+      { id: "testing", label: "Test kit" },
+      { id: "new-package", label: "new-package" },
+    ]);
+    expect(
+      componentIds({ packages: ["@zitadel/sdk-next", "@zitadel/sdk-nuxt", "@zitadel/cli"] }),
+    ).toEqual(["sdks", "cli"]);
+  });
+
+  it("counts each change once per component, in the release notes' order of packages", () => {
+    const sdks = parseRelease(
+      release("v1.0.0-alpha.29", {
+        body: [
+          "<!-- nextgen-release-facts:start -->",
+          "### Package Changes",
+          "",
+          "#### `@zitadel/sdk-next`",
+          "",
+          "### Patch Changes",
+          "",
+          "- Reads the session's project.",
+          "",
+          "#### `@zitadel/sdk-nuxt`",
+          "",
+          "### Patch Changes",
+          "",
+          "- Reads the session's project.",
+          "- Loads the elements once.",
+          "<!-- nextgen-release-facts:end -->",
+        ].join("\n"),
+      }),
+    );
+
+    expect(componentsIn([sdks, parseRelease(release("v1.0.0-alpha.28", { body: BODY }))])).toEqual([
+      { id: "cli", label: "CLI", count: 2 },
+      { id: "server", label: "Server", count: 2 },
+      { id: "sdks", label: "SDKs", count: 2 },
     ]);
   });
 });
