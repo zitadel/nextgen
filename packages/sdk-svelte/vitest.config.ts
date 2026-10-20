@@ -48,7 +48,6 @@ export default defineConfig({
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
       edgeProject({
-        conditions: ["worker"],
         // Svelte loads `node:async_hooks` for its async server rendering, which
         // Workers (`nodejs_compat`) and Vercel Edge both provide.
         polyfilledPackages: ["svelte"],

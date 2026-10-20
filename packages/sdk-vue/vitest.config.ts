@@ -20,12 +20,7 @@ export default defineConfig({
         },
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
-      edgeProject({
-        // The SDK imports `@zitadel/components` for registration and locale
-        // data only, so on the edge it resolves to the components' Lit-free
-        // entry; `workerd` selects it, as Wrangler does.
-        conditions: ["workerd"],
-      }),
+      edgeProject({}),
     ],
   },
 });

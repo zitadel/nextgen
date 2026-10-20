@@ -138,7 +138,9 @@ function rejectNodeBuiltins(allowedPackages) {
  *
  *   projects: [..., edgeProject({ include: ["src/jwt.test.ts"] })]
  *
- * `conditions` are extra resolve conditions, e.g. `sourceConditions`; `alias`
+ * Every project resolves with `workerd`, the condition Wrangler adds for
+ * Cloudflare Workers, and `conditions` are extra ones for a package that
+ * needs more (`packages/AGENTS.md`); `alias`
  * is the package's own `resolve.alias`; `plugins` are its own Vite plugins,
  * which go here rather than over the result, or the built-in check is lost. A Node built-in imported by anything
  * but a spec or its fixtures fails the run, unless the importing dependency
@@ -163,11 +165,12 @@ export function edgeProject({
   if (globSync(specs, { cwd: process.cwd() }).length === 0) {
     throw new Error(`edgeProject: no spec matches ${specs.join(", ")} in ${process.cwd()}`);
   }
+  const resolved = ["workerd", ...conditions];
   return {
     cacheDir: ".vitest/edge",
     plugins: [...plugins, rejectNodeBuiltins(polyfilledPackages)],
-    resolve: { conditions, alias },
-    ssr: { resolve: { conditions: ["browser", ...conditions] } },
+    resolve: { conditions: resolved, alias },
+    ssr: { resolve: { conditions: ["browser", ...resolved] } },
     test: {
       name: "edge",
       globals: true,

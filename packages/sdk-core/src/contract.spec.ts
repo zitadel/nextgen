@@ -689,15 +689,33 @@ const BUSINESS_LOCALES_EXPORT = 'export { businessLocales } from "@zitadel/compo
 /** Every `export … from "@zitadel/components"` statement of a source. */
 const EXPORTS_FROM_COMPONENTS = /\bexport\s[^;]*?from\s*["']@zitadel\/components["']/g;
 
-const occurrences = (source: string, part: string): number => source.split(part).length - 1;
+/** A line that imports `@zitadel/components` for its side effect, however it is written. */
+const REGISTERING_IMPORT_LINE = /^\s*import\s*["']@zitadel\/components["']/;
+
+/** A line that re-exports `businessLocales`, however it is written. */
+const BUSINESS_LOCALES_LINE = /^\s*export\s*\{[^}]*\bbusinessLocales\b/;
+
+/** How often the lines of `block` follow each other in `lines`, each matching whole and exactly. */
+const blocksIn = (lines: readonly string[], block: string): number => {
+  const wanted = block.split("\n");
+  return lines.filter((_, at) => wanted.every((line, offset) => lines[at + offset] === line))
+    .length;
+};
 
 /** What is wrong with the way a client SDK entry uses `@zitadel/components`. */
 const entryProblems = (source: string): string[] => {
   const found: string[] = [];
-  if (occurrences(source, IMPORT_BLOCK) !== 1) {
+  const lines = source.split("\n");
+  if (
+    blocksIn(lines, IMPORT_BLOCK) !== 1 ||
+    lines.filter((line) => REGISTERING_IMPORT_LINE.test(line)).length !== 1
+  ) {
     found.push("does not hold the registering import, with its comment, exactly once");
   }
-  if (occurrences(source, EXPORT_BLOCK) !== 1) {
+  if (
+    blocksIn(lines, EXPORT_BLOCK) !== 1 ||
+    lines.filter((line) => BUSINESS_LOCALES_LINE.test(line)).length !== 1
+  ) {
     found.push("does not hold the businessLocales re-export, with its comment, exactly once");
   }
   for (const statement of source.match(EXPORTS_FROM_COMPONENTS) ?? []) {
@@ -747,13 +765,40 @@ describe("client SDK entries ↔ @zitadel/components", () => {
     });
 
     it.each([
+      ["a trailing comment", 'import "@zitadel/components";', 'import "@zitadel/components"; // x'],
+      ["extra whitespace", 'import "@zitadel/components";', 'import  "@zitadel/components";'],
+      ["trailing whitespace", 'import "@zitadel/components";', 'import "@zitadel/components"; '],
+      ["an indent", 'import "@zitadel/components";', '  import "@zitadel/components";'],
+      [
+        "a trailing comment on the re-export",
+        'export { businessLocales } from "@zitadel/components";',
+        'export { businessLocales } from "@zitadel/components"; // x',
+      ],
+      [
+        "extra whitespace in the re-export",
+        'export { businessLocales } from "@zitadel/components";',
+        'export {  businessLocales } from "@zitadel/components";',
+      ],
+    ])("sees %s", (_, line, changed) => {
+      expect(entryProblems(good.replace(line, changed))).not.toEqual([]);
+    });
+
+    it("sees a second import or re-export beside the canonical lines", () => {
+      expect(entryProblems(`${good}import "@zitadel/components"; // x\n`)).toHaveLength(1);
+      expect(entryProblems(`${good}import '@zitadel/components';\n`)).toHaveLength(1);
+      expect(
+        entryProblems(`${good}export { businessLocales } from "@zitadel/components"; // x\n`),
+      ).toHaveLength(1);
+    });
+
+    it.each([
       'export { ZitadelLogin } from "@zitadel/components";',
       'export type { ZitadelLogout, ZitadelSession } from "@zitadel/components";',
       'export { businessLocales, ZitadelSession } from "@zitadel/components";',
       'export * from "@zitadel/components";',
       'export {\n  ZitadelLogin,\n} from "@zitadel/components";',
     ])("sees %j", (statement) => {
-      expect(entryProblems(`${good}${statement}\n`)).toHaveLength(1);
+      expect(entryProblems(`${good}${statement}\n`)).not.toEqual([]);
     });
 
     it("lets an entry import an element class as a type for its own use", () => {
@@ -815,6 +860,38 @@ const edgeSpecProblems = (specs: Readonly<Record<string, EdgeSpec>>, files: Edge
     return found;
   });
 
+/** The doc comment every client wrapper's edge spec opens its `EdgeProps` with. */
+const LOAD_COMMENT = [
+  "/**",
+  " * Loads the built package, as a consumer's bundler resolves it, inside the",
+  " * `edge-runtime` VM (the `edge` project in `vitest.config.ts`), which has no",
+  " * `HTMLElement`, `document` or `customElements`, with dependencies resolved the",
+  " * way a bundler resolves them for the edge, and renders its widgets to markup.",
+  " */",
+].join("\n");
+
+/**
+ * What is wrong with the way a client wrapper's edge spec loads the package: it
+ * imports the wrapper by its package name, so it runs the built package as an
+ * external consumer does and never the source, and carries {@link LOAD_COMMENT}.
+ */
+const loadProblems = (sdk: string, source: string): string[] => {
+  const found: string[] = [];
+  const specifier = `@zitadel/${sdk}`;
+  const lines = source.split("\n");
+  const imported = lines.filter((line) => line.endsWith(`from "${specifier}";`));
+  if (imported.length !== 1) {
+    found.push(`${sdk}: does not import the built package ${specifier} once`);
+  }
+  if (lines.some((line) => /\bfrom ["']\.{1,2}\//.test(line))) {
+    found.push(`${sdk}: imports a source file, not the built package`);
+  }
+  if (blocksIn(lines, LOAD_COMMENT) !== 1) {
+    found.push(`${sdk}: does not carry the shared comment on what it loads`);
+  }
+  return found;
+};
+
 /** The `edgeProject` argument names, in the order a config writes them. */
 const EDGE_ARGUMENTS = [
   "include",
@@ -829,7 +906,7 @@ const EDGE_ARGUMENT =
   /^(include|exclude|conditions|alias|polyfilledPackages|plugins)(?::\s*(?:\[[^\]]*\]|[A-Za-z]+\(\)|sourceConditions))?,\s*/;
 
 const EDGE_DECLARATION =
-  /^ {6}\/\/ Runs the edge specs in the edge-runtime VM; see edgeProject in vitest\.shared\.mjs\.\n {6}edgeProject\(\{\n([\s\S]*?)\n {6}\}\),\n {4}\],\n {2}\},\n\}\);\n$/m;
+  /^ {6}\/\/ Runs the edge specs in the edge-runtime VM; see edgeProject in vitest\.shared\.mjs\.\n {6}edgeProject\(\{(?:\n([\s\S]*?)\n {6})?\}\),\n {4}\],\n {2}\},\n\}\);\n$/m;
 
 const EDGE_IMPORT =
   /^import \{[^}]*\bedgeProject\b[^}]*\} from "\.\.\/\.\.\/vitest\.shared\.mjs";$/m;
@@ -838,10 +915,15 @@ const EDGE_IMPORT =
  * What is wrong with the edge project declared in each config: it must be
  * imported from the shared module, be the last entry of `projects`, have the
  * one comment above it, and pass only the arguments of {@link EDGE_ARGUMENTS},
- * in that order. The value of an argument is the package's own; nothing else
- * may differ.
+ * in that order. Every edge project resolves with `workerd` already, so a
+ * config passes `conditions` only when `extraConditions` lists it, with exactly
+ * that value and a comment line above saying why. The value of another
+ * argument is the package's own; nothing else may differ.
  */
-const edgeConfigProblems = (configs: Readonly<Record<string, string>>): string[] =>
+const edgeConfigProblems = (
+  configs: Readonly<Record<string, string>>,
+  extraConditions: Readonly<Record<string, string>> = {},
+): string[] =>
   Object.entries(configs).flatMap(([sdk, source]) => {
     if (!EDGE_IMPORT.test(source))
       return [`${sdk}: does not import edgeProject from the shared module`];
@@ -849,8 +931,19 @@ const edgeConfigProblems = (configs: Readonly<Record<string, string>>): string[]
     if (!declaration) {
       return [`${sdk}: the edge project is not the last project, under the shared comment`];
     }
-    let rest = (declaration[1] ?? "")
-      .split("\n")
+    const body = (declaration[1] ?? "").split("\n");
+    const at = body.findIndex((line) => /^\s*conditions:/.test(line));
+    const passed =
+      at === -1 ? undefined : (body[at] ?? "").replace(/^\s*conditions:\s*|,\s*$/g, "");
+    if (passed !== extraConditions[sdk]) {
+      return [
+        `${sdk}: passes conditions ${passed ?? "none"}, not ${extraConditions[sdk] ?? "none"}`,
+      ];
+    }
+    if (at !== -1 && !/^\s*\/\/ \S/.test(body[at - 1] ?? "")) {
+      return [`${sdk}: does not say in a comment line above conditions why it needs them`];
+    }
+    let rest = body
       .filter((line) => !/^\s*\/\//.test(line))
       .join(" ")
       .replace(/\s+/g, " ")
@@ -889,7 +982,9 @@ describe("edge specs", () => {
   ];
   const EDGE_TITLES = [
     "the SDK in the edge runtime",
-    "renders the %s widget as its custom element with its attributes",
+    "renders the login widget as its custom element with its attributes",
+    "renders the session widget as its custom element with its attributes",
+    "renders the logout widget as its custom element with its attributes",
     "writes the purpose and the resumed flow into the login markup",
     "omits the language when none is set",
   ];
@@ -966,6 +1061,12 @@ describe("edge specs", () => {
     expect(problems(sourcesOf(CLIENT), "edge-entry", ENTRY_TITLES)).toEqual([]);
   });
 
+  it("has every client wrapper load the built package by its name, as one comment says", () => {
+    expect(
+      Object.entries(WRAPPERS).flatMap(([sdk, { path }]) => loadProblems(sdk, files.read(path))),
+    ).toEqual([]);
+  });
+
   it("has the render block in every SDK that renders widgets", () => {
     expect(problems(sourcesOf(WRAPPERS), "edge-render", EDGE_TITLES)).toEqual([]);
   });
@@ -1016,9 +1117,15 @@ describe("edge specs", () => {
     "sdk-vue/vitest.config.ts",
   ];
 
+  /** The conditions beyond `workerd` that a config passes: what its framework's bundler adds. */
+  const EXTRA_CONDITIONS = {
+    "sdk-next/vitest.config.ts": '["react-server", "edge-light"]',
+    "sdk-solid/vitest.config.ts": '["worker"]',
+  };
+
   it("declares the edge project the same way in every config", () => {
     const configs = Object.fromEntries(CONFIGS.map((path) => [path, files.read(path)]));
-    expect(edgeConfigProblems(configs)).toEqual([]);
+    expect(edgeConfigProblems(configs, EXTRA_CONDITIONS)).toEqual([]);
   });
 
   it("every server SDK runs its canonical middleware tests in the edge VM", () => {
@@ -1104,32 +1211,63 @@ describe("edge specs", () => {
         "});",
         "",
       ].join("\n");
-    const configCheck = (source: string) => edgeConfigProblems({ p: source });
+    const configCheck = (source: string, extra: Record<string, string> = {}) =>
+      edgeConfigProblems({ p: source }, extra);
     const args =
-      '        include: ["a"],\n        conditions: ["worker"],\n        plugins: [x()],';
+      '        include: ["a"],\n        // why\n        conditions: ["worker"],\n        plugins: [x()],';
+    const extra = { p: '["worker"]' };
 
     it("accepts the declaration with the arguments it may pass", () => {
-      expect(configCheck(declaration(args))).toEqual([]);
+      expect(configCheck(declaration(args), extra)).toEqual([]);
       expect(
         configCheck(declaration('        alias,\n        polyfilledPackages: ["a"],')),
       ).toEqual([]);
-      expect(
-        configCheck(declaration("        // why\n        conditions: sourceConditions,")),
-      ).toEqual([]);
+    });
+
+    it("sees conditions that are not listed, differ from the list or lack a reason", () => {
+      expect(configCheck(declaration(args))).toHaveLength(1);
+      expect(configCheck(declaration(args), { p: '["workerd"]' })).toHaveLength(1);
+      expect(configCheck(declaration('        include: ["a"],'), extra)).toHaveLength(1);
+      expect(configCheck(declaration(args.replace("        // why\n", "")), extra)).toHaveLength(1);
+      expect(configCheck(declaration('        conditions: ["worker"],'), extra)).toHaveLength(1);
+    });
+
+    describe("the load guard", () => {
+      const spec = `import { x } from "@zitadel/sdk-p";\n\n${LOAD_COMMENT}\ntype EdgeProps = {};\n`;
+
+      it("accepts the package name and the shared comment", () => {
+        expect(loadProblems("sdk-p", spec)).toEqual([]);
+      });
+
+      it("sees the source, another package and a reworded comment", () => {
+        expect(loadProblems("sdk-p", spec.replace("@zitadel/sdk-p", "./index"))).not.toEqual([]);
+        expect(loadProblems("sdk-p", spec.replace("@zitadel/sdk-p", "../index"))).not.toEqual([]);
+        expect(loadProblems("sdk-p", spec.replace("@zitadel/sdk-p", "@zitadel/sdk-q"))).not.toEqual(
+          [],
+        );
+        expect(loadProblems("sdk-p", spec.replace("Loads the built", "Loads the"))).not.toEqual([]);
+        expect(loadProblems("sdk-p", spec.replace(LOAD_COMMENT, ""))).not.toEqual([]);
+      });
     });
 
     it("sees a declaration without the shared comment or not last", () => {
-      expect(configCheck(declaration(args, false))).toHaveLength(1);
+      expect(configCheck(declaration(args, false), extra)).toHaveLength(1);
       expect(
-        configCheck(declaration(args).replace("// Runs the edge", "// Run the edge")),
+        configCheck(declaration(args).replace("// Runs the edge", "// Run the edge"), extra),
       ).toHaveLength(1);
-      expect(configCheck(declaration(args).replace("    ],", "      {},\n    ],"))).toHaveLength(1);
+      expect(
+        configCheck(declaration(args).replace("    ],", "      {},\n    ],"), extra),
+      ).toHaveLength(1);
     });
 
     it("sees an argument it may not pass, or one out of order", () => {
       expect(configCheck(declaration('        name: "edge",'))).toHaveLength(1);
+      expect(configCheck(declaration('        name: "edge",'), extra)).toHaveLength(1);
       expect(
-        configCheck(declaration('        conditions: ["worker"],\n        include: ["a"],')),
+        configCheck(
+          declaration('        // why\n        conditions: ["worker"],\n        include: ["a"],'),
+          extra,
+        ),
       ).toHaveLength(1);
       expect(
         configCheck(declaration('        include: ["a"],\n        include: ["b"],')),
@@ -1138,7 +1276,7 @@ describe("edge specs", () => {
 
     it("sees an edgeProject that is not the shared one", () => {
       expect(
-        configCheck(declaration(args).replace("../../vitest.shared.mjs", "./edge.mjs")),
+        configCheck(declaration(args).replace("../../vitest.shared.mjs", "./edge.mjs"), extra),
       ).toHaveLength(1);
     });
   });

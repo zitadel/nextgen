@@ -187,11 +187,8 @@ function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps
 }
 
 /** Hands the detail of a widget event to its handler; a plain event carries none and is not one. */
-function withDetail<Detail>(
-  event: Event,
-  handler: ((detail: Detail) => unknown) | undefined,
-): void {
-  if (event instanceof CustomEvent) void handler?.(event.detail);
+function withDetail<Detail>(event: Event, handler: ((detail: Detail) => void) | undefined): void {
+  if (event instanceof CustomEvent) handler?.(event.detail);
 }
 
 /**

@@ -36,12 +36,7 @@ export default defineConfig({
         },
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
-      edgeProject({
-        // The wrapper must load on an edge runtime, which has no DOM: the
-        // components package resolves to its entry without the elements under
-        // `worker` (see its package.json).
-        conditions: ["worker"],
-      }),
+      edgeProject({}),
     ],
   },
 });

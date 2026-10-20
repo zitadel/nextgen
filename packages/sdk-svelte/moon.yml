@@ -11,6 +11,7 @@ dependsOn:
 tasks:
   typecheck:
     deps:
+      # The edge spec imports this package's built dist.
       - "api-mock:build"
       - "build"
 

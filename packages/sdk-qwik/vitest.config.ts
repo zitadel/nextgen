@@ -61,7 +61,6 @@ export default defineConfig({
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
       edgeProject({
-        conditions: ["edge-light"],
         // Qwik keeps its request context in an AsyncLocalStorage, which Workers
         // (`nodejs_compat`) and Vercel Edge both provide.
         polyfilledPackages: ["@qwik.dev/core"],

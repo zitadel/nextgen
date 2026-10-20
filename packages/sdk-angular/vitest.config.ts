@@ -67,9 +67,6 @@ export default defineConfig({
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
       edgeProject({
-        // `workerd` selects the Lit-free entry of `@zitadel/components`, as
-        // Wrangler does. The build is a dependency of the test task.
-        conditions: ["workerd"],
         alias,
         plugins: [angularLinker()],
       }),
