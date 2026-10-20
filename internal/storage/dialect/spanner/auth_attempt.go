@@ -111,7 +111,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 
 	return withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
 		stmt := buildStatement(createAuthAttemptStmt, attempt.ProjectID, attempt.ID, req, ttlNanos, authattempt.SessionIDArg(attempt.SessionID), now, attempt.Internal,
-			emptyStringArg(attempt.DeploymentID), emptyStringArg(attempt.ReleaseID)).statement()
+			authattempt.EmptyStringArg(attempt.DeploymentID), authattempt.EmptyStringArg(attempt.ReleaseID)).statement()
 		if _, err := tx.Update(ctx, stmt); err != nil {
 			return fmt.Errorf("failed to create auth attempt: %w", err)
 		}
@@ -645,13 +645,6 @@ func (as authAttemptStatements) MarkSSOCallbackCollision(ctx context.Context, pr
 		return domain.ErrSSOStateInvalid()
 	}
 	return nil
-}
-
-func emptyStringArg(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
 }
 
 var _ service.AuthAttemptStatements = (*authAttemptStatements)(nil)

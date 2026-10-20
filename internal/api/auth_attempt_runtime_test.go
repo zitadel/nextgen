@@ -97,7 +97,7 @@ func TestExchangeHandoff_ProjectMismatch(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrProjectMismatch())
 }
 
-func TestWithAttemptSealedRelease_Revoked(t *testing.T) {
+func TestWithSealedRuntime_Revoked(t *testing.T) {
 	t.Parallel()
 
 	ctrl := gomock.NewController(t)
@@ -110,22 +110,15 @@ func TestWithAttemptSealedRelease_Revoked(t *testing.T) {
 	}, nil)
 
 	h := Handler{releaseService: releases}
-	_, err := h.withAttemptSealedRelease(t.Context(), &domain.AuthAttempt{
-		ProjectID: "proj_1",
-		ID:        "att_1",
-		ReleaseID: "rel_1",
-	})
+	_, err := h.withSealedRuntime(t.Context(), "proj_1", "dep_1", "rel_1")
 	require.ErrorIs(t, err, domain.ErrReleaseRevoked())
 }
 
-func TestWithAttemptSealedRelease_EmptyIsNoop(t *testing.T) {
+func TestWithSealedRuntime_EmptyIsNoop(t *testing.T) {
 	t.Parallel()
 
 	h := Handler{}
-	ctx, err := h.withAttemptSealedRelease(t.Context(), &domain.AuthAttempt{
-		ProjectID: "proj_1",
-		ID:        "att_1",
-	})
+	ctx, err := h.withSealedRuntime(t.Context(), "proj_1", "", "")
 	require.NoError(t, err)
 	require.Nil(t, service.RuntimeResolutionFromContext(ctx))
 }

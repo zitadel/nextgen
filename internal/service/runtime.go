@@ -239,15 +239,6 @@ func ReleaseFromContext(ctx context.Context) *domain.Release {
 	return resolution.Release
 }
 
-// WithRelease attaches a release already known from sealed flow state, for
-// the steps after the first.
-func WithRelease(ctx context.Context, release *domain.Release) context.Context {
-	if release == nil {
-		return ctx
-	}
-	return WithRuntimeResolution(ctx, &RuntimeResolution{Release: release})
-}
-
 // PinnedRevisions is handle → revision id for one release pointer kind.
 type PinnedRevisions map[string]string
 

@@ -129,9 +129,8 @@ type CreateAuthAttemptInput struct {
 	// Internal marks a server-orchestrated ceremony (see
 	// [domain.AuthAttempt.Internal]). Never settable through the REST surface.
 	Internal bool
-	// DeploymentID and ReleaseID seal the runtime resolution that served
-	// create. Empty when no resolution ran (interim until the project
-	// default target). Also filled from RuntimeResolutionFromContext when
+	// DeploymentID and ReleaseID seal the runtime resolution. Empty when
+	// create did not resolve; filled from RuntimeResolutionFromContext when
 	// the caller leaves them empty.
 	DeploymentID string
 	ReleaseID    string
