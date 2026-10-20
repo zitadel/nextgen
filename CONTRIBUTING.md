@@ -131,6 +131,15 @@ generated app instead of local ones.
 Pass `--runtime docker`, `--image <tag>`, or set `ZITADEL_LOCAL_IMAGE=<tag>` when
 intentionally testing the Docker backend.
 
+The published `zitadel` commands must not need Docker, Go, Moon or this
+checkout; only the `workspace:*` wrappers may.
+
+To capture the CLI's JSON through the root wrapper, run
+`corepack pnpm --silent run cli -- … --json`: plain `pnpm run` prints its own
+script prelude to stdout first. Running `apps/cli/bin/run.js` directly uses the
+last-built `dist/`, so after a fresh checkout or a source change run
+`pnpm install` and `moon run cli:build` first.
+
 ---
 
 ## I want to contribute to the front-end embedded apps
@@ -143,17 +152,17 @@ the two SPAs bundled directly into the server binary.
 | Install dependencies                         | `corepack pnpm install --frozen-lockfile`  |
 | Verify my toolchain                          | `moon run workspace:doctor`                |
 | Open the component workbench (Storybook)     | `moon run storybook:dev` → http://localhost:6006 |
-| Start the console dev server                 | `moon run console:dev` → http://localhost:5174 |
+| Start the console on a seeded real instance  | `moon run console:dev-real` |
 | Start the login-UI dev server                | `moon run login-ui:dev` → http://localhost:5175 |
 | Build both apps and test with the Go server  | `moon run console:build login-ui:build` then `go run . server --migrate` |
 | Run lint, type checks, and tests             | `moon ci :lint :typecheck :build :test`    |
 
 Run `corepack pnpm install --frozen-lockfile` first.
 
-The console dev server uses in-browser API mocking, so you do not need a running
-backend to iterate on the console. The login-UI dev server renders the real
-sign-in flow instead; so you do need a running backend server to test the
-authentication flows.
+`console:dev-real` boots an ephemeral real instance, seeds it, and starts the
+console dev server against it; the console's other loops are in its
+[README](apps/console/README.md#local-development). The login-UI dev server
+renders the real sign-in flow, so it needs a running backend server too.
 
 Dev servers serve at `/`; the embedded production builds are served at
 `/ui/console/` and `/ui/login/`.
@@ -244,13 +253,15 @@ token as `DEPOT_CACHE_TOKEN` — with one set, your machine downloads shared tas
 outputs but never uploads (uploads happen only in CI). Pull requests from forks
 run on GitHub-hosted runners without the Depot cache credential.
 
-To run the full CI-parity suite locally — including database integration
-tests, package checks, and the fresh-app journey — run
-`moon run workspace:check -- --full`. The demo end-to-end suites are not part
-of `--full`; run them with `moon run workspace:check -- --only node:e2e` or
-the Moon tasks below. To re-run a single failing task, use
-`moon run <project>:<task>`. To re-run one check phase:
-`moon run workspace:check -- --only <phase>`.
+`moon run workspace:check -- --full` runs the slow phases of
+[`scripts/check.mjs`](scripts/check.mjs): the OpenAPI lint, the Go generate
+check and tests with the Postgres and Spanner lanes, the workspace gate, the
+release tarballs and snapshot, and the fresh-app journey. That comes close to
+`full-pr` but does not mirror it: CI runs Spanner only nightly, and adds the
+SQLite lane, a few repository checks and every other e2e lane
+(`moon run e2e:all`). Rerun one phase with
+`moon run workspace:check -- --only <phase>`, one task with
+`moon run <project>:<task>`.
 
 ### What CI runs
 
@@ -262,9 +273,9 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 **Full mode** (normal PRs) runs, in order:
 
 - `moon run server:check-generate-pruned` — Go generated-file drift check.
-- Playwright Chromium install for the e2e lanes. The `components`/`api-mock`
-  browser projects pull in their own Chromium through a moon `install-browsers`
-  dep on their `:test` task.
+- Playwright Chromium install for the e2e lanes. Browser test lanes pull in
+  their own Chromium through a moon `install-browsers` dep on their `:test`
+  task.
 - `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph` —
   builds, lint, typecheck and unit tests, and the Go database lanes
   (`server:test-postgres`, `server:test-sqlite`) whenever moon finds them
@@ -284,8 +295,9 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 - `moon exec e2e:all --ignore-ci-checks` — the e2e suite, in a step of its own
   so its browsers and dev servers do not compete with the unit suites. Its
   lanes are `runInCI: "skip"`, which keeps them out of the `moon ci` graph.
-  `e2e:all` runs every e2e lane as its dependencies: console, demo, the journey
-  (with ci-mode's framework matrix), and `testing:test-integration`. They run
+  `e2e:all` runs as its dependencies every lane that needs no deployment (the
+  journey with ci-mode's framework matrix) and `testing:test-integration`; the
+  deployment lanes run [per deployment](#cloud-deployment-checks). They run
   side by side; only the two demo-next lanes, which serve the same app on one
   port, wait for each other.
 
@@ -300,7 +312,9 @@ them.
 the steps outside the graph: the Go suites, the e2e step (on when moon finds
 `e2e:all` affected), the release snapshot (on when a journey trigger moved or
 the e2e step runs) and the journey's framework matrix, which collapses to Next
-unless an SDK, the CLI, the test kit or the journey's own files moved. It asks
+unless an SDK, the CLI, the test kit or the journey's own files moved; even the
+full matrix skips the frameworks in `ciExcludedFrameworkIds`
+([`frameworks.mjs`](e2e/journey/scripts/frameworks.mjs)). It asks
 moon as a local run would: in CI, moon leaves `runInCI: "skip"` tasks such as
 the lanes out of its affected set when only their own files changed.
 ci-turbo.yml uses the same gates for its per-lane steps. The gates fail
@@ -437,8 +451,9 @@ moon run docs:e2e
 
 ### Cloud deployment checks
 
-`pnpm check:cloud` runs every deployment suite, today the docs' and the
-console's, against the deployment of the hosted cloud that `CLOUD_URL` names:
+`pnpm check:cloud` runs every deployment suite (the `check:cloud` script in the
+root `package.json` names them) against the deployment of the hosted cloud
+that `CLOUD_URL` names:
 the checks CI runs for every deployment, and it reports every suite even when
 one fails. The production domain needs nothing else; any other deployment URL
 needs `VERCEL_AUTOMATION_BYPASS_SECRET`
@@ -513,6 +528,48 @@ relevant architecture decision records:
 
 - [`AGENTS.md`](AGENTS.md) — workspace conventions
 - [`docs/adrs/`](docs/adrs/) — architecture decisions
+
+### Personal agent setup
+
+`AGENTS.md` is checked in and shared. Keep per-developer rules — which GitHub
+account to use, whether an agent may push, editor preferences — in your
+agent's user-level file, such as `~/.claude/CLAUDE.md`. Do not add a
+`CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` to the checkout or a
+folder above it: while one exists, Claude Code reads it instead of every
+`AGENTS.md`, unless your Claude Code **Project instructions** setting is
+`claude-md-and-agents-md`.
+
+Some contributors keep local skills in `.claude/skills/` (gitignored), such as
+a `console-design-system-ui` classify-before-build guardrail or a
+`zitadel-pr-template` helper. They layer on these docs; nothing in the repo
+depends on them, so do not assume they are present.
+
+## Node.js and dependency versions
+
+`.nvmrc` names only the Node.js major, and every runtime in the repo uses that
+major. Minor and patch versions do not matter, so never pin one. When the major
+changes, bump it everywhere at once:
+
+- `.nvmrc` and `devbox.json` (`nodejs@<major>`)
+- `.devcontainer/devcontainer.json` (the `node` feature's `version`)
+- `apps/cli-skill-e2e/scripts/run.mjs` (the `node:<major>` image)
+- every `engines.node` of `<major>.x` (the Vercel-deployed apps)
+- `@types/node` in the pnpm catalog, so code cannot type-check against APIs the
+  runtime lacks
+
+CI workflows read `.nvmrc` through `node-version-file`; never hard-code a
+`node-version`.
+
+The same rules hold for dependencies:
+
+- Use caret ranges (`^1.2.3`). An exact pin needs a comment saying why (see
+  `@redocly/openapi-core` in `pnpm-workspace.yaml`).
+- A dependency used by more than one package lives in the pnpm catalog and is
+  referenced as `catalog:`, so the workspace resolves one version of it.
+- Peer ranges of the published SDKs describe what consumers may install, not
+  what the repo uses. Keep each as wide as the SDK works with: an open `>=`
+  floor, or a caret range that stops before a framework major the SDK does not
+  support.
 
 ## Opening a pull request
 
@@ -606,3 +663,34 @@ fix the branch and queue it again.
 A branch does not have to be up to date with `main` to merge. Merge `main`
 into it only to resolve a conflict or to pick up a change you need: every
 push runs `full-pr` and rebuilds the branch's cloud preview.
+
+## Troubleshooting
+
+Fresh cloud-agent VMs and containers commonly hit these.
+
+### Node.js is older than `.nvmrc`
+
+Sandbox images often ship an older Node.js. Put the `.nvmrc` major first on
+`$PATH` (for example with nvm) before running any `corepack` or `pnpm` command.
+
+### Playwright's browser install hangs
+
+`playwright install --with-deps chromium` can hang while extracting in a
+minimal VM. Download and extract the browser by hand instead:
+
+```sh
+curl -fsSL -o /tmp/chrome-linux64.zip \
+  "https://cdn.playwright.dev/builds/cft/<version>/linux64/chrome-linux64.zip"
+mkdir -p ~/.cache/ms-playwright/chromium-<rev>
+unzip -q /tmp/chrome-linux64.zip -d ~/.cache/ms-playwright/chromium-<rev>
+```
+
+Repeat for `chrome-headless-shell-linux64.zip` into
+`chromium_headless_shell-<rev>`. Take `<version>` (`browserVersion`) and `<rev>`
+(`revision`) from the installed package's `browsers.json` at
+`node_modules/.pnpm/playwright-core@<pkg>/node_modules/playwright-core/browsers.json`.
+
+### "Another Nuxt dev server is already running"
+
+A Nuxt e2e run or dev server that was killed ungracefully leaves a stale lock
+at `apps/demo-nuxt/.nuxt/dev/.lock`. Remove it and the `.nuxt` directory.
