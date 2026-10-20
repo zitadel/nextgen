@@ -6,55 +6,66 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>{{.Title}} · cell hierarchy</title>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-  <style>
-    :root { --bg:#0f1419; --panel:#1a222c; --text:#e7ecf1; --muted:#8b9aab; --accent:#3d9cf0; --ok:#3ecf8e; --bad:#f07178; --stale:#6b7280; --border:#2a3542; --warn:#e6b450; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
-    header { display:flex; gap:1rem; align-items:center; padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--panel); }
-    header a { color:var(--muted); text-decoration:none; margin-right:0.75rem; }
-    header a:hover { color:var(--accent); }
-    main { padding:1.25rem; max-width:1100px; margin:0 auto; }
-    h1 { font-size:1.25rem; margin:0 0 1rem; }
-    h2 { font-size:1rem; margin:0 0 0.5rem; }
-    .grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
-    @media (max-width:800px) { .grid { grid-template-columns:1fr; } }
-    .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:1rem; }
-    .muted { color:var(--muted); font-size:0.875rem; }
-    .badge { display:inline-block; font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:4px; border:1px solid var(--border); color:var(--muted); margin-left:0.35rem; }
-    .badge.parent { color:var(--accent); border-color:var(--accent); }
-    .badge.lookup { color:var(--ok); border-color:var(--ok); }
-    .dot { display:inline-block; width:0.55rem; height:0.55rem; border-radius:50%; margin-right:0.35rem; background:var(--ok); }
-    .dot.stale { background:var(--stale); }
-    .dot.down { background:var(--bad); }
-    ul.tree { list-style:none; padding-left:1.1rem; margin:0.25rem 0; }
-    ul.tree.root { padding-left:0; }
-    li.node { margin:0.35rem 0; }
-    code { font-size:0.8rem; color:var(--muted); }
-    table.trace { width:100%; border-collapse:collapse; font-size:0.85rem; }
-    table.trace th, table.trace td { text-align:left; padding:0.35rem 0.4rem; border-bottom:1px solid var(--border); vertical-align:top; }
-  </style>
+  <style>{{template "layout-styles" .}}</style>
 </head>
 <body>
-  <header>
-    <strong>cell hierarchy</strong>
-    <nav><a href="/">Tree</a><a href="/workspaces/acme">Workspace</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
-  </header>
-  <main>
-    <h1>Cell &amp; site trees</h1>
-    <p class="muted">Cell tree = membership (leaves under platform). Sites = projects with optional <code>workspace_id</code>. Platform project is the lookup zone.
-      {{range .Workspaces}} · <a href="/workspaces/{{.}}">workspace {{.}}</a>{{end}}
-    </p>
-    <div id="tree" hx-get="/tree" hx-trigger="every 5s" hx-swap="innerHTML">
-      {{template "tree" .}}
-    </div>
-    <div class="panel">
-      <h2>Global Trace</h2>
-      <p class="muted">Hops from scenario create-user float and lookup walks. Open <a href="/scenarios">Scenarios</a> to append.</p>
-      <div id="trace" hx-get="/trace" hx-trigger="every 5s" hx-swap="innerHTML">
-        {{template "trace" .}}
+<div class="app">
+  {{template "layout-nav" .}}
+  <div class="content">
+    <div class="content-main">
+      <h1>Cells</h1>
+      <p class="muted">Cell topology, join spare cells, and edit pairwise inter-cell delays. Same-cell hops are 0; unlisted labeled pairs are 0; unlabeled URLs default to 50ms.</p>
+      {{if .Flash}}<div class="flash-ok">{{.Flash}}</div>{{end}}
+      {{if .FlashErr}}<div class="flash-err">{{.FlashErr}}</div>{{end}}
+
+      <div id="tree" hx-get="/tree" hx-trigger="every 5s" hx-swap="innerHTML">
+        {{template "tree" .}}
+      </div>
+
+      <div class="panel">
+        <h2>Join spare</h2>
+        <p class="muted">Prepare an invite on a parent cell, then accept on an unjoined child.</p>
+        <form method="post" action="/join">
+          <label for="parent_url">Parent (is_parent)</label>
+          <select id="parent_url" name="parent_url" required>
+            <option value="">Select parent…</option>
+            {{range .Parents}}
+            <option value="{{.URL}}">{{.Label}} — {{.URL}}</option>
+            {{end}}
+          </select>
+          <label for="child_url">Unjoined cell</label>
+          <select id="child_url" name="child_url" required>
+            <option value="">Select cell…</option>
+            {{range .UnjoinedO}}
+            <option value="{{.URL}}">{{.Label}} — {{.URL}}</option>
+            {{end}}
+          </select>
+          <button type="submit">Join</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>Pairwise delay matrix (ms)</h2>
+        <p class="muted">Saved locally and broadcast to every cell via <code>POST /v1/admin/delays</code>.</p>
+        <form method="post" action="/cells/delays">
+          <table class="delay-matrix">
+            <thead><tr><th>Pair</th><th>Delay (ms)</th></tr></thead>
+            <tbody>
+            {{range .DelayPairs}}
+              <tr>
+                <td><code>{{.Left}}</code> ↔ <code>{{.Right}}</code></td>
+                <td><input type="number" min="0" max="5000" name="delay_{{.Key}}" value="{{.Ms}}"/></td>
+              </tr>
+            {{end}}
+            </tbody>
+          </table>
+          <button type="submit">Save delays</button>
+        </form>
       </div>
     </div>
-  </main>
+    {{template "layout-trace-drawer" .}}
+  </div>
+</div>
 </body>
 </html>
 {{end}}

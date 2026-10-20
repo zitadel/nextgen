@@ -64,17 +64,18 @@ func (a *App) handleProjectCreateUser(w http.ResponseWriter, r *http.Request) {
 	if teamID != "" {
 		body["lifecycle_owner_team_id"] = teamID
 	}
-	out, err := a.Peer.CreateUserBody(ctx, host, projectID, body)
 	note := "project create user " + email
 	if teamID != "" {
 		note += " team=" + teamID
 	}
+	a.beginTrace(note)
+	out, err := a.Peer.CreateUserBody(ctx, host, projectID, body)
 	if err != nil {
-		a.appendTrace(note, out.Trace, err.Error())
+		a.endTrace(err.Error(), out.Trace)
 		a.redirectProject(w, r, projectID, "", err.Error())
 		return
 	}
-	a.appendTrace(note, out.Trace, "created")
+	a.endTrace("created", out.Trace)
 	msg := "created user " + email
 	if teamID != "" {
 		msg += " (lifecycle team " + teamID + ")"
@@ -102,14 +103,15 @@ func (a *App) handleProjectDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	out, err := a.Peer.DeleteUser(ctx, host, projectID, email)
 	note := "project delete user " + email
+	a.beginTrace(note)
+	out, err := a.Peer.DeleteUser(ctx, host, projectID, email)
 	if err != nil {
-		a.appendTrace(note, out.Trace, err.Error())
+		a.endTrace(err.Error(), out.Trace)
 		a.redirectProject(w, r, projectID, "", err.Error())
 		return
 	}
-	a.appendTrace(note, out.Trace, "deleted")
+	a.endTrace("deleted", out.Trace)
 	a.redirectProject(w, r, projectID, "deleted user "+email+" (grants tombstoned via interests)", "")
 }
 
@@ -136,13 +138,14 @@ func (a *App) handleProjectCreateTeam(w http.ResponseWriter, r *http.Request) {
 	if parent != "" {
 		body["parent_team_id"] = parent
 	}
+	a.beginTrace("project create team " + name)
 	team, err := a.Peer.CreateTeam(ctx, host, projectID, body)
 	if err != nil {
-		a.appendTrace("project create team "+name, nil, err.Error())
+		a.endTrace(err.Error(), nil)
 		a.redirectProject(w, r, projectID, "", err.Error())
 		return
 	}
-	a.appendTrace("project create team "+name, nil, "id="+team.ID)
+	a.endTrace("id="+team.ID, nil)
 	a.redirectProject(w, r, projectID, "created team "+team.Name, "")
 }
 
@@ -164,12 +167,13 @@ func (a *App) handleProjectDeleteTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
+	a.beginTrace("project delete team " + teamID)
 	if err := a.Peer.DeleteTeam(ctx, host, projectID, teamID); err != nil {
-		a.appendTrace("project delete team "+teamID, nil, err.Error())
+		a.endTrace(err.Error(), nil)
 		a.redirectProject(w, r, projectID, "", err.Error())
 		return
 	}
-	a.appendTrace("project delete team "+teamID, nil, "deleted")
+	a.endTrace("deleted", nil)
 	a.redirectProject(w, r, projectID, "deleted team "+teamID, "")
 }
 
@@ -191,13 +195,14 @@ func (a *App) handleProjectCreateApp(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
+	a.beginTrace("project create app " + name)
 	app, err := a.Peer.CreateApp(ctx, host, projectID, map[string]any{"name": name})
 	if err != nil {
-		a.appendTrace("project create app "+name, nil, err.Error())
+		a.endTrace(err.Error(), nil)
 		a.redirectProject(w, r, projectID, "", err.Error())
 		return
 	}
-	a.appendTrace("project create app "+name, nil, "id="+app.ID)
+	a.endTrace("id="+app.ID, nil)
 	a.redirectProject(w, r, projectID, "created app "+app.Name, "")
 }
 
@@ -219,12 +224,13 @@ func (a *App) handleProjectDeleteApp(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
+	a.beginTrace("project delete app " + appID)
 	if err := a.Peer.DeleteApp(ctx, host, projectID, appID); err != nil {
-		a.appendTrace("project delete app "+appID, nil, err.Error())
+		a.endTrace(err.Error(), nil)
 		a.redirectProject(w, r, projectID, "", err.Error())
 		return
 	}
-	a.appendTrace("project delete app "+appID, nil, "deleted")
+	a.endTrace("deleted", nil)
 	a.redirectProject(w, r, projectID, "deleted app "+appID, "")
 }
 
@@ -246,13 +252,14 @@ func (a *App) handleProjectCreateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
+	a.beginTrace("project create group " + name)
 	g, err := a.Peer.CreateGroup(ctx, host, projectID, map[string]any{"name": name})
 	if err != nil {
-		a.appendTrace("project create group "+name, nil, err.Error())
+		a.endTrace(err.Error(), nil)
 		a.redirectProject(w, r, projectID, "", err.Error())
 		return
 	}
-	a.appendTrace("project create group "+name, nil, "id="+g.ID)
+	a.endTrace("id="+g.ID, nil)
 	a.redirectProject(w, r, projectID, "created group "+g.Name, "")
 }
 
@@ -274,12 +281,13 @@ func (a *App) handleProjectDeleteGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
+	a.beginTrace("project delete group " + groupID)
 	if err := a.Peer.DeleteGroup(ctx, host, projectID, groupID); err != nil {
-		a.appendTrace("project delete group "+groupID, nil, err.Error())
+		a.endTrace(err.Error(), nil)
 		a.redirectProject(w, r, projectID, "", err.Error())
 		return
 	}
-	a.appendTrace("project delete group "+groupID, nil, "deleted")
+	a.endTrace("deleted", nil)
 	a.redirectProject(w, r, projectID, "deleted group "+groupID, "")
 }
 
@@ -326,14 +334,15 @@ func (a *App) handleProjectCreateTuple(w http.ResponseWriter, r *http.Request) {
 		body["home_project_id"] = homeProject
 		body["home_cell_url"] = homeCell
 	}
-	out, err := a.Peer.CreateTuple(ctx, host, projectID, body)
 	note := fmt.Sprintf("project create tuple %s#%s@%s:%s", object, relation, kind, subject)
+	a.beginTrace(note)
+	out, err := a.Peer.CreateTuple(ctx, host, projectID, body)
 	if err != nil {
-		a.appendTrace(note, out.Trace, err.Error())
+		a.endTrace(err.Error(), out.Trace)
 		a.redirectProject(w, r, projectID, "", err.Error())
 		return
 	}
-	a.appendTrace(note, out.Trace, "tuple="+out.Tuple.ID)
+	a.endTrace("tuple="+out.Tuple.ID, out.Trace)
 	a.redirectProject(w, r, projectID, "created tuple "+out.Tuple.ID, "")
 }
 
@@ -355,14 +364,15 @@ func (a *App) handleProjectTombstoneTuple(w http.ResponseWriter, r *http.Request
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	out, err := a.Peer.TombstoneTuple(ctx, host, projectID, tupleID)
 	note := "project tombstone tuple " + tupleID
+	a.beginTrace(note)
+	out, err := a.Peer.TombstoneTuple(ctx, host, projectID, tupleID)
 	if err != nil {
-		a.appendTrace(note, out.Trace, err.Error())
+		a.endTrace(err.Error(), out.Trace)
 		a.redirectProject(w, r, projectID, "", err.Error())
 		return
 	}
-	a.appendTrace(note, out.Trace, "tombstoned")
+	a.endTrace("tombstoned", out.Trace)
 	msg := "tombstoned tuple " + tupleID
 	if out.InterestRemoved {
 		msg += " (interest unregistered on home)"

@@ -6,231 +6,192 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>{{.Title}} · cell hierarchy</title>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-  <style>
-    :root { --bg:#0f1419; --panel:#1a222c; --text:#e7ecf1; --muted:#8b9aab; --accent:#3d9cf0; --ok:#3ecf8e; --bad:#f07178; --border:#2a3542; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
-    header { display:flex; gap:1rem; align-items:center; padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--panel); }
-    header a { color:var(--muted); text-decoration:none; margin-right:0.75rem; }
-    main { padding:1.25rem; max-width:960px; margin:0 auto; }
-    .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:1rem; }
-    .controls { background:var(--panel); border:1px solid var(--accent); border-radius:8px; padding:1rem; margin-bottom:1rem; }
-    .muted { color:var(--muted); font-size:0.875rem; }
-    .flash-ok { color:var(--ok); margin-bottom:0.75rem; }
-    .flash-err { color:var(--bad); margin-bottom:0.75rem; }
-    label { display:block; margin:0.5rem 0 0.25rem; color:var(--muted); font-size:0.875rem; }
-    input, select, button { font:inherit; padding:0.45rem 0.6rem; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); }
-    input:not([type=checkbox]):not([type=range]), select { width:100%; }
-    button { background:var(--accent); border-color:var(--accent); color:#041018; font-weight:600; cursor:pointer; margin-top:0.5rem; margin-right:0.5rem; }
-    button.secondary { background:transparent; color:var(--text); }
-    .row { display:flex; flex-wrap:wrap; gap:0.5rem; align-items:flex-end; }
-    table.trace { width:100%; border-collapse:collapse; font-size:0.85rem; }
-    table.trace th, table.trace td { text-align:left; padding:0.35rem 0.4rem; border-bottom:1px solid var(--border); vertical-align:top; }
-    code { font-size:0.8rem; color:var(--muted); }
-    ul.compact { margin:0.35rem 0; padding-left:1.2rem; font-size:0.875rem; color:var(--muted); }
-  </style>
+  <style>{{template "layout-styles" .}}</style>
 </head>
 <body>
-  <header>
-    <strong>cell hierarchy</strong>
-    <nav><a href="/">Tree</a><a href="/workspaces/acme">Workspace</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
-  </header>
-  <main>
-    <h1>Scenarios (sites · global login · grants)</h1>
-    {{if .ScenarioOK}}<div class="flash-ok">{{.ScenarioOK}}</div>{{end}}
-    {{if .ScenarioErr}}<div class="flash-err">{{.ScenarioErr}}</div>{{end}}
+<div class="app">
+  {{template "layout-nav" .}}
+  <div class="content">
+    <div class="content-main">
+      <h1>Lab</h1>
+      <p class="muted">Scenario demos. Inter-cell latency comes from the <a href="/">Cells</a> pairwise delay matrix (not a flat slider).</p>
+      {{if .ScenarioOK}}<div class="flash-ok">{{.ScenarioOK}}</div>{{end}}
+      {{if .ScenarioErr}}<div class="flash-err">{{.ScenarioErr}}</div>{{end}}
 
-    <div class="controls" id="shared-controls">
-      <h2 style="font-size:1rem;margin:0 0 0.5rem">Shared controls</h2>
-      <p class="muted">Entry cell selects which cell’s site project the scenario uses (eu-1→acme-fra, us-1→acme-iowa when expanded). Defaults depend on the scenario.</p>
-      <label for="shared_entry_cell">Entry cell</label>
-      <select id="shared_entry_cell" name="entry_cell">
-        {{range .Cells}}
-        <option value="{{.Label}}">{{.Label}}</option>
-        {{end}}
-      </select>
-      <label for="shared_delay_ms">Inter-cell delay (ms): <span id="delay_val">0</span></label>
-      <input id="shared_delay_ms" name="delay_ms" type="range" min="0" max="200" step="5" value="0"
-             oninput="document.getElementById('delay_val').textContent=this.value;" style="width:100%"/>
-    </div>
-
-    <div class="panel">
-      <h2 style="font-size:1rem;margin:0 0 0.5rem">Global login</h2>
-      <p class="muted">Entry URL is conceptual global. Lookup walks from the <strong>platform</strong> project → home_project / home_cell / issuer hint. Optionally issue token at home and auth/check on home site’s chat.</p>
-      <form method="post" action="/scenarios/global-login" class="scenario-form" data-default-cell="platform">
-        <label for="gl_email">Email</label>
-        <input id="gl_email" name="email" value="joe@example.com"/>
-        <label><input type="checkbox" name="issue_token" value="1" checked/> Issue token + auth/check on home chat</label>
-        <button type="submit">Global login discovery</button>
-      </form>
-      {{if .GlobalLogin}}
-      <div style="margin-top:1rem">
-        <p class="muted">
-          {{.GlobalLogin.Email}}
-          {{if .GlobalLogin.Hit}}
-          → home <code>{{.GlobalLogin.HomeProject}}</code> @ <code>{{.GlobalLogin.HomeCell}}</code>
-          · found_at <code>{{.GlobalLogin.FoundAt}}</code>
-          · issuer <code>{{.GlobalLogin.IssuerHint}}</code>
-          {{if .GlobalLogin.Token}}
-          · auth: {{if .GlobalLogin.AuthAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.GlobalLogin.AuthReason}}</span>{{end}}
+      <div class="controls" id="shared-controls">
+        <h2>Shared controls</h2>
+        <p class="muted">Entry cell selects which cell’s site project the scenario uses (eu-1→acme-fra, us-1→acme-iowa when expanded).</p>
+        <label for="shared_entry_cell">Entry cell</label>
+        <select id="shared_entry_cell" name="entry_cell">
+          {{range .Cells}}
+          <option value="{{.Label}}">{{.Label}}</option>
           {{end}}
-          {{else}}miss{{end}}
-        </p>
-        {{if .GlobalLogin.ClaimsJSON}}
-        <pre style="margin:0.25rem 0 0;padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:auto;font-size:0.8rem">{{.GlobalLogin.ClaimsJSON}}</pre>
-        {{end}}
+        </select>
       </div>
-      {{end}}
-    </div>
 
-    <div class="panel">
-      <h2 style="font-size:1rem;margin:0 0 0.5rem">Block / Delete Joe</h2>
-      <p class="muted">
-        Lifecycle acts on Joe’s home (<code>eu-1</code> / <code>acme-fra</code>).
-        Entry cell selects the <strong>resource</strong> site for tuples + auth/FGA (default <code>eu-1</code>; use <code>us-1</code> after Expand).
-      </p>
-      <form method="post" action="/scenarios/block-joe" class="scenario-form" style="display:inline" data-default-cell="eu-1">
-        <button type="submit">Block Joe</button>
-      </form>
-      <form method="post" action="/scenarios/delete-joe" class="scenario-form" style="display:inline" data-default-cell="eu-1">
-        <button type="submit" class="secondary">Delete Joe</button>
-      </form>
-      {{if .Lifecycle}}
-      <div style="margin-top:1rem">
-        <p class="muted">
-          action=<code>{{.Lifecycle.Action}}</code>
-          · epoch <strong>{{.Lifecycle.Epoch}}</strong>
-          {{if .Lifecycle.Blocked}} · blocked{{end}}
-          {{if .Lifecycle.Deleted}} · deleted{{end}}
-          · resource <code>{{.Lifecycle.ResourceProject}}</code>@{{.Lifecycle.ResourceCell}}
-          · active joe-tuples <strong>{{.Lifecycle.USTuplesBefore}} → {{.Lifecycle.USTuplesActiveAfter}}</strong>
-          {{if .Lifecycle.Deleted}} · tombstoned <strong>{{.Lifecycle.USTuplesTombstonedAfter}}</strong>{{end}}
-          · offline: {{if .Lifecycle.OfflineAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.Lifecycle.OfflineReason}}</span>{{end}}
-          · online: {{if .Lifecycle.OnlineAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.Lifecycle.OnlineReason}}</span>{{end}}
-          {{with .Lifecycle.GroupAllowed}}
-            · group: {{if .}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">denied</span>{{end}}
+      <div class="panel">
+        <h2>Global login</h2>
+        <p class="muted">Lookup walks from the <strong>platform</strong> project → home_project / home_cell / issuer hint.</p>
+        <form method="post" action="/lab/global-login" class="scenario-form" data-default-cell="platform">
+          <label for="gl_email">Email</label>
+          <input id="gl_email" name="email" value="joe@example.com"/>
+          <label><input type="checkbox" name="issue_token" value="1" checked/> Issue token + auth/check on home chat</label>
+          <button type="submit">Global login discovery</button>
+        </form>
+        {{if .GlobalLogin}}
+        <div style="margin-top:1rem">
+          <p class="muted">
+            {{.GlobalLogin.Email}}
+            {{if .GlobalLogin.Hit}}
+            → home <code>{{.GlobalLogin.HomeProject}}</code> @ <code>{{.GlobalLogin.HomeCell}}</code>
+            · found_at <code>{{.GlobalLogin.FoundAt}}</code>
+            · issuer <code>{{.GlobalLogin.IssuerHint}}</code>
+            {{if .GlobalLogin.Token}}
+            · auth: {{if .GlobalLogin.AuthAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.GlobalLogin.AuthReason}}</span>{{end}}
+            {{end}}
+            {{else}}miss{{end}}
+          </p>
+          {{if .GlobalLogin.ClaimsJSON}}
+          <pre style="margin:0.25rem 0 0;padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:auto;font-size:0.8rem">{{.GlobalLogin.ClaimsJSON}}</pre>
           {{end}}
-          {{if ne .Lifecycle.LookupState ""}} · lookup <code>{{.Lifecycle.LookupState}}</code>{{end}}
-        </p>
-        {{if .Lifecycle.InterestsNotified}}
-        <p class="muted">Interests notified:</p>
-        <ul class="compact">{{range .Lifecycle.InterestsNotified}}<li><code>{{.}}</code></li>{{end}}</ul>
+        </div>
         {{end}}
-        {{if .Lifecycle.TombstonedSubjects}}
-        <p class="muted">Tombstoned subjects:</p>
-        <ul class="compact">{{range .Lifecycle.TombstonedSubjects}}<li><code>{{.}}</code></li>{{end}}</ul>
+      </div>
+
+      <div class="panel">
+        <h2>Block / Delete Joe</h2>
+        <p class="muted">Lifecycle acts on Joe’s home (<code>eu-1</code> / <code>acme-fra</code>). Entry cell selects the resource site.</p>
+        <form method="post" action="/lab/block-joe" class="scenario-form" style="display:inline" data-default-cell="eu-1">
+          <button type="submit">Block Joe</button>
+        </form>
+        <form method="post" action="/lab/delete-joe" class="scenario-form" style="display:inline" data-default-cell="eu-1">
+          <button type="submit" class="secondary">Delete Joe</button>
+        </form>
+        {{if .Lifecycle}}
+        <div style="margin-top:1rem">
+          <p class="muted">
+            action=<code>{{.Lifecycle.Action}}</code>
+            · epoch <strong>{{.Lifecycle.Epoch}}</strong>
+            {{if .Lifecycle.Blocked}} · blocked{{end}}
+            {{if .Lifecycle.Deleted}} · deleted{{end}}
+            · resource <code>{{.Lifecycle.ResourceProject}}</code>@{{.Lifecycle.ResourceCell}}
+            · active joe-tuples <strong>{{.Lifecycle.USTuplesBefore}} → {{.Lifecycle.USTuplesActiveAfter}}</strong>
+            {{if .Lifecycle.Deleted}} · tombstoned <strong>{{.Lifecycle.USTuplesTombstonedAfter}}</strong>{{end}}
+            · offline: {{if .Lifecycle.OfflineAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.Lifecycle.OfflineReason}}</span>{{end}}
+            · online: {{if .Lifecycle.OnlineAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.Lifecycle.OnlineReason}}</span>{{end}}
+            {{with .Lifecycle.GroupAllowed}}
+              · group: {{if .}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">denied</span>{{end}}
+            {{end}}
+            {{if ne .Lifecycle.LookupState ""}} · lookup <code>{{.Lifecycle.LookupState}}</code>{{end}}
+          </p>
+          {{if .Lifecycle.InterestsNotified}}
+          <p class="muted">Interests notified:</p>
+          <ul class="compact">{{range .Lifecycle.InterestsNotified}}<li><code>{{.}}</code></li>{{end}}</ul>
+          {{end}}
+          {{if .Lifecycle.TombstonedSubjects}}
+          <p class="muted">Tombstoned subjects:</p>
+          <ul class="compact">{{range .Lifecycle.TombstonedSubjects}}<li><code>{{.}}</code></li>{{end}}</ul>
+          {{end}}
+          <p class="muted">{{.Lifecycle.Note}}</p>
+        </div>
         {{end}}
-        <p class="muted">{{.Lifecycle.Note}}</p>
       </div>
-      {{end}}
-    </div>
 
-    <div class="panel">
-      <h2 style="font-size:1rem;margin:0 0 0.5rem">Group check Joe → app:chat</h2>
-      <p class="muted">Chain: acme-fra group:A → platform group:B → acme-fra app:chat. Default entry <code>eu-1</code>.</p>
-      <form method="post" action="/scenarios/seed-group-chain" class="scenario-form" style="margin-bottom:0.75rem" data-default-cell="eu-1">
-        <button class="secondary" type="submit">Seed group chain</button>
-      </form>
-      <form method="post" action="/scenarios/group-check-joe" class="scenario-form" data-default-cell="eu-1">
-        <label><input type="checkbox" name="auto_seed" value="1" checked/> Auto-seed chain if missing</label>
-        <button type="submit">Group check Joe → app:chat</button>
-      </form>
-      {{if .GroupCheck}}
-      <div style="margin-top:1rem">
-        <p class="muted">
-          {{if .GroupCheck.Allowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.GroupCheck.Reason}}</span>{{end}}
-          · total <strong>{{.GroupCheck.TotalMs}} ms</strong>
-          · cross-cell hops <strong>{{.GroupCheck.CrossCellHops}}</strong>
-        </p>
+      <div class="panel">
+        <h2>Group check Joe → app:chat</h2>
+        <p class="muted">Chain: acme-fra group:A → platform group:B → acme-fra app:chat. Pairwise delays apply on peer hops.</p>
+        <form method="post" action="/lab/seed-group-chain" class="scenario-form" style="margin-bottom:0.75rem" data-default-cell="eu-1">
+          <button class="secondary" type="submit">Seed group chain</button>
+        </form>
+        <form method="post" action="/lab/group-check-joe" class="scenario-form" data-default-cell="eu-1">
+          <label><input type="checkbox" name="auto_seed" value="1" checked/> Auto-seed chain if missing</label>
+          <button type="submit">Group check Joe → app:chat</button>
+        </form>
+        {{if .GroupCheck}}
+        <div style="margin-top:1rem">
+          <p class="muted">
+            {{if .GroupCheck.Allowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.GroupCheck.Reason}}</span>{{end}}
+            · total <strong>{{.GroupCheck.TotalMs}} ms</strong>
+            · cross-cell hops <strong>{{.GroupCheck.CrossCellHops}}</strong>
+          </p>
+        </div>
+        {{end}}
       </div>
-      {{end}}
-    </div>
 
-    <div class="panel">
-      <h2 style="font-size:1rem;margin:0 0 0.5rem">Sign in as Joe</h2>
-      <p class="muted">Issue JWT at Joe’s home (acme-fra). Auth/check hits the entry cell’s site (default <code>eu-1</code>).</p>
-      <form method="post" action="/scenarios/sign-in-joe" class="scenario-form" data-default-cell="eu-1">
-        <label><input type="checkbox" name="auto_grant" value="1" checked/> Auto-grant if missing</label>
-        <button type="submit">Sign in as Joe</button>
-      </form>
-      {{if .SignIn}}
-      <div style="margin-top:1rem">
-        <p class="muted">Home: <code>{{.SignIn.HomeProject}}</code> @ <code>{{.SignIn.HomeCell}}</code>
-          · offline: {{if .SignIn.AllowedOffline}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.SignIn.ReasonOffline}}</span>{{end}}
-          · online: {{if .SignIn.AllowedOnline}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.SignIn.ReasonOnline}}</span>{{end}}
-        </p>
+      <div class="panel">
+        <h2>Sign in as Joe</h2>
+        <form method="post" action="/lab/sign-in-joe" class="scenario-form" data-default-cell="eu-1">
+          <label><input type="checkbox" name="auto_grant" value="1" checked/> Auto-grant if missing</label>
+          <button type="submit">Sign in as Joe</button>
+        </form>
+        {{if .SignIn}}
+        <div style="margin-top:1rem">
+          <p class="muted">Home: <code>{{.SignIn.HomeProject}}</code> @ <code>{{.SignIn.HomeCell}}</code>
+            · offline: {{if .SignIn.AllowedOffline}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.SignIn.ReasonOffline}}</span>{{end}}
+            · online: {{if .SignIn.AllowedOnline}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.SignIn.ReasonOnline}}</span>{{end}}
+          </p>
+        </div>
+        {{end}}
       </div>
-      {{end}}
-    </div>
 
-    <div class="panel">
-      <h2 style="font-size:1rem;margin:0 0 0.5rem">Grant Joe on entry cell / chat</h2>
-      <form method="post" action="/scenarios/grant-joe" class="scenario-form" data-default-cell="eu-1">
-        <button type="submit">Grant Joe</button>
-      </form>
-    </div>
-
-    <div class="panel">
-      <h2 style="font-size:1rem;margin:0 0 0.5rem">Create user (watch float)</h2>
-      <p class="muted">Creates on the entry cell’s site (default <code>eu-1</code> → <code>acme-fra</code>). Floats to platform with provenance <code>source=child</code>.</p>
-      <form method="post" action="/scenarios/create-user" class="scenario-form" data-default-cell="eu-1">
-        <label for="email">Email</label>
-        <input id="email" name="email" placeholder="demo@example.com" />
-        <label><input type="checkbox" name="defer_float" value="1"/> Defer float (local only)</label>
-        <button type="submit">Create user (watch float)</button>
-      </form>
-    </div>
-
-    <div class="panel">
-      <h2 style="font-size:1rem;margin:0 0 0.5rem">Lookup walk</h2>
-      <form method="post" action="/scenarios/lookup" class="scenario-form" data-default-cell="eu-1">
-        <label for="key">Key</label>
-        <input id="key" name="key" value="joe@example.com" />
-        <button type="submit">Lookup</button>
-      </form>
-    </div>
-
-    <div class="panel">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <h2 style="font-size:1rem;margin:0">Global Trace</h2>
-        <form method="post" action="/trace/clear"><button class="secondary" type="submit">Clear</button></form>
+      <div class="panel">
+        <h2>Grant Joe on entry cell / chat</h2>
+        <form method="post" action="/lab/grant-joe" class="scenario-form" data-default-cell="eu-1">
+          <button type="submit">Grant Joe</button>
+        </form>
       </div>
-      <div id="trace" hx-get="/trace" hx-trigger="every 3s" hx-swap="innerHTML">
-        {{template "trace" .}}
+
+      <div class="panel">
+        <h2>Create user (watch float)</h2>
+        <form method="post" action="/lab/create-user" class="scenario-form" data-default-cell="eu-1">
+          <label for="email">Email</label>
+          <input id="email" name="email" placeholder="demo@example.com" />
+          <label><input type="checkbox" name="defer_float" value="1"/> Defer float (local only)</label>
+          <button type="submit">Create user (watch float)</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>Lookup walk</h2>
+        <form method="post" action="/lab/lookup" class="scenario-form" data-default-cell="eu-1">
+          <label for="key">Key</label>
+          <input id="key" name="key" value="joe@example.com" />
+          <button type="submit">Lookup</button>
+        </form>
       </div>
     </div>
-  </main>
-  <script>
-    (function () {
-      var cellSel = document.getElementById('shared_entry_cell');
-      var delayInp = document.getElementById('shared_delay_ms');
-      var cellDirty = false;
-      function ensureHidden(form, name, value) {
-        var el = form.querySelector('input[name="' + name + '"]');
-        if (!el) {
-          el = document.createElement('input');
-          el.type = 'hidden';
-          el.name = name;
-          form.appendChild(el);
-        }
-        el.value = value;
+    {{template "layout-trace-drawer" .}}
+  </div>
+</div>
+<script>
+  (function () {
+    var cellSel = document.getElementById('shared_entry_cell');
+    var cellDirty = false;
+    function ensureHidden(form, name, value) {
+      var el = form.querySelector('input[name="' + name + '"]');
+      if (!el) {
+        el = document.createElement('input');
+        el.type = 'hidden';
+        el.name = name;
+        form.appendChild(el);
       }
-      if (cellSel) {
-        for (var i = 0; i < cellSel.options.length; i++) {
-          if (cellSel.options[i].value === 'eu-1') { cellSel.selectedIndex = i; break; }
-        }
-        cellSel.addEventListener('change', function () { cellDirty = true; });
+      el.value = value;
+    }
+    if (cellSel) {
+      for (var i = 0; i < cellSel.options.length; i++) {
+        if (cellSel.options[i].value === 'eu-1') { cellSel.selectedIndex = i; break; }
       }
-      document.querySelectorAll('form.scenario-form').forEach(function (form) {
-        form.addEventListener('submit', function () {
-          var def = form.getAttribute('data-default-cell') || 'eu-1';
-          var cell = (cellDirty && cellSel && cellSel.value) ? cellSel.value : def;
-          ensureHidden(form, 'entry_cell', cell);
-          ensureHidden(form, 'delay_ms', delayInp ? delayInp.value : '0');
-        });
+      cellSel.addEventListener('change', function () { cellDirty = true; });
+    }
+    document.querySelectorAll('form.scenario-form').forEach(function (form) {
+      form.addEventListener('submit', function () {
+        var def = form.getAttribute('data-default-cell') || 'eu-1';
+        var cell = (cellDirty && cellSel && cellSel.value) ? cellSel.value : def;
+        ensureHidden(form, 'entry_cell', cell);
       });
-    })();
-  </script>
+    });
+  })();
+</script>
 </body>
 </html>
 {{end}}

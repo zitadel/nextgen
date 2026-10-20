@@ -126,10 +126,7 @@ func (a *App) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/create?err="+url.QueryEscape("created but attach failed: "+err.Error()), http.StatusSeeOther)
 			return
 		}
-		parentCell := parent.HostCellURL
-		if parentCell == "" {
-			parentCell = parentHost
-		}
+		parentCell := parentHost
 		if err := a.Peer.AttachProject(ctx, hostURL, proj.ID, parent.ID, parentCell); err != nil {
 			http.Redirect(w, r, "/create?err="+url.QueryEscape("created but attach failed: "+err.Error()), http.StatusSeeOther)
 			return

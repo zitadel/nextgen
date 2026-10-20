@@ -80,6 +80,7 @@ func (s *Server) registerProjectRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/lookup/walk", s.handleLookupWalk)
 	mux.HandleFunc("POST /v1/me/parent", s.handleEnableParent)
 	mux.HandleFunc("POST /v1/admin/enable-parent", s.handleEnableParent)
+	mux.HandleFunc("POST /v1/admin/delays", s.handleAdminDelays)
 }
 
 func (s *Server) floatDelay() time.Duration {

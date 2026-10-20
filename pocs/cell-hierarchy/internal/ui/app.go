@@ -31,8 +31,17 @@ type App struct {
 	Log   *log.Logger
 	tmpl  *template.Template
 
-	traceMu sync.Mutex
-	trace   []traceEntry
+	traceMu     sync.Mutex
+	trace       []traceEntry
+	traceAction string
+	traceBuf    []cell.TraceHop
+
+	delayMu    sync.Mutex
+	delayPairs map[string]int
+
+	wsMu          sync.Mutex
+	workspaces    map[string]Workspace
+	workspaceFile string
 
 	signInMu sync.Mutex
 	signIn   *signInResult
@@ -54,6 +63,11 @@ type traceEntry struct {
 	Note   string
 }
 
+type crumb struct {
+	Label string
+	Href  string
+}
+
 func NewApp(cells []CellRef, logger *log.Logger) (*App, error) {
 	if logger == nil {
 		logger = log.Default()
@@ -64,22 +78,38 @@ func NewApp(cells []CellRef, logger *log.Logger) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{Cells: cells, Peer: cell.NewPeerClient(), Log: logger, tmpl: tmpl}, nil
+	a := &App{Cells: cells, Peer: cell.NewPeerClient(), Log: logger, tmpl: tmpl}
+	a.Peer.OnHop = a.onHop
+	a.seedDefaultDelays()
+	a.seedWorkspaces()
+	return a, nil
 }
 
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", a.handleHome)
 	mux.HandleFunc("GET /tree", a.handleTree)
+	mux.HandleFunc("POST /cells/delays", a.handleCellsDelays)
+
+	mux.HandleFunc("GET /workspaces", a.handleWorkspacesList)
+	mux.HandleFunc("POST /workspaces", a.handleWorkspaceCreate)
 	mux.HandleFunc("GET /workspaces/{id}", a.handleWorkspaceHome)
-	mux.HandleFunc("GET /join", a.handleJoinForm)
+	mux.HandleFunc("POST /workspaces/{id}/sites", a.handleWorkspaceAddSite)
+
+	mux.HandleFunc("GET /join", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	})
 	mux.HandleFunc("POST /join", a.handleJoinSubmit)
-	mux.HandleFunc("GET /create", a.handleCreateForm)
-	mux.HandleFunc("POST /create/site", a.handleCreateSite)
+
+	mux.HandleFunc("GET /create", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/workspaces", http.StatusSeeOther)
+	})
+	mux.HandleFunc("POST /create/site", a.handleCreateSiteLegacy)
 	mux.HandleFunc("POST /create/expand", a.handleExpandSite)
 	mux.HandleFunc("POST /create/project", a.handleCreateProject)
 	mux.HandleFunc("POST /create/team", a.handleCreateTeam)
 	mux.HandleFunc("POST /create/app", a.handleCreateAppForm)
+
 	mux.HandleFunc("GET /cells/{label}", a.handleCellDetail)
 	mux.HandleFunc("GET /projects/{id}", a.handleProjectDetail)
 	mux.HandleFunc("POST /projects/{id}/users", a.handleProjectCreateUser)
@@ -92,7 +122,11 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /projects/{id}/groups/delete", a.handleProjectDeleteGroup)
 	mux.HandleFunc("POST /projects/{id}/tuples", a.handleProjectCreateTuple)
 	mux.HandleFunc("POST /projects/{id}/tuples/tombstone", a.handleProjectTombstoneTuple)
-	mux.HandleFunc("GET /scenarios", a.handleScenarios)
+
+	mux.HandleFunc("GET /lab", a.handleScenarios)
+	mux.HandleFunc("GET /scenarios", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/lab", http.StatusSeeOther)
+	})
 	mux.HandleFunc("POST /scenarios/create-user", a.handleScenarioCreateUser)
 	mux.HandleFunc("POST /scenarios/lookup", a.handleScenarioLookup)
 	mux.HandleFunc("POST /scenarios/grant-joe", a.handleScenarioGrantJoe)
@@ -102,7 +136,20 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /scenarios/block-joe", a.handleScenarioBlockJoe)
 	mux.HandleFunc("POST /scenarios/delete-joe", a.handleScenarioDeleteJoe)
 	mux.HandleFunc("POST /scenarios/global-login", a.handleScenarioGlobalLogin)
-	mux.HandleFunc("GET /trace", a.handleTrace)
+	// Lab aliases
+	mux.HandleFunc("POST /lab/create-user", a.handleScenarioCreateUser)
+	mux.HandleFunc("POST /lab/lookup", a.handleScenarioLookup)
+	mux.HandleFunc("POST /lab/grant-joe", a.handleScenarioGrantJoe)
+	mux.HandleFunc("POST /lab/sign-in-joe", a.handleScenarioSignInJoe)
+	mux.HandleFunc("POST /lab/seed-group-chain", a.handleScenarioSeedGroupChain)
+	mux.HandleFunc("POST /lab/group-check-joe", a.handleScenarioGroupCheckJoe)
+	mux.HandleFunc("POST /lab/block-joe", a.handleScenarioBlockJoe)
+	mux.HandleFunc("POST /lab/delete-joe", a.handleScenarioDeleteJoe)
+	mux.HandleFunc("POST /lab/global-login", a.handleScenarioGlobalLogin)
+
+	mux.HandleFunc("GET /trace", a.handleTracePartial)
+	mux.HandleFunc("GET /trace-view", a.handleTracePage)
+	mux.HandleFunc("GET /trace-page", a.handleTracePage)
 	mux.HandleFunc("POST /trace/clear", a.handleTraceClear)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -135,27 +182,34 @@ type projectNode struct {
 }
 
 type pageData struct {
-	Title       string
-	Flash       string
-	FlashErr    string
-	Tree        []*snapshotNode
-	Unjoined    []*snapshotNode
-	ProjectTree []*projectNode
-	Parents     []CellRef
-	UnjoinedO   []CellRef
-	Cells       []CellRef
-	Detail      *cellDetail
-	Project     *projectDetail
-	Trace       []traceEntry
-	Now         string
-	ScenarioOK  string
-	ScenarioErr string
-	SignIn      *signInResult
-	GlobalLogin *globalLoginResult
-	GroupCheck  *groupCheckResult
-	Lifecycle   *lifecycleResult
-	Workspaces  []string
-	Sites       []siteSummary
+	Title          string
+	NavActive      string
+	Breadcrumbs    []crumb
+	ShowTracePanel bool
+	Flash          string
+	FlashErr       string
+	Tree           []*snapshotNode
+	Unjoined       []*snapshotNode
+	ProjectTree    []*projectNode
+	Parents        []CellRef
+	UnjoinedO      []CellRef
+	Cells          []CellRef
+	Detail         *cellDetail
+	Project        *projectDetail
+	Trace          []traceEntry
+	Now            string
+	ScenarioOK     string
+	ScenarioErr    string
+	SignIn         *signInResult
+	GlobalLogin    *globalLoginResult
+	GroupCheck     *groupCheckResult
+	Lifecycle      *lifecycleResult
+	Workspaces     []string
+	WorkspaceList  []Workspace
+	Workspace      *Workspace
+	Sites          []siteSummary
+	CellMeta       map[string]string
+	DelayPairs     []delayPairView
 }
 
 type lifecycleResult struct {
@@ -276,15 +330,24 @@ func (a *App) handleHome(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	tree, unjoined := a.buildTree(ctx)
 	sites := a.listSites(ctx)
+	a.ensureWorkspaceFromSites(sites)
+	parents, unjoinedOpts := a.joinOptions(ctx)
 	a.render(w, "home", pageData{
-		Title:       "Cell & project trees",
-		Tree:        tree,
-		Unjoined:    unjoined,
-		ProjectTree: a.buildProjectTree(ctx),
-		Trace:       a.copyTrace(),
-		Now:         time.Now().UTC().Format(time.RFC3339),
-		Workspaces:  a.listWorkspaceIDs(sites),
-		Sites:       sites,
+		Title:          "Cells",
+		NavActive:      "cells",
+		ShowTracePanel: true,
+		Tree:           tree,
+		Unjoined:       unjoined,
+		ProjectTree:    a.buildProjectTree(ctx),
+		Parents:        parents,
+		UnjoinedO:      unjoinedOpts,
+		Trace:          a.copyTrace(),
+		Now:            time.Now().UTC().Format(time.RFC3339),
+		Workspaces:     a.listWorkspaceIDs(sites),
+		Sites:          sites,
+		DelayPairs:     a.delayPairViews(),
+		Flash:          r.URL.Query().Get("ok"),
+		FlashErr:       r.URL.Query().Get("err"),
 	})
 }
 
@@ -298,33 +361,24 @@ func (a *App) handleTree(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (a *App) handleJoinForm(w http.ResponseWriter, r *http.Request) {
-	parents, unjoined := a.joinOptions(r.Context())
-	a.render(w, "join", pageData{
-		Title:     "Join cell",
-		Parents:   parents,
-		UnjoinedO: unjoined,
-		Flash:     r.URL.Query().Get("ok"),
-		FlashErr:  r.URL.Query().Get("err"),
-	})
-}
-
 func (a *App) handleJoinSubmit(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, "/join?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
+		http.Redirect(w, r, "/?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
 		return
 	}
 	parentURL := r.FormValue("parent_url")
 	childURL := r.FormValue("child_url")
 	if parentURL == "" || childURL == "" {
-		http.Redirect(w, r, "/join?err="+url.QueryEscape("parent and child required"), http.StatusSeeOther)
+		http.Redirect(w, r, "/?err="+url.QueryEscape("parent and child required"), http.StatusSeeOther)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
+	a.beginTrace("join cell")
 	invite, err := a.Peer.Prepare(ctx, parentURL)
 	if err != nil {
-		http.Redirect(w, r, "/join?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		a.endTrace(err.Error(), nil)
+		http.Redirect(w, r, "/?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	_, err = a.Peer.Accept(ctx, childURL, cell.AcceptRequest{
@@ -332,10 +386,12 @@ func (a *App) handleJoinSubmit(w http.ResponseWriter, r *http.Request) {
 		JoinToken: invite.JoinToken,
 	})
 	if err != nil {
-		http.Redirect(w, r, "/join?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		a.endTrace(err.Error(), nil)
+		http.Redirect(w, r, "/?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/join?ok="+url.QueryEscape("joined successfully"), http.StatusSeeOther)
+	a.endTrace("joined successfully", nil)
+	http.Redirect(w, r, "/?ok="+url.QueryEscape("joined successfully"), http.StatusSeeOther)
 }
 
 func (a *App) handleCellDetail(w http.ResponseWriter, r *http.Request) {
@@ -366,7 +422,10 @@ func (a *App) handleCellDetail(w http.ResponseWriter, r *http.Request) {
 			detail.Projects = projects
 		}
 	}
-	a.render(w, "detail", pageData{Title: "Cell " + label, Detail: detail})
+	a.render(w, "detail", pageData{
+		Title: "Cell " + label, NavActive: "cells", Detail: detail,
+		ShowTracePanel: true, Trace: a.copyTrace(),
+	})
 }
 
 func (a *App) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
@@ -380,7 +439,11 @@ func (a *App) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
 	hostURL, proj, err := a.findProject(ctx, id)
 	if err != nil {
 		detail.Error = err.Error()
-		a.render(w, "project", pageData{Title: "Project " + id, Project: detail, Trace: a.copyTrace()})
+		a.render(w, "project", pageData{
+			Title: "Project " + id, NavActive: "workspaces", Project: detail,
+			ShowTracePanel: true, Trace: a.copyTrace(),
+			Breadcrumbs: []crumb{{Label: "Workspaces", Href: "/workspaces"}, {Label: id}},
+		})
 		return
 	}
 	detail.Project = proj
@@ -404,26 +467,47 @@ func (a *App) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
 		detail.Tuples = raw.Tuples
 		detail.Interests = raw.Interests
 	}
-	a.render(w, "project", pageData{Title: "Project " + id, Project: detail, Trace: a.copyTrace()})
+	crumbs := []crumb{{Label: "Workspaces", Href: "/workspaces"}}
+	if proj.WorkspaceID != "" {
+		crumbs = append(crumbs,
+			crumb{Label: proj.WorkspaceID, Href: "/workspaces/" + url.PathEscape(proj.WorkspaceID)},
+			crumb{Label: id},
+		)
+	} else {
+		crumbs = append(crumbs, crumb{Label: id})
+	}
+	a.render(w, "project", pageData{
+		Title: "Project " + id, NavActive: "workspaces", Project: detail,
+		Breadcrumbs: crumbs, ShowTracePanel: true, Trace: a.copyTrace(),
+	})
 }
 
 func (a *App) handleScenarios(w http.ResponseWriter, r *http.Request) {
 	a.render(w, "scenarios", pageData{
-		Title:       "Scenarios",
-		Cells:       a.Cells,
-		Trace:       a.copyTrace(),
-		ScenarioOK:  r.URL.Query().Get("ok"),
-		ScenarioErr: r.URL.Query().Get("err"),
-		SignIn:      a.copySignIn(),
-		GlobalLogin: a.copyGlobalLogin(),
-		GroupCheck:  a.copyGroupCheck(),
-		Lifecycle:   a.copyLifecycle(),
+		Title:          "Lab",
+		NavActive:      "lab",
+		ShowTracePanel: true,
+		Cells:          a.Cells,
+		Trace:          a.copyTrace(),
+		ScenarioOK:     r.URL.Query().Get("ok"),
+		ScenarioErr:    r.URL.Query().Get("err"),
+		SignIn:         a.copySignIn(),
+		GlobalLogin:    a.copyGlobalLogin(),
+		GroupCheck:     a.copyGroupCheck(),
+		Lifecycle:      a.copyLifecycle(),
 	})
+}
+
+func (a *App) finishTraceSession() {
+	a.traceMu.Lock()
+	defer a.traceMu.Unlock()
+	a.traceAction = ""
+	a.traceBuf = nil
 }
 
 func (a *App) handleScenarioCreateUser(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
 		return
 	}
 	email := strings.TrimSpace(r.FormValue("email"))
@@ -432,13 +516,13 @@ func (a *App) handleScenarioCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	deferFloat := r.FormValue("defer_float") == "1"
 	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
-	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	defer a.withPeerDelay(delayMs)()
+	a.beginTrace("create user")
+	defer a.finishTraceSession()
 	host, projectID, err := a.projectOnCell(ctx, entryCell)
 	if err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	out, err := a.Peer.CreateUser(ctx, host, projectID, email, deferFloat)
@@ -448,16 +532,16 @@ func (a *App) handleScenarioCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		a.appendTrace(note, out.Trace, err.Error())
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	a.appendTrace(note, out.Trace, "created")
-	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape("created "+email+" on "+projectID), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape("created "+email+" on "+projectID), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioLookup(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
 		return
 	}
 	key := strings.TrimSpace(r.FormValue("key"))
@@ -465,19 +549,19 @@ func (a *App) handleScenarioLookup(w http.ResponseWriter, r *http.Request) {
 		key = "joe@example.com"
 	}
 	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
-	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	defer a.withPeerDelay(delayMs)()
+	a.beginTrace("lookup walk")
+	defer a.finishTraceSession()
 	host, projectID, err := a.projectOnCell(ctx, entryCell)
 	if err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	res, hops, err := a.Peer.LookupWalk(ctx, host, projectID, key)
 	if err != nil {
 		a.appendTrace("lookup walk from "+projectID+": "+key, hops, err.Error())
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	note := "miss"
@@ -485,43 +569,43 @@ func (a *App) handleScenarioLookup(w http.ResponseWriter, r *http.Request) {
 		note = "hit home=" + res.HomeProjectID + " at=" + res.FoundAtProjectID
 	}
 	a.appendTrace("lookup walk from "+projectID+": "+key, hops, note)
-	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(note), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(note), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioGrantJoe(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
-	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	defer a.withPeerDelay(delayMs)()
+	a.beginTrace("grant joe")
+	defer a.finishTraceSession()
 	host, projectID, err := a.projectOnCell(ctx, entryCell)
 	if err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	if _, err := a.ensureJoeGrantOn(ctx, host, projectID); err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape("granted joe viewer on "+projectID+"/chat"), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape("granted joe viewer on "+projectID+"/chat"), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
+	a.beginTrace("sign-in joe")
+	defer a.finishTraceSession()
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
 		return
 	}
 	autoGrant := r.FormValue("auto_grant") == "1"
 	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
-	delayMs := parseDelayMs(r.FormValue("delay_ms"))
-	defer a.withPeerDelay(delayMs)()
 
 	resourceHost, resourceProject, err := a.projectOnCell(ctx, entryCell)
 	if err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	key := "joe@example.com"
@@ -532,12 +616,12 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	allHops = append(allHops, hops...)
 	if err != nil {
 		a.appendTrace("sign-in joe: lookup", allHops, err.Error())
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	if !res.Hit {
 		a.appendTrace("sign-in joe: lookup", allHops, "miss — run grant / seed float first")
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("lookup miss for joe@example.com from "+resourceProject), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape("lookup miss for joe@example.com from "+resourceProject), http.StatusSeeOther)
 		return
 	}
 	a.appendTrace("sign-in joe: lookup", hops, "hit home="+res.HomeProjectID+" cell="+res.HomeCellURL)
@@ -546,7 +630,7 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	autoGranted := false
 	tuples, err := a.Peer.ListTuples(ctx, resourceHost, resourceProject)
 	if err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	hasGrant := false
@@ -562,11 +646,11 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	if !hasGrant {
 		if !autoGrant {
 			a.appendTrace("sign-in joe: grant", nil, "missing — run grant scenario first")
-			http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("no grant for joe on "+resourceProject+"/chat — run Grant Joe or enable auto-grant"), http.StatusSeeOther)
+			http.Redirect(w, r, "/lab?err="+url.QueryEscape("no grant for joe on "+resourceProject+"/chat — run Grant Joe or enable auto-grant"), http.StatusSeeOther)
 			return
 		}
 		if _, err := a.ensureJoeGrantOn(ctx, resourceHost, resourceProject); err != nil {
-			http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+			http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 			return
 		}
 		autoGranted = true
@@ -583,7 +667,7 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	}}
 	if err != nil {
 		a.appendTrace("sign-in joe: issue", append(allHops, issueHop...), err.Error())
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	a.appendTrace("sign-in joe: issue", issueHop, "token issued epoch="+fmt.Sprintf("%d", issued.Claims.Epoch))
@@ -604,7 +688,7 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		a.appendTrace("sign-in joe: auth offline", offline.Trace, err.Error())
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	result.AllowedOffline = offline.Allowed
@@ -616,7 +700,7 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		a.appendTrace("sign-in joe: auth online", online.Trace, err.Error())
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	result.AllowedOnline = online.Allowed
@@ -631,41 +715,43 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	if !online.Allowed {
 		msg += " — denied: " + online.Reason
 	}
-	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(msg), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioSeedGroupChain(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
+	a.beginTrace("seed group chain")
+	defer a.finishTraceSession()
 	if err := a.ensureGroupChain(ctx); err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape("seeded group chain A→B→chat"), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape("seeded group chain A→B→chat"), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioGroupCheckJoe(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
 	defer cancel()
+	a.beginTrace("group check joe")
+	defer a.finishTraceSession()
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
 		return
 	}
-	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
 	autoSeed := r.FormValue("auto_seed") == "1"
-	defer a.withPeerDelay(delayMs)()
 
 	host, projectID, err := a.projectOnCell(ctx, entryCell)
 	if err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 
 	seeded := false
 	if autoSeed {
 		if err := a.ensureGroupChain(ctx); err != nil {
-			http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+			http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 			return
 		}
 		seeded = true
@@ -676,35 +762,35 @@ func (a *App) handleScenarioGroupCheckJoe(w http.ResponseWriter, r *http.Request
 		Object:    "app:chat",
 		Relation:  "viewer",
 		UserKey:   "joe@example.com",
-		DelayMs:   &delayMs,
+		DelayMs:   nil,
 	})
 	if err != nil {
 		a.appendTrace("group check joe → app:chat@"+projectID, res.Trace, err.Error())
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	note := fmt.Sprintf("allowed=%v total_ms=%d cross_cell_hops=%d delay_ms=%d entry=%s",
-		res.Allowed, res.TotalMs, res.CrossCellHops, delayMs, entryCell)
+		res.Allowed, res.TotalMs, res.CrossCellHops, 0, entryCell)
 	a.appendTrace("group check joe → app:chat@"+projectID, res.Trace, note)
 
 	result := &groupCheckResult{
 		Allowed:       res.Allowed,
 		Reason:        res.Reason,
-		DelayMs:       delayMs,
+		DelayMs:       0,
 		TotalMs:       res.TotalMs,
 		CrossCellHops: res.CrossCellHops,
 		Hops:          res.Trace,
 		Seeded:        seeded,
-		Note:          "Compare with Phase 3/4 flattened direct grant (app:chat#viewer@user:joe) — one local hop, no cross-cell expand. Inter-cell ExtraDelay also applies to peer hops.",
+		Note:          "Compare with Phase 3/4 flattened direct grant (app:chat#viewer@user:joe) — one local hop, no cross-cell expand. Pairwise delays apply on cross-cell peer hops.",
 	}
 	a.setGroupCheck(result)
 
 	msg := fmt.Sprintf("group check @%s: %s · %dms · %d cross-cell hops", projectID, res.Reason, res.TotalMs, res.CrossCellHops)
 	if !res.Allowed {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(msg), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(msg), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(msg), http.StatusSeeOther)
 }
 
 func (a *App) ensureGroupChain(ctx context.Context) error {
@@ -825,38 +911,38 @@ func (a *App) copyGroupCheck() *groupCheckResult {
 func (a *App) handleScenarioBlockJoe(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
-	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
-	defer a.withPeerDelay(delayMs)()
+	a.beginTrace("block joe")
+	defer a.finishTraceSession()
 	result, err := a.runLifecycleScenario(ctx, "block", entryCell)
 	if err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	a.setLifecycle(result)
 	msg := fmt.Sprintf("blocked joe · epoch=%d · online=%v (%s) · offline=%v (%s)",
 		result.Epoch, result.OnlineAllowed, result.OnlineReason, result.OfflineAllowed, result.OfflineReason)
-	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(msg), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioDeleteJoe(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
-	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
-	defer a.withPeerDelay(delayMs)()
+	a.beginTrace("delete joe")
+	defer a.finishTraceSession()
 	result, err := a.runLifecycleScenario(ctx, "delete", entryCell)
 	if err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	a.setLifecycle(result)
 	msg := fmt.Sprintf("deleted joe · %s tuples active %d→%d (tombstoned %d) · interests notified=%d · lookup=%s",
 		result.ResourceProject, result.USTuplesBefore, result.USTuplesActiveAfter,
 		result.USTuplesTombstonedAfter, len(result.InterestsNotified), result.LookupState)
-	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(msg), http.StatusSeeOther)
 }
 
 func (a *App) runLifecycleScenario(ctx context.Context, action, resourceCellLabel string) (*lifecycleResult, error) {
@@ -1050,7 +1136,7 @@ func (a *App) ensureJoeAlive(ctx context.Context, action string) error {
 
 func (a *App) handleScenarioGlobalLogin(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
 		return
 	}
 	email := strings.TrimSpace(r.FormValue("email"))
@@ -1058,20 +1144,20 @@ func (a *App) handleScenarioGlobalLogin(w http.ResponseWriter, r *http.Request) 
 		email = "joe@example.com"
 	}
 	issueToken := r.FormValue("issue_token") == "1"
-	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
-	defer a.withPeerDelay(delayMs)()
+	a.beginTrace("global login")
+	defer a.finishTraceSession()
 
 	platformHost, err := a.cellURLByLabel("platform")
 	if err != nil {
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	res, hops, err := a.Peer.LookupWalk(ctx, platformHost, "platform", email)
 	if err != nil {
 		a.appendTrace("global login: lookup", hops, err.Error())
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	result := &globalLoginResult{
@@ -1082,7 +1168,7 @@ func (a *App) handleScenarioGlobalLogin(w http.ResponseWriter, r *http.Request) 
 	if !res.Hit {
 		a.appendTrace("global login: lookup", hops, "miss")
 		a.setGlobalLogin(result)
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("global login miss for "+email), http.StatusSeeOther)
+		http.Redirect(w, r, "/lab?err="+url.QueryEscape("global login miss for "+email), http.StatusSeeOther)
 		return
 	}
 	result.HomeProject = res.HomeProjectID
@@ -1097,7 +1183,7 @@ func (a *App) handleScenarioGlobalLogin(w http.ResponseWriter, r *http.Request) 
 		})
 		if err != nil {
 			a.appendTrace("global login: issue", nil, err.Error())
-			http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+			http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 			return
 		}
 		claimsJSON, _ := json.MarshalIndent(issued.Claims, "", "  ")
@@ -1124,7 +1210,7 @@ func (a *App) handleScenarioGlobalLogin(w http.ResponseWriter, r *http.Request) 
 	}
 	a.setGlobalLogin(result)
 	msg := fmt.Sprintf("global login %s → %s @ %s", email, result.HomeProject, result.HomeCell)
-	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(msg), http.StatusSeeOther)
 }
 
 func (a *App) setGlobalLogin(gl *globalLoginResult) {
@@ -1237,18 +1323,80 @@ func (a *App) copySignIn() *signInResult {
 	return &cp
 }
 
-func (a *App) handleTrace(w http.ResponseWriter, r *http.Request) {
+func (a *App) handleTracePartial(w http.ResponseWriter, r *http.Request) {
 	a.render(w, "trace", pageData{Trace: a.copyTrace()})
+}
+
+func (a *App) handleTracePage(w http.ResponseWriter, r *http.Request) {
+	a.render(w, "trace_page", pageData{
+		Title:          "Global Trace",
+		NavActive:      "trace",
+		ShowTracePanel: true,
+		Trace:          a.copyTrace(),
+	})
 }
 
 func (a *App) handleTraceClear(w http.ResponseWriter, r *http.Request) {
 	a.traceMu.Lock()
 	a.trace = nil
+	a.traceAction = ""
+	a.traceBuf = nil
 	a.traceMu.Unlock()
-	http.Redirect(w, r, "/scenarios", http.StatusSeeOther)
+	ref := r.Header.Get("Referer")
+	if strings.Contains(ref, "/lab") {
+		http.Redirect(w, r, "/lab", http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/trace-view", http.StatusSeeOther)
+}
+
+func (a *App) beginTrace(action string) {
+	a.traceMu.Lock()
+	defer a.traceMu.Unlock()
+	a.traceAction = action
+	a.traceBuf = nil
+}
+
+func (a *App) onHop(hop cell.TraceHop) {
+	a.traceMu.Lock()
+	defer a.traceMu.Unlock()
+	if a.traceAction == "" {
+		return
+	}
+	a.traceBuf = append(a.traceBuf, hop)
+}
+
+// endTrace finalizes the current action, merging OnHop buffer with optional server hops.
+func (a *App) endTrace(note string, serverHops []cell.TraceHop) {
+	a.traceMu.Lock()
+	action := a.traceAction
+	hops := append([]cell.TraceHop{}, a.traceBuf...)
+	a.traceAction = ""
+	a.traceBuf = nil
+	a.traceMu.Unlock()
+	if action == "" && len(hops) == 0 && len(serverHops) == 0 {
+		return
+	}
+	if action == "" {
+		action = "peer"
+	}
+	hops = append(hops, serverHops...)
+	a.appendTraceEntry(action, hops, note)
 }
 
 func (a *App) appendTrace(action string, hops []cell.TraceHop, note string) {
+	a.traceMu.Lock()
+	buf := a.traceBuf
+	a.traceBuf = nil
+	if action == "" {
+		action = a.traceAction
+	}
+	a.traceMu.Unlock()
+	merged := append(append([]cell.TraceHop{}, buf...), hops...)
+	a.appendTraceEntry(action, merged, note)
+}
+
+func (a *App) appendTraceEntry(action string, hops []cell.TraceHop, note string) {
 	a.traceMu.Lock()
 	defer a.traceMu.Unlock()
 	a.trace = append(a.trace, traceEntry{

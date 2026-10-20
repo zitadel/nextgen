@@ -5,60 +5,96 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>{{.Title}} · cell hierarchy</title>
-  <style>
-    :root { --bg:#0f1419; --panel:#1a222c; --text:#e7ecf1; --muted:#8b9aab; --accent:#3d9cf0; --ok:#3ecf8e; --bad:#f07178; --border:#2a3542; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
-    header { display:flex; gap:1rem; align-items:center; padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--panel); }
-    header a { color:var(--muted); text-decoration:none; margin-right:0.75rem; }
-    main { padding:1.25rem; max-width:960px; margin:0 auto; }
-    .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:1rem; }
-    .muted { color:var(--muted); font-size:0.875rem; }
-    .flash-ok { color:var(--ok); margin-bottom:0.75rem; }
-    .flash-err { color:var(--bad); margin-bottom:0.75rem; }
-    table { width:100%; border-collapse:collapse; }
-    th, td { text-align:left; padding:0.45rem 0.5rem; border-bottom:1px solid var(--border); font-size:0.9rem; }
-    code { font-size:0.8rem; color:var(--muted); }
-    a { color:var(--accent); }
-  </style>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>{{template "layout-styles" .}}</style>
 </head>
 <body>
-  <header>
-    <strong>cell hierarchy</strong>
-    <nav><a href="/">Tree</a><a href="/workspaces/acme">Workspace</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
-  </header>
-  <main>
-    <h1>Workspace <code>{{.WorkspaceID}}</code></h1>
-    <p class="muted">Sites in this workspace (projects with <code>workspace_id={{.WorkspaceID}}</code>). Expand via <a href="/create">Create</a>.</p>
-    {{if .Flash}}<div class="flash-ok">{{.Flash}}</div>{{end}}
-    {{if .FlashErr}}<div class="flash-err">{{.FlashErr}}</div>{{end}}
-    {{if .Workspaces}}
-    <p class="muted">Workspaces:
-      {{range .Workspaces}}
-      <a href="/workspaces/{{.}}">{{.}}</a>
+<div class="app">
+  {{template "layout-nav" .}}
+  <div class="content">
+    <div class="content-main">
+      {{template "layout-breadcrumbs" .}}
+      {{with .Workspace}}
+      <h1>Workspace <code>{{.ID}}</code></h1>
+      <p class="muted">{{.Name}} · home cell <code>{{.HomeCell}}</code> (default when adding the first site; sites may pick other cells).</p>
       {{end}}
-    </p>
-    {{end}}
-    <div class="panel">
-      {{if .Sites}}
-      <table>
-        <thead><tr><th>Site</th><th>Cell</th><th>Users</th><th>Apps</th></tr></thead>
-        <tbody>
-        {{range .Sites}}
-          <tr>
-            <td><a href="/projects/{{.ID}}"><code>{{.ID}}</code></a> {{.Name}}</td>
-            <td>{{.HostLabel}}{{if .HostDisplay}} · {{.HostDisplay}}{{end}}</td>
-            <td>{{.UserCount}}</td>
-            <td>{{.AppCount}}</td>
-          </tr>
+      {{if .Flash}}<div class="flash-ok">{{.Flash}}</div>{{end}}
+      {{if .FlashErr}}<div class="flash-err">{{.FlashErr}}</div>{{end}}
+
+      <div class="panel">
+        <h2>Sites</h2>
+        {{if .Sites}}
+        <table>
+          <thead><tr><th>Site</th><th>Cell</th><th>Users</th><th>Apps</th></tr></thead>
+          <tbody>
+          {{range .Sites}}
+            <tr>
+              <td><a href="/projects/{{.ID}}"><code>{{.ID}}</code></a> {{.Name}}</td>
+              <td>{{.HostLabel}}{{if .HostDisplay}} · {{.HostDisplay}}{{end}}</td>
+              <td>{{.UserCount}}</td>
+              <td>{{.AppCount}}</td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No sites in this workspace yet.</p>
         {{end}}
-        </tbody>
-      </table>
-      {{else}}
-      <p class="muted">No sites in this workspace yet. <a href="/create">Create a site</a>.</p>
-      {{end}}
+      </div>
+
+      <div class="panel">
+        <h2>Add site</h2>
+        <p class="muted">Creates a project on the chosen cell with this workspace_id, then attaches to the lookup parent (default <code>platform</code>).</p>
+        {{with .Workspace}}
+        <form method="post" action="/workspaces/{{.ID}}/sites">
+          <label for="id">Site id</label>
+          <input id="id" name="id" required placeholder="{{.ID}}-fra"/>
+          <label for="name">Name</label>
+          <input id="name" name="name" placeholder="optional"/>
+          <label for="cell">Cell</label>
+          <select id="cell" name="cell" required>
+            {{$home := .HomeCell}}
+            {{range $.Cells}}
+            <option value="{{.Label}}" {{if eq .Label $home}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+          </select>
+          <label for="parent_project_id">Lookup parent project</label>
+          <input id="parent_project_id" name="parent_project_id" value="platform"/>
+          <button type="submit">Add site</button>
+        </form>
+        {{end}}
+      </div>
+
+      <div class="panel">
+        <h2>Expand site</h2>
+        <p class="muted">Sibling site on another cell (copies optional chat app).</p>
+        {{with .Workspace}}
+        <form method="post" action="/create/expand">
+          <input type="hidden" name="workspace_id" value="{{.ID}}"/>
+          <label for="source_site_id">Source site</label>
+          <select id="source_site_id" name="source_site_id" required>
+            <option value="">Select…</option>
+            {{range $.Sites}}
+            <option value="{{.ID}}">{{.ID}} @ {{.HostLabel}}</option>
+            {{end}}
+          </select>
+          <label for="expand_cell">New cell</label>
+          <select id="expand_cell" name="cell" required>
+            {{range $.Cells}}
+            <option value="{{.Label}}">{{.Label}}</option>
+            {{end}}
+          </select>
+          <label for="expand_id">New site id (optional)</label>
+          <input id="expand_id" name="id" placeholder="auto from cell"/>
+          <label><input type="checkbox" name="copy_chat" value="1" checked/> Copy chat app</label>
+          <button type="submit">Expand</button>
+        </form>
+        {{end}}
+      </div>
     </div>
-  </main>
+    {{template "layout-trace-drawer" .}}
+  </div>
+</div>
 </body>
 </html>
 {{end}}

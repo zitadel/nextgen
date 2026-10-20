@@ -8,17 +8,168 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
+	"strings"
+	"sync"
 	"time"
 )
 
+// TraceSink receives one hop after every outbound PeerClient HTTP call.
+type TraceSink func(TraceHop)
+
+type fromCellCtxKey struct{}
+
+// WithFromCellURL tags ctx so the next outbound request delays as from→to.
+func WithFromCellURL(ctx context.Context, cellURL string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, fromCellCtxKey{}, NormalizeURL(cellURL))
+}
+
+// FromCellURL returns the caller cell URL from ctx, if set.
+func FromCellURL(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	v, _ := ctx.Value(fromCellCtxKey{}).(string)
+	return v
+}
+
 type PeerClient struct {
-	HTTP       *http.Client
-	ExtraDelay time.Duration // optional sleep before each outbound HTTP (UI scenario strip)
+	HTTP *http.Client
+
+	// ExtraDelay is a flat sleep before each request (legacy; prefer PairDelays).
+	ExtraDelay time.Duration
+
+	// PairDelays maps canonical "a|b" (sorted labels) → milliseconds.
+	// Protected by delayMu.
+	PairDelays map[string]int
+	// URLLabels maps normalized cell base URL → label (e.g. eu-1).
+	URLLabels map[string]string
+	// SelfURL is this process's cell URL (cell-server Peer); used as from when ctx has none.
+	SelfURL string
+
+	// OnHop is called after every HTTP attempt (success or failure).
+	OnHop TraceSink
+
+	delayMu sync.RWMutex
 }
 
 func NewPeerClient() *PeerClient {
-	// Longer timeout so Phase 5 delay-slider demos (per-hop sleep) do not abort mid-chain.
-	return &PeerClient{HTTP: &http.Client{Timeout: 60 * time.Second}}
+	// Longer timeout so pairwise-delay demos (per-hop sleep) do not abort mid-chain.
+	return &PeerClient{
+		HTTP:       &http.Client{Timeout: 60 * time.Second},
+		PairDelays: map[string]int{},
+		URLLabels:  map[string]string{},
+	}
+}
+
+// PairKey returns the canonical sorted key for two cell labels.
+func PairKey(a, b string) string {
+	a = strings.TrimSpace(a)
+	b = strings.TrimSpace(b)
+	if a > b {
+		a, b = b, a
+	}
+	return a + "|" + b
+}
+
+// SetDelayConfig replaces pairwise delays and URL→label map.
+func (c *PeerClient) SetDelayConfig(pairs map[string]int, labels map[string]string) {
+	if c == nil {
+		return
+	}
+	c.delayMu.Lock()
+	defer c.delayMu.Unlock()
+	c.PairDelays = map[string]int{}
+	for k, v := range pairs {
+		if v < 0 {
+			v = 0
+		}
+		c.PairDelays[k] = v
+	}
+	c.URLLabels = map[string]string{}
+	for u, label := range labels {
+		c.URLLabels[NormalizeURL(u)] = label
+	}
+}
+
+// LabelForURL resolves a request or base URL to a cell label.
+func (c *PeerClient) LabelForURL(raw string) string {
+	if c == nil {
+		return ""
+	}
+	base := BaseURLOf(raw)
+	c.delayMu.RLock()
+	defer c.delayMu.RUnlock()
+	if label, ok := c.URLLabels[base]; ok {
+		return label
+	}
+	return ""
+}
+
+// DelayBetween returns sleep duration for a hop from→to.
+// Same-cell = 0. Listed pairs use the matrix. Both labels known but unlisted = 0.
+// Either side unlabeled = 50ms (unknown hop).
+func (c *PeerClient) DelayBetween(fromURL, toURL string) time.Duration {
+	if c == nil {
+		return 0
+	}
+	fromLabel := c.LabelForURL(fromURL)
+	toLabel := c.LabelForURL(toURL)
+	if fromLabel != "" && toLabel != "" && fromLabel == toLabel {
+		return 0
+	}
+	if fromLabel == "" || toLabel == "" {
+		if fromURL != "" && toURL != "" && BaseURLOf(fromURL) == BaseURLOf(toURL) {
+			return 0
+		}
+		return 50 * time.Millisecond
+	}
+	key := PairKey(fromLabel, toLabel)
+	c.delayMu.RLock()
+	ms, ok := c.PairDelays[key]
+	c.delayMu.RUnlock()
+	if !ok {
+		return 0
+	}
+	return time.Duration(ms) * time.Millisecond
+}
+
+// BaseURLOf strips path/query from a URL, returning scheme://host.
+func BaseURLOf(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return NormalizeURL(raw)
+	}
+	return NormalizeURL(u.Scheme + "://" + u.Host)
+}
+
+// DefaultPairDelays returns the POC demo matrix (ms).
+func DefaultPairDelays() map[string]int {
+	return map[string]int{
+		PairKey("eu-1", "eu-2"): 20,
+		PairKey("eu-1", "us-1"): 100,
+		PairKey("eu-1", "us-2"): 200,
+		PairKey("eu-2", "us-1"): 150,
+		PairKey("eu-2", "us-2"): 250,
+		PairKey("us-1", "us-2"): 10,
+	}
+}
+
+// SortedPairKeys returns matrix keys sorted for stable UI/forms.
+func SortedPairKeys(pairs map[string]int) []string {
+	keys := make([]string, 0, len(pairs))
+	for k := range pairs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 type MeResponse struct {
@@ -198,16 +349,31 @@ func (c *PeerClient) Lookup(ctx context.Context, cellURL, projectID, key string)
 }
 
 // LookupWalk starts at projectID on startCellURL and walks UP parent project pointers only.
+// Each hop delays using the previous cell URL as from (pairwise matrix).
 func (c *PeerClient) LookupWalk(ctx context.Context, startCellURL, projectID, key string) (LookupResult, []TraceHop, error) {
 	var trace []TraceHop
 	cellURL := NormalizeURL(startCellURL)
 	curProjectID := projectID
+	prevURL := ""
+	if c.SelfURL != "" {
+		prevURL = NormalizeURL(c.SelfURL)
+	}
+	if from := FromCellURL(ctx); from != "" {
+		prevURL = from
+	}
 	for {
-		proj, err := c.GetProject(ctx, cellURL, curProjectID)
+		hopCtx := ctx
+		if prevURL != "" {
+			hopCtx = WithFromCellURL(ctx, prevURL)
+		} else {
+			// First UI hop with no prior: treat as same-cell (from=target).
+			hopCtx = WithFromCellURL(ctx, cellURL)
+		}
+		proj, err := c.GetProject(hopCtx, cellURL, curProjectID)
 		if err != nil {
 			return LookupResult{}, trace, err
 		}
-		res, hops, err := c.Lookup(ctx, cellURL, curProjectID, key)
+		res, hops, err := c.Lookup(hopCtx, cellURL, curProjectID, key)
 		trace = append(trace, hops...)
 		if err != nil {
 			return LookupResult{}, trace, err
@@ -223,6 +389,7 @@ func (c *PeerClient) LookupWalk(ctx context.Context, startCellURL, projectID, ke
 		if proj.ParentProjectID == "" || proj.ParentCellURL == "" {
 			return LookupResult{Hit: false}, trace, nil
 		}
+		prevURL = cellURL
 		cellURL = NormalizeURL(proj.ParentCellURL)
 		curProjectID = proj.ParentProjectID
 	}
@@ -261,48 +428,8 @@ func (c *PeerClient) CreateTuple(ctx context.Context, cellURL, projectID string,
 }
 
 // doJSONAllowError unmarshals the body even when status >= 300 so callers can keep traces.
-func (c *PeerClient) doJSONAllowError(ctx context.Context, method, url string, body any, out any) error {
-	if err := c.applyExtraDelay(ctx); err != nil {
-		return err
-	}
-	var rdr io.Reader
-	if body != nil {
-		b, err := json.Marshal(body)
-		if err != nil {
-			return err
-		}
-		rdr = bytes.NewReader(b)
-	}
-	req, err := http.NewRequestWithContext(ctx, method, url, rdr)
-	if err != nil {
-		return err
-	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	res, err := c.HTTP.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
-	if out != nil && len(data) > 0 {
-		_ = json.Unmarshal(data, out)
-	}
-	if res.StatusCode >= 300 {
-		var er struct {
-			Error string `json:"error"`
-		}
-		_ = json.Unmarshal(data, &er)
-		if er.Error != "" {
-			return fmt.Errorf("%s", er.Error)
-		}
-		return fmt.Errorf("http %d: %s", res.StatusCode, string(data))
-	}
-	return nil
+func (c *PeerClient) doJSONAllowError(ctx context.Context, method, reqURL string, body any, out any) error {
+	return c.doHTTP(ctx, method, reqURL, body, "", out, true)
 }
 
 func (c *PeerClient) CreateApp(ctx context.Context, cellURL, projectID string, body map[string]any) (AppView, error) {
@@ -457,11 +584,22 @@ func (c *PeerClient) DeleteUser(ctx context.Context, cellURL, projectID, key str
 	return out, err
 }
 
-func (c *PeerClient) applyExtraDelay(ctx context.Context) error {
-	if c == nil || c.ExtraDelay <= 0 {
+func (c *PeerClient) applyExtraDelay(ctx context.Context, toURL string) error {
+	if c == nil {
 		return nil
 	}
-	t := time.NewTimer(c.ExtraDelay)
+	from := FromCellURL(ctx)
+	if from == "" {
+		from = c.SelfURL
+	}
+	d := c.DelayBetween(from, toURL)
+	if c.ExtraDelay > 0 {
+		d += c.ExtraDelay
+	}
+	if d <= 0 {
+		return nil
+	}
+	t := time.NewTimer(d)
 	defer t.Stop()
 	select {
 	case <-ctx.Done():
@@ -471,8 +609,25 @@ func (c *PeerClient) applyExtraDelay(ctx context.Context) error {
 	}
 }
 
-func (c *PeerClient) doJSON(ctx context.Context, method, url string, body any, bearer string, out any) error {
-	if err := c.applyExtraDelay(ctx); err != nil {
+func (c *PeerClient) emitHop(cellURL, methodPath string, ms int64, result string) {
+	if c == nil || c.OnHop == nil {
+		return
+	}
+	c.OnHop(TraceHop{
+		Cell:   BaseURLOf(cellURL),
+		Method: methodPath,
+		Ms:     ms,
+		Result: result,
+	})
+}
+
+func (c *PeerClient) doJSON(ctx context.Context, method, reqURL string, body any, bearer string, out any) error {
+	return c.doHTTP(ctx, method, reqURL, body, bearer, out, false)
+}
+
+func (c *PeerClient) doHTTP(ctx context.Context, method, reqURL string, body any, bearer string, out any, allowErrorBody bool) error {
+	if err := c.applyExtraDelay(ctx, reqURL); err != nil {
+		c.emitHop(reqURL, method+" "+pathOfURL(reqURL), 0, "error:"+err.Error())
 		return err
 	}
 	var rdr io.Reader
@@ -483,7 +638,7 @@ func (c *PeerClient) doJSON(ctx context.Context, method, url string, body any, b
 		}
 		rdr = bytes.NewReader(b)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, url, rdr)
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, rdr)
 	if err != nil {
 		return err
 	}
@@ -493,27 +648,55 @@ func (c *PeerClient) doJSON(ctx context.Context, method, url string, body any, b
 	if bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
+	start := time.Now()
 	res, err := c.HTTP.Do(req)
+	elapsed := time.Since(start).Milliseconds()
+	methodPath := method + " " + pathOfURL(reqURL)
 	if err != nil {
+		c.emitHop(reqURL, methodPath, elapsed, "error:"+err.Error())
 		return err
 	}
 	defer res.Body.Close()
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
+		c.emitHop(reqURL, methodPath, elapsed, "error:"+err.Error())
 		return err
+	}
+	if allowErrorBody && out != nil && len(data) > 0 {
+		_ = json.Unmarshal(data, out)
 	}
 	if res.StatusCode >= 300 {
 		var er struct {
 			Error string `json:"error"`
 		}
 		_ = json.Unmarshal(data, &er)
+		detail := fmt.Sprintf("http %d", res.StatusCode)
+		if er.Error != "" {
+			detail = er.Error
+		}
+		c.emitHop(reqURL, methodPath, elapsed, detail)
 		if er.Error != "" {
 			return fmt.Errorf("%s", er.Error)
 		}
 		return fmt.Errorf("http %d: %s", res.StatusCode, string(data))
 	}
+	c.emitHop(reqURL, methodPath, elapsed, fmt.Sprintf("%d", res.StatusCode))
+	if allowErrorBody {
+		return nil
+	}
 	if out == nil || res.StatusCode == http.StatusNoContent || len(data) == 0 {
 		return nil
 	}
 	return json.Unmarshal(data, out)
+}
+
+func pathOfURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Path == "" {
+		return raw
+	}
+	if u.RawQuery != "" {
+		return u.Path + "?" + u.RawQuery
+	}
+	return u.Path
 }

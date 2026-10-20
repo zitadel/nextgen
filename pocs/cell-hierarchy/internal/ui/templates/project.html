@@ -5,43 +5,16 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>{{.Title}} · cell hierarchy</title>
-  <style>
-    :root { --bg:#0f1419; --panel:#1a222c; --text:#e7ecf1; --muted:#8b9aab; --accent:#3d9cf0; --ok:#3ecf8e; --bad:#f07178; --border:#2a3542; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
-    header { display:flex; gap:1rem; align-items:center; padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--panel); }
-    header a { color:var(--muted); text-decoration:none; margin-right:0.75rem; }
-    main { padding:1.25rem; max-width:1100px; margin:0 auto; }
-    .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:1rem; }
-    .muted { color:var(--muted); font-size:0.875rem; }
-    .flash-ok { color:var(--ok); margin:0 0 0.75rem; }
-    .flash-err { color:var(--bad); margin:0 0 0.75rem; }
-    .badge { display:inline-block; font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:4px; border:1px solid var(--border); color:var(--muted); margin-left:0.35rem; }
-    .badge.lookup { color:var(--ok); border-color:var(--ok); }
-    .badge.local { color:var(--accent); border-color:var(--accent); }
-    .badge.child { color:var(--ok); border-color:var(--ok); }
-    .badge.tombstone { color:var(--muted); border-color:var(--muted); text-decoration:line-through; }
-    tr.tombstoned td { opacity:0.55; text-decoration:line-through; }
-    table { width:100%; border-collapse:collapse; }
-    th, td { text-align:left; padding:0.4rem 0.5rem; border-bottom:1px solid var(--border); font-size:0.9rem; vertical-align:middle; }
-    code { font-size:0.8rem; color:var(--muted); }
-    form.inline { display:inline; }
-    form.row { display:flex; flex-wrap:wrap; gap:0.5rem; align-items:end; margin-top:0.75rem; }
-    form.row label { display:flex; flex-direction:column; gap:0.2rem; font-size:0.75rem; color:var(--muted); }
-    input, select, button { font:inherit; padding:0.35rem 0.5rem; border-radius:4px; border:1px solid var(--border); background:#121820; color:var(--text); }
-    button { cursor:pointer; background:#243041; }
-    button.danger { color:var(--bad); }
-    .hint { font-size:0.8rem; color:var(--muted); margin:0.35rem 0 0; }
-    table.trace th, table.trace td { font-size:0.8rem; }
-  </style>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>{{template "layout-styles" .}}</style>
 </head>
 <body>
-  <header>
-    <strong>cell hierarchy</strong>
-    <nav><a href="/">Tree</a><a href="/workspaces/acme">Workspace</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a><a href="/trace">Trace</a></nav>
-  </header>
-  <main>
-    <h1>{{.Title}}</h1>
+<div class="app">
+  {{template "layout-nav" .}}
+  <div class="content">
+    <div class="content-main">
+      {{template "layout-breadcrumbs" .}}
+      <h1>{{.Title}}</h1>
     {{with .Project}}
       {{if .FlashOK}}<p class="flash-ok">{{.FlashOK}}</p>{{end}}
       {{if .FlashErr}}<p class="flash-err">{{.FlashErr}}</p>{{end}}
@@ -56,7 +29,7 @@
         </p>
         <p class="muted">id={{.Project.ID}} · host={{.Project.HostCellURL}}</p>
         <p class="muted">parent_project_id={{.Project.ParentProjectID}} · parent_cell_url={{.Project.ParentCellURL}}</p>
-        <p class="hint">Day-to-day resource CRUD lives on this page. Create site/attach stays on <a href="/create">/create</a>. Nextgen projects have no parent tree (platform claim is separate); POC <code>parent_project</code> is lookup-only and optional until attach.</p>
+        <p class="hint">Day-to-day resource CRUD lives on this page. Add sites under <a href="/workspaces">Workspaces</a>. Nextgen projects have no parent tree (platform claim is separate); POC <code>parent_project</code> is lookup-only and optional until attach.</p>
       </div>
 
       <div class="panel">
@@ -320,11 +293,10 @@
       </div>
     {{end}}
 
-    <div class="panel">
-      <h2 style="font-size:1rem;margin:0 0 0.5rem">Global Trace</h2>
-      {{template "trace" .}}
     </div>
-  </main>
+    {{template "layout-trace-drawer" .}}
+  </div>
+</div>
 </body>
 </html>
 {{end}}

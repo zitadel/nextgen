@@ -35,6 +35,17 @@ func NewServer(store *Store, peer *PeerClient, logger *log.Logger) *Server {
 	if logger == nil {
 		logger = log.Default()
 	}
+	if store != nil {
+		if meta, err := store.GetMeta(); err == nil && meta.URL != "" {
+			peer.SelfURL = NormalizeURL(meta.URL)
+			if peer.URLLabels == nil {
+				peer.URLLabels = map[string]string{}
+			}
+			if meta.Label != "" {
+				peer.URLLabels[NormalizeURL(meta.URL)] = meta.Label
+			}
+		}
+	}
 	return &Server{
 		Store:    store,
 		Peer:     peer,
