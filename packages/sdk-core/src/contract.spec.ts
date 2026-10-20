@@ -765,18 +765,21 @@ describe("client SDK entries ↔ @zitadel/components", () => {
 });
 
 /**
- * The edge specs of the client SDKs that server-render widgets.
+ * The edge specs of the client SDKs.
  *
- * Each loads its built entry in the edge VM and renders a login, a session and
- * a logout, with one block between the same markers, byte for byte, so every
- * SDK is held to the same facts. Only the glue outside the block, `renderWidget`
- * and the imports, is the framework's. `@zitadel/sdk-next/client` registers
- * elements and renders no widget, so its edge spec has no such block. The
- * comparison itself is tested on the backend-url block below.
+ * Each loads its entry in the edge VM and checks it between the same markers,
+ * byte for byte, so every SDK is held to the same facts. The `edge-entry` block
+ * is in every client SDK, `@zitadel/sdk-next/client` included: the entry loads
+ * without a DOM and keeps the locale data it re-exports. The `edge-render`
+ * block, which renders a login, a session and a logout, is in every SDK that
+ * renders widgets; `@zitadel/sdk-next/client` registers elements and renders
+ * none, so it has only the first. Only the glue outside a block,
+ * `renderWidget` and the imports, is the framework's. The comparison itself is
+ * tested on the backend-url block below.
  */
 describe("client SDK edge specs", () => {
   const packagesDir = `${resolve(process.cwd(), "..")}/`;
-  const SPECS = {
+  const RENDERING = {
     "sdk-react": "sdk-react/src/index.edge.spec.tsx",
     "sdk-vue": "sdk-vue/src/index.edge.spec.ts",
     "sdk-angular": "sdk-angular/src/public-api.edge.spec.ts",
@@ -784,28 +787,42 @@ describe("client SDK edge specs", () => {
     "sdk-solid": "sdk-solid/src/index.edge.spec.tsx",
     "sdk-qwik": "sdk-qwik/src/index.edge.spec.tsx",
   } as const;
-  const EDGE_TITLES = [
-    "the SDK in the edge runtime",
+  const ENTRY_TITLES = [
+    "the SDK entry in the edge runtime",
     "runs without a DOM",
     "keeps the locale data it re-exports",
+  ];
+  const EDGE_TITLES = [
+    "the SDK in the edge runtime",
     "renders the %s widget as its custom element with its attributes",
     "writes the purpose and the resumed flow into the login markup",
     "omits the language when none is set",
   ];
 
-  it("is canonical in every SDK", () => {
-    const sources = Object.fromEntries(
-      Object.entries(SPECS).map(([sdk, path]) => [
+  const sourcesOf = (specs: Record<string, string>): Record<string, string> =>
+    Object.fromEntries(
+      Object.entries(specs).map(([sdk, path]) => [
         sdk,
         readFileSync(`${packagesDir}${path}`, "utf8"),
       ]),
     );
-    expect(problems(sources, "edge-render", EDGE_TITLES)).toEqual([]);
+
+  it("has the entry block in every client SDK, sdk-next included", () => {
+    const sources = sourcesOf({
+      ...RENDERING,
+      "sdk-next": "sdk-next/src/__tests__/client.edge.test.ts",
+    });
+    expect(problems(sources, "edge-entry", ENTRY_TITLES)).toEqual([]);
+  });
+
+  it("has the render block in every SDK that renders widgets", () => {
+    expect(problems(sourcesOf(RENDERING), "edge-render", EDGE_TITLES)).toEqual([]);
   });
 
   it("every server SDK runs its canonical middleware tests in the edge VM", () => {
     const CONFIGS = {
       "sdk-next": ["sdk-next/vitest.config.ts", "middleware.test.ts"],
+      "sdk-nuxt": ["sdk-nuxt/vitest.config.ts", "server/middleware.test.ts"],
       "sdk-sveltekit": ["sdk-sveltekit/vitest.config.ts", "handle.test.ts"],
       "sdk-solid-start": ["sdk-solid-start/vitest.config.ts", "middleware.test.ts"],
       "sdk-qwik-router": ["sdk-qwik-router/vitest.config.ts", "request-handler.test.ts"],
