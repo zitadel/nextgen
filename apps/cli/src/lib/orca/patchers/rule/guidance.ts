@@ -112,6 +112,7 @@ ${sessionStateParagraph}
 
 Machine-readable dialect (read these before authoring flow or schema edits):
 
+- \`zitadel.json\` carries \`"$schema": "./.zitadel/meta/project.json"\`, the schema of the project configuration.
 - Flow files carry \`"$schema": "../meta/flow-definition.json"\` — the flow dialect spec (steps, actions and their kinds, transitions, reserved outcomes like \`user_not_found\`). Editors validate against it.
 - \`.zitadel/meta/user-schema.json\` (with its companions \`user-property.json\`, \`auth-methods.json\`, \`auth-method.json\`, \`sso-auth-method.json\`) specifies the user-schema dialect (\`x-auth-methods\`, \`x-unique\`, property constraints).
 - \`.zitadel/meta/idp-connection.json\` specifies a provider connection file under \`.zitadel/idps/\` (protocol block, credentials as \`\${{ NAME }}\` variable references, claim mapping). A user schema lists the connection slugs it allows under \`x-auth-methods.sso.providers\`.

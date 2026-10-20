@@ -98,10 +98,13 @@ no version beyond `v1`, so it names every server version's copy at once.
   older release validates against the copy it embeds, which can differ, and
   never fetches the published one.
 - **Editors stay on local copies.** `zitadel setup` writes the Meta-Schemas
-  into a project's `.zitadel/meta/`, and the flow and branding files point
-  their `$schema` there, so an editor validates against the version the
-  developer runs, offline. Nothing points an editor at the published copies
-  until the decision below is made.
+  into a project's `.zitadel/meta/`, with the schema of `zitadel.json`, and
+  `zitadel.json`, the flow and the branding files point their `$schema` there,
+  so an editor validates against the version the developer runs, offline.
+  Nothing points an editor at the published copies until the decision below
+  is made. A user schema's `metaSchema` is no editor pointer: it is the
+  identifier the server validates the schema by, and it keeps naming the
+  namespace.
 - **Decide before 1.0** what `v1` promises: changes within `v1` stay additive
   and a breaking change moves to `v2`, or every release publishes a snapshot
   of its own. It goes with the mechanism above for keeping several versions,
