@@ -1191,6 +1191,9 @@ importers:
       '@types/node':
         specifier: ^24.19.1
         version: 24.19.1
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../packages/api
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../packages/api-mock
