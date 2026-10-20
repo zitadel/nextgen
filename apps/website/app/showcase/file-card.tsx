@@ -138,7 +138,11 @@ export function FileCard({
       return;
     }
     refocus.current = false;
-    commandsRef.current?.querySelector<HTMLElement>("[data-run]")?.focus();
+    // Only if the focus still waits on the commands: a visitor who moved on
+    // meanwhile, or pressed Before, keeps the control they chose.
+    if (document.activeElement === commandsRef.current) {
+      commandsRef.current?.querySelector<HTMLElement>("[data-run]")?.focus();
+    }
   }, [ran, running]);
 
   return (

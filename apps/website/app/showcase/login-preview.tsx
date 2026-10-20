@@ -122,6 +122,9 @@ export function LoginPreview({
   const logoId = `preview-${useId().replace(/[^\w-]/g, "")}`;
 
   const near = useSeen(root, { rootMargin: LOAD_MARGIN });
+  const stack = useRef<HTMLDivElement>(null);
+  // The visitor pressed the shown screen's action, which hides that screen.
+  const advanced = useRef(false);
 
   useEffect(() => {
     if (!near) {
@@ -145,6 +148,25 @@ export function LoginPreview({
     };
   }, [near]);
 
+  const advance = () => {
+    advanced.current = true;
+    onAdvance?.();
+  };
+
+  // The pressed action's screen goes inert, which would drop the focus: it
+  // moves on to the next screen's first field, or its action. Only the
+  // preview's own action moves it, never Before / After or a theme.
+  useEffect(() => {
+    if (!advanced.current) {
+      return;
+    }
+    advanced.current = false;
+    stack.current
+      ?.querySelector('[data-shown="true"]')
+      ?.querySelector<HTMLElement>("zl-field, zl-button")
+      ?.focus();
+  }, [index]);
+
   const style =
     layers &&
     ({
@@ -160,7 +182,7 @@ export function LoginPreview({
   return (
     <div ref={root} className={styles.preview} style={style}>
       {layers ? (
-        <div className={styles.stack}>
+        <div ref={stack} className={styles.stack}>
           {flows.flatMap((flow, flowIndex) =>
             flow.screens.map((screen, screenIndex) => {
               const shown = flow.current && screenIndex === index;
@@ -173,7 +195,7 @@ export function LoginPreview({
                   aria-hidden={!shown || undefined}
                   inert={!shown || undefined}
                 >
-                  <Card screen={screen} onAction={shown ? onAdvance : undefined} />
+                  <Card screen={screen} onAction={shown ? advance : undefined} />
                   <p className={styles.trustmark}>
                     Secured with <Logo id={`${logoId}-${flowIndex}-${screenIndex}`} />
                   </p>

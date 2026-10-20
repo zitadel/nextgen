@@ -273,10 +273,16 @@
       transition-delay: calc(250ms + var(--i, 0) * 110ms);
     }
 
-    [data-armed] [data-finish]:not([data-reached]) .finish-reveal {
+    /* A keyboard's focus inside it shows it at once, reached or not, so a
+       focused link is never invisible. */
+    [data-armed] [data-finish]:not([data-reached], :focus-within) .finish-reveal {
       opacity: 0;
       translate: 0 1rem;
       filter: blur(6px);
+    }
+
+    [data-finish]:focus-within .finish-reveal {
+      transition-delay: 0s;
     }
 
     [data-reached] .finish-dot {
