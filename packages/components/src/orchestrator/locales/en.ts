@@ -247,6 +247,9 @@ export const en: Record<string, string> = {
   "error.sso_failed.title": "Sign-in failed",
   "error.sso_failed.body": "The sign-in could not be completed. Please try again.",
   "error.more_info": "More information",
+  // Under a generic error, on a local development deployment only: the code a
+  // developer looks up ({0} = the code, such as idp.discovery_failed).
+  "error.code_detail": "Error code: {0}",
 };
 
 export type Locale = Record<string, string>;

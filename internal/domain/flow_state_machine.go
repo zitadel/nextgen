@@ -204,9 +204,13 @@ type FlowStepResult struct {
 // FlowStep is the capability payload the API surfaces to the client.
 // It mirrors the OpenAPI `flow-step` component in domain terms.
 type FlowStep struct {
-	Name         string
-	Texts        FlowStepTexts
-	Error        *string
+	Name  string
+	Texts FlowStepTexts
+	Error *string
+	// ErrorCode is the domain error code behind Error, when the engine has
+	// one the user is not shown: why a provider is unavailable, say. The API
+	// passes it on only on a local development deployment.
+	ErrorCode    string
 	Complete     *FlowStepComplete
 	RedirectURL  *string
 	Fields       []FlowField
@@ -1120,11 +1124,16 @@ func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, er
 		// The render dropped the slug, so the client never offered it.
 		return FlowStepResult{}, fmt.Errorf("%w: sso provider %q on step %q has no connection", ErrFlowInvalidAction(), in.SSOProvider.ID, pc.currentStep.Name)
 	case errors.Is(err, ErrFlowSSOUnavailable(nil)):
+		cause := ssoUnavailableCause(err)
 		resolved, err := r.resolveInputs(pc)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
-		return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUnavailable))
+		result, err := r.renderStepError(pc, resolved, new(FlowStepErrorSSOUnavailable))
+		if result.Step != nil {
+			result.Step.ErrorCode = cause
+		}
+		return result, err
 	case err != nil:
 		return FlowStepResult{}, err
 	}
@@ -1138,6 +1147,19 @@ func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, er
 		},
 		SSOBindingNonce: out.BindingNonce,
 	}, nil
+}
+
+// ssoUnavailableCause is the code of the innermost domain error under an
+// [ErrFlowSSOUnavailable], such as idp.discovery_failed, or the code of the
+// unavailability itself when its cause carries none.
+func ssoUnavailableCause(err error) string {
+	code := ""
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		if de, ok := e.(Error); ok {
+			code = de.Code
+		}
+	}
+	return code
 }
 
 // resolveInputs resolves the step's fields and prefills any values the

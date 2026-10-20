@@ -3,6 +3,7 @@ package domain_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"strings"
 	"testing"
@@ -832,6 +833,30 @@ func TestFlowStateMachine_Process_SSO_EmitsRedirectStep(t *testing.T) {
 	assert.Nil(t, result.Step.Challenge, "a cleared challenge is not rendered")
 }
 
+// The step carries the code of the domain error that made the provider
+// unavailable, for the API to show a developer; the step error stays generic.
+func TestFlowStateMachine_Process_SSO_ProviderUnavailableCarriesCauseCode(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := ssoStepDefinition()
+	state := startSSOStepFlow(t, w, def)
+	w.ssoRedirects.EXPECT().Issue(gomock.Any(), gomock.Any()).
+		Return(domain.FlowSSORedirectOutput{}, domain.ErrFlowSSOUnavailable(fmt.Errorf("issue: %w", domain.ErrIDPDiscoveryFailed(errors.New("connection refused")))))
+	w.ssoProviders.EXPECT().
+		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}, {ID: "github", Name: "GitHub"}}, nil)
+
+	result, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{
+		Action:      domain.FlowActionSSO,
+		SSOProvider: &domain.FlowSSOProviderRef{ID: "google"},
+		SSOReturn:   ssoSubmitReturn,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
+	assert.Equal(t, "idp.discovery_failed", result.Step.ErrorCode)
+}
+
 func TestFlowStateMachine_Process_SSO_InvalidSubmissions(t *testing.T) {
 	t.Parallel()
 
@@ -913,6 +938,7 @@ func TestFlowStateMachine_Process_SSO_ProviderUnavailableReRendersStep(t *testin
 	require.NotNil(t, result.Step.Error)
 	assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
 	assert.Len(t, result.Step.SSOProviders, 2, "the other providers stay on offer")
+	assert.Equal(t, domain.ErrFlowSSOUnavailable(nil).Code, result.Step.ErrorCode, "a cause without a code of its own reports the unavailability")
 	assert.Nil(t, result.Step.RedirectURL)
 	assert.Empty(t, result.SSOBindingNonce)
 	assert.Nil(t, result.State.PendingChallenge, "the abandoned ceremony is dropped")

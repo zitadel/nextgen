@@ -904,6 +904,11 @@ export class ZitadelLogin extends ZitadelSurface {
     // preview navigates nowhere, so it never holds the loader for it.
     this.completing = !preview && navigatesOnComplete(wire, this.postSignInUrl);
     this.response = wire;
+    if (wire.step.error_code) {
+      // Only a local development deployment sends it: the console is where a
+      // developer looks first.
+      console.warn(`[zitadel-login] ${wire.step.error ?? "step error"}: ${wire.step.error_code}`);
+    }
     const { branding, issues } = validateBranding(wire.branding, {
       renderingOrigin: this.ownerDocument.location.origin,
     });
@@ -1095,6 +1100,15 @@ export class ZitadelLogin extends ZitadelSurface {
     // stay as-is: keystroke re-renders have to produce a byte-identical
     // string, and the imperatively removed alert stays removed.
     const errors: FlowError[] = this.loading && this.stepErrorDismissed ? [] : rawErrors;
+    // Only a local development deployment sends the code behind a generic
+    // error; it goes under the form-level message, where the developer looks.
+    const code = step.error_code;
+    if (code) {
+      const locale = this.resolveLocale();
+      const detail = (locale["error.code_detail"] ?? "Error code: {0}").replace("{0}", code);
+      const banner = errors.find((error) => !error.field);
+      if (banner) banner.detail = detail;
+    }
 
     const fields = step.fields ?? [];
     const actions = step.actions ?? [];

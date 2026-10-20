@@ -312,6 +312,11 @@ to record the hand-off (analytics, a spinner, saving scroll state) before the
 page goes away. The framework wrappers surface it as `onFlowRedirect`, except
 Vue and Angular, which emit `flowRedirect`, and Qwik, which takes
 `onFlowRedirect$`.
+A development deployment (one whose public base is an http loopback origin,
+such as `zitadel start`) sends the code behind a generic step error, such as
+why an identity provider is unavailable (`idp.discovery_failed`); the element
+shows it under the message and logs it to the console.
+
 The orchestrator exposes `::part(form)` for tenant-side CSS hooks. Adopts
 design tokens and `branding.font_url` into its shadow root on each update.
 

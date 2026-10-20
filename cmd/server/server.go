@@ -412,7 +412,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases),
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).
+			WithFlowDiagnostics(api.FlowDiagnosticsFor(cfg.Server.PublicBase)),
 		api.NewSecurityHandler(tokenService),
 		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider())...)
 	if err != nil {
