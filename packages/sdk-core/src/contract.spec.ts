@@ -934,6 +934,44 @@ describe("client SDK edge specs", () => {
 });
 
 /**
+ * The server SDK edge specs. Each sends requests through its built package inside
+ * the edge VM and carries the same `edge-server` block: the same titles and the
+ * same body, byte for byte. Only the glue that hands a request to the framework's
+ * handler, above the block, is the framework's.
+ */
+describe("server SDK edge specs", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+
+  const SERVER_TITLES = [
+    "the server SDK in the edge runtime",
+    "answers a protected route with a redirect to the login path",
+    "forwards the proxy path to the backend",
+    "forwards a GET on the proxy path as a GET",
+    "refuses a request that carries the auth header before forwarding it",
+    "passes an unprotected route through",
+  ];
+
+  const SERVERS = {
+    "sdk-sveltekit": "sdk-sveltekit/src/__tests__/handle.edge.test.ts",
+    "sdk-solid-start": "sdk-solid-start/src/__tests__/middleware.edge.test.ts",
+    "sdk-tanstack-start": "sdk-tanstack-start/src/__tests__/middleware.edge.test.ts",
+    "sdk-qwik-router": "sdk-qwik-router/src/__tests__/request-handler.edge.test.ts",
+    "sdk-next": "sdk-next/src/__tests__/middleware.edge.test.ts",
+    "sdk-nuxt": "sdk-nuxt/src/__tests__/server/middleware.edge.test.ts",
+  };
+
+  it("has the server block in every server SDK", () => {
+    const sources = Object.fromEntries(
+      Object.entries(SERVERS).map(([sdk, path]) => [
+        sdk,
+        readFileSync(`${packagesDir}${path}`, "utf8"),
+      ]),
+    );
+    expect(problems(sources, "edge-server", SERVER_TITLES)).toEqual([]);
+  });
+});
+
+/**
  * The server SDKs' test titles.
  *
  * The six meta-framework SDKs test the same server behaviours, so their test
