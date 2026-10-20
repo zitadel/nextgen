@@ -5,11 +5,9 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/zitadel/oidc/v3/example/server/exampleop"
 	"github.com/zitadel/oidc/v3/example/server/storage"
@@ -17,7 +15,7 @@ import (
 
 type config struct {
 	Issuer       string
-	RedirectURIs []string
+	RedirectURI  string
 	ClientID     string
 	ClientSecret string
 	UsersFile    string
@@ -29,39 +27,28 @@ func newHandler(cfg config) (http.Handler, error) {
 		return nil, err
 	}
 	clients := map[string]*storage.Client{
-		cfg.ClientID: storage.WebClient(cfg.ClientID, cfg.ClientSecret, cfg.RedirectURIs...),
+		cfg.ClientID: storage.WebClient(cfg.ClientID, cfg.ClientSecret, cfg.RedirectURI),
 	}
 	return exampleop.SetupServer(cfg.Issuer, storage.NewStorageWithClients(users, clients), slog.Default(), false), nil
 }
 
-func envOr(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return fallback
-}
-
 func run() error {
 	port := os.Getenv("PORT")
-	redirectURIs := os.Getenv("REDIRECT_URI")
-	usersFile := os.Getenv("USERS_FILE")
-	if port == "" || redirectURIs == "" || usersFile == "" {
-		return errors.New("PORT, REDIRECT_URI and USERS_FILE are required")
-	}
 	cfg := config{
-		// The trailing slash is part of the issuer: discovery returns it verbatim
-		// and the relying party compares it exactly.
-		Issuer:       fmt.Sprintf("http://localhost:%s/", port),
-		RedirectURIs: strings.Split(redirectURIs, ","),
-		ClientID:     envOr("CLIENT_ID", "journey"),
-		ClientSecret: envOr("CLIENT_SECRET", "journey-secret"),
-		UsersFile:    usersFile,
+		Issuer:       os.Getenv("ISSUER"),
+		RedirectURI:  os.Getenv("REDIRECT_URI"),
+		ClientID:     os.Getenv("CLIENT_ID"),
+		ClientSecret: os.Getenv("CLIENT_SECRET"),
+		UsersFile:    os.Getenv("USERS_FILE"),
+	}
+	if port == "" || cfg.Issuer == "" || cfg.RedirectURI == "" || cfg.ClientID == "" || cfg.ClientSecret == "" || cfg.UsersFile == "" {
+		return errors.New("PORT, ISSUER, REDIRECT_URI, CLIENT_ID, CLIENT_SECRET and USERS_FILE are required")
 	}
 	handler, err := newHandler(cfg)
 	if err != nil {
 		return err
 	}
-	slog.Info("oidc-mock listening", "issuer", cfg.Issuer, "redirect_uris", cfg.RedirectURIs, "users_file", cfg.UsersFile)
+	slog.Info("oidc-mock listening", "issuer", cfg.Issuer, "redirect_uri", cfg.RedirectURI, "users_file", cfg.UsersFile)
 	return (&http.Server{Addr: "127.0.0.1:" + port, Handler: handler}).ListenAndServe()
 }
 
