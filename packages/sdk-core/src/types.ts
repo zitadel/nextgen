@@ -374,13 +374,6 @@ const isEnumerated = (name: string): boolean =>
 const isOmitted = (name: string, value: unknown): boolean =>
   value == null || (value === false && !isEnumerated(name));
 
-// The one cast: TypeScript cannot follow a record built key by key to its mapped type.
-function asStandardAttributes<Props extends object, Prefix extends string>(
-  record: Record<string, unknown>,
-): StandardAttributes<Props, Prefix> {
-  return record as StandardAttributes<Props, Prefix>;
-}
-
 /**
  * The standard HTML attributes among the given props: `class`, `style`, `id`,
  * `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`. A widget
@@ -395,35 +388,41 @@ function asStandardAttributes<Props extends object, Prefix extends string>(
 export function standardAttributes<Props extends object, Prefix extends string = "">(
   props: Props,
   prefix?: Prefix,
-): StandardAttributes<Props, Prefix> {
+): StandardAttributes<Props, Prefix>;
+// The one place the record is typed loosely: the overload above is the type callers get.
+export function standardAttributes(props: object, prefix = ""): Record<string, unknown> {
   const record: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(props)) {
     if (isStandardAttributeName(name) && !isOmitted(name, value)) {
       const native = NATIVE_NAMES.some((nativeName) => nativeName === name);
       // An `aria-*` or `data-*` boolean is written out, since not every framework renders `false`.
-      record[native ? name : `${prefix ?? ""}${name}`] =
+      record[native ? name : `${prefix}${name}`] =
         typeof value === "boolean" && isEnumerated(name) ? String(value) : value;
     }
   }
-  return asStandardAttributes(record);
+  return record;
 }
 
+/* ───────────────────────────────  Widget names  ───────────────────────────────
+ * The widgets and the tag names of their elements, defined once.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/** Every widget name, for code that loops over the widgets. */
+export const widgetNames = ["login", "logout", "session"] as const;
+
+/** The name of a widget. */
+export type WidgetName = (typeof widgetNames)[number];
+
 /**
- * The tag names of the widget elements, defined once. The elements register
- * under these names, and every SDK wrapper, spec and guard reads them from here
- * rather than spelling them out.
+ * The tag names of the widget elements. The elements register under these
+ * names, and every SDK wrapper, spec and guard reads them from here rather than
+ * spelling them out. The type ties each tag to its widget name.
  */
 export const widgetTags = {
   login: "zitadel-login",
   logout: "zitadel-logout",
   session: "zitadel-session",
-} as const;
+} as const satisfies Record<WidgetName, `zitadel-${WidgetName}`>;
 
 /** One of the widget element tag names. */
-export type WidgetTag = (typeof widgetTags)[keyof typeof widgetTags];
-
-/** The name of a widget, as it keys {@link widgetTags}. */
-export type WidgetName = keyof typeof widgetTags;
-
-/** Every widget name, for code that loops over the widgets. */
-export const widgetNames = ["login", "logout", "session"] as const satisfies readonly WidgetName[];
+export type WidgetTag = (typeof widgetTags)[WidgetName];

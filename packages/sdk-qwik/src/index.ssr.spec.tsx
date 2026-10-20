@@ -24,7 +24,10 @@ async function serverAttributes(
   const open = new RegExp(`<${tag}(\\s[^>]*)?>`).exec(html);
   expect(open, `<${tag}> missing from server HTML`).not.toBeNull();
   return Object.fromEntries(
-    [...(open?.[1] ?? "").matchAll(/([a-z][\w-]*)(?:="([^"]*)")?/g)].map((m) => [m[1], m[2] ?? ""]),
+    [...(open?.[1] ?? "").matchAll(/([a-z][\w-]*)(?:="([^"]*)")?/gi)].map((m) => [
+      m[1]?.toLowerCase(),
+      m[2] ?? "",
+    ]),
   );
 }
 
@@ -163,7 +166,11 @@ async function renderAttributes(
   props: Readonly<Record<string, unknown>>,
 ): Promise<Record<string, string>> {
   const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
-  return serverAttributes(widgetTags[widget], <Widget {...props} />);
+  const { tabindex, ...rest } = props;
+  return serverAttributes(
+    widgetTags[widget],
+    <Widget {...rest} {...(typeof tabindex === "string" ? { tabIndex: Number(tabindex) } : {})} />,
+  );
 }
 
 // standard-attributes-server:begin
@@ -174,6 +181,7 @@ describe.each(widgetNames)("%s server-rendered standard attributes", (widget) =>
       title: "probe",
       slot: "probe",
       role: "region",
+      tabindex: "3",
       "data-testid": "probe",
       "aria-label": "probe",
     });
@@ -182,6 +190,7 @@ describe.each(widgetNames)("%s server-rendered standard attributes", (widget) =>
       title: "probe",
       slot: "probe",
       role: "region",
+      tabindex: "3",
       "data-testid": "probe",
       "aria-label": "probe",
     });

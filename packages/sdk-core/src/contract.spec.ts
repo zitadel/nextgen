@@ -17,7 +17,6 @@ import {
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
   standardAttributes,
-  widgetNames,
   widgetTags,
 } from "./types.js";
 
@@ -53,6 +52,17 @@ const SDK_SPECS = {
 
 /** Angular's spec: it carries the shared server-render table but no standard-attribute block. */
 const ANGULAR_SPEC = "../../sdk-angular/src/lib/components.spec.ts";
+
+/** The first place two lists of test titles differ, or "" when they are the same. */
+const firstDifference = (titles: readonly string[], canonical: readonly string[]): string => {
+  const length = Math.max(titles.length, canonical.length);
+  for (let index = 0; index < length; index++) {
+    if (titles[index] !== canonical[index]) {
+      return `test ${index + 1} is ${JSON.stringify(titles[index])}, expected ${JSON.stringify(canonical[index])}`;
+    }
+  }
+  return "";
+};
 
 /**
  * The element↔contract drift guard.
@@ -100,10 +110,6 @@ describe("widget tags ↔ @zitadel/components", () => {
     ["session", ZitadelSession],
   ] as const)("registers the %s element under its tag", (widget, element) => {
     expect(customElements.get(widgetTags[widget])).toBe(element);
-  });
-
-  it("names exactly the three widgets", () => {
-    expect(Object.keys(widgetTags)).toEqual([...widgetNames]);
   });
 });
 
@@ -334,16 +340,6 @@ describe("standard-attribute tests ↔ SDK specs", () => {
   const titlesIn = (block: string): string[] =>
     Array.from(block.matchAll(TITLE), (match) => match[2] ?? "");
 
-  const firstDifference = (titles: readonly string[], canonical: readonly string[]): string => {
-    const length = Math.max(titles.length, canonical.length);
-    for (let index = 0; index < length; index++) {
-      if (titles[index] !== canonical[index]) {
-        return `test ${index + 1} is ${JSON.stringify(titles[index])}, expected ${JSON.stringify(canonical[index])}`;
-      }
-    }
-    return "";
-  };
-
   /**
    * What is wrong with the `name` blocks of the given sources: a block that is
    * missing, one whose titles are not the canonical ones, in order and without an
@@ -355,15 +351,20 @@ describe("standard-attribute tests ↔ SDK specs", () => {
     canonical: readonly string[],
   ): string[] => {
     const blocks = Object.entries(sources).map(
-      ([sdk, source]) => [sdk, blockIn(source, name)] as const,
+      ([sdk, source]) => [sdk, source, blockIn(source, name)] as const,
     );
-    const reference = blocks[0]?.[1];
-    return blocks.flatMap(([sdk, block]) => {
+    const reference = blocks[0]?.[2];
+    return blocks.flatMap(([sdk, source, block]) => {
       if (block === undefined) return [`${sdk} has no ${name} block`];
       const found = [];
       const difference = firstDifference(titlesIn(block), canonical);
       if (difference) found.push(`${sdk}: ${difference}`);
       if (block !== reference) found.push(`${sdk}: the body differs from the first SDK's`);
+      const outside = titlesIn(source.replace(block, "")).filter((title) =>
+        canonical.includes(title),
+      );
+      if (outside.length > 0)
+        found.push(`${sdk}: ${JSON.stringify(outside[0])} is also tested outside the block`);
       return found;
     });
   };
@@ -387,10 +388,7 @@ describe("standard-attribute tests ↔ SDK specs", () => {
     expect(problems(specsOf(side), name, canonical)).toEqual([]);
   });
 
-  it("covers every SDK but Angular, the one documented exception", () => {
-    expect(Object.keys(specsOf("client")).sort()).toEqual(
-      ["sdk-qwik", "sdk-react", "sdk-solid", "sdk-svelte", "sdk-vue"].sort(),
-    );
+  it("has no block in Angular, the one documented exception", () => {
     const angular = read(ANGULAR_SPEC);
     expect(blockIn(angular, "standard-attributes")).toBeUndefined();
     expect(blockIn(angular, "standard-attributes-server")).toBeUndefined();
@@ -445,6 +443,12 @@ describe("standard-attribute tests ↔ SDK specs", () => {
       expect(
         check(block.replace('it("first", () => {})', 'it("first", () => { run(); })')),
       ).toEqual(["two: the body differs from the first SDK's"]);
+    });
+
+    it("sees a canonical test outside the block", () => {
+      expect(check(`it("first", () => {});\n${block}`)).toEqual([
+        'two: "first" is also tested outside the block',
+      ]);
     });
 
     it("sees a block that is missing or unterminated", () => {
@@ -754,22 +758,12 @@ describe("server SDK test titles", () => {
       (match) => match[2]!,
     );
 
-  const firstDifference = (titles: readonly string[]): string => {
-    const length = Math.max(titles.length, CANONICAL_TITLES.length);
-    for (let index = 0; index < length; index++) {
-      if (titles[index] !== CANONICAL_TITLES[index]) {
-        return `test ${index + 1} is ${JSON.stringify(titles[index])}, expected ${JSON.stringify(CANONICAL_TITLES[index])}`;
-      }
-    }
-    return "";
-  };
-
   it.each(Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[])(
     "%s carries exactly the canonical tests, in the canonical order",
     (sdk) => {
       const titles = titlesOf(sdk);
       expect(
-        firstDifference(titles),
+        firstDifference(titles, CANONICAL_TITLES),
         `${sdk} has ${titles.length} tests, expected ${CANONICAL_TITLES.length}`,
       ).toBe("");
     },

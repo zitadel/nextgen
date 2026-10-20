@@ -82,6 +82,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin {project} class="login" data-testid="login" aria-label="Sign in" />
 ```
 
+In Svelte, removing the `title` prop leaves `title="null"` on the element, because Svelte assigns it as a property.
+
 ## Server rendering
 
 If your app renders on the server, mount the widget on the client only, after hydration, or pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow.

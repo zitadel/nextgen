@@ -142,6 +142,7 @@ describe.each(widgetNames)("%s server-rendered standard attributes", (widget) =>
       title: "probe",
       slot: "probe",
       role: "region",
+      tabindex: "3",
       "data-testid": "probe",
       "aria-label": "probe",
     });
@@ -150,6 +151,7 @@ describe.each(widgetNames)("%s server-rendered standard attributes", (widget) =>
       title: "probe",
       slot: "probe",
       role: "region",
+      tabindex: "3",
       "data-testid": "probe",
       "aria-label": "probe",
     });

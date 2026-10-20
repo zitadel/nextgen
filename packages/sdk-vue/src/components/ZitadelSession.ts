@@ -9,17 +9,7 @@ import "@zitadel/components";
 import type { WithZitadelWidgetAttributes } from "../types";
 import { forceAttr } from "./forceAttr";
 
-/**
- * Vue wrapper for the `<zitadel-session>` Lit web component — the post-sign-in
- * "signed in as" card. See {@link ZitadelLogin} for the rendering strategy.
- * Supply the SDK handle from `configureZitadel(...)` as `:project`, or the
- * discrete `:project-id` / `:proxy-path` the widget reads instead. The widget's
- * `zitadel-signout` event is re-emitted with its detail as `signout`.
- *
- * A Vue `ref` on this component resolves to the component *instance*; the
- * rendered `<zitadel-session>` DOM node is exposed as `element`.
- */
-const ZitadelSession = defineComponent({
+const Base = defineComponent({
   name: "ZitadelSession",
   // The element takes only the standard attributes (see below), never the rest of `attrs`.
   inheritAttrs: false,
@@ -77,4 +67,16 @@ const ZitadelSession = defineComponent({
   },
 });
 
-export default ZitadelSession as WithZitadelWidgetAttributes<typeof ZitadelSession>;
+/**
+ * Vue wrapper for the `<zitadel-session>` Lit web component — the post-sign-in
+ * "signed in as" card. See {@link ZitadelLogin} for the rendering strategy.
+ * Supply the SDK handle from `configureZitadel(...)` as `:project`, or the
+ * discrete `:project-id` / `:proxy-path` the widget reads instead. The widget's
+ * `zitadel-signout` event is re-emitted with its detail as `signout`.
+ *
+ * A Vue `ref` on this component resolves to the component *instance*; the
+ * rendered `<zitadel-session>` DOM node is exposed as `element`.
+ */
+const ZitadelSession: WithZitadelWidgetAttributes<typeof Base> = Base;
+
+export default ZitadelSession;

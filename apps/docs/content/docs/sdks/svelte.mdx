@@ -118,6 +118,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin {project} class="login" data-testid="login" aria-label="Sign in" />
 ```
 
+In Svelte, removing the `title` prop leaves `title="null"` on the element, because Svelte assigns it as a property.
+
 ## Runtime model
 
 <Steps>

@@ -24,10 +24,5 @@ export type ZitadelWidgetAttributes = StandardAttributeProps<
 >;
 
 /** A widget component's type with {@link ZitadelWidgetAttributes} added to its props. */
-export type WithZitadelWidgetAttributes<Component extends abstract new (...args: never) => object> =
-  Component &
-    (new (
-      ...args: never
-    ) => {
-      $props: ZitadelWidgetAttributes;
-    });
+export type WithZitadelWidgetAttributes<Component extends abstract new () => object> = Component &
+  (new () => { $props: ZitadelWidgetAttributes });

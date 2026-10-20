@@ -9,21 +9,7 @@ import "@zitadel/components";
 import type { WithZitadelWidgetAttributes } from "../types";
 import { forceAttr } from "./forceAttr";
 
-/**
- * Vue wrapper for the `<zitadel-logout>` Lit web component. See
- * {@link ZitadelLogin} for the rendering strategy. Supply the SDK handle from
- * `configureZitadel(...)` as `:project`, or the discrete `:project-id` /
- * `:proxy-path` the widget reads instead — the widget uses whichever is
- * present. The widget's `zitadel-signout` event is re-emitted with its detail
- * as `signout`.
- *
- * A Vue `ref` on this component resolves to the component *instance*, not the
- * inner element, so the rendered `<zitadel-logout>` DOM node is exposed as
- * `element` (a `Ref` whose `.value` is the {@link ZitadelLogoutElement}, or
- * `null` before mount). A consumer with `<ZitadelLogout ref="r" />` reads it via
- * `r.value.element`.
- */
-const ZitadelLogout = defineComponent({
+const Base = defineComponent({
   name: "ZitadelLogout",
   // The element takes only the standard attributes (see below), never the rest of `attrs`.
   inheritAttrs: false,
@@ -77,4 +63,20 @@ const ZitadelLogout = defineComponent({
   },
 });
 
-export default ZitadelLogout as WithZitadelWidgetAttributes<typeof ZitadelLogout>;
+/**
+ * Vue wrapper for the `<zitadel-logout>` Lit web component. See
+ * {@link ZitadelLogin} for the rendering strategy. Supply the SDK handle from
+ * `configureZitadel(...)` as `:project`, or the discrete `:project-id` /
+ * `:proxy-path` the widget reads instead — the widget uses whichever is
+ * present. The widget's `zitadel-signout` event is re-emitted with its detail
+ * as `signout`.
+ *
+ * A Vue `ref` on this component resolves to the component *instance*, not the
+ * inner element, so the rendered `<zitadel-logout>` DOM node is exposed as
+ * `element` (a `Ref` whose `.value` is the {@link ZitadelLogoutElement}, or
+ * `null` before mount). A consumer with `<ZitadelLogout ref="r" />` reads it via
+ * `r.value.element`.
+ */
+const ZitadelLogout: WithZitadelWidgetAttributes<typeof Base> = Base;
+
+export default ZitadelLogout;

@@ -67,6 +67,12 @@ async function serverRender(
   return host.firstElementChild!;
 }
 
+function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
+  const element = root.querySelector(tag);
+  if (!element) throw new Error(`no <${tag}> was rendered`);
+  return element;
+}
+
 describe("ZitadelLogin", () => {
   it("keeps the properties the client render assigns", () => {
     const { container } = render(ZitadelLogin, { props: { project: handle } });
@@ -802,15 +808,11 @@ type WidgetProps = {
   session: InstanceType<typeof ZitadelSession>["$props"];
 };
 
+const staleOnRemoval: readonly string[] = [];
+
 type Attributes = {
   readonly [name: string]: string | boolean | null | undefined;
 };
-
-function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
-  const element = root.querySelector(tag);
-  if (!element) throw new Error(`no <${tag}> was rendered`);
-  return element;
-}
 
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through a `ref` on the component, the way a consumer does.
@@ -908,28 +910,52 @@ describe.each(widgetNames)("%s standard attributes", (widget) => {
   it("updates a forwarded attribute when the prop changes", async () => {
     const { container, update } = await mountWidget(widget, {
       class: "before",
+      id: "before",
+      title: "before",
+      slot: "before",
+      tabindex: "1",
       "aria-label": "before",
       "data-testid": "before",
     });
-    await update({ class: "after", "aria-label": "after", "data-testid": "after" });
+    await update({
+      class: "after",
+      id: "after",
+      title: "after",
+      slot: "after",
+      tabindex: "2",
+      "aria-label": "after",
+      "data-testid": "after",
+    });
     const element = container.querySelector(tag);
     expect(element?.classList.contains("before")).toBe(false);
     expect(element?.classList.contains("after")).toBe(true);
-    expect(element?.getAttribute("aria-label")).toBe("after");
-    expect(element?.getAttribute("data-testid")).toBe("after");
+    for (const name of ["id", "title", "slot", "aria-label", "data-testid"]) {
+      expect(element?.getAttribute(name)).toBe("after");
+    }
+    expect(element?.getAttribute("tabindex")).toBe("2");
   });
 
   it("removes a forwarded attribute when the prop is removed", async () => {
     const { container, update } = await mountWidget(widget, {
       class: "before",
+      id: "before",
+      title: "before",
+      slot: "before",
+      tabindex: "1",
       "aria-label": "before",
       "data-testid": "before",
     });
-    await update({});
     const element = container.querySelector(tag);
+    expect(element?.classList.contains("before")).toBe(true);
+    for (const name of ["id", "title", "slot", "aria-label", "data-testid"]) {
+      expect(element?.getAttribute(name)).toBe("before");
+    }
+    expect(element?.getAttribute("tabindex")).toBe("1");
+    await update({});
     expect(element?.classList.contains("before")).toBe(false);
-    expect(element?.hasAttribute("aria-label")).toBe(false);
-    expect(element?.hasAttribute("data-testid")).toBe(false);
+    for (const name of ["id", "title", "slot", "tabindex", "aria-label", "data-testid"]) {
+      if (!staleOnRemoval.includes(name)) expect(element?.hasAttribute(name)).toBe(false);
+    }
   });
 
   it("does not forward props outside the standard set", async () => {
@@ -973,6 +999,7 @@ describe.each(widgetNames)("%s server-rendered standard attributes", (widget) =>
       title: "probe",
       slot: "probe",
       role: "region",
+      tabindex: "3",
       "data-testid": "probe",
       "aria-label": "probe",
     });
@@ -981,6 +1008,7 @@ describe.each(widgetNames)("%s server-rendered standard attributes", (widget) =>
       title: "probe",
       slot: "probe",
       role: "region",
+      tabindex: "3",
       "data-testid": "probe",
       "aria-label": "probe",
     });

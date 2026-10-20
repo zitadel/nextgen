@@ -84,8 +84,6 @@ The components are **standalone** — import them directly into a component's
 
 `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default.
 
-They also take the standard HTML attributes; the README says how.
-
 | Prop | Type | Default | Widgets | Description |
 | --- | --- | --- | --- | --- |
 | `project` | `ZitadelProject` | unset | Login, Logout, Session | The handle from `configureZitadel(...)`. Wins over `projectId` and `proxyPath`. |

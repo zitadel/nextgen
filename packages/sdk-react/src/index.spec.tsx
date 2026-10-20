@@ -42,6 +42,12 @@ import {
 // rejection is ignored package-wide; these are light binding/event assertions.
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
+function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
+  const element = root.querySelector(tag);
+  if (!element) throw new Error(`no <${tag}> was rendered`);
+  return element;
+}
+
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", () => {
     const { container } = render(<ZitadelLogin project={project} purpose="login" />);
@@ -517,8 +523,15 @@ async function renderAttributes(
   const Widget = { login: ZitadelLogin, session: ZitadelSession, logout: ZitadelLogout }[
     widget
   ] as React.ElementType;
+  // The server has no `document`, which is how the wrapper knows to write the markup out.
+  vi.stubGlobal("document", undefined);
+  const { tabindex, ...rest } = props;
+  const html = renderToString(
+    <Widget {...rest} {...(typeof tabindex === "string" ? { tabIndex: Number(tabindex) } : {})} />,
+  );
+  vi.unstubAllGlobals();
   const host = document.createElement("div");
-  host.innerHTML = renderToString(<Widget {...props} />);
+  host.innerHTML = html;
   const el = host.firstElementChild;
   expect(el, `<zitadel-${widget}> missing from server HTML`).not.toBeNull();
   return Object.fromEntries(el!.getAttributeNames().map((n) => [n, el!.getAttribute(n) ?? ""]));
@@ -806,15 +819,11 @@ type WidgetProps = {
   session: ZitadelSessionReactProps;
 };
 
+const staleOnRemoval: readonly string[] = [];
+
 type Attributes = {
   readonly [name: string]: string | boolean | null | undefined;
 };
-
-function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
-  const element = root.querySelector(tag);
-  if (!element) throw new Error(`no <${tag}> was rendered`);
-  return element;
-}
 
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through a `ref`, the way a consumer does. `update` renders it
@@ -822,10 +831,11 @@ function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElemen
 async function mountWidget(widget: WidgetName, attributes: Attributes) {
   const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
   let element: HTMLElement | null = null;
-  const elementFor = ({ class: className, style, hidden, ...rest }: Attributes) => (
+  const elementFor = ({ class: className, style, hidden, tabindex, ...rest }: Attributes) => (
     <Widget
       {...rest}
       {...(hidden === undefined ? {} : { hidden: hidden === "" })}
+      {...(typeof tabindex === "string" ? { tabIndex: Number(tabindex) } : {})}
       {...(typeof className === "string" ? { className } : {})}
       {...(typeof style === "string" ? { style: cssProperties(style) } : {})}
       ref={(el: HTMLElement | null) => {
@@ -911,28 +921,52 @@ describe.each(widgetNames)("%s standard attributes", (widget) => {
   it("updates a forwarded attribute when the prop changes", async () => {
     const { container, update } = await mountWidget(widget, {
       class: "before",
+      id: "before",
+      title: "before",
+      slot: "before",
+      tabindex: "1",
       "aria-label": "before",
       "data-testid": "before",
     });
-    await update({ class: "after", "aria-label": "after", "data-testid": "after" });
+    await update({
+      class: "after",
+      id: "after",
+      title: "after",
+      slot: "after",
+      tabindex: "2",
+      "aria-label": "after",
+      "data-testid": "after",
+    });
     const element = container.querySelector(tag);
     expect(element?.classList.contains("before")).toBe(false);
     expect(element?.classList.contains("after")).toBe(true);
-    expect(element?.getAttribute("aria-label")).toBe("after");
-    expect(element?.getAttribute("data-testid")).toBe("after");
+    for (const name of ["id", "title", "slot", "aria-label", "data-testid"]) {
+      expect(element?.getAttribute(name)).toBe("after");
+    }
+    expect(element?.getAttribute("tabindex")).toBe("2");
   });
 
   it("removes a forwarded attribute when the prop is removed", async () => {
     const { container, update } = await mountWidget(widget, {
       class: "before",
+      id: "before",
+      title: "before",
+      slot: "before",
+      tabindex: "1",
       "aria-label": "before",
       "data-testid": "before",
     });
-    await update({});
     const element = container.querySelector(tag);
+    expect(element?.classList.contains("before")).toBe(true);
+    for (const name of ["id", "title", "slot", "aria-label", "data-testid"]) {
+      expect(element?.getAttribute(name)).toBe("before");
+    }
+    expect(element?.getAttribute("tabindex")).toBe("1");
+    await update({});
     expect(element?.classList.contains("before")).toBe(false);
-    expect(element?.hasAttribute("aria-label")).toBe(false);
-    expect(element?.hasAttribute("data-testid")).toBe(false);
+    for (const name of ["id", "title", "slot", "tabindex", "aria-label", "data-testid"]) {
+      if (!staleOnRemoval.includes(name)) expect(element?.hasAttribute(name)).toBe(false);
+    }
   });
 
   it("does not forward props outside the standard set", async () => {
@@ -976,6 +1010,7 @@ describe.each(widgetNames)("%s server-rendered standard attributes", (widget) =>
       title: "probe",
       slot: "probe",
       role: "region",
+      tabindex: "3",
       "data-testid": "probe",
       "aria-label": "probe",
     });
@@ -984,6 +1019,7 @@ describe.each(widgetNames)("%s server-rendered standard attributes", (widget) =>
       title: "probe",
       slot: "probe",
       role: "region",
+      tabindex: "3",
       "data-testid": "probe",
       "aria-label": "probe",
     });
