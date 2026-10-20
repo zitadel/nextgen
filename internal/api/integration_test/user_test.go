@@ -884,10 +884,7 @@ func TestPatchUserFailedMigration(t *testing.T) {
 			if tc.collide {
 				body["attributes"] = map[string]any{"username": taken, "preferredLanguage": "en"}
 			}
-			req := &api.PatchUserRequest{}
-			require.NoError(t, req.UnmarshalJSON([]byte(helpers.MustMarshal(t, body))))
-
-			resp, err := client.PatchUserByID(t.Context(), req, api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
+			resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, body), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 			require.NoError(t, err)
 			require.IsType(t, tc.wantStatus, resp, helpers.MustMarshal(t, resp))
 			assertAuthzError(t, resp, tc.wantCode)

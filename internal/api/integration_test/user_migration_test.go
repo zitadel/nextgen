@@ -78,13 +78,6 @@ func TestPatchUserMigration(t *testing.T) {
 		return resp
 	}
 
-	// asJSON round-trips v through JSON, so a fixture and a decoded response
-	// compare equal regardless of Go's numeric types.
-	asJSON := func(t *testing.T, v any) map[string]any {
-		t.Helper()
-		return *helpers.MustUnmarshal[map[string]any](t, []byte(helpers.MustMarshal(t, v)))
-	}
-
 	// assertUser checks the user both in a response and in a fresh read: the
 	// response is not the only witness, the stored user has to agree.
 	assertUser := func(t *testing.T, resp api.PatchUserByIDRes, userID api.UserID, wantSchema string, wantAttributes map[string]any) {
@@ -97,7 +90,7 @@ func TestPatchUserMigration(t *testing.T) {
 		for _, user := range []*api.User{resp.(*api.User), got.(*api.User)} {
 			assert.Equal(t, userID, user.ID, "migration keeps the user's identity")
 			assert.Equal(t, wantSchema, user.Schema)
-			assert.Equal(t, asJSON(t, wantAttributes), asJSON(t, user.Attributes))
+			assert.JSONEq(t, helpers.MustMarshal(t, wantAttributes), helpers.MustMarshal(t, user.Attributes))
 		}
 	}
 
@@ -117,14 +110,13 @@ func TestPatchUserMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, got, helpers.MustMarshal(t, got))
 		assert.Equal(t, wantSchema, got.(*api.User).Schema)
-		assert.Equal(t, asJSON(t, wantAttributes), asJSON(t, got.(*api.User).Attributes))
+		assert.JSONEq(t, helpers.MustMarshal(t, wantAttributes), helpers.MustMarshal(t, got.(*api.User).Attributes))
 	}
 
 	tcs := []struct {
-		name       string
-		objectType string
-		v1, v2     map[string]any
-		stored     map[string]any
+		name   string
+		v1, v2 map[string]any
+		stored map[string]any
 		// wantRefusal marks a change that needs the caller's help: moving to
 		// v2 with refusal as the attribute patch (none: the schema reference
 		// alone) is refused before accepted is tried.
@@ -141,8 +133,7 @@ func TestPatchUserMigration(t *testing.T) {
 		wantAfterwards map[string]any
 	}{
 		{
-			name:       "add an optional attribute",
-			objectType: "migration-add-optional",
+			name: "add an optional attribute",
 			v1: map[string]any{
 				"additionalProperties": false,
 				"properties":           map[string]any{"givenName": map[string]any{"type": "string"}},
@@ -160,8 +151,7 @@ func TestPatchUserMigration(t *testing.T) {
 			wantAfterwards: map[string]any{"givenName": "Ada", "preferredLanguage": "en"},
 		},
 		{
-			name:       "relax validation",
-			objectType: "migration-relax",
+			name: "relax validation",
 			v1: map[string]any{
 				"required": []string{"givenName", "nickname"},
 				"properties": map[string]any{
@@ -183,8 +173,7 @@ func TestPatchUserMigration(t *testing.T) {
 			wantAfterwards: map[string]any{"givenName": "Augusta Ada"},
 		},
 		{
-			name:       "add a required attribute",
-			objectType: "migration-add-required",
+			name: "add a required attribute",
 			v1: map[string]any{
 				"properties": map[string]any{"givenName": map[string]any{"type": "string"}},
 			},
@@ -201,8 +190,7 @@ func TestPatchUserMigration(t *testing.T) {
 			want:        map[string]any{"givenName": "Ada", "country": "CH"},
 		},
 		{
-			name:       "tighten validation",
-			objectType: "migration-tighten",
+			name: "tighten validation",
 			v1: map[string]any{
 				"properties": map[string]any{"country": map[string]any{"type": "string"}},
 			},
@@ -217,8 +205,7 @@ func TestPatchUserMigration(t *testing.T) {
 			want:        map[string]any{"country": "CH"},
 		},
 		{
-			name:       "rename an attribute",
-			objectType: "migration-rename",
+			name: "rename an attribute",
 			v1: map[string]any{
 				"properties": map[string]any{
 					"givenName": map[string]any{"type": "string"},
@@ -241,8 +228,7 @@ func TestPatchUserMigration(t *testing.T) {
 			want:     map[string]any{"givenName": "Ada", "lastName": "Lovelace"},
 		},
 		{
-			name:       "remove an attribute",
-			objectType: "migration-remove",
+			name: "remove an attribute",
 			v1: map[string]any{
 				"properties": map[string]any{
 					"givenName": map[string]any{"type": "string"},
@@ -261,8 +247,7 @@ func TestPatchUserMigration(t *testing.T) {
 			want:        map[string]any{"givenName": "Ada"},
 		},
 		{
-			name:       "change an attribute's type",
-			objectType: "migration-change-type",
+			name: "change an attribute's type",
 			v1: map[string]any{
 				"properties": map[string]any{
 					"givenName": map[string]any{"type": "string"},
@@ -287,8 +272,9 @@ func TestPatchUserMigration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			v1 := createRevision(t, tc.objectType, 1, tc.v1)
-			v2 := createRevision(t, tc.objectType, 2, tc.v2)
+			objectType := "migration-" + helpers.RandString(8)
+			v1 := createRevision(t, objectType, 1, tc.v1)
+			v2 := createRevision(t, objectType, 2, tc.v2)
 			userID := createUser(t, v1, tc.stored)
 
 			if tc.wantRefusal {
