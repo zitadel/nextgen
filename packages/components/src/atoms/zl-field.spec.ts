@@ -308,18 +308,28 @@ describe("<zl-field> events", () => {
     field.name = "pw";
     root.appendChild(field);
     await field.updateComplete;
-    const seenByPage: string[] = [];
-    document.addEventListener("zl-input", () => seenByPage.push("input"), true);
-    const own: string[] = [];
-    field.addEventListener("zl-input", () => own.push("input"));
+    const eventsSeenByPage: string[] = [];
+    document.addEventListener(
+      "zl-input",
+      () => {
+        eventsSeenByPage.push("input");
+      },
+      true,
+    );
+    const eventsSeenByWidget: string[] = [];
+    field.addEventListener("zl-input", () => {
+      eventsSeenByWidget.push("input");
+    });
     const native = field.shadowRoot?.querySelector("input");
-    if (!native) throw new Error("no native input");
+    if (!native) {
+      throw new Error("no native input");
+    }
 
     native.value = "hunter2";
     native.dispatchEvent(new Event("input", { bubbles: true }));
 
-    expect(own).toEqual(["input"]);
-    expect(seenByPage).toEqual([]);
+    expect(eventsSeenByWidget).toEqual(["input"]);
+    expect(eventsSeenByPage).toEqual([]);
     host.remove();
   });
 });

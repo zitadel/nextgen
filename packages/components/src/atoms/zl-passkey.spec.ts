@@ -173,17 +173,20 @@ describe("<zl-passkey>", () => {
       ceremony: "authenticate",
       options: { challenge: "AAAA" },
     });
-    const seenByPage: string[] = [];
-    for (const target of [window, document]) {
-      for (const capture of [true, false]) {
-        target.addEventListener("zl-passkey-result", () => seenByPage.push("proof"), capture);
+    const eventsSeenByPage: string[] = [];
+    const recordPageEvent = (): void => {
+      eventsSeenByPage.push("proof");
+    };
+    for (const pageTarget of [window, document]) {
+      for (const useCapture of [true, false]) {
+        pageTarget.addEventListener("zl-passkey-result", recordPageEvent, useCapture);
       }
     }
     const done = nextEvent(el, "zl-passkey-result");
     root.appendChild(el);
     await done;
 
-    expect(seenByPage).toEqual([]);
+    expect(eventsSeenByPage).toEqual([]);
   });
 
   it("decodes allowCredentials descriptors into ArrayBuffer ids", async () => {

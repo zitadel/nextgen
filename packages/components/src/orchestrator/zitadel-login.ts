@@ -1283,11 +1283,11 @@ export class ZitadelLogin extends ZitadelSurface {
     this.clearStaleErrors(name);
     // The widget never broadcasts a password or one-time-code value through its
     // own events. It cannot hide the input from other scripts on the same page.
-    const field = this.response?.step.fields?.find((f) => f.name === name);
-    const tokens = (field?.autocomplete ?? "").toLowerCase().split(/\s+/);
-    const isSecret =
-      field?.type === "password" ||
-      tokens.some((token) => ["current-password", "new-password", "one-time-code"].includes(token));
+    const field = this.response?.step.fields?.find((candidate) => candidate.name === name);
+    const autocompleteTokens = (field?.autocomplete ?? "").toLowerCase().split(/\s+/);
+    const secretTokens = ["current-password", "new-password", "one-time-code"];
+    const hasSecretToken = autocompleteTokens.some((token) => secretTokens.includes(token));
+    const isSecret = field?.type === "password" || hasSecretToken;
     if (isSecret) {
       return;
     }

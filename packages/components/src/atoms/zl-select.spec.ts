@@ -165,21 +165,26 @@ describe("<zl-select> markup", () => {
     el.options = OPTIONS;
     root.appendChild(el);
     await el.updateComplete;
-    const seenByPage: string[] = [];
-    for (const target of [window, document]) {
-      for (const capture of [true, false]) {
-        target.addEventListener("zl-change", () => seenByPage.push("change"), capture);
+    const eventsSeenByPage: string[] = [];
+    const recordPageEvent = (): void => {
+      eventsSeenByPage.push("change");
+    };
+    for (const pageTarget of [window, document]) {
+      for (const useCapture of [true, false]) {
+        pageTarget.addEventListener("zl-change", recordPageEvent, useCapture);
       }
     }
-    const own: string[] = [];
-    el.addEventListener("zl-change", () => own.push("change"));
+    const eventsSeenByWidget: string[] = [];
+    el.addEventListener("zl-change", () => {
+      eventsSeenByWidget.push("change");
+    });
     const select = native(el);
 
     select.value = "us";
     select.dispatchEvent(new Event("change", { bubbles: true }));
 
-    expect(own).toEqual(["change"]);
-    expect(seenByPage).toEqual([]);
+    expect(eventsSeenByWidget).toEqual(["change"]);
+    expect(eventsSeenByPage).toEqual([]);
   });
 
   it("lets the user clear back to the empty option", async () => {

@@ -134,18 +134,24 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   describe("zitadel-flow-input", () => {
-    function serveField(kind: CreateFlow201StepFieldsItem["type"], autocomplete?: string): void {
+    type FieldKind = CreateFlow201StepFieldsItem["type"];
+
+    const TYPED_VALUE = "s3cret";
+
+    /** Serves a first step that holds a single field `f` of the given kind and autocomplete. */
+    function serveStepWithField(kind: FieldKind, autocomplete?: string): void {
+      const step: CreateFlow201["step"] = {
+        name: "challenge",
+        texts: { title_key: "identifier.title" },
+        fields: [{ name: "f", type: kind, text_key: "identifier.field.email", autocomplete }],
+        actions: [{ name: "submit", kind: "submit", text_key: "submit.signin", primary: true }],
+        gates: {},
+      };
       const body: CreateFlow201 = {
         id: "flow_test",
         session_id: "sess_test",
         session_token: "st_test",
-        step: {
-          name: "challenge",
-          texts: { title_key: "identifier.title" },
-          fields: [{ name: "f", type: kind, text_key: "identifier.field.email", autocomplete }],
-          actions: [{ name: "submit", kind: "submit", text_key: "submit.signin", primary: true }],
-          gates: {},
-        },
+        step,
         branding: {},
       };
       server.use(
@@ -153,38 +159,96 @@ describe("<zitadel-login> against the typed Flow API", () => {
       );
     }
 
-    /** What a page script listening on the document sees while a visitor types "s3cret". */
-    async function seenWhileTyping(
-      kind: CreateFlow201StepFieldsItem["type"],
+    /** Types the value into the field `f` and returns what a page listener saw on the document. */
+    async function flowInputEventsWhileTyping(
+      kind: FieldKind,
       autocomplete?: string,
     ): Promise<unknown[]> {
-      serveField(kind, autocomplete);
+      serveStepWithField(kind, autocomplete);
       const element = await mount(host);
       await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="f"]'));
-      const seen: unknown[] = [];
-      const listener = (event: Event): void => {
-        if (event instanceof CustomEvent) seen.push(event.detail);
+      const details: unknown[] = [];
+      const recordDetail = (event: Event): void => {
+        if (event instanceof CustomEvent) {
+          details.push(event.detail);
+        }
       };
-      document.addEventListener("zitadel-flow-input", listener);
-      type(element, "f", "s3cret");
-      document.removeEventListener("zitadel-flow-input", listener);
-      return seen;
+      document.addEventListener("zitadel-flow-input", recordDetail);
+      type(element, "f", TYPED_VALUE);
+      document.removeEventListener("zitadel-flow-input", recordDetail);
+      return details;
     }
 
-    it("is not dispatched for a password field", async () => {
-      expect(await seenWhileTyping("password", "current-password")).toEqual([]);
-    });
+    const rows: ReadonlyArray<{
+      kind: FieldKind;
+      autocomplete?: string;
+      secret: boolean;
+      description: string;
+    }> = [
+      {
+        kind: "password",
+        autocomplete: "current-password",
+        secret: true,
+        description: "a password field for the current password is not dispatched",
+      },
+      {
+        kind: "password",
+        secret: true,
+        description: "a password field without an autocomplete token is not dispatched",
+      },
+      {
+        kind: "password",
+        autocomplete: "new-password",
+        secret: true,
+        description: "a password field for a new password is not dispatched",
+      },
+      {
+        kind: "text",
+        autocomplete: "one-time-code",
+        secret: true,
+        description: "a one-time-code field is not dispatched",
+      },
+      {
+        kind: "text",
+        autocomplete: "ONE-TIME-CODE",
+        secret: true,
+        description: "a one-time-code token in uppercase is not dispatched",
+      },
+      {
+        kind: "text",
+        autocomplete: "section-x one-time-code",
+        secret: true,
+        description: "a one-time-code token among several tokens is not dispatched",
+      },
+      {
+        kind: "email",
+        autocomplete: "username",
+        secret: false,
+        description: "an email field for a username is dispatched with its name and value",
+      },
+      {
+        kind: "text",
+        secret: false,
+        description: "a plain text field without an autocomplete token is dispatched",
+      },
+      {
+        kind: "tel",
+        autocomplete: "tel",
+        secret: false,
+        description: "a telephone field is dispatched",
+      },
+      {
+        kind: "number",
+        secret: false,
+        description: "a number field is dispatched",
+      },
+    ];
 
-    it("is not dispatched for a password type without an autocomplete token", async () => {
-      expect(await seenWhileTyping("password")).toEqual([]);
-    });
+    it.each(rows)("$description", async ({ kind, autocomplete, secret }) => {
+      const details = await flowInputEventsWhileTyping(kind, autocomplete);
 
-    it("is not dispatched for a one-time-code field", async () => {
-      expect(await seenWhileTyping("text", "one-time-code")).toEqual([]);
-    });
-
-    it("is dispatched with name and value for an email field", async () => {
-      expect(await seenWhileTyping("email", "username")).toEqual([{ name: "f", value: "s3cret" }]);
+      const expected = secret ? [] : [{ name: "f", value: TYPED_VALUE }];
+      expect(details).toEqual(expected);
     });
   });
 

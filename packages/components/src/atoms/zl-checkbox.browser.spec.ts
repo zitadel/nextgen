@@ -85,21 +85,28 @@ describe("<zl-checkbox> form participation (chromium)", () => {
     checkbox.name = "terms";
     root.appendChild(checkbox);
     await checkbox.updateComplete;
-    const seenByPage: string[] = [];
-    for (const target of [window, document]) {
-      for (const capture of [true, false]) {
-        target.addEventListener("zl-change", () => seenByPage.push("change"), capture);
+    const eventsSeenByPage: string[] = [];
+    const recordPageEvent = (): void => {
+      eventsSeenByPage.push("change");
+    };
+    for (const pageTarget of [window, document]) {
+      for (const useCapture of [true, false]) {
+        pageTarget.addEventListener("zl-change", recordPageEvent, useCapture);
       }
     }
-    const own: string[] = [];
-    checkbox.addEventListener("zl-change", () => own.push("change"));
+    const eventsSeenByWidget: string[] = [];
+    checkbox.addEventListener("zl-change", () => {
+      eventsSeenByWidget.push("change");
+    });
     const input = checkbox.shadowRoot?.querySelector("input");
-    if (!input) throw new Error("no native checkbox");
+    if (!input) {
+      throw new Error("no native checkbox");
+    }
 
     input.click();
 
-    expect(own).toEqual(["change"]);
-    expect(seenByPage).toEqual([]);
+    expect(eventsSeenByWidget).toEqual(["change"]);
+    expect(eventsSeenByPage).toEqual([]);
     host.remove();
   });
 
