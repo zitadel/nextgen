@@ -20,7 +20,6 @@ import {
   OIDC_MOCK_CLIENT_ID,
   OIDC_MOCK_CLIENT_SECRET,
   OIDC_MOCK_REDIRECT_PATH,
-  OIDC_MOCK_SLUG,
 } from "./oidc-mock.mjs";
 import { canListen, createJourneyPortAllocator } from "./ports.mjs";
 import {
@@ -42,6 +41,8 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
 const repoRoot = resolve(projectRoot, "../..");
+// Where `moon run oidc-mock:build` writes the mock OIDC provider.
+const oidcMockBinary = join(repoRoot, "tools/oidc-mock/dist/oidc-mock");
 
 const options = parseArgsOrExit([...journeyArgsFromEnv(process.env), ...process.argv.slice(2)]);
 if (options.help) {
@@ -107,7 +108,7 @@ try {
       .join(", ")}`,
   );
   log(`runtime: ${options.runtime}`);
-  if (!options.oidcMockBinary) {
+  if (!existsSync(oidcMockBinary)) {
     log("no mock OIDC provider binary (moon run oidc-mock:build); the specs that need it skip");
   }
   if (options.runtime === "docker") {
@@ -175,17 +176,7 @@ function parseArgsOrExit(args) {
     const parsed = parseLocalJourneyArgs(args);
     if (!parsed.help) {
       assertPrebuiltTarballs(parsed, process.env);
-      // The lane starts the mock from its own work dir, so a relative path
-      // must not depend on the cwd.
-      if (parsed.oidcMockBinary) {
-        parsed.oidcMockBinary = resolve(repoRoot, parsed.oidcMockBinary);
-      }
-      // By default the binary `moon run oidc-mock:build` writes, when it is there.
-      const builtOidcMock = join(repoRoot, "tools/oidc-mock/dist/oidc-mock");
-      if (!parsed.oidcMockBinary && existsSync(builtOidcMock)) {
-        parsed.oidcMockBinary = builtOidcMock;
-      }
-      assertOidcMock(parsed, process.env);
+      assertOidcMock(parsed, oidcMockBinary);
     }
     return parsed;
   } catch (error) {
@@ -220,9 +211,6 @@ Options:
                            app then reaches its server the way it reaches a
                            hosted deployment
   --tarballs-dir <path>    Use prebuilt release npm tarballs
-  --oidc-mock-binary <path> Mock OIDC provider the framework lanes start
-                           (default: tools/oidc-mock/dist/oidc-mock when built;
-                           without it the specs that need it skip)
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
 
@@ -230,12 +218,10 @@ Environment (the command line's arguments win):
   JOURNEY_CI=1             --ci
   JOURNEY_CONCURRENCY      --concurrency
   JOURNEY_MATRIX           --matrix
-  JOURNEY_OIDC_MOCK_BINARY --oidc-mock-binary
   JOURNEY_RUNTIME          --runtime
   JOURNEY_TARBALLS_DIR     --tarballs-dir
   JOURNEY_WORK_DIR         --work-dir
   JOURNEY_TARBALLS_REQUIRED=1  refuse to pack without --tarballs-dir
-  JOURNEY_OIDC_MOCK_REQUIRED=1 refuse to run without the mock OIDC provider binary
 `);
 }
 
@@ -337,7 +323,7 @@ async function createJourneyContext(variant, framework) {
   // The testkit lane boots its own instance and never talks to the mock. A
   // docker runtime cannot reach a mock that listens on the host only.
   const oidcMockPort =
-    variant.suite !== "testkit" && options.runtime !== "docker" && options.oidcMockBinary
+    variant.suite !== "testkit" && options.runtime !== "docker" && existsSync(oidcMockBinary)
       ? await resolveFrameworkPort("JOURNEY_OIDC_MOCK_PORT")
       : undefined;
   const appUrl = `http://localhost:${appPort}`;
@@ -369,7 +355,7 @@ async function createJourneyContext(variant, framework) {
 async function resolveFrameworkPort(envName, preferred) {
   const explicit = process.env[envName];
   if (explicit) {
-    const port = validatePortValue(explicit, envName);
+    const port = parsePort(explicit, envName);
     if (usedPorts.has(port)) {
       throw new Error(`${envName}=${port} is already reserved by another journey service`);
     }
@@ -498,15 +484,9 @@ async function runFrameworkJourney(context) {
             // prepare-app note.
             JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
             JOURNEY_PRESET: context.preset,
-            // The mock OIDC provider, for the specs that sign in through it.
-            ...(context.oidcMock
-              ? {
-                  JOURNEY_OIDC_MOCK_URL: context.oidcMock.issuer,
-                  JOURNEY_OIDC_MOCK_SLUG: OIDC_MOCK_SLUG,
-                  JOURNEY_OIDC_MOCK_CLIENT_ID: OIDC_MOCK_CLIENT_ID,
-                  JOURNEY_OIDC_MOCK_CLIENT_SECRET: OIDC_MOCK_CLIENT_SECRET,
-                }
-              : {}),
+            // Always explicit ("" = no mock in this lane): the specs that
+            // sign in through the mock skip without it.
+            JOURNEY_OIDC_MOCK_URL: context.oidcMock?.issuer ?? "",
           },
         },
       ),
@@ -563,12 +543,16 @@ async function startLaneEdge(context, prefix) {
  */
 async function startLaneOidcMock(context, prefix) {
   await mkdir(context.frameworkWorkDir, { recursive: true });
-  const issuer = `http://localhost:${context.oidcMockPort}/`;
-  const child = startChild(options.oidcMockBinary, [], {
+  // 127.0.0.1, not localhost: the mock listens there only, and the hop back
+  // to the app on localhost must be cross-site, as from a real provider. The
+  // trailing slash is part of the issuer the relying party compares.
+  const issuer = `http://127.0.0.1:${context.oidcMockPort}/`;
+  const child = startChild(oidcMockBinary, [], {
     cwd: context.frameworkWorkDir,
     env: {
       ...process.env,
       PORT: String(context.oidcMockPort),
+      ISSUER: issuer,
       REDIRECT_URI: `${context.appUrl}${OIDC_MOCK_REDIRECT_PATH}`,
       USERS_FILE: join(repoRoot, "tools/oidc-mock/users.json"),
       CLIENT_ID: OIDC_MOCK_CLIENT_ID,
@@ -1060,11 +1044,12 @@ async function teardownJourney(context) {
   await resetLocalRuntime(context);
 }
 
+// A child killed by a signal keeps exitCode null and sets signalCode instead.
 async function stopChild(child) {
-  if (child.exitCode !== null) return;
+  if (child.exitCode !== null || child.signalCode !== null) return;
   signalChild(child, "SIGTERM");
   const exited = await waitForExit(child, 5000);
-  if (!exited && child.exitCode === null) {
+  if (!exited && child.exitCode === null && child.signalCode === null) {
     signalChild(child, "SIGKILL");
     await waitForExit(child, 5000);
   }
@@ -1086,7 +1071,7 @@ function signalChild(child, signal) {
 
 function waitForExit(child, timeoutMs) {
   return new Promise((resolveWait) => {
-    if (child.exitCode !== null) {
+    if (child.exitCode !== null || child.signalCode !== null) {
       resolveWait(true);
       return;
     }

@@ -35,11 +35,8 @@ the repo root.
   consumer suite in `e2e/journey/fixtures/testkit/`. It never sets
   `ZITADEL_SERVER_BINARY` or `NEXTGEN_*`: proving the published binary works
   unconfigured is the point.
-- Each framework lane starts `tools/oidc-mock` before prepare-app, and specs
-  read `JOURNEY_OIDC_MOCK_URL`, `_SLUG`, `_CLIENT_ID` and `_CLIENT_SECRET`.
-  Framework lanes set `NEXTGEN_HTTPCLIENT_ALLOW_LIST` so the server may call
-  it; the testkit lane does not. Specs type the account names in
-  `tools/oidc-mock/users.json`.
+- Skip a spec that needs the mock OIDC provider when `JOURNEY_OIDC_MOCK_URL`
+  is unset: lanes on `--runtime docker` or without a built mock start none.
 
 ## Packages and the registry
 

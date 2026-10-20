@@ -19,7 +19,7 @@
     "demo-nuxt-mock": "playwright test --config demo-nuxt/playwright.config.mts",
     "e2e-local": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} node journey/scripts/run-local.mjs",
     "journey": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} node journey/scripts/run-local.mjs",
-    "journey-local": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} JOURNEY_TARBALLS_REQUIRED=${JOURNEY_TARBALLS_REQUIRED-1} JOURNEY_OIDC_MOCK_REQUIRED=${JOURNEY_OIDC_MOCK_REQUIRED-1} node journey/scripts/run-local.mjs --ci --runtime binary"
+    "journey-local": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} JOURNEY_TARBALLS_REQUIRED=${JOURNEY_TARBALLS_REQUIRED-1} node journey/scripts/run-local.mjs --ci --runtime binary"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

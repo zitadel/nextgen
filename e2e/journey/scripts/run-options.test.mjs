@@ -29,7 +29,6 @@ test("local journey defaults to the full framework matrix", () => {
     image: "",
     keep: false,
     matrix: "full",
-    oidcMockBinary: "",
     preexistingApp: false,
     preset: "",
     remote: false,
@@ -62,7 +61,6 @@ test("local journey can select one framework and tune concurrency", () => {
       image: "nextgen:test",
       keep: true,
       matrix: "full",
-      oidcMockBinary: "",
       preexistingApp: false,
       preset: "",
       remote: false,
@@ -82,7 +80,6 @@ test("local journey can scaffold with a sign-in preset", () => {
     image: "",
     keep: false,
     matrix: "full",
-    oidcMockBinary: "",
     preexistingApp: false,
     preset: "passkey-first",
     remote: false,
@@ -102,7 +99,6 @@ test("the testkit suite pins the next framework and rejects an explicit one", ()
     image: "",
     keep: false,
     matrix: "full",
-    oidcMockBinary: "",
     preexistingApp: false,
     preset: "",
     remote: false,
@@ -126,7 +122,6 @@ test("local journey can request the binary runtime explicitly", () => {
     image: "",
     keep: false,
     matrix: "full",
-    oidcMockBinary: "",
     preexistingApp: false,
     preset: "",
     remote: false,
@@ -226,7 +221,6 @@ test("the JOURNEY_* variables stand for the options CI sets", () => {
       JOURNEY_CI: "1",
       JOURNEY_CONCURRENCY: "8",
       JOURNEY_MATRIX: "single",
-      JOURNEY_OIDC_MOCK_BINARY: "/x/oidc-mock",
       JOURNEY_RUNTIME: "binary",
       JOURNEY_TARBALLS_DIR: "dist/release/1.0.0/npm",
       JOURNEY_WORK_DIR: "/tmp/ci-journey",
@@ -237,8 +231,6 @@ test("the JOURNEY_* variables stand for the options CI sets", () => {
       "8",
       "--matrix",
       "single",
-      "--oidc-mock-binary",
-      "/x/oidc-mock",
       "--runtime",
       "binary",
       "--tarballs-dir",
@@ -300,25 +292,13 @@ test("the e2e:all lane refuses to pack beside the other lanes", () => {
   assert.doesNotThrow(() => assertPrebuiltTarballs(handedOver, lane));
 });
 
-test("the runner takes the mock OIDC provider binary from a flag", () => {
-  assert.equal(
-    parseLocalJourneyArgs(["--oidc-mock-binary", "/x/oidc-mock"]).oidcMockBinary,
-    "/x/oidc-mock",
-  );
-  assert.throws(() => parseLocalJourneyArgs(["--oidc-mock-binary"]), /requires a value/);
-});
-
-test("the e2e:journey-local lane refuses to run without the mock OIDC provider", () => {
-  const lane = { JOURNEY_OIDC_MOCK_REQUIRED: "1" };
-  assert.throws(() => assertOidcMock({ oidcMockBinary: "" }, lane), /oidc-mock:build/);
-  assert.throws(
-    () => assertOidcMock({ oidcMockBinary: "/does/not/exist/oidc-mock" }, lane),
-    /oidc-mock:build/,
-  );
+test("--ci refuses to run without the mock OIDC provider", () => {
+  const missing = "/does/not/exist/oidc-mock";
+  assert.throws(() => assertOidcMock({ ci: true }, missing), /oidc-mock:build/);
   // Any existing file stands in for the built binary.
-  assert.doesNotThrow(() => assertOidcMock({ oidcMockBinary: process.execPath }, lane));
+  assert.doesNotThrow(() => assertOidcMock({ ci: true }, process.execPath));
   // Run by hand, a missing binary only skips the mock.
-  assert.doesNotThrow(() => assertOidcMock({ oidcMockBinary: "" }, {}));
+  assert.doesNotThrow(() => assertOidcMock({ ci: false }, missing));
 });
 
 test("local journey rejects invalid options", () => {

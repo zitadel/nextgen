@@ -27,7 +27,7 @@ func startMock(t *testing.T) string {
 	issuer := "http://" + srv.Listener.Addr().String() + "/"
 	handler, err := newHandler(config{
 		Issuer:       issuer,
-		RedirectURIs: []string{redirectURI},
+		RedirectURI:  redirectURI,
 		ClientID:     "journey",
 		ClientSecret: "journey-secret",
 		UsersFile:    "users.json",

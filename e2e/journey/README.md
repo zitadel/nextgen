@@ -72,10 +72,10 @@ moon run e2e:journey -- --tarballs-dir dist/release/<version>/npm
   building one and implies `--runtime docker`.
 - `--tarballs-dir <path>` uses prebuilt release npm tarballs instead of running
   `moon run release:pack`.
-- `--oidc-mock-binary <path>` is the mock OIDC provider each framework lane
-  starts (`tools/oidc-mock`). The default is `tools/oidc-mock/dist/oidc-mock`
-  when `moon run oidc-mock:build` wrote it; without it the specs that sign in
-  through it skip. A docker runtime starts no mock.
+- Each framework lane starts the mock OIDC provider from
+  `tools/oidc-mock/dist/oidc-mock` (`moon run oidc-mock:build`). Without it the
+  specs that sign in through it skip, and `--ci` refuses to start. A docker
+  runtime starts no mock.
 - `--keep` keeps the temporary work directory after success.
 - `--work-dir <path>` uses an explicit work directory.
 
@@ -89,11 +89,7 @@ Useful environment overrides:
 - `JOURNEY_TARBALLS_REQUIRED=1` to refuse to pack without them. The
   `e2e:journey-local` lane sets it: the e2e lanes beside it read the dist
   folders a pack wipes and rebuilds.
-- `JOURNEY_OIDC_MOCK_BINARY` for `--oidc-mock-binary`
 - `JOURNEY_OIDC_MOCK_PORT` for single-framework runs only
-- `JOURNEY_OIDC_MOCK_REQUIRED=1` to refuse to run without the mock OIDC
-  provider binary. The `e2e:journey-local` lane sets it, so a missing binary
-  fails instead of skipping the specs that need it.
 - `JOURNEY_CI=1`, `JOURNEY_CONCURRENCY`, `JOURNEY_MATRIX`, `JOURNEY_RUNTIME`
   and `JOURNEY_WORK_DIR` for `--ci`, `--concurrency`, `--matrix`, `--runtime`
   and `--work-dir`. Arguments on the command line win. CI's turbo job sets
