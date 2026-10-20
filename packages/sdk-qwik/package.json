@@ -47,6 +47,7 @@
     "@qwik.dev/core": "^2.0.0-beta.45"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@qwik.dev/core": "catalog:",
     "@types/node": "catalog:",
     "@vitest/browser": "catalog:",

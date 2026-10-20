@@ -301,6 +301,16 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: env -u CI -u GITHUB_ACTIONS moon run release:version
 
+      # npm trusted publishing cannot create a package, so release publish
+      # stops a version that includes a public package npm has never seen, or
+      # one with only prereleases of the pre tag (scripts/release-dist-tags.mjs).
+      # It used to find out only after the version commit was on main (run
+      # 39324183811). Asking npm here fails the version PR and its merge group
+      # instead, with the one-time commands that fix it.
+      - name: Check npm can publish the version PR's packages
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: node scripts/release.mjs check-npm
+
       - name: Pack version PR artifacts
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: env -u CI -u GITHUB_ACTIONS moon run release:pack

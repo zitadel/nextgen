@@ -3,6 +3,7 @@ import type {
   NextgenMiddlewareOptions,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
+import { joinURL } from "ufo";
 import type { EventHandler, H3Event } from "h3";
 
 import { useRuntimeConfig } from "#imports";
@@ -12,19 +13,25 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
+  proxySessionCookies,
+  SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
+  serializeSessionCookie,
 } from "@zitadel/sdk-core/middleware";
 import {
   defineEventHandler,
   getCookie,
-  parseCookies,
-  deleteCookie,
+  appendResponseHeader,
+  setResponseHeader,
   sendRedirect,
   getRequestURL,
   getRequestHeader,
+  getRequestHeaders,
+  getRequestIP,
+  getMethod,
   setResponseStatus,
-  readRawBody,
+  toWebRequest,
 } from "h3";
 
 import { resolveProjectSecret, resolveUrl } from "../lib/settings";
@@ -52,20 +59,20 @@ declare module "h3" {
  * receives origin information. `X-Forwarded-Host` and `X-Forwarded-Proto` are set
  * only when absent, preserving values injected by an upstream CDN.
  *
- * Node.js header values may be a string or an array of strings; arrays are
- * joined with `", "` to produce a single header value.
+ * The request is read through h3's accessors, never `event.node`, so this runs
+ * wherever Nitro does: h3 joins a repeated header with `", "` into one value.
  *
  * @param event - The current H3 event.
  * @returns A `Headers` instance safe to forward to the upstream service.
  */
 function buildUpstreamHeaders(event: H3Event): Headers {
   const headers = new Headers();
-  for (const [key, value] of Object.entries(event.node.req.headers)) {
+  for (const [key, value] of Object.entries(getRequestHeaders(event))) {
     const lower = key.toLowerCase();
     if (!value || HOP_BY_HOP.has(lower) || INTERNAL_HEADERS.has(lower)) {
       continue;
     }
-    headers.set(key, Array.isArray(value) ? value.join(", ") : value);
+    headers.set(key, value);
   }
 
   const url = getRequestURL(event);
@@ -74,7 +81,9 @@ function buildUpstreamHeaders(event: H3Event): Headers {
   // upstream auth server sees the full proxy path. We never skip this even when
   // a chain is already present — a load balancer may have set XFF before the
   // request reached this Nitro server, and our hop must still be recorded.
-  const socketIp = (event.node.req.socket as { remoteAddress?: string } | undefined)?.remoteAddress;
+  // `getRequestIP` without `xForwardedFor` answers the address the runtime
+  // reports for the connection, never a client-supplied header.
+  const socketIp = getRequestIP(event);
   if (socketIp) {
     const existingXff = headers.get("x-forwarded-for");
     headers.set("x-forwarded-for", existingXff ? `${existingXff}, ${socketIp}` : socketIp);
@@ -161,7 +170,7 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, url, proxyPath, urlObj, proxyTimeoutMs);
+      return proxyRequest(event, url, proxyPath, urlObj, projectId, proxyTimeoutMs);
     }
 
     return handleAuth(event, {
@@ -182,13 +191,16 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
 
 /**
  * Forwards a `/__nextgen/*` request to the upstream auth backend and streams
- * the response back verbatim, including `Set-Cookie` headers.
- * Hop-by-hop headers are stripped in both directions.
+ * the response back, including its `Set-Cookie` headers. Hop-by-hop headers are
+ * stripped in both directions, and the session cookie travels under this
+ * project's name in the browser and the server's name upstream
+ * ({@link proxySessionCookies}).
  *
  * @param event      - The current H3 event.
  * @param authUrl    - Base URL of the auth backend.
  * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
  * @param url        - The parsed request URL.
+ * @param projectId  - The project this app signs its users in to.
  * @returns The upstream response body stream.
  */
 async function proxyRequest(
@@ -196,17 +208,38 @@ async function proxyRequest(
   authUrl: string,
   proxyPath: string,
   url: URL,
+  projectId: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<ReadableStream<Uint8Array> | null> {
   const suffix = url.pathname.slice(proxyPath.length);
-  const target = `${authUrl}${suffix}${url.search}`;
+  const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
-  const method = event.node.req.method ?? "GET";
+  const method = getMethod(event);
   const hasBody = !["GET", "HEAD"].includes(method);
-  const rawBody = hasBody ? await readRawBody(event, false) : undefined;
-  const body = rawBody != null ? new Uint8Array(rawBody) : undefined;
+  // Read through the web Request, as `Buffer` is not there on every runtime.
+  const rawBody = hasBody ? await toWebRequest(event).arrayBuffer() : undefined;
+  const body =
+    rawBody !== undefined && rawBody.byteLength > 0 ? new Uint8Array(rawBody) : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event);
+  const sessionCookies = proxySessionCookies(
+    {
+      method,
+      path: suffix,
+      search: url.search,
+      cookie: getRequestHeader(event, "cookie") ?? null,
+      requestUrl: url,
+      forwardedProto: getRequestHeader(event, "x-forwarded-proto") ?? null,
+      forwardedHost: getRequestHeader(event, "x-forwarded-host") ?? null,
+    },
+    projectId,
+    { url: authUrl, timeoutMs: proxyTimeoutMs },
+  );
+  if (sessionCookies.upstreamCookie === null) {
+    upstreamHeaders.delete("cookie");
+  } else {
+    upstreamHeaders.set("cookie", sessionCookies.upstreamCookie);
+  }
 
   // ADR 036: the current browser flow needs the confidential project secret
   // only for the handoff exchange. Never make the public proxy an
@@ -214,9 +247,7 @@ async function proxyRequest(
   // the future publishable-key exchange path.
   if (requiresProjectSecret(method, suffix) && !upstreamHeaders.has("authorization")) {
     const config = useRuntimeConfig();
-    const projectSecret = resolveProjectSecret(
-      config.nextgen as Record<string, unknown> | undefined,
-    );
+    const projectSecret = resolveProjectSecret(config.nextgen);
     if (projectSecret) {
       upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
     }
@@ -231,31 +262,34 @@ async function proxyRequest(
   });
 
   // Build a web-standard Response with filtered headers. This is the
-  // canonical representation — we write it to event.node.res at the end.
+  // canonical representation — we write it to the h3 event at the end.
   // The app's own request URL: the origin a proxied redirect may name, and
   // the base a relative one resolves against.
   const responseHeaders = filterResponseHeaders(upstream.headers, getRequestURL(event).toString());
 
-  const setCookieHeaders = upstream.headers.getSetCookie?.() ?? [];
-  for (const cookie of setCookieHeaders) {
+  const answer = await sessionCookies.toBrowser(upstream);
+  for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
   }
+  if (answer.setCookies.length > 0) {
+    responseHeaders.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
+  }
 
-  const response = new Response(upstream.body, {
+  const response = new Response(answer.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
 
   // Write the response to the H3 event.
-  event.node.res.statusCode = response.status;
+  setResponseStatus(event, response.status);
   for (const [key, value] of response.headers.entries()) {
     if (key.toLowerCase() === "set-cookie") continue;
-    event.node.res.setHeader(key, value);
+    setResponseHeader(event, key, value);
   }
   // Use getSetCookie() so multiple Set-Cookie values aren't collapsed.
   const finalCookies = response.headers.getSetCookie?.() ?? [];
   for (const cookie of finalCookies) {
-    event.node.res.appendHeader("set-cookie", cookie);
+    appendResponseHeader(event, "set-cookie", cookie);
   }
 
   return response.body;
@@ -273,11 +307,10 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
 }
 
 /**
- * Judges the session and writes the auth result to `event.context`. Deletes
- * all `__nextgen*` cookies when they hold dead credentials. Redirects to the
- * login page on protected routes when nobody is signed in. When the backend
- * cannot say whether the session is live, the cookies stay and a protected
- * route answers `503`.
+ * Judges the session and writes the auth result to `event.context`, sets the
+ * session cookies the judgement asks for, and redirects to the login page on
+ * protected routes when nobody is signed in. When the backend cannot say
+ * whether the session is live, a protected route answers `503` instead.
  *
  * @param event - The current H3 event.
  * @param opts  - Auth handler options.
@@ -288,16 +321,18 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<str
 
   const authHeader = getRequestHeader(event, "authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cookieToken = getCookie(event, "__nextgen_session") ?? null;
-  const { auth, clearCookies, undecided } = await resolveSession(
-    { bearer: bearerToken, cookie: cookieToken },
+  const { auth, undecided, cookies } = await resolveSession(
+    {
+      bearer: bearerToken,
+      cookie: (name) => getCookie(event, name),
+      requestUrl: getRequestURL(event),
+      forwardedProto: getRequestHeader(event, "x-forwarded-proto") ?? null,
+      forwardedHost: getRequestHeader(event, "x-forwarded-host") ?? null,
+    },
     verification,
   );
 
   event.context.nextgenAuth = auth;
-  if (auth.isAuthenticated) {
-    return;
-  }
 
   // The backend could not say whether the session is live. The user may well
   // be signed in, so a protected route answers 503 rather than send them to
@@ -307,19 +342,19 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<str
     return "Service Unavailable";
   }
 
-  // Clearing cookies stops the browser from replaying dead credentials. A live
-  // session that signs no one in here (an anonymous one, whose sign-in may
-  // still complete, or one of another project) keeps its cookie, and so does
-  // one the backend gave no verdict on.
-  if (clearCookies) {
-    for (const name of Object.keys(parseCookies(event))) {
-      if (name.startsWith("__nextgen")) {
-        deleteCookie(event, name);
-      }
-    }
+  // A dead session's cookie is cleared so the browser stops replaying it, and a
+  // session of this project still under the shared name is copied to the
+  // project's own cookie. A live session that signs no one in here (an
+  // anonymous one, whose sign-in may still complete, or one of another project)
+  // keeps its cookie, and so does one the backend gave no verdict on.
+  for (const cookie of cookies) {
+    appendResponseHeader(event, "set-cookie", serializeSessionCookie(cookie));
+  }
+  if (cookies.length > 0) {
+    setResponseHeader(event, "cache-control", SESSION_COOKIE_CACHE_CONTROL);
   }
 
-  if (matchesRoutes(pathname, protectedRoutes)) {
+  if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
     await sendRedirect(event, loginRedirectUrl(loginPath, getRequestURL(event)).toString(), 302);
   }
   return undefined;

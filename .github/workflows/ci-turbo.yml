@@ -317,6 +317,12 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: turbo run version --filter=@zitadel/release
 
+      # As in ci.yml: a version PR fails here, not after it lands, when npm
+      # cannot take one of its packages.
+      - name: Check npm can publish the version PR's packages
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: node scripts/release.mjs check-npm
+
       - name: Pack version PR artifacts
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: turbo run pack --filter=@zitadel/release

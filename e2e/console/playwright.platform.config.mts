@@ -18,7 +18,8 @@ import {
  * Same server as `playwright.embedded.config.mts` (the built binary serving
  * the console and the API at one origin, no Vite proxy, no project secret in
  * any console request), but with `platform.bootstrap_project` left at the
- * server default instead of switched off: the console signs people into the
+ * `zitadel start` default, on, instead of switched off (the server alone
+ * defaults it to off): the console signs people into the
  * platform project, and customer projects are managed through grants. That
  * is what the embedded lane cannot show, because its sign-ins run against the
  * harness's own project.

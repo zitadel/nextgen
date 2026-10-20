@@ -9,10 +9,9 @@
  */
 import { createRef } from "react";
 import { businessLocales } from "@zitadel/sdk-next/client";
-import type { ZitadelLogin, ZitadelSession } from "@zitadel/sdk-next/client";
 
-const loginRef = createRef<ZitadelLogin>();
-const sessionRef = createRef<ZitadelSession>();
+const loginRef = createRef<HTMLElementTagNameMap["zitadel-login"]>();
+const sessionRef = createRef<HTMLElementTagNameMap["zitadel-session"]>();
 
 export const fixtures = [
   // `ref`/`key` come from RefAttributes, `className` from HTMLAttributes;

@@ -131,6 +131,14 @@ type ReleaseContent struct {
 	Branding        *Branding
 }
 
+// Pointers returns one pointer per revision, under the handle it declares,
+// in canonical order. It refuses a revision without a handle or id, and two
+// revisions of the same resource. Build uses this for auto-pin bookkeeping
+// and the pointer cap before [NewRelease] / [ValidateRelease].
+func (c ReleaseContent) Pointers() ([]ReleasePointer, error) {
+	return c.pointers()
+}
+
 // pointers returns one pointer per revision, under the handle it declares,
 // in canonical order. It refuses a revision without a handle or id, and two
 // revisions of the same resource.
