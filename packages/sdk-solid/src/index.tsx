@@ -99,6 +99,22 @@ function proxyPathAttribute(proxyPath: string | undefined): string | undefined {
   return proxyPath === "" ? "/" : proxyPath;
 }
 
+/** Hands the widget's `zitadel-signout` and `zitadel-session-error` events to the callbacks in `props`. */
+function forwardSessionEvents(
+  el: HTMLElement,
+  props: {
+    onSignout?: (detail: ZitadelSignoutDetail) => void;
+    onSessionError?: (detail: ZitadelSessionErrorDetail) => void;
+  },
+): void {
+  el.addEventListener("zitadel-signout", (event) => {
+    if (event instanceof CustomEvent) props.onSignout?.(event.detail);
+  });
+  el.addEventListener("zitadel-session-error", (event) => {
+    if (event instanceof CustomEvent) props.onSessionError?.(event.detail);
+  });
+}
+
 /** Props of `ZitadelLogin`: the widget's own plus the standard HTML attributes. */
 export type ZitadelLoginSolidProps = ZitadelLoginProps &
   ZitadelWidgetAttributes & {
@@ -184,15 +200,19 @@ export function ZitadelLogout(props: ZitadelLogoutSolidProps): JSX.Element {
     <Dynamic
       component={widgetTags.logout}
       {...attributes()}
-      ref={props.ref}
       prop:project={props.project}
       project-id={props.project?.projectId ?? props.projectId}
       proxy-path={proxyPathAttribute(props.project?.proxyPath ?? props.proxyPath)}
       url={props.project?.url}
       post-sign-out-url={props.postSignOutUrl}
       theme={props.theme}
-      on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
-      on:zitadel-session-error={(event) => props.onSessionError?.(event.detail)}
+      ref={(el: HTMLElement) => {
+        // Bound here, ahead of the consumer's own ref callback: the props `Dynamic` applies
+        // reach the element in no fixed order, and an event raised the moment it mounts
+        // must not be lost.
+        forwardSessionEvents(el, props);
+        if (typeof props.ref === "function") props.ref(el as never);
+      }}
     />
   );
 }
@@ -214,7 +234,6 @@ export function ZitadelSession(props: ZitadelSessionSolidProps): JSX.Element {
     <Dynamic
       component={widgetTags.session}
       {...attributes()}
-      ref={props.ref}
       prop:project={props.project}
       project-id={props.project?.projectId ?? props.projectId}
       proxy-path={proxyPathAttribute(props.project?.proxyPath ?? props.proxyPath)}
@@ -225,8 +244,13 @@ export function ZitadelSession(props: ZitadelSessionSolidProps): JSX.Element {
       variant={props.variant}
       theme={props.theme}
       prop:suppressHeader={props.suppressHeader}
-      on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
-      on:zitadel-session-error={(event) => props.onSessionError?.(event.detail)}
+      ref={(el: HTMLElement) => {
+        // Bound here, ahead of the consumer's own ref callback: the props `Dynamic` applies
+        // reach the element in no fixed order, and an event raised the moment it mounts
+        // must not be lost.
+        forwardSessionEvents(el, props);
+        if (typeof props.ref === "function") props.ref(el as never);
+      }}
     />
   );
 }
