@@ -374,6 +374,145 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(completeEvents[0]?.detail.handoff_token).toBeTruthy();
   });
 
+  describe("zitadel-flow-input never carries a secret value", () => {
+    const SECRET = "Tr0ub4dor&3-typed-by-the-visitor";
+
+    /**
+     * Listens on `document`, where any script on the page (analytics included)
+     * can: the event is composed, so this sees exactly what a third party sees.
+     */
+    function listenOnDocument(): { details: unknown[]; stop: () => void } {
+      const details: unknown[] = [];
+      const listener = (event: Event): void => {
+        details.push((event as CustomEvent).detail);
+      };
+      document.addEventListener("zitadel-flow-input", listener);
+      return { details, stop: () => document.removeEventListener("zitadel-flow-input", listener) };
+    }
+
+    /** Serves one step with the given fields as the flow's first step. */
+    function serveStep(fields: Record<string, unknown>[]): void {
+      server.use(
+        http.post(
+          "*/flow",
+          () =>
+            HttpResponse.json(
+              {
+                id: "flow_test",
+                session_token: "st_test",
+                step: {
+                  name: "challenge",
+                  texts: { title_key: "identifier.title" },
+                  fields,
+                  actions: [{ name: "submit", text_key: "submit.signin", primary: true }],
+                  gates: {},
+                },
+                branding: {},
+              },
+              { status: 201 },
+            ),
+          { once: true },
+        ),
+      );
+    }
+
+    it("redacts the password, keeping the field name", async () => {
+      const element = await mount(host);
+      type(element, "email", "alice@acme.com");
+      submit(element);
+      await waitFor(() => element.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`));
+      const listening = listenOnDocument();
+      try {
+        type(element, PASSWORD_FIELD, SECRET);
+
+        expect(listening.details).toEqual([{ name: PASSWORD_FIELD, secret: true }]);
+        expect(JSON.stringify(listening.details)).not.toContain(SECRET);
+      } finally {
+        listening.stop();
+      }
+    });
+
+    it("keeps the value of a field that is not a secret", async () => {
+      const element = await mount(host);
+      const listening = listenOnDocument();
+      try {
+        type(element, "email", "alice@acme.com");
+
+        expect(listening.details).toEqual([
+          { name: "email", secret: false, value: "alice@acme.com" },
+        ]);
+      } finally {
+        listening.stop();
+      }
+    });
+
+    it.each([
+      ["a one-time code", { name: "code", type: "text", autocomplete: "one-time-code" }],
+      [
+        "a sectioned one-time code",
+        { name: "code", type: "text", autocomplete: "section-2fa one-time-code" },
+      ],
+      ["a recovery code", { name: "recovery", type: "text", autocomplete: "one-time-code" }],
+      [
+        "a current password under another type",
+        { name: "pin", type: "text", autocomplete: "current-password" },
+      ],
+      [
+        "a new password under another type",
+        { name: "pin", type: "text", autocomplete: "new-password" },
+      ],
+      ["a field of type password", { name: "secret_answer", type: "password" }],
+    ])("redacts %s, as the field definition says", async (_label, field) => {
+      serveStep([
+        { ...field, text_key: "identifier.field.email", required: true },
+        { name: "nickname", type: "text", text_key: "identifier.field.email" },
+      ]);
+      const element = await mount(host);
+      const listening = listenOnDocument();
+      try {
+        type(element, field.name, SECRET);
+        type(element, "nickname", "ally");
+
+        expect(listening.details).toEqual([
+          { name: field.name, secret: true },
+          { name: "nickname", secret: false, value: "ally" },
+        ]);
+        expect(JSON.stringify(listening.details)).not.toContain(SECRET);
+      } finally {
+        listening.stop();
+      }
+    });
+
+    it("redacts a field the step does not define", async () => {
+      const element = await mount(host);
+      const listening = listenOnDocument();
+      try {
+        type(element, "not-in-the-step", SECRET);
+
+        expect(listening.details).toEqual([{ name: "not-in-the-step", secret: true }]);
+        expect(JSON.stringify(listening.details)).not.toContain(SECRET);
+      } finally {
+        listening.stop();
+      }
+    });
+
+    it("does not let the atom's own zl-input event carry the value out of the widget", async () => {
+      const element = await mount(host);
+      const leaked: unknown[] = [];
+      const listener = (event: Event): void => {
+        leaked.push((event as CustomEvent).detail);
+      };
+      document.addEventListener("zl-input", listener);
+      try {
+        type(element, "email", "alice@acme.com");
+
+        expect(leaked).toEqual([]);
+      } finally {
+        document.removeEventListener("zl-input", listener);
+      }
+    });
+  });
+
   it("does not paint the terminal step when it is about to navigate away", async () => {
     const assign = vi.fn();
     const { location } = window;

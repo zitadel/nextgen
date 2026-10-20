@@ -76,6 +76,7 @@ export {
   ZitadelLogin,
   loginPreviewStatesFor,
   type LoginPreviewState,
+  type ZitadelFlowInputEventDetail,
   ZitadelLogout,
   ZitadelSession,
   applyBrandingTokens,

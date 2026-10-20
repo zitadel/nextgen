@@ -161,6 +161,17 @@ function apiErrorCode(error: unknown): string {
     : "";
 }
 
+/**
+ * Detail of the `zitadel-flow-input` event, which is composed and so readable
+ * by any script on the page. A field whose value is a secret (a password, a
+ * one-time or recovery code) is reported as `{ name, secret: true }` with no
+ * `value` at all; every other field carries `{ name, secret: false, value }`.
+ * Narrow on `secret` to read a value.
+ */
+export type ZitadelFlowInputEventDetail =
+  | { readonly name: string; readonly secret: false; readonly value: string }
+  | { readonly name: string; readonly secret: true };
+
 @customElement("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
@@ -1281,7 +1292,15 @@ export class ZitadelLogin extends ZitadelSurface {
     this.formValues = { ...this.formValues, [name]: value };
     this.syncFieldElementValue(name, value);
     this.clearStaleErrors(name);
-    emit(this, "zitadel-flow-input", { name, value });
+    // `zl-input` is composed, so left alone it would carry the raw value out of
+    // the shadow root to every listener on the page, which is exactly what
+    // redacting `zitadel-flow-input` below is meant to prevent.
+    event.stopPropagation();
+    const secret = isSecretField(this.response?.step.fields?.find((f) => f.name === name));
+    const detail: ZitadelFlowInputEventDetail = secret
+      ? { name, secret: true }
+      : { name, secret: false, value };
+    emit(this, "zitadel-flow-input", detail);
   };
 
   /**
@@ -1615,6 +1634,31 @@ export class ZitadelLogin extends ZitadelSurface {
  */
 function isAllowedSelectValue(field: CreateFlow201StepFieldsItem, value: string): boolean {
   return field.validation?.enum?.includes(value) ?? false;
+}
+
+/**
+ * `autocomplete` tokens that mark a field's value as a secret. The engine puts
+ * `current-password` / `new-password` on password fields, and `one-time-code`
+ * is the standard token for one-time and recovery codes.
+ */
+const SECRET_AUTOCOMPLETE_TOKENS: ReadonlySet<string> = new Set([
+  "current-password",
+  "new-password",
+  "one-time-code",
+]);
+
+/**
+ * Whether a field's value must stay out of the `zitadel-flow-input` event. It
+ * is decided from the step's field definition: a `password` field type, or an
+ * `autocomplete` token list naming a password or a one-time code. The field's
+ * name is never consulted, so renaming a field cannot expose it. A field the
+ * step does not define is treated as secret, because nothing says it is safe.
+ */
+function isSecretField(field: CreateFlow201StepFieldsItem | undefined): boolean {
+  if (!field) return true;
+  if (field.type === "password") return true;
+  const tokens = field.autocomplete?.toLowerCase().split(/\s+/) ?? [];
+  return tokens.some((token) => SECRET_AUTOCOMPLETE_TOKENS.has(token));
 }
 
 /** Every state {@link ZitadelLogin.previewState} can show a step in, in order. */
