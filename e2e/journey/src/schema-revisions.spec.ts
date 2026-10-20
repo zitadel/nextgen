@@ -25,8 +25,8 @@ import {
  * revision; a user keeps the revision it was created on. So a user created
  * before a schema publish and one created after it must both sign in, with a
  * password and through the SSO provider, and neither record may change.
- * This spec runs before user-journey.spec.ts in the same lane and leaves the
- * app with SSO enabled, an IdP connection and schema revision 2.
+ * Its own Playwright project runs it after the other specs, because it leaves
+ * the app with SSO enabled, an IdP connection and schema revision 2.
  */
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);

@@ -84,7 +84,9 @@ export async function runCli(
       maxBuffer: 10 * 1024 * 1024,
     },
   );
-  if (stdin !== undefined) run.child.stdin?.end(stdin);
+  // Closed even with nothing to pipe: the CLI reads stdin whenever it is not
+  // a TTY, and would wait on an open pipe.
+  run.child.stdin?.end(stdin);
   const { stdout } = await run;
   return JSON.parse(stdout) as unknown;
 }
