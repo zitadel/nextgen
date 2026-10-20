@@ -1169,3 +1169,108 @@ describe("setup asked on a terminal", () => {
     });
   });
 });
+
+describe("setup --dev-port on an app already set up", () => {
+  /** A Next app with a `dev` script, through setup on the detected port, 3000. */
+  async function aSetUpNextApp(): Promise<string> {
+    const cwd = await makeNextProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", scripts: { dev: "next dev" }, dependencies: { next: "^15" } }),
+    );
+    const res = await setup(cwd, ["--non-interactive", "--skip-install"]);
+    expect(res.exitCode, res.stdout).toBe(0);
+    return cwd;
+  }
+
+  function moveTo(cwd: string, port: number) {
+    return setup(cwd, ["--non-interactive", "--dev-port", String(port)]);
+  }
+
+  /** The fields of `package.json`, `zitadel.json` and `.zitadel/secret` these tests read. */
+  type MovedFile = {
+    scripts?: { dev?: string };
+    environments?: unknown;
+    preview_origins?: unknown;
+    project_id?: string;
+  };
+
+  async function readJsonFile(cwd: string, path: string): Promise<MovedFile> {
+    return JSON.parse(await readFile(join(cwd, path), "utf8")) as MovedFile;
+  }
+
+  async function projectOrigins(cwd: string): Promise<unknown> {
+    const { project_id } = await readJsonFile(cwd, ".zitadel/secret");
+    const res = await fetch(`https://api.zitadel.cloud/projects/${project_id}`);
+    return ((await res.json()) as { origins: unknown }).origins;
+  }
+
+  it("moves the dev script, the issuer and the allowed origin to the new port", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const res = await moveTo(cwd, 3101);
+
+    expect(res.exitCode, res.stdout).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; data: Record<string, unknown> };
+    expect(json.status).toBe("ok");
+    expect(json.data).toMatchObject({
+      moved: true,
+      previous_issuer: "http://localhost:3000",
+      issuer: "http://localhost:3101",
+    });
+    expect((await readJsonFile(cwd, "package.json")).scripts?.dev).toBe("next dev --port 3101");
+    expect(await readFile(join(cwd, ".env.local"), "utf8")).toContain(
+      "ZITADEL_ISSUER=http://localhost:3101\n",
+    );
+    expect((await readJsonFile(cwd, "zitadel.json")).environments).toEqual({
+      development: { issuer: "http://localhost:3101" },
+      preview: { issuer_pattern: ["http://localhost:3101"] },
+    });
+    expect((await readJsonFile(cwd, ".zitadel/secret")).preview_origins).toEqual([
+      "http://localhost:3101",
+    ]);
+    expect(await readFile(join(cwd, "README.md"), "utf8")).toContain("http://localhost:3101/login");
+    expect(await projectOrigins(cwd)).toEqual([
+      { pattern: "http://localhost:3101", kind: "preview" },
+    ]);
+  });
+
+  it("changes nothing when the server refuses the new origin", async () => {
+    const cwd = await aSetUpNextApp();
+    const before = await readFile(join(cwd, "package.json"), "utf8");
+    const env = await readFile(join(cwd, ".env.local"), "utf8");
+    server.use(
+      http.post("*/projects/:project_id/origins", () =>
+        HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
+      ),
+    );
+
+    const res = await moveTo(cwd, 3101);
+
+    expect(res.exitCode).not.toBe(0);
+    expect(await readFile(join(cwd, "package.json"), "utf8")).toBe(before);
+    expect(await readFile(join(cwd, ".env.local"), "utf8")).toBe(env);
+  });
+
+  it("reports nothing moved for the port the app is already on", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const res = await moveTo(cwd, 3000);
+
+    expect(res.exitCode, res.stdout).toBe(0);
+    const json = parseJson(res.stdout) as { data: { moved: boolean; files_written: string[] } };
+    expect(json.data.moved).toBe(false);
+    expect(await projectOrigins(cwd)).toEqual([
+      { pattern: "http://localhost:3000", kind: "preview" },
+    ]);
+  });
+
+  it("refuses a port outside 1..65535", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const res = await moveTo(cwd, 70000);
+
+    const json = parseJson(res.stdout) as { code: string };
+    expect(json.code).toBe("E_VALIDATION");
+  });
+});

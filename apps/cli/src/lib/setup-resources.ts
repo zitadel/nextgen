@@ -1,8 +1,6 @@
 import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { consola } from "consola";
-
 import type {
   CreateFlowDefinition201,
   CreateIdpBodyIdp,
@@ -30,7 +28,11 @@ import {
   providerOf,
   selectionName,
 } from "@zitadel/config/idp";
-import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+import {
+  normalizeFlowBody,
+  normalizeIdpBody,
+  normalizeSchemaBody,
+} from "@zitadel/config/normalize";
 
 import { FLOWS_DIR } from "./flows";
 import {
@@ -52,11 +54,10 @@ import {
   IDPS_DIR,
   planConnection,
   readConnectionFiles,
-  refuseResolvedSecret,
 } from "./idp";
 import { stableStringify } from "./json";
 import { normalizePublicCliProse } from "./public-cli";
-import { hashForState, writeBackResource } from "./sync";
+import { hashForState } from "./sync";
 import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
 import { ZitadelError } from "./errors";
@@ -165,15 +166,11 @@ export async function materializeSetupResources(opts: {
       filesWritten.push(join(opts.cwd, connectionPath));
       consola.info(`Claims in ${connectionPath}:\n  ${summary.join("\n  ")}`);
     }
-    // The same guard the syncer applies: this write puts the canonical body
-    // into a file the developer commits, so a resolved secret must stop here
-    // rather than land on disk.
-    const canonical = (created.definition ?? connection) as object;
-    refuseResolvedSecret(canonical, requiredString(created.id, "created connection id"));
-    const written = await writeBackResource(opts.cwd, connectionPath, {}, canonical);
+    // The file stays as written: the stored connection spells out defaults
+    // the file leaves to the server, and `plan` reads those as no change.
     await updateState(opts.cwd, connectionPath, {
       id: requiredString(created.id, "created identity provider connection id"),
-      hash: written.hash,
+      hash: hashForState({ normalize: normalizeIdpBody }, connection),
     });
   }
 
@@ -202,28 +199,9 @@ export async function materializeSetupResources(opts: {
   const schema = (await opts.client.createSchema(schemaBody as CreateSchemaBody, {
     project_id: opts.projectId,
   })) as CreateSchema201;
-  const schemaId = requiredString(schema.id, "created schema id");
-  // Reconcile the just-written file with the server's stored body so local
-  // config matches live state from the first second; a fetch failure keeps
-  // the template body and its hash (parity is best-effort at setup).
-  let schemaHash = hashForState({ normalize: normalizeSchemaBody }, schemaBody);
-  try {
-    // The response is the `{id, schema, metadata}` envelope; the local config
-    // file keeps only the customer-authored document.
-    const canonical = (await opts.client.getSchemaById(schemaId)).schema;
-    const written = await writeBackResource(
-      opts.cwd,
-      DEFAULT_SCHEMA_CONFIG_PATH,
-      { normalize: normalizeSchemaBody },
-      canonical,
-    );
-    schemaHash = written.hash;
-  } catch (err) {
-    consola.debug(`fetch created schema ${schemaId} during setup failed:`, err);
-  }
   await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
-    id: schemaId,
-    hash: schemaHash,
+    id: requiredString(schema.id, "created schema id"),
+    hash: hashForState({ normalize: normalizeSchemaBody }, schemaBody),
   });
 
   const flowTemplate = addAttributesToFlow(
@@ -255,19 +233,9 @@ export async function materializeSetupResources(opts: {
     flow_definition: flowBody,
   })) as CreateFlowDefinition201;
 
-  let flowHash = hashForState({ normalize: normalizeFlowBody }, flowBody);
-  if (flow.flow_definition) {
-    const written = await writeBackResource(
-      opts.cwd,
-      DEFAULT_FLOW_CONFIG_PATH,
-      { normalize: normalizeFlowBody, normalizeWrite: normalizeFlowBody },
-      flow.flow_definition as object,
-    );
-    flowHash = written.hash;
-  }
   await updateState(opts.cwd, DEFAULT_FLOW_CONFIG_PATH, {
     id: requiredString(flow.id, "created flow definition id"),
-    hash: flowHash,
+    hash: hashForState({ normalize: normalizeFlowBody }, flowBody),
     name: flowBody.name,
     status: flowBody.status,
   });
