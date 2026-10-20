@@ -174,11 +174,18 @@
       }
     }
   ],
-  "regions": ["fra1"],
+  "regions": [
+    "fra1"
+  ],
   "git": {
     "deploymentEnabled": {
       "changeset-release/*": false,
       "gh-readonly-queue/**": false
+    }
+  },
+  "build": {
+    "env": {
+      "VERCEL_FORCE_NO_BUILD_CACHE": "1"
     }
   }
 }
