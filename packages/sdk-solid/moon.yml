@@ -12,8 +12,7 @@ tasks:
   typecheck:
     deps:
       - "api-mock:build"
-      - "components:build"
-      - "sdk-core:build"
+      - "build"
 
   build:
     deps:

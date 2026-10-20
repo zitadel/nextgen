@@ -2,10 +2,7 @@ import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/type
 import { render } from "svelte/server";
 import { describe, expect, it } from "vitest";
 
-import { businessLocales } from "./lib";
-import ZitadelLogin from "./lib/ZitadelLogin.svelte";
-import ZitadelLogout from "./lib/ZitadelLogout.svelte";
-import ZitadelSession from "./lib/ZitadelSession.svelte";
+import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/sdk-svelte";
 
 /**
  * Loads the SDK entry and the components inside the `edge-runtime` VM (the

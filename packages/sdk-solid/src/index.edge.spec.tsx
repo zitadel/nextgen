@@ -2,13 +2,14 @@ import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/type
 import { renderToString } from "solid-js/web";
 import { describe, expect, it } from "vitest";
 
-import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
+import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/sdk-solid";
 
 /**
- * Loads the SDK entry inside the `edge-runtime` VM (the `edge` project in
- * `vitest.config.ts`), which has no `HTMLElement`, `document` or
- * `customElements`, with dependencies resolved the way a bundler resolves them
- * for the edge, and renders its widgets to markup.
+ * Loads the built package, through its `exports` map as a consumer's bundler
+ * does, inside the `edge-runtime` VM (the `edge` project in `vitest.config.ts`),
+ * which has no `HTMLElement`, `document` or `customElements`, with dependencies
+ * resolved the way a bundler resolves them for the edge, and renders its
+ * widgets to markup.
  */
 type EdgeProps = {
   projectId: string;

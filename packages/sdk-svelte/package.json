@@ -14,14 +14,16 @@
   "license": "MIT",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "src/lib",
+    "!src/lib/**/*.spec.ts"
   ],
-  "svelte": "./dist/index.js",
+  "svelte": "./src/lib/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "svelte": "./dist/index.js",
+      "svelte": "./src/lib/index.ts",
       "default": "./dist/index.js"
     }
   },
