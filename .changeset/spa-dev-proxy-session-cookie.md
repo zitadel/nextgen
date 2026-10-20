@@ -10,7 +10,9 @@ signing in to the Console no longer signs you out of the app. The project comes
 from `ZITADEL_PROJECT_ID` in `.env.local`; without it the proxy passes cookies
 through as before.
 
-For an app set up with an earlier CLI, `zitadel setup` or `zitadel doctor --fix`
-adds this to the dev proxy it wrote, and `zitadel doctor` warns until then. A dev
-session from before the change is not carried over, so sign in to the app once
-more.
+For an app set up with an earlier CLI, run `zitadel doctor --fix`: it adds this
+to the dev proxy the CLI wrote, and `zitadel doctor` warns until then. (Running
+`zitadel setup` again leaves an app that is already set up alone.) A dev proxy
+changed by hand since is left as it is, and `zitadel doctor` says the hooks must
+be added by hand. A dev session from before the change is not carried over, so
+sign in to the app once more.

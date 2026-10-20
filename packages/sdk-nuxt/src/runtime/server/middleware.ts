@@ -13,6 +13,7 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   proxySessionCookies,
+  SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
   serializeSessionCookie,
@@ -21,6 +22,7 @@ import {
   defineEventHandler,
   getCookie,
   appendResponseHeader,
+  setResponseHeader,
   sendRedirect,
   getRequestURL,
   getRequestHeader,
@@ -219,8 +221,11 @@ async function proxyRequest(
       search: url.search,
       cookie: getRequestHeader(event, "cookie") ?? null,
       requestUrl: url,
+      forwardedProto: getRequestHeader(event, "x-forwarded-proto") ?? null,
+      forwardedHost: getRequestHeader(event, "x-forwarded-host") ?? null,
     },
     projectId,
+    { url: authUrl, timeoutMs: proxyTimeoutMs },
   );
   if (sessionCookies.upstreamCookie === null) {
     upstreamHeaders.delete("cookie");
@@ -259,6 +264,9 @@ async function proxyRequest(
   const answer = await sessionCookies.toBrowser(upstream);
   for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
+  }
+  if (answer.setCookies.length > 0) {
+    responseHeaders.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
   }
 
   const response = new Response(answer.body, {
@@ -312,6 +320,8 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<str
       bearer: bearerToken,
       cookie: (name) => getCookie(event, name),
       requestUrl: getRequestURL(event),
+      forwardedProto: getRequestHeader(event, "x-forwarded-proto") ?? null,
+      forwardedHost: getRequestHeader(event, "x-forwarded-host") ?? null,
     },
     verification,
   );
@@ -327,12 +337,15 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<str
   }
 
   // A dead session's cookie is cleared so the browser stops replaying it, and a
-  // session of this project still under the shared name moves to the project's
-  // own cookie. A live session that signs no one in here (an anonymous one,
-  // whose sign-in may still complete, or one of another project) keeps its
-  // cookie, and so does one the backend gave no verdict on.
+  // session of this project still under the shared name is copied to the
+  // project's own cookie. A live session that signs no one in here (an
+  // anonymous one, whose sign-in may still complete, or one of another project)
+  // keeps its cookie, and so does one the backend gave no verdict on.
   for (const cookie of cookies) {
     appendResponseHeader(event, "set-cookie", serializeSessionCookie(cookie));
+  }
+  if (cookies.length > 0) {
+    setResponseHeader(event, "cache-control", SESSION_COOKIE_CACHE_CONTROL);
   }
 
   if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {

@@ -20,6 +20,8 @@ export {
   sessionCookieName,
   serializeSessionCookie,
   proxySessionCookies,
+  clearSessionCheckCache,
+  SESSION_COOKIE_CACHE_CONTROL,
 } from "./middleware.js";
 export type {
   OpaqueSession,
@@ -31,6 +33,8 @@ export type {
   ProxiedRequest,
   ProxiedAnswer,
   ProxiedSessionCookies,
+  ProxyUpstream,
+  BrowserRequest,
 } from "./middleware.js";
 export {
   verifyJwt,

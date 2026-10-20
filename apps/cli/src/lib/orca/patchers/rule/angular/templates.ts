@@ -1,5 +1,6 @@
 import { MANAGED_MARKER } from "../../../../paths";
 import type { PatchContext } from "../../types";
+import type { WiringVerdict } from "../file-writer/types";
 import { PROXY_PATH } from "../proxy";
 import {
   assertNoUnreviewedProjectSecretProxy,
@@ -10,6 +11,7 @@ import {
   proxyConfSessionCookieStatements,
   SESSION_COOKIE_MARKER,
 } from "../session-cookie";
+import { lfText, withLfLineEnds } from "../utils/line-ends";
 
 /**
  * The managed root component `src/app/app.ts`: a standalone component that
@@ -202,13 +204,13 @@ const BEARER_ONLY_HOOKS = `    onProxyReq: setBearer,
 /** How the managed entry attaches the bearer and the session-cookie hooks. */
 const SESSION_COOKIE_HOOKS = `    onProxyReq: (proxyReq) => {
       setBearer(proxyReq);
-      forwardSessionCookie(proxyReq, appCookie);
+      forwardSessionCookie(proxyReq);
     },
-    onProxyRes: (proxyRes) => renameSessionCookie(proxyRes, appCookie),
+    onProxyRes: renameSessionCookie,
     configure: (proxy) => {
       proxy.on("proxyReq", setBearer);
-      proxy.on("proxyReq", (proxyReq) => forwardSessionCookie(proxyReq, appCookie));
-      proxy.on("proxyRes", (proxyRes) => renameSessionCookie(proxyRes, appCookie));
+      proxy.on("proxyReq", forwardSessionCookie);
+      proxy.on("proxyRes", renameSessionCookie);
     },
 `;
 
@@ -246,12 +248,23 @@ export function proxyConfEdit(): (source: string | undefined) => string {
     if (source === undefined) {
       return proxyConfTemplate();
     }
-    if (source.includes(MANAGED_MARKER) && source.includes(LEGACY_UNCONDITIONAL_BEARER)) {
-      return forwardAppOrigin(source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER));
-    }
-    assertNoUnreviewedProjectSecretProxy(source, "proxy.conf.cjs");
-    return source.includes(MANAGED_MARKER) ? forwardAppOrigin(source) : source;
+    return withLfLineEnds(source, (text) => {
+      if (text.includes(MANAGED_MARKER) && text.includes(LEGACY_UNCONDITIONAL_BEARER)) {
+        return forwardAppOrigin(text.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER));
+      }
+      assertNoUnreviewedProjectSecretProxy(text, "proxy.conf.cjs");
+      return text.includes(MANAGED_MARKER) ? forwardAppOrigin(text) : text;
+    });
   };
+}
+
+/** Whether `text` (LF line ends) is the managed proxy as an earlier CLI wrote it, without the session-cookie hooks. */
+function hasBearerOnlyHooks(text: string): boolean {
+  return (
+    text.includes(MANAGED_MARKER) &&
+    text.includes(EXCHANGE_ONLY_BEARER) &&
+    text.includes(BEARER_ONLY_HOOKS)
+  );
 }
 
 /**
@@ -259,24 +272,42 @@ export function proxyConfEdit(): (source: string | undefined) => string {
  * exact file an earlier CLI wrote: the hook functions go after the bearer hook,
  * and the entry attaches them beside it. A file that carries them already, an
  * unmanaged one, and a managed one whose hooks were changed by hand are left as
- * they are. Creates the managed proxy when it is absent, as
- * {@link proxyConfEdit} does.
+ * they are; {@link proxyConfSessionCookieVerdict} tells the doctor which it is.
+ * Line ends are the file's own (CRLF or LF). Creates the managed proxy when it
+ * is absent, as {@link proxyConfEdit} does.
  */
 export function proxyConfSessionCookieEdit(): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
       return proxyConfTemplate();
     }
-    if (
-      !source.includes(MANAGED_MARKER) ||
-      source.includes(SESSION_COOKIE_MARKER) ||
-      !source.includes(EXCHANGE_ONLY_BEARER) ||
-      !source.includes(BEARER_ONLY_HOOKS)
-    ) {
-      return source;
-    }
-    return source
-      .replace(EXCHANGE_ONLY_BEARER, `${EXCHANGE_ONLY_BEARER}\n\n${SESSION_COOKIE_FUNCTIONS}`)
-      .replace(BEARER_ONLY_HOOKS, SESSION_COOKIE_HOOKS);
+    return withLfLineEnds(source, (text) =>
+      text.includes(SESSION_COOKIE_MARKER) || !hasBearerOnlyHooks(text)
+        ? text
+        : text
+            .replace(EXCHANGE_ONLY_BEARER, `${EXCHANGE_ONLY_BEARER}\n\n${SESSION_COOKIE_FUNCTIONS}`)
+            .replace(BEARER_ONLY_HOOKS, SESSION_COOKIE_HOOKS),
+    );
+  };
+}
+
+/**
+ * Whether `proxy.conf.cjs` carries the session-cookie hooks, for the doctor.
+ * The managed file as an earlier CLI wrote it is `detached` (`doctor --fix`
+ * adds them). One the edit cannot place them in, a managed file changed by
+ * hand or a proxy of the developer's own, is `unknown`: only the developer can.
+ */
+export function proxyConfSessionCookieVerdict(source: string): WiringVerdict {
+  const text = lfText(source);
+  if (text.includes(SESSION_COOKIE_MARKER)) {
+    return "applied";
+  }
+  if (hasBearerOnlyHooks(text)) {
+    return "detached";
+  }
+  return {
+    unknown: text.includes(MANAGED_MARKER)
+      ? "it was changed since zitadel setup wrote it, so the session-cookie hooks (ADR 073) must be added by hand"
+      : "it is not the proxy zitadel setup writes, so the session-cookie hooks (ADR 073) must be added by hand",
   };
 }
