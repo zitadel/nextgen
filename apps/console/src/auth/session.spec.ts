@@ -12,6 +12,7 @@ import {
   invalidateSessionCache,
   sanitizeNextPath,
   sessionPage,
+  signOut,
 } from "./session";
 import { _resetRuntimeForTesting, _setRuntimeForTesting } from "@/runtime/runtime";
 import { makeTestSession } from "@/test/session.fixture";
@@ -257,6 +258,39 @@ describe("fetchSession, held to the console's project", () => {
     expect(await fetchSession()).toBeNull();
     expect(calls()).toBe(0);
   });
+
+  it("names the console's project in the token read", async () => {
+    stubSessionBody({ project_id: "proj_platform" });
+    const urls: string[] = [];
+    server.use(
+      http.get("*/sessions/me/csrf", ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json({ csrf_token: "tok" });
+      }),
+    );
+
+    await fetchSession();
+    expect(new URL(urls[0] ?? "").searchParams.get("project_id")).toBe("proj_platform");
+    expect(getApiCsrfToken()).toBe("tok");
+  });
+
+  // The server refuses to revoke an app's session the cookie holds, so signing
+  // out of the console never signs anyone out of the app.
+  it("names the console's project in the sign-out, and takes its refusal as signed out", async () => {
+    const urls: string[] = [];
+    server.use(
+      http.delete("*/sessions/me", ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json(
+          { code: "sess.project_mismatch", message: "different project" },
+          { status: 403 },
+        );
+      }),
+    );
+
+    await expect(signOut()).resolves.toBeUndefined();
+    expect(new URL(urls[0] ?? "").searchParams.get("project_id")).toBe("proj_platform");
+  });
 });
 
 describe("CSRF rejection", () => {
@@ -375,6 +409,57 @@ describe("CSRF rejection", () => {
     expect(await rejected).toBeUndefined();
     expect(sessionPage.reload).toHaveBeenCalledOnce();
     expect(getApiCsrfToken()).toBeUndefined();
+  });
+});
+
+describe("signOut", () => {
+  /** Answers DELETE /sessions/me: 204 with the token `want`, else the CSRF refusal. */
+  function stubRevoke(want: string) {
+    const sent: (string | null)[] = [];
+    server.use(
+      http.delete("*/sessions/me", ({ request }) => {
+        const csrf = request.headers.get("x-zitadel-csrf");
+        sent.push(csrf);
+        return csrf === want
+          ? new HttpResponse(null, { status: 204 })
+          : HttpResponse.json({ code: "auth.csrf_invalid", message: "csrf" }, { status: 403 });
+      }),
+    );
+    return sent;
+  }
+
+  it("sends the session's CSRF token and drops the cached session after", async () => {
+    stubSession("user_a");
+    stubCsrf(token("tok"));
+    await fetchSession();
+    const sent = stubRevoke("tok");
+
+    await signOut();
+
+    expect(sent).toEqual(["tok"]);
+    expect(getApiCsrfToken()).toBeUndefined();
+    stubSession(null);
+    expect(await fetchSession()).toBeNull();
+  });
+
+  // No token yet (its read failed at load): the revoke is refused, the
+  // re-check reads the session to hand back a token, and the retry signs out.
+  // That re-check cached the session, so it must not outlive the sign-out, or
+  // /login would read it and bounce straight back into the console.
+  it("drops the session the refused token's re-check cached", async () => {
+    stubSession("user_a");
+    stubCsrf(failing);
+    await fetchSession();
+    expect(getApiCsrfToken()).toBeUndefined();
+    stubCsrf(token("tok"));
+    const sent = stubRevoke("tok");
+
+    await signOut();
+
+    expect(sent).toEqual([null, "tok"]);
+    stubSession(null);
+    expect(await fetchSession()).toBeNull();
+    expect(sessionPage.reload).not.toHaveBeenCalled();
   });
 });
 

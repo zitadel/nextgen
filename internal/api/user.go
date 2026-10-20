@@ -332,8 +332,10 @@ func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, 
 	return domainUserToApiUser(user)
 }
 
-func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest) (api.PatchMyUserRes, error) {
-	self, err := requireSelf(ctx)
+// PatchMyUser updates the user of the cookie's session, held to project_id when
+// the caller names one (requireSelfInProject).
+func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest, params api.PatchMyUserParams) (api.PatchMyUserRes, error) {
+	self, err := requireSelfInProject(ctx, params.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -371,8 +373,10 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	return &api.SetUserPasswordNoContent{}, nil
 }
 
-func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
-	self, err := requireSelf(ctx)
+// GetMyUser reads the user of the cookie's session, held to project_id when the
+// caller names one (requireSelfInProject).
+func (h *Handler) GetMyUser(ctx context.Context, params api.GetMyUserParams) (api.GetMyUserRes, error) {
+	self, err := requireSelfInProject(ctx, params.ProjectID)
 	if err != nil {
 		return nil, err
 	}

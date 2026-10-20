@@ -92,20 +92,27 @@ describe("<zitadel-logout> open/close (chromium)", () => {
     expect(element.shadowRoot?.activeElement).toBe(trigger);
   });
 
-  it("calls DELETE /sessions/me with credentials", async () => {
+  it("calls DELETE /sessions/me with credentials and the session's CSRF token", async () => {
     const element = await mount();
-    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    const fetchMock = vi.fn(async (url: string) =>
+      String(url).includes("/sessions/me/csrf")
+        ? Response.json({ csrf_token: "csrf_test" })
+        : new Response(null, { status: 204 }),
+    );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     element.postSignOutUrl = "";
 
     shadowQuery<HTMLButtonElement>(element, ".trigger").click();
     await element.updateComplete;
     shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
-    await waitFor(() => (fetchMock.mock.calls.length > 0 ? fetchMock : null));
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url.startsWith(`${API_BASE}/sessions/me`)).toBe(true);
+    await waitFor(() => (fetchMock.mock.calls.length > 1 ? fetchMock : null));
+    const [tokenUrl] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(String(tokenUrl).startsWith(`${API_BASE}/sessions/me/csrf`)).toBe(true);
+    const [url, init] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
+    expect(String(url).startsWith(`${API_BASE}/sessions/me`)).toBe(true);
     expect(init.method).toBe("DELETE");
     expect(init.credentials).toBe("include");
+    expect(new Headers(init.headers).get("X-Zitadel-CSRF")).toBe("csrf_test");
   });
 });
 

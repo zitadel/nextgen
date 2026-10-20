@@ -2,8 +2,9 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
+    // The edge spec imports this package's built dist.
     "typecheck": {
-      "dependsOn": ["@zitadel/sdk-react#build"]
+      "dependsOn": ["build"]
     },
     "build": {
       "dependsOn": ["@zitadel/sdk-react#build"]
