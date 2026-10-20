@@ -1,7 +1,6 @@
 {
   "title": "CLI",
   "pages": [
-    "index",
     "local-runtime",
     "plan-apply",
     "social-sign-in",

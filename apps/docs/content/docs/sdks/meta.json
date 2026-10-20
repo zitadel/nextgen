@@ -1,7 +1,6 @@
 {
   "title": "SDKs",
   "pages": [
-    "index",
     "---Server frameworks---",
     "next",
     "nuxt",

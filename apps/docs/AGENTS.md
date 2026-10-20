@@ -46,6 +46,9 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 
 ## Content
 
+- Leave `index` out of a folder's `meta.json` `pages`: Fumadocs then opens it
+  from the folder's own entry instead of listing it as a child that repeats the
+  folder's name.
 - A page's URL is its path under `content/docs/`. The API reference pages per
   operation and per webhook come from the OpenAPI document (`lib/source.ts`);
   `moon run docs:generate` bundles it into `.generated/openapi.mjs`.
