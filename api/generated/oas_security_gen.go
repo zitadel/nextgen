@@ -48,6 +48,7 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 // operationRolesNextgenSession is a private map storing roles per operation.
 var operationRolesNextgenSession = map[string][]string{
 	CompleteClaimOperation:         []string{},
+	CreateDeploymentOperation:      []string{},
 	CreateGrantOperation:           []string{},
 	CreateTeamOperation:            []string{},
 	CreateUserOperation:            []string{},

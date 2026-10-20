@@ -117,12 +117,21 @@ export async function deployToPrimary(
   releaseId: string,
   origin: string,
 ): Promise<{ id: string }> {
-  const projectId = zitadel.handle.projectId;
-  await withErrorBody(zitadel.api.addOrigin(projectId, { pattern: origin, kind: "primary" }));
+  await addPrimaryOrigin(zitadel, origin);
   return withErrorBody(
     zitadel.api.createDeployment(
       { release_id: releaseId, targets: ["primary"] },
-      { project_id: projectId },
+      { project_id: zitadel.handle.projectId },
     ),
+  );
+}
+
+/**
+ * Adds a primary origin to the instance's project. The console has no screen
+ * for origins yet, and `primary` deploys need one to resolve to.
+ */
+export async function addPrimaryOrigin(zitadel: ConnectedZitadel, origin: string): Promise<void> {
+  await withErrorBody(
+    zitadel.api.addOrigin(zitadel.handle.projectId, { pattern: origin, kind: "primary" }),
   );
 }

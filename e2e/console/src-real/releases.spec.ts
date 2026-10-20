@@ -1,6 +1,6 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { createRelease, deployToPrimary } from "../support/api";
+import { addPrimaryOrigin, createRelease, deployToPrimary } from "../support/api";
 import { expectNoErrorBoundary } from "../support/screens";
 import { signIn } from "../support/sign-in";
 
@@ -73,5 +73,37 @@ test("lists the project's deployments without leaving the shell", async ({
 
   await expect(page.getByRole("heading", { name: "Deployments" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Release" })).toBeVisible();
+  await expectNoErrorBoundary(page);
+});
+
+test("deploys a release to the primary origins from the directory", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
+  await signIn(page, zitadel, await seed.user());
+  const release = await createRelease(zitadel, `e2e deploy ${Date.now()}`);
+  const origin = `https://${Date.now()}.deploy.acme.test`;
+  await addPrimaryOrigin(zitadel, origin);
+
+  await page.goto("/deployments");
+  await page.getByRole("button", { name: "New deployment" }).click();
+  const drawer = page.getByRole("dialog", { name: "Deploy release" });
+  await expect(drawer).toBeVisible();
+  // The card lists what `primary` resolves to on the server: the origin just
+  // added is among the project's primary origins.
+  await expect(drawer.getByRole("link", { name: origin })).toBeVisible();
+
+  await drawer.getByRole("combobox", { name: "Release" }).click();
+  await page.getByRole("option", { name: release.id }).click();
+  await drawer.getByLabel("Message").fill("e2e deploy");
+  await drawer.getByRole("button", { name: "Deploy release" }).click();
+
+  // The record the server wrote is what the directory lists.
+  await expect(page.getByText("Release deployed")).toBeVisible();
+  const row = page.getByRole("row").filter({ hasText: release.id }).first();
+  await expect(row).toBeVisible();
+  await expect(row.getByText("Primary")).toBeVisible();
+  await expect(row.getByText("active")).toBeVisible();
   await expectNoErrorBoundary(page);
 });

@@ -268,6 +268,7 @@ var dualSchemeRequests = []struct {
 	{"release get", http.MethodGet, "/releases/rel_1?project_id=proj_1", ""},
 	{"deployments list", http.MethodGet, "/deployments?project_id=proj_1", ""},
 	{"deployment get", http.MethodGet, "/deployments/dep_1?project_id=proj_1", ""},
+	{"deployment create", http.MethodPost, "/deployments?project_id=proj_1", `{"release_id":"rel_1","targets":["primary"]}`},
 }
 
 func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testing.T) {
@@ -300,6 +301,7 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		api.GetReleaseByIdOperation,
 		api.ListDeploymentsOperation,
 		api.GetDeploymentByIdOperation,
+		api.CreateDeploymentOperation,
 	} {
 		require.False(t, sessionCookieOperations[op], "%s must stay off the session-only 401 rewrite", op)
 	}

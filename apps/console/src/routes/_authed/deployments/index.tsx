@@ -1,5 +1,7 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Layers3, Link as LinkIcon } from "lucide-react";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { Layers3, Link as LinkIcon, Plus } from "lucide-react";
+
+import { DeploySheet } from "@/components/deploy-sheet";
 
 import {
   LoadMore,
@@ -41,8 +43,9 @@ import {
  * origins it went to and of which kind, whether any origin still serves it,
  * and when. A row opens the release.
  *
- * The design also draws a **New deployment** button on the title row; it
- * arrives with the other actions (#1857).
+ * **New deployment** on the title row opens the Deploy release drawer with
+ * the release to pick; the row it records appears here once the drawer
+ * closes. The row menu's **Redeploy** and **Rollback** are #1857's.
  */
 export const Route = createFileRoute("/_authed/deployments/")({
   // Order 6: Login flows sits at 5, with Branding nested under it; Project
@@ -56,6 +59,7 @@ export const Route = createFileRoute("/_authed/deployments/")({
 function DeploymentsScreen() {
   const projectId = useRequiredProjectScope();
   const loaded = Route.useLoaderData();
+  const router = useRouter();
 
   const paging = useLoadMore(
     loaded,
@@ -66,7 +70,20 @@ function DeploymentsScreen() {
 
   return (
     <ResourcePage>
-      <ResourceTitle>Deployments</ResourceTitle>
+      <ResourceTitle
+        action={
+          <DeploySheet onDeployed={() => router.invalidate()}>
+            {/* `px-2.5!`: `Button`'s `has-[>svg]:px-3` out-specifies a plain
+                `px-2.5`. */}
+            <Button className="shrink-0 gap-1.5 px-2.5!">
+              <Plus aria-hidden />
+              New deployment
+            </Button>
+          </DeploySheet>
+        }
+      >
+        Deployments
+      </ResourceTitle>
 
       <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
         {/* The design draws five near-equal columns around a short id; a real
