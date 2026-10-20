@@ -6,8 +6,10 @@ export const WINDOW_INSET = "px-5 md:px-6";
 export const WINDOW_BODY = `${WINDOW_INSET} py-4 font-mono text-xs leading-5 md:py-5 md:text-[0.8125rem]`;
 export const WINDOW_FOOTER = "border-window-border border-t bg-black/20";
 
-// The three dots' width, and the spacer's that balances them.
-const DOTS_WIDTH = "w-[2.625rem]";
+// The three dots' width, and the spacer's that balances them: smaller on a
+// phone, where the title needs the room.
+const DOTS_WIDTH = "w-8 sm:w-[2.625rem]";
+const DOT = "size-2 rounded-full bg-white/10 sm:size-2.5";
 
 /**
  * A title bar's button, as the copy button is wherever it stands: 28px high,
@@ -25,7 +27,7 @@ export const SEGMENTS = "flex shrink-0 rounded-lg bg-white/[0.05] p-0.5";
  * WCAG 2.2 asks for.
  */
 export function segment(on: boolean): string {
-  return `cursor-pointer rounded-md px-2.5 py-1 font-semibold text-xs leading-4 transition-colors ${
+  return `cursor-pointer rounded-md px-2 py-1 font-semibold text-xs leading-4 transition-colors sm:px-2.5 ${
     on ? "bg-white/10 text-text-primary" : "text-text-muted hover:text-text-primary"
   }`;
 }
@@ -53,7 +55,7 @@ export function Window({
     <div
       className={`flex flex-col overflow-hidden rounded-xl border border-window-border bg-window shadow-window ${className}`}
     >
-      <div className="flex h-11 shrink-0 items-center gap-3 border-window-border border-b bg-window-bar px-4">
+      <div className="flex h-11 shrink-0 items-center gap-2 border-window-border border-b bg-window-bar px-3 sm:gap-3 sm:px-4">
         <Dots />
         <div className="flex min-w-0 flex-1 justify-center font-mono text-text-muted text-xs leading-4">
           {typeof title === "string" ? <span className="truncate">{title}</span> : title}
@@ -62,7 +64,7 @@ export function Window({
         {end ? (
           <div className="flex shrink-0 items-center gap-2">{end}</div>
         ) : (
-          <span aria-hidden="true" className={`${DOTS_WIDTH} shrink-0 max-sm:hidden`} />
+          <span aria-hidden="true" className={`${DOTS_WIDTH} shrink-0`} />
         )}
       </div>
       <div className="flex flex-1 flex-col">{children}</div>
@@ -70,13 +72,13 @@ export function Window({
   );
 }
 
-/** The three dots of a title bar; on a phone the title needs their room. */
+/** The three dots of a title bar. */
 function Dots() {
   return (
-    <span aria-hidden="true" className={`flex ${DOTS_WIDTH} shrink-0 gap-1.5 max-sm:hidden`}>
-      <span className="size-2.5 rounded-full bg-white/10" />
-      <span className="size-2.5 rounded-full bg-white/10" />
-      <span className="size-2.5 rounded-full bg-white/10" />
+    <span aria-hidden="true" className={`flex ${DOTS_WIDTH} shrink-0 gap-1 sm:gap-1.5`}>
+      <span className={DOT} />
+      <span className={DOT} />
+      <span className={DOT} />
     </span>
   );
 }

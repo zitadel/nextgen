@@ -24,8 +24,8 @@ export function BrowserFrame({
     <Window
       className="h-full"
       title={
-        <span className="flex h-7 w-full max-w-[17rem] min-w-0 items-center justify-center gap-1.5 rounded-md bg-white/[0.05] px-3 text-[0.6875rem] text-text-secondary sm:text-xs">
-          <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="size-3 shrink-0">
+        <span className="flex h-7 w-full max-w-[17rem] min-w-0 items-center justify-center gap-1.5 rounded-md bg-white/[0.05] px-2 text-[0.6875rem] text-text-secondary sm:px-3 sm:text-xs">
+          <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="size-3 shrink-0 max-sm:hidden">
             <rect x="3" y="7" width="10" height="7" rx="1.5" fill="currentColor" opacity="0.7" />
             <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" strokeWidth="1.5" />
           </svg>
