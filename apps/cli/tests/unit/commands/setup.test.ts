@@ -972,6 +972,25 @@ describe("a retry after a failure before the wizard", () => {
 
     expect(setupRetryFlags(retry)).not.toContain("--sso");
   });
+
+  it("carries the claims that were asked for, since a retry must scaffold the same connection", () => {
+    const retry = retryOptionsFromFlags({
+      sso: "google",
+      "sso-claim": ["staffNumber=employee_id:integer"],
+      "sso-verified-claim": ["staffNumber=true"],
+      "sso-claim-scope": "employee",
+    });
+
+    expect(setupRetryFlags(retry)).toContain(
+      "--sso google --sso-claim staffNumber=employee_id:integer --sso-verified-claim staffNumber=true --sso-claim-scope employee",
+    );
+  });
+
+  it("leaves out a claim it cannot read, as it leaves out a connection the checks refuse", () => {
+    const retry = retryOptionsFromFlags({ sso: "google", "sso-claim": ["nonsense"] });
+
+    expect(setupRetryFlags(retry)).not.toContain("--sso-claim");
+  });
 });
 
 describe("a custom provider named with --sso", () => {

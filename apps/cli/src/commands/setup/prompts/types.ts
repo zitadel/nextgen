@@ -6,6 +6,7 @@ import {
   providerOf,
 } from "@zitadel/config/idp";
 
+import type { ClaimRequest } from "../../../lib/idp";
 import type { Asker } from "../../../lib/input";
 import type { FrameworkFacts } from "../../../lib/orca";
 
@@ -38,6 +39,11 @@ export type SsoDraft = {
    * up locally — see {@link import("./social-sign-in").SocialSignInPrompt}.
    */
   readonly endpoints?: ConnectionEndpoints;
+  /**
+   * The claims asked for beyond the defaults, from `--sso-claim` or from the
+   * wizard. Checked against the schema where the connection is built.
+   */
+  readonly claims?: ClaimRequest;
 };
 
 /**

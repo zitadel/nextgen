@@ -24,11 +24,18 @@ import {
 } from "@zitadel/config/idp";
 
 import {
+  applyRequest,
+  asksForClaims,
+  askClaims,
+  claimsOrRefuse,
   askConnectionEndpoints,
   callbackUriFor,
   type CustomFlagValues,
+  CONNECTION_SCHEMA_REF,
   loopbackIssuerWarning,
+  seedMapping,
 } from "../../../lib/idp";
+import { defaultSchemaAttributes } from "../../../lib/setup-resources";
 import { reportWarning } from "../../../lib/warnings";
 import type { Asker } from "../../../lib/input";
 import { issuerFromPort } from "../../../lib/orca";
@@ -141,6 +148,28 @@ export class SocialSignInPrompt implements SetupPrompt {
             })));
       this.announce(entry, answers.devPort, endpoints?.issuer);
 
+      // Before the credentials, as in `auth-method sso enable`. `--sso-claim` is
+      // the whole answer when given. A request that does not fit the schema is
+      // refused where the connection is built, not here.
+      const attributes = defaultSchemaAttributes(answers.preset, answers.useCase);
+      const seeded = seedMapping(
+        entry.connection({
+          schemaProperties: attributes.map((one) => one.name),
+          schemaRef: CONNECTION_SCHEMA_REF,
+          endpoints,
+        }),
+        attributes,
+      );
+      const given = flagged?.claims;
+      // Flags are held to the schema now, before anything is typed: the
+      // check that runs when the connection is built comes after the
+      // credentials, and a mistake in the command line should not cost them.
+      if (given !== undefined && asksForClaims(given)) {
+        claimsOrRefuse(applyRequest(seeded, given), "");
+      }
+      const claims =
+        given !== undefined && asksForClaims(given) ? given : await askClaims(seeded, ctx.input);
+
       const clientId = await ctx.input({
         kind: "text",
         name: "client id",
@@ -155,7 +184,7 @@ export class SocialSignInPrompt implements SetupPrompt {
         parse: parseClientSecret,
         given: flagged?.credentials.secret,
       });
-      collected.push({ selection, credentials: { clientId, secret }, endpoints });
+      collected.push({ selection, credentials: { clientId, secret }, endpoints, claims });
     }
     return { ...answers, sso: collected };
   }

@@ -383,6 +383,7 @@ describe("SocialSignInPrompt", () => {
           secret: "s3cret",
         },
         endpoints: undefined,
+        claims: { entries: [], verified: [], scopes: [] },
       },
     ]);
     // The URI has to be exact — the vendor matches it literally — and the
@@ -390,6 +391,95 @@ describe("SocialSignInPrompt", () => {
     expect(vi.mocked(note).mock.calls[0]?.[0]).toContain(
       "http://localhost:4321/__nextgen/idp/google/callback",
     );
+  });
+
+  describe("claim questions", () => {
+    it("offers to replace a default even when the schema has no empty property", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["google"] as never);
+      vi.mocked(select).mockResolvedValueOnce(false as never);
+      vi.mocked(text).mockResolvedValueOnce("a-client-id" as never);
+      vi.mocked(password).mockResolvedValueOnce("s3cret" as never);
+
+      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+      expect(select).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses a claim given as a flag that the schema cannot take, before the credentials", async () => {
+      const flagged = {
+        selection: googleSelection,
+        credentials: {},
+        claims: {
+          entries: [{ attribute: "shoeSize", claim: "shoe" }],
+          verified: [],
+          scopes: [],
+        },
+      };
+
+      await expect(
+        new SocialSignInPrompt().ask(baseAnswers({ sso: [flagged] }), {
+          ...ctx,
+          ssoFromFlag: true,
+        }),
+      ).rejects.toMatchObject({ code: "E_VALIDATION" });
+      expect(text).not.toHaveBeenCalled();
+      expect(password).not.toHaveBeenCalled();
+    });
+
+    it("offers to map more claims when the schema has an empty property, before the credentials", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["google"] as never);
+      vi.mocked(select).mockResolvedValueOnce(false as never);
+      vi.mocked(text).mockResolvedValueOnce("a-client-id" as never);
+      vi.mocked(password).mockResolvedValueOnce("s3cret" as never);
+
+      await new SocialSignInPrompt().ask(baseAnswers({ useCase: "business" }), ctx);
+
+      expect(vi.mocked(select).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(text).mock.invocationCallOrder[0] ?? 0,
+      );
+    });
+
+    it("carries the claims the person maps into the draft", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["google"] as never);
+      vi.mocked(select)
+        .mockResolvedValueOnce(true as never)
+        .mockResolvedValueOnce("string" as never)
+        .mockResolvedValueOnce("companyName" as never)
+        .mockResolvedValueOnce(false as never);
+      vi.mocked(text)
+        .mockResolvedValueOnce("organization" as never)
+        .mockResolvedValueOnce("" as never)
+        .mockResolvedValueOnce("a-client-id" as never);
+      vi.mocked(password).mockResolvedValueOnce("s3cret" as never);
+
+      const answers = await new SocialSignInPrompt().ask(baseAnswers({ useCase: "business" }), ctx);
+
+      expect(answers.sso[0]?.claims?.entries).toEqual([
+        { attribute: "companyName", claim: "organization" },
+      ]);
+    });
+
+    it("skips the questions when claims were given as flags", async () => {
+      vi.mocked(text).mockResolvedValueOnce("a-client-id" as never);
+      vi.mocked(password).mockResolvedValueOnce("s3cret" as never);
+      const flagged = {
+        selection: googleSelection,
+        credentials: {},
+        claims: {
+          entries: [{ attribute: "companyName", claim: "organization" }],
+          verified: [],
+          scopes: [],
+        },
+      };
+
+      const answers = await new SocialSignInPrompt().ask(
+        baseAnswers({ useCase: "business", sso: [flagged] }),
+        { ...ctx, ssoFromFlag: true },
+      );
+
+      expect(select).not.toHaveBeenCalled();
+      expect(answers.sso[0]?.claims).toEqual(flagged.claims);
+    });
   });
 
   describe("a custom provider", () => {
@@ -435,6 +525,7 @@ describe("SocialSignInPrompt", () => {
           },
           credentials: { clientId: "acme-client-id", secret: "acme-secret" },
           endpoints: undefined,
+          claims: { entries: [], verified: [], scopes: [] },
         },
       ]);
     });
@@ -628,13 +719,14 @@ describe("SocialSignInPrompt", () => {
 
   it("does not ask which provider when --sso named one", async () => {
     vi.mocked(password).mockResolvedValueOnce("a-secret" as never);
+    vi.mocked(select).mockResolvedValueOnce(false as never);
     const seeded = baseAnswers({
       sso: [{ selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } }],
     });
 
     const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
 
-    expect(select).not.toHaveBeenCalled();
+    expect(multiselect).not.toHaveBeenCalled();
     expect(text).not.toHaveBeenCalled();
     expect(answers.sso[0]?.selection).toEqual(googleSelection);
     expect(answers.sso[0]?.credentials.clientId).toBe("from-the-flag");

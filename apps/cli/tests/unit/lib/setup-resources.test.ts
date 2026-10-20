@@ -11,6 +11,7 @@ import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normaliz
 
 import {
   assertNoSetupResourceConflicts,
+  defaultSchemaAttributes,
   materializeSetupResources,
 } from "../../../src/lib/setup-resources";
 import { IDPS_DIR } from "../../../src/lib/idp";
@@ -807,5 +808,59 @@ describe("assertNoSetupResourceConflicts", () => {
     await writeFile(join(cwd, IDPS_DIR, "google.json"), JSON.stringify({ slug: "google" }));
 
     await expect(assertNoSetupResourceConflicts({ cwd, force: false })).resolves.toBe(undefined);
+  });
+});
+
+describe("defaultSchemaAttributes", () => {
+  it("lists the properties the use case's schema defines, with their types", () => {
+    expect(
+      defaultSchemaAttributes("passkey-first", "business").map((one) => [one.name, one.type]),
+    ).toEqual([
+      ["email", "string"],
+      ["givenName", "string"],
+      ["familyName", "string"],
+      ["companyName", "string"],
+    ]);
+  });
+});
+
+describe("assertNoSetupResourceConflicts with claims", () => {
+  it("refuses a claim for a property the schema does not define, before the project exists", async () => {
+    await expect(
+      assertNoSetupResourceConflicts({
+        cwd,
+        force: true,
+        sso: [
+          {
+            selection: googleSelection,
+            claims: {
+              entries: [{ attribute: "shoeSize", claim: "shoe" }],
+              verified: [],
+              scopes: [],
+            },
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("accepts a claim for a property the schema defines", async () => {
+    await expect(
+      assertNoSetupResourceConflicts({
+        cwd,
+        force: true,
+        useCase: "business",
+        sso: [
+          {
+            selection: googleSelection,
+            claims: {
+              entries: [{ attribute: "companyName", claim: "organization" }],
+              verified: [],
+              scopes: [],
+            },
+          },
+        ],
+      }),
+    ).resolves.toBe(undefined);
   });
 });

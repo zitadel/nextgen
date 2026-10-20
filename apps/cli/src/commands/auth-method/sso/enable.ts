@@ -26,7 +26,17 @@ import { isDevelopmentBuild } from "../../../lib/build-channel";
 import { ZitadelError } from "../../../lib/errors";
 import { stableStringify } from "../../../lib/json";
 import {
+  applyRequest,
   applySsoToFlow,
+  asksForClaims,
+  askClaims,
+  claimFlagText,
+  claimRequestFromFlags,
+  claimsOrRefuse,
+  ENABLE_CLAIM_FLAGS,
+  type MappingState,
+  seedMapping,
+  withClaims,
   applySsoToSchema,
   askConnectionEndpoints,
   callbackUriFor,
@@ -119,6 +129,20 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     "client-id": nonBlankString({
       description: "Client id of the application registered with the provider.",
     }),
+    claim: Flags.string({
+      multiple: true,
+      description:
+        "Fill a user-schema property from a provider claim: <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim the provider returns as a number or boolean says so after a colon (string is the default). Repeatable. Given, it replaces the interactive claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+    }),
+    "verified-claim": Flags.string({
+      multiple: true,
+      description:
+        "Say how a mapped property is verified: <property>=<claim> names the boolean claim that must be true, <property>=true trusts the provider. Repeatable.",
+    }),
+    "claim-scope": nonBlankString({
+      description:
+        "Extra scopes the mapped claims need before the provider returns them, separated by spaces or commas.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -141,6 +165,14 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // catalog provider: a custom connection needs its settings repeated too.
     // `--cwd` only when it can be written unquoted on every shell.
     const cwdText = portableCommands([cwdArgs], cliVersion).length > 0 ? cwdArgs : [];
+    const claimRequest = claimRequestFromFlags(
+      { claim: flags.claim, scope: flags["claim-scope"], verified: flags["verified-claim"] },
+      ENABLE_CLAIM_FLAGS,
+    );
+    const claimsGiven = asksForClaims(claimRequest);
+    // The claims travel in the retry: a rerun that dropped them would create the
+    // connection with the defaults and report success.
+    const claimText = claimsGiven ? [claimFlagText(claimRequest, ENABLE_CLAIM_FLAGS)] : [];
     const retryFor = (clientId: string, pipe = ""): string | undefined =>
       selection.kind === "catalog"
         ? `${pipe}${publicCliCommand(
@@ -149,6 +181,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
               provider,
               "--client-id",
               clientId,
+              ...claimText,
               ...cwdText,
             ].join(" "),
             cliVersion,
@@ -181,6 +214,34 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         `${plan.file.path} already exists, so the ${plan.notApplied.join(" and ")} you gave ${plan.notApplied.length === 1 ? "was" : "were"} not applied. Edit the file to change ${plan.notApplied.length === 1 ? "it" : "them"}.`,
       );
     }
+    // The mapping a new connection will carry, checked against the schema now,
+    // before a secret is asked for or a file is written, like the edits below.
+    // A reused connection keeps the mapping it has: it is the developer's file.
+    const mapped = reusing
+      ? undefined
+      : claimsOrRefuse(
+          applyRequest(
+            seedMapping(
+              entry.connection({
+                slug: plan.slug,
+                schemaProperties: schema.properties,
+                schemaRef: CONNECTION_SCHEMA_REF,
+              }),
+              schema.attributes,
+            ),
+            claimRequest,
+          ),
+          "",
+        );
+    for (const note of mapped?.notes ?? []) {
+      reportWarning(note);
+    }
+    if (reusing && claimsGiven) {
+      reportWarning(
+        `${plan.file.path} already exists, so the claims you gave were not applied. Edit claim_mapping in the file to change them.`,
+      );
+    }
+
     // What a newly written connection will reference: this command writes both
     // as `${{ NAME }}`, so on the create path the names are certain.
     const scaffolded = credentialVariables(plan.slug);
@@ -240,6 +301,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           clientId: undefined,
           idVariable,
           changed: editedFiles(schema, edits),
+          claims: mapped,
         }),
         pretty: `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
       });
@@ -251,6 +313,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // written, both arrive here.
     let secret: SecretOutcome | undefined;
     let clientIdState: PublishState | undefined;
+    let createdClaims: MappingState | undefined;
 
     if (reusing) {
       consola.success(`Reusing ${plan.file.path}`);
@@ -325,6 +388,21 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
               ask: this.input,
             })
           : undefined;
+      // The claims come before the credentials, as a refusal does: a person who
+      // has typed a secret should not then be asked to think about mappings.
+      // Flags that name claims are the whole answer, as `--preset` is for its
+      // question; a run nobody can answer takes the defaults.
+      if (mapped === undefined) {
+        throw new Error("a connection being created has a claim mapping");
+      }
+      const claims =
+        this.meta.nonInteractive || claimsGiven
+          ? mapped
+          : claimsOrRefuse(applyRequest(mapped, await askClaims(mapped, this.input)), "");
+      createdClaims = claims;
+      for (const note of claims.notes.slice(mapped.notes.length)) {
+        reportWarning(note);
+      }
       const clientId = await this.input({
         kind: "text",
         name: `client id for ${entry.displayName}`,
@@ -349,12 +427,15 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       });
 
       const publish = this.publisher(secretFile);
-      const connection = entry.connection({
-        slug: plan.slug,
-        schemaProperties: schema.properties,
-        schemaRef: CONNECTION_SCHEMA_REF,
-        endpoints,
-      });
+      const connection = withClaims(
+        entry.connection({
+          slug: plan.slug,
+          schemaProperties: schema.properties,
+          schemaRef: CONNECTION_SCHEMA_REF,
+          endpoints,
+        }),
+        claims,
+      );
       // A connection is scaffolded with the properties the provider maps by
       // default, narrowed to what the schema defines. A schema that defines none
       // of them leaves it with no mapping, and `plan` refuses a connection that
@@ -444,6 +525,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           idVariable,
           changed: written,
           skipped: edits.skipped,
+          claims: createdClaims,
         }),
         // An ok result carries its follow-ups in data.next_commands (errors
         // use the top-level nextCommands instead).
@@ -514,6 +596,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     idVariable: ClientIdVariable | undefined;
     changed?: string[];
     skipped?: SsoSkipped[];
+    /** What a connection this run creates maps and requests. */
+    claims?: MappingState;
   }): Record<string, unknown> {
     return {
       project_id: input.projectId,
@@ -523,6 +607,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         action: input.plan.action,
         slug: input.plan.slug,
         file: input.plan.action === "reuse" ? input.plan.file.path : input.plan.path,
+        ...(input.claims === undefined
+          ? {}
+          : {
+              claim_mapping: input.claims.mapping,
+              verified_claims: input.claims.verified,
+              scopes: input.claims.scopes,
+            }),
       },
       callback_uri: input.callbackUri,
       changed: input.changed ?? [],

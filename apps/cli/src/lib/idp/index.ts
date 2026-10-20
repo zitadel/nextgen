@@ -48,6 +48,7 @@ export {
   customFlagValues,
   ENABLE_FLAG_KEYS,
   flagText,
+  shellWord,
   SETUP_FLAG_KEYS,
   loopbackIssuerWarning,
   ENABLE_FLAG_NAMES,
@@ -55,6 +56,36 @@ export {
   SETUP_FLAG_NAMES,
   type CustomFlagValues,
 } from "./custom";
+
+export { askClaims } from "./claim-wizard";
+
+export {
+  applyRequest,
+  asksForClaims,
+  claimFlagText,
+  attributesOf,
+  type ClaimFlagNames,
+  type ClaimFlagValues,
+  claimRequestFromFlags,
+  claimsOrRefuse,
+  ENABLE_CLAIM_FLAGS,
+  SETUP_CLAIM_FLAGS,
+  CLAIM_TYPES,
+  claimedConnection,
+  type ClaimEntry,
+  type ClaimRequest,
+  type ClaimType,
+  describeMapping,
+  type MappingState,
+  NO_CLAIM_REQUEST,
+  parseClaimEntry,
+  parseScopeList,
+  parseVerifiedEntry,
+  type SchemaAttribute,
+  seedMapping,
+  type VerifiedEntry,
+  withClaims,
+} from "./claims";
 
 export { callbackUriFor } from "./callback";
 

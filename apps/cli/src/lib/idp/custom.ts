@@ -240,10 +240,14 @@ export function customFlagText(custom: CustomOidcInput, flag: CustomFlagNames): 
   );
 }
 
+/** A value as one shell word: bare when it is safe, else single-quoted. */
+export function shellWord(value: string): string {
+  return /^[A-Za-z0-9_@%+=:,./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
+}
+
 /** The same for whichever settings were given, each as one shell word. */
 export function flagText(values: CustomFlagValues, flag: CustomFlagNames): string {
-  const word = (value: string) =>
-    /^[A-Za-z0-9_@%+=:,./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
+  const word = shellWord;
   return [
     [flag.slug, values.slug],
     [flag.displayName, values.displayName],
