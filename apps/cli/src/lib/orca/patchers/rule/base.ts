@@ -1,7 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { metaSchemaFiles, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
+import {
+  metaSchemaFiles,
+  META_SCHEMA_DIR,
+  PROJECT_FILE_SCHEMA_REF,
+} from "@zitadel/config/meta-schemas";
 
 import { stableStringify } from "../../../json";
 import { normalizePublicCliJson } from "../../../public-cli";
@@ -307,9 +311,10 @@ export abstract class AbstractRulePatcher implements Patcher {
         path: ".zitadel/state.json",
         contents: `${stableStringify({ framework: ctx.framework.id, resources: {} })}\n`,
       },
-      // The dialect meta-schemas, committed with the project so flow files'
-      // relative `$schema` pointers resolve offline (editor validation) and
-      // agents can read the flow/schema dialect without the docs site. Their
+      // The dialect meta-schemas, committed with the project so the relative
+      // `$schema` pointers of `zitadel.json` and the flow files resolve
+      // offline (editor validation) and agents can read the flow/schema
+      // dialect without the docs site. Their
       // descriptions become editor tooltips inside the generated app, so the
       // `zitadel …` mentions are rewritten to the runnable public form on the
       // way out — the shared source keeps the bare spelling the server wants.
@@ -373,7 +378,9 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
     };
   }
   return {
-    $schema: "https://schemas.zitadel.com/v2/project.schema.json",
+    // The copy setup writes into .zitadel/meta/, so an editor validates the
+    // file offline against the CLI version that wrote it.
+    $schema: PROJECT_FILE_SCHEMA_REF,
     project: ctx.project.id,
     server: resolveServerOrigin(ctx.server),
     framework: { id: ctx.framework.id },

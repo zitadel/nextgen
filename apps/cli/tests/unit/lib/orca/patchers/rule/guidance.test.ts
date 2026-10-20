@@ -109,6 +109,7 @@ describe("guidance content", () => {
 
   it("points agents at the dialect meta-schemas and the plan/apply loop", () => {
     const agents = agentsGuidanceSection(ctx);
+    expect(agents).toContain('"$schema": "./.zitadel/meta/project.json"');
     expect(agents).toContain('"$schema": "../meta/flow-definition.json"');
     expect(agents).toContain(".zitadel/meta/user-schema.json");
     expect(agents).toContain("npx @zitadel/cli@0.1.0-alpha.15 plan");
