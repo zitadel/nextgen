@@ -1,11 +1,11 @@
-import type { Screen, Session } from "./types";
+import type { Page, Screen, Session } from "./types";
 
 // The login's screens the steps show, drawn live from its atoms
 // (login-preview.tsx) in the default template's English copy
 // (packages/components/src/orchestrator/locales/en.ts), with the fields the
-// recorded session's pages had: the sign-in setup serves, the registration
-// form before and after the schema change, and the sign-in after the flow
-// change, which the brand row themes.
+// recorded session's pages had: the sign-in setup serves, step by step to
+// signed in, the registration form before and after the schema change, and
+// the sign-in after the flow change, which the brand step themes.
 const email = {
   label: "Email",
   type: "email",
@@ -29,10 +29,30 @@ const register: Screen = {
   nav: { lead: "Already have an account? ", link: "Sign in" },
 };
 
-export const signInWithPassword: Screen = {
-  ...signIn,
-  fields: [email, { label: "Password", type: "password", required: true }],
+const password = { label: "Password", type: "password", required: true } as const;
+
+const enterPassword: Screen = {
+  title: "Sign in",
+  subtitle: "Enter your password",
+  fields: [password],
+  action: "Sign in",
+  nav: signIn.nav,
 };
+
+const signInWithPassword: Screen = { ...signIn, fields: [email, password] };
+
+// The flow's last step; its action is the signed-in page's, back to the start.
+const done: Screen = { title: "You're signed in", fields: [], action: "Sign out" };
+
+// The default login flow, identifier → password → done, at the URL setup's
+// login page serves it.
+const login: Page = { url: "localhost:3000/login", screens: [signIn, enterPassword, done] };
+
+const registration: Page = { url: "localhost:3000/register", screens: [register] };
+
+// The login after the flow change, the identifier step asking for the
+// password too; the brand step themes it.
+export const loginAfterFlowChange: Page = { url: login.url, screens: [signInWithPassword, done] };
 
 // The showcase's recorded steps, from zitadel/new-website's narrative redesign
 // (its homepage's terminalSection, a session recorded with `script` on
@@ -67,8 +87,8 @@ export const sessions: Session[] = [
     scaffold: {
       root: "myapp",
       entries: [
-        { path: "app/login/page.tsx", note: "Login page" },
-        { path: "app/register/page.tsx", note: "Registration page" },
+        { path: "app/login/page.tsx", note: "Login page", page: login },
+        { path: "app/register/page.tsx", note: "Registration page", page: registration },
         { path: "app/profile/page.tsx", note: "Profile page" },
         { path: "proxy.ts", note: "Next.js proxy" },
         {
@@ -80,7 +100,7 @@ export const sessions: Session[] = [
       ],
       rest: "+ package.json, .env.local, zitadel.json and more",
     },
-    result: { url: "localhost:3000/login", screen: signIn },
+    result: login,
   },
   {
     label: "Add a field",
@@ -118,9 +138,9 @@ export const sessions: Session[] = [
       ],
     },
     result: {
-      url: "localhost:3000/register",
-      before: register,
-      screen: { ...register, fields: [email, { label: "Company" }] },
+      url: registration.url,
+      before: registration.screens,
+      screens: [{ ...register, fields: [email, { label: "Company" }] }],
     },
   },
   {
@@ -159,6 +179,14 @@ export const sessions: Session[] = [
         },
       ],
     },
-    result: { url: "localhost:3000/login", before: signIn, screen: signInWithPassword },
+    result: { ...loginAfterFlowChange, before: login.screens },
   },
 ];
+
+// The last step, live (brand-row.tsx): no recording, only its words, here so
+// the hero can point to it by name.
+export const brandStep = {
+  label: "Match your brand",
+  description:
+    "Set the login's design tokens in your own stylesheet. The look follows your app. Try it here.",
+};

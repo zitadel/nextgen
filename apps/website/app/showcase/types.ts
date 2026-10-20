@@ -2,12 +2,12 @@ import type { ZlField } from "@zitadel/components/atoms";
 
 /**
  * What setup writes into the app, under `root`: the files that matter, each
- * with what it is (`highlight` for the ones the next rows edit), and a line
- * for the rest.
+ * with what it is (`highlight` for the ones the next steps edit, `page` for
+ * the ones the browser beside it can open), and a line for the rest.
  */
 export type Scaffold = {
   root: string;
-  entries: { path: string; note: string; highlight?: boolean }[];
+  entries: { path: string; note: string; highlight?: boolean; page?: Page }[];
   rest: string;
 };
 
@@ -40,17 +40,23 @@ export type Artifact = {
  */
 export type Screen = {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   fields: { label: string; type?: ZlField["type"]; placeholder?: string; required?: boolean }[];
   action: string;
-  nav: { lead: string; link: string };
+  nav?: { lead: string; link: string };
 };
 
 /**
- * What a row produced, the login's `screen` in a browser frame at `url`; with
- * `before`, the frame switches between the two.
+ * A page of the app at `url`: the screens of its flow in order. The action of
+ * each leads to the next, and the last one's back to the first.
  */
-export type Result = { url: string; before?: Screen; screen: Screen };
+export type Page = { url: string; screens: Screen[] };
+
+/**
+ * What a step produced, a page in a browser frame; with `before`, the page
+ * before the change, and the frame switches between the two.
+ */
+export type Result = Page & { before?: Screen[] };
 
 /** A command of the hero and the lines it printed, in a terminal window titled `title`. */
 export type Recording = { title: string; command: string; output: string[] };

@@ -2,10 +2,13 @@
 // it and the docs' quickstart without its optional `doctor` (AGENTS.md): a new
 // folder, start, setup for a Next.js app, the app's dev server. The session the
 // showcase was recorded from (showcase/sessions.ts) ran the same, with `doctor`
-// first. The hero shows them; /llms.txt hands them to agents.
+// first. The hero shows them; /llms.txt hands them to agents. The footer
+// offers the one that starts Zitadel.
+export const startCommand = "npx @zitadel/cli@alpha start";
+
 export const commands = [
   "mkdir myapp && cd myapp",
-  "npx @zitadel/cli@alpha start",
+  startCommand,
   "npx @zitadel/cli@alpha setup --framework next --server local",
   "npm run dev",
 ];
