@@ -14,7 +14,7 @@ export const FORCE_OPEN_SHADOW_ROOTS = `(() => {
 
 /** What {@link openShadowRoots} needs of a Playwright `Page` or `BrowserContext`. */
 export interface InitScriptTarget {
-  addInitScript(script: { content: string }): Promise<unknown>;
+  addInitScript(script: { content: string }): Promise<object | undefined>;
 }
 
 /**

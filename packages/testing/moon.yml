@@ -37,9 +37,17 @@ tasks:
       # so task ordering alone is enough — no shared mutex needed here.
       runInCI: false
 
+  # Chromium for the fixtures' own browser test
+  # (tests/unit/shadow-roots-browser.test.ts), which skips where it is missing.
+  install-browsers:
+    command: "corepack pnpm exec playwright install chromium"
+    options:
+      cache: false
+
   test:
     deps:
       - "build"
+      - "install-browsers"
 
   # Boots a real local server (binary runtime + SQLite by default). Not cached
   # (it spawns OS processes). Runs in CI as a dependency of `e2e:all` — the

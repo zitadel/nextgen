@@ -56,6 +56,7 @@ describe("withOpenShadowRoots", () => {
     const context = {
       addInitScript: async () => {
         calls.push("opened");
+        return undefined;
       },
     };
 
