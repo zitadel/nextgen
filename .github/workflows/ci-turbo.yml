@@ -105,8 +105,9 @@ jobs:
       # GOCACHEPROG, so the builds here use Go's own files. Whichever job
       # saved a shared entry first chose the format for both. The key names
       # the installed Go, whose patch differs between Depot's runner images
-      # (a build result serves only the compiler that made it), and both
-      # modules' go.sum (tools/bench is a module of its own).
+      # (a build result serves only the compiler that made it), and every
+      # module's go.sum (tools/bench and tools/oidc-mock are modules of their
+      # own).
       - uses: actions/setup-go@v6
         id: setup-go
         with:
@@ -119,7 +120,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum', 'tools/bench/go.sum') }}
+          key: go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}
           restore-keys: |
             go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-
 
