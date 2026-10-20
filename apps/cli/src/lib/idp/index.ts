@@ -93,6 +93,8 @@ export { callbackUriFor } from "./callback";
 
 export { registrationLines } from "./registration";
 
+export { askScopes } from "./scopes";
+
 export { askConnectionEndpoints } from "./endpoints";
 
 export {

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import { Readable } from "node:stream";
+import { Readable, Writable } from "node:stream";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -393,6 +393,26 @@ describe("input", () => {
         "a",
         "b",
       ]);
+    });
+
+    it("shows the ticked options it was given", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["a"] as never);
+
+      await input(
+        { kind: "multiselect", name: "x", message: "X", options, initialValues: ["a"] },
+        ask,
+      );
+
+      expect(multiselect).toHaveBeenCalledWith(expect.objectContaining({ initialValues: ["a"] }));
+    });
+
+    it("draws on the stream it was given", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["a"] as never);
+      const output = new Writable({ write: (_chunk, _encoding, done) => done() });
+
+      await input({ kind: "multiselect", name: "x", message: "X", options, output }, ask);
+
+      expect(multiselect).toHaveBeenCalledWith(expect.objectContaining({ output }));
     });
 
     it("returns nothing chosen as an empty list", async () => {

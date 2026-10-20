@@ -522,11 +522,21 @@ describe("SocialSignInPrompt", () => {
   describe("a custom provider", () => {
     /** The four questions describing the connection, then the client id. */
     function describeAcme(overrides: { slug?: string; scopes?: string } = {}): void {
+      const [chosen, extra] = (overrides.scopes ?? "openid profile email groups")
+        .split(" ")
+        .reduce<[string[], string[]]>(
+          ([ticked, typed], scope) =>
+            ["openid", "profile", "email", "phone", "address", "offline_access"].includes(scope)
+              ? [[...ticked, scope], typed]
+              : [ticked, [...typed, scope]],
+          [[], []],
+        );
+      vi.mocked(multiselect).mockResolvedValueOnce(chosen as never);
       vi.mocked(text)
         .mockResolvedValueOnce((overrides.slug ?? " acme-sso ") as never)
         .mockResolvedValueOnce(" Acme SSO " as never)
         .mockResolvedValueOnce(" https://sso.acme.example " as never)
-        .mockResolvedValueOnce((overrides.scopes ?? "openid profile email groups") as never)
+        .mockResolvedValueOnce(extra.join(" ") as never)
         .mockResolvedValueOnce("acme-client-id" as never);
     }
 
@@ -570,11 +580,12 @@ describe("SocialSignInPrompt", () => {
     it("warns about an issuer on this machine that was typed in, naming the allow list", async () => {
       takeReportedWarnings();
       vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
+      vi.mocked(multiselect).mockResolvedValueOnce(["openid"] as never);
       vi.mocked(text)
         .mockResolvedValueOnce("acme-sso" as never)
         .mockResolvedValueOnce("Acme SSO" as never)
         .mockResolvedValueOnce("http://localhost:9100" as never)
-        .mockResolvedValueOnce("openid" as never)
+        .mockResolvedValueOnce("" as never)
         .mockResolvedValueOnce("acme-client-id" as never);
       vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
 
@@ -640,8 +651,8 @@ describe("SocialSignInPrompt", () => {
       expect(validate(1)("  ")).toBeTruthy();
       expect(validate(2)("http://sso.acme.example")).toBeTruthy();
       expect(validate(2)("https://sso.acme.example")).toBeUndefined();
-      expect(validate(3)("profile email")).toContain("openid");
-      expect(validate(3)("openid email")).toBeUndefined();
+      expect(validate(3)("")).toBeUndefined();
+      expect(validate(3)("groups employee")).toBeUndefined();
     });
 
     it("will not take an empty client id or client secret, so the connection cannot be left without one", async () => {
@@ -798,6 +809,7 @@ describe("SocialSignInPrompt", () => {
 describe("askCustomSettings", () => {
   beforeEach(() => {
     vi.mocked(text).mockReset();
+    vi.mocked(multiselect).mockResolvedValue(["openid"] as never);
   });
 
   it("asks for nothing when every setting was given", async () => {
@@ -822,7 +834,7 @@ describe("askCustomSettings", () => {
     slug: "What should this connection be called?",
     displayName: "What should the sign-in button say?",
     issuer: "What is the provider's issuer URL?",
-    scopes: "Which scopes should",
+    scopes: "Would you like to ask for any additional scopes?",
   };
 
   it.each([

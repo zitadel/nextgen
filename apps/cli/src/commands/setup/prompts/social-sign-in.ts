@@ -1,7 +1,6 @@
 import {
   CUSTOM_PROVIDER,
   type CustomOidcInput,
-  DEFAULT_SCOPES,
   idpProvider,
   IDP_PROVIDERS,
   RESERVED_SLUGS,
@@ -26,6 +25,7 @@ import {
   askConnectionEndpoints,
   callbackUriFor,
   type CustomFlagValues,
+  askScopes,
   CONNECTION_SCHEMA_REF,
   loopbackIssuerWarning,
   registrationLines,
@@ -76,16 +76,9 @@ export async function askCustomSettings(
     parse: parseIssuer,
     given: given.issuer,
   });
-  const scopes = await ask({
-    kind: "text",
-    name: "scopes",
-    message: `Which scopes should "${displayName}" be asked for?`,
-    parse: parseScopes,
-    given: given.scopes,
-    initialValue: DEFAULT_SCOPES.join(" "),
-  });
+  const scopes = await askScopes(ask, displayName, given.scopes);
   // The settings carry the scopes as the one string a flag does.
-  return { slug, displayName, issuer, scopes: scopes.join(" ") };
+  return { slug, displayName, issuer, scopes };
 }
 
 /**

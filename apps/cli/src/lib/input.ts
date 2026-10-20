@@ -80,6 +80,8 @@ type MultiselectQuestion = Common & {
   options: Choice<unknown>[];
   /** Whether at least one option must be ticked. */
   required?: boolean;
+  /** The options ticked when the question first shows. */
+  initialValues?: unknown[];
 };
 
 type ConfirmQuestion = Common & {
@@ -242,6 +244,7 @@ export async function input<Q extends Question>(question: Q, session: Session): 
               message: q.message,
               options: q.options,
               required: q.required,
+              initialValues: q.initialValues,
               output: q.output,
             });
       if (isCancel(chosen)) {
