@@ -86,6 +86,27 @@ export function runCapture(command, args = [], options = {}) {
   });
 }
 
+// Runs a command with its output captured, then replays it to this process's
+// stdout and stderr once it exits. For commands that print a lot (pnpm 12 lists
+// every packed file): a pnpm 12 child that shares an inherited, non-blocking
+// pipe aborts on EAGAIN when the reader falls behind, where this process's own
+// writes retry.
+export async function runBuffered(command, args = [], options = {}) {
+  try {
+    const result = await runCapture(command, args, options);
+    process.stdout.write(result.stdout);
+    process.stderr.write(result.stderr);
+    return result;
+  } catch (error) {
+    if (typeof error.stdout === "string") {
+      process.stdout.write(error.stdout);
+      process.stderr.write(error.stderr);
+      error.message = error.message.split("\n")[0];
+    }
+    throw error;
+  }
+}
+
 export function formatCommand(command, args = []) {
   return [command, ...args].map(shellQuote).join(" ");
 }

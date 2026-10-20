@@ -5,7 +5,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const execFile = promisify(execFileCallback);
 
@@ -13,6 +13,11 @@ const devProcessUrl = new URL("../../../../../scripts/dev-process.mjs", import.m
 
 type DevProcessModule = {
   isDirectRun: (moduleUrl: string, argv?: string[]) => boolean;
+  runBuffered: (
+    command: string,
+    args?: string[],
+    options?: { env?: NodeJS.ProcessEnv },
+  ) => Promise<{ stdout: string; stderr: string }>;
   mapWithConcurrency: <T, R>(
     items: T[],
     limit: number,
@@ -75,6 +80,44 @@ if (isDirectRun(import.meta.url)) console.log("main block ran");
       expect(stdout).toBe("main block ran\n");
     } finally {
       await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("runBuffered", () => {
+  const printer = (code: number) => [
+    "-e",
+    `process.stdout.write("out-line\\n"); process.stderr.write("err-line\\n"); process.exit(${code});`,
+  ];
+
+  it("returns the child's output and replays it once the child has exited", async () => {
+    const { runBuffered } = await loadModule();
+    const out = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const result = await runBuffered(process.execPath, printer(0));
+      expect(result.stdout).toBe("out-line\n");
+      expect(out).toHaveBeenCalledWith("out-line\n");
+      expect(err).toHaveBeenCalledWith("err-line\n");
+    } finally {
+      out.mockRestore();
+      err.mockRestore();
+    }
+  });
+
+  it("replays the output of a failing child and keeps the error to one line", async () => {
+    const { runBuffered } = await loadModule();
+    const out = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const failure = await runBuffered(process.execPath, printer(3)).catch((e) => e);
+      expect(failure.code).toBe(3);
+      expect(failure.message).not.toContain("\n");
+      expect(out).toHaveBeenCalledWith("out-line\n");
+      expect(err).toHaveBeenCalledWith("err-line\n");
+    } finally {
+      out.mockRestore();
+      err.mockRestore();
     }
   });
 });

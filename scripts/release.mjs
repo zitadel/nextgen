@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
+import { forwardedArgs, isDirectRun, run, runBuffered, runCapture } from "./dev-process.mjs";
 import { upsertProductGithubRelease } from "./release-github.mjs";
 import {
   findPublishBlockers,
@@ -169,7 +169,7 @@ async function commandPublish(options) {
   }
 
   await commandSnapshot({ skipContainer: true });
-  await run("corepack", ["pnpm", "exec", "changeset", "publish"], {
+  await runBuffered("corepack", ["pnpm", "exec", "changeset", "publish"], {
     cwd: repoRoot,
     env: releasePublishEnv(),
   });

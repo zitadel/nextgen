@@ -13,7 +13,7 @@ If you want to add Zitadel to your own app rather than contribute here, see the
 
 - Go version from [`go.mod`](go.mod)
 - Node.js from [`.nvmrc`](.nvmrc)
-- pnpm 10 from [`package.json`](package.json) (`corepack enable`)
+- pnpm 12 from [`package.json`](package.json) (`corepack enable`)
 - [Moon](https://moonrepo.dev/moon)
 
 ### Using the devcontainer
