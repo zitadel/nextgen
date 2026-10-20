@@ -1,4 +1,4 @@
-import { commands, skillsCommand } from "../commands";
+import { commands, folderCommand, skillsCommand } from "../commands";
 
 // The host's llms.txt (llmstxt.org): what the preview is and where an agent
 // reads on. The docs keep the index of their own pages at /docs/llms.txt.
@@ -11,7 +11,7 @@ const body = `# Zitadel (developer preview)
 Run it locally with the published CLI (Node.js 24 or newer). Every Zitadel command takes \`--non-interactive --json\` and prints one JSON envelope on stdout:
 
 \`\`\`sh
-${commands.join("\n")}
+${[folderCommand, ...commands].join("\n")}
 \`\`\`
 
 Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.

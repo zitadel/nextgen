@@ -1,7 +1,7 @@
 import { CommandBlock } from "./command-block";
 import { Words } from "./command-line";
 import { CallToAction } from "./cta";
-import { commands, skillsCommand } from "./commands";
+import { appPath, commands, skillsCommand } from "./commands";
 import { CopyButton } from "./copy-button";
 import { Showcase, stepLink } from "./showcase/showcase";
 import { SiteFooter } from "./site-footer";
@@ -62,7 +62,7 @@ export default function Home() {
           <div className="teaser mt-9 flex w-full max-w-[40rem] flex-col items-center">
             <div className="w-full">
               <CommandBlock
-                title="Terminal"
+                title={appPath}
                 note="Node 24+"
                 lines={commands}
                 footer={

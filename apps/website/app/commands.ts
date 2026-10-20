@@ -1,14 +1,19 @@
 // The local preview with the published CLI, as the README's quick start runs
-// it and the docs' quickstart without its optional `doctor` (AGENTS.md): a new
-// folder, start, setup for a Next.js app, the app's dev server. The session the
-// showcase was recorded from (showcase/sessions.ts) ran the same, with `doctor`
-// first. The hero shows them; /llms.txt hands them to agents. The showcase's
-// first two steps show start and setup at their prompts, and the footer
+// it and the docs' quickstart without its optional `doctor` (AGENTS.md), in a
+// new folder for the app: start, setup for a Next.js app, the app's dev
+// server. The session the showcase was recorded from (showcase/sessions.ts)
+// ran the same, with `doctor` first. The hero shows them, with the folder as
+// its terminal's title, and the showcase's first two steps start and setup;
+// /llms.txt hands them to agents after the folder's command; the footer
 // offers start.
+export const appFolder = "myapp";
+// The folder as the windows' title bars show it.
+export const appPath = `~/${appFolder}`;
+export const folderCommand = `mkdir ${appFolder} && cd ${appFolder}`;
 export const startCommand = "npx @zitadel/cli@alpha start";
 export const setupCommand = "npx @zitadel/cli@alpha setup --framework next --server local";
 
-export const commands = ["mkdir myapp && cd myapp", startCommand, setupCommand, "npm run dev"];
+export const commands = [startCommand, setupCommand, "npm run dev"];
 
 // The skills of this repository, for any skills-compatible coding agent
 // (README.md): the router skill, the CLI's, and one per framework SDK and
