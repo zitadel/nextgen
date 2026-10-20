@@ -131,8 +131,8 @@ packages, publishes them to a persistent local Verdaccio registry under
 `tmp/cli-local-registry`, and points the generated app install at that registry.
 Set `ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` to install public npm packages in the
 generated app instead of local ones. The scaffolded app's lockfile points at the
-wrapper's local registry, so reinstalling it later needs the wrapper (or the
-version published on npm).
+wrapper's local registry, so reinstalling it after the wrapper exits fails until
+that version is published on npm.
 
 The wrapper sets `ZITADEL_TELEMETRY_ENV=development` unless you set it, so local
 builds, which report their unreleased version, stay out of the production
