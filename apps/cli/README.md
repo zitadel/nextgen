@@ -2783,10 +2783,12 @@ FLAGS
       qual|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not
       _contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
       schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal
-      |greater_than|greater_than_or_equal), status (equals|not_equals|contains|not
-      _contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
-      team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equa
-      l|greater_than|greater_than_or_equal), lifecycle_owner_team_id
+      |greater_than|greater_than_or_equal), schema_object_type
+      (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
+      r_than|greater_than_or_equal), status (equals|not_equals|contains|not_contai
+      ns|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id
+      (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
+      r_than|greater_than_or_equal), lifecycle_owner_team_id
       (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
       r_than|greater_than_or_equal).
 

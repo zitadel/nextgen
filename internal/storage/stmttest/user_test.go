@@ -293,6 +293,93 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 	})
 }
 
+// Revisions of one schema share its object type, so a migration is tracked by
+// selecting the users of an object type who are not on its newest revision.
+func TestUserStatements_ListUsersBySchemaRevision(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, untypedSchemaURL := ensureUserTestProject(t, d.stmts)
+		suffix := uniqueSuffix(t)
+		base := "https://example.com/schemas/" + suffix + "-"
+		consumer := "consumer-" + suffix
+		business := "business-" + suffix
+
+		consumerV1 := createJSONSchemaRevision(t, d.stmts, projectID, base+"consumer-v1", &consumer)
+		consumerV2 := createJSONSchemaRevision(t, d.stmts, projectID, base+"consumer-v2", &consumer)
+		businessV1 := createJSONSchemaRevision(t, d.stmts, projectID, base+"business-v1", &business)
+
+		for _, spec := range []struct{ id, schemaURL string }{
+			{"user_rev_consumer_v1_a", consumerV1.URL},
+			{"user_rev_consumer_v1_b", consumerV1.URL},
+			{"user_rev_consumer_v2", consumerV2.URL},
+			{"user_rev_business_v1", businessV1.URL},
+			{"user_rev_untyped", untypedSchemaURL},
+		} {
+			user := newTestUser(t, projectID, spec.schemaURL, spec.id, spec.id+"@example.com", spec.id)
+			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
+		}
+
+		list := func(t *testing.T, filters ...database.Filter[domain.UserField]) []string {
+			t.Helper()
+			filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), projectID))
+			result, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
+				Filter: database.And(filters...),
+				Pagination: database.Page[domain.UserField]{
+					OrderBy: database.OrderBy[domain.UserField]{
+						Columns:   []database.Column[domain.UserField]{database.Col(domain.UserFieldID)},
+						Direction: database.OrderAsc,
+					},
+				},
+			}, service.UserQueryOptions{})
+			require.NoError(t, err)
+			return userIDs(result.Items)
+		}
+		schemaURL := database.Col(domain.UserFieldSchemaURL)
+		objectType := database.Col(domain.UserFieldSchemaObjectType)
+
+		t.Run("OnRevision", func(t *testing.T) {
+			assert.Equal(t, []string{"user_rev_consumer_v1_a", "user_rev_consumer_v1_b"},
+				list(t, database.StringEqual(schemaURL, consumerV1.URL)))
+		})
+
+		t.Run("NotOnRevision", func(t *testing.T) {
+			assert.Equal(t, []string{"user_rev_business_v1", "user_rev_consumer_v1_a", "user_rev_consumer_v1_b", "user_rev_untyped"},
+				list(t, database.Not[domain.UserField](database.StringEqual(schemaURL, consumerV2.URL))))
+		})
+
+		t.Run("OfObjectType", func(t *testing.T) {
+			assert.Equal(t, []string{"user_rev_consumer_v1_a", "user_rev_consumer_v1_b", "user_rev_consumer_v2"},
+				list(t, database.StringEqual(objectType, consumer)))
+		})
+
+		t.Run("OfObjectTypeNotOnRevision", func(t *testing.T) {
+			assert.Equal(t, []string{"user_rev_consumer_v1_a", "user_rev_consumer_v1_b"},
+				list(t,
+					database.StringEqual(objectType, consumer),
+					database.Not[domain.UserField](database.StringEqual(schemaURL, consumerV2.URL)),
+				))
+		})
+
+		t.Run("NotOfObjectTypes", func(t *testing.T) {
+			assert.Equal(t, []string{"user_rev_business_v1", "user_rev_untyped"},
+				list(t, database.Not[domain.UserField](database.StringEqual(objectType, consumer))))
+			assert.Equal(t, []string{"user_rev_untyped"}, list(t,
+				database.Not[domain.UserField](database.StringEqual(objectType, consumer)),
+				database.Not[domain.UserField](database.StringEqual(objectType, business)),
+			))
+		})
+
+		// A schema without an object type reads as an empty one.
+		t.Run("WithoutObjectType", func(t *testing.T) {
+			assert.Equal(t, []string{"user_rev_untyped"}, list(t, database.StringEqual(objectType, "")))
+		})
+
+		t.Run("ObjectTypeContains", func(t *testing.T) {
+			assert.Equal(t, []string{"user_rev_consumer_v1_a", "user_rev_consumer_v1_b", "user_rev_consumer_v2"},
+				list(t, database.StringContainsFold(objectType, "CONSUMER")))
+		})
+	})
+}
+
 func TestUserStatements_UserExists(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)

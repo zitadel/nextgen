@@ -110740,6 +110740,8 @@ func (s *UserFilterField) Decode(d *jx.Decoder) error {
 		*s = UserFilterFieldID
 	case UserFilterFieldSchema:
 		*s = UserFilterFieldSchema
+	case UserFilterFieldSchemaObjectType:
+		*s = UserFilterFieldSchemaObjectType
 	case UserFilterFieldStatus:
 		*s = UserFilterFieldStatus
 	case UserFilterFieldTeamID:

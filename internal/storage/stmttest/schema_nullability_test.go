@@ -30,7 +30,7 @@ import (
 func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	t.Helper()
 	var cols []schematest.ColumnNullability
-	cols = append(cols, schematest.Columns("users", user.Schema)...)
+	cols = append(cols, schematest.Columns("users", user.NewSchema("users", "json_schemas"))...)
 	cols = append(cols, schematest.Columns("user_passkeys", userpasskey.Schema)...)
 	cols = append(cols, schematest.Columns("user_passwords", userpassword.Schema)...)
 	cols = append(cols, schematest.Columns("user_recovery_codes", userrecoverycodes.Schema)...)

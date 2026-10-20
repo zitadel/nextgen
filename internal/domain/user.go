@@ -318,4 +318,5 @@ const (
 	UserFieldStatus
 	UserFieldCreatedAt
 	UserFieldUpdatedAt
+	UserFieldSchemaObjectType
 )

@@ -14,6 +14,7 @@ const (
 	userFieldCreatedAt            = "created_at"
 	userFieldID                   = "id"
 	userFieldSchema               = "schema"
+	userFieldSchemaObjectType     = "schema_object_type"
 	userFieldStatus               = "status"
 	userFieldTeamID               = "team_id"
 	userFieldLifecycleOwnerTeamID = "lifecycle_owner_team_id"
@@ -371,7 +372,19 @@ func userFilter(f Filter) (database.Filter[domain.UserField], error) {
 		if err != nil {
 			return nil, err
 		}
+		if f.Operation == filterOpNotEquals {
+			return database.Not[domain.UserField](database.StringEqual(database.Col(domain.UserFieldSchemaURL), value)), nil
+		}
 		return stringFilter(f.Operation, database.Col(domain.UserFieldSchemaURL), value)
+	case userFieldSchemaObjectType:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		if f.Operation == filterOpNotEquals {
+			return database.Not[domain.UserField](database.StringEqual(database.Col(domain.UserFieldSchemaObjectType), value)), nil
+		}
+		return stringFilter(f.Operation, database.Col(domain.UserFieldSchemaObjectType), value)
 	case userFieldStatus:
 		value, err := stringFilterValue(f)
 		if err != nil {
@@ -427,11 +440,11 @@ func userField(field string) (domain.UserField, error) {
 		return domain.UserFieldStatus, nil
 	case userFieldLifecycleOwnerTeamID:
 		return domain.UserFieldLifecycleOwnerTeamID, nil
-	case userFieldTeamID:
+	case userFieldTeamID, userFieldSchemaObjectType:
 		// Not a column on the user: the keyset cursor is built from the last
-		// row's sort values, and there is no membership value on that row.
+		// row's sort values, and there is no such value on that row.
 		return domain.UserFieldUnspecified, domain.ErrRequestInvalid().
-			WithDetails(fmt.Sprintf("%s can be filtered but not sorted", userFieldTeamID))
+			WithDetails(fmt.Sprintf("%s can be filtered but not sorted", field))
 	default:
 		return domain.UserFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
 	}

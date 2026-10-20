@@ -14,6 +14,8 @@ import (
 	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
+var userSchema = v2user.NewSchema("users", "json_schemas")
+
 const (
 	createUserHeaderStmt = `INSERT INTO users (project_id, schema_url, id, lifecycle_owner_team_id, status, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -230,19 +232,19 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 	}
 	filter = v2user.EnsureListOptions(filter)
 
-	readFilter, err := v2user.ApplyCursor(filter.Filter, filter.Pagination)
+	readFilter, err := v2user.ApplyCursor(userSchema, filter.Filter, filter.Pagination)
 	if err != nil {
 		return nil, err
 	}
 
-	headers, nextCursor, err := pagination.Page(filter.Pagination, v2user.Schema, func(limit uint32) ([]*domain.User, error) {
+	headers, nextCursor, err := pagination.Page(filter.Pagination, userSchema, func(limit uint32) ([]*domain.User, error) {
 		var compiler statementCompiler
 		compiler.WriteString(userQuery)
 
 		hasWhere := false
 		if readFilter != nil {
 			writeConjunct(&compiler, &hasWhere)
-			compileFilter(&compiler, readFilter, v2user.Schema)
+			compileFilter(&compiler, readFilter, userSchema)
 		}
 		for _, a := range opts.Attributes {
 			writeConjunct(&compiler, &hasWhere)
@@ -282,7 +284,7 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		}
 		maybeWriteAuthzListPredicate(ctx, &compiler, &hasWhere, "users", "id")
 
-		compileOrderBy(&compiler, filter.Pagination.OrderBy, v2user.Schema)
+		compileOrderBy(&compiler, filter.Pagination.OrderBy, userSchema)
 		compileLimit(&compiler, limit)
 
 		rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)

@@ -117,6 +117,8 @@ func compileFilter[F ~uint8, T any](c *statementCompiler, filter database.Filter
 		compileAndFilter(c, f, schema)
 	case database.OrFilter[F]:
 		compileOrFilter(c, f, schema)
+	case database.NotFilter[F]:
+		compileNotFilter(c, f, schema)
 	case *database.CompareFilter[F]:
 		compileCompareFilter(c, f, schema)
 	case *database.StringFilter[F]:
@@ -146,6 +148,12 @@ func compileAndFilter[F ~uint8, T any](c *statementCompiler, filter database.And
 		}
 		compileFilter(c, child, schema)
 	}
+	c.WriteString(")")
+}
+
+func compileNotFilter[F ~uint8, T any](c *statementCompiler, filter database.NotFilter[F], schema database.Schema[F, T]) {
+	c.WriteString("NOT (")
+	compileFilter(c, filter.Filter, schema)
 	c.WriteString(")")
 }
 

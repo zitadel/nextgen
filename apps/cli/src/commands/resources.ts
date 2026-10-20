@@ -127,6 +127,7 @@ export const RESOURCES = {
         { field: "created_at", operations: FILTER_OPERATIONS },
         { field: "id", operations: FILTER_OPERATIONS },
         { field: "schema", operations: FILTER_OPERATIONS },
+        { field: "schema_object_type", operations: FILTER_OPERATIONS },
         { field: "status", operations: FILTER_OPERATIONS },
         { field: "team_id", operations: FILTER_OPERATIONS },
         { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
