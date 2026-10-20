@@ -7,7 +7,7 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
-import { render, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
@@ -235,13 +235,25 @@ describe("hydrating a server-rendered login", () => {
     document.body.appendChild(host);
     const login = <ZitadelLogin project={globalProject} resumeFlowId="flow_123" />;
     host.innerHTML = renderToString(login);
+    const rendered = host.querySelector(widgetTags.login);
+    expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
+    const firstStep = new Promise((resolve) =>
+      rendered?.addEventListener("zitadel-flow-step", resolve, { once: true }),
+    );
 
-    hydrateRoot(host, login);
+    await act(async () => {
+      hydrateRoot(host, login);
+    });
 
     await waitFor(() => expect(fetched).toHaveBeenCalled());
     const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
     expect(first.method).toBe("GET");
     expect(first.url).toContain("flow_123");
+    expect(host.querySelector(widgetTags.login)).toBe(rendered);
+    await firstStep;
+    await rendered?.updateComplete;
+    await Promise.all(fetched.mock.results.map((result) => result.value));
+    expect(fetched).toHaveBeenCalledTimes(1);
     host.remove();
   });
 });

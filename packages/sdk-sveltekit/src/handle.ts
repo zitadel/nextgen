@@ -4,6 +4,7 @@ import type {
   NextgenMiddlewareOptions,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
+import { joinURL } from "ufo";
 
 import {
   HOP_BY_HOP,
@@ -129,7 +130,7 @@ async function proxyRequest(
 ): Promise<Response> {
   const { url } = event;
   const suffix = url.pathname.slice(proxyPath.length);
-  const target = `${authUrl}${suffix}${url.search}`;
+  const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const method = event.request.method;
   const hasBody = !["GET", "HEAD"].includes(method);
