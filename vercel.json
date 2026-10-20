@@ -10,7 +10,7 @@
     "console": {
       "root": "apps/console",
       "framework": "vite",
-      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install && cd $(git rev-parse --show-toplevel) && echo SPIKE-DEBUG-PNPM-DIRS && ls node_modules/.pnpm | grep -i sharp; echo SPIKE-DEBUG-LINKS; ls -la node_modules/.pnpm/node_modules/@img 2>&1 | head -20; echo SPIKE-DEBUG-DANGLING; find node_modules -maxdepth 7 -xtype l 2>/dev/null | grep -i darwin | head; echo SPIKE-DEBUG-END; cd -",
       "buildCommand": "CONSOLE_BASE_PATH=/console/ CONSOLE_VERCEL_INSIGHTS=1 turbo run build",
       "devCommand": "NODE_ENV=production CONSOLE_BASE_PATH=/console/ vite build --outDir node_modules/.cloud-dev && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
       "outputDirectory": "../../internal/staticui/console/dist",
@@ -28,7 +28,7 @@
     "storybook": {
       "root": "apps/storybook",
       "framework": "storybook",
-      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install && cd $(git rev-parse --show-toplevel) && echo SPIKE-DEBUG-PNPM-DIRS && ls node_modules/.pnpm | grep -i sharp; echo SPIKE-DEBUG-LINKS; ls -la node_modules/.pnpm/node_modules/@img 2>&1 | head -20; echo SPIKE-DEBUG-DANGLING; find node_modules -maxdepth 7 -xtype l 2>/dev/null | grep -i darwin | head; echo SPIKE-DEBUG-END; cd -",
       "buildCommand": "turbo run build",
       "devCommand": "NODE_ENV=production storybook build --output-dir node_modules/.cloud-dev --quiet && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
       "outputDirectory": "dist",
@@ -42,13 +42,13 @@
     "docs": {
       "root": "apps/docs",
       "framework": "nextjs",
-      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install && cd $(git rev-parse --show-toplevel) && echo SPIKE-DEBUG-PNPM-DIRS && ls node_modules/.pnpm | grep -i sharp; echo SPIKE-DEBUG-LINKS; ls -la node_modules/.pnpm/node_modules/@img 2>&1 | head -20; echo SPIKE-DEBUG-DANGLING; find node_modules -maxdepth 7 -xtype l 2>/dev/null | grep -i darwin | head; echo SPIKE-DEBUG-END; cd -",
       "buildCommand": "pnpm run build"
     },
     "website": {
       "root": "apps/website",
       "framework": "nextjs",
-      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install && cd $(git rev-parse --show-toplevel) && echo SPIKE-DEBUG-PNPM-DIRS && ls node_modules/.pnpm | grep -i sharp; echo SPIKE-DEBUG-LINKS; ls -la node_modules/.pnpm/node_modules/@img 2>&1 | head -20; echo SPIKE-DEBUG-DANGLING; find node_modules -maxdepth 7 -xtype l 2>/dev/null | grep -i darwin | head; echo SPIKE-DEBUG-END; cd -",
       "buildCommand": "turbo run build --filter=@zitadel/components && pnpm run build"
     },
     "schemas": {
