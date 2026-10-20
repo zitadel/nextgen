@@ -64,6 +64,47 @@ const firstDifference = (titles: readonly string[], canonical: readonly string[]
   return "";
 };
 
+// Matches `it("title"`, `it.each(…)("title"`, `describe("title"` and `describe.each(…)("title"`.
+const BLOCK_TITLE = /\b(?:it|describe)(?:\.each\([^)]*\))?\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+
+const blockIn = (source: string, name: string): string | undefined => {
+  const begin = source.indexOf(`// ${name}:begin`);
+  const end = source.indexOf(`// ${name}:end`);
+  return begin >= 0 && end > begin ? source.slice(begin, end) : undefined;
+};
+
+const titlesIn = (block: string): string[] =>
+  Array.from(block.matchAll(BLOCK_TITLE), (match) => match[2] ?? "");
+
+/**
+ * What is wrong with the `name` blocks of the given sources: a block that is
+ * missing, one whose titles are not the canonical ones, in order and without an
+ * extra, and one whose body is not the first source's, byte for byte.
+ */
+const problems = (
+  sources: Readonly<Record<string, string>>,
+  name: string,
+  canonical: readonly string[],
+): string[] => {
+  const blocks = Object.entries(sources).map(
+    ([sdk, source]) => [sdk, source, blockIn(source, name)] as const,
+  );
+  const reference = blocks[0]?.[2];
+  return blocks.flatMap(([sdk, source, block]) => {
+    if (block === undefined) return [`${sdk} has no ${name} block`];
+    const found = [];
+    const difference = firstDifference(titlesIn(block), canonical);
+    if (difference) found.push(`${sdk}: ${difference}`);
+    if (block !== reference) found.push(`${sdk}: the body differs from the first SDK's`);
+    const outside = titlesIn(source.replace(block, "")).filter((title) =>
+      canonical.includes(title),
+    );
+    if (outside.length > 0)
+      found.push(`${sdk}: ${JSON.stringify(outside[0])} is also tested outside the block`);
+    return found;
+  });
+};
+
 /**
  * The element↔contract drift guard.
  *
@@ -327,47 +368,6 @@ describe("standard-attribute tests ↔ SDK specs", () => {
     "puts the standard attributes into the server markup",
     "leaves props outside the standard set out of the server markup",
   ];
-
-  // Matches `it("title"`, `it.each(…)("title"`, `describe("title"` and `describe.each(…)("title"`.
-  const TITLE = /\b(?:it|describe)(?:\.each\([^)]*\))?\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
-
-  const blockIn = (source: string, name: string): string | undefined => {
-    const begin = source.indexOf(`// ${name}:begin`);
-    const end = source.indexOf(`// ${name}:end`);
-    return begin >= 0 && end > begin ? source.slice(begin, end) : undefined;
-  };
-
-  const titlesIn = (block: string): string[] =>
-    Array.from(block.matchAll(TITLE), (match) => match[2] ?? "");
-
-  /**
-   * What is wrong with the `name` blocks of the given sources: a block that is
-   * missing, one whose titles are not the canonical ones, in order and without an
-   * extra, and one whose body is not the first source's, byte for byte.
-   */
-  const problems = (
-    sources: Readonly<Record<string, string>>,
-    name: string,
-    canonical: readonly string[],
-  ): string[] => {
-    const blocks = Object.entries(sources).map(
-      ([sdk, source]) => [sdk, source, blockIn(source, name)] as const,
-    );
-    const reference = blocks[0]?.[2];
-    return blocks.flatMap(([sdk, source, block]) => {
-      if (block === undefined) return [`${sdk} has no ${name} block`];
-      const found = [];
-      const difference = firstDifference(titlesIn(block), canonical);
-      if (difference) found.push(`${sdk}: ${difference}`);
-      if (block !== reference) found.push(`${sdk}: the body differs from the first SDK's`);
-      const outside = titlesIn(source.replace(block, "")).filter((title) =>
-        canonical.includes(title),
-      );
-      if (outside.length > 0)
-        found.push(`${sdk}: ${JSON.stringify(outside[0])} is also tested outside the block`);
-      return found;
-    });
-  };
 
   const read = (spec: string): string =>
     readFileSync(fileURLToPath(new URL(spec, import.meta.url)), "utf8");
@@ -785,4 +785,72 @@ describe("server SDK test titles", () => {
       ).toBe("");
     },
   );
+
+  /**
+   * The backend-url tests are the one group of cases the server SDKs also
+   * carry byte for byte: the same rows and bodies between the same markers, so
+   * every SDK resolves the url the same way. Only the glue outside the block
+   * (`serve`, `captureFetch`, `signer`) differs.
+   */
+  describe("the backend-url block", () => {
+    const URL_TITLES = [
+      "proxies to the backend from %s",
+      "verifies a JWT against a backend url given with a trailing slash",
+      "asks the session probe at a backend url given with a trailing slash",
+    ];
+    const sources = Object.fromEntries(
+      Object.entries(TEST_FILES).map(([sdk, file]) => [
+        sdk,
+        readFileSync(`${packagesPath}${file}`, "utf8"),
+      ]),
+    );
+    const mutated = (from: string, to: string): Record<string, string> => {
+      const source = sources["sdk-solid-start"] ?? "";
+      expect(source, "the mutated text is in the block").toContain(from);
+      return { ...sources, "sdk-solid-start": source.replace(from, to) };
+    };
+    const ROW = '    ["an IPv6 option", "http://[::1]:8080/", undefined, "http://[::1]:8080/"],\n';
+
+    it("is canonical in every SDK", () => {
+      expect(problems(sources, "backend-url", URL_TITLES)).toEqual([]);
+    });
+
+    it("sees a changed row and names the SDK", () => {
+      expect(
+        problems(mutated("http://[::1]:8080/", "http://[::1]:8080"), "backend-url", URL_TITLES),
+      ).toEqual(["sdk-solid-start: the body differs from the first SDK's"]);
+    });
+
+    it("sees a dropped row", () => {
+      expect(problems(mutated(ROW, ""), "backend-url", URL_TITLES)).toEqual([
+        "sdk-solid-start: the body differs from the first SDK's",
+      ]);
+    });
+
+    it("sees an extra row", () => {
+      expect(
+        problems(
+          mutated(ROW, `${ROW}${ROW.replace("IPv6", "second IPv6")}`),
+          "backend-url",
+          URL_TITLES,
+        ),
+      ).toEqual(["sdk-solid-start: the body differs from the first SDK's"]);
+    });
+
+    it("sees a changed assertion", () => {
+      expect(
+        problems(
+          mutated("expect(calls[0]?.url).toBe(", "expect(calls[0]?.url).not.toBe("),
+          "backend-url",
+          URL_TITLES,
+        ),
+      ).toEqual(["sdk-solid-start: the body differs from the first SDK's"]);
+    });
+
+    it("sees a missing marker", () => {
+      expect(problems(mutated("// backend-url:end", ""), "backend-url", URL_TITLES)).toEqual([
+        "sdk-solid-start has no backend-url block",
+      ]);
+    });
+  });
 });

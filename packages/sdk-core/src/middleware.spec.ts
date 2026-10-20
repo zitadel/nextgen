@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearJwksCache } from "./jwt.js";
 import {
+  DEFAULT_BACKEND_URL,
   HOP_BY_HOP,
   SERVER_SESSION_COOKIE,
   checkOpaqueSessionToken,
@@ -10,7 +11,7 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
-  normalizeBackendUrl,
+  resolveBackendUrl,
   jwtNamesProject,
   proxySessionCookies,
   requiresProjectSecret,
@@ -156,28 +157,69 @@ describe("matchesRoutes", () => {
   });
 });
 
-describe("normalizeBackendUrl", () => {
+describe("resolveBackendUrl", () => {
   it.each([
     ["a url without a trailing slash", "http://localhost:8080", "http://localhost:8080"],
     ["a trailing slash", "http://localhost:8080/", "http://localhost:8080"],
     ["several trailing slashes", "https://auth.example.com///", "https://auth.example.com"],
     ["surrounding whitespace", " \thttp://localhost:8080\n", "http://localhost:8080"],
     ["whitespace around a trailing slash", " http://localhost:8080/ ", "http://localhost:8080"],
-    ["a path prefix", "https://example.com/zitadel/", "https://example.com/zitadel"],
-    ["an empty string", "", ""],
-    ["only slashes", "///", ""],
-  ])("normalizes %s", (_label, given, expected) => {
-    expect(normalizeBackendUrl(given)).toBe(expected);
+    ["whitespace between trailing slashes", "https://h.test/ /", "https://h.test"],
+    ["slashes and whitespace in turn", "https://h.test/ / \n//", "https://h.test"],
+  ])("strips %s", (_label, given, expected) => {
+    expect(resolveBackendUrl(given)).toBe(expected);
+  });
+
+  it.each([
+    ["a url without a trailing slash", "http://localhost:8080"],
+    ["a path prefix", "https://example.com/zitadel"],
+    ["the case of the scheme and host", "HTTP://Auth.Example.COM/Zitadel"],
+    ["credentials", "https://user:p%40ss@auth.example.com"],
+    ["a port", "http://localhost:4000"],
+    ["a port and a path", "http://localhost:4000/zitadel"],
+    ["an IPv6 host", "http://[::1]:8080"],
+    ["a query string", "https://auth.example.com/?q=1"],
+    ["slashes before a query", "https://auth.example.com//?q=1"],
+    ["a fragment", "https://auth.example.com/#top"],
+  ])("keeps %s", (_label, given) => {
+    expect(resolveBackendUrl(`${given}/`)).toBe(given);
+    expect(resolveBackendUrl(given)).toBe(given);
   });
 
   it("is idempotent", () => {
-    const once = normalizeBackendUrl("http://localhost:8080//");
+    for (const given of [
+      "http://localhost:8080//",
+      "https://h.test/ /",
+      " https://h.test/ / ",
+      "/ ",
+      " ",
+      "",
+    ]) {
+      const once = resolveBackendUrl(given);
 
-    expect(normalizeBackendUrl(once)).toBe(once);
+      expect(resolveBackendUrl(once)).toBe(once);
+    }
+  });
+
+  it("takes the first candidate that is not blank", () => {
+    expect(resolveBackendUrl("http://one.test/", "http://two.test")).toBe("http://one.test");
+    expect(resolveBackendUrl(undefined, "", " \t", "http://two.test/")).toBe("http://two.test");
+  });
+
+  it.each([
+    ["no candidate", []],
+    ["undefined", [undefined]],
+    ["an empty string", [""]],
+    ["only whitespace", [" \t\n"]],
+    ["only slashes", ["///"]],
+    ["only blank candidates", [undefined, "", "  ", " / "]],
+  ])("falls back to the local default for %s", (_label, candidates) => {
+    expect(resolveBackendUrl(...candidates)).toBe(DEFAULT_BACKEND_URL);
+    expect(DEFAULT_BACKEND_URL).toBe("http://localhost:8080");
   });
 
   it("handles a long run of slashes", () => {
-    expect(normalizeBackendUrl(`http://localhost:8080${"/".repeat(200_000)}`)).toBe(
+    expect(resolveBackendUrl(`http://localhost:8080${"/".repeat(200_000)}`)).toBe(
       "http://localhost:8080",
     );
   });

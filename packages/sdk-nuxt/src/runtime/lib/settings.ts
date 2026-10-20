@@ -2,7 +2,7 @@
 export const DEFAULT_URL = "http://localhost:8080";
 
 function nonEmpty(value: unknown): string | undefined {
-  return typeof value === "string" && value !== "" ? value : undefined;
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
 /**

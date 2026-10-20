@@ -6,7 +6,7 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
-  normalizeBackendUrl,
+  resolveBackendUrl,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
@@ -199,7 +199,7 @@ export async function handleNextgenRequest(
   options: NextgenRequestOptions = {},
 ): Promise<NextgenRequestDecision> {
   const {
-    url: configuredUrl = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
+    url: configuredUrl,
     projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
@@ -215,7 +215,7 @@ export async function handleNextgenRequest(
     projectSecret = PROCESS_ENV.ZITADEL_PROJECT_SECRET,
     clientAddress,
   } = options;
-  const url = normalizeBackendUrl(configuredUrl);
+  const url = resolveBackendUrl(configuredUrl, PROCESS_ENV.ZITADEL_URL);
 
   // Guard against open-redirect: loginPath must be a relative path.
   if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {

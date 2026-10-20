@@ -1445,6 +1445,7 @@ describe("server middleware", () => {
     expect(calls[0]?.headers.get("authorization")).toBe(expected);
   });
 
+  // backend-url:begin
   it.each([
     ["the option", "http://option.test:4000", "http://env.test:4000", "http://option.test:4000/"],
     ["ZITADEL_URL", undefined, "http://env.test:4000", "http://env.test:4000/"],
@@ -1460,6 +1461,21 @@ describe("server middleware", () => {
       "http://env.test:4000/",
       "http://env.test:4000/",
     ],
+    ["an empty option, else ZITADEL_URL", "", "http://env.test:4000", "http://env.test:4000/"],
+    ["a blank option, else ZITADEL_URL", " \t", "http://env.test:4000", "http://env.test:4000/"],
+    [
+      "a blank option and a blank ZITADEL_URL, else the local default",
+      " ",
+      "\n",
+      "http://localhost:8080/",
+    ],
+    [
+      "an option kept as given apart from its slash",
+      "HTTP://User:Pw@Auth.Test:8080/Zitadel/",
+      undefined,
+      "HTTP://User:Pw@Auth.Test:8080/Zitadel/",
+    ],
+    ["an IPv6 option", "http://[::1]:8080/", undefined, "http://[::1]:8080/"],
   ])("proxies to the backend from %s", async (_l, option, environment, expected) => {
     vi.stubEnv("ZITADEL_URL", environment);
     const calls = captureFetch();
@@ -1495,4 +1511,5 @@ describe("server middleware", () => {
     expect(served.auth?.isAuthenticated).toBe(true);
     expect(calls[0]?.url.startsWith("http://localhost:4000/sessions/me?")).toBe(true);
   });
+  // backend-url:end
 });

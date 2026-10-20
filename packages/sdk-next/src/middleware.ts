@@ -8,7 +8,7 @@ import {
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
-  normalizeBackendUrl,
+  resolveBackendUrl,
   proxySessionCookies,
   SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
@@ -84,7 +84,7 @@ export async function nextgenMiddleware(
   options: NextgenMiddlewareOptions = {},
 ): Promise<NextResponse | Response> {
   const {
-    url: configuredUrl = process.env.ZITADEL_URL ?? "http://localhost:8080",
+    url: configuredUrl,
     projectId = process.env.ZITADEL_PROJECT_ID || process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
@@ -98,7 +98,7 @@ export async function nextgenMiddleware(
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
   } = options;
-  const url = normalizeBackendUrl(configuredUrl);
+  const url = resolveBackendUrl(configuredUrl, process.env.ZITADEL_URL);
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL

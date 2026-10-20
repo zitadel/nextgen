@@ -372,6 +372,23 @@ describe("auth()", () => {
     expect(result.isAuthenticated).toBe(true);
   });
 
+  it("falls back to ZITADEL_URL when the url option is blank", async () => {
+    vi.stubEnv("ZITADEL_URL", ISSUER);
+    routeFetch(nextKid(), () =>
+      jsonResponse({ session_id: "sess-3", project_id: PROJECT, state: "active", user_id: "u3" }),
+    );
+    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+
+    const auth = await importAuth();
+    const result = await auth({ ...OPTIONS, url: "  " });
+
+    expect(result.isAuthenticated).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${ISSUER}/sessions/me?project_id=${PROJECT}`,
+      expect.anything(),
+    );
+  });
+
   it("asks the session probe at a backend url given with a trailing slash", async () => {
     routeFetch(nextKid(), () =>
       jsonResponse({ session_id: "sess-3", project_id: PROJECT, state: "active", user_id: "u3" }),

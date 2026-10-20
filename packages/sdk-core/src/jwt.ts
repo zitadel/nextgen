@@ -680,7 +680,7 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
     // given. This function does not normalise trailing slashes, case, or
     // surrounding whitespace — any difference is either a misconfiguration or
     // a token issued by a different server and must be rejected. The SDKs
-    // normalise the configured `url` once, with `normalizeBackendUrl`, before
+    // normalise the configured `url` once, with `resolveBackendUrl`, before
     // they pass it here.
     if (payload.iss !== issuerUrl) {
       return null;

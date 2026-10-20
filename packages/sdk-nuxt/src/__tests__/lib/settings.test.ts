@@ -24,6 +24,18 @@ describe("resolveUrl", () => {
 
     expect(resolveUrl(undefined)).toBe(DEFAULT_URL);
   });
+
+  it("treats a runtime config of only whitespace as unset", () => {
+    vi.stubEnv("ZITADEL_URL", "http://env.test");
+
+    expect(resolveUrl({ url: " \t", issuerUrl: "  " })).toBe("http://env.test");
+  });
+
+  it("falls back to the local server when every source is only whitespace", () => {
+    vi.stubEnv("ZITADEL_URL", " ");
+
+    expect(resolveUrl({ url: " " })).toBe(DEFAULT_URL);
+  });
 });
 
 describe("resolveProjectSecret", () => {
@@ -37,6 +49,12 @@ describe("resolveProjectSecret", () => {
     vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_env");
 
     expect(resolveProjectSecret({ projectSecret: "" })).toBe("sk_env");
+  });
+
+  it("treats a runtime config of only whitespace as unset", () => {
+    vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_env");
+
+    expect(resolveProjectSecret({ projectSecret: "  " })).toBe("sk_env");
   });
 
   it("is undefined when neither is set", () => {

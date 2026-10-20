@@ -47,27 +47,42 @@ export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-nextgen-auth-to
 
 // ─── Backend URL ─────────────────────────────────────────────────────────────
 
+/** Where `zitadel start` runs the local server, which an unset backend `url` falls back to. */
+export const DEFAULT_BACKEND_URL = "http://localhost:8080";
+
+/** Strips surrounding whitespace and trailing slashes together, so the result is stable. */
+function normalizeBackendUrl(url: string): string {
+  // A linear scan, not /[\s/]+$/, which backtracks quadratically on a long run of slashes.
+  let end = url.length;
+  while (end > 0 && (url.charCodeAt(end - 1) === 0x2f || url.charAt(end - 1).trim() === "")) {
+    end--;
+  }
+  return url.slice(0, end).trimStart();
+}
+
 /**
- * Normalizes the configured backend `url` once, where an SDK reads it: strips
- * surrounding whitespace and trailing slashes.
+ * Resolves the backend `url` once, where an SDK reads it: the first candidate
+ * that is not blank, normalized, else {@link DEFAULT_BACKEND_URL}. A candidate
+ * is blank when it is `undefined`, empty or only whitespace, so a `url` option
+ * left unset falls through to `ZITADEL_URL` and then to the default.
+ * Normalizing strips surrounding whitespace and trailing slashes; nothing else
+ * in the url changes.
  *
  * Every server SDK builds `${url}/auth/keys`, `${url}/sessions/me` and the
  * proxy target from it, and {@link verifyJwt} compares a token's `iss` with it
  * exactly. A `ZITADEL_URL` copied with a trailing slash or a stray newline
  * would otherwise produce `//auth/keys` and reject every token on issuer
- * mismatch. The `iss` check stays strict, against the normalized value.
+ * mismatch. The `iss` check stays strict, against the resolved value.
  *
- * @param url - The backend URL as configured.
- * @returns The URL without surrounding whitespace or trailing slashes.
+ * @param candidates - The configured urls, highest precedence first.
+ * @returns The backend URL without surrounding whitespace or trailing slashes.
  */
-export function normalizeBackendUrl(url: string): string {
-  const trimmed = url.trim();
-  // A linear scan, not /\/+$/, which backtracks quadratically on a long run of slashes.
-  let end = trimmed.length;
-  while (end > 0 && trimmed.charCodeAt(end - 1) === 0x2f) {
-    end--;
+export function resolveBackendUrl(...candidates: readonly (string | undefined)[]): string {
+  for (const candidate of candidates) {
+    const url = candidate === undefined ? "" : normalizeBackendUrl(candidate);
+    if (url !== "") return url;
   }
-  return trimmed.slice(0, end);
+  return DEFAULT_BACKEND_URL;
 }
 
 // ─── Route matching ──────────────────────────────────────────────────────────
