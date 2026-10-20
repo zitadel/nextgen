@@ -6,20 +6,18 @@ import { SiteFooter } from "../site-footer";
 import { SiteHeader } from "../site-header";
 import {
   ChangeCount,
-  ComponentFilter,
-  ComponentFilterProvider,
+  ChangelogFilter,
+  FilterButtons,
   Filtered,
   NoneFiltered,
-} from "./component-filter";
+} from "./changelog-filter";
+import { BUMP_LABELS, bumpsIn, componentOf, componentsIn, facetOf } from "./filter";
 import { Markdown } from "./markdown";
 import { OpenLinkedRelease } from "./open-linked-release";
 import {
   BUMPS,
   type Bump,
   type Change,
-  componentIds,
-  componentOf,
-  componentsIn,
   fetchReleases,
   RELEASE_COUNT,
   type Release,
@@ -50,12 +48,6 @@ export const metadata: Metadata = {
     images: [{ url: og.src, width: og.width, height: og.height, alt: "Zitadel" }],
   },
   twitter: { card: "summary_large_image", title, description, images: [og.src] },
-};
-
-const BUMP_TITLES: Record<Bump, string> = {
-  major: "Major changes",
-  minor: "Minor changes",
-  patch: "Patch changes",
 };
 
 const DATE = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" });
@@ -104,14 +96,18 @@ export default async function ChangelogPage() {
             What each release of the preview changes, from its release notes on {github}.
           </p>
           {releases ? (
-            <ComponentFilterProvider components={components}>
+            <ChangelogFilter
+              components={components}
+              bumps={bumpsIn(releases)}
+              facets={releases.flatMap((release) => release.changes.map(facetOf))}
+            >
               <div className="mt-10">
-                <ComponentFilter />
-                {components.some(({ id }) => id === "server") && (
-                  <p className="mt-3 text-text-muted text-xs leading-5">
-                    The console and the login ship in the server: their changes are under Server.
-                  </p>
-                )}
+                <FilterButtons
+                  note={
+                    components.some(({ id }) => id === "server") &&
+                    "The console and the login ship in the server: their changes are under Server."
+                  }
+                />
               </div>
               <ol className="mt-10 border-border-primary border-b">
                 {releases.map((release, index) => (
@@ -122,7 +118,7 @@ export default async function ChangelogPage() {
                 The last {RELEASE_COUNT} releases; {github} has every one.
               </p>
               <OpenLinkedRelease />
-            </ComponentFilterProvider>
+            </ChangelogFilter>
           ) : (
             <p className="mt-12 rounded-xl border border-window-border bg-window px-5 py-4 text-sm text-text-secondary leading-6">
               The release notes did not load. Read them on {github}.
@@ -138,11 +134,11 @@ export default async function ChangelogPage() {
 /**
  * One release, the newest open and the others folded to their version, date
  * and count: the maintainers' notes, the changes by bump, then what the
- * release body says of changes it left out. The filter shows the changes,
- * and the pointers to left-out ones, of the chosen component only.
+ * release body says of changes it left out. The filters show the changes,
+ * and the pointers to left-out ones, that match the visitor's choice.
  */
 function ReleaseEntry({ release, open }: { release: Release; open: boolean }) {
-  const components = release.changes.map(componentIds);
+  const facets = release.changes.map(facetOf);
   return (
     <li id={release.tag} className="scroll-mt-20 border-border-primary border-t">
       <details open={open} className="group">
@@ -170,16 +166,16 @@ function ReleaseEntry({ release, open }: { release: Release; open: boolean }) {
                 {DATE.format(new Date(release.publishedAt))}
               </time>
             )}
-            {components.length > 0 && (
+            {facets.length > 0 && (
               <span className="ml-auto font-mono text-text-muted text-xs leading-6">
-                <ChangeCount changes={components} />
+                <ChangeCount facets={facets} />
               </span>
             )}
           </div>
         </summary>
         <div className="flex flex-col gap-8 pb-10 sm:pl-7">
           {release.notes && <Markdown>{release.notes}</Markdown>}
-          <NoneFiltered changes={components} />
+          <NoneFiltered facets={facets} />
           {BUMPS.map((bump) => (
             <ChangeGroup
               key={bump}
@@ -191,7 +187,7 @@ function ReleaseEntry({ release, open }: { release: Release; open: boolean }) {
             notice.package ? (
               <Filtered
                 key={`${notice.package} ${notice.text}`}
-                components={[componentOf(notice.package).id]}
+                facets={[{ components: [componentOf(notice.package).id] }]}
               >
                 <Markdown className="text-sm text-text-muted">{`\`${notice.package}\`: ${notice.text}`}</Markdown>
               </Filtered>
@@ -213,15 +209,12 @@ function ReleaseEntry({ release, open }: { release: Release; open: boolean }) {
 function ChangeGroup({ bump, changes }: { bump: Bump; changes: Change[] }) {
   if (changes.length === 0) return null;
   return (
-    <Filtered components={[...new Set(changes.flatMap(componentIds))]}>
+    <Filtered facets={changes.map(facetOf)}>
       <div>
-        <h3 className="font-mono text-text-muted text-xs leading-4">{BUMP_TITLES[bump]}</h3>
+        <h3 className="font-mono text-text-muted text-xs leading-4">{BUMP_LABELS[bump]} changes</h3>
         <ul className="mt-2">
           {changes.map((change) => (
-            <Filtered
-              key={`${change.source?.href} ${change.summary}`}
-              components={componentIds(change)}
-            >
+            <Filtered key={`${change.source?.href} ${change.summary}`} facets={[facetOf(change)]}>
               <ChangeEntry change={change} />
             </Filtered>
           ))}

@@ -90,8 +90,8 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   regeneration rethrows, so the last page stays up.
 - Render release Markdown only through `app/changelog/markdown.tsx`, as
   elements and never as HTML: this origin also serves the console's session.
-- The component filter names packages in `COMPONENTS` (`releases.ts`); list
-  a new published package there, or it shows under its bare name.
+- The filters (`app/changelog/filter.ts`) name packages in `COMPONENTS`;
+  list a new published package there, or it shows under its bare name.
 - `WEBSITE_GITHUB_TOKEN`, a token without permissions, lifts GitHub's
   rate limit on Vercel's shared addresses ([runbook](../../docs/runbooks/cloud.md)).
 
