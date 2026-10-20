@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { viteProxyEdit } from "../../../../../../src/lib/orca/patchers/rule/vite-support";
+import { SESSION_COOKIE_MARKER } from "../../../../../../src/lib/orca/patchers/rule/session-cookie";
+import {
+  viteProxyEdit,
+  viteSessionCookieEdit,
+} from "../../../../../../src/lib/orca/patchers/rule/vite-support";
 import { REMOTE_HOST, useRemoteServer } from "../../../../../helpers/remote-server";
 import { aViteApp, type DevApp } from "../../../../../helpers/vite";
 
 const edit = viteProxyEdit(5173, "http://127.0.0.1:8099");
+const sessionCookieEdit = viteSessionCookieEdit();
 
 const BARE_CONFIG = 'import { defineConfig } from "vite";\n\nexport default defineConfig({});\n';
 
@@ -92,6 +97,16 @@ describe("viteProxyEdit", () => {
     expect(out).not.toContain("host:");
   });
 
+  it("keeps the app's session cookie under its project's name", () => {
+    const out = edit("export default defineConfig({});");
+
+    expect(out).toContain(SESSION_COOKIE_MARKER);
+    expect(out).toContain('loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_ID');
+    expect(out).toContain(
+      'proxy.on("proxyRes", (proxyRes) => renameSessionCookie(proxyRes, appCookie));',
+    );
+  });
+
   it("is idempotent — re-running over its own output changes nothing", () => {
     const once = edit("export default defineConfig({});");
     expect(edit(once)).toBe(once);
@@ -137,7 +152,8 @@ export default defineConfig({
   it("moves the entry it wrote before onto the origin-forwarding shape", () => {
     const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
 
-    expect(edit(PREVIOUS_CONFIG)).toBe(current);
+    // As setup applies them: the entry's edit, then its session-cookie hooks.
+    expect(sessionCookieEdit(edit(PREVIOUS_CONFIG))).toBe(current);
   });
 
   it("leaves a hand-written entry that keeps the browser's Host alone", () => {
@@ -218,18 +234,101 @@ export default defineConfig({
   });
 });
 
+describe("viteSessionCookieEdit", () => {
+  /** What setup wrote before the entry carried the session-cookie hooks. */
+  const bearerOnly = edit(PREVIOUS_CONFIG);
+
+  it("gives the entry it wrote before the session-cookie hooks", () => {
+    const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
+
+    expect(sessionCookieEdit(bearerOnly)).toBe(current);
+  });
+
+  it("finds the entry it wrote whatever a formatter did to its layout", () => {
+    const tabbed = bearerOnly.replace(/^(?: {2})+/gm, (spaces) => "\t".repeat(spaces.length / 2));
+
+    const out = sessionCookieEdit(tabbed);
+
+    expect(out).toContain(`\t\t\t\t\t/* ${SESSION_COOKIE_MARKER} */`);
+    expect(out.indexOf('proxyReq.setHeader("authorization", bearer);')).toBeLessThan(
+      out.indexOf(SESSION_COOKIE_MARKER),
+    );
+    expect(sessionCookieEdit(out)).toBe(out);
+  });
+
+  it("also gives the entry it migrated from the unconditional bearer the hooks", () => {
+    const legacy = `import { defineConfig, loadEnv } from "vite";
+export default defineConfig({
+  server: {
+    proxy: {
+      "/__nextgen": {
+        target: "http://old.example",
+        configure: (proxy) => {
+          const secret = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET;
+          if (!secret) {
+            throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).")
+          }
+          const bearer = \`Bearer \${secret}\`;
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader("authorization", bearer);
+          });
+        },
+      },
+    },
+  },
+});
+// preserved user note`;
+
+    const out = sessionCookieEdit(edit(legacy));
+
+    expect(out).toContain(SESSION_COOKIE_MARKER);
+    expect(out).toContain("http://old.example");
+    expect(out).toContain("// preserved user note");
+  });
+
+  it("leaves a hand-written entry alone", () => {
+    const custom = `export default defineConfig({
+  server: { proxy: { "/__nextgen": { target: "https://custom.example" } } },
+});`;
+
+    expect(sessionCookieEdit(custom)).toBe(custom);
+  });
+
+  it("leaves an entry whose bearer hook was changed alone", () => {
+    const changed = bearerOnly.replace(
+      'proxyReq.setHeader("authorization", bearer);',
+      'proxyReq.setHeader("authorization", bearer);\n              console.debug("exchange");',
+    );
+
+    expect(sessionCookieEdit(changed)).toBe(changed);
+  });
+
+  it("is idempotent — an entry with the hooks is left as it is", () => {
+    const current = edit(BARE_CONFIG);
+
+    expect(sessionCookieEdit(current)).toBe(current);
+  });
+
+  it("throws E_VALIDATION when the config is missing", () => {
+    expect(() => sessionCookieEdit(undefined)).toThrowError(/not found/);
+  });
+});
+
 describe("the generated proxy, run by Vite against a remote https server", () => {
   const remote = useRemoteServer();
   const env = { ZITADEL_PROJECT_SECRET: "sk_proj_test" };
+  /** An app whose `.env.local` names its project, as setup writes it. */
+  const withProject = { ...env, ZITADEL_PROJECT_ID: "proj_spa" };
   let app: DevApp | undefined;
 
   afterEach(async () => {
     await app?.close();
     app = undefined;
+    remote.answerWith(undefined);
   });
 
-  async function serve(config: string): Promise<DevApp> {
-    app = await aViteApp(config, env);
+  async function serve(config: string, appEnv: Record<string, string> = env): Promise<DevApp> {
+    app = await aViteApp(config, appEnv);
     return app;
   }
 
@@ -278,5 +377,63 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
 
     expect(response.ok).toBe(false);
     expect(remote.requests).toHaveLength(reached);
+  });
+
+  it("sends the app's session cookie to the server under the server's name", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG), withProject);
+
+    await fetch(`${origin}/__nextgen/users/me`, {
+      headers: {
+        cookie:
+          "theme=dark; __nextgen_session=console; __nextgen_session_proj_other=other; __nextgen_session_proj_spa=mine",
+      },
+    });
+
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("theme=dark; __nextgen_session=mine");
+  });
+
+  it("keeps the session cookie the server sets under the app's project's name", async () => {
+    remote.answerWith({
+      "set-cookie": [
+        "__nextgen_session=minted; Path=/; HttpOnly; SameSite=Lax",
+        "_zflow=; Path=/; Max-Age=0",
+      ],
+    });
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG), withProject);
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(response.headers.getSetCookie()).toEqual([
+      "__nextgen_session_proj_spa=minted; Path=/; HttpOnly; SameSite=Lax",
+      "_zflow=; Path=/; Max-Age=0",
+    ]);
+  });
+
+  it("passes the cookies through when no project is configured", async () => {
+    remote.answerWith({ "set-cookie": "__nextgen_session=minted; Path=/" });
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG), {
+      ...env,
+      ZITADEL_PROJECT_ID: "",
+    });
+
+    const response = await fetch(`${origin}/__nextgen/sessions/me`, {
+      headers: { cookie: "__nextgen_session=tok" },
+    });
+
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("__nextgen_session=tok");
+    expect(response.headers.getSetCookie()).toEqual(["__nextgen_session=minted; Path=/"]);
+  });
+
+  it("keeps the session cookie per project once it gave the entry it wrote before the hooks", async () => {
+    remote.answerWith({ "set-cookie": "__nextgen_session=minted; Path=/" });
+    const previous = edit(PREVIOUS_CONFIG.replace("https://zitadel.example.com", remote.url));
+    const { origin } = await serve(sessionCookieEdit(previous), withProject);
+
+    const response = await fetch(`${origin}/__nextgen/users/me`, {
+      headers: { cookie: "__nextgen_session=console; __nextgen_session_proj_spa=mine" },
+    });
+
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("__nextgen_session=mine");
+    expect(response.headers.getSetCookie()).toEqual(["__nextgen_session_proj_spa=minted; Path=/"]);
   });
 });
