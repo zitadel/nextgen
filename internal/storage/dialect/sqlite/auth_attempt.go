@@ -129,7 +129,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 	return withTransaction(ctx, as.client, func(ctx context.Context, tx queryExecutor) error {
 		if _, err := tx.Exec(ctx, createAuthAttemptStmt,
 			attempt.ProjectID, attempt.ID, string(req), ttlNanos, sessionID, now.UnixNano(), attempt.Internal,
-			emptyStringArg(attempt.DeploymentID), emptyStringArg(attempt.ReleaseID),
+			authattempt.EmptyStringArg(attempt.DeploymentID), authattempt.EmptyStringArg(attempt.ReleaseID),
 		); err != nil {
 			return fmt.Errorf("failed to create auth attempt: %w", wrapError(err))
 		}
@@ -599,13 +599,6 @@ func (as authAttemptStatements) MarkSSOCallbackCollision(ctx context.Context, pr
 		return domain.ErrSSOStateInvalid()
 	}
 	return nil
-}
-
-func emptyStringArg(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
 }
 
 var _ service.AuthAttemptStatements = (*authAttemptStatements)(nil)

@@ -144,7 +144,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttem
 	rows, err := as.client.Query(ctx, createAuthAttemptStmt,
 		authAttempt.ProjectID, authAttempt.ID, requiredChecks, authAttempt.TimeToLive,
 		authattempt.SessionIDArg(authAttempt.SessionID), authAttempt.Internal,
-		emptyStringArg(authAttempt.DeploymentID), emptyStringArg(authAttempt.ReleaseID), checkRowsJSON)
+		authattempt.EmptyStringArg(authAttempt.DeploymentID), authattempt.EmptyStringArg(authAttempt.ReleaseID), checkRowsJSON)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -576,13 +576,6 @@ func (as authAttemptStatements) MarkSSOCallbackCollision(ctx context.Context, pr
 		return domain.ErrSSOStateInvalid()
 	}
 	return nil
-}
-
-func emptyStringArg(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
 }
 
 var _ service.AuthAttemptStatements = (*authAttemptStatements)(nil)

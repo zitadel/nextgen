@@ -97,10 +97,8 @@ type AuthAttempt struct {
 	// it must never be handed off, exchanged, or read through the attempt API.
 	Internal bool
 
-	// DeploymentID and ReleaseID are what createAuthAttempt (or a flow start
-	// that creates the attempt) resolved to. Later attempt ops and handoff
-	// exchange reuse them so a mid-attempt deploy does not change the release
-	// under the caller; empty until a resolution seals them.
+	// DeploymentID and ReleaseID seal the runtime resolution for later
+	// attempt ops; empty when create did not resolve a deployment.
 	DeploymentID string
 	ReleaseID    string
 }

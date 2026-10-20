@@ -46,15 +46,8 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	if !ok {
 		return nil, domain.ErrAuthUnauthorized(nil)
 	}
-	queryProjectID := string(params.ProjectID)
-	if queryProjectID != "" && queryProjectID != scopeCtx.ProjectID {
+	if queryProjectID := string(params.ProjectID); queryProjectID != "" && queryProjectID != scopeCtx.ProjectID {
 		return nil, domain.ErrProjectMismatch()
-	}
-
-	// Same interim as createAuthAttempt: no Origin → skip resolve until #1616.
-	ctx, err := h.resolveAppRuntime(ctx, scopeCtx.ProjectID, "")
-	if err != nil {
-		return nil, err
 	}
 	if err := h.refuseRevokedHandoff(ctx, scopeCtx.ProjectID, req.HandoffToken); err != nil {
 		return nil, err
@@ -133,7 +126,7 @@ func (h *Handler) refuseRevokedHandoff(ctx context.Context, projectID, handoffTo
 		}
 		return err
 	}
-	_, err = h.withAttemptSealedRelease(ctx, attempt)
+	_, err = h.withSealedRuntime(ctx, attempt.ProjectID, attempt.DeploymentID, attempt.ReleaseID)
 	return err
 }
 
