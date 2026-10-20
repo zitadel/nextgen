@@ -16,10 +16,13 @@ const REPOSITORY = "zitadel/nextgen";
  */
 export const RELEASE_COUNT = 5;
 
-// The generated block, as scripts/release-github.mjs writes it.
+// The generated block and the placeholder for the notes above it, as
+// scripts/release-github.mjs writes them.
 const GENERATED_START = "<!-- nextgen-release-facts:start -->";
 const GENERATED_END = "<!-- nextgen-release-facts:end -->";
 const PACKAGE_CHANGES = "### Package Changes";
+const NOTES_PLACEHOLDER =
+  "<!-- Maintainers: add human-written product release notes above the generated facts before publishing this draft. -->";
 
 /** A change's semver bump, the highest first. */
 export const BUMPS = ["major", "minor", "patch"] as const;
@@ -111,9 +114,11 @@ export function parseRelease(release: GitHubRelease): Release {
     tag: release.tag_name,
     url: release.html_url,
     publishedAt: release.published_at ?? "",
-    // Without its comments, the placeholder the automation leaves among them.
+    // Without the placeholder, so a release nobody wrote notes for has none.
+    // This is no sanitizing: the page drops any HTML a note holds
+    // (markdown.tsx), comments included.
     notes: notes
-      .replace(/<!--[\s\S]*?-->/g, "")
+      .replaceAll(NOTES_PLACEHOLDER, "")
       .replace(/\n{3,}/g, "\n\n")
       .trim(),
     ...parsePackageChanges(generated ? body.slice(start, end) : ""),

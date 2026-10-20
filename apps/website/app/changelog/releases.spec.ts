@@ -129,11 +129,13 @@ describe("parseRelease", () => {
     expect(parsed.notes).toBe("");
   });
 
-  it("reads the maintainers' notes on both sides of the generated block", () => {
+  it("reads the maintainers' notes on both sides of the generated block, without the placeholder", () => {
     const body = [
       "## Highlights",
       "",
       "Sign in with Google.",
+      "",
+      "<!-- Maintainers: add human-written product release notes above the generated facts before publishing this draft. -->",
       "",
       "<!-- nextgen-release-facts:start -->",
       "### Package Changes",
