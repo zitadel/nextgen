@@ -25,6 +25,9 @@
     "./package.json": "./package.json",
     ".": {
       "types": "./dist/index.d.mts",
+      "workerd": "./dist/server.mjs",
+      "worker": "./dist/server.mjs",
+      "edge-light": "./dist/server.mjs",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
     },
