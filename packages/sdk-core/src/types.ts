@@ -308,10 +308,12 @@ export type ZitadelSessionProps = ZitadelSessionConfig & ZitadelSessionHandlers;
  * a widget prop ever being shadowed.
  * ───────────────────────────────────────────────────────────────────────── */
 
+/** The names every framework applies to an element itself, so none of them takes a prefix. */
+const NATIVE_NAMES = ["class", "className", "style"] as const;
+type NativeName = (typeof NATIVE_NAMES)[number];
+
 const STANDARD_NAMES = [
-  "class",
-  "className",
-  "style",
+  ...NATIVE_NAMES,
   "id",
   "title",
   "slot",
@@ -331,11 +333,10 @@ export type StandardAttributeName =
   | `data-${string}`
   | `aria-${string}`;
 
-type NativeName = "class" | "className" | "style";
-
 /**
  * The standard attributes among the props `Props`, each name with `Prefix`
- * before it, except `class`, `className` and `style`. Every value keeps the type it has in `Props`.
+ * before it, except the native names. Every value keeps the type it has in
+ * `Props`.
  */
 export type StandardAttributes<Props extends object, Prefix extends string = ""> = {
   [Name in keyof Props & StandardAttributeName as Name extends NativeName
@@ -353,6 +354,11 @@ export type StandardAttributeProps<Attributes extends object> = Pick<
   Extract<keyof Attributes, StandardAttributeName>
 >;
 
+/**
+ * Whether `name` is the name of a standard HTML attribute (see
+ * {@link StandardAttributeName}). A wrapper that needs to keep such a name away
+ * from a property binding of its own asks this rather than listing the names.
+ */
 export function isStandardAttributeName(name: string): name is StandardAttributeName {
   return (
     STANDARD_NAMES.some((standard) => standard === name) ||
@@ -383,8 +389,8 @@ function asStandardAttributes<Props extends object, Prefix extends string>(
  * widget's configuration. A value of `undefined` or `null` is left out, and so
  * is `false` except for `aria-*` and `data-*`, which render as the string
  * `"false"`. A framework that needs the names marked (Solid writes `attr:id` as
- * an attribute) passes the `prefix` to put before each name except `class`,
- * `className` and `style`, which every framework applies to an element itself.
+ * an attribute) passes the `prefix` to put before each name except the native
+ * ones (`class`, `className` and `style`).
  */
 export function standardAttributes<Props extends object, Prefix extends string = "">(
   props: Props,
@@ -393,7 +399,7 @@ export function standardAttributes<Props extends object, Prefix extends string =
   const record: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(props)) {
     if (isStandardAttributeName(name) && !isOmitted(name, value)) {
-      const native = name === "class" || name === "className" || name === "style";
+      const native = NATIVE_NAMES.some((nativeName) => nativeName === name);
       // An `aria-*` or `data-*` boolean is written out, since not every framework renders `false`.
       record[native ? name : `${prefix ?? ""}${name}`] =
         typeof value === "boolean" && isEnumerated(name) ? String(value) : value;
@@ -415,3 +421,9 @@ export const widgetTags = {
 
 /** One of the widget element tag names. */
 export type WidgetTag = (typeof widgetTags)[keyof typeof widgetTags];
+
+/** The name of a widget, as it keys {@link widgetTags}. */
+export type WidgetName = keyof typeof widgetTags;
+
+/** Every widget name, for code that loops over the widgets. */
+export const widgetNames = ["login", "logout", "session"] as const satisfies readonly WidgetName[];

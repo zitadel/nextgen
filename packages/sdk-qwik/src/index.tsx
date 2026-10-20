@@ -16,16 +16,8 @@ import type {
 // of them can emit); keep it directly above the components import.
 import "./early-events";
 import "@zitadel/components";
-import {
-  component$,
-  useSignal,
-  useVisibleTask$,
-  type ClassList,
-  type HTMLElementAttrs,
-  type QRL,
-  type Signal,
-} from "@qwik.dev/core";
-import { type StandardAttributeProps, standardAttributes } from "@zitadel/sdk-core/types";
+import { component$, useSignal, useVisibleTask$, type QRL, type Signal } from "@qwik.dev/core";
+import { standardAttributes } from "@zitadel/sdk-core/types";
 import {
   configureZitadel,
   getApi,
@@ -35,6 +27,7 @@ import {
 } from "@zitadel/api/config";
 
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
+import type { ZitadelWidgetAttributes } from "./types";
 
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
@@ -191,15 +184,6 @@ function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps
   setProp(el, "suppressHeader", props.suppressHeader);
 }
 
-/**
- * The standard HTML attributes a widget wrapper accepts besides its own props,
- * and nothing else, so no prop the type accepts is dropped. They are passed to
- * the widget element.
- */
-export type ZitadelWidgetAttributes = StandardAttributeProps<
-  HTMLElementAttrs & { class?: ClassList }
->;
-
 function eventDetail<T>(event: Event): T {
   return (event as CustomEvent<T>).detail;
 }
@@ -277,6 +261,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   );
   return (
     <zitadel-login
+      {...attributes}
       {...{ [WRAPPER_MARKER]: "" }}
       ref={(el) => {
         host.value = el;
@@ -285,7 +270,6 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
         }
         bindLoginConfig(el, props);
       }}
-      {...attributes}
       {...loginAttrs(props)}
     />
   );
@@ -336,6 +320,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   );
   return (
     <zitadel-logout
+      {...attributes}
       {...{ [WRAPPER_MARKER]: "" }}
       ref={(el) => {
         host.value = el;
@@ -344,7 +329,6 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
         }
         bindLogoutConfig(el, props);
       }}
-      {...attributes}
       {...logoutAttrs(props)}
     />
   );
@@ -395,6 +379,7 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   );
   return (
     <zitadel-session
+      {...attributes}
       {...{ [WRAPPER_MARKER]: "" }}
       ref={(el) => {
         host.value = el;
@@ -403,7 +388,6 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
         }
         bindSessionConfig(el, props);
       }}
-      {...attributes}
       {...sessionAttrs(props)}
     />
   );

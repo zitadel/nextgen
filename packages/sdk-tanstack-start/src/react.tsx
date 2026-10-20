@@ -41,6 +41,8 @@ export type {
   StandardAttributeProps,
   StandardAttributes,
   standardAttributes,
+  WidgetName,
+  widgetNames,
   WidgetTag,
   widgetTags,
   ZITADEL_LOGIN_EVENT_HANDLERS,

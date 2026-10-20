@@ -17,8 +17,42 @@ import {
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
   standardAttributes,
+  widgetNames,
   widgetTags,
 } from "./types.js";
+
+/**
+ * The spec files the guards below read, by SDK: `client` is the spec that carries
+ * the SDK's client-side tests, `server` the one that carries its server-markup
+ * tests. Angular is not here: its wrapper forwards no standard attribute, since
+ * its component tag already is the element that carries them, so it has no
+ * standard-attribute block (see {@link ANGULAR_SPEC}).
+ */
+const SDK_SPECS = {
+  "sdk-react": {
+    client: "../../sdk-react/src/index.spec.tsx",
+    server: "../../sdk-react/src/index.spec.tsx",
+  },
+  "sdk-vue": {
+    client: "../../sdk-vue/src/components.spec.ts",
+    server: "../../sdk-vue/src/components.spec.ts",
+  },
+  "sdk-svelte": {
+    client: "../../sdk-svelte/src/index.spec.ts",
+    server: "../../sdk-svelte/src/index.ssr.spec.ts",
+  },
+  "sdk-solid": {
+    client: "../../sdk-solid/src/index.spec.tsx",
+    server: "../../sdk-solid/src/index.ssr.spec.tsx",
+  },
+  "sdk-qwik": {
+    client: "../../sdk-qwik/src/index.spec.tsx",
+    server: "../../sdk-qwik/src/index.ssr.spec.tsx",
+  },
+} as const;
+
+/** Angular's spec: it carries the shared server-render table but no standard-attribute block. */
+const ANGULAR_SPEC = "../../sdk-angular/src/lib/components.spec.ts";
 
 /**
  * The element↔contract drift guard.
@@ -69,7 +103,7 @@ describe("widget tags ↔ @zitadel/components", () => {
   });
 
   it("names exactly the three widgets", () => {
-    expect(Object.keys(widgetTags)).toEqual(["login", "logout", "session"]);
+    expect(Object.keys(widgetTags)).toEqual([...widgetNames]);
   });
 });
 
@@ -209,10 +243,10 @@ describe("config types ↔ element properties", () => {
  */
 describe("server-render cases ↔ SDK specs", () => {
   const SPECS = [
-    "../../sdk-react/src/index.spec.tsx",
-    "../../sdk-vue/src/components.spec.ts",
-    "../../sdk-angular/src/lib/components.spec.ts",
-    "../../sdk-svelte/src/index.spec.ts",
+    SDK_SPECS["sdk-react"].client,
+    SDK_SPECS["sdk-vue"].client,
+    ANGULAR_SPEC,
+    SDK_SPECS["sdk-svelte"].client,
   ];
 
   const casesIn = (spec: string): string => {
@@ -264,22 +298,6 @@ describe("standard attributes ↔ widget props", () => {
  * its spec has no block.
  */
 describe("standard-attribute tests ↔ SDK specs", () => {
-  const CLIENT_SPECS = {
-    "sdk-react": "../../sdk-react/src/index.spec.tsx",
-    "sdk-vue": "../../sdk-vue/src/components.spec.ts",
-    "sdk-svelte": "../../sdk-svelte/src/index.spec.ts",
-    "sdk-solid": "../../sdk-solid/src/index.spec.tsx",
-    "sdk-qwik": "../../sdk-qwik/src/index.spec.tsx",
-  } as const;
-
-  const SERVER_SPECS = {
-    "sdk-react": "../../sdk-react/src/index.spec.tsx",
-    "sdk-vue": "../../sdk-vue/src/components.spec.ts",
-    "sdk-svelte": "../../sdk-svelte/src/index.spec.ts",
-    "sdk-solid": "../../sdk-solid/src/index.ssr.spec.tsx",
-    "sdk-qwik": "../../sdk-qwik/src/index.ssr.spec.tsx",
-  } as const;
-
   const CLIENT_TITLES = [
     "%s standard attributes",
     "forwards the class to the widget element",
@@ -290,7 +308,8 @@ describe("standard-attribute tests ↔ SDK specs", () => {
     "forwards the remaining standard attributes to the widget element",
     "forwards the slot to the widget element",
     "renders a false aria or data attribute as the string false",
-    "leaves out an attribute whose value is false, null or undefined",
+    "updates a forwarded attribute when the prop changes",
+    "removes a forwarded attribute when the prop is removed",
     "does not forward props outside the standard set",
     "gives access to the widget element through a ref",
     "accepts the standard attributes in its props",
@@ -325,63 +344,85 @@ describe("standard-attribute tests ↔ SDK specs", () => {
     return "";
   };
 
+  /**
+   * What is wrong with the `name` blocks of the given sources: a block that is
+   * missing, one whose titles are not the canonical ones, in order and without an
+   * extra, and one whose body is not the first source's, byte for byte.
+   */
+  const problems = (
+    sources: Readonly<Record<string, string>>,
+    name: string,
+    canonical: readonly string[],
+  ): string[] => {
+    const blocks = Object.entries(sources).map(
+      ([sdk, source]) => [sdk, blockIn(source, name)] as const,
+    );
+    const reference = blocks[0]?.[1];
+    return blocks.flatMap(([sdk, block]) => {
+      if (block === undefined) return [`${sdk} has no ${name} block`];
+      const found = [];
+      const difference = firstDifference(titlesIn(block), canonical);
+      if (difference) found.push(`${sdk}: ${difference}`);
+      if (block !== reference) found.push(`${sdk}: the body differs from the first SDK's`);
+      return found;
+    });
+  };
+
   const read = (spec: string): string =>
     readFileSync(fileURLToPath(new URL(spec, import.meta.url)), "utf8");
 
-  describe.each([
-    ["standard-attributes", CLIENT_SPECS, CLIENT_TITLES],
-    ["standard-attributes-server", SERVER_SPECS, SERVER_TITLES],
-  ] as const)("the %s block", (name, specs, canonical) => {
-    it.each(Object.entries(specs))(
-      "%s carries exactly the canonical tests, in order",
-      (sdk, spec) => {
-        const block = blockIn(read(spec), name);
-        expect(block, `${sdk} has no ${name} block`).toBeDefined();
-        const titles = titlesIn(block ?? "");
-        expect(
-          firstDifference(titles, canonical),
-          `${sdk} has ${titles.length} tests, expected ${canonical.length}`,
-        ).toBe("");
-      },
+  const specsOf = (side: "client" | "server"): Record<string, string> =>
+    Object.fromEntries(
+      Object.entries(SDK_SPECS).flatMap(([sdk, specs]) => {
+        const spec =
+          side === "client" ? specs.client : "server" in specs ? specs.server : undefined;
+        return spec === undefined ? [] : [[sdk, read(spec)]];
+      }),
     );
 
-    it.each(Object.entries(specs))(
-      "%s carries the same test bodies as the React spec",
-      (sdk, spec) => {
-        expect(blockIn(read(spec), name), `${sdk} differs from the React block`).toBe(
-          blockIn(read(specs["sdk-react"]), name),
-        );
-      },
-    );
+  it.each([
+    ["standard-attributes", "client", CLIENT_TITLES],
+    ["standard-attributes-server", "server", SERVER_TITLES],
+  ] as const)("the %s block is canonical in every SDK", (name, side, canonical) => {
+    expect(problems(specsOf(side), name, canonical)).toEqual([]);
   });
 
-  // The guard's own logic, on blocks it is made to reject.
+  it("covers every SDK but Angular, the one documented exception", () => {
+    expect(Object.keys(specsOf("client")).sort()).toEqual(
+      ["sdk-qwik", "sdk-react", "sdk-solid", "sdk-svelte", "sdk-vue"].sort(),
+    );
+    const angular = read(ANGULAR_SPEC);
+    expect(blockIn(angular, "standard-attributes")).toBeUndefined();
+    expect(blockIn(angular, "standard-attributes-server")).toBeUndefined();
+  });
+
+  // The guard's own logic, on sources it is made to reject.
   describe("the guard", () => {
     const block = [
       "// x:begin",
-      'describe.each(WIDGETS)("%s group", (widget) => {',
+      'describe.each(widgetNames)("%s group", (widget) => {',
       '  it("first", () => {});',
       '  it.each([1, 2])("second", () => {});',
       "});",
       "// x:end",
     ].join("\n");
     const canonical = ["%s group", "first", "second"];
-    const titles = (source: string): string[] => titlesIn(blockIn(source, "x") ?? "");
+    const check = (other: string): string[] => problems({ one: block, two: other }, "x", canonical);
+
+    it("accepts blocks that match", () => {
+      expect(check(block)).toEqual([]);
+    });
 
     it("reads it, it.each and describe.each titles", () => {
-      expect(titles(block)).toEqual(canonical);
+      expect(titlesIn(blockIn(block, "x") ?? "")).toEqual(canonical);
     });
 
     it("sees a dropped title", () => {
-      expect(
-        firstDifference(titles(block.replace('  it("first", () => {});\n', "")), canonical),
-      ).not.toBe("");
+      expect(check(block.replace('  it("first", () => {});\n', ""))).toHaveLength(2);
     });
 
     it("sees a renamed title", () => {
-      expect(firstDifference(titles(block.replace('"first"', '"primary"')), canonical)).not.toBe(
-        "",
-      );
+      expect(check(block.replace('"first"', '"primary"'))).toHaveLength(2);
     });
 
     it("sees a reordered title", () => {
@@ -391,27 +432,24 @@ describe("standard-attribute tests ↔ SDK specs", () => {
           '  it.each([1, 2])("second", () => {});',
           '  it.each([1, 2])("second", () => {});\n  it("first", () => {});',
         );
-      expect(firstDifference(titles(swapped), canonical)).not.toBe("");
+      expect(check(swapped)).toHaveLength(2);
     });
 
     it("sees an extra test inside the block", () => {
       expect(
-        firstDifference(
-          titles(block.replace("});\n// x:end", '  it("extra", () => {});\n});\n// x:end')),
-          canonical,
-        ),
-      ).not.toBe("");
+        check(block.replace("});\n// x:end", '  it("extra", () => {});\n});\n// x:end')),
+      ).toHaveLength(2);
     });
 
-    it("sees a changed body, which the byte comparison catches", () => {
-      expect(blockIn(block.replace("() => {}", "() => { run(); }"), "x")).not.toBe(
-        blockIn(block, "x"),
-      );
+    it("sees a changed body and names it", () => {
+      expect(
+        check(block.replace('it("first", () => {})', 'it("first", () => { run(); })')),
+      ).toEqual(["two: the body differs from the first SDK's"]);
     });
 
-    it("finds no block that is missing or unterminated", () => {
-      expect(blockIn("nothing here", "x")).toBeUndefined();
-      expect(blockIn("// x:begin\nno end", "x")).toBeUndefined();
+    it("sees a block that is missing or unterminated", () => {
+      expect(check("nothing here")).toEqual(["two has no x block"]);
+      expect(check("// x:begin\nno end")).toEqual(["two has no x block"]);
     });
   });
 });
@@ -474,14 +512,11 @@ describe("widget loading ↔ SDK packages", () => {
     (file) => {
       const config = read(`${packagesDir}sdk-core/${file}`);
       for (const input of [
-        "packages/sdk-react/src/index.spec.tsx",
-        "packages/sdk-vue/src/components.spec.ts",
-        "packages/sdk-angular/src/lib/components.spec.ts",
-        "packages/sdk-svelte/src/index.spec.ts",
-        "packages/sdk-solid/src/index.spec.tsx",
-        "packages/sdk-solid/src/index.ssr.spec.tsx",
-        "packages/sdk-qwik/src/index.spec.tsx",
-        "packages/sdk-qwik/src/index.ssr.spec.tsx",
+        ...new Set(
+          [ANGULAR_SPEC, ...Object.values(SDK_SPECS).flatMap((specs) => Object.values(specs))].map(
+            (spec) => spec.replace("../../", "packages/"),
+          ),
+        ),
         "packages/sdk-*/src/__tests__/*.test.ts",
         "packages/sdk-*/src/__tests__/*/*.test.ts",
         "packages/sdk-*/package.json",

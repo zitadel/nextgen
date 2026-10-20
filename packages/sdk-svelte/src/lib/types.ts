@@ -23,11 +23,11 @@ export type * from "@zitadel/sdk-core/types";
  */
 export type ZitadelWidgetAttributes = StandardAttributeProps<HTMLAttributes<HTMLElement>>;
 
-/** Props of `ZitadelLogin`: the widget's own plus the element's HTML attributes. */
+/** Props of `ZitadelLogin`: the widget's own plus the standard HTML attributes. */
 export type ZitadelLoginSvelteProps = ZitadelLoginProps & ZitadelWidgetAttributes;
 
-/** Props of `ZitadelLogout`: the widget's own plus the element's HTML attributes. */
+/** Props of `ZitadelLogout`: the widget's own plus the standard HTML attributes. */
 export type ZitadelLogoutSvelteProps = ZitadelLogoutProps & ZitadelWidgetAttributes;
 
-/** Props of `ZitadelSession`: the widget's own plus the element's HTML attributes. */
+/** Props of `ZitadelSession`: the widget's own plus the standard HTML attributes. */
 export type ZitadelSessionSvelteProps = ZitadelSessionProps & ZitadelWidgetAttributes;

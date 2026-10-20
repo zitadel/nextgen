@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
-import { widgetTags } from "@zitadel/sdk-core/types";
+import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
 
 /** The attributes of the first `<tag>` in server-rendered HTML. */
 function serverAttributes(
@@ -124,3 +124,50 @@ describe("server-rendered widget options", () => {
     ).not.toHaveProperty("heading");
   });
 });
+
+/** The attributes on the widget's element in the markup a server would send. */
+async function renderAttributes(
+  widget: WidgetName,
+  props: Readonly<Record<string, unknown>>,
+): Promise<Record<string, string>> {
+  return serverAttributes(
+    widgetTags[widget],
+    { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget],
+    { ...props },
+  );
+}
+
+// standard-attributes-server:begin
+describe.each(widgetNames)("%s server-rendered standard attributes", (widget) => {
+  it("puts the standard attributes into the server markup", async () => {
+    const attributes = await renderAttributes(widget, {
+      id: "probe",
+      title: "probe",
+      slot: "probe",
+      role: "region",
+      "data-testid": "probe",
+      "aria-label": "probe",
+    });
+    expect(attributes).toMatchObject({
+      id: "probe",
+      title: "probe",
+      slot: "probe",
+      role: "region",
+      "data-testid": "probe",
+      "aria-label": "probe",
+    });
+  });
+
+  it("leaves props outside the standard set out of the server markup", async () => {
+    const attributes = await renderAttributes(widget, {
+      srcdoc: "probe",
+      onclick: "probe",
+      part: "probe",
+      dir: "probe",
+    });
+    for (const name of ["srcdoc", "onclick", "part", "dir"]) {
+      expect(attributes).not.toHaveProperty(name);
+    }
+  });
+});
+// standard-attributes-server:end

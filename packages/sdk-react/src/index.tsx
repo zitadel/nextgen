@@ -242,6 +242,7 @@ ZitadelLogin.displayName = "ZitadelLogin";
  * A forwarded `ref` resolves to the underlying `<zitadel-logout>` DOM element,
  * so consumers can imperatively access the upgraded web component.
  */
+/** Props of `ZitadelLogout`: the widget's own plus the standard HTML attributes. */
 export type ZitadelLogoutReactProps = ZitadelLogoutProps & ZitadelWidgetAttributes;
 
 export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogoutReactProps>(
@@ -274,6 +275,7 @@ ZitadelLogout.displayName = "ZitadelLogout";
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
  */
+/** Props of `ZitadelSession`: the widget's own plus the standard HTML attributes. */
 export type ZitadelSessionReactProps = ZitadelSessionProps & ZitadelWidgetAttributes;
 
 export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionReactProps>(

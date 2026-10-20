@@ -8,7 +8,7 @@ import type {
 } from "@zitadel/components";
 
 import { render } from "@solidjs/testing-library";
-import { createSignal, type JSX } from "solid-js";
+import { createSignal } from "solid-js";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -18,6 +18,8 @@ import {
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
   type WidgetTag,
+  type WidgetName,
+  widgetNames,
   widgetTags,
 } from "@zitadel/sdk-core/types";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
@@ -409,7 +411,7 @@ describe("package manifest", () => {
   });
 });
 
-type StandardAttributes = {
+type ForwardedAttributes = {
   class: string;
   style: string;
   id: string;
@@ -427,45 +429,8 @@ type WidgetProps = {
   session: ZitadelSessionSolidProps;
 };
 
-type WidgetName = keyof typeof widgetTags;
-
-const WIDGETS = ["login", "logout", "session"] as const satisfies readonly WidgetName[];
-
 type Attributes = {
   readonly [name: string]: string | boolean | null | undefined;
-};
-
-// The attributes are open-ended, so the component is seen through a loose props type.
-function looseComponent(widget: WidgetName): (props: Record<string, unknown>) => JSX.Element {
-  return { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget] as (
-    props: Record<string, unknown>,
-  ) => JSX.Element;
-}
-
-// Mounts a widget with the given attributes (named as the markup names them) and
-// reaches its element through a `ref`, the way a consumer does.
-async function mountWidget(widget: WidgetName, attributes: Attributes) {
-  const { style, hidden, ...rest } = attributes;
-  const Widget = looseComponent(widget);
-  let element: HTMLElement | undefined;
-  const { container } = render(() => (
-    <Widget
-      {...rest}
-      {...(hidden === undefined ? {} : { hidden: hidden === "" })}
-      {...(typeof style === "string" ? { style: cssProperties(style) } : {})}
-      ref={(el: HTMLElement) => {
-        element = el;
-      }}
-    />
-  ));
-  return { container, ref: () => element };
-}
-
-// standard-attributes:begin
-type StandardProps = {
-  [W in WidgetName]: {
-    [K in keyof StandardAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
-  };
 };
 
 function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
@@ -474,12 +439,48 @@ function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElemen
   return element;
 }
 
+// Mounts a widget with the given attributes (named as the markup names them) and
+// reaches its element through a `ref`, the way a consumer does. `update` renders it
+// again with other attributes.
+async function mountWidget(widget: WidgetName, attributes: Attributes) {
+  const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
+  const [current, setCurrent] = createSignal(attributes);
+  const propsOf = ({ style, hidden, ...rest }: Attributes) => ({
+    ...rest,
+    ...(hidden === undefined ? {} : { hidden: hidden === "" }),
+    ...(typeof style === "string" ? { style: cssProperties(style) } : {}),
+  });
+  let element: HTMLElement | undefined;
+  const { container } = render(() => (
+    <Widget
+      {...propsOf(current())}
+      ref={(el: HTMLElement) => {
+        element = el;
+      }}
+    />
+  ));
+  return {
+    container,
+    ref: () => element,
+    update: async (next: Attributes) => {
+      setCurrent(next);
+    },
+  };
+}
+
+// standard-attributes:begin
+type StandardProps = {
+  [W in WidgetName]: {
+    [K in keyof ForwardedAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
+  };
+};
+
 function cssProperties(style: string): Record<string, string> {
   const [property = "", value = ""] = style.split(":").map((part) => part.trim());
   return { [property]: value };
 }
 
-describe.each(WIDGETS)("%s standard attributes", (widget) => {
+describe.each(widgetNames)("%s standard attributes", (widget) => {
   const tag = widgetTags[widget];
 
   it("forwards the class to the widget element", async () => {
@@ -532,15 +533,31 @@ describe.each(WIDGETS)("%s standard attributes", (widget) => {
     expect(container.querySelector(tag)?.getAttribute("data-open")).toBe("false");
   });
 
-  it("leaves out an attribute whose value is false, null or undefined", async () => {
-    const { container } = await mountWidget(widget, {
-      hidden: false,
-      title: undefined,
-      role: null,
+  it("updates a forwarded attribute when the prop changes", async () => {
+    const { container, update } = await mountWidget(widget, {
+      class: "before",
+      "aria-label": "before",
+      "data-testid": "before",
     });
-    expect(container.querySelector(tag)?.hidden).toBe(false);
-    expect(container.querySelector(tag)?.hasAttribute("title")).toBe(false);
-    expect(container.querySelector(tag)?.hasAttribute("role")).toBe(false);
+    await update({ class: "after", "aria-label": "after", "data-testid": "after" });
+    const element = container.querySelector(tag);
+    expect(element?.classList.contains("before")).toBe(false);
+    expect(element?.classList.contains("after")).toBe(true);
+    expect(element?.getAttribute("aria-label")).toBe("after");
+    expect(element?.getAttribute("data-testid")).toBe("after");
+  });
+
+  it("removes a forwarded attribute when the prop is removed", async () => {
+    const { container, update } = await mountWidget(widget, {
+      class: "before",
+      "aria-label": "before",
+      "data-testid": "before",
+    });
+    await update({});
+    const element = container.querySelector(tag);
+    expect(element?.classList.contains("before")).toBe(false);
+    expect(element?.hasAttribute("aria-label")).toBe(false);
+    expect(element?.hasAttribute("data-testid")).toBe(false);
   });
 
   it("does not forward props outside the standard set", async () => {
@@ -562,15 +579,16 @@ describe.each(WIDGETS)("%s standard attributes", (widget) => {
   });
 
   it("accepts the standard attributes in its props", () => {
-    const attributes: Partial<StandardAttributes> = {};
+    const attributes: Partial<ForwardedAttributes> = {};
     const accepted: StandardProps = { login: attributes, logout: attributes, session: attributes };
     expect(accepted).toBeDefined();
   });
 
   it("rejects the attributes it does not forward in its props", () => {
-    expectTypeOf<
-      Extract<"dir" | "classList" | "onClick", keyof WidgetProps[WidgetName]>
-    >().toBeNever();
+    type Rejected = {
+      [W in WidgetName]: Extract<"dir" | "classList" | "onClick", keyof WidgetProps[W]>;
+    };
+    expectTypeOf<Rejected>().toEqualTypeOf<Record<WidgetName, never>>();
   });
 });
 // standard-attributes:end

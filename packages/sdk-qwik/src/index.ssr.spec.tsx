@@ -1,9 +1,8 @@
-import type { JSXOutput } from "@qwik.dev/core";
 import { renderToString } from "@qwik.dev/core/server";
 import { describe, expect, it } from "vitest";
 
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
-import { widgetTags } from "@zitadel/sdk-core/types";
+import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
 
 const project = {
   projectId: "proj-test",
@@ -158,28 +157,17 @@ describe("server-rendered widget config", () => {
   });
 });
 
-type WidgetName = keyof typeof widgetTags;
-
-const WIDGETS = ["login", "logout", "session"] as const satisfies readonly WidgetName[];
-
-// The attributes are open-ended, so the component is seen through a loose props type.
-function looseComponent(widget: WidgetName): (props: Record<string, unknown>) => JSXOutput {
-  return { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[
-    widget
-  ] as unknown as (props: Record<string, unknown>) => JSXOutput;
-}
-
 /** The attributes on the widget's element in the markup a server would send. */
 async function renderAttributes(
   widget: WidgetName,
   props: Readonly<Record<string, unknown>>,
 ): Promise<Record<string, string>> {
-  const Widget = looseComponent(widget);
+  const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget];
   return serverAttributes(widgetTags[widget], <Widget {...props} />);
 }
 
 // standard-attributes-server:begin
-describe.each(WIDGETS)("%s server-rendered standard attributes", (widget) => {
+describe.each(widgetNames)("%s server-rendered standard attributes", (widget) => {
   it("puts the standard attributes into the server markup", async () => {
     const attributes = await renderAttributes(widget, {
       id: "probe",
