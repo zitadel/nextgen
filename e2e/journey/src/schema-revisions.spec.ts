@@ -6,6 +6,11 @@ import { createZitadelClient, type ZitadelClient } from "@zitadel/api/client";
 import { identity, loginWithPassword } from "@zitadel/testing/playwright";
 
 import {
+  OIDC_MOCK_CLIENT_ID,
+  OIDC_MOCK_CLIENT_SECRET,
+  OIDC_MOCK_SLUG,
+} from "../scripts/oidc-mock.mjs";
+import {
   expectSignedIn,
   gotoLogin,
   type JourneyMetadata,
@@ -27,9 +32,6 @@ test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
 
 const mockUrl = process.env.JOURNEY_OIDC_MOCK_URL ?? "";
-const slug = process.env.JOURNEY_OIDC_MOCK_SLUG ?? "";
-const clientId = process.env.JOURNEY_OIDC_MOCK_CLIENT_ID ?? "";
-const clientSecret = process.env.JOURNEY_OIDC_MOCK_CLIENT_SECRET ?? "";
 // The fixed accounts in tools/oidc-mock/users.json.
 const mockPassword = "journey-pass";
 const userA = { username: "rev1-user", email: "rev1-user@example.com" };
@@ -70,15 +72,15 @@ test("enables the mock provider", async () => {
       "--provider",
       "custom",
       "--slug",
-      slug,
+      OIDC_MOCK_SLUG,
       "--display-name",
       "Mock IdP",
       "--issuer",
       mockUrl,
       "--client-id",
-      clientId,
+      OIDC_MOCK_CLIENT_ID,
     ],
-    clientSecret,
+    OIDC_MOCK_CLIENT_SECRET,
   );
   await runCli(metadata, ["apply", "--non-interactive", "--json"]);
 
@@ -163,7 +165,7 @@ async function latestRevision(): Promise<string> {
 /** Clicks the provider button on the app's sign-in page and signs in at the mock. */
 async function signInAtProvider(page: Page, username: string): Promise<void> {
   await gotoLogin(page);
-  await page.getByTestId(`zitadel-sso-provider-${slug}`).click();
+  await page.getByTestId(`zitadel-sso-provider-${OIDC_MOCK_SLUG}`).click();
   // The mock keeps no session, so it shows its form every time.
   await page.waitForURL(/\/login\/username/);
   await page.locator("#username").fill(username);
