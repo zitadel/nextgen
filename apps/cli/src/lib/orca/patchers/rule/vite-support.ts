@@ -1,13 +1,14 @@
 import { builders, generateCode } from "magicast";
 
 import { configCandidates } from "./config-paths";
-import type { FileOp } from "./file-writer/types";
+import type { FileOp, WiringVerdict } from "./file-writer/types";
 import { PROXY_PATH } from "./proxy";
 import {
   assertNoUnreviewedProjectSecretProxy,
   PROXY_CREDENTIAL_POLICY_MARKER,
 } from "./proxy-credential-policy";
 import { indented, SESSION_COOKIE_MARKER, viteSessionCookieStatements } from "./session-cookie";
+import { lfText, withLfLineEnds } from "./utils/line-ends";
 import {
   ensureEditableObject,
   importIsPresent,
@@ -214,9 +215,19 @@ function propertyOf(node: AstNode | undefined, name: string): AstNode | undefine
   );
 }
 
-/** `source` without whitespace, so a formatter's layout does not hide what the CLI wrote. */
-function compact(source: string): string {
-  return source.replace(/\s+/g, "");
+/**
+ * `source` as the tokens a formatter leaves alone, so Prettier's or Biome's
+ * layout of what the CLI wrote still matches it: no whitespace, semicolons or
+ * trailing commas, double quotes, and a lone arrow-function parameter in
+ * parentheses.
+ */
+function fingerprint(source: string): string {
+  return source
+    .replace(/\s+/g, "")
+    .replace(/'/g, '"')
+    .replace(/;/g, "")
+    .replace(/,(?=[)\]}])/g, "")
+    .replace(/(^|[(,:=])([A-Za-z_$][\w$]*)=>/g, "$1($2)=>");
 }
 
 /**
@@ -242,8 +253,22 @@ function cliConfigureStatements(
   const statements = block.body as ReadonlyArray<AstNode>;
   const owned =
     source.slice(entry.start, entry.end).includes(PROXY_CREDENTIAL_POLICY_MARKER) &&
-    compact(source.slice(block.start, block.end)).includes(compact(bearerListener("")));
+    fingerprint(source.slice(block.start, block.end)).includes(fingerprint(bearerListener("")));
   return owned && statements.length > 0 ? statements : undefined;
+}
+
+/** What the session-cookie edit and its verdict call the file they read. */
+const VITE_CONFIG_LABEL = "the Vite config (vite.config.*)";
+
+/**
+ * The statements of the CLI's own `/__nextgen` entry's `configure(proxy)` body
+ * in `source` (LF line ends), or `undefined` when there is no such entry.
+ */
+function cliEntryStatements(source: string): ReadonlyArray<AstNode> | undefined {
+  // At tabWidth 1 the node offsets index the source itself; at recast's
+  // default a tab counts as four, which a tab-indented config would expose.
+  const mod = parseConfigModule(source, VITE_CONFIG_LABEL, { tabWidth: 1 });
+  return cliConfigureStatements(resolveDefaultExportObject(mod, VITE_CONFIG_LABEL), source);
 }
 
 /**
@@ -252,29 +277,54 @@ function cliConfigureStatements(
  * them: the hooks go after the last statement of its `configure(proxy)` body,
  * at that statement's indentation, and nothing else in the file changes. A
  * config whose entry carries them already, a hand-written entry, and one whose
- * bearer hook was changed are returned untouched. Throws `E_VALIDATION`, as
- * {@link viteProxyEdit} does, when the file is absent or unreadable.
+ * bearer hook was changed are returned untouched; {@link viteSessionCookieVerdict}
+ * tells the doctor which it is. Line ends are the file's own (CRLF or LF).
+ * Throws `E_VALIDATION`, as {@link viteProxyEdit} does, when the file is absent
+ * or unreadable.
  */
 export function viteSessionCookieEdit(): (source: string | undefined) => string {
   return (source) => {
-    const label = "the Vite config (vite.config.*)";
-    // At tabWidth 1 the node offsets index the source itself; at recast's
-    // default a tab counts as four, which a tab-indented config would expose.
-    const mod = parseConfigModule(source, label, { tabWidth: 1 });
-    const text = source ?? "";
-    if (text.includes(SESSION_COOKIE_MARKER)) {
-      return text;
+    if (source === undefined) {
+      // Throws the E_VALIDATION a missing config gets everywhere.
+      parseConfigModule(source, VITE_CONFIG_LABEL, { tabWidth: 1 });
+      return "";
     }
-    const statements = cliConfigureStatements(resolveDefaultExportObject(mod, label), text);
-    const last = statements?.at(-1);
-    if (!last) {
-      return text;
-    }
-    const eol = text.includes("\r\n") ? "\r\n" : "\n";
-    const lineStart = text.lastIndexOf("\n", last.start - 1) + 1;
-    const indent = /^[\t ]*/.exec(text.slice(lineStart, last.start))?.[0] ?? "";
-    return `${text.slice(0, last.end)}${eol}${indented(viteSessionCookieStatements(), indent, eol)}${text.slice(last.end)}`;
+    return withLfLineEnds(source, (text) => {
+      if (text.includes(SESSION_COOKIE_MARKER)) {
+        return text;
+      }
+      const last = cliEntryStatements(text)?.at(-1);
+      if (!last) {
+        return text;
+      }
+      const lineStart = text.lastIndexOf("\n", last.start - 1) + 1;
+      const indent = /^[\t ]*/.exec(text.slice(lineStart, last.start))?.[0] ?? "";
+      return `${text.slice(0, last.end)}\n${indented(viteSessionCookieStatements(), indent)}${text.slice(last.end)}`;
+    });
   };
+}
+
+/**
+ * Whether the Vite config carries the session-cookie hooks, for the doctor.
+ * The CLI's entry without them is `detached` (`doctor --fix` adds them), and so
+ * is a config without the CLI's entry, which the proxy edit writes with them.
+ * An entry the CLI wrote whose bearer hook was changed by hand is `unknown`:
+ * the edit cannot place the hooks there, and only the developer can.
+ */
+export function viteSessionCookieVerdict(source: string): WiringVerdict {
+  const text = lfText(source);
+  if (text.includes(SESSION_COOKIE_MARKER)) {
+    return "applied";
+  }
+  if (cliEntryStatements(text)) {
+    return "detached";
+  }
+  return text.includes(PROXY_CREDENTIAL_POLICY_MARKER)
+    ? {
+        unknown:
+          "its /__nextgen proxy entry was changed since zitadel setup wrote it, so the session-cookie hooks (ADR 073) must be added by hand",
+      }
+    : "detached";
 }
 
 /**
@@ -321,5 +371,6 @@ export function buildViteSessionCookieOp(): FileOp {
     // from signing each other out on localhost. Sign-in works without it, so
     // the doctor only warns while it is missing.
     wiring: "convenience",
+    verify: viteSessionCookieVerdict,
   };
 }

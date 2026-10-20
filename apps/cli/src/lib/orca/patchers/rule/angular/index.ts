@@ -12,6 +12,7 @@ import {
   appTemplateHtml,
   proxyConfEdit,
   proxyConfSessionCookieEdit,
+  proxyConfSessionCookieVerdict,
 } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-angular";
@@ -111,6 +112,7 @@ export class AngularPatcher extends AbstractRulePatcher {
         // from signing each other out on localhost. Sign-in works without it,
         // so the doctor only warns while it is missing.
         wiring: "convenience",
+        verify: proxyConfSessionCookieVerdict,
       },
       {
         kind: "edit",

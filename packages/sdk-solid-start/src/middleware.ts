@@ -11,6 +11,7 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   proxySessionCookies,
+  SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
   resolveSession,
   serializeSessionCookie,
@@ -40,8 +41,10 @@ export interface SolidFetchEvent {
   /**
    * The response stub SolidStart merges into the response it eventually sends;
    * a middleware that continues sets headers (here, session cookies) on it.
+   * On SolidStart 2 it is h3 v2's response, which sends `errHeaders` instead
+   * of `headers` with an answer of status 400 or above and a thrown error.
    */
-  readonly response?: { readonly headers: Headers };
+  readonly response?: { readonly headers: Headers; readonly errHeaders?: Headers };
 }
 
 /**
@@ -135,8 +138,11 @@ async function proxyRequest(
       search: url.search,
       cookie: event.request.headers.get("cookie"),
       requestUrl: url,
+      forwardedProto: event.request.headers.get("x-forwarded-proto"),
+      forwardedHost: event.request.headers.get("x-forwarded-host"),
     },
     projectId,
+    { url: authUrl, timeoutMs: proxyTimeoutMs },
   );
   if (sessionCookies.upstreamCookie === null) {
     upstreamHeaders.delete("cookie");
@@ -169,6 +175,9 @@ async function proxyRequest(
   const answer = await sessionCookies.toBrowser(upstream);
   for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
+  }
+  if (answer.setCookies.length > 0) {
+    responseHeaders.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
   }
 
   return new Response(answer.body, {
@@ -209,17 +218,23 @@ async function handleAuth(
     undecided,
     cookies: sessionCookies,
   } = await resolveSession(
-    { bearer: bearerToken, cookie: (name) => cookies.get(name), requestUrl: url2 },
+    {
+      bearer: bearerToken,
+      cookie: (name) => cookies.get(name),
+      requestUrl: url2,
+      forwardedProto: event.request.headers.get("x-forwarded-proto"),
+      forwardedHost: event.request.headers.get("x-forwarded-host"),
+    },
     verification,
   );
 
   event.locals.nextgenAuth = auth;
   // A dead session's cookie is cleared so the browser stops replaying it (each
   // replay costs a backend session check), and a session of this project still
-  // under the shared name moves to the project's own cookie. A live session that
-  // signs no one in here (an anonymous one, whose sign-in may still complete, or
-  // one of another project) keeps its cookie, and so does one the backend gave
-  // no verdict on.
+  // under the shared name is copied to the project's own cookie. A live session
+  // that signs no one in here (an anonymous one, whose sign-in may still
+  // complete, or one of another project) keeps its cookie, and so does one the
+  // backend gave no verdict on.
   const setCookies = sessionCookies.map(serializeSessionCookie);
 
   // The backend could not say whether the session is live. The user may well
@@ -234,13 +249,22 @@ async function handleAuth(
     for (const cookie of setCookies) {
       headers.append("set-cookie", cookie);
     }
+    if (setCookies.length > 0) {
+      headers.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
+    }
     return new Response(null, { status: 302, headers });
   }
 
   // Continue the SolidStart pipeline, which merges the response stub's headers
-  // into the response it sends.
-  for (const cookie of setCookies) {
-    event.response?.headers.append("set-cookie", cookie);
+  // into the response it sends: `headers`, or with an error answer h3 v2's
+  // `errHeaders`, so both carry the cookies.
+  for (const target of [event.response?.headers, event.response?.errHeaders]) {
+    if (target && setCookies.length > 0) {
+      for (const cookie of setCookies) {
+        target.append("set-cookie", cookie);
+      }
+      target.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
+    }
   }
   return undefined;
 }
