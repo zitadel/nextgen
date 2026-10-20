@@ -118,28 +118,21 @@ Restore the stored value, or add a new connection file with its own slug. Everyt
 
 ## Test against a local OIDC provider
 
-The local server refuses outgoing requests to loopback addresses, so a provider running on your machine, such as a Keycloak or Dex container on `localhost`, is blocked by default. `sso enable` warns about it:
+A provider running on your machine, such as a Keycloak or Dex container on `localhost`, works with the server `zitadel start` runs. A server refuses outgoing requests to loopback addresses unless `NEXTGEN_HTTPCLIENT_ALLOW_LIST` allows them, and `start` sets it to `localhost,127.0.0.0/8,::1/128` unless `.env.local`, `.env` or your shell already sets it. `data.runtime.env.injected` in `start --json` lists the variable.
 
-```text
-http://localhost:9400 is on this machine, and the server blocks requests to localhost unless NEXTGEN_HTTPCLIENT_ALLOW_LIST allows it, so sign-in will fail until it does.
-```
+Two cases still can't reach the provider, and `sso enable` warns about both:
 
-Until you allow it, the widget only says "This sign-in provider is not available right now", and `zitadel logs` shows `idp.discovery_failed` with `address is denied by 'localhost'`.
+- **The Docker runtime.** Inside the container, `localhost` is the container itself. Start the server with `zitadel start --runtime binary` instead.
+- **Any other server**, or a local one with `NEXTGEN_HTTPCLIENT_ALLOW_LIST=` set empty, which turns the default off.
 
-`zitadel start` hands every `NEXTGEN_*` variable in `.env.local` (and `.env`) of the directory it runs in to the server. To allow loopback, add this line there:
+`setup --sso custom` doesn't know yet which server will run, so it warns about any `localhost` issuer.
 
-```sh
-NEXTGEN_HTTPCLIENT_ALLOW_LIST=localhost,127.0.0.0/8,::1/128
-```
-
-Then restart the server. `start` alone keeps a running server as it is, so stop it first:
+When the server can't reach the provider, the widget only says "This sign-in provider is not available right now", and `zitadel logs` shows `idp.discovery_failed` with `address is denied by 'localhost'`. After changing the variable in `.env.local`, stop the server and start it again: `start` alone keeps a running server as it is.
 
 ```sh
 npx @zitadel/cli@alpha stop
-npx @zitadel/cli@alpha start --json
+npx @zitadel/cli@alpha start
 ```
-
-`data.runtime.env.injected` in the result lists `NEXTGEN_HTTPCLIENT_ALLOW_LIST` once the server has it.
 
 Only allow loopback on your machine. A deployed server must not reach its own network on a URL that a project can configure.
 
