@@ -17822,6 +17822,38 @@ func (s CreateAuthAttemptErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EncKeyDecryptFailedCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.decrypt_failed")
+		{
+			s := s.EncKeyDecryptFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyNotFoundCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.not_found")
+		{
+			s := s.EncKeyNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case EvtInvalidCreateAuthAttemptErrorResponse:
 		e.FieldStart("code")
 		e.Str("evt.invalid")
@@ -17854,11 +17886,59 @@ func (s CreateAuthAttemptErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case TknInvalidCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("tkn.invalid")
+		{
+			s := s.TknInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateAuthAttemptErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyUnknownAlgCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.unknown_alg")
+		{
+			s := s.EncKeyUnknownAlg
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case TknRevokedCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("tkn.revoked")
+		{
+			s := s.TknRevoked
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -17902,14 +17982,29 @@ func (s *CreateAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedCreateAuthAttemptErrorResponse
 					found = true
+				case "enc_key.decrypt_failed":
+					s.Type = EncKeyDecryptFailedCreateAuthAttemptErrorResponse
+					found = true
+				case "enc_key.not_found":
+					s.Type = EncKeyNotFoundCreateAuthAttemptErrorResponse
+					found = true
 				case "evt.invalid":
 					s.Type = EvtInvalidCreateAuthAttemptErrorResponse
 					found = true
 				case "internal":
 					s.Type = InternalCreateAuthAttemptErrorResponse
 					found = true
+				case "tkn.invalid":
+					s.Type = TknInvalidCreateAuthAttemptErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateAuthAttemptErrorResponse
+					found = true
+				case "enc_key.unknown_alg":
+					s.Type = EncKeyUnknownAlgCreateAuthAttemptErrorResponse
+					found = true
+				case "tkn.revoked":
+					s.Type = TknRevokedCreateAuthAttemptErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -17933,6 +18028,14 @@ func (s *CreateAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
+	case EncKeyDecryptFailedCreateAuthAttemptErrorResponse:
+		if err := s.EncKeyDecryptFailed.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyNotFoundCreateAuthAttemptErrorResponse:
+		if err := s.EncKeyNotFound.Decode(d); err != nil {
+			return err
+		}
 	case EvtInvalidCreateAuthAttemptErrorResponse:
 		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
@@ -17941,8 +18044,20 @@ func (s *CreateAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case TknInvalidCreateAuthAttemptErrorResponse:
+		if err := s.TknInvalid.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidCreateAuthAttemptErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyUnknownAlgCreateAuthAttemptErrorResponse:
+		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
+			return err
+		}
+	case TknRevokedCreateAuthAttemptErrorResponse:
+		if err := s.TknRevoked.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -17989,12 +18104,19 @@ func (s *CreateAuthAttemptRequest) encodeFields(e *jx.Encoder) {
 			s.SessionID.Encode(e)
 		}
 	}
+	{
+		if s.SessionToken.Set {
+			e.FieldStart("session_token")
+			s.SessionToken.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfCreateAuthAttemptRequest = [3]string{
+var jsonFieldsNameOfCreateAuthAttemptRequest = [4]string{
 	0: "project_id",
 	1: "challenge_nonce",
 	2: "session_id",
+	3: "session_token",
 }
 
 // Decode decodes CreateAuthAttemptRequest from json.
@@ -18035,6 +18157,16 @@ func (s *CreateAuthAttemptRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "session_token":
+			if err := func() error {
+				s.SessionToken.Reset()
+				if err := s.SessionToken.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_token\"")
 			}
 		default:
 			return d.Skip()
@@ -19618,6 +19750,22 @@ func (s CreateFlowErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case TknRevokedCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("tkn.revoked")
+		{
+			s := s.TknRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -19685,6 +19833,9 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "enc_key.unknown_alg":
 					s.Type = EncKeyUnknownAlgCreateFlowErrorResponse
+					found = true
+				case "tkn.revoked":
+					s.Type = TknRevokedCreateFlowErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -19756,6 +19907,10 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
 			return err
 		}
+	case TknRevokedCreateFlowErrorResponse:
+		if err := s.TknRevoked.Decode(d); err != nil {
+			return err
+		}
 	default:
 		return errors.Errorf("inferred invalid type: %s", s.Type)
 	}
@@ -19823,6 +19978,12 @@ func (s *CreateFlowRequest) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.SessionToken.Set {
+			e.FieldStart("session_token")
+			s.SessionToken.Encode(e)
+		}
+	}
+	{
 		if s.AuthRequestID.Set {
 			e.FieldStart("auth_request_id")
 			s.AuthRequestID.Encode(e)
@@ -19842,17 +20003,18 @@ func (s *CreateFlowRequest) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfCreateFlowRequest = [10]string{
-	0: "project_id",
-	1: "purpose",
-	2: "flow_definition_name",
-	3: "dry_run",
-	4: "schema_version",
-	5: "challenge_nonce",
-	6: "session_id",
-	7: "auth_request_id",
-	8: "redirect_uri",
-	9: "hint",
+var jsonFieldsNameOfCreateFlowRequest = [11]string{
+	0:  "project_id",
+	1:  "purpose",
+	2:  "flow_definition_name",
+	3:  "dry_run",
+	4:  "schema_version",
+	5:  "challenge_nonce",
+	6:  "session_id",
+	7:  "session_token",
+	8:  "auth_request_id",
+	9:  "redirect_uri",
+	10: "hint",
 }
 
 // Decode decodes CreateFlowRequest from json.
@@ -19934,6 +20096,16 @@ func (s *CreateFlowRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "session_token":
+			if err := func() error {
+				s.SessionToken.Reset()
+				if err := s.SessionToken.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_token\"")
 			}
 		case "auth_request_id":
 			if err := func() error {
@@ -73439,6 +73611,39 @@ func (s *OptSessionEstablishedEventDelegationType) UnmarshalJSON(data []byte) er
 	return s.Decode(d)
 }
 
+// Encode encodes SessionProofToken as json.
+func (o OptSessionProofToken) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes SessionProofToken from json.
+func (o *OptSessionProofToken) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptSessionProofToken to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptSessionProofToken) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptSessionProofToken) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes StepTexts as json.
 func (o OptStepTexts) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -73803,6 +74008,40 @@ func (s OptTknInvalidTknidDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptTknInvalidTknidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes TknRevokedDetails as json.
+func (o OptTknRevokedDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes TknRevokedDetails from json.
+func (o *OptTknRevokedDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptTknRevokedDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(TknRevokedDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptTknRevokedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptTknRevokedDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -102400,6 +102639,46 @@ func (s *SessionID) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes SessionProofToken as json.
+func (s SessionProofToken) Encode(e *jx.Encoder) {
+	unwrapped := string(s)
+
+	e.Str(unwrapped)
+}
+
+// Decode decodes SessionProofToken from json.
+func (s *SessionProofToken) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode SessionProofToken to nil")
+	}
+	var unwrapped string
+	if err := func() error {
+		v, err := d.Str()
+		unwrapped = string(v)
+		if err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = SessionProofToken(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s SessionProofToken) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *SessionProofToken) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
 func (s *SessionResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -107479,6 +107758,194 @@ func (s TknInvalidTknidDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *TknInvalidTknidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *TknRevoked) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *TknRevoked) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("tkn.revoked")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfTknRevoked = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes TknRevoked from json.
+func (s *TknRevoked) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TknRevoked to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode TknRevoked")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfTknRevoked) {
+					name = jsonFieldsNameOfTknRevoked[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *TknRevoked) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TknRevoked) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s TknRevokedDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s TknRevokedDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes TknRevokedDetails from json.
+func (s *TknRevokedDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TknRevokedDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode TknRevokedDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s TknRevokedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TknRevokedDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

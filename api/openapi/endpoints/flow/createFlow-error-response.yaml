@@ -18,6 +18,7 @@ content:
         - $ref: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+        - $ref: '../../components/schemas/errors/tkn-revoked.yaml'
       discriminator:
         propertyName: code
         mapping:
@@ -35,6 +36,7 @@ content:
           tkn.invalid_tknid: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+          tkn.revoked: '../../components/schemas/errors/tkn-revoked.yaml'
     examples:
       att.invalid_request:
         summary: att.invalid_request
@@ -106,3 +108,8 @@ content:
         value:
           code: enc_key.unknown_alg
           message: 'unsupported encryption algorithm'
+      tkn.revoked:
+        summary: tkn.revoked
+        value:
+          code: tkn.revoked
+          message: 'the token is not valid'

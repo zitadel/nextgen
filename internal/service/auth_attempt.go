@@ -120,7 +120,10 @@ type AuthAttemptService interface {
 
 type CreateAuthAttemptInput struct {
 	ProjectID string
-	// SessionID is set for step-up auth against an existing session.
+	// SessionID is set for step-up auth against an existing session. The
+	// attempt inherits the session's verified factors, so a caller must have
+	// proven it holds the session; the API layer checks the session token
+	// (provenSessionID in internal/api).
 	SessionID *string
 	// RequiredChecks overrides the project's default policy.
 	// Used by the OIDC adapter (acr_values) and flow engine.

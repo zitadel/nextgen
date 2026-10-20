@@ -11527,12 +11527,17 @@ func NewSchemaURLConfigurationBundleSchemasItem(v SchemaURL) ConfigurationBundle
 
 // CreateAuthAttemptErrorResponse represents sum type.
 type CreateAuthAttemptErrorResponse struct {
-	Type              CreateAuthAttemptErrorResponseType // switch on this field
-	AttInvalidRequest AttInvalidRequest
-	AuthUnauthorized  AuthUnauthorized
-	EvtInvalid        EvtInvalid
-	Internal          Internal
-	ReqInvalid        ReqInvalid
+	Type                CreateAuthAttemptErrorResponseType // switch on this field
+	AttInvalidRequest   AttInvalidRequest
+	AuthUnauthorized    AuthUnauthorized
+	EncKeyDecryptFailed EncKeyDecryptFailed
+	EncKeyNotFound      EncKeyNotFound
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	TknInvalid          TknInvalid
+	ReqInvalid          ReqInvalid
+	EncKeyUnknownAlg    EncKeyUnknownAlg
+	TknRevoked          TknRevoked
 }
 
 // CreateAuthAttemptErrorResponseType is oneOf type of CreateAuthAttemptErrorResponse.
@@ -11540,11 +11545,16 @@ type CreateAuthAttemptErrorResponseType string
 
 // Possible values for CreateAuthAttemptErrorResponseType.
 const (
-	AttInvalidRequestCreateAuthAttemptErrorResponse CreateAuthAttemptErrorResponseType = "att.invalid_request"
-	AuthUnauthorizedCreateAuthAttemptErrorResponse  CreateAuthAttemptErrorResponseType = "auth.unauthorized"
-	EvtInvalidCreateAuthAttemptErrorResponse        CreateAuthAttemptErrorResponseType = "evt.invalid"
-	InternalCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "internal"
-	ReqInvalidCreateAuthAttemptErrorResponse        CreateAuthAttemptErrorResponseType = "req.invalid"
+	AttInvalidRequestCreateAuthAttemptErrorResponse   CreateAuthAttemptErrorResponseType = "att.invalid_request"
+	AuthUnauthorizedCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "auth.unauthorized"
+	EncKeyDecryptFailedCreateAuthAttemptErrorResponse CreateAuthAttemptErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyNotFoundCreateAuthAttemptErrorResponse      CreateAuthAttemptErrorResponseType = "enc_key.not_found"
+	EvtInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "evt.invalid"
+	InternalCreateAuthAttemptErrorResponse            CreateAuthAttemptErrorResponseType = "internal"
+	TknInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "tkn.invalid"
+	ReqInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "enc_key.unknown_alg"
+	TknRevokedCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "tkn.revoked"
 )
 
 // IsAttInvalidRequest reports whether CreateAuthAttemptErrorResponse is AttInvalidRequest.
@@ -11557,6 +11567,16 @@ func (s CreateAuthAttemptErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateAuthAttemptErrorResponse
 }
 
+// IsEncKeyDecryptFailed reports whether CreateAuthAttemptErrorResponse is EncKeyDecryptFailed.
+func (s CreateAuthAttemptErrorResponse) IsEncKeyDecryptFailed() bool {
+	return s.Type == EncKeyDecryptFailedCreateAuthAttemptErrorResponse
+}
+
+// IsEncKeyNotFound reports whether CreateAuthAttemptErrorResponse is EncKeyNotFound.
+func (s CreateAuthAttemptErrorResponse) IsEncKeyNotFound() bool {
+	return s.Type == EncKeyNotFoundCreateAuthAttemptErrorResponse
+}
+
 // IsEvtInvalid reports whether CreateAuthAttemptErrorResponse is EvtInvalid.
 func (s CreateAuthAttemptErrorResponse) IsEvtInvalid() bool {
 	return s.Type == EvtInvalidCreateAuthAttemptErrorResponse
@@ -11567,9 +11587,24 @@ func (s CreateAuthAttemptErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateAuthAttemptErrorResponse
 }
 
+// IsTknInvalid reports whether CreateAuthAttemptErrorResponse is TknInvalid.
+func (s CreateAuthAttemptErrorResponse) IsTknInvalid() bool {
+	return s.Type == TknInvalidCreateAuthAttemptErrorResponse
+}
+
 // IsReqInvalid reports whether CreateAuthAttemptErrorResponse is ReqInvalid.
 func (s CreateAuthAttemptErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateAuthAttemptErrorResponse
+}
+
+// IsEncKeyUnknownAlg reports whether CreateAuthAttemptErrorResponse is EncKeyUnknownAlg.
+func (s CreateAuthAttemptErrorResponse) IsEncKeyUnknownAlg() bool {
+	return s.Type == EncKeyUnknownAlgCreateAuthAttemptErrorResponse
+}
+
+// IsTknRevoked reports whether CreateAuthAttemptErrorResponse is TknRevoked.
+func (s CreateAuthAttemptErrorResponse) IsTknRevoked() bool {
+	return s.Type == TknRevokedCreateAuthAttemptErrorResponse
 }
 
 // SetAttInvalidRequest sets CreateAuthAttemptErrorResponse to AttInvalidRequest.
@@ -11611,6 +11646,48 @@ func (s CreateAuthAttemptErrorResponse) GetAuthUnauthorized() (v AuthUnauthorize
 func NewAuthUnauthorizedCreateAuthAttemptErrorResponse(v AuthUnauthorized) CreateAuthAttemptErrorResponse {
 	var s CreateAuthAttemptErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEncKeyDecryptFailed sets CreateAuthAttemptErrorResponse to EncKeyDecryptFailed.
+func (s *CreateAuthAttemptErrorResponse) SetEncKeyDecryptFailed(v EncKeyDecryptFailed) {
+	s.Type = EncKeyDecryptFailedCreateAuthAttemptErrorResponse
+	s.EncKeyDecryptFailed = v
+}
+
+// GetEncKeyDecryptFailed returns EncKeyDecryptFailed and true boolean if CreateAuthAttemptErrorResponse is EncKeyDecryptFailed.
+func (s CreateAuthAttemptErrorResponse) GetEncKeyDecryptFailed() (v EncKeyDecryptFailed, ok bool) {
+	if !s.IsEncKeyDecryptFailed() {
+		return v, false
+	}
+	return s.EncKeyDecryptFailed, true
+}
+
+// NewEncKeyDecryptFailedCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from EncKeyDecryptFailed.
+func NewEncKeyDecryptFailedCreateAuthAttemptErrorResponse(v EncKeyDecryptFailed) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetEncKeyDecryptFailed(v)
+	return s
+}
+
+// SetEncKeyNotFound sets CreateAuthAttemptErrorResponse to EncKeyNotFound.
+func (s *CreateAuthAttemptErrorResponse) SetEncKeyNotFound(v EncKeyNotFound) {
+	s.Type = EncKeyNotFoundCreateAuthAttemptErrorResponse
+	s.EncKeyNotFound = v
+}
+
+// GetEncKeyNotFound returns EncKeyNotFound and true boolean if CreateAuthAttemptErrorResponse is EncKeyNotFound.
+func (s CreateAuthAttemptErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok bool) {
+	if !s.IsEncKeyNotFound() {
+		return v, false
+	}
+	return s.EncKeyNotFound, true
+}
+
+// NewEncKeyNotFoundCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from EncKeyNotFound.
+func NewEncKeyNotFoundCreateAuthAttemptErrorResponse(v EncKeyNotFound) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetEncKeyNotFound(v)
 	return s
 }
 
@@ -11656,6 +11733,27 @@ func NewInternalCreateAuthAttemptErrorResponse(v Internal) CreateAuthAttemptErro
 	return s
 }
 
+// SetTknInvalid sets CreateAuthAttemptErrorResponse to TknInvalid.
+func (s *CreateAuthAttemptErrorResponse) SetTknInvalid(v TknInvalid) {
+	s.Type = TknInvalidCreateAuthAttemptErrorResponse
+	s.TknInvalid = v
+}
+
+// GetTknInvalid returns TknInvalid and true boolean if CreateAuthAttemptErrorResponse is TknInvalid.
+func (s CreateAuthAttemptErrorResponse) GetTknInvalid() (v TknInvalid, ok bool) {
+	if !s.IsTknInvalid() {
+		return v, false
+	}
+	return s.TknInvalid, true
+}
+
+// NewTknInvalidCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from TknInvalid.
+func NewTknInvalidCreateAuthAttemptErrorResponse(v TknInvalid) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetTknInvalid(v)
+	return s
+}
+
 // SetReqInvalid sets CreateAuthAttemptErrorResponse to ReqInvalid.
 func (s *CreateAuthAttemptErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateAuthAttemptErrorResponse
@@ -11674,6 +11772,48 @@ func (s CreateAuthAttemptErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) 
 func NewReqInvalidCreateAuthAttemptErrorResponse(v ReqInvalid) CreateAuthAttemptErrorResponse {
 	var s CreateAuthAttemptErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetEncKeyUnknownAlg sets CreateAuthAttemptErrorResponse to EncKeyUnknownAlg.
+func (s *CreateAuthAttemptErrorResponse) SetEncKeyUnknownAlg(v EncKeyUnknownAlg) {
+	s.Type = EncKeyUnknownAlgCreateAuthAttemptErrorResponse
+	s.EncKeyUnknownAlg = v
+}
+
+// GetEncKeyUnknownAlg returns EncKeyUnknownAlg and true boolean if CreateAuthAttemptErrorResponse is EncKeyUnknownAlg.
+func (s CreateAuthAttemptErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok bool) {
+	if !s.IsEncKeyUnknownAlg() {
+		return v, false
+	}
+	return s.EncKeyUnknownAlg, true
+}
+
+// NewEncKeyUnknownAlgCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from EncKeyUnknownAlg.
+func NewEncKeyUnknownAlgCreateAuthAttemptErrorResponse(v EncKeyUnknownAlg) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetTknRevoked sets CreateAuthAttemptErrorResponse to TknRevoked.
+func (s *CreateAuthAttemptErrorResponse) SetTknRevoked(v TknRevoked) {
+	s.Type = TknRevokedCreateAuthAttemptErrorResponse
+	s.TknRevoked = v
+}
+
+// GetTknRevoked returns TknRevoked and true boolean if CreateAuthAttemptErrorResponse is TknRevoked.
+func (s CreateAuthAttemptErrorResponse) GetTknRevoked() (v TknRevoked, ok bool) {
+	if !s.IsTknRevoked() {
+		return v, false
+	}
+	return s.TknRevoked, true
+}
+
+// NewTknRevokedCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from TknRevoked.
+func NewTknRevokedCreateAuthAttemptErrorResponse(v TknRevoked) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetTknRevoked(v)
 	return s
 }
 
@@ -11712,7 +11852,10 @@ type CreateAuthAttemptRequest struct {
 	ChallengeNonce OptChallengeNonce `json:"challenge_nonce"`
 	// Optional. If provided, this attempt adds factors to an existing session (step-up auth).
 	// If omitted, a new session is created implicitly on successful handoff.
-	SessionID OptNilSessionID `json:"session_id"`
+	// Requires `session_token`: a session id names a session but does not
+	// prove the caller holds it.
+	SessionID    OptNilSessionID      `json:"session_id"`
+	SessionToken OptSessionProofToken `json:"session_token"`
 }
 
 // GetProjectID returns the value of ProjectID.
@@ -11730,6 +11873,11 @@ func (s *CreateAuthAttemptRequest) GetSessionID() OptNilSessionID {
 	return s.SessionID
 }
 
+// GetSessionToken returns the value of SessionToken.
+func (s *CreateAuthAttemptRequest) GetSessionToken() OptSessionProofToken {
+	return s.SessionToken
+}
+
 // SetProjectID sets the value of ProjectID.
 func (s *CreateAuthAttemptRequest) SetProjectID(val ProjectID) {
 	s.ProjectID = val
@@ -11743,6 +11891,11 @@ func (s *CreateAuthAttemptRequest) SetChallengeNonce(val OptChallengeNonce) {
 // SetSessionID sets the value of SessionID.
 func (s *CreateAuthAttemptRequest) SetSessionID(val OptNilSessionID) {
 	s.SessionID = val
+}
+
+// SetSessionToken sets the value of SessionToken.
+func (s *CreateAuthAttemptRequest) SetSessionToken(val OptSessionProofToken) {
+	s.SessionToken = val
 }
 
 // Merged schema.
@@ -12611,6 +12764,7 @@ type CreateFlowErrorResponse struct {
 	TknInvalidTknid        TknInvalidTknid
 	ReqInvalid             ReqInvalid
 	EncKeyUnknownAlg       EncKeyUnknownAlg
+	TknRevoked             TknRevoked
 }
 
 // CreateFlowErrorResponseType is oneOf type of CreateFlowErrorResponse.
@@ -12632,6 +12786,7 @@ const (
 	TknInvalidTknidCreateFlowErrorResponse        CreateFlowErrorResponseType = "tkn.invalid_tknid"
 	ReqInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateFlowErrorResponse       CreateFlowErrorResponseType = "enc_key.unknown_alg"
+	TknRevokedCreateFlowErrorResponse             CreateFlowErrorResponseType = "tkn.revoked"
 )
 
 // IsAttInvalidRequest reports whether CreateFlowErrorResponse is AttInvalidRequest.
@@ -12700,6 +12855,11 @@ func (s CreateFlowErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether CreateFlowErrorResponse is EncKeyUnknownAlg.
 func (s CreateFlowErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgCreateFlowErrorResponse
+}
+
+// IsTknRevoked reports whether CreateFlowErrorResponse is TknRevoked.
+func (s CreateFlowErrorResponse) IsTknRevoked() bool {
+	return s.Type == TknRevokedCreateFlowErrorResponse
 }
 
 // SetAttInvalidRequest sets CreateFlowErrorResponse to AttInvalidRequest.
@@ -12996,6 +13156,27 @@ func NewEncKeyUnknownAlgCreateFlowErrorResponse(v EncKeyUnknownAlg) CreateFlowEr
 	return s
 }
 
+// SetTknRevoked sets CreateFlowErrorResponse to TknRevoked.
+func (s *CreateFlowErrorResponse) SetTknRevoked(v TknRevoked) {
+	s.Type = TknRevokedCreateFlowErrorResponse
+	s.TknRevoked = v
+}
+
+// GetTknRevoked returns TknRevoked and true boolean if CreateFlowErrorResponse is TknRevoked.
+func (s CreateFlowErrorResponse) GetTknRevoked() (v TknRevoked, ok bool) {
+	if !s.IsTknRevoked() {
+		return v, false
+	}
+	return s.TknRevoked, true
+}
+
+// NewTknRevokedCreateFlowErrorResponse returns new CreateFlowErrorResponse from TknRevoked.
+func NewTknRevokedCreateFlowErrorResponse(v TknRevoked) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetTknRevoked(v)
+	return s
+}
+
 // CreateFlowErrorResponseStatusCode wraps CreateFlowErrorResponse with StatusCode.
 type CreateFlowErrorResponseStatusCode struct {
 	StatusCode int
@@ -13042,7 +13223,10 @@ type CreateFlowRequest struct {
 	ChallengeNonce OptChallengeNonce `json:"challenge_nonce"`
 	// Existing session to attach to (for step-up / reauth).
 	// Omit to let the flow create a new session implicitly.
-	SessionID OptString `json:"session_id"`
+	// Requires `session_token`: a session id names a session but does not
+	// prove the caller holds it.
+	SessionID    OptString            `json:"session_id"`
+	SessionToken OptSessionProofToken `json:"session_token"`
 	// OIDC/SAML auth request ID (links flow to protocol request).
 	AuthRequestID OptString   `json:"auth_request_id"`
 	RedirectURI   OptURI      `json:"redirect_uri"`
@@ -13082,6 +13266,11 @@ func (s *CreateFlowRequest) GetChallengeNonce() OptChallengeNonce {
 // GetSessionID returns the value of SessionID.
 func (s *CreateFlowRequest) GetSessionID() OptString {
 	return s.SessionID
+}
+
+// GetSessionToken returns the value of SessionToken.
+func (s *CreateFlowRequest) GetSessionToken() OptSessionProofToken {
+	return s.SessionToken
 }
 
 // GetAuthRequestID returns the value of AuthRequestID.
@@ -13132,6 +13321,11 @@ func (s *CreateFlowRequest) SetChallengeNonce(val OptChallengeNonce) {
 // SetSessionID sets the value of SessionID.
 func (s *CreateFlowRequest) SetSessionID(val OptString) {
 	s.SessionID = val
+}
+
+// SetSessionToken sets the value of SessionToken.
+func (s *CreateFlowRequest) SetSessionToken(val OptSessionProofToken) {
+	s.SessionToken = val
 }
 
 // SetAuthRequestID sets the value of AuthRequestID.
@@ -51138,6 +51332,52 @@ func (o OptSessionEstablishedEventDelegationType) Or(d SessionEstablishedEventDe
 	return d
 }
 
+// NewOptSessionProofToken returns new OptSessionProofToken with value set to v.
+func NewOptSessionProofToken(v SessionProofToken) OptSessionProofToken {
+	return OptSessionProofToken{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessionProofToken is optional SessionProofToken.
+type OptSessionProofToken struct {
+	Value SessionProofToken
+	Set   bool
+}
+
+// IsSet returns true if OptSessionProofToken was set.
+func (o OptSessionProofToken) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessionProofToken) Reset() {
+	var v SessionProofToken
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessionProofToken) SetTo(v SessionProofToken) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessionProofToken) Get() (v SessionProofToken, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessionProofToken) Or(d SessionProofToken) SessionProofToken {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptStepTexts returns new OptStepTexts with value set to v.
 func NewOptStepTexts(v StepTexts) OptStepTexts {
 	return OptStepTexts{
@@ -51638,6 +51878,52 @@ func (o OptTknInvalidTknidDetails) Get() (v TknInvalidTknidDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptTknInvalidTknidDetails) Or(d TknInvalidTknidDetails) TknInvalidTknidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptTknRevokedDetails returns new OptTknRevokedDetails with value set to v.
+func NewOptTknRevokedDetails(v TknRevokedDetails) OptTknRevokedDetails {
+	return OptTknRevokedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTknRevokedDetails is optional TknRevokedDetails.
+type OptTknRevokedDetails struct {
+	Value TknRevokedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptTknRevokedDetails was set.
+func (o OptTknRevokedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTknRevokedDetails) Reset() {
+	var v TknRevokedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTknRevokedDetails) SetTo(v TknRevokedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTknRevokedDetails) Get() (v TknRevokedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTknRevokedDetails) Or(d TknRevokedDetails) TknRevokedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -67648,6 +67934,8 @@ func (s *SessionFilterField) UnmarshalText(data []byte) error {
 
 type SessionID string
 
+type SessionProofToken string
+
 // The current state of a session.
 // A session is the durable post-auth primitive. It accumulates verified authentication
 // factors and exposes `assurance_levels[]` — the set of assurance profiles its current
@@ -71391,6 +71679,59 @@ func (s *TknInvalidTknid) SetDetails(val OptTknInvalidTknidDetails) {
 type TknInvalidTknidDetails map[string]jx.Raw
 
 func (s *TknInvalidTknidDetails) init() TknInvalidTknidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type TknRevoked struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptTknRevokedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *TknRevoked) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *TknRevoked) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *TknRevoked) GetDetails() OptTknRevokedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *TknRevoked) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *TknRevoked) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *TknRevoked) SetDetails(val OptTknRevokedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type TknRevokedDetails map[string]jx.Raw
+
+func (s *TknRevokedDetails) init() TknRevokedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

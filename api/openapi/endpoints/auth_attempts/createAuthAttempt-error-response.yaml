@@ -6,17 +6,27 @@ content:
       oneOf:
         - $ref: '../../components/schemas/errors/att-invalid_request.yaml'
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
+        - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
+        - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+        - $ref: '../../components/schemas/errors/tkn-revoked.yaml'
       discriminator:
         propertyName: code
         mapping:
           att.invalid_request: '../../components/schemas/errors/att-invalid_request.yaml'
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
+          enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
+          enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
+          tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
+          enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+          tkn.revoked: '../../components/schemas/errors/tkn-revoked.yaml'
     examples:
       att.invalid_request:
         summary: att.invalid_request
@@ -28,6 +38,16 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      enc_key.decrypt_failed:
+        summary: enc_key.decrypt_failed
+        value:
+          code: enc_key.decrypt_failed
+          message: 'failed to decrypt data'
+      enc_key.not_found:
+        summary: enc_key.not_found
+        value:
+          code: enc_key.not_found
+          message: 'encryption key not found'
       evt.invalid:
         summary: evt.invalid
         value:
@@ -38,8 +58,23 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      tkn.invalid:
+        summary: tkn.invalid
+        value:
+          code: tkn.invalid
+          message: 'the token is not valid'
       req.invalid:
         summary: req.invalid
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      enc_key.unknown_alg:
+        summary: enc_key.unknown_alg
+        value:
+          code: enc_key.unknown_alg
+          message: 'unsupported encryption algorithm'
+      tkn.revoked:
+        summary: tkn.revoked
+        value:
+          code: tkn.revoked
+          message: 'the token is not valid'

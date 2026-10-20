@@ -64,9 +64,23 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 	if id, ok := req.AuthRequestID.Get(); ok {
 		startReq.AuthRequestID = &id
 	}
+	var sessionID, sessionToken *string
 	if id, ok := req.SessionID.Get(); ok {
-		startReq.SessionID = &id
+		sessionID = &id
 	}
+	if token, ok := req.SessionToken.Get(); ok {
+		sessionToken = new(string(token))
+	}
+	// The flow's attempt inherits the session's verified factors, so the
+	// caller must prove it holds the session, not just name it.
+	proven, err := h.provenSessionID(ctx, string(req.ProjectID), sessionID, sessionToken)
+	if errors.Is(err, errSessionNotProven) {
+		return nil, domain.ErrRequestInvalid().WithMessage(sessionProofMessage)
+	}
+	if err != nil {
+		return nil, err
+	}
+	startReq.SessionID = proven
 	if ua, ok := middleware.UserAgentFromContext(ctx); ok {
 		startReq.UserAgent = ua
 	}

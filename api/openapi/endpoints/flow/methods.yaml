@@ -4,7 +4,8 @@ post:
   description: |
     Resolves a flow definition based on purpose + audience context and returns
     the first capability step. Creates a new session implicitly unless
-    `session_id` is provided (for step-up / reauth on an existing session).
+    `session_id` is provided, together with that session's `session_token`
+    (for step-up / reauth on an existing session).
 
     The response contains an `id` field — the flow handle. Use it as the path
     parameter for all subsequent `/flow/{id}/submit` calls.

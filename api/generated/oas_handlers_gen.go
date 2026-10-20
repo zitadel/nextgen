@@ -882,7 +882,7 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 // An attempt is an ephemeral (15-minute TTL) state machine that drives a single authentication round.
 // It accepts factor challenges, verifies proofs, and completes into a session or handoff token.
 // Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
-// also include session_id to add factors to an existing session.
+// also include session_id and that session's session_token to add factors to an existing session.
 //
 // POST /auth_attempts
 func (s *Server) handleCreateAuthAttemptRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -1522,7 +1522,8 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 //
 // Resolves a flow definition based on purpose + audience context and returns
 // the first capability step. Creates a new session implicitly unless
-// `session_id` is provided (for step-up / reauth on an existing session).
+// `session_id` is provided, together with that session's `session_token`
+// (for step-up / reauth on an existing session).
 // The response contains an `id` field — the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing

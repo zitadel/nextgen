@@ -11,7 +11,12 @@ properties:
     description: |
       Optional. If provided, this attempt adds factors to an existing session (step-up auth).
       If omitted, a new session is created implicitly on successful handoff.
+
+      Requires `session_token`: a session id names a session but does not
+      prove the caller holds it.
     oneOf:
       - $ref: "../../components/schemas/session-id.yaml"
       - type: 'null'
+  session_token:
+    $ref: "../../components/schemas/session-proof-token.yaml"
 
