@@ -16,6 +16,8 @@ tasks:
       - "api-mock:build"
       - "components:build"
       - "sdk-core:build"
+      # The edge spec imports the built package, so its declarations must exist.
+      - "build"
 
   build:
     deps:
