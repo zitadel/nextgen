@@ -1,3 +1,5 @@
+import type { Writable } from "node:stream";
+
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import {
   type ConnectionEndpoints,
@@ -98,6 +100,8 @@ export type SetupAnswers = {
 
 /** Read-only facts a prompt may need. */
 export type PromptContext = {
+  /** Where the wizard draws, left out for the terminal. Only a test sets it. */
+  readonly wizardOutput?: Writable;
   /**
    * How a prompt asks its question: `input`, so every question the wizard
    * asks behaves like every other question the CLI asks.

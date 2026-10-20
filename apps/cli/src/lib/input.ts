@@ -1,3 +1,5 @@
+import type { Writable } from "node:stream";
+
 import { cancel, confirm, isCancel, multiselect, password, select, text } from "@clack/prompts";
 
 import type { Parsed } from "@zitadel/config/idp";
@@ -34,6 +36,11 @@ type Common = {
    * quoted in the hint as an example.
    */
   retry?: string;
+  /**
+   * Where the prompt draws itself. Left out it is the terminal; a `Wizard`
+   * sets it to indent the prompt under the branch it is in.
+   */
+  output?: Writable;
 };
 
 /** A question whose answer is text that must parse. */
@@ -211,6 +218,7 @@ export async function input<Q extends Question>(question: Q, session: Session): 
       const confirmed = await confirm({
         message: q.message,
         initialValue: q.initialValue ?? false,
+        output: q.output,
       });
       if (isCancel(confirmed)) {
         throw cancelled();
@@ -228,11 +236,13 @@ export async function input<Q extends Question>(question: Q, session: Session): 
               message: q.message,
               options: q.options,
               initialValue: q.initialValue,
+              output: q.output,
             })
           : await multiselect({
               message: q.message,
               options: q.options,
               required: q.required,
+              output: q.output,
             });
       if (isCancel(chosen)) {
         throw cancelled();
@@ -272,12 +282,13 @@ export async function input<Q extends Question>(question: Q, session: Session): 
     };
     const typed =
       q.kind === "secret"
-        ? await password({ message: q.message, validate })
+        ? await password({ message: q.message, validate, output: q.output })
         : await text({
             message: q.message,
             validate,
             initialValue: q.initialValue,
             placeholder: q.placeholder,
+            output: q.output,
           });
     if (isCancel(typed)) {
       throw cancelled();

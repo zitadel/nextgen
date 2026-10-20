@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
@@ -53,6 +54,7 @@ import {
   ENABLE_FLAG_NAMES,
   loopbackIssuerWarning,
   planConnection,
+  registrationLines,
   publishClientId,
   type PublishState,
   readConnectionFiles,
@@ -83,6 +85,7 @@ import {
 } from "../../../lib/project";
 import { portableCommands, publicCliCommand } from "../../../lib/public-cli";
 import { reportWarning } from "../../../lib/warnings";
+import { Wizard } from "../../../lib/wizard";
 
 /**
  * The `auth-method sso enable` command (ADR 070) — add a provider to a
@@ -368,16 +371,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         }
       }
     } else {
-      consola.info(`${entry.displayName} needs an OAuth application.`);
-      consola.info(`Callback URI   ${callbackUri}`);
-      // A custom provider has no console to send the developer to: it is
-      // theirs, and the issuer they gave is the only address known.
-      consola.info(
-        entry.consoleUrl === undefined
-          ? `Register it as a client at ${entry.issuer}, with the callback URI above.`
-          : `Create it at   ${entry.consoleUrl}`,
-      );
-
       // Before the credentials: on a development run (ZITADEL_CLI_DEV) the
       // provider may be a local stand-in, and the client is registered with
       // whatever answers. Not asked of a custom connection, whose issuer the
@@ -390,28 +383,24 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
               ask: this.input,
             })
           : undefined;
-      // The claims come before the credentials, as a refusal does: a person who
-      // has typed a secret should not then be asked to think about mappings.
-      // Flags that name claims are the whole answer, as `--preset` is for its
-      // question; a run nobody can answer takes the defaults.
+
       if (mapped === undefined) {
         throw new Error("a connection being created has a claim mapping");
       }
-      const claims =
-        this.meta.nonInteractive || claimsGiven
-          ? mapped
-          : claimsOrRefuse(applyRequest(mapped, await askClaims(mapped, this.input)), "");
-      createdClaims = claims;
-      const heard = new Set(claimNotes(mapped));
-      for (const note of claimNotes(claims)) {
-        if (!heard.has(note)) {
-          reportWarning(note);
-        }
+      // A person at a terminal is walked through it as a wizard; a script or an
+      // agent gets the same facts as log lines and answers by flag.
+      const wizard = new Wizard({ ask: this.input });
+      const registration = registrationLines(entry, callbackUri, endpoints?.issuer);
+      if (nonInteractive) {
+        consola.info(registration.join("\n"));
+      } else {
+        intro(`Add "${entry.displayName}"`);
+        wizard.say(registration);
       }
-      const clientId = await this.input({
+      const clientId = await wizard.ask({
         kind: "text",
         name: `client id for ${entry.displayName}`,
-        message: "Client ID",
+        message: "What is the OAuth client ID?",
         flag: "--client-id",
         parse: parseClientId,
         given: flags["client-id"],
@@ -422,14 +411,34 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // variables, so enabling a provider without one writes a sign-in button
       // that fails at the token endpoint with `invalid_client` -- a failure
       // that surfaces in a browser, not here. Refusing now is the cheaper answer.
-      const secretValue = await this.input({
+      const secretValue = await wizard.ask({
         kind: "secret",
         name: `client secret for ${scaffolded.clientSecret}`,
-        message: `Client secret (published to the project as ${scaffolded.clientSecret})`,
+        message: "What is the OAuth client secret?",
         parse: parseClientSecret,
         stdin: true,
         retry: retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
       });
+
+      // Flags that name claims are the whole answer, as `--preset` is for its
+      // question; a run nobody can answer takes the defaults.
+      const claims =
+        nonInteractive || claimsGiven
+          ? mapped
+          : claimsOrRefuse(
+              applyRequest(mapped, await askClaims(mapped, wizard, entry.displayName)),
+              "",
+            );
+      if (!nonInteractive) {
+        outro("Configuration captured");
+      }
+      createdClaims = claims;
+      const heard = new Set(claimNotes(mapped));
+      for (const note of claimNotes(claims)) {
+        if (!heard.has(note)) {
+          reportWarning(note);
+        }
+      }
 
       const publish = this.publisher(secretFile);
       const connection = withClaims(
