@@ -150,6 +150,23 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.DeleteUserByIDNoContent{}, deleted, helpers.MustMarshal(t, deleted))
 	})
+
+	// Editor is the least PATCH asks for; the admin grant above would also
+	// pass a check that wrongly asked for admin.
+	t.Run("an editor patches a user", func(t *testing.T) {
+		t.Parallel()
+		edited, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		harness.SeedProjectEditor(t, edited.ID, claimerID)
+		targetID, _ := harness.CreateUserOwnedByTeam(t, edited.ID)
+
+		resp, err := session.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"attributes": map[string]any{"nickname": "Patched"},
+		}), api.PatchUserByIDParams{UserID: api.UserID(targetID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, "Patched", userProp(t, *resp.(*api.User), "nickname"))
+	})
 }
 
 // TestConsoleManagementSessionWithoutAccess pins the other half: accepting
