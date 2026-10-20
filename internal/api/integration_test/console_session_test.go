@@ -854,6 +854,7 @@ func TestPersonalTeamOwnerRenamesTheirTeam(t *testing.T) {
 		return cookie, string(teams[0].ID)
 	}
 	cookie, teamID := signUp(t)
+	otherUserID := harness.CreateUserWithTeam(t, platform.ID)
 
 	t.Run("renames their team", func(t *testing.T) {
 		status, body := consoleCall(t, cookie, http.MethodPatch, "/teams/"+teamID, `{"name":"Acme Platform"}`)
@@ -867,4 +868,17 @@ func TestPersonalTeamOwnerRenamesTheirTeam(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, status, body)
 		assert.Equal(t, api.ErrorCode("team.permission_denied"), helpers.MustUnmarshal[api.ErrorDetails](t, []byte(body)).Code)
 	})
+
+	// The grant reaches nothing else in the platform project. It is a foothold
+	// there, so these answer 403 rather than 404 until #2112.
+	for name, tc := range map[string]struct{ path, code string }{
+		"cannot read the platform project":  {"/projects/" + platform.ID, "proj.permission_denied"},
+		"cannot read another platform user": {"/users/" + otherUserID, "user.permission_denied"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			status, body := consoleCall(t, cookie, http.MethodGet, tc.path, "")
+			assert.Equal(t, http.StatusForbidden, status, body)
+			assert.Equal(t, api.ErrorCode(tc.code), helpers.MustUnmarshal[api.ErrorDetails](t, []byte(body)).Code)
+		})
+	}
 }
