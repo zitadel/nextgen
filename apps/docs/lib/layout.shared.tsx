@@ -1,5 +1,5 @@
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
-import { House } from "lucide-react";
+import { History, House } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Logo } from "@/components/logo";
@@ -44,8 +44,8 @@ export function baseOptions(): BaseLayoutProps {
       // The docs' home; on the cloud's host / is the website's start page.
       url: docsRoute,
     },
-    // The website, above the pages.
-    links: [hostLink("/", <House />, "Preview home")],
+    // The website's start page and its changelog, above the pages.
+    links: [hostLink("/", <House />, "Home"), hostLink("/changelog", <History />, "Changelog")],
     githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
   };
 }

@@ -2,7 +2,7 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   // The hosted cloud's front page at / (Next.js). Mirrors
-  // apps/website/moon.yml; it has no tests yet.
+  // apps/website/moon.yml; `test` is the root's.
   "tasks": {
     // Typecheck waits for the build, as in moon.yml: `next typegen` and
     // `next build` both write .next/types, where tsc reads the route types,

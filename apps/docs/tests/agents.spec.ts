@@ -36,12 +36,12 @@ test("the routes that are not pages answer an agent that asks for text", async (
 });
 
 test("a page advertises its Open Graph image, and the image renders", async ({ request }) => {
-  const html = await (await request.get("/docs/cli")).text();
+  const html = await (await request.get("/docs/get-started/quickstart")).text();
   const [, image = ""] = html.match(/<meta property="og:image" content="([^"]+)"/) ?? [];
   expect(image).not.toBe("");
   // Absolute, from the metadata base of the deployment; the path is the contract.
   const path = new URL(image).pathname;
-  expect(path).toBe("/docs/og/cli/image.png");
+  expect(path).toBe("/docs/og/get-started/quickstart/image.png");
   const response = await request.get(path);
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"]).toBe("image/png");
@@ -105,18 +105,18 @@ test.describe("the MCP server", () => {
     expect(response.status()).toBe(200);
     const result = (await jsonRpcMessage(response)).result as CallToolResult;
     expect(result.isError).toBeFalsy();
-    expect(result.content[0]?.text).toContain("(/docs/cli)");
+    expect(result.content[0]?.text).toContain("(/docs/get-started/quickstart)");
   });
 
   test("serves a page's Markdown through get_page", async ({ request }) => {
     const response = await call(request, {
       id: 3,
       method: "tools/call",
-      params: { name: "get_page", arguments: { url: "/docs/cli" } },
+      params: { name: "get_page", arguments: { url: "/docs/get-started/quickstart" } },
     });
     expect(response.status()).toBe(200);
     const result = (await jsonRpcMessage(response)).result as CallToolResult;
     expect(result.isError).toBeFalsy();
-    expect(result.content[0]?.text).toMatch(/^# CLI \(\/docs\/cli\)/);
+    expect(result.content[0]?.text).toMatch(/^# Quickstart \(\/docs\/get-started\/quickstart\)/);
   });
 });
