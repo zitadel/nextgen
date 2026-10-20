@@ -37,11 +37,13 @@
 <body>
   <header>
     <strong>cell hierarchy</strong>
-    <nav><a href="/">Tree</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
+    <nav><a href="/">Tree</a><a href="/workspaces/acme">Workspace</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
   </header>
   <main>
-    <h1>Cell &amp; project trees</h1>
-    <p class="muted">Cell tree = membership. Project tree = separate attach graph. Platform PROJECT is the customer lookup zone.</p>
+    <h1>Cell &amp; site trees</h1>
+    <p class="muted">Cell tree = membership (leaves under platform). Sites = projects with optional <code>workspace_id</code>. Platform project is the lookup zone.
+      {{range .Workspaces}} · <a href="/workspaces/{{.}}">workspace {{.}}</a>{{end}}
+    </p>
     <div id="tree" hx-get="/tree" hx-trigger="every 5s" hx-swap="innerHTML">
       {{template "tree" .}}
     </div>

@@ -17,6 +17,8 @@
     .flash-err { color:var(--bad); }
     .badge { display:inline-block; font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:4px; border:1px solid var(--border); color:var(--muted); margin-left:0.35rem; }
     .badge.lookup { color:var(--ok); border-color:var(--ok); }
+    .badge.local { color:var(--accent); border-color:var(--accent); }
+    .badge.child { color:var(--ok); border-color:var(--ok); }
     .badge.tombstone { color:var(--muted); border-color:var(--muted); text-decoration:line-through; }
     tr.tombstoned td { opacity:0.55; text-decoration:line-through; }
     table { width:100%; border-collapse:collapse; }
@@ -27,7 +29,7 @@
 <body>
   <header>
     <strong>cell hierarchy</strong>
-    <nav><a href="/">Tree</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
+    <nav><a href="/">Tree</a><a href="/workspaces/acme">Workspace</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
   </header>
   <main>
     <h1>{{.Title}}</h1>
@@ -39,6 +41,7 @@
           <strong>{{.Project.Name}}</strong>
           {{if .Project.IsParent}}<span class="badge">parent</span>{{end}}
           {{if .Project.LookupEnabled}}<span class="badge lookup">lookup</span>{{else}}<span class="badge">lookup off</span>{{end}}
+          {{if .Project.WorkspaceID}}<span class="badge">workspace {{.Project.WorkspaceID}}</span>{{end}}
         </p>
         <p class="muted">id={{.Project.ID}} · host={{.Project.HostCellURL}}</p>
         <p class="muted">parent_project_id={{.Project.ParentProjectID}} · parent_cell_url={{.Project.ParentCellURL}}</p>
@@ -147,9 +150,10 @@
       </div>
       <div class="panel">
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Lookup table (this cell)</h2>
+        <p class="muted">Provenance: <span class="badge local">local</span> created here · <span class="badge child">from child &lt;id&gt;</span> floated from a child project.</p>
         {{if .Lookup}}
         <table>
-          <thead><tr><th>Key</th><th>Home project</th><th>Home cell</th><th>State</th><th>Updated</th></tr></thead>
+          <thead><tr><th>Key</th><th>Home project</th><th>Home cell</th><th>State</th><th>Provenance</th><th>Updated</th></tr></thead>
           <tbody>
           {{range .Lookup}}
             <tr>
@@ -157,6 +161,13 @@
               <td><code>{{.HomeProjectID}}</code></td>
               <td><code>{{.HomeCellURL}}</code></td>
               <td>{{.State}}</td>
+              <td>
+                {{if eq .Source "child"}}
+                <span class="badge child">from child {{.ViaProject}}</span>
+                {{else}}
+                <span class="badge local">local</span>
+                {{end}}
+              </td>
               <td class="muted">{{.UpdatedAt}}</td>
             </tr>
           {{end}}

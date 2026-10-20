@@ -25,6 +25,11 @@ func main() {
 		logger.Fatal(err)
 	}
 	defer store.Close()
+	if cfg.Display != "" {
+		if err := store.SetDisplay(cfg.Display); err != nil {
+			logger.Fatal(err)
+		}
+	}
 
 	srv := cell.NewServer(store, cell.NewPeerClient(), logger)
 	if ms, err := strconv.Atoi(env("FLOAT_DELAY_MS", "0")); err == nil && ms > 0 {
@@ -55,6 +60,7 @@ func main() {
 type config struct {
 	URL      string
 	Label    string
+	Display  string
 	Listen   string
 	DataDir  string
 	IsParent bool
@@ -65,6 +71,7 @@ func loadConfig() config {
 	return config{
 		URL:      mustEnv("CELL_URL"),
 		Label:    env("CELL_LABEL", "cell"),
+		Display:  env("CELL_DISPLAY", ""),
 		Listen:   env("LISTEN_ADDR", ":8100"),
 		DataDir:  env("DATA_DIR", "/data"),
 		IsParent: isParent,

@@ -28,44 +28,73 @@
 <body>
   <header>
     <strong>cell hierarchy</strong>
-    <nav><a href="/">Tree</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
+    <nav><a href="/">Tree</a><a href="/workspaces/acme">Workspace</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
   </header>
   <main>
-    <h1>Create resources</h1>
-    <p class="muted">Operators create projects, teams, and apps on the correct host cell. Projects are discovered by listing each cell’s <code>/v1/projects</code>.</p>
+    <h1>Create / Expand sites</h1>
+    <p class="muted">Sites are projects on a customer-chosen cell. Workspace is UX metadata (<code>workspace_id</code>). Platform project stays the lookup zone.</p>
     {{if .Flash}}<div class="flash-ok">{{.Flash}}</div>{{end}}
     {{if .FlashErr}}<div class="flash-err">{{.FlashErr}}</div>{{end}}
 
     <div class="panel">
-      <h2 style="font-size:1rem;margin:0 0 0.5rem">Project / sub-project</h2>
-      <p class="muted">POST create on the selected host cell, then attach if a parent project is set.</p>
-      <form method="post" action="/create/project">
-        <label for="host_cell">Host cell</label>
-        <select id="host_cell" name="host_cell" required>
-          {{range .Cells}}
-          <option value="{{.Label}}">{{.Label}}</option>
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Create site</h2>
+      <p class="muted">Creates a project on the selected cell and attaches it to platform (lookup).</p>
+      <form method="post" action="/create/site">
+        <label for="workspace_id">Workspace id</label>
+        <input id="workspace_id" name="workspace_id" value="acme" required/>
+        <label for="site_id">Site id</label>
+        <input id="site_id" name="id" required placeholder="acme-iowa"/>
+        <label for="site_name">Name</label>
+        <input id="site_name" name="name" placeholder="acme-iowa"/>
+        <label for="site_cell">Cell (required)</label>
+        <select id="site_cell" name="cell" required>
+          {{range .LeafCells}}
+          <option value="{{.Label}}">{{.Label}}{{with index $.CellMeta .Label}} — {{.}}{{end}}</option>
           {{end}}
         </select>
-        <label for="proj_id">ID (optional)</label>
-        <input id="proj_id" name="id" placeholder="my-project"/>
-        <label for="proj_name">Name</label>
-        <input id="proj_name" name="name" required placeholder="My project"/>
-        <label class="check"><input type="checkbox" name="is_parent" value="1"/> is_parent</label>
-        <label class="check"><input type="checkbox" name="lookup_enabled" value="1"/> lookup_enabled</label>
-        <label for="parent_project_id">Parent project (optional — across cells)</label>
+        <label for="parent_project_id">Parent project</label>
         <select id="parent_project_id" name="parent_project_id">
-          <option value="">— none —</option>
+          <option value="platform" selected>platform (lookup)</option>
           {{range .Projects}}
-          <option value="{{.ID}}">{{.ID}} ({{.Name}}) · {{.HostLabel}}</option>
+          {{if ne .ID "platform"}}
+          <option value="{{.ID}}">{{.ID}} · {{.HostLabel}}</option>
+          {{end}}
           {{end}}
         </select>
-        <button type="submit">Create project</button>
+        <button type="submit">Create site</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Expand site</h2>
+      <p class="muted">Creates a sibling site on a new cell in the same workspace; optionally copies <code>chat</code> app from the source site.</p>
+      <form method="post" action="/create/expand">
+        <label for="expand_ws">Workspace id</label>
+        <input id="expand_ws" name="workspace_id" value="acme"/>
+        <label for="source_site_id">Source site</label>
+        <select id="source_site_id" name="source_site_id" required>
+          {{range .Sites}}
+          <option value="{{.ID}}" {{if eq .ID "acme-fra"}}selected{{end}}>{{.ID}} · {{.HostLabel}} ({{.WorkspaceID}})</option>
+          {{else}}
+          <option value="acme-fra">acme-fra</option>
+          {{end}}
+        </select>
+        <label for="expand_cell">New cell</label>
+        <select id="expand_cell" name="cell" required>
+          {{range .LeafCells}}
+          <option value="{{.Label}}" {{if eq .Label "us-1"}}selected{{end}}>{{.Label}}{{with index $.CellMeta .Label}} — {{.}}{{end}}</option>
+          {{end}}
+        </select>
+        <label for="expand_id">New site id (optional)</label>
+        <input id="expand_id" name="id" placeholder="acme-iowa"/>
+        <label class="check"><input type="checkbox" name="copy_chat" value="1" checked/> Copy app <code>chat</code></label>
+        <button type="submit">Expand site</button>
       </form>
     </div>
 
     <div class="panel">
       <h2 style="font-size:1rem;margin:0 0 0.5rem">Team / sub-team</h2>
-      <p class="muted">Teams live under a project (<code>GET/POST /v1/projects/{id}/teams</code>). Optional parent team must be in the same project.</p>
+      <p class="muted">Teams live under a project. Optional parent team must be in the same project.</p>
       <form method="post" action="/create/team">
         <label for="team_project">Project</label>
         <select id="team_project" name="project_id" required>
@@ -83,7 +112,6 @@
 
     <div class="panel">
       <h2 style="font-size:1rem;margin:0 0 0.5rem">App</h2>
-      <p class="muted">Creates an app on the project’s host cell via <code>POST /v1/projects/{id}/apps</code>.</p>
       <form method="post" action="/create/app">
         <label for="app_project">Project</label>
         <select id="app_project" name="project_id" required>
@@ -96,6 +124,25 @@
         <button type="submit">Create app</button>
       </form>
     </div>
+
+    <details class="panel">
+      <summary style="cursor:pointer">Advanced: raw project create</summary>
+      <form method="post" action="/create/project" style="margin-top:0.75rem">
+        <label for="host_cell">Host cell</label>
+        <select id="host_cell" name="host_cell" required>
+          {{range .Cells}}
+          <option value="{{.Label}}">{{.Label}}</option>
+          {{end}}
+        </select>
+        <label for="proj_id">ID (optional)</label>
+        <input id="proj_id" name="id" placeholder="my-project"/>
+        <label for="proj_name">Name</label>
+        <input id="proj_name" name="name" required placeholder="My project"/>
+        <label class="check"><input type="checkbox" name="is_parent" value="1"/> is_parent</label>
+        <label class="check"><input type="checkbox" name="lookup_enabled" value="1"/> lookup_enabled</label>
+        <button type="submit">Create project</button>
+      </form>
+    </details>
   </main>
 </body>
 </html>

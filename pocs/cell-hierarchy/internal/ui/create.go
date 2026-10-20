@@ -11,29 +11,52 @@ import (
 )
 
 type createPageData struct {
-	Title    string
-	Flash    string
-	FlashErr string
-	Cells    []CellRef
-	Projects []projectOption
+	Title      string
+	Flash      string
+	FlashErr   string
+	Cells      []CellRef
+	LeafCells  []CellRef
+	Projects   []projectOption
+	Sites      []projectOption
+	Workspaces []string
+	CellMeta   map[string]string
 }
 
 type projectOption struct {
-	ID        string
-	Name      string
-	HostLabel string
-	HostURL   string
+	ID          string
+	Name        string
+	HostLabel   string
+	HostURL     string
+	WorkspaceID string
 }
 
 func (a *App) handleCreateForm(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
+	projects := a.listAllProjects(ctx)
+	var sites []projectOption
+	wsSeen := map[string]bool{}
+	var workspaces []string
+	for _, p := range projects {
+		if p.WorkspaceID != "" {
+			sites = append(sites, p)
+			if !wsSeen[p.WorkspaceID] {
+				wsSeen[p.WorkspaceID] = true
+				workspaces = append(workspaces, p.WorkspaceID)
+			}
+		}
+	}
+	sort.Strings(workspaces)
 	a.render(w, "create", createPageData{
-		Title:    "Create",
-		Flash:    r.URL.Query().Get("ok"),
-		FlashErr: r.URL.Query().Get("err"),
-		Cells:    a.Cells,
-		Projects: a.listAllProjects(ctx),
+		Title:      "Create",
+		Flash:      r.URL.Query().Get("ok"),
+		FlashErr:   r.URL.Query().Get("err"),
+		Cells:      a.Cells,
+		LeafCells:  a.leafCells(),
+		Projects:   projects,
+		Sites:      sites,
+		Workspaces: workspaces,
+		CellMeta:   a.cellDisplayMap(ctx),
 	})
 }
 
@@ -51,6 +74,7 @@ func (a *App) listAllProjects(ctx context.Context) []projectOption {
 			}
 			out = append(out, projectOption{
 				ID: p.ID, Name: p.Name, HostLabel: c.Label, HostURL: host,
+				WorkspaceID: p.WorkspaceID,
 			})
 		}
 	}

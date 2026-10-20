@@ -15,18 +15,14 @@ import (
 func TestFloatUpCreatesAncestorRows(t *testing.T) {
 	platform, platformURL, c1 := startCell(t, "http://platform", "platform", true)
 	defer c1()
-	eu, euURL, c2 := startCell(t, "http://eu", "eu", true)
+	eu1, eu1URL, c2 := startCell(t, "http://eu-1", "eu-1", false)
 	defer c2()
-	eu2, eu2URL, c3 := startCell(t, "http://eu-2", "eu-2", false)
-	defer c3()
 
 	createProject(t, platform, "platform", true, true)
-	createProject(t, eu, "eu", true, true)
-	createProject(t, eu2, "team-eu-2", false, false)
-	attachProject(t, eu, "eu", "platform", platformURL)
-	attachProject(t, eu2, "team-eu-2", "eu", euURL)
+	createProjectWS(t, eu1, "acme-fra", "acme", false, false)
+	attachProject(t, eu1, "acme-fra", "platform", platformURL)
 
-	res := postJSON(t, eu2, "/v1/projects/team-eu-2/users", map[string]any{
+	res := postJSON(t, eu1, "/v1/projects/acme-fra/users", map[string]any{
 		"email": "joe@example.com",
 	})
 	defer res.Body.Close()
@@ -35,31 +31,26 @@ func TestFloatUpCreatesAncestorRows(t *testing.T) {
 		t.Fatalf("create user status=%d body=%s", res.StatusCode, body)
 	}
 
-	assertLookupHit(t, eu2URL, "team-eu-2", "joe@example.com")
-	assertLookupHit(t, euURL, "eu", "joe@example.com")
+	assertLookupHit(t, eu1URL, "acme-fra", "joe@example.com")
 	assertLookupHit(t, platformURL, "platform", "joe@example.com")
 }
 
-func TestLookupFromUSFindsJoeAfterFloat(t *testing.T) {
+func TestLookupFromSiblingFindsJoeAfterFloat(t *testing.T) {
 	platform, platformURL, c1 := startCell(t, "http://platform", "platform", true)
 	defer c1()
-	eu, euURL, c2 := startCell(t, "http://eu", "eu", true)
+	eu1, _, c2 := startCell(t, "http://eu-1", "eu-1", false)
 	defer c2()
-	eu2, _, c3 := startCell(t, "http://eu-2", "eu-2", false)
+	us1, _, c3 := startCell(t, "http://us-1", "us-1", false)
 	defer c3()
-	us, _, c4 := startCell(t, "http://us", "us", false)
-	defer c4()
 
 	createProject(t, platform, "platform", true, true)
-	createProject(t, eu, "eu", true, true)
-	createProject(t, eu2, "team-eu-2", false, false)
-	createProject(t, us, "us", false, false)
-	attachProject(t, eu, "eu", "platform", platformURL)
-	attachProject(t, eu2, "team-eu-2", "eu", euURL)
-	attachProject(t, us, "us", "platform", platformURL)
+	createProjectWS(t, eu1, "acme-fra", "acme", false, false)
+	createProjectWS(t, us1, "acme-iowa", "acme", false, false)
+	attachProject(t, eu1, "acme-fra", "platform", platformURL)
+	attachProject(t, us1, "acme-iowa", "platform", platformURL)
 
-	miss := postJSON(t, us, "/v1/lookup/walk", map[string]any{
-		"project_id": "us",
+	miss := postJSON(t, us1, "/v1/lookup/walk", map[string]any{
+		"project_id": "acme-iowa",
 		"key":        "joe@example.com",
 	})
 	defer miss.Body.Close()
@@ -71,7 +62,7 @@ func TestLookupFromUSFindsJoeAfterFloat(t *testing.T) {
 		t.Fatal("expected miss before float")
 	}
 
-	created := postJSON(t, eu2, "/v1/projects/team-eu-2/users", map[string]any{
+	created := postJSON(t, eu1, "/v1/projects/acme-fra/users", map[string]any{
 		"email": "joe@example.com",
 	})
 	defer created.Body.Close()
@@ -80,8 +71,8 @@ func TestLookupFromUSFindsJoeAfterFloat(t *testing.T) {
 		t.Fatalf("create status=%d body=%s", created.StatusCode, body)
 	}
 
-	hit := postJSON(t, us, "/v1/lookup/walk", map[string]any{
-		"project_id": "us",
+	hit := postJSON(t, us1, "/v1/lookup/walk", map[string]any{
+		"project_id": "acme-iowa",
 		"key":        "joe@example.com",
 	})
 	defer hit.Body.Close()
@@ -94,7 +85,7 @@ func TestLookupFromUSFindsJoeAfterFloat(t *testing.T) {
 	if !hitBody.Hit {
 		t.Fatal("expected hit after float")
 	}
-	if hitBody.HomeProjectID != "team-eu-2" {
+	if hitBody.HomeProjectID != "acme-fra" {
 		t.Fatalf("home_project_id=%s", hitBody.HomeProjectID)
 	}
 	if hitBody.FoundAt != "platform" {
@@ -105,20 +96,16 @@ func TestLookupFromUSFindsJoeAfterFloat(t *testing.T) {
 func TestLookupMissWhenEntryAbsentAndConflictOnDuplicate(t *testing.T) {
 	platform, platformURL, c1 := startCell(t, "http://platform", "platform", true)
 	defer c1()
-	eu, euURL, c2 := startCell(t, "http://eu", "eu", true)
+	eu1, _, c2 := startCell(t, "http://eu-1", "eu-1", false)
 	defer c2()
-	eu1, _, c3 := startCell(t, "http://eu-1", "eu-1", false)
+	eu2, _, c3 := startCell(t, "http://eu-2", "eu-2", false)
 	defer c3()
-	eu2, _, c4 := startCell(t, "http://eu-2", "eu-2", false)
-	defer c4()
 
 	createProject(t, platform, "platform", true, true)
-	createProject(t, eu, "eu", true, true)
-	createProject(t, eu1, "team-eu-1", false, false)
-	createProject(t, eu2, "team-eu-2", false, false)
-	attachProject(t, eu, "eu", "platform", platformURL)
-	attachProject(t, eu1, "team-eu-1", "eu", euURL)
-	attachProject(t, eu2, "team-eu-2", "eu", euURL)
+	createProjectWS(t, eu1, "acme-fra", "acme", false, false)
+	createProjectWS(t, eu2, "acme-lis", "acme", false, false)
+	attachProject(t, eu1, "acme-fra", "platform", platformURL)
+	attachProject(t, eu2, "acme-lis", "platform", platformURL)
 
 	localMiss := postJSON(t, platform, "/v1/lookup", map[string]any{
 		"project_id": "platform",
@@ -133,14 +120,14 @@ func TestLookupMissWhenEntryAbsentAndConflictOnDuplicate(t *testing.T) {
 		t.Fatal("expected local miss")
 	}
 
-	a := postJSON(t, eu1, "/v1/projects/team-eu-1/users", map[string]any{"email": "alice@example.com"})
+	a := postJSON(t, eu1, "/v1/projects/acme-fra/users", map[string]any{"email": "alice@example.com"})
 	defer a.Body.Close()
 	if a.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(a.Body)
 		t.Fatalf("alice status=%d body=%s", a.StatusCode, body)
 	}
 
-	b := postJSON(t, eu2, "/v1/projects/team-eu-2/users", map[string]any{"email": "alice@example.com"})
+	b := postJSON(t, eu2, "/v1/projects/acme-lis/users", map[string]any{"email": "alice@example.com"})
 	defer b.Body.Close()
 	if b.StatusCode != http.StatusConflict {
 		body, _ := io.ReadAll(b.Body)
@@ -152,18 +139,14 @@ func TestLookupMissWhenEntryAbsentAndConflictOnDuplicate(t *testing.T) {
 func TestLookupNeverCallsChildren(t *testing.T) {
 	platform, platformURL, c1 := startCell(t, "http://platform", "platform", true)
 	defer c1()
-	eu, euURL, c2 := startCell(t, "http://eu", "eu", true)
+	eu1, eu1URL, c2 := startCell(t, "http://eu-1", "eu-1", false)
 	defer c2()
-	eu2, eu2URL, c3 := startCell(t, "http://eu-2", "eu-2", false)
-	defer c3()
 
 	createProject(t, platform, "platform", true, true)
-	createProject(t, eu, "eu", true, true)
-	createProject(t, eu2, "team-eu-2", false, false)
-	attachProject(t, eu, "eu", "platform", platformURL)
-	attachProject(t, eu2, "team-eu-2", "eu", euURL)
+	createProjectWS(t, eu1, "acme-fra", "acme", false, false)
+	attachProject(t, eu1, "acme-fra", "platform", platformURL)
 
-	created := postJSON(t, eu2, "/v1/projects/team-eu-2/users", map[string]any{
+	created := postJSON(t, eu1, "/v1/projects/acme-fra/users", map[string]any{
 		"email":       "joe@example.com",
 		"defer_float": true,
 	})
@@ -204,7 +187,7 @@ func TestLookupNeverCallsChildren(t *testing.T) {
 		t.Fatal("walk from root must not descend")
 	}
 	for _, hop := range walkBody.Trace {
-		if hop.Cell == eu2URL || hop.Cell == euURL {
+		if hop.Cell == eu1URL {
 			t.Fatalf("walk visited child cell %s", hop.Cell)
 		}
 	}
@@ -214,22 +197,18 @@ func TestLookupNeverCallsChildren(t *testing.T) {
 func TestMissBeforePushHitAfterPush(t *testing.T) {
 	platform, platformURL, c1 := startCell(t, "http://platform", "platform", true)
 	defer c1()
-	eu, euURL, c2 := startCell(t, "http://eu", "eu", true)
+	eu1, _, c2 := startCell(t, "http://eu-1", "eu-1", false)
 	defer c2()
-	eu2, _, c3 := startCell(t, "http://eu-2", "eu-2", false)
+	us1, _, c3 := startCell(t, "http://us-1", "us-1", false)
 	defer c3()
-	us, _, c4 := startCell(t, "http://us", "us", false)
-	defer c4()
 
 	createProject(t, platform, "platform", true, true)
-	createProject(t, eu, "eu", true, true)
-	createProject(t, eu2, "team-eu-2", false, false)
-	createProject(t, us, "us", false, false)
-	attachProject(t, eu, "eu", "platform", platformURL)
-	attachProject(t, eu2, "team-eu-2", "eu", euURL)
-	attachProject(t, us, "us", "platform", platformURL)
+	createProjectWS(t, eu1, "acme-fra", "acme", false, false)
+	createProjectWS(t, us1, "acme-iowa", "acme", false, false)
+	attachProject(t, eu1, "acme-fra", "platform", platformURL)
+	attachProject(t, us1, "acme-iowa", "platform", platformURL)
 
-	created := postJSON(t, eu2, "/v1/projects/team-eu-2/users", map[string]any{
+	created := postJSON(t, eu1, "/v1/projects/acme-fra/users", map[string]any{
 		"email":       "joe@example.com",
 		"defer_float": true,
 	})
@@ -238,8 +217,8 @@ func TestMissBeforePushHitAfterPush(t *testing.T) {
 		t.Fatalf("status=%d", created.StatusCode)
 	}
 
-	before := postJSON(t, us, "/v1/lookup/walk", map[string]any{
-		"project_id": "us", "key": "joe@example.com",
+	before := postJSON(t, us1, "/v1/lookup/walk", map[string]any{
+		"project_id": "acme-iowa", "key": "joe@example.com",
 	})
 	defer before.Body.Close()
 	var beforeBody struct {
@@ -250,15 +229,15 @@ func TestMissBeforePushHitAfterPush(t *testing.T) {
 		t.Fatal("expected miss before push")
 	}
 
-	floated := postJSON(t, eu2, "/v1/projects/team-eu-2/float", map[string]any{"key": "joe@example.com"})
+	floated := postJSON(t, eu1, "/v1/projects/acme-fra/float", map[string]any{"key": "joe@example.com"})
 	defer floated.Body.Close()
 	if floated.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(floated.Body)
 		t.Fatalf("float status=%d body=%s", floated.StatusCode, body)
 	}
 
-	after := postJSON(t, us, "/v1/lookup/walk", map[string]any{
-		"project_id": "us", "key": "joe@example.com",
+	after := postJSON(t, us1, "/v1/lookup/walk", map[string]any{
+		"project_id": "acme-iowa", "key": "joe@example.com",
 	})
 	defer after.Body.Close()
 	var afterBody struct {
@@ -273,7 +252,7 @@ func TestMissBeforePushHitAfterPush(t *testing.T) {
 func TestFloatDelayHook(t *testing.T) {
 	platform, platformURL, c1 := startCell(t, "http://platform", "platform", true)
 	defer c1()
-	usStore := mustOpenStore(t, "http://us", "us", false)
+	usStore := mustOpenStore(t, "http://us-1", "us-1", false)
 	defer usStore.Close()
 	srv := cell.NewServer(usStore, cell.NewPeerClient(), nil)
 	srv.FloatDelay = 80 * time.Millisecond
@@ -282,11 +261,11 @@ func TestFloatDelayHook(t *testing.T) {
 	rewriteMetaURL(t, usStore, us.URL)
 
 	createProject(t, platform, "platform", true, true)
-	createProject(t, us, "us", false, false)
-	attachProject(t, us, "us", "platform", platformURL)
+	createProjectWS(t, us, "acme-iowa", "acme", false, false)
+	attachProject(t, us, "acme-iowa", "platform", platformURL)
 
 	start := time.Now()
-	res := postJSON(t, us, "/v1/projects/us/users", map[string]any{"email": "delayed@example.com"})
+	res := postJSON(t, us, "/v1/projects/acme-iowa/users", map[string]any{"email": "delayed@example.com"})
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(res.Body)

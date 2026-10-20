@@ -117,6 +117,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, MeResponse{
 		URL:       meta.URL,
 		Label:     meta.Label,
+		Display:   meta.Display,
 		IsParent:  meta.IsParent,
 		ParentURL: meta.ParentURL,
 		Status:    status,

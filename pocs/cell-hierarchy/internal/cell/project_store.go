@@ -23,6 +23,9 @@ const (
 	LookupStateLocal   = "local"
 	LookupStatePushed  = "pushed"
 	LookupStateVisible = "visible"
+
+	LookupSourceLocal = "local"
+	LookupSourceChild = "child"
 )
 
 type Project struct {
@@ -30,6 +33,7 @@ type Project struct {
 	Name            string
 	IsParent        bool
 	LookupEnabled   bool
+	WorkspaceID     string
 	ParentProjectID string
 	ParentCellURL   string
 	CreatedAt       time.Time
@@ -50,6 +54,8 @@ type LookupEntry struct {
 	HomeProjectID string
 	HomeCellURL   string
 	State         string
+	Source        string // local | child
+	ViaProject    string // child project id when floated; empty if local
 	UpdatedAt     time.Time
 }
 
@@ -78,7 +84,16 @@ CREATE TABLE IF NOT EXISTS lookup_entries (
   state TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );`)
-	return err
+	if err != nil {
+		return err
+	}
+	if err := s.ensureColumn("projects", "workspace_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn("lookup_entries", "source", "TEXT NOT NULL DEFAULT 'local'"); err != nil {
+		return err
+	}
+	return s.ensureColumn("lookup_entries", "via_project", "TEXT NOT NULL DEFAULT ''")
 }
 
 func NormalizeKey(raw string) string {
@@ -98,9 +113,9 @@ func (s *Store) CreateProject(p Project) error {
 		lookup = 1
 	}
 	_, err := s.db.Exec(
-		`INSERT INTO projects(id, name, is_parent, lookup_enabled, parent_project_id, parent_cell_url, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		id, p.Name, isParent, lookup,
+		`INSERT INTO projects(id, name, is_parent, lookup_enabled, workspace_id, parent_project_id, parent_cell_url, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, p.Name, isParent, lookup, strings.TrimSpace(p.WorkspaceID),
 		strings.TrimSpace(p.ParentProjectID), NormalizeURL(p.ParentCellURL),
 		p.CreatedAt.UTC().Format(time.RFC3339Nano),
 	)
@@ -115,9 +130,9 @@ func (s *Store) GetProject(id string) (Project, error) {
 	var isParent, lookup int
 	var created string
 	err := s.db.QueryRow(
-		`SELECT id, name, is_parent, lookup_enabled, parent_project_id, parent_cell_url, created_at
+		`SELECT id, name, is_parent, lookup_enabled, COALESCE(workspace_id, ''), parent_project_id, parent_cell_url, created_at
 		 FROM projects WHERE id = ?`, id,
-	).Scan(&p.ID, &p.Name, &isParent, &lookup, &p.ParentProjectID, &p.ParentCellURL, &created)
+	).Scan(&p.ID, &p.Name, &isParent, &lookup, &p.WorkspaceID, &p.ParentProjectID, &p.ParentCellURL, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Project{}, ErrProjectNotFound
 	}
@@ -132,7 +147,7 @@ func (s *Store) GetProject(id string) (Project, error) {
 
 func (s *Store) ListProjects() ([]Project, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, is_parent, lookup_enabled, parent_project_id, parent_cell_url, created_at
+		`SELECT id, name, is_parent, lookup_enabled, COALESCE(workspace_id, ''), parent_project_id, parent_cell_url, created_at
 		 FROM projects ORDER BY name`,
 	)
 	if err != nil {
@@ -144,7 +159,7 @@ func (s *Store) ListProjects() ([]Project, error) {
 		var p Project
 		var isParent, lookup int
 		var created string
-		if err := rows.Scan(&p.ID, &p.Name, &isParent, &lookup, &p.ParentProjectID, &p.ParentCellURL, &created); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &isParent, &lookup, &p.WorkspaceID, &p.ParentProjectID, &p.ParentCellURL, &created); err != nil {
 			return nil, err
 		}
 		p.IsParent = isParent == 1
@@ -207,8 +222,8 @@ func (s *Store) UpsertLookupLocal(key, homeProjectID, homeCellURL string, at tim
 			return ErrLookupConflict
 		}
 		_, err = s.db.Exec(
-			`UPDATE lookup_entries SET home_cell_url = ?, state = ?, updated_at = ? WHERE key = ?`,
-			NormalizeURL(homeCellURL), LookupStateLocal, at.UTC().Format(time.RFC3339Nano), key,
+			`UPDATE lookup_entries SET home_cell_url = ?, state = ?, source = ?, via_project = ?, updated_at = ? WHERE key = ?`,
+			NormalizeURL(homeCellURL), LookupStateLocal, LookupSourceLocal, "", at.UTC().Format(time.RFC3339Nano), key,
 		)
 		return err
 	}
@@ -216,16 +231,20 @@ func (s *Store) UpsertLookupLocal(key, homeProjectID, homeCellURL string, at tim
 		return err
 	}
 	_, err = s.db.Exec(
-		`INSERT INTO lookup_entries(key, home_project_id, home_cell_url, state, updated_at) VALUES (?, ?, ?, ?, ?)`,
-		key, homeProjectID, NormalizeURL(homeCellURL), LookupStateLocal, at.UTC().Format(time.RFC3339Nano),
+		`INSERT INTO lookup_entries(key, home_project_id, home_cell_url, state, source, via_project, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		key, homeProjectID, NormalizeURL(homeCellURL), LookupStateLocal, LookupSourceLocal, "", at.UTC().Format(time.RFC3339Nano),
 	)
 	return err
 }
 
-func (s *Store) UpsertLookupVisible(key, homeProjectID, homeCellURL string, at time.Time) error {
+func (s *Store) UpsertLookupVisible(key, homeProjectID, homeCellURL, viaProject string, at time.Time) error {
 	key = NormalizeKey(key)
 	if key == "" {
 		return ErrLookupKeyRequired
+	}
+	via := strings.TrimSpace(viaProject)
+	if via == "" {
+		via = homeProjectID
 	}
 	existing, err := s.GetLookup(key)
 	if err == nil {
@@ -233,8 +252,8 @@ func (s *Store) UpsertLookupVisible(key, homeProjectID, homeCellURL string, at t
 			return ErrLookupConflict
 		}
 		_, err = s.db.Exec(
-			`UPDATE lookup_entries SET home_cell_url = ?, state = ?, updated_at = ? WHERE key = ?`,
-			NormalizeURL(homeCellURL), LookupStateVisible, at.UTC().Format(time.RFC3339Nano), key,
+			`UPDATE lookup_entries SET home_cell_url = ?, state = ?, source = ?, via_project = ?, updated_at = ? WHERE key = ?`,
+			NormalizeURL(homeCellURL), LookupStateVisible, LookupSourceChild, via, at.UTC().Format(time.RFC3339Nano), key,
 		)
 		return err
 	}
@@ -242,8 +261,8 @@ func (s *Store) UpsertLookupVisible(key, homeProjectID, homeCellURL string, at t
 		return err
 	}
 	_, err = s.db.Exec(
-		`INSERT INTO lookup_entries(key, home_project_id, home_cell_url, state, updated_at) VALUES (?, ?, ?, ?, ?)`,
-		key, homeProjectID, NormalizeURL(homeCellURL), LookupStateVisible, at.UTC().Format(time.RFC3339Nano),
+		`INSERT INTO lookup_entries(key, home_project_id, home_cell_url, state, source, via_project, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		key, homeProjectID, NormalizeURL(homeCellURL), LookupStateVisible, LookupSourceChild, via, at.UTC().Format(time.RFC3339Nano),
 	)
 	return err
 }
@@ -267,9 +286,10 @@ func (s *Store) GetLookup(key string) (LookupEntry, error) {
 	var e LookupEntry
 	var updated string
 	err := s.db.QueryRow(
-		`SELECT key, home_project_id, home_cell_url, state, updated_at FROM lookup_entries WHERE key = ?`,
+		`SELECT key, home_project_id, home_cell_url, state, COALESCE(source, 'local'), COALESCE(via_project, ''), updated_at
+		 FROM lookup_entries WHERE key = ?`,
 		NormalizeKey(key),
-	).Scan(&e.Key, &e.HomeProjectID, &e.HomeCellURL, &e.State, &updated)
+	).Scan(&e.Key, &e.HomeProjectID, &e.HomeCellURL, &e.State, &e.Source, &e.ViaProject, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return LookupEntry{}, ErrLookupNotFound
 	}
@@ -282,7 +302,8 @@ func (s *Store) GetLookup(key string) (LookupEntry, error) {
 
 func (s *Store) ListLookupEntries() ([]LookupEntry, error) {
 	rows, err := s.db.Query(
-		`SELECT key, home_project_id, home_cell_url, state, updated_at FROM lookup_entries ORDER BY key`,
+		`SELECT key, home_project_id, home_cell_url, state, COALESCE(source, 'local'), COALESCE(via_project, ''), updated_at
+		 FROM lookup_entries ORDER BY key`,
 	)
 	if err != nil {
 		return nil, err
@@ -292,7 +313,7 @@ func (s *Store) ListLookupEntries() ([]LookupEntry, error) {
 	for rows.Next() {
 		var e LookupEntry
 		var updated string
-		if err := rows.Scan(&e.Key, &e.HomeProjectID, &e.HomeCellURL, &e.State, &updated); err != nil {
+		if err := rows.Scan(&e.Key, &e.HomeProjectID, &e.HomeCellURL, &e.State, &e.Source, &e.ViaProject, &updated); err != nil {
 			return nil, err
 		}
 		e.UpdatedAt, err = time.Parse(time.RFC3339Nano, updated)

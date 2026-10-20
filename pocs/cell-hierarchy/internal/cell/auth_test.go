@@ -18,7 +18,7 @@ func TestIssueAndAuthCheckAllowsWithGrant(t *testing.T) {
 	defer cleanup()
 
 	issue := postJSON(t, home, "/v1/token/issue", map[string]any{
-		"project_id": "team-eu-2",
+		"project_id": "acme-fra",
 		"sub":        "joe@example.com",
 		"aud":        "app:chat",
 	})
@@ -32,7 +32,7 @@ func TestIssueAndAuthCheckAllowsWithGrant(t *testing.T) {
 	if issued.Token == "" || issued.Claims.Sub != "joe@example.com" {
 		t.Fatalf("issued=%+v", issued)
 	}
-	if issued.Claims.HomeProject != "team-eu-2" || issued.Claims.Epoch != 1 {
+	if issued.Claims.HomeProject != "acme-fra" || issued.Claims.Epoch != 1 {
 		t.Fatalf("claims=%+v", issued.Claims)
 	}
 	if issued.Claims.Aud != "app:chat" {
@@ -41,7 +41,7 @@ func TestIssueAndAuthCheckAllowsWithGrant(t *testing.T) {
 
 	check := postJSON(t, us, "/v1/auth/check", map[string]any{
 		"token":      issued.Token,
-		"project_id": "us",
+		"project_id": "acme-iowa",
 		"object":     "app:chat",
 		"relation":   "viewer",
 		"online":     true,
@@ -79,18 +79,18 @@ func TestAuthCheckDeniesWithoutGrant(t *testing.T) {
 	home, us, cleanup := setupJoeAuthBase(t, false)
 	defer cleanup()
 
-	appRes := postJSON(t, us, "/v1/projects/us/apps", map[string]any{"name": "chat"})
+	appRes := postJSON(t, us, "/v1/projects/acme-iowa/apps", map[string]any{"name": "chat"})
 	defer appRes.Body.Close()
 
 	issue := postJSON(t, home, "/v1/token/issue", map[string]any{
-		"project_id": "team-eu-2", "sub": "joe@example.com", "aud": "app:chat",
+		"project_id": "acme-fra", "sub": "joe@example.com", "aud": "app:chat",
 	})
 	defer issue.Body.Close()
 	var issued cell.IssueTokenResponse
 	decode(t, issue, &issued)
 
 	check := postJSON(t, us, "/v1/auth/check", map[string]any{
-		"token": issued.Token, "project_id": "us", "object": "app:chat", "relation": "viewer", "online": false,
+		"token": issued.Token, "project_id": "acme-iowa", "object": "app:chat", "relation": "viewer", "online": false,
 	})
 	defer check.Body.Close()
 	var auth cell.AuthCheckResponse
@@ -106,13 +106,13 @@ func TestAuthCheckDeniesWithoutGrant(t *testing.T) {
 func TestUnknownUserLookupMissNoChildWalk(t *testing.T) {
 	platform, platformURL, c1 := startCell(t, "http://platform", "platform", true)
 	defer c1()
-	us, _, c2 := startCell(t, "http://us", "us", false)
+	us1, _, c2 := startCell(t, "http://us-1", "us-1", false)
 	defer c2()
 	createProject(t, platform, "platform", true, true)
-	createProject(t, us, "us", false, false)
-	attachProject(t, us, "us", "platform", platformURL)
+	createProjectWS(t, us1, "acme-iowa", "acme", false, false)
+	attachProject(t, us1, "acme-iowa", "platform", platformURL)
 
-	res, hops, err := cell.NewPeerClient().LookupWalk(t.Context(), us.URL, "us", "nobody@example.com")
+	res, hops, err := cell.NewPeerClient().LookupWalk(t.Context(), us1.URL, "acme-iowa", "nobody@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,11 +125,11 @@ func TestUnknownUserLookupMissNoChildWalk(t *testing.T) {
 		}
 	}
 
-	eu2, _, c3 := startCell(t, "http://eu-2", "eu-2", false)
+	eu1, _, c3 := startCell(t, "http://eu-1", "eu-1", false)
 	defer c3()
-	createProject(t, eu2, "team-eu-2", false, false)
-	issue := postJSON(t, eu2, "/v1/token/issue", map[string]any{
-		"project_id": "team-eu-2", "sub": "nobody@example.com", "aud": "app:chat",
+	createProjectWS(t, eu1, "acme-fra", "acme", false, false)
+	issue := postJSON(t, eu1, "/v1/token/issue", map[string]any{
+		"project_id": "acme-fra", "sub": "nobody@example.com", "aud": "app:chat",
 	})
 	defer issue.Body.Close()
 	if issue.StatusCode != http.StatusNotFound {
@@ -143,7 +143,7 @@ func TestTamperedTokenRejected(t *testing.T) {
 	defer cleanup()
 
 	issue := postJSON(t, home, "/v1/token/issue", map[string]any{
-		"project_id": "team-eu-2", "sub": "joe@example.com", "aud": "app:chat",
+		"project_id": "acme-fra", "sub": "joe@example.com", "aud": "app:chat",
 	})
 	defer issue.Body.Close()
 	var issued cell.IssueTokenResponse
@@ -166,7 +166,7 @@ func TestTamperedTokenRejected(t *testing.T) {
 	tampered := parts[0] + "." + base64.RawURLEncoding.EncodeToString(tamperedPayload) + "." + parts[2]
 
 	check := postJSON(t, us, "/v1/auth/check", map[string]any{
-		"token": tampered, "project_id": "us", "object": "app:chat", "relation": "viewer", "online": false,
+		"token": tampered, "project_id": "acme-iowa", "object": "app:chat", "relation": "viewer", "online": false,
 	})
 	defer check.Body.Close()
 	var auth cell.AuthCheckResponse
@@ -219,22 +219,20 @@ func TestJWKSPersistsAcrossRestart(t *testing.T) {
 	}
 }
 
-func setupJoeAuthBase(t *testing.T, withGrant bool) (home, us *httptest.Server, cleanup func()) {
+// setupJoeAuthBase: platform lookup + acme-fra@eu-1 (home) + acme-iowa@us-1 (resource).
+func setupJoeAuthBase(t *testing.T, withGrant bool) (home, resource *httptest.Server, cleanup func()) {
 	t.Helper()
 	platform, platformURL, c1 := startCell(t, "http://platform", "platform", true)
-	eu, euURL, c2 := startCell(t, "http://eu", "eu", true)
-	eu2, _, c3 := startCell(t, "http://eu-2", "eu-2", false)
-	usCell, _, c4 := startCell(t, "http://us", "us", false)
+	eu1, _, c2 := startCell(t, "http://eu-1", "eu-1", false)
+	us1, _, c3 := startCell(t, "http://us-1", "us-1", false)
 
 	createProject(t, platform, "platform", true, true)
-	createProject(t, eu, "eu", true, true)
-	createProject(t, eu2, "team-eu-2", false, false)
-	createProject(t, usCell, "us", false, false)
-	attachProject(t, eu, "eu", "platform", platformURL)
-	attachProject(t, eu2, "team-eu-2", "eu", euURL)
-	attachProject(t, usCell, "us", "platform", platformURL)
+	createProjectWS(t, eu1, "acme-fra", "acme", false, false)
+	createProjectWS(t, us1, "acme-iowa", "acme", false, false)
+	attachProject(t, eu1, "acme-fra", "platform", platformURL)
+	attachProject(t, us1, "acme-iowa", "platform", platformURL)
 
-	created := postJSON(t, eu2, "/v1/projects/team-eu-2/users", map[string]any{"email": "joe@example.com"})
+	created := postJSON(t, eu1, "/v1/projects/acme-fra/users", map[string]any{"email": "joe@example.com"})
 	defer created.Body.Close()
 	if created.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(created.Body)
@@ -242,9 +240,9 @@ func setupJoeAuthBase(t *testing.T, withGrant bool) (home, us *httptest.Server, 
 	}
 
 	if withGrant {
-		appRes := postJSON(t, usCell, "/v1/projects/us/apps", map[string]any{"name": "chat"})
+		appRes := postJSON(t, us1, "/v1/projects/acme-iowa/apps", map[string]any{"name": "chat"})
 		defer appRes.Body.Close()
-		grant := postJSON(t, usCell, "/v1/projects/us/tuples", map[string]any{
+		grant := postJSON(t, us1, "/v1/projects/acme-iowa/tuples", map[string]any{
 			"object": "app:chat", "relation": "viewer", "user_key": "joe@example.com",
 		})
 		defer grant.Body.Close()
@@ -254,6 +252,18 @@ func setupJoeAuthBase(t *testing.T, withGrant bool) (home, us *httptest.Server, 
 		}
 	}
 
-	cleanup = func() { c1(); c2(); c3(); c4() }
-	return eu2, usCell, cleanup
+	cleanup = func() { c1(); c2(); c3() }
+	return eu1, us1, cleanup
+}
+
+func createProjectWS(t *testing.T, ts *httptest.Server, id, workspace string, isParent, lookup bool) {
+	t.Helper()
+	res := postJSON(t, ts, "/v1/projects", map[string]any{
+		"id": id, "name": id, "is_parent": isParent, "lookup_enabled": lookup, "workspace_id": workspace,
+	})
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(res.Body)
+		t.Fatalf("create project %s status=%d body=%s", id, res.StatusCode, body)
+	}
 }

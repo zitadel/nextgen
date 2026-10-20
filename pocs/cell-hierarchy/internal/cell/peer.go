@@ -24,6 +24,7 @@ func NewPeerClient() *PeerClient {
 type MeResponse struct {
 	URL       string `json:"url"`
 	Label     string `json:"label"`
+	Display   string `json:"display,omitempty"`
 	IsParent  bool   `json:"is_parent"`
 	ParentURL string `json:"parent_url"`
 	Status    string `json:"status"`
@@ -89,6 +90,7 @@ type ProjectResponse struct {
 	Name            string `json:"name"`
 	IsParent        bool   `json:"is_parent"`
 	LookupEnabled   bool   `json:"lookup_enabled"`
+	WorkspaceID     string `json:"workspace_id,omitempty"`
 	ParentProjectID string `json:"parent_project_id"`
 	ParentCellURL   string `json:"parent_cell_url"`
 	HostCellURL     string `json:"host_cell_url"`
@@ -161,6 +163,7 @@ type PushLookupRequest struct {
 	HomeProjectID string `json:"home_project_id"`
 	HomeCellURL   string `json:"home_cell_url"`
 	ProjectID     string `json:"project_id,omitempty"`
+	ViaProject    string `json:"via_project,omitempty"`
 }
 
 func (c *PeerClient) PushLookup(ctx context.Context, cellURL string, req PushLookupRequest) error {

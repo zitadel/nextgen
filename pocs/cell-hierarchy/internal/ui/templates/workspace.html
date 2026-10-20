@@ -1,0 +1,64 @@
+{{define "workspace"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <style>
+    :root { --bg:#0f1419; --panel:#1a222c; --text:#e7ecf1; --muted:#8b9aab; --accent:#3d9cf0; --ok:#3ecf8e; --bad:#f07178; --border:#2a3542; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
+    header { display:flex; gap:1rem; align-items:center; padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--panel); }
+    header a { color:var(--muted); text-decoration:none; margin-right:0.75rem; }
+    main { padding:1.25rem; max-width:960px; margin:0 auto; }
+    .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:1rem; }
+    .muted { color:var(--muted); font-size:0.875rem; }
+    .flash-ok { color:var(--ok); margin-bottom:0.75rem; }
+    .flash-err { color:var(--bad); margin-bottom:0.75rem; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:0.45rem 0.5rem; border-bottom:1px solid var(--border); font-size:0.9rem; }
+    code { font-size:0.8rem; color:var(--muted); }
+    a { color:var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>cell hierarchy</strong>
+    <nav><a href="/">Tree</a><a href="/workspaces/acme">Workspace</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
+  </header>
+  <main>
+    <h1>Workspace <code>{{.WorkspaceID}}</code></h1>
+    <p class="muted">Sites in this workspace (projects with <code>workspace_id={{.WorkspaceID}}</code>). Expand via <a href="/create">Create</a>.</p>
+    {{if .Flash}}<div class="flash-ok">{{.Flash}}</div>{{end}}
+    {{if .FlashErr}}<div class="flash-err">{{.FlashErr}}</div>{{end}}
+    {{if .Workspaces}}
+    <p class="muted">Workspaces:
+      {{range .Workspaces}}
+      <a href="/workspaces/{{.}}">{{.}}</a>
+      {{end}}
+    </p>
+    {{end}}
+    <div class="panel">
+      {{if .Sites}}
+      <table>
+        <thead><tr><th>Site</th><th>Cell</th><th>Users</th><th>Apps</th></tr></thead>
+        <tbody>
+        {{range .Sites}}
+          <tr>
+            <td><a href="/projects/{{.ID}}"><code>{{.ID}}</code></a> {{.Name}}</td>
+            <td>{{.HostLabel}}{{if .HostDisplay}} · {{.HostDisplay}}{{end}}</td>
+            <td>{{.UserCount}}</td>
+            <td>{{.AppCount}}</td>
+          </tr>
+        {{end}}
+        </tbody>
+      </table>
+      {{else}}
+      <p class="muted">No sites in this workspace yet. <a href="/create">Create a site</a>.</p>
+      {{end}}
+    </div>
+  </main>
+</body>
+</html>
+{{end}}

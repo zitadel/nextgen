@@ -37,6 +37,9 @@ type App struct {
 	signInMu sync.Mutex
 	signIn   *signInResult
 
+	globalLoginMu sync.Mutex
+	globalLogin   *globalLoginResult
+
 	groupCheckMu sync.Mutex
 	groupCheck   *groupCheckResult
 
@@ -68,9 +71,12 @@ func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", a.handleHome)
 	mux.HandleFunc("GET /tree", a.handleTree)
+	mux.HandleFunc("GET /workspaces/{id}", a.handleWorkspaceHome)
 	mux.HandleFunc("GET /join", a.handleJoinForm)
 	mux.HandleFunc("POST /join", a.handleJoinSubmit)
 	mux.HandleFunc("GET /create", a.handleCreateForm)
+	mux.HandleFunc("POST /create/site", a.handleCreateSite)
+	mux.HandleFunc("POST /create/expand", a.handleExpandSite)
 	mux.HandleFunc("POST /create/project", a.handleCreateProject)
 	mux.HandleFunc("POST /create/team", a.handleCreateTeam)
 	mux.HandleFunc("POST /create/app", a.handleCreateAppForm)
@@ -85,6 +91,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /scenarios/group-check-joe", a.handleScenarioGroupCheckJoe)
 	mux.HandleFunc("POST /scenarios/block-joe", a.handleScenarioBlockJoe)
 	mux.HandleFunc("POST /scenarios/delete-joe", a.handleScenarioDeleteJoe)
+	mux.HandleFunc("POST /scenarios/global-login", a.handleScenarioGlobalLogin)
 	mux.HandleFunc("GET /trace", a.handleTrace)
 	mux.HandleFunc("POST /trace/clear", a.handleTraceClear)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -134,8 +141,11 @@ type pageData struct {
 	ScenarioOK  string
 	ScenarioErr string
 	SignIn      *signInResult
+	GlobalLogin *globalLoginResult
 	GroupCheck  *groupCheckResult
 	Lifecycle   *lifecycleResult
+	Workspaces  []string
+	Sites       []siteSummary
 }
 
 type lifecycleResult struct {
@@ -176,6 +186,20 @@ type signInResult struct {
 	LookupHit      bool
 	HomeProject    string
 	HomeCell       string
+}
+
+type globalLoginResult struct {
+	Email       string
+	Hit         bool
+	HomeProject string
+	HomeCell    string
+	IssuerHint  string
+	FoundAt     string
+	Token       string
+	ClaimsJSON  string
+	AuthAllowed bool
+	AuthReason  string
+	Note        string
 }
 
 type groupCheckResult struct {
@@ -222,6 +246,8 @@ type lookupRow struct {
 	HomeProjectID string `json:"home_project_id"`
 	HomeCellURL   string `json:"home_cell_url"`
 	State         string `json:"state"`
+	Source        string `json:"source"`
+	ViaProject    string `json:"via_project"`
 	UpdatedAt     string `json:"updated_at"`
 }
 
@@ -233,14 +259,18 @@ type childRow struct {
 }
 
 func (a *App) handleHome(w http.ResponseWriter, r *http.Request) {
-	tree, unjoined := a.buildTree(r.Context())
+	ctx := r.Context()
+	tree, unjoined := a.buildTree(ctx)
+	sites := a.listSites(ctx)
 	a.render(w, "home", pageData{
 		Title:       "Cell & project trees",
 		Tree:        tree,
 		Unjoined:    unjoined,
-		ProjectTree: a.buildProjectTree(r.Context()),
+		ProjectTree: a.buildProjectTree(ctx),
 		Trace:       a.copyTrace(),
 		Now:         time.Now().UTC().Format(time.RFC3339),
+		Workspaces:  a.listWorkspaceIDs(sites),
+		Sites:       sites,
 	})
 }
 
@@ -366,6 +396,7 @@ func (a *App) handleScenarios(w http.ResponseWriter, r *http.Request) {
 		ScenarioOK:  r.URL.Query().Get("ok"),
 		ScenarioErr: r.URL.Query().Get("err"),
 		SignIn:      a.copySignIn(),
+		GlobalLogin: a.copyGlobalLogin(),
 		GroupCheck:  a.copyGroupCheck(),
 		Lifecycle:   a.copyLifecycle(),
 	})
@@ -381,7 +412,7 @@ func (a *App) handleScenarioCreateUser(w http.ResponseWriter, r *http.Request) {
 		email = fmt.Sprintf("demo-%d@example.com", time.Now().Unix()%100000)
 	}
 	deferFloat := r.FormValue("defer_float") == "1"
-	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-2")
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
 	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
@@ -414,7 +445,7 @@ func (a *App) handleScenarioLookup(w http.ResponseWriter, r *http.Request) {
 	if key == "" {
 		key = "joe@example.com"
 	}
-	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "us")
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
 	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
@@ -440,7 +471,7 @@ func (a *App) handleScenarioLookup(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) handleScenarioGrantJoe(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
-	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "us")
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
 	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
@@ -465,7 +496,7 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	autoGrant := r.FormValue("auto_grant") == "1"
-	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "us")
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
 	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	defer a.withPeerDelay(delayMs)()
 
@@ -522,7 +553,7 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 		autoGranted = true
 	}
 
-	// 3) Issue token at Joe's home (still eu-2 / team-eu-2).
+	// 3) Issue token at Joe's home (acme-fra @ eu-1).
 	issued, err := a.Peer.IssueToken(ctx, res.HomeCellURL, cell.IssueTokenRequest{
 		ProjectID: res.HomeProjectID,
 		Sub:       key,
@@ -602,7 +633,7 @@ func (a *App) handleScenarioGroupCheckJoe(w http.ResponseWriter, r *http.Request
 		return
 	}
 	delayMs := parseDelayMs(r.FormValue("delay_ms"))
-	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "us")
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
 	autoSeed := r.FormValue("auto_seed") == "1"
 	defer a.withPeerDelay(delayMs)()
 
@@ -658,20 +689,16 @@ func (a *App) handleScenarioGroupCheckJoe(w http.ResponseWriter, r *http.Request
 }
 
 func (a *App) ensureGroupChain(ctx context.Context) error {
-	euHost, err := a.cellURLByLabel("eu")
+	platformHost, err := a.cellURLByLabel("platform")
 	if err != nil {
 		return err
 	}
-	eu2Host, err := a.cellURLByLabel("eu-2")
-	if err != nil {
-		return err
-	}
-	usHost, err := a.cellURLByLabel("us")
+	eu1Host, err := a.cellURLByLabel("eu-1")
 	if err != nil {
 		return err
 	}
 
-	apps, err := a.Peer.ListApps(ctx, usHost, "us")
+	apps, err := a.Peer.ListApps(ctx, eu1Host, "acme-fra")
 	if err != nil {
 		return err
 	}
@@ -683,7 +710,7 @@ func (a *App) ensureGroupChain(ctx context.Context) error {
 		}
 	}
 	if !hasChat {
-		if _, err := a.Peer.CreateApp(ctx, usHost, "us", map[string]any{"name": "chat"}); err != nil {
+		if _, err := a.Peer.CreateApp(ctx, eu1Host, "acme-fra", map[string]any{"name": "chat"}); err != nil {
 			return err
 		}
 	}
@@ -695,27 +722,27 @@ func (a *App) ensureGroupChain(ctx context.Context) error {
 	}
 	seeds := []seed{
 		{
-			cellURL: eu2Host, projectID: "team-eu-2", label: "group:A#member@user:joe",
+			cellURL: eu1Host, projectID: "acme-fra", label: "group:A#member@user:joe",
 			body: map[string]any{
 				"object": "group:A", "relation": "member", "user_key": "joe@example.com",
-				"subject_kind": "user", "home_project_id": "team-eu-2", "home_cell_url": eu2Host,
+				"subject_kind": "user", "home_project_id": "acme-fra", "home_cell_url": eu1Host,
 				"skip_interest": true,
 			},
 		},
 		{
-			cellURL: euHost, projectID: "eu", label: "group:B#member@group:A@team-eu-2",
+			cellURL: platformHost, projectID: "platform", label: "group:B#member@group:A@acme-fra",
 			body: map[string]any{
 				"object": "group:B", "relation": "member",
 				"subject_kind": "group", "user_key": "A",
-				"home_project_id": "team-eu-2", "home_cell_url": eu2Host,
+				"home_project_id": "acme-fra", "home_cell_url": eu1Host,
 			},
 		},
 		{
-			cellURL: usHost, projectID: "us", label: "app:chat#viewer@group:B@eu",
+			cellURL: eu1Host, projectID: "acme-fra", label: "app:chat#viewer@group:B@platform",
 			body: map[string]any{
 				"object": "app:chat", "relation": "viewer",
 				"subject_kind": "group", "user_key": "B",
-				"home_project_id": "eu", "home_cell_url": euHost,
+				"home_project_id": "platform", "home_cell_url": platformHost,
 			},
 		},
 	}
@@ -778,7 +805,7 @@ func (a *App) copyGroupCheck() *groupCheckResult {
 
 func (a *App) handleScenarioBlockJoe(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
-	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "us")
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
 	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
@@ -796,7 +823,7 @@ func (a *App) handleScenarioBlockJoe(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) handleScenarioDeleteJoe(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
-	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "us")
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-1")
 	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
@@ -814,10 +841,11 @@ func (a *App) handleScenarioDeleteJoe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) runLifecycleScenario(ctx context.Context, action, resourceCellLabel string) (*lifecycleResult, error) {
-	eu2Host, err := a.cellURLByLabel("eu-2")
+	homeHost, err := a.cellURLByLabel("eu-1")
 	if err != nil {
 		return nil, err
 	}
+	homeProject := "acme-fra"
 	resourceHost, resourceProject, err := a.projectOnCell(ctx, resourceCellLabel)
 	if err != nil {
 		return nil, err
@@ -834,7 +862,7 @@ func (a *App) runLifecycleScenario(ctx context.Context, action, resourceCellLabe
 		return nil, err
 	}
 
-	interestsBefore, err := a.Peer.ListInterests(ctx, eu2Host, "team-eu-2")
+	interestsBefore, err := a.Peer.ListInterests(ctx, homeHost, homeProject)
 	if err != nil {
 		return nil, err
 	}
@@ -866,8 +894,8 @@ func (a *App) runLifecycleScenario(ctx context.Context, action, resourceCellLabe
 	}
 
 	var token string
-	issued, err := a.Peer.IssueToken(ctx, eu2Host, cell.IssueTokenRequest{
-		ProjectID: "team-eu-2", Sub: key, Aud: "app:chat",
+	issued, err := a.Peer.IssueToken(ctx, homeHost, cell.IssueTokenRequest{
+		ProjectID: homeProject, Sub: key, Aud: "app:chat",
 	})
 	if err != nil {
 		a.appendTrace("lifecycle: issue before "+action, nil, err.Error())
@@ -881,7 +909,7 @@ func (a *App) runLifecycleScenario(ctx context.Context, action, resourceCellLabe
 
 	switch action {
 	case "block":
-		out, err := a.Peer.BlockUser(ctx, eu2Host, "team-eu-2", key)
+		out, err := a.Peer.BlockUser(ctx, homeHost, homeProject, key)
 		hops = out.Trace
 		if err != nil {
 			a.appendTrace("block joe", hops, err.Error())
@@ -891,7 +919,7 @@ func (a *App) runLifecycleScenario(ctx context.Context, action, resourceCellLabe
 		result.Blocked = out.User.Blocked
 		a.appendTrace("block joe", hops, fmt.Sprintf("epoch=%d blocked=%v", out.User.Epoch, out.User.Blocked))
 	case "delete":
-		out, err := a.Peer.DeleteUser(ctx, eu2Host, "team-eu-2", key)
+		out, err := a.Peer.DeleteUser(ctx, homeHost, homeProject, key)
 		hops = out.Trace
 		if err != nil {
 			a.appendTrace("delete joe", hops, err.Error())
@@ -967,17 +995,18 @@ func (a *App) runLifecycleScenario(ctx context.Context, action, resourceCellLabe
 	return result, nil
 }
 
-// ensureJoeAlive recreates joe@example.com on team-eu-2 when missing.
+// ensureJoeAlive recreates joe@example.com on acme-fra when missing.
 // After delete the home row stays as a tombstone — re-bootstrap to demo again.
 func (a *App) ensureJoeAlive(ctx context.Context, action string) error {
-	eu2Host, err := a.cellURLByLabel("eu-2")
+	homeHost, err := a.cellURLByLabel("eu-1")
 	if err != nil {
 		return err
 	}
+	homeProject := "acme-fra"
 	var raw struct {
 		Users []userRow `json:"users"`
 	}
-	if err := a.Peer.DoRaw(ctx, http.MethodGet, cell.NormalizeURL(eu2Host)+"/v1/projects/team-eu-2", nil, "", &raw); err != nil {
+	if err := a.Peer.DoRaw(ctx, http.MethodGet, cell.NormalizeURL(homeHost)+"/v1/projects/"+homeProject, nil, "", &raw); err != nil {
 		return err
 	}
 	for _, u := range raw.Users {
@@ -991,13 +1020,108 @@ func (a *App) ensureJoeAlive(ctx context.Context, action string) error {
 			return nil
 		}
 	}
-	out, err := a.Peer.CreateUser(ctx, eu2Host, "team-eu-2", "joe@example.com", false)
+	out, err := a.Peer.CreateUser(ctx, homeHost, homeProject, "joe@example.com", false)
 	if err != nil {
 		a.appendTrace("recreate joe", out.Trace, err.Error())
 		return err
 	}
 	a.appendTrace("recreate joe", out.Trace, "created")
 	return nil
+}
+
+func (a *App) handleScenarioGlobalLogin(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
+		return
+	}
+	email := strings.TrimSpace(r.FormValue("email"))
+	if email == "" {
+		email = "joe@example.com"
+	}
+	issueToken := r.FormValue("issue_token") == "1"
+	delayMs := parseDelayMs(r.FormValue("delay_ms"))
+	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
+	defer cancel()
+	defer a.withPeerDelay(delayMs)()
+
+	platformHost, err := a.cellURLByLabel("platform")
+	if err != nil {
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	res, hops, err := a.Peer.LookupWalk(ctx, platformHost, "platform", email)
+	if err != nil {
+		a.appendTrace("global login: lookup", hops, err.Error())
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	result := &globalLoginResult{
+		Email: email,
+		Hit:   res.Hit,
+		Note:  "Lookup starts at platform project (global entry). Redirect target is home_project + home_cell.",
+	}
+	if !res.Hit {
+		a.appendTrace("global login: lookup", hops, "miss")
+		a.setGlobalLogin(result)
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("global login miss for "+email), http.StatusSeeOther)
+		return
+	}
+	result.HomeProject = res.HomeProjectID
+	result.HomeCell = res.HomeCellURL
+	result.FoundAt = res.FoundAtProjectID
+	result.IssuerHint = res.HomeCellURL
+	a.appendTrace("global login: lookup", hops, "hit home="+res.HomeProjectID+" cell="+res.HomeCellURL)
+
+	if issueToken {
+		issued, err := a.Peer.IssueToken(ctx, res.HomeCellURL, cell.IssueTokenRequest{
+			ProjectID: res.HomeProjectID, Sub: email, Aud: "app:chat",
+		})
+		if err != nil {
+			a.appendTrace("global login: issue", nil, err.Error())
+			http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+			return
+		}
+		claimsJSON, _ := json.MarshalIndent(issued.Claims, "", "  ")
+		result.Token = issued.Token
+		result.ClaimsJSON = string(claimsJSON)
+		auth, err := a.Peer.AuthCheck(ctx, res.HomeCellURL, cell.AuthCheckRequest{
+			Token: issued.Token, ProjectID: res.HomeProjectID, Object: "app:chat", Relation: "viewer", Online: true,
+		})
+		if err != nil {
+			// Ensure grant then retry once.
+			if _, gerr := a.ensureJoeGrantOn(ctx, res.HomeCellURL, res.HomeProjectID); gerr == nil {
+				auth, err = a.Peer.AuthCheck(ctx, res.HomeCellURL, cell.AuthCheckRequest{
+					Token: issued.Token, ProjectID: res.HomeProjectID, Object: "app:chat", Relation: "viewer", Online: true,
+				})
+			}
+		}
+		if err != nil {
+			a.appendTrace("global login: auth", nil, err.Error())
+		} else {
+			result.AuthAllowed = auth.Allowed
+			result.AuthReason = auth.Reason
+			a.appendTrace("global login: auth on home chat", auth.Trace, auth.Reason)
+		}
+	}
+	a.setGlobalLogin(result)
+	msg := fmt.Sprintf("global login %s → %s @ %s", email, result.HomeProject, result.HomeCell)
+	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+func (a *App) setGlobalLogin(gl *globalLoginResult) {
+	a.globalLoginMu.Lock()
+	defer a.globalLoginMu.Unlock()
+	a.globalLogin = gl
+}
+
+func (a *App) copyGlobalLogin() *globalLoginResult {
+	a.globalLoginMu.Lock()
+	defer a.globalLoginMu.Unlock()
+	if a.globalLogin == nil {
+		return nil
+	}
+	cp := *a.globalLogin
+	return &cp
 }
 
 func (a *App) setLifecycle(lr *lifecycleResult) {
@@ -1027,11 +1151,11 @@ func (a *App) copyLifecycle() *lifecycleResult {
 }
 
 func (a *App) ensureJoeGrant(ctx context.Context) (cell.CreateTupleResponse, error) {
-	usHost, err := a.cellURLByLabel("us")
+	host, err := a.cellURLByLabel("eu-1")
 	if err != nil {
 		return cell.CreateTupleResponse{}, err
 	}
-	return a.ensureJoeGrantOn(ctx, usHost, "us")
+	return a.ensureJoeGrantOn(ctx, host, "acme-fra")
 }
 
 func (a *App) ensureJoeGrantOn(ctx context.Context, hostURL, projectID string) (cell.CreateTupleResponse, error) {

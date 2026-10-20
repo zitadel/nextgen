@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -22,6 +23,7 @@ type ProjectView struct {
 	Name            string `json:"name"`
 	IsParent        bool   `json:"is_parent"`
 	LookupEnabled   bool   `json:"lookup_enabled"`
+	WorkspaceID     string `json:"workspace_id,omitempty"`
 	ParentProjectID string `json:"parent_project_id"`
 	ParentCellURL   string `json:"parent_cell_url"`
 	HostCellURL     string `json:"host_cell_url"`
@@ -59,6 +61,8 @@ type LookupView struct {
 	HomeProjectID string `json:"home_project_id"`
 	HomeCellURL   string `json:"home_cell_url"`
 	State         string `json:"state"`
+	Source        string `json:"source"`
+	ViaProject    string `json:"via_project,omitempty"`
 	UpdatedAt     string `json:"updated_at"`
 }
 
@@ -72,6 +76,8 @@ func (s *Server) registerProjectRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/lookup", s.handleLookup)
 	mux.HandleFunc("POST /v1/lookup/push", s.handleLookupPush)
 	mux.HandleFunc("POST /v1/lookup/walk", s.handleLookupWalk)
+	mux.HandleFunc("POST /v1/me/parent", s.handleEnableParent)
+	mux.HandleFunc("POST /v1/admin/enable-parent", s.handleEnableParent)
 }
 
 func (s *Server) floatDelay() time.Duration {
@@ -93,6 +99,7 @@ func projectView(p Project, host string) ProjectView {
 		Name:            p.Name,
 		IsParent:        p.IsParent,
 		LookupEnabled:   p.LookupEnabled,
+		WorkspaceID:     p.WorkspaceID,
 		ParentProjectID: p.ParentProjectID,
 		ParentCellURL:   p.ParentCellURL,
 		HostCellURL:     host,
@@ -101,13 +108,52 @@ func projectView(p Project, host string) ProjectView {
 }
 
 func lookupView(e LookupEntry) LookupView {
+	src := e.Source
+	if src == "" {
+		if e.State == LookupStateLocal || e.State == LookupStatePushed {
+			src = LookupSourceLocal
+		} else {
+			src = LookupSourceChild
+		}
+	}
 	return LookupView{
 		Key:           e.Key,
 		HomeProjectID: e.HomeProjectID,
 		HomeCellURL:   e.HomeCellURL,
 		State:         e.State,
+		Source:        src,
+		ViaProject:    e.ViaProject,
 		UpdatedAt:     e.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
+}
+
+func (s *Server) handleEnableParent(w http.ResponseWriter, _ *http.Request) {
+	meta, err := s.Store.GetMeta()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := s.Store.SetIsParent(true); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	meta.IsParent = true
+	status := "unjoined"
+	switch {
+	case meta.ParentURL != "":
+		status = "joined"
+	case meta.IsParent:
+		status = "root"
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":        true,
+		"is_parent": true,
+		"note":      "join key still via POST /v1/join/prepare on this cell",
+		"me": MeResponse{
+			URL: meta.URL, Label: meta.Label, Display: meta.Display,
+			IsParent: true, ParentURL: meta.ParentURL, Status: status,
+		},
+	})
 }
 
 func (s *Server) handleListProjects(w http.ResponseWriter, _ *http.Request) {
@@ -134,6 +180,7 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		Name          string `json:"name"`
 		IsParent      bool   `json:"is_parent"`
 		LookupEnabled bool   `json:"lookup_enabled"`
+		WorkspaceID   string `json:"workspace_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid_json")
@@ -162,6 +209,7 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		Name:          req.Name,
 		IsParent:      req.IsParent,
 		LookupEnabled: req.LookupEnabled,
+		WorkspaceID:   strings.TrimSpace(req.WorkspaceID),
 		CreatedAt:     s.Now(),
 	}
 	if err := s.Store.CreateProject(p); err != nil {
@@ -462,6 +510,7 @@ func (s *Server) floatLookup(ctx context.Context, home Project, key, homeCellURL
 			HomeProjectID: home.ID,
 			HomeCellURL:   homeCellURL,
 			ProjectID:     parentProj.ID,
+			ViaProject:    cur.ID, // immediate child that floated this hop
 		})
 		hop := TraceHop{
 			Cell:   cur.ParentCellURL,
@@ -486,6 +535,7 @@ func (s *Server) floatLookup(ctx context.Context, home Project, key, homeCellURL
 			Name:            next.Name,
 			IsParent:        next.IsParent,
 			LookupEnabled:   next.LookupEnabled,
+			WorkspaceID:     next.WorkspaceID,
 			ParentProjectID: next.ParentProjectID,
 			ParentCellURL:   next.ParentCellURL,
 		}
@@ -553,11 +603,14 @@ func (s *Server) handleLookup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hop.Result = "hit"
+	lv := lookupView(entry)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"hit":             true,
 		"home_project_id": entry.HomeProjectID,
 		"home_cell_url":   entry.HomeCellURL,
 		"state":           entry.State,
+		"source":          lv.Source,
+		"via_project":     lv.ViaProject,
 		"trace":           []TraceHop{hop},
 	})
 }
@@ -583,7 +636,11 @@ func (s *Server) handleLookupPush(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := s.Store.UpsertLookupVisible(key, req.HomeProjectID, req.HomeCellURL, s.Now()); err != nil {
+	via := strings.TrimSpace(req.ViaProject)
+	if via == "" {
+		via = req.HomeProjectID
+	}
+	if err := s.Store.UpsertLookupVisible(key, req.HomeProjectID, req.HomeCellURL, via, s.Now()); err != nil {
 		if errors.Is(err, ErrLookupConflict) {
 			writeErr(w, http.StatusConflict, err.Error())
 			return
@@ -591,7 +648,7 @@ func (s *Server) handleLookupPush(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "source": LookupSourceChild, "via_project": via})
 }
 
 func (s *Server) handleLookupWalk(w http.ResponseWriter, r *http.Request) {

@@ -34,6 +34,7 @@ type Store struct {
 type Meta struct {
 	URL        string
 	Label      string
+	Display    string
 	IsParent   bool
 	ParentURL  string
 	JoinSecret string
@@ -103,6 +104,9 @@ CREATE TABLE IF NOT EXISTS join_tokens (
 }
 
 func (s *Store) ensureMeta(cellURL, label string, isParent bool) error {
+	if err := s.ensureColumn("meta", "display", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
 	var n int
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM meta`).Scan(&n); err != nil {
 		return err
@@ -115,7 +119,7 @@ func (s *Store) ensureMeta(cellURL, label string, isParent bool) error {
 		parent = 1
 	}
 	_, err := s.db.Exec(
-		`INSERT INTO meta(id, url, label, is_parent, parent_url, join_secret) VALUES (1, ?, ?, ?, '', '')`,
+		`INSERT INTO meta(id, url, label, is_parent, parent_url, join_secret, display) VALUES (1, ?, ?, ?, '', '', '')`,
 		NormalizeURL(cellURL), label, parent,
 	)
 	return err
@@ -125,10 +129,24 @@ func (s *Store) GetMeta() (Meta, error) {
 	var m Meta
 	var isParent int
 	err := s.db.QueryRow(
-		`SELECT url, label, is_parent, parent_url, join_secret FROM meta WHERE id = 1`,
-	).Scan(&m.URL, &m.Label, &isParent, &m.ParentURL, &m.JoinSecret)
+		`SELECT url, label, is_parent, parent_url, join_secret, COALESCE(display, '') FROM meta WHERE id = 1`,
+	).Scan(&m.URL, &m.Label, &isParent, &m.ParentURL, &m.JoinSecret, &m.Display)
 	m.IsParent = isParent == 1
 	return m, err
+}
+
+func (s *Store) SetDisplay(display string) error {
+	_, err := s.db.Exec(`UPDATE meta SET display = ? WHERE id = 1`, strings.TrimSpace(display))
+	return err
+}
+
+func (s *Store) SetIsParent(isParent bool) error {
+	parent := 0
+	if isParent {
+		parent = 1
+	}
+	_, err := s.db.Exec(`UPDATE meta SET is_parent = ? WHERE id = 1`, parent)
+	return err
 }
 
 func (s *Store) SetParent(parentURL, joinSecret string) error {

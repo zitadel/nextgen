@@ -138,31 +138,29 @@ func TestCompleteRejectsDuplicateChild(t *testing.T) {
 func TestCompleteRejectsCycle(t *testing.T) {
 	platform, platformURL, c1 := startCell(t, "http://platform", "platform", true)
 	defer c1()
-	eu, euURL, c2 := startCell(t, "http://eu", "eu", true)
+	eu1, eu1URL, c2 := startCell(t, "http://eu-1", "eu-1", false)
 	defer c2()
-	eu1, _, c3 := startCell(t, "http://eu-1", "eu-1", false)
-	defer c3()
 
-	joinOnce(t, platform, eu, platformURL)
-	joinOnce(t, eu, eu1, euURL)
+	joinOnce(t, platform, eu1, platformURL)
+
+	// Enable parent on leaf so it can prepare, then try to complete with platform as child (cycle).
+	en := postJSON(t, eu1, "/v1/admin/enable-parent", map[string]any{})
+	defer en.Body.Close()
+	if en.StatusCode != http.StatusOK {
+		t.Fatalf("enable-parent status=%d", en.StatusCode)
+	}
 
 	prep := postJSON(t, eu1, "/v1/join/prepare", map[string]any{})
 	defer prep.Body.Close()
-	if prep.StatusCode != http.StatusBadRequest {
-		t.Fatalf("leaf prepare status=%d", prep.StatusCode)
-	}
-
-	prepEU := postJSON(t, eu, "/v1/join/prepare", map[string]any{})
-	defer prepEU.Body.Close()
 	var invite cell.PrepareResponse
-	decode(t, prepEU, &invite)
+	decode(t, prep, &invite)
 
 	meP := getJSON(t, platform, "/v1/me")
 	defer meP.Body.Close()
 	var platformMe cell.MeResponse
 	decode(t, meP, &platformMe)
 
-	res := postJSON(t, eu, "/v1/join/complete", cell.CompleteRequest{
+	res := postJSON(t, eu1, "/v1/join/complete", cell.CompleteRequest{
 		ChildURL:  platformMe.URL,
 		JoinToken: invite.JoinToken,
 	})
@@ -172,6 +170,8 @@ func TestCompleteRejectsCycle(t *testing.T) {
 		t.Fatalf("status=%d body=%s", res.StatusCode, body)
 	}
 	assertError(t, res, "join_would_create_cycle")
+	_ = eu1URL
+	_ = platformURL
 }
 
 func TestHeartbeatUnauthorized(t *testing.T) {

@@ -19,19 +19,21 @@ create_project() {
   local name="$3"
   local is_parent="$4"
   local lookup="$5"
+  local workspace="${6:-}"
   if curl -fsS "$cell_url/v1/projects/$id" >/dev/null 2>&1; then
     echo "skip project $id (exists on $cell_url)"
     return 0
   fi
-  echo "create project $id on $cell_url (lookup=$lookup)"
+  echo "create project $id on $cell_url (lookup=$lookup workspace=$workspace)"
   curl -fsS -X POST "$cell_url/v1/projects" \
     -H 'Content-Type: application/json' \
     -d "$(jq -n \
       --arg id "$id" \
       --arg name "$name" \
+      --arg ws "$workspace" \
       --argjson parent "$is_parent" \
       --argjson lookup "$lookup" \
-      '{id:$id, name:$name, is_parent:$parent, lookup_enabled:$lookup}')" >/dev/null
+      '{id:$id, name:$name, is_parent:$parent, lookup_enabled:$lookup, workspace_id:$ws}')" >/dev/null
 }
 
 attach_project() {
@@ -85,39 +87,31 @@ create_app() {
 }
 
 PLATFORM="${PLATFORM_URL:-http://platform:8100}"
-EU="${EU_URL:-http://eu:8101}"
-EU1="${EU1_URL:-http://eu-1:8102}"
-EU2="${EU2_URL:-http://eu-2:8103}"
-US="${US_URL:-http://us:8104}"
-AUS="${AUS_URL:-http://aus:8105}"
+EU1="${EU1_URL:-http://eu-1:8101}"
+EU2="${EU2_URL:-http://eu-2:8102}"
+US1="${US1_URL:-http://us-1:8103}"
+US2="${US2_URL:-http://us-2:8104}"
 
-for u in "$PLATFORM" "$EU" "$EU1" "$EU2" "$US" "$AUS"; do
+for u in "$PLATFORM" "$EU1" "$EU2" "$US1" "$US2"; do
   wait_healthy "$u"
 done
 
-# Seed projects: id hosted on cell, lookup flag
-create_project "$PLATFORM" "platform" "platform" true true
-create_project "$EU" "eu" "eu" true true
-create_project "$EU1" "team-eu-1" "team-eu-1" false false
-create_project "$EU2" "team-eu-2" "team-eu-2" false false
-create_project "$US" "us" "us" false false
-create_project "$AUS" "aus" "aus" false false
+# Sites = projects. Workspace is UX metadata (workspace_id).
+# platform = lookup zone. acme-fra on eu-1; leave US empty for Expand demo.
+create_project "$PLATFORM" "platform" "platform" true true ""
+create_project "$EU1" "acme-fra" "acme-fra" false false "acme"
 
-attach_project "$EU" "eu" "platform" "$PLATFORM"
-attach_project "$EU1" "team-eu-1" "eu" "$EU"
-attach_project "$EU2" "team-eu-2" "eu" "$EU"
-attach_project "$US" "us" "platform" "$PLATFORM"
-attach_project "$AUS" "aus" "platform" "$PLATFORM"
+attach_project "$EU1" "acme-fra" "platform" "$PLATFORM"
 
-create_user "$EU1" "team-eu-1" "alice@example.com"
-create_user "$EU2" "team-eu-2" "bob@example.com"
-create_user "$EU2" "team-eu-2" "joe@example.com"
+create_user "$EU1" "acme-fra" "joe@example.com"
+create_user "$EU1" "acme-fra" "alice@example.com"
 
-# Phase 3: regional app on us (grant left to scenario button)
-create_app "$US" "us" "chat"
+create_app "$EU1" "acme-fra" "chat"
 
-# Phase 5: group chain Joe ∈ A@eu-2 ∈ B@eu → viewer on us/chat
-# Idempotent: skip when the subject tuple already exists.
+# Phase 5 group chain (simplified for site topology):
+#   acme-fra: group:A#member@joe
+#   platform: group:B#member@group:A@acme-fra
+#   acme-fra: app:chat#viewer@group:B@platform
 seed_tuple() {
   local cell_url="$1"
   local project_id="$2"
@@ -146,8 +140,8 @@ seed_tuple() {
         home_project_id:$hp, home_cell_url:$hc, skip_interest:true}')" >/dev/null
 }
 
-seed_tuple "$EU2" "team-eu-2" "group:A" "member" "user" "joe@example.com" "team-eu-2" "$EU2"
-seed_tuple "$EU" "eu" "group:B" "member" "group" "A" "team-eu-2" "$EU2"
-seed_tuple "$US" "us" "app:chat" "viewer" "group" "B" "eu" "$EU"
+seed_tuple "$EU1" "acme-fra" "group:A" "member" "user" "joe@example.com" "acme-fra" "$EU1"
+seed_tuple "$PLATFORM" "platform" "group:B" "member" "group" "A" "acme-fra" "$EU1"
+seed_tuple "$EU1" "acme-fra" "app:chat" "viewer" "group" "B" "platform" "$PLATFORM"
 
 echo "project bootstrap complete"

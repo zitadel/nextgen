@@ -33,13 +33,12 @@ wait_healthy() {
 }
 
 PLATFORM="${PLATFORM_URL:-http://platform:8100}"
-EU="${EU_URL:-http://eu:8101}"
-EU1="${EU1_URL:-http://eu-1:8102}"
-EU2="${EU2_URL:-http://eu-2:8103}"
-US="${US_URL:-http://us:8104}"
-AUS="${AUS_URL:-http://aus:8105}"
+EU1="${EU1_URL:-http://eu-1:8101}"
+EU2="${EU2_URL:-http://eu-2:8102}"
+US1="${US1_URL:-http://us-1:8103}"
+US2="${US2_URL:-http://us-2:8104}"
 
-for u in "$PLATFORM" "$EU" "$EU1" "$EU2" "$US" "$AUS"; do
+for u in "$PLATFORM" "$EU1" "$EU2" "$US1" "$US2"; do
   wait_healthy "$u"
 done
 
@@ -60,10 +59,10 @@ join_ok() {
   }
 }
 
-join_ok "$PLATFORM" "$EU" "eu"
-join_ok "$EU" "$EU1" "eu-1"
-join_ok "$EU" "$EU2" "eu-2"
-join_ok "$PLATFORM" "$US" "us"
-join_ok "$PLATFORM" "$AUS" "aus"
+# All leaves join directly under platform (no region aggregator cells).
+join_ok "$PLATFORM" "$EU1" "eu-1"
+join_ok "$PLATFORM" "$EU2" "eu-2"
+join_ok "$PLATFORM" "$US1" "us-1"
+join_ok "$PLATFORM" "$US2" "us-2"
 
 echo "bootstrap complete"

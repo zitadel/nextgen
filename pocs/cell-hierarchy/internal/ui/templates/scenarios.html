@@ -33,16 +33,16 @@
 <body>
   <header>
     <strong>cell hierarchy</strong>
-    <nav><a href="/">Tree</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
+    <nav><a href="/">Tree</a><a href="/workspaces/acme">Workspace</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
   </header>
   <main>
-    <h1>Phase 2–6 scenarios</h1>
+    <h1>Scenarios (sites · global login · grants)</h1>
     {{if .ScenarioOK}}<div class="flash-ok">{{.ScenarioOK}}</div>{{end}}
     {{if .ScenarioErr}}<div class="flash-err">{{.ScenarioErr}}</div>{{end}}
 
     <div class="controls" id="shared-controls">
       <h2 style="font-size:1rem;margin:0 0 0.5rem">Shared controls</h2>
-      <p class="muted">Entry cell and inter-cell delay apply to every scenario below (injected on submit). Defaults depend on the scenario when left as-is.</p>
+      <p class="muted">Entry cell selects which cell’s site project the scenario uses (eu-1→acme-fra, us-1→acme-iowa when expanded). Defaults depend on the scenario.</p>
       <label for="shared_entry_cell">Entry cell</label>
       <select id="shared_entry_cell" name="entry_cell">
         {{range .Cells}}
@@ -51,20 +51,48 @@
       </select>
       <label for="shared_delay_ms">Inter-cell delay (ms): <span id="delay_val">0</span></label>
       <input id="shared_delay_ms" name="delay_ms" type="range" min="0" max="200" step="5" value="0"
-             oninput="document.getElementById('delay_val').textContent=this.value; syncShared();" style="width:100%"/>
+             oninput="document.getElementById('delay_val').textContent=this.value;" style="width:100%"/>
+    </div>
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Global login</h2>
+      <p class="muted">Entry URL is conceptual global. Lookup walks from the <strong>platform</strong> project → home_project / home_cell / issuer hint. Optionally issue token at home and auth/check on home site’s chat.</p>
+      <form method="post" action="/scenarios/global-login" class="scenario-form" data-default-cell="platform">
+        <label for="gl_email">Email</label>
+        <input id="gl_email" name="email" value="joe@example.com"/>
+        <label><input type="checkbox" name="issue_token" value="1" checked/> Issue token + auth/check on home chat</label>
+        <button type="submit">Global login discovery</button>
+      </form>
+      {{if .GlobalLogin}}
+      <div style="margin-top:1rem">
+        <p class="muted">
+          {{.GlobalLogin.Email}}
+          {{if .GlobalLogin.Hit}}
+          → home <code>{{.GlobalLogin.HomeProject}}</code> @ <code>{{.GlobalLogin.HomeCell}}</code>
+          · found_at <code>{{.GlobalLogin.FoundAt}}</code>
+          · issuer <code>{{.GlobalLogin.IssuerHint}}</code>
+          {{if .GlobalLogin.Token}}
+          · auth: {{if .GlobalLogin.AuthAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.GlobalLogin.AuthReason}}</span>{{end}}
+          {{end}}
+          {{else}}miss{{end}}
+        </p>
+        {{if .GlobalLogin.ClaimsJSON}}
+        <pre style="margin:0.25rem 0 0;padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:auto;font-size:0.8rem">{{.GlobalLogin.ClaimsJSON}}</pre>
+        {{end}}
+      </div>
+      {{end}}
     </div>
 
     <div class="panel">
       <h2 style="font-size:1rem;margin:0 0 0.5rem">Block / Delete Joe</h2>
       <p class="muted">
-        Lifecycle always acts on Joe’s home (<code>eu-2</code> / <code>team-eu-2</code>).
-        Entry cell selects the <strong>resource</strong> project for before/after tuples + auth/FGA (default <code>us</code>).
-        <strong>Delete</strong> fans out <code>user.deleted</code> → subscribers <em>tombstone</em> grants (rows stay listed with a badge). Interests unregister after fan-out.
+        Lifecycle acts on Joe’s home (<code>eu-1</code> / <code>acme-fra</code>).
+        Entry cell selects the <strong>resource</strong> site for tuples + auth/FGA (default <code>eu-1</code>; use <code>us-1</code> after Expand).
       </p>
-      <form method="post" action="/scenarios/block-joe" class="scenario-form" style="display:inline" data-default-cell="us">
+      <form method="post" action="/scenarios/block-joe" class="scenario-form" style="display:inline" data-default-cell="eu-1">
         <button type="submit">Block Joe</button>
       </form>
-      <form method="post" action="/scenarios/delete-joe" class="scenario-form" style="display:inline" data-default-cell="us">
+      <form method="post" action="/scenarios/delete-joe" class="scenario-form" style="display:inline" data-default-cell="eu-1">
         <button type="submit" class="secondary">Delete Joe</button>
       </form>
       {{if .Lifecycle}}
@@ -77,53 +105,35 @@
           · resource <code>{{.Lifecycle.ResourceProject}}</code>@{{.Lifecycle.ResourceCell}}
           · active joe-tuples <strong>{{.Lifecycle.USTuplesBefore}} → {{.Lifecycle.USTuplesActiveAfter}}</strong>
           {{if .Lifecycle.Deleted}} · tombstoned <strong>{{.Lifecycle.USTuplesTombstonedAfter}}</strong>{{end}}
-          · interests before <strong>{{.Lifecycle.InterestsBefore}}</strong>
           · offline: {{if .Lifecycle.OfflineAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.Lifecycle.OfflineReason}}</span>{{end}}
           · online: {{if .Lifecycle.OnlineAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.Lifecycle.OnlineReason}}</span>{{end}}
           {{with .Lifecycle.GroupAllowed}}
             · group: {{if .}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">denied</span>{{end}}
           {{end}}
-          {{if ne .Lifecycle.GroupReason ""}} · group reason <code>{{.Lifecycle.GroupReason}}</code>{{end}}
           {{if ne .Lifecycle.LookupState ""}} · lookup <code>{{.Lifecycle.LookupState}}</code>{{end}}
         </p>
         {{if .Lifecycle.InterestsNotified}}
-        <p class="muted">Interests notified (from delete/block trace):</p>
-        <ul class="compact">
-          {{range .Lifecycle.InterestsNotified}}<li><code>{{.}}</code></li>{{end}}
-        </ul>
+        <p class="muted">Interests notified:</p>
+        <ul class="compact">{{range .Lifecycle.InterestsNotified}}<li><code>{{.}}</code></li>{{end}}</ul>
         {{end}}
         {{if .Lifecycle.TombstonedSubjects}}
-        <p class="muted">Tombstoned tuple subjects on resource cell:</p>
-        <ul class="compact">
-          {{range .Lifecycle.TombstonedSubjects}}<li><code>{{.}}</code></li>{{end}}
-        </ul>
+        <p class="muted">Tombstoned subjects:</p>
+        <ul class="compact">{{range .Lifecycle.TombstonedSubjects}}<li><code>{{.}}</code></li>{{end}}</ul>
         {{end}}
         <p class="muted">{{.Lifecycle.Note}}</p>
-        {{if .Lifecycle.Hops}}
-        <table class="trace">
-          <thead><tr><th>Cell</th><th>Method</th><th>ms</th><th>Result</th></tr></thead>
-          <tbody>
-          {{range .Lifecycle.Hops}}
-            <tr><td><code>{{.Cell}}</code></td><td>{{.Method}}</td><td>{{.Ms}}</td><td>{{.Result}}</td></tr>
-          {{end}}
-          </tbody>
-        </table>
-        {{end}}
       </div>
       {{end}}
     </div>
 
     <div class="panel">
       <h2 style="font-size:1rem;margin:0 0 0.5rem">Group check Joe → app:chat</h2>
-      <p class="muted">FGA check on the entry cell’s project (default <code>us</code>). Delay slider sleeps per FGA hop and also sets PeerClient ExtraDelay for outbound HTTP.</p>
-      <form method="post" action="/scenarios/seed-group-chain" class="scenario-form" style="margin-bottom:0.75rem" data-default-cell="us">
+      <p class="muted">Chain: acme-fra group:A → platform group:B → acme-fra app:chat. Default entry <code>eu-1</code>.</p>
+      <form method="post" action="/scenarios/seed-group-chain" class="scenario-form" style="margin-bottom:0.75rem" data-default-cell="eu-1">
         <button class="secondary" type="submit">Seed group chain</button>
       </form>
-      <form method="post" action="/scenarios/group-check-joe" class="scenario-form" data-default-cell="us">
+      <form method="post" action="/scenarios/group-check-joe" class="scenario-form" data-default-cell="eu-1">
         <label><input type="checkbox" name="auto_seed" value="1" checked/> Auto-seed chain if missing</label>
-        <div class="row">
-          <button type="submit">Group check Joe → app:chat</button>
-        </div>
+        <button type="submit">Group check Joe → app:chat</button>
       </form>
       {{if .GroupCheck}}
       <div style="margin-top:1rem">
@@ -131,73 +141,49 @@
           {{if .GroupCheck.Allowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.GroupCheck.Reason}}</span>{{end}}
           · total <strong>{{.GroupCheck.TotalMs}} ms</strong>
           · cross-cell hops <strong>{{.GroupCheck.CrossCellHops}}</strong>
-          · delay {{.GroupCheck.DelayMs}} ms/hop
-          {{if .GroupCheck.Seeded}} · auto-seeded{{end}}
         </p>
-        <p class="muted">{{.GroupCheck.Note}}</p>
-        {{if .GroupCheck.Hops}}
-        <table class="trace">
-          <thead><tr><th>Cell</th><th>Method</th><th>ms</th><th>Result</th></tr></thead>
-          <tbody>
-          {{range .GroupCheck.Hops}}
-            <tr><td><code>{{.Cell}}</code></td><td>{{.Method}}</td><td>{{.Ms}}</td><td>{{.Result}}</td></tr>
-          {{end}}
-          </tbody>
-        </table>
-        {{end}}
       </div>
       {{end}}
     </div>
 
     <div class="panel">
       <h2 style="font-size:1rem;margin:0 0 0.5rem">Sign in as Joe</h2>
-      <p class="muted">Issue JWT at Joe’s home (eu-2). Auth/check hits the <strong>entry cell</strong> project (default <code>us</code>).</p>
-      <form method="post" action="/scenarios/sign-in-joe" class="scenario-form" data-default-cell="us">
+      <p class="muted">Issue JWT at Joe’s home (acme-fra). Auth/check hits the entry cell’s site (default <code>eu-1</code>).</p>
+      <form method="post" action="/scenarios/sign-in-joe" class="scenario-form" data-default-cell="eu-1">
         <label><input type="checkbox" name="auto_grant" value="1" checked/> Auto-grant if missing</label>
-        <div class="row">
-          <button type="submit">Sign in as Joe</button>
-        </div>
+        <button type="submit">Sign in as Joe</button>
       </form>
       {{if .SignIn}}
       <div style="margin-top:1rem">
         <p class="muted">Home: <code>{{.SignIn.HomeProject}}</code> @ <code>{{.SignIn.HomeCell}}</code>
-          {{if .SignIn.AutoGranted}} · auto-granted{{end}}
           · offline: {{if .SignIn.AllowedOffline}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.SignIn.ReasonOffline}}</span>{{end}}
           · online: {{if .SignIn.AllowedOnline}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.SignIn.ReasonOnline}}</span>{{end}}
         </p>
-        <label>Raw token</label>
-        <textarea readonly rows="3" style="width:100%;font:0.75rem ui-monospace,monospace;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem">{{.SignIn.Token}}</textarea>
-        <label>Decoded claims</label>
-        <pre style="margin:0.25rem 0 0;padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:auto;font-size:0.8rem">{{.SignIn.ClaimsJSON}}</pre>
       </div>
       {{end}}
     </div>
 
     <div class="panel">
       <h2 style="font-size:1rem;margin:0 0 0.5rem">Grant Joe on entry cell / chat</h2>
-      <p class="muted">Creates app:chat if needed, grants viewer, registers interest on Joe’s home. Default entry cell <code>us</code>.</p>
-      <form method="post" action="/scenarios/grant-joe" class="scenario-form" data-default-cell="us">
+      <form method="post" action="/scenarios/grant-joe" class="scenario-form" data-default-cell="eu-1">
         <button type="submit">Grant Joe</button>
       </form>
     </div>
 
     <div class="panel">
       <h2 style="font-size:1rem;margin:0 0 0.5rem">Create user (watch float)</h2>
-      <p class="muted">Creates on the entry cell’s project (default <code>eu-2</code> → <code>team-eu-2</code>).</p>
-      <form method="post" action="/scenarios/create-user" class="scenario-form" data-default-cell="eu-2">
+      <p class="muted">Creates on the entry cell’s site (default <code>eu-1</code> → <code>acme-fra</code>). Floats to platform with provenance <code>source=child</code>.</p>
+      <form method="post" action="/scenarios/create-user" class="scenario-form" data-default-cell="eu-1">
         <label for="email">Email</label>
         <input id="email" name="email" placeholder="demo@example.com" />
         <label><input type="checkbox" name="defer_float" value="1"/> Defer float (local only)</label>
-        <div class="row">
-          <button type="submit">Create user (watch float)</button>
-        </div>
+        <button type="submit">Create user (watch float)</button>
       </form>
     </div>
 
     <div class="panel">
       <h2 style="font-size:1rem;margin:0 0 0.5rem">Lookup walk</h2>
-      <p class="muted">Walks UP from the entry cell’s project (default <code>us</code>). Prefer a project whose id matches the cell label.</p>
-      <form method="post" action="/scenarios/lookup" class="scenario-form" data-default-cell="us">
+      <form method="post" action="/scenarios/lookup" class="scenario-form" data-default-cell="eu-1">
         <label for="key">Key</label>
         <input id="key" name="key" value="joe@example.com" />
         <button type="submit">Lookup</button>
@@ -231,13 +217,13 @@
       }
       if (cellSel) {
         for (var i = 0; i < cellSel.options.length; i++) {
-          if (cellSel.options[i].value === 'us') { cellSel.selectedIndex = i; break; }
+          if (cellSel.options[i].value === 'eu-1') { cellSel.selectedIndex = i; break; }
         }
         cellSel.addEventListener('change', function () { cellDirty = true; });
       }
       document.querySelectorAll('form.scenario-form').forEach(function (form) {
         form.addEventListener('submit', function () {
-          var def = form.getAttribute('data-default-cell') || 'us';
+          var def = form.getAttribute('data-default-cell') || 'eu-1';
           var cell = (cellDirty && cellSel && cellSel.value) ? cellSel.value : def;
           ensureHidden(form, 'entry_cell', cell);
           ensureHidden(form, 'delay_ms', delayInp ? delayInp.value : '0');
