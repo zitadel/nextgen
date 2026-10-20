@@ -3,7 +3,7 @@
   "extends": ["//"],
   "tasks": {
     "typecheck": {
-      "dependsOn": ["build", "@zitadel/api-mock#build", "@zitadel/components#build", "@zitadel/sdk-core#build"]
+      "dependsOn": ["build", "@zitadel/api-mock#build"]
     },
     "build": {
       "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
