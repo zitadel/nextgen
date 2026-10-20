@@ -976,6 +976,9 @@ importers:
 
   apps/login-ui:
     dependencies:
+      '@fontsource/arimo':
+        specifier: 'catalog:'
+        version: 5.3.0
       '@zitadel/components':
         specifier: workspace:*
         version: link:../../packages/components

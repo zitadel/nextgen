@@ -1,6 +1,6 @@
 # ADR 025: Default brand font loading
 
-> **Status:** Accepted — 2026-06-15 (revised 2026-06-16: dropped APK Futural; headings use bold Arimo)
+> **Status:** Accepted — 2026-06-15 (revised 2026-06-16: dropped APK Futural; headings use bold Arimo; amended 2026-10-20: the package loads no default face, see [Amendment](#amendment-2026-10-20-no-default-font-request))
 
 ## Context
 
@@ -85,6 +85,35 @@ inlined into the package, for now:
 `DEFAULT_BRAND_FONT_HREF` is exported so a deployment that cannot make a
 third-party request (privacy/GDPR, CSP, offline) can self-host the same face
 and pass its own href to `applyDefaultFont`.
+
+## Amendment (2026-10-20): no default font request
+
+Decisions 1–3 and the asset strategy above are withdrawn. Linking Google Fonts
+by default made every unbranded login page send each visitor's IP address to
+Google, which for an EU deployment is a GDPR problem the integrator never
+chose (LG München, 3 O 17493/20). The out-of-the-box default must make no
+third-party request.
+
+- `@zitadel/components` loads no face of its own: `applyDefaultFont` and
+  `DEFAULT_BRAND_FONT_HREF` are gone. Without a tenant `typography.font_url`
+  the token stacks (decision 4, unchanged) render Arimo where the page or the
+  OS already has it and the system font otherwise.
+- `typography.font_url` stays the one opt-in, `variant="page"` only, so a
+  third-party font host is always the tenant's choice.
+- First-party shells self-host Arimo from their own origin with
+  `@fontsource/arimo`: `apps/console` already did, and `apps/login-ui` now
+  does, so the server's hosted login keeps the brand face.
+- The mock's `defaultDevBranding` sets no typography, so the demos behave
+  like a server without branding.
+
+Self-hosting inside the package was rejected on cost. Inlining a latin-subset
+Arimo (about 20 KB of woff2, about 27 KB as base64) into the bundle charges
+every consumer on every page, widget embeds included, which inject no font at
+all. Emitting the file as an asset makes the host's bundler serve it, the
+coupling the runtime-injection pattern avoids. Serving it from the Zitadel
+server needs a cross-origin font route and still leaves the mock-backed demos
+without it. The system stack costs nothing, and the token stacks already
+declared it as the fallback.
 
 ## Consequences
 
