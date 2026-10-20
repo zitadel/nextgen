@@ -75,11 +75,12 @@ func TestStepUpRequiresSessionProof(t *testing.T) {
 	}
 
 	t.Run("flow: session id alone is refused", func(t *testing.T) {
+		// createFlow declares its 400 explicitly, so the refusal decodes as
+		// ErrorDetails rather than the default error union.
 		resp := startFlow(t, string(own.Session.SessionID), nil)
-		refused, ok := resp.(*api.CreateFlowErrorResponseStatusCode)
+		refused, ok := resp.(*api.ErrorDetails)
 		require.True(t, ok, "expected a refusal, got %s", helpers.MustMarshal(t, resp))
-		require.Equal(t, http.StatusBadRequest, refused.StatusCode, helpers.MustMarshal(t, refused))
-		require.Equal(t, api.ReqInvalidCreateFlowErrorResponse, refused.Response.Type, helpers.MustMarshal(t, refused))
+		require.Equal(t, api.ErrorCode("req.invalid"), refused.Code, helpers.MustMarshal(t, refused))
 	})
 	t.Run("flow: the session's own token starts the flow", func(t *testing.T) {
 		resp := startFlow(t, string(own.Session.SessionID), &own.SessionToken)
