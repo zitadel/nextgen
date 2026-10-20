@@ -49634,6 +49634,22 @@ func (s GetMyUserSchemaErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SessProjectMismatchGetMyUserSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("sess.project_mismatch")
+		{
+			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserNotFoundGetMyUserSchemaErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.not_found")
@@ -49685,6 +49701,9 @@ func (s *GetMyUserSchemaErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidGetMyUserSchemaErrorResponse
 					found = true
+				case "sess.project_mismatch":
+					s.Type = SessProjectMismatchGetMyUserSchemaErrorResponse
+					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundGetMyUserSchemaErrorResponse
 					found = true
@@ -49712,6 +49731,10 @@ func (s *GetMyUserSchemaErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidGetMyUserSchemaErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case SessProjectMismatchGetMyUserSchemaErrorResponse:
+		if err := s.SessProjectMismatch.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundGetMyUserSchemaErrorResponse:
@@ -60909,6 +60932,22 @@ func (s ListMyTeamsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SessProjectMismatchListMyTeamsErrorResponse:
+		e.FieldStart("code")
+		e.Str("sess.project_mismatch")
+		{
+			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserNotFoundListMyTeamsErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.not_found")
@@ -60960,6 +60999,9 @@ func (s *ListMyTeamsErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidListMyTeamsErrorResponse
 					found = true
+				case "sess.project_mismatch":
+					s.Type = SessProjectMismatchListMyTeamsErrorResponse
+					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundListMyTeamsErrorResponse
 					found = true
@@ -60987,6 +61029,10 @@ func (s *ListMyTeamsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidListMyTeamsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case SessProjectMismatchListMyTeamsErrorResponse:
+		if err := s.SessProjectMismatch.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundListMyTeamsErrorResponse:

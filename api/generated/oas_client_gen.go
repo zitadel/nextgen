@@ -574,9 +574,11 @@ type Invoker interface {
 	// GetMyUserSchema invokes getMyUserSchema operation.
 	//
 	// The schema the signed-in user's own record is validated against.
+	// With `project_id`, the schema is returned only when the session belongs to
+	// that project.
 	//
 	// GET /users/me/schema
-	GetMyUserSchema(ctx context.Context) (GetMyUserSchemaRes, error)
+	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
 	// GetProject invokes getProject operation.
 	//
 	// Returns the current state of a project.
@@ -758,6 +760,8 @@ type Invoker interface {
 	// ListMyTeams invokes listMyTeams operation.
 	//
 	// The signed-in user's own team roster, ordered by team name.
+	// With `project_id`, the teams are listed only when the session belongs to
+	// that project.
 	//
 	// GET /users/me/teams
 	ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error)
@@ -7008,14 +7012,16 @@ func (c *Client) sendGetMyUser(ctx context.Context, params GetMyUserParams) (res
 // GetMyUserSchema invokes getMyUserSchema operation.
 //
 // The schema the signed-in user's own record is validated against.
+// With `project_id`, the schema is returned only when the session belongs to
+// that project.
 //
 // GET /users/me/schema
-func (c *Client) GetMyUserSchema(ctx context.Context) (GetMyUserSchemaRes, error) {
-	res, err := c.sendGetMyUserSchema(ctx)
+func (c *Client) GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error) {
+	res, err := c.sendGetMyUserSchema(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetMyUserSchema(ctx context.Context) (res GetMyUserSchemaRes, err error) {
+func (c *Client) sendGetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (res GetMyUserSchemaRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMyUserSchema"),
 		semconv.HTTPRequestMethodKey.String("GET"),
@@ -7055,6 +7061,30 @@ func (c *Client) sendGetMyUserSchema(ctx context.Context) (res GetMyUserSchemaRe
 	var pathParts [1]string
 	pathParts[0] = "/users/me/schema"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
@@ -10158,6 +10188,8 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 // ListMyTeams invokes listMyTeams operation.
 //
 // The signed-in user's own team roster, ordered by team name.
+// With `project_id`, the teams are listed only when the session belongs to
+// that project.
 //
 // GET /users/me/teams
 func (c *Client) ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error) {
@@ -10238,6 +10270,26 @@ func (c *Client) sendListMyTeams(ctx context.Context, params ListMyTeamsParams) 
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
 				if unwrapped := string(val); true {
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}

@@ -1,7 +1,11 @@
 get:
   operationId: listMyTeams
   summary: List the teams I belong to
-  description: The signed-in user's own team roster, ordered by team name.
+  description: |
+    The signed-in user's own team roster, ordered by team name.
+
+    With `project_id`, the teams are listed only when the session belongs to
+    that project.
   tags:
     - Users
   security:
@@ -9,6 +13,7 @@ get:
   parameters:
     - $ref: ../../../../components/parameters/limit.yaml
     - $ref: ../../../../components/parameters/page-token.yaml
+    - $ref: ../../../../components/parameters/session-project-id.yaml
   responses:
     '200':
       description: The user's teams.
@@ -31,5 +36,11 @@ get:
         application/json:
           schema:
             $ref: ../../../../components/schemas/errors/auth-unauthorized.yaml
+    '403':
+      description: The session belongs to a different project than `project_id`.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/sess-project_mismatch.yaml
     default:
       $ref: listMyTeams-error-response.yaml
