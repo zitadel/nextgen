@@ -209,3 +209,8 @@ overrides:
 # pnpm 12 offers to link the agent skills dependencies ship; we use none.
 skills:
   dirs: []
+
+# Never re-install before a `pnpm run`. With supportedArchitectures listing every
+# platform, pnpm 12's check reinstalls them all over an install made with
+# --os=current --cpu=current, which breaks the Vercel services' shared node_modules.
+verifyDepsBeforeRun: false
