@@ -266,6 +266,10 @@ So the configuration has to be there when the element starts. Give a raw element
 
 Do not build on server-rendered markup that carries an object-valued prop. React 19 does not apply a custom element's object property while hydrating it, so a `project` handle passed to a raw `<zitadel-login>` that was server-rendered is never delivered. Pass `project-id` and `proxy-path` as strings, configure globally before the bundle loads, or mount on the client only.
 
+### Edge runtimes
+
+Cloudflare Workers and Vercel Edge have no DOM, and bundlers target them with the `browser` condition next to `workerd`, `worker` or `edge-light`, so Lit's browser build throws `HTMLElement is not defined` as soon as it is imported. When one of those conditions is active together with `browser`, the package root therefore resolves to a build that never loads Lit and defines no element. It keeps what does not need one: `businessLocales` and the other locales, `tokens` and `cssVars`, the branding helpers, the attribution markup and the flow API client. The elements, their manifests, the sanitiser and `ThemeController` are not in it, so a bundle for those runtimes fails at build time if it imports one. The other entries (`./atoms`, `./manifests`, `./orchestrator`, `./standalone`) are unchanged and still need a DOM, as does the root under `browser` alone. Without `browser`, `workerd`, `worker` and `edge-light` resolve to the full root as before.
+
 ## Element APIs
 
 ### `<zitadel-login>`
@@ -438,6 +442,7 @@ packages/components/
 │   ├── tokens/            re-export of @zitadel/design-tokens
 │   ├── styles/            shared host styles, focus ring, t() css-var bridge
 │   ├── manifests.ts       per-atom attribute / part / event manifests
+│   ├── server.ts          Lit-free subset the root resolves to on edge
 │   └── index.ts           barrel
 ├── tsdown.config.ts       library build (externalises lit/liquidjs/dompurify)
 └── vitest.config.ts       jsdom (unit) + chromium (browser) projects

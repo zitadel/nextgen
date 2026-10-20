@@ -62,7 +62,7 @@ export class ZitadelLogoutComponent {
   }
 
   onSignout(event: Event): void {
-    this.signout.emit((event as CustomEvent<ZitadelSignoutDetail>).detail);
+    if (event instanceof CustomEvent) this.signout.emit(event.detail);
   }
 
   onSessionError(event: Event): void {

@@ -47,6 +47,8 @@ export async function main(args = forwardedArgs()) {
       return await commandPack();
     case "publish":
       return await commandPublish(options);
+    case "check-npm":
+      return await commandCheckNpm();
     case "verify":
       return await commandVerify();
     default:
@@ -195,6 +197,15 @@ async function assertPackagesPublishable() {
   }
 }
 
+// The publish preflight's npm check, on its own. ci.yml runs it on the version
+// PR and its merge group, so a version that release publish would refuse fails
+// before it lands on main, not after.
+async function commandCheckNpm() {
+  const release = await readServerRelease(repoRoot);
+  await assertPackagesPublishable();
+  console.log(`npm preflight passed for ${release.version}`);
+}
+
 function assertRecoverVersion(release, recoverVersion) {
   if (release.version !== recoverVersion) {
     throw new Error(
@@ -291,7 +302,7 @@ function usage(error) {
     console.error(error);
     console.error("");
   }
-  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|verify> [options]
+  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|check-npm|verify> [options]
 
 Options:
   --dry-run          Do not publish or mutate remote registries.

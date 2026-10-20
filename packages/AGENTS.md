@@ -1,72 +1,75 @@
 # Agent Instructions — `packages/`
 
-Scoped instructions for packages that have **no nearer `AGENTS.md` of their
-own** — today that is the nine `packages/sdk-*` packages plus `packages/api`
-and `packages/config`. Packages with their own scoped file
-(`components`, `design-tokens`, `testing`, `api-mock`) are governed by
-those files, not this one. Defer to root
-[`AGENTS.md`](../AGENTS.md) for repo-wide rules.
+Rules for the packages without an `AGENTS.md` of their own: the SDKs
+(`packages/sdk-*`), `packages/api` and `packages/config`.
 
-## `packages/sdk-*` (applies only to the SDK packages)
+## The SDKs (`packages/sdk-*`)
 
-Nine published SDKs: `sdk-core` plus one per framework (next, nuxt, react,
-vue, angular, solid, svelte, qwik). All are public npm packages in
-`PUBLIC_RELEASE_PACKAGES` and the changesets `fixed` group — every observable
+`sdk-core` plus one package per framework. Every one is public, listed in
+`PUBLIC_RELEASE_PACKAGES` and in the changesets `fixed` group: every observable
 change needs a changeset, and the whole train versions together.
 
 - **`sdk-core` is the shared contract**: JWT verification (`verifyJwt`),
   middleware primitives, runtime resolution, and the `NextgenSession` /
-  `AuthResult` types every SPA SDK re-exports via `@zitadel/sdk-core/types`.
-  Change a shared type there, not by forking it into a framework package.
-- **Export stability**: the `exports` map and public entry points
-  (`/server`, `/client`, `/react`, `/module`, `/types`, …) are consumer
-  contract — removing or renaming one is a breaking change; additions need a
-  changeset. Do not deep-import between SDK packages; go through the
-  published entry points.
-- **Peer dependencies**: framework runtimes (`react`, `vue`, `@angular/core`,
-  `solid-js`, `svelte`, `@qwik.dev/core`, `next`, `nuxt`) are
-  `peerDependencies`, never hard dependencies — an SDK must not pin its
-  host framework.
-- **TypeScript floor**: consumers need TypeScript ≥ 5.0 (the entry points use
-  `export type *`). This is a compatibility floor, stated here once — READMEs
-  link it rather than restating.
-- **Build tooling is deliberately mixed**: `sdk-core`/`sdk-next` build with
-  per-file `tsc` because bundlers merge `"use client"` modules into shared
-  chunks and strip the directive (the RSC chunk trap); the SPA SDKs bundle
-  with Vite. Don't "unify" the build without re-testing the App Router
-  client/server split.
+  `AuthResult` types the SDKs re-export through `@zitadel/sdk-core/types`.
+  Change a shared type there; never fork it into a framework package.
+- **Exports are consumer contract**: removing or renaming an `exports` entry
+  (`/server`, `/client`, `/types`, …) is a breaking change, and an addition
+  needs a changeset. Never deep-import between SDKs; use their published
+  entry points.
+- **Framework runtimes are `peerDependencies`**, never `dependencies`: an SDK
+  never pins its host framework. `src/contract.spec.ts` in `sdk-core` checks
+  each README lists its peers.
+- **TypeScript floor**: consumers need TypeScript ≥ 5.0, because the entry
+  points use `export type *`. This is the one statement of it; READMEs link
+  here.
+- **Keep each package's build tool** (its `build` script). `sdk-next` builds
+  per file with `tsc` because bundlers merge `"use client"` modules into shared
+  chunks and strip the directive. Never unify the builds without re-testing
+  the App Router client/server split.
 - **The same-origin proxy is the shared concept**: every SDK fronts the API
   through `/__nextgen/*` on the app's own origin
-  ([ADR 036](../docs/adrs/036-api-credential-planes.md), ADR 005). Middleware
-  SDKs (next, nuxt) implement it server-side; SPA SDKs document a dev/deploy
-  proxy. Production SPA deployment guidance is tracked in
-  [issue #560](https://github.com/zitadel/nextgen/issues/560) — READMEs link
-  this section instead of restating the caveat twelve times.
-- **Agent Skill per SDK**: every framework SDK (not `sdk-core`) ships an Agent
-  Skill at `<pkg>/skills/<name>/SKILL.md`, and `@zitadel/components` ships one
-  too; the top-level `skills/zitadel` skill routes to them. Adding a framework
-  SDK means adding its skill, and all of them stay in harmony — same sections
-  and structure. They are **discover-first**: a skill teaches the integration
-  *pattern* and points at the package's own README and TypeScript types for the
-  exact props, exports, and APIs — it never enumerates them. So adding or
-  removing a property means updating the README/types, **not** the skill (the
-  skill reads them at runtime and cannot drift); edit a skill only when the
-  integration pattern itself changes.
+  ([ADR 036](../docs/adrs/036-api-credential-planes.md), ADR 005). Server SDKs
+  implement it; SPA SDKs document a dev/deploy proxy (production guidance:
+  [#560](https://github.com/zitadel/nextgen/issues/560)).
+- **Edge entries are tested in the edge runtime**: an SDK entry that claims
+  edge support has an `edge` project (`edgeProject()` in `vitest.shared.mjs`,
+  Vercel's `edge-runtime` VM) that re-runs its existing mirrored specs, chosen
+  by `include`. It fails at config load if `include` matches nothing. Every
+  edge project resolves with `workerd`, the condition Wrangler adds for
+  Cloudflare Workers. A package adds a condition only where what it loads
+  needs one: `react-server` and `edge-light` for Next, whose bundler adds both,
+  and `worker` for Solid, which ships its server build under that name. Each
+  carries a one-line comment saying why. Add an edge project only where the README claims edge, and leave
+  Node-only entries out. A client wrapper's edge spec loads the built package
+  by its name, as a consumer's bundler resolves it, never the source.
+  A spec that runs only there is named after its entry, `<entry>.edge.<spec|test>.<ext>`,
+  sits where the package keeps the spec of that entry and uses the suffix of
+  the package's own tests; the contract spec in `sdk-core` holds the client
+  SDKs' `edge-entry` and `edge-render` blocks and every edge project
+  declaration to one shape.
+- **One Agent Skill per framework SDK**, at `<pkg>/skills/<name>/SKILL.md`,
+  plus `skills/zitadel-components/SKILL.md` for `@zitadel/components`; the
+  top-level `skills/zitadel` routes to them. A new framework SDK adds its
+  skill with the same sections and structure as the others.
+- **Skills are discover-first**: they teach the integration pattern and send
+  the reader to the package's README and types for props, exports and APIs,
+  never listing them. A changed property updates the README or types; edit a
+  skill only when the pattern changes.
 
 ## `packages/api`
 
-Generated TypeScript API client (orval output under `src/generated/` —
-regenerate, don't hand-edit; the OpenAPI source of truth is
-[`api/openapi/`](../api/openapi/AGENTS.md)). Runtime helpers
-(`configureZitadel()` from `@zitadel/api/config`, proxy-path handling) are
-hand-written and the primary consumer surface.
+The generated TypeScript client: orval output under `src/generated/`.
+Regenerate it, never hand-edit it; the source is
+[`api/openapi/`](../api/openapi/AGENTS.md). The runtime helpers in
+`src/runtime/` (`configureZitadel()` from `@zitadel/api/config`, proxy-path
+handling) are hand-written and the primary consumer surface.
 
 ## `packages/config`
 
 Versioned local config schemas and defaults. The defaults are product:
-`defaults/README-*.md` ship to npm **and** are copied into customer projects
-as `.zitadel/{schemas,flows,branding}/README.md` (`src/readmes.ts`) — treat
-edits there as customer-facing (changeset + `fix:`/`feat:`, not `docs:`).
-`defaults/default-login.json` is the authority for flow step shape
-([`packages/api-mock/AGENTS.md`](api-mock/AGENTS.md) owns the
-fixture-diff rule).
+`defaults/README-*.md` ship to npm and are copied into customer projects as
+`.zitadel/{schemas,flows,branding}/README.md` (`src/readmes.ts`), so an edit
+there is customer-facing (changeset, `fix:`/`feat:`, not `docs:`).
+`defaults/default-login.json` is the authority for flow step shape; the
+fixture-diff rule is in [`packages/api-mock/AGENTS.md`](api-mock/AGENTS.md).

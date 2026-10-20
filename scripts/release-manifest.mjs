@@ -132,10 +132,10 @@ export const PUBLIC_RELEASE_PACKAGES = [
     buildTarget: "sdk-solid-start:build-release",
   },
   {
-    name: "@zitadel/sdk-qwik-city",
-    dir: "packages/sdk-qwik-city",
-    moonProject: "sdk-qwik-city",
-    buildTarget: "sdk-qwik-city:build-release",
+    name: "@zitadel/sdk-qwik-router",
+    dir: "packages/sdk-qwik-router",
+    moonProject: "sdk-qwik-router",
+    buildTarget: "sdk-qwik-router:build-release",
   },
   {
     name: "@zitadel/sdk-tanstack-start",

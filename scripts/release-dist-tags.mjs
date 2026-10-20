@@ -22,6 +22,10 @@ import { mapWithConcurrency, runCapture } from "./dev-process.mjs";
 //
 // The preflight asks the npm registry before `release publish --dry-run`
 // returns, so an offline dry run fails closed instead of passing unchecked.
+//
+// ci.yml runs the same check on the version PR and its merge group
+// (`release.mjs check-npm`), so a version it would stop fails there, before
+// the version commit is on main.
 
 /** The prerelease tag from `.changeset/pre.json`, or undefined outside pre mode. */
 export async function readPrereleaseTag(root) {
@@ -118,6 +122,11 @@ function bootstrapCommand(pkg, tag) {
   return `dir=$(mktemp -d) && printf '{"name":"%s","version":"0.0.0-bootstrap.0","license":"%s","description":"Placeholder. Install %s."}\\n' "${pkg.name}" "${pkg.license}" "${install}" > "$dir/package.json" && (cd "$dir" && npm publish --access public --tag bootstrap)`;
 }
 
+/** The npmjs.com trusted publisher setting for `pkg`, made from a terminal (npm 11.15 or later). */
+function trustCommand(pkg) {
+  return `npm trust github ${pkg.name} --repo zitadel/nextgen --file release-publish.yml --allow-publish --yes`;
+}
+
 function nameList(packages) {
   return packages.map((pkg) => pkg.name).join(", ");
 }
@@ -144,9 +153,11 @@ export function publishBlockersMessage({ unpublished, prereleaseOnly }, tag) {
   if (unpublished.length > 0) {
     lines.push(
       "",
-      `Then add a trusted publisher for ${nameList(unpublished)} on npmjs.com (package Settings → Trusted Publishing: GitHub Actions, repository zitadel/nextgen, workflow release-publish.yml), as .changeset/README.md describes under "Publishing".`,
+      `Then add a trusted publisher for ${nameList(unpublished)} on npmjs.com (package Settings → Trusted Publishing: GitHub Actions, repository zitadel/nextgen, workflow release-publish.yml), as .changeset/README.md describes under "Publishing". With npm 11.15 or later, the same account can do it from a terminal:`,
+      "",
+      ...unpublished.map(trustCommand),
     );
   }
-  lines.push("", "Then rerun the release.");
+  lines.push("", "Then rerun this job.");
   return lines.join("\n");
 }
