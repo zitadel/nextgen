@@ -15059,6 +15059,45 @@ func (m *MockReleaseService) EXPECT() *MockReleaseServiceMockRecorder {
 	return m.recorder
 }
 
+// Build mocks base method.
+func (m *MockReleaseService) Build(ctx context.Context, input service.BuildReleaseInput) (*service.CreateReleaseOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Build", ctx, input)
+	ret0, _ := ret[0].(*service.CreateReleaseOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Build indicates an expected call of Build.
+func (mr *MockReleaseServiceMockRecorder) Build(ctx, input any) *MockReleaseServiceBuildCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Build", reflect.TypeOf((*MockReleaseService)(nil).Build), ctx, input)
+	return &MockReleaseServiceBuildCall{Call: call}
+}
+
+// MockReleaseServiceBuildCall wrap *gomock.Call
+type MockReleaseServiceBuildCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockReleaseServiceBuildCall) Return(arg0 *service.CreateReleaseOutput, arg1 error) *MockReleaseServiceBuildCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockReleaseServiceBuildCall) Do(f func(context.Context, service.BuildReleaseInput) (*service.CreateReleaseOutput, error)) *MockReleaseServiceBuildCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockReleaseServiceBuildCall) DoAndReturn(f func(context.Context, service.BuildReleaseInput) (*service.CreateReleaseOutput, error)) *MockReleaseServiceBuildCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // Create mocks base method.
 func (m *MockReleaseService) Create(ctx context.Context, input service.CreateReleaseInput) (*service.CreateReleaseOutput, error) {
 	m.ctrl.T.Helper()

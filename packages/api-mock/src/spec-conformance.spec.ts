@@ -412,17 +412,42 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${BASE}/sessions/me`, { method: "DELETE" });
     expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("unauthenticated");
+    expect(body.code).toBe("auth.unauthorized");
   });
 
-  test("DELETE /sessions/me with an unknown session token returns 404", async () => {
+  // The server's token gate refuses a cookie whose token record is gone (never
+  // issued, revoked) or expired before the handler runs, so it answers 401
+  // whatever project the request names.
+  test("DELETE /sessions/me with an unknown session token returns 401", async () => {
     const res = await fetch(`${BASE}/sessions/me`, {
       method: "DELETE",
       headers: { cookie: "__nextgen_session=deadbeefdeadbeef" },
     });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("session_not_found");
+    expect(body.code).toBe("auth.unauthorized");
+  });
+
+  test("an expired session answers 401, not the project mismatch, on sign-out and the CSRF read", async () => {
+    const cookie = await sessionCookie("proj_me_expired");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      // Past the mock's one-hour session lifetime.
+      vi.setSystemTime(Date.now() + 2 * 3_600_000);
+      for (const route of [
+        { path: "/sessions/me", method: "DELETE" },
+        { path: "/sessions/me/csrf", method: "GET" },
+      ]) {
+        const res = await fetch(`${BASE}${route.path}?project_id=proj_me_other`, {
+          method: route.method,
+          headers: { cookie },
+        });
+        expect(res.status).toBe(401);
+        expect(await res.json()).toMatchObject({ code: "auth.unauthorized" });
+      }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("GET /console/runtime.json names the project the console signs into", async () => {

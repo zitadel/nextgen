@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { failureAdvice } from "../../../src/commands/doctor";
 import { publicCliCommand } from "../../../src/lib/public-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
+import { nextPort } from "../../helpers/ports";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
@@ -25,7 +26,7 @@ const VALID_USER_SCHEMA = {
 
 async function doctor(cwd: string, extra: string[] = []) {
   const fake = await fakeDocker();
-  const port = await freePort();
+  const port = nextPort();
   return runCliForTest(
     [
       "doctor",
@@ -641,17 +642,6 @@ async function startHealthServer(): Promise<string> {
     throw new Error("health server did not expose a TCP address");
   }
   return `http://127.0.0.1:${String(address.port)}`;
-}
-
-async function freePort(): Promise<number> {
-  const server = createServer();
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
-  const address = server.address();
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  if (!address || typeof address === "string") {
-    throw new Error("free port probe did not expose a TCP address");
-  }
-  return address.port;
 }
 
 describe("failureAdvice for a runtime found in a parent directory", () => {

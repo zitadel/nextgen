@@ -416,6 +416,9 @@ export function createMockApp(options: { issuer: string }): express.Express {
     // Both the token and the 401 are session state: neither may be stored.
     res.setHeader("Cache-Control", "private, no-store");
     const found = lookupSession(req);
+    // The server's token gate refuses a missing, unknown, revoked or expired
+    // cookie before the handler runs, so its project check, like this one,
+    // only ever sees a live session.
     if (found.status !== "active") {
       res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
       return;
@@ -428,34 +431,28 @@ export function createMockApp(options: { issuer: string }): express.Express {
   // Go server's revokeMySession handler and the SDK proxy's logout call.
   app.delete("/sessions/me", (req: express.Request, res: express.Response) => {
     const found = lookupSession(req);
-    switch (found.status) {
-      case "missing":
-        res.status(401).json(errorBody("unauthenticated", "no session cookie"));
-        return;
-      case "unknown":
-        res.status(404).json(errorBody("session_not_found", "session not found"));
-        return;
-      case "expired":
-        res.status(409).json(errorBody("session_revoked", "session already revoked or expired"));
-        return;
-      case "active":
-        // ADR 053 §5: sign-out is a cookie-authenticated write, so it
-        // carries the session's CSRF token. Checked before the project hold,
-        // in the same order as the Go server's security handler.
-        if (req.get("x-zitadel-csrf") !== csrfTokenFor(found.token)) {
-          res
-            .status(403)
-            .json(
-              errorBody(
-                "auth.csrf_invalid",
-                "The request failed cross-site request forgery validation.",
-              ),
-            );
-          return;
-        }
-        if (refuseForProject(req, res, found.session)) return;
-        sessionStore.delete(found.token);
+    // As on GET /sessions/me/csrf: the server's token gate answers these 401
+    // before the handler, whatever project the request names.
+    if (found.status !== "active") {
+      res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
+      return;
     }
+    // ADR 053 §5: sign-out is a cookie-authenticated write, so it carries the
+    // session's CSRF token. Checked before the project hold, in the same order
+    // as the Go server's security handler.
+    if (req.get("x-zitadel-csrf") !== csrfTokenFor(found.token)) {
+      res
+        .status(403)
+        .json(
+          errorBody(
+            "auth.csrf_invalid",
+            "The request failed cross-site request forgery validation.",
+          ),
+        );
+      return;
+    }
+    if (refuseForProject(req, res, found.session)) return;
+    sessionStore.delete(found.token);
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,

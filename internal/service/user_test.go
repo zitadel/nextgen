@@ -445,22 +445,24 @@ func TestUserService_PatchUser_EmptyPatchRefused(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrUserInvalid())
 }
 
-func TestUserService_PatchMyUser_SessionGuards(t *testing.T) {
+// The read is pinned to the caller's own record and the schema it points at:
+// identity and project come from Self, never from the request.
+func TestUserService_GetMyUserSchema(t *testing.T) {
 	t.Parallel()
 
-	svc, _ := newMockedUserService(t)
+	svc, stmts := newMockedUserService(t)
+	self, err := domain.SelfFromSession(&domain.Token{ProjectID: "proj_1", UserID: "user_1"}, time.Now())
+	require.NoError(t, err)
+	stmts.EXPECT().GetUser(gomock.Any(), database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), "proj_1"),
+		database.Equal(database.Col(domain.UserFieldID), "user_1"),
+	), gomock.Any()).Return(&domain.User{ProjectID: "proj_1", ID: "user_1", SchemaURL: "https://example.test/schema.json"}, nil)
+	stmts.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
+		Return(&domain.JSONSchema{ProjectID: "proj_1", URL: "https://example.test/schema.json"}, nil)
 
-	_, err := svc.PatchMyUser(t.Context(), service.PatchMyUserInput{
-		Attributes: map[string]any{"givenName": "Alicia"},
-	})
-	require.ErrorIs(t, err, domain.ErrSessionTokenInvalid())
-
-	expired := time.Now().Add(-time.Hour)
-	_, err = svc.PatchMyUser(t.Context(), service.PatchMyUserInput{
-		SessionToken: &domain.Token{ProjectID: "proj_1", UserID: "user_1", ExpiresAt: &expired},
-		Attributes:   map[string]any{"givenName": "Alicia"},
-	})
-	require.ErrorIs(t, err, domain.ErrSessionTokenInvalid())
+	schema, err := svc.GetMyUserSchema(t.Context(), service.GetMyUserInput{Self: self})
+	require.NoError(t, err)
+	assert.Equal(t, "https://example.test/schema.json", schema.URL)
 }
 
 func newMockedUserService(t *testing.T) (service.UserService, *servicemocks.MockAllStatements) {

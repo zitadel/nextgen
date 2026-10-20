@@ -5,7 +5,7 @@ import { AngularPatcher } from "../../../../../../src/lib/orca/patchers/rule/ang
 import { NextPatcher } from "../../../../../../src/lib/orca/patchers/rule/next";
 import { NuxtPatcher } from "../../../../../../src/lib/orca/patchers/rule/nuxt";
 import { QwikPatcher } from "../../../../../../src/lib/orca/patchers/rule/qwik";
-import { QwikCityPatcher } from "../../../../../../src/lib/orca/patchers/rule/qwik-city";
+import { QwikRouterPatcher } from "../../../../../../src/lib/orca/patchers/rule/qwik-router";
 import { ReactPatcher } from "../../../../../../src/lib/orca/patchers/rule/react";
 import { SolidPatcher } from "../../../../../../src/lib/orca/patchers/rule/solid";
 import { SolidStartPatcher } from "../../../../../../src/lib/orca/patchers/rule/solid-start";
@@ -54,8 +54,8 @@ const PATCHERS: Array<{
     view: { framework: facts("solid-start", "src"), rendererId: "react" },
   },
   {
-    patcher: new QwikCityPatcher(),
-    view: { framework: facts("qwik-city", "src"), rendererId: "react" },
+    patcher: new QwikRouterPatcher(),
+    view: { framework: facts("qwik-router", "src"), rendererId: "react" },
   },
   {
     patcher: new TanStackStartPatcher(),
@@ -120,7 +120,7 @@ describe("patcher file classification", () => {
   it.each([
     ["sveltekit", "src/hooks.server.ts"],
     ["solid-start", "src/middleware.ts"],
-    ["qwik-city", "src/routes/plugin@nextgen.ts"],
+    ["qwik-router", "src/routes/plugin@nextgen.ts"],
     ["tanstack-start", "src/start.ts"],
   ])("%s marks its auth boundary %s as infrastructure", (id, boundary) => {
     const { patcher, view } = PATCHERS.find((entry) => entry.view.framework.id === id)!;
