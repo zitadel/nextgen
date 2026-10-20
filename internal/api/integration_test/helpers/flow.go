@@ -8,7 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserWithPasswordHandler {
+func (h *Harness) EnsureCreateUserHandler(t testing.TB) *service.FlowCreateUserWithPasswordHandler {
 	t.Helper()
 	return service.NewFlowCreateUserHandler(
 		h.EnsureProjectHashers(t),
@@ -18,7 +18,7 @@ func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserW
 	)
 }
 
-func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
+func (h *Harness) EnsureFlowService(t testing.TB) service.FlowService {
 	t.Helper()
 	h.flowService.mutex.Lock()
 	defer h.flowService.mutex.Unlock()
@@ -32,7 +32,7 @@ func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 	return h.flowService.value
 }
 
-func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineRuntime {
+func (h *Harness) EnsureFlowStateMachine(t testing.TB) *domain.FlowStateMachineRuntime {
 	t.Helper()
 	h.flowStateMachine.mutex.Lock()
 	defer h.flowStateMachine.mutex.Unlock()

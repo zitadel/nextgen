@@ -1,6 +1,6 @@
 # @zitadel/cli
 
-Scaffolds Zitadel auth (login, register, profile, middleware/proxy) into a Next.js, Nuxt, SvelteKit, SolidStart, Qwik City, TanStack Start, React, Vue, Angular, Solid, Svelte, or Qwik app.
+Scaffolds Zitadel auth (login, register, profile, middleware/proxy) into a Next.js, Nuxt, SvelteKit, SolidStart, Qwik Router, TanStack Start, React, Vue, Angular, Solid, Svelte, or Qwik app.
 
 ```sh
 npx @zitadel/cli@alpha start
@@ -2120,8 +2120,8 @@ Create a Zitadel project and scaffold local auth.
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f] [--framework
-    next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|svelte|qwik-c
-    ity|qwik|angular] [--renderer react] [--dev-port <value>] [--skip-install]
+    next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|svelte|qwik-r
+    outer|qwik|angular] [--renderer react] [--dev-port <value>] [--skip-install]
     [--preset password-first|passkey-first] [--use-case
     minimal|consumer|business] [--sso google|custom] [--sso-client-id <value>]
     [--sso-slug <value>] [--sso-display-name <value>] [--sso-issuer <value>]
@@ -2162,7 +2162,7 @@ FLAGS
   --framework=<option>
       Framework to target.
       <options: next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|sve
-      lte|qwik-city|qwik|angular>
+      lte|qwik-router|qwik|angular>
 
   --preset=<option>
       Sign-in preset for the scaffolded schema and login flow (default:

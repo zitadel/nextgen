@@ -17,7 +17,8 @@ name: deployment-checks
 # turbo task: the docs' the way the service runs it locally, but against the
 # deployment instead of a local server (`@zitadel/docs#e2e-deployment`); the
 # console's, which has no local counterpart, signed out
-# (`@zitadel/e2e#console-deployment`). They are the tasks `pnpm check:cloud`
+# (`@zitadel/e2e#console-deployment`); the built-in schemas', over HTTP alone
+# (`@zitadel/e2e#schemas-deployment`). They are the tasks `pnpm check:cloud`
 # runs from a checkout, so the command in the run's summary is the one a
 # person types. What is checked is the artifact Vercel built, routed by the
 # repo-root vercel.json, behind Vercel's protection.
@@ -61,6 +62,9 @@ on:
       console:
         description: "`success` once the console suite passed, empty otherwise"
         value: ${{ jobs.console.outputs.result }}
+      schemas:
+        description: "`success` once the schemas suite passed, empty otherwise"
+        value: ${{ jobs.schemas.outputs.result }}
 
 permissions:
   contents: read
@@ -305,3 +309,92 @@ jobs:
           path: ${{ steps.suite.outputs.results }}/**/*.png
           if-no-files-found: ignore
           retention-days: 7
+
+  # The built-in schemas the `schemas` service publishes under /schemas/v1/,
+  # step for step as the console job above, without a browser: each document
+  # this commit renders, served as the one its $id names, labelled, cached and
+  # routed as vercel.json says. HTTP alone, so no Chromium and no screenshots.
+  schemas:
+    name: schemas (${{ inputs.environment || (github.event_name == 'deployment_status' && 'Preview') || 'dispatch' }})
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.creator.login == 'vercel[bot]' &&
+       startsWith(github.event.deployment.environment, 'Preview') &&
+       startsWith(github.event.deployment_status.environment_url, 'https://cloud-'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      result: ${{ steps.passed.outputs.result }}
+    env:
+      CLOUD_URL: ${{ inputs.url || github.event.deployment_status.environment_url }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      DO_NOT_TRACK: "1"
+      # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
+      # warns on every process that also sees NO_COLOR. Blank it so only the
+      # test output is left in the log.
+      NO_COLOR: ""
+    steps:
+      - name: Name the deployment in the run's summary
+        env:
+          ENVIRONMENT: ${{ inputs.environment || github.event.deployment.environment || 'dispatch' }}
+          COMMIT: ${{ inputs.sha || github.event.deployment.sha || github.sha }}
+        run: |
+          {
+            echo "- Deployment: $CLOUD_URL ($ENVIRONMENT, commit ${COMMIT:0:8})"
+            echo "- Reproduce: \`CLOUD_URL=$CLOUD_URL VERCEL_AUTOMATION_BYPASS_SECRET=… pnpm exec turbo run schemas-deployment\` (\`pnpm check:cloud\` runs every suite)"
+            echo "- On a failure the annotations name the document or the route and what it answered."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.sha || github.event.deployment.sha || github.ref }}
+
+      # On production this workflow comes from main's head but the code from
+      # the deployed commit, which can predate the schemas service (a
+      # deployment still building when it merged, or a redeploy of an older
+      # commit). Such a deployment publishes no schemas, so there is nothing
+      # to check.
+      - name: Find the schemas suite in this commit
+        id: suite
+        run: |
+          if [ -f e2e/schemas/playwright.deployment.config.mts ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "- This commit predates the schemas service: nothing to check." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: pnpm/action-setup@v5
+        if: steps.suite.outputs.present == 'true'
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        if: steps.suite.outputs.present == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        if: steps.suite.outputs.present == 'true'
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Put workspace binaries on PATH
+        if: steps.suite.outputs.present == 'true'
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Check the bypass secret is set
+        if: steps.suite.outputs.present == 'true'
+        run: |
+          [ -n "$VERCEL_AUTOMATION_BYPASS_SECRET" ] || {
+            echo "::error::Set the repository secret VERCEL_AUTOMATION_BYPASS_SECRET (docs/runbooks/cloud.md, Deployment checks)"
+            exit 1
+          }
+
+      - name: Run the schemas suite against the deployment
+        if: steps.suite.outputs.present == 'true'
+        run: turbo run schemas-deployment --filter=@zitadel/e2e
+
+      - name: Record the pass
+        id: passed
+        run: echo "result=success" >> "$GITHUB_OUTPUT"

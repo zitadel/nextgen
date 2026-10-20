@@ -83,6 +83,29 @@ was never implemented — the shipped Meta-Schema is the single unversioned
 `api/openapi/endpoints/schemas/user-schema.json`. Revisit the mechanism when
 the first breaking Meta-Schema change actually lands.
 
+### Published copies
+
+The built-in Meta-Schemas are named by URL under the server's
+`schema.builtin_public_base`, and the hosted cloud publishes them there:
+`https://preview.zitadel.com/schemas/v1/user-schema.json` answers with the
+document whose `$id` it is ([cloud runbook](../../runbooks/cloud.md#built-in-schemas)).
+The URL carries no version beyond `v1`, so it names every server version's
+copy at once.
+
+- **Through alpha, `/schemas/v1/` serves main's latest.** The documents change
+  with every deployment under URLs that stay. A local server, a branch or an
+  older release validates against the copy it embeds, which can differ, and
+  never fetches the published one.
+- **Editors stay on local copies.** `zitadel setup` writes the Meta-Schemas
+  into a project's `.zitadel/meta/`, and the flow and branding files point
+  their `$schema` there, so an editor validates against the version the
+  developer runs, offline. Nothing points an editor at the published copies
+  until the decision below is made.
+- **Decide before 1.0** what `v1` promises: changes within `v1` stay additive
+  and a breaking change moves to `v2`, or every release publishes a snapshot
+  of its own. It goes with the mechanism above for keeping several versions,
+  and it has to be settled before anyone relies on the published URLs.
+
 Schemas created by the CUSTOMER which are stored in ZITADEL are not versioned.
 It is assumed that each schema is immutable. If a CUSTOMER wants to create a
 new version they can submit a new schema.

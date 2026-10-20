@@ -86,6 +86,34 @@ func sameUserSchema(ctx context.Context, stmts userSchemaReader, projectID, user
 	return userType == flowType, nil
 }
 
+// userSchemaRevisionURLs returns the id of every revision of the user schema
+// schemaID is a revision of. A user keeps the revision it was created under
+// (users.schema_url), so a lookup scoped to one schema must accept them all
+// (#1507).
+func userSchemaRevisionURLs(ctx context.Context, stmts userSchemaStatements, projectID, schemaID string) ([]string, error) {
+	objectType, err := userSchemaObjectType(ctx, stmts, projectID, schemaID)
+	if err != nil {
+		return nil, err
+	}
+	list := listUserSchemas(WithAuthzListUnrestricted(ctx), stmts, projectID,
+		database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType))
+	first, err := list(nil)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list schemas from database")
+	}
+	var urls []string
+	for schema, err := range first.Iterate(list) {
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to list schemas from database")
+		}
+		urls = append(urls, schema.URL)
+	}
+	if len(urls) == 0 {
+		return nil, domain.ErrInternal(nil).WithMessage("bound user schema has no revisions")
+	}
+	return urls, nil
+}
+
 func isUserSchemaID(ref string) bool {
 	if domain.PrefixJSONSchema.Matches(ref) {
 		return true

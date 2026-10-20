@@ -37,20 +37,30 @@ seeds server-side auth state, hydrates it on the client, and calls
 `configureZitadel()` from runtime config), and auto-imports the
 composables — no `server/middleware/auth.ts`, no manual plugin.
 
-It takes three settings from the environment, or from `.env.local` when the
-environment has none. Nuxt itself loads only `.env`; `zitadel setup` writes
-all three to `.env.local` and the module registration to `nuxt.config.ts`:
+It takes three settings. Nuxt itself loads only `.env`; `zitadel setup` writes
+all three to `.env.local` and the module registration to `nuxt.config.ts`.
+`nuxt dev` reads them from the environment, or from `.env.local` when the
+environment has none:
 
 | Variable | Sets | Without it |
 | --- | --- | --- |
-| `ZITADEL_URL` | `nextgen.url`, unless `nuxt.config.ts` sets it | `http://localhost:8080` |
+| `ZITADEL_URL` | the backend URL, unless `nextgen.url` or `NUXT_NEXTGEN_URL` sets it | `http://localhost:8080` |
 | `NUXT_PUBLIC_ZITADEL_PROJECT_ID` | `runtimeConfig.public.zitadelProjectId`, unless `nuxt.config.ts` sets it | the plugin skips `configureZitadel()`, `useZitadelProject()` returns `null`, and the login widget cannot initialize |
-| `ZITADEL_PROJECT_SECRET` | the server-only `runtimeConfig.nextgen.projectSecret` | sign-in cannot finish: the session exchange has no credential |
+| `ZITADEL_PROJECT_SECRET` | the server-only secret, unless `NUXT_NEXTGEN_PROJECT_SECRET` sets it | sign-in cannot finish: the session exchange has no credential |
 
-The module reads them when `nuxt dev` or `nuxt build` runs, and a build keeps
-what it found. For a built server, set `NUXT_NEXTGEN_URL`,
-`NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and `NUXT_NEXTGEN_PROJECT_SECRET` in its
-runtime environment instead.
+The backend URL and the project secret default to `ZITADEL_URL` and
+`ZITADEL_PROJECT_SECRET` from the server environment; set `nextgen.url` or the
+`NUXT_NEXTGEN_*` variables only to override. A built server reads `ZITADEL_URL`
+and `ZITADEL_PROJECT_SECRET` from its own
+runtime environment when it starts, and takes `NUXT_NEXTGEN_URL` and
+`NUXT_NEXTGEN_PROJECT_SECRET` ahead of them, so one build runs against any
+backend. `nuxt build` never copies the URL or the secret from its environment
+or from `.env.local` into `.output/`, so the secret exists only where the
+server runs; `.env.local` is not read by a built server. A `nextgen.url` in
+`nuxt.config.ts` is the exception: you wrote it into the config, so it is part
+of the build. `NUXT_PUBLIC_ZITADEL_PROJECT_ID` is public and is still read when
+`nuxt build` runs; set it in the runtime environment to change it per
+deployment.
 
 ### Module options
 
@@ -162,7 +172,7 @@ The middleware runs on every request and does three things in one pass:
 
 1. **Proxies** `/__nextgen/*` requests to the auth backend
 2. **Verifies** the session JWT via JWKS using the Web Crypto API
-3. **Redirects** unauthenticated requests to `loginPath` for protected routes
+3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in
 
 ### Options
 
@@ -171,7 +181,8 @@ Both surfaces take these options: the module under `nextgen` in
 
 | Option              | Type                 | Default                  | Description                                                                                                                |
 | ------------------- | -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `url`                 | `string`             | `ZITADEL_URL` env (the module also reads `.env.local`), else `http://localhost:8080` | Full URL of the Zitadel auth backend                                                                                       |
+| `url`                 | `string`             | `ZITADEL_URL` env, read when the server starts (`nuxt dev` also reads `.env.local`), else `http://localhost:8080` | Full URL of the Zitadel auth backend                                                                                       |
+| `projectId`         | `string`             | the public project id (`runtimeConfig.public.zitadelProjectId`), else `ZITADEL_PROJECT_ID` at runtime; `createNextgenMiddleware` alone: `ZITADEL_PROJECT_ID`, else `NUXT_PUBLIC_ZITADEL_PROJECT_ID` | The project this app signs its users in to. A session of any other project on the server reads as signed out and keeps its cookie; with no project, no session counts. A built server takes it from `NUXT_NEXTGEN_PROJECT_ID` |
 | `proxyPath`         | `string`             | `"/__nextgen"`           | Path prefix proxied to the auth backend. Sign-in with an external provider currently requires the default: the provider returns to `/__nextgen/idp/{slug}/callback` |
 | `protectedRoutes`   | `string[]`           | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
 | `ignoredRoutes`     | `string[]`           | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
@@ -188,5 +199,6 @@ Both surfaces take these options: the module under `nextgen` in
 
 The verification pipeline is shared across SDKs and documented once in
 [`@zitadel/sdk-core`](https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#how-jwt-verification-works).
-On top of it, the Nitro middleware strips the `x-nextgen-auth-token` header
-from all proxied requests to prevent internal state leakage.
+On top of it, the Nitro middleware refuses with a 400 any request that carries
+an `x-nextgen-auth-token` header: that header is an internal channel, so a
+client never sends it.

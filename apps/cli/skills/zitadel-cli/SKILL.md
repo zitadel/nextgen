@@ -4,7 +4,7 @@ description: >-
   Set up and manage Zitadel authentication in a local project with the
   agent-friendly `zitadel` CLI. Use when the user wants to add login,
   registration, or session handling, create a Zitadel project, scaffold auth
-  for a Next.js, Nuxt, SvelteKit, SolidStart, Qwik City, TanStack Start, React,
+  for a Next.js, Nuxt, SvelteKit, SolidStart, Qwik Router, TanStack Start, React,
   Vue, Angular, Solid, Svelte, or Qwik app, or plan and apply Zitadel config
   changes from repo state.
 ---
@@ -299,7 +299,12 @@ directory. Any other non-empty directory stops setup with a hint to pass
 `--force`. Pass it only for a directory whose contents may be replaced: files
 the new app also has, such as `package.json`, are overwritten. Without a
 terminal `setup` cannot ask which framework to scaffold, so pass `--framework`;
-the error lists the choices in `details.frameworks`.
+the error lists the choices in `details.frameworks`. `setup --dry-run` creates
+no app: where it would scaffold one, it previews the project, and
+`data.files_written` is empty, because those files depend on the generated app.
+When setup fails after scaffolding a new app, before its default schema and
+flow are uploaded, it removes the app again and puts back what the directory
+held, so rerunning the same `setup` starts over.
 
 `start` reuses a server already running in the directory only when it is the
 release this CLI ships; one an earlier release started is restarted, and its

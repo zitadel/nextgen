@@ -145,6 +145,9 @@
         "scripts/release-github.mjs",
         "scripts/release-github.test.mjs",
         "scripts/release-manifest.mjs",
+        "scripts/render-builtin-schemas.mjs",
+        "scripts/render-builtin-schemas.test.mjs",
+        "api/openapi/endpoints/schemas/*.json",
         "scripts/assert-file.mjs",
         "vitest.config.ts"
       ]

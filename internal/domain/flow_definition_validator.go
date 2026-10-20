@@ -268,6 +268,10 @@ func validateSteps(steps []FlowDefinitionStep) error {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: action name %q is reserved for sso submissions", step.Name, a.Name), nil)
 			}
+			if _, ok := reservedOutcomes[a.Name]; ok {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: action name %q is reserved for flow outcomes", step.Name, a.Name), nil)
+			}
 			actionNames[a.Name] = struct{}{}
 		}
 

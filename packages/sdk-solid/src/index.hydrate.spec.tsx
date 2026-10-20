@@ -6,6 +6,7 @@ import solid from "vite-plugin-solid";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ZitadelLogin } from "./index";
+import { widgetTags } from "@zitadel/sdk-core/types";
 
 /**
  * The wrapper's server markup. The server compile of `./index` cannot share a
@@ -51,7 +52,7 @@ describe("hydrating a server-rendered login", () => {
     host.innerHTML = await serverMarkup({ project: globalProject, purpose: "register" });
     const firstStep = new Promise((resolve) =>
       host
-        .querySelector("zitadel-login")
+        .querySelector(widgetTags.login)
         ?.addEventListener("zitadel-flow-step", resolve, { once: true }),
     );
 

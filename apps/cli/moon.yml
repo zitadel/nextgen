@@ -60,6 +60,17 @@ tasks:
       # these tests import from it.
       mutex: "public-dist"
 
+  check-advisories:
+    command: "corepack pnpm run check-advisories"
+    options:
+      # It asks the npm advisory database about the package versions the
+      # scaffolders pin, so it needs the network, and its answer changes when
+      # an advisory is published, with no input changing: never cached, and
+      # left out of `moon ci`. scaffold-advisories.yml runs it nightly and on
+      # changes to the scaffolders, with `moon exec --ignore-ci-checks`.
+      cache: false
+      runInCI: "skip"
+
   readme:
     command: "corepack pnpm run readme"
     deps:

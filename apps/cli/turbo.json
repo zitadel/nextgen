@@ -26,6 +26,11 @@
         "$TURBO_ROOT$/api/openapi/endpoints/**/methods.yaml"
       ]
     },
+    // It asks the npm advisory database, whose answer changes when an
+    // advisory is published, with no input changing.
+    "check-advisories": {
+      "cache": false
+    },
     "readme": {
       "dependsOn": ["build"],
       "outputs": ["README.md"]
