@@ -51,6 +51,8 @@ type ListDeploymentsInput struct {
 	ProjectID string
 	// Origin narrows the list to one origin's history.
 	Origin *string
+	// Live lists what is served now instead of the history.
+	Live bool
 	// IncludeReleases embeds the release each deployment made live (ADR 059).
 	IncludeReleases bool
 	PageToken       string
@@ -62,7 +64,9 @@ type ListDeploymentsOutput struct {
 	// ReleasesByID holds the releases the listed deployments point at, keyed
 	// by id, when IncludeReleases asked for them. Nil otherwise: the caller
 	// distinguishes "did not ask" from "none found".
-	ReleasesByID  map[string]*domain.Release
+	ReleasesByID map[string]*domain.Release
+	// Live holds the ids of the listed deployments that are live now.
+	Live          map[string]bool
 	NextPageToken string
 }
 
@@ -178,11 +182,8 @@ func servedBy(ctx context.Context, stmts AllStatements, entity *domain.Deploymen
 		return nil, nil, err
 	}
 	if entity.OriginKind == domain.DeploymentOriginKindPrimary {
-		newest, err := stmts.ListDeployments(WithAuthzListUnrestricted(ctx), deployment.NewestOfKindOptions(entity.ProjectID, domain.DeploymentOriginKindPrimary))
-		if err != nil || len(newest.Items) == 0 {
-			return read, nil, err
-		}
-		return read, newest.Items[0], nil
+		current, err := newestPrimary(ctx, stmts, entity.ProjectID)
+		return read, current, err
 	}
 	newest := domain.NewestOriginDeployment(read)
 	if newest == nil {
@@ -291,16 +292,18 @@ func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput
 	ctx, end := startSpan(ctx, "DeploymentService.List")
 	defer end(&err)
 
-	opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
-	opts.Pagination.Cursor = []byte(input.PageToken)
-
-	result, err := s.v2Pool.Statements().ListDeployments(ctx, opts)
+	list := s.listHistory
+	if input.Live {
+		list = s.listLive
+	}
+	result, live, err := list(ctx, input)
 	if err != nil {
-		return nil, mapListError(err, "failed to list deployments")
+		return nil, err
 	}
 
 	output := &ListDeploymentsOutput{
 		Items:         result.Items,
+		Live:          live,
 		NextPageToken: string(result.NextCursor),
 	}
 	if input.IncludeReleases {
@@ -311,6 +314,40 @@ func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput
 		output.ReleasesByID = releases
 	}
 	return output, nil
+}
+
+// listHistory lists the project's deployments newest first, with the ids of
+// the listed ones that are live now.
+func (s *DeploymentService) listHistory(ctx context.Context, input ListDeploymentsInput) (*database.ListResult[*domain.Deployment], map[string]bool, error) {
+	opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
+	opts.Pagination.Cursor = []byte(input.PageToken)
+	result, err := s.v2Pool.Statements().ListDeployments(ctx, opts)
+	if err != nil {
+		return nil, nil, mapListError(err, "failed to list deployments")
+	}
+	live, err := s.liveIDs(ctx, input.ProjectID, result.Items)
+	return result, live, err
+}
+
+// listLive is the live view, newest first: the deployments some origin serves
+// now, each narrowed to the origins it serves, so all of them are live. With
+// an origin, it is the one deployment serving it.
+func (s *DeploymentService) listLive(ctx context.Context, input ListDeploymentsInput) (*database.ListResult[*domain.Deployment], map[string]bool, error) {
+	now := time.Now()
+	opts := deployment.LiveListOptions(input.ProjectID, nil, uint32(normalizeLimit(input.Limit)))
+	opts.Pagination.Cursor = []byte(input.PageToken)
+	if input.Origin != nil {
+		opts.Filter = database.And(opts.Filter, deployment.ServesOrigin(*input.Origin, now))
+	}
+	result, err := s.v2Pool.Statements().ListLiveDeployments(ctx, now, opts)
+	if err != nil {
+		return nil, nil, mapListError(err, "failed to list live deployments")
+	}
+	live := make(map[string]bool, len(result.Items))
+	for _, entity := range result.Items {
+		live[entity.ID] = true
+	}
+	return result, live, nil
 }
 
 // releasesFor hydrates the releases a page of deployments points at, batched:
@@ -334,4 +371,50 @@ func (s *DeploymentService) releasesFor(ctx context.Context, projectID string, i
 		byID[release.ID] = release
 	}
 	return byID, nil
+}
+
+// Read gets a deployment and whether it is live now.
+func (s *DeploymentService) Read(ctx context.Context, projectID, id string) (_ *domain.Deployment, _ bool, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.Read")
+	defer end(&err)
+
+	entity, err := s.Get(ctx, projectID, id)
+	if err != nil {
+		return nil, false, err
+	}
+	live, err := s.liveIDs(ctx, projectID, []*domain.Deployment{entity})
+	if err != nil {
+		return nil, false, err
+	}
+	return entity, live[entity.ID], nil
+}
+
+// liveIDs reports which of items are live, by the storage live predicate. It
+// is a status lookup, not the caller's list, so it reads unfiltered.
+func (s *DeploymentService) liveIDs(ctx context.Context, projectID string, items []*domain.Deployment) (map[string]bool, error) {
+	live := make(map[string]bool, len(items))
+	if len(items) == 0 {
+		return live, nil
+	}
+	result, err := s.v2Pool.Statements().ListLiveDeployments(WithAuthzListUnrestricted(ctx), time.Now(), &database.ListOptions[domain.DeploymentField]{
+		Filter:     deployment.ByIDs(projectID, deployment.DeploymentIDs(items)),
+		Pagination: database.Page[domain.DeploymentField]{Limit: uint32(len(items)), OrderBy: deployment.NewestFirst()},
+	})
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the live deployments")
+	}
+	for _, entity := range result.Items {
+		live[entity.ID] = true
+	}
+	return live, nil
+}
+
+// newestPrimary is the project's newest primary deployment, nil when none.
+// It is a lookup, not the caller's list, so it reads unfiltered.
+func newestPrimary(ctx context.Context, stmts DeploymentStatements, projectID string) (*domain.Deployment, error) {
+	result, err := stmts.ListDeployments(WithAuthzListUnrestricted(ctx), deployment.NewestOfKindOptions(projectID, domain.DeploymentOriginKindPrimary))
+	if err != nil || len(result.Items) == 0 {
+		return nil, err
+	}
+	return result.Items[0], nil
 }

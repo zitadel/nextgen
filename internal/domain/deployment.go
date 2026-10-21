@@ -76,8 +76,8 @@ type DeploymentTarget struct {
 }
 
 // Deployment is an append-only record of a release going live on a set of
-// origins, sorted. What an origin serves is the newest deployment that names
-// it.
+// origins, sorted. All primary origins serve the newest primary deployment; a
+// preview URL serves its latest deployment until the preview expires.
 type Deployment struct {
 	ProjectID  string               `json:"project_id"`
 	ID         string               `json:"id"`
@@ -157,6 +157,8 @@ const (
 	// DeploymentFieldLive filters to the deployments some origin still serves.
 	DeploymentFieldLive
 	DeploymentFieldOriginKind
+	// DeploymentFieldServesOrigin filters to the deployment one origin serves.
+	DeploymentFieldServesOrigin
 )
 
 // NewDeployment validates the record and sorts its origins. The dialect mints

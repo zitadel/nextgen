@@ -66,6 +66,11 @@ func LiveListOptions(projectID string, releaseID *string, limit uint32) *databas
 	return opts
 }
 
+// ServesOrigin matches the deployment origin serves at now.
+func ServesOrigin(origin string, now time.Time) database.Filter[domain.DeploymentField] {
+	return database.CorrelatedEqual(database.Col(domain.DeploymentFieldServesOrigin), origin, now)
+}
+
 // LiveAt returns opts narrowed to the deployments some origin serves at now.
 func LiveAt(opts *database.ListOptions[domain.DeploymentField], now time.Time) *database.ListOptions[domain.DeploymentField] {
 	live := *opts

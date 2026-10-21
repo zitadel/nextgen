@@ -14,6 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/deployment"
 )
 
 const appOrigin = "https://app.acme.com"
@@ -375,6 +376,7 @@ func TestDeploymentServiceListExpandsReleases(t *testing.T) {
 	statements.EXPECT().
 		ListDeployments(gomock.Any(), gomock.Any()).
 		Return(&database.ListResult[*domain.Deployment]{Items: items}, nil)
+	expectStatusLookup(statements, items[0])
 	statements.EXPECT().
 		GetReleasesByIDs(gomock.Any(), "proj_1", []string{"rel_a", "rel_b"}).
 		Return([]*domain.Release{
@@ -394,13 +396,69 @@ func TestDeploymentServiceListExpandsReleases(t *testing.T) {
 // Not asking reads nothing and leaves the map nil.
 func TestDeploymentServiceListWithoutExpand(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
+	only := &domain.Deployment{ProjectID: "proj_1", ID: "dep_1", ReleaseID: "rel_a"}
 	statements.EXPECT().
 		ListDeployments(gomock.Any(), gomock.Any()).
-		Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{
-			{ProjectID: "proj_1", ID: "dep_1", ReleaseID: "rel_a"},
-		}}, nil)
+		Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{only}}, nil)
+	expectStatusLookup(statements, only)
 
 	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1"})
 	require.NoError(t, err)
 	assert.Nil(t, result.ReleasesByID)
+}
+
+// expectStatusLookup answers the unfiltered read of which listed deployments
+// are live, with live.
+func expectStatusLookup(statements *servicemocks.MockAllStatements, live ...*domain.Deployment) {
+	statements.EXPECT().ListLiveDeployments(unrestricted, gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.Deployment]{Items: live}, nil)
+}
+
+// status is what the storage live predicate answers for the listed ids.
+func TestDeploymentServiceListStatus(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	newer := &domain.Deployment{ProjectID: "proj_1", ID: "dep_newer"}
+	preview := &domain.Deployment{ProjectID: "proj_1", ID: "dep_preview", OriginKind: domain.DeploymentOriginKindPreview}
+	older := &domain.Deployment{ProjectID: "proj_1", ID: "dep_older"}
+	statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{newer, preview, older}}, nil)
+	expectStatusLookup(statements, newer, preview)
+
+	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1"})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]bool{"dep_newer": true, "dep_preview": true}, result.Live)
+}
+
+// The live view is one page of the storage live list, with its cursor.
+func TestDeploymentServiceListLive(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	served := &domain.Deployment{ProjectID: "proj_1", ID: "dep_served"}
+	statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ time.Time, opts *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
+			assert.Equal(t, []byte("cursor"), opts.Pagination.Cursor)
+			return &database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{served}, NextCursor: []byte("next")}, nil
+		})
+
+	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, PageToken: "cursor"})
+	require.NoError(t, err)
+	assert.Equal(t, []*domain.Deployment{served}, result.Items)
+	assert.Equal(t, "next", result.NextPageToken)
+	assert.True(t, result.Live["dep_served"])
+}
+
+// With an origin, the live view asks storage for the deployment serving it at
+// the same time it reads the live set.
+func TestDeploymentServiceListLiveOrigin(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	serving := &domain.Deployment{ID: "dep_serving"}
+	statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, now time.Time, opts *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
+			filters := opts.Filter.(database.AndFilter[domain.DeploymentField]).Filters
+			assert.Contains(t, filters, deployment.ServesOrigin(appOrigin, now))
+			return &database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{serving}}, nil
+		})
+
+	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, Origin: new(appOrigin)})
+	require.NoError(t, err)
+	assert.Equal(t, []*domain.Deployment{serving}, result.Items)
 }
