@@ -14,6 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/deployment"
 )
 
 const appOrigin = "https://app.acme.com"
@@ -445,16 +446,19 @@ func TestDeploymentServiceListLive(t *testing.T) {
 	assert.True(t, result.Live["dep_served"])
 }
 
-// With an origin, the live view keeps the deployment serving it.
+// With an origin, the live view asks storage for the deployment serving it at
+// the same time it reads the live set.
 func TestDeploymentServiceListLiveOrigin(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	serving := &domain.Deployment{ID: "dep_serving", Targets: []domain.DeploymentTarget{{Origin: appOrigin}}}
-	elsewhere := &domain.Deployment{ID: "dep_elsewhere", Targets: []domain.DeploymentTarget{{Origin: "https://www.acme.com"}}}
+	serving := &domain.Deployment{ID: "dep_serving"}
 	statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{elsewhere, serving}, NextCursor: []byte("next")}, nil)
+		DoAndReturn(func(_ context.Context, now time.Time, opts *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
+			filters := opts.Filter.(database.AndFilter[domain.DeploymentField]).Filters
+			assert.Contains(t, filters, deployment.ServesOrigin(appOrigin, now))
+			return &database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{serving}}, nil
+		})
 
 	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, Origin: new(appOrigin)})
 	require.NoError(t, err)
 	assert.Equal(t, []*domain.Deployment{serving}, result.Items)
-	assert.Empty(t, result.NextPageToken)
 }

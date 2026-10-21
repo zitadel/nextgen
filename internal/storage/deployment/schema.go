@@ -56,18 +56,30 @@ func isPrimaryOrigin(tables Tables) string {
 		` WHERE po.project_id = t.project_id AND po.pattern = t.origin AND po.kind = 'primary')`
 }
 
-// liveValue holds the place of the Live filter's time. The filter needs the SQL
-// before and after that time, so the predicate is written whole with this marker
-// and cut in two at it. Any text works that never shows up in SQL; a NUL never does.
-const liveValue = "\x00"
+// valueMarker holds the place of a filter value. A correlated filter needs the
+// SQL around its values, so each predicate is written whole with this marker
+// and cut at it. Any text works that never shows up in SQL; a NUL never does.
+const valueMarker = "\x00"
+
+// correlated binds predicate, with a valueMarker for each value its filter
+// takes.
+func correlated(predicate string) database.FieldBinding[domain.Deployment] {
+	parts := strings.Split(predicate, valueMarker)
+	return database.FieldBinding[domain.Deployment]{
+		SQLName:    parts[0],
+		SQLBetween: parts[1 : len(parts)-1],
+		SQLSuffix:  parts[len(parts)-1],
+		Computed:   true,
+	}
+}
 
 // NewSchema binds deployment list/filter/order fields for one dialect's table
-// names. Origin and Live are correlated predicates over the origin rows.
+// names. Origin, Live and ServesOrigin are correlated predicates over the
+// origin rows.
 func NewSchema(tables Tables) database.Schema[domain.DeploymentField, domain.Deployment] {
 	deploymentsTable := tables.Deployments
 	ownOrigins := `SELECT 1 FROM ` + tables.Origins + ` t` +
 		` WHERE t.project_id = ` + deploymentsTable + `.project_id AND t.deployment_id = ` + deploymentsTable + `.id`
-	liveBefore, liveAfter, _ := strings.Cut(`EXISTS (`+ownOrigins+` AND `+RowServes(tables, liveValue)+`)`, liveValue)
 	return database.NewSchema(map[domain.DeploymentField]database.FieldBinding[domain.Deployment]{
 		domain.DeploymentFieldProjectID: {
 			SQLName:  "project_id",
@@ -94,15 +106,9 @@ func NewSchema(tables Tables) database.Schema[domain.DeploymentField, domain.Dep
 			Accessor: func(d *domain.Deployment) any { return d.OriginKind.String() },
 			Coerce:   database.CoerceString,
 		},
-		domain.DeploymentFieldOrigin: {
-			SQLName:   `EXISTS (` + ownOrigins + ` AND t.origin = `,
-			SQLSuffix: ")",
-			Computed:  true,
-		},
-		domain.DeploymentFieldLive: {
-			SQLName:   liveBefore,
-			SQLSuffix: liveAfter,
-			Computed:  true,
-		},
+		domain.DeploymentFieldOrigin: correlated(`EXISTS (` + ownOrigins + ` AND t.origin = ` + valueMarker + `)`),
+		domain.DeploymentFieldLive:   correlated(`EXISTS (` + ownOrigins + ` AND ` + RowServes(tables, valueMarker) + `)`),
+		domain.DeploymentFieldServesOrigin: correlated(`EXISTS (` + ownOrigins +
+			` AND t.origin = ` + valueMarker + ` AND ` + RowServes(tables, valueMarker) + `)`),
 	})
 }

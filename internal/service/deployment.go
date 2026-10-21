@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"slices"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -320,7 +319,9 @@ func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput
 // listHistory lists the project's deployments newest first, with the ids of
 // the listed ones that are live now.
 func (s *DeploymentService) listHistory(ctx context.Context, input ListDeploymentsInput) (*database.ListResult[*domain.Deployment], map[string]bool, error) {
-	result, err := s.v2Pool.Statements().ListDeployments(ctx, listOptions(input))
+	opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
+	opts.Pagination.Cursor = []byte(input.PageToken)
+	result, err := s.v2Pool.Statements().ListDeployments(ctx, opts)
 	if err != nil {
 		return nil, nil, mapListError(err, "failed to list deployments")
 	}
@@ -330,29 +331,23 @@ func (s *DeploymentService) listHistory(ctx context.Context, input ListDeploymen
 
 // listLive is the live view, newest first: the deployments some origin serves
 // now, each narrowed to the origins it serves, so all of them are live. With
-// an origin, it keeps the one deployment serving it; another that once named
-// it may serve others.
+// an origin, it is the one deployment serving it.
 func (s *DeploymentService) listLive(ctx context.Context, input ListDeploymentsInput) (*database.ListResult[*domain.Deployment], map[string]bool, error) {
-	result, err := s.v2Pool.Statements().ListLiveDeployments(ctx, time.Now(), listOptions(input))
+	now := time.Now()
+	opts := deployment.LiveListOptions(input.ProjectID, nil, uint32(normalizeLimit(input.Limit)))
+	opts.Pagination.Cursor = []byte(input.PageToken)
+	if input.Origin != nil {
+		opts.Filter = database.And(opts.Filter, deployment.ServesOrigin(*input.Origin, now))
+	}
+	result, err := s.v2Pool.Statements().ListLiveDeployments(ctx, now, opts)
 	if err != nil {
 		return nil, nil, mapListError(err, "failed to list live deployments")
-	}
-	if input.Origin != nil {
-		result = &database.ListResult[*domain.Deployment]{Items: slices.DeleteFunc(result.Items, func(entity *domain.Deployment) bool {
-			return !slices.Contains(entity.Origins(), *input.Origin)
-		})}
 	}
 	live := make(map[string]bool, len(result.Items))
 	for _, entity := range result.Items {
 		live[entity.ID] = true
 	}
 	return result, live, nil
-}
-
-func listOptions(input ListDeploymentsInput) *database.ListOptions[domain.DeploymentField] {
-	opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
-	opts.Pagination.Cursor = []byte(input.PageToken)
-	return opts
 }
 
 // releasesFor hydrates the releases a page of deployments points at, batched:

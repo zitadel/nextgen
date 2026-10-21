@@ -303,8 +303,8 @@ func TestDeploymentStatements_LiveView(t *testing.T) {
 }
 
 // GetLiveDeployment checks the origin and its liveness on the same origin row:
-// a deployment superseded on app but still live on www is what www serves,
-// not what app serves.
+// app and www serve the newest primary deployment; once it stops covering www,
+// www serves nothing.
 func TestDeploymentStatements_LiveDeploymentOfOneOrigin(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureReleaseProject(t, d.stmts)
@@ -348,6 +348,28 @@ func TestDeploymentStatements_LiveDeploymentOfOneOrigin(t *testing.T) {
 
 		_, err = d.stmts.GetLiveDeployment(t.Context(), projectID, "https://nothing.acme.com", now)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
+// ServesOrigin keeps the deployment serving the origin even when a newer one
+// that once named it sorts first and serves other origins.
+func TestDeploymentStatements_ListServingOneOrigin(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		addPrimaryOrigins(t, d.stmts, projectID, appOrigin)
+		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+
+		primary := deploy(t, d.stmts, projectID, rel.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		deploy(t, d.stmts, projectID, rel.ID, []string{wwwOrigin, gitOrigin}, previewDeploy(time.Hour))
+		addPrimaryOrigins(t, d.stmts, projectID, wwwOrigin)
+		now := time.Now()
+
+		opts := deployment.LiveListOptions(projectID, nil, 1)
+		opts.Filter = database.And(opts.Filter, deployment.ServesOrigin(wwwOrigin, now))
+		result, err := d.stmts.ListLiveDeployments(unfilteredListCtx(t), now, opts)
+		require.NoError(t, err)
+		assert.Equal(t, []string{primary.ID}, deployment.DeploymentIDs(result.Items))
+		assert.Empty(t, result.NextCursor)
 	})
 }
 
