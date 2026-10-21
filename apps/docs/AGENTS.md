@@ -49,6 +49,8 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - Leave `index` out of a folder's `meta.json` `pages`: Fumadocs then opens it
   from the folder's own entry instead of listing it as a child that repeats the
   folder's name.
+- A sidebar section (`components/sidebar.tsx`) is a folder with `root: true`
+  and `pagesIndex: "index"`: a root folder has no index otherwise.
 - When a page moves, add its old and new URL to `lib/moved.json`:
   `next.config.mjs` redirects it and its `.md` twin, and a test follows each.
 - A page's URL is its path under `content/docs/`. The API reference pages per

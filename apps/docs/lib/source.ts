@@ -11,7 +11,7 @@ import type { RequestData } from "fumadocs-openapi/requests";
 import { pathnameFromRequest } from "fumadocs-openapi/requests/generators";
 import { curl } from "fumadocs-openapi/requests/generators/curl";
 
-import { cliCommandUrl, cliSidebarNames, cliSource } from "./cli-reference";
+import { cliCommandUrl, cliSidebarNames, cliSource, commandOperations } from "./cli-reference";
 import { codeThemes } from "./code-theme";
 import { cliCommand, cliSample } from "./cli-sample";
 import { defaultRequest, withRefValues } from "./default-request";
@@ -38,24 +38,25 @@ const docs = defineDocs({
   },
 });
 
+// A page per operation of the server's API, beside the reference's own pages
+// in content/docs/reference/api.
+const operationPages = await openapi.staticSource({
+  baseDir: "reference/api",
+  groupBy: "tag",
+  meta: true,
+});
+
 // See https://fumadocs.dev/docs/headless/source-api for more info
 export const source = loader(
   {
     docs: docs.toFumadocsSource(),
-    // A page per operation of the server's API, beside the reference's own
-    // pages in content/docs/reference/api. Fumadocs makes the operation's
-    // whole description the page's description; the page's own is a line of
-    // plain text, and `markdownDescription` keeps the whole (lib/description.ts).
+    // Fumadocs makes the operation's whole description the page's
+    // description; the page's own is a line of plain text, and
+    // `markdownDescription` keeps the whole (lib/description.ts).
     // The sidebar lists a tag's operations in the document's order. A tag's
     // folder takes its name from the tag's page, and the reference's own
     // meta.json orders the tags.
-    openapi: update(
-      await openapi.staticSource({
-        baseDir: "reference/api",
-        groupBy: "tag",
-        meta: true,
-      }),
-    )
+    openapi: update(operationPages)
       .files((files) =>
         files.filter((file) => file.type !== "meta" || file.path !== "reference/api/meta.json"),
       )
@@ -74,8 +75,9 @@ export const source = loader(
         };
       })
       .build(),
-    // A page per command of the CLI, under reference/cli (lib/cli-reference.ts).
-    cli: cliSource,
+    // A page per command of the CLI, under reference/cli, which links the
+    // operation the command calls (lib/cli-reference.ts).
+    cli: cliSource(commandOperations(operationPages)),
   },
   {
     baseUrl: docsRoute,
@@ -88,7 +90,7 @@ type OpenAPIPage = Extract<Page, { type: "openapi" }>;
 
 // llms.txt and MCP's list_pages have room for an operation's whole first
 // sentence (lib/description.ts); otherwise Fumadocs' own description.
-function sourceLlms(input: typeof source, { operationLinks = true } = {}) {
+function sourceLlms(input: typeof source, { full = false } = {}) {
   return llms(input, {
     renderDescription: (node) => {
       const data =
@@ -99,21 +101,22 @@ function sourceLlms(input: typeof source, { operationLinks = true } = {}) {
     },
     renderPage: async (page) => `# ${page.data.title} (${page.url})
 
-${await pageText(page, operationLinks)}`,
+${await pageText(page, full)}`,
   });
 }
 
-// A CLI reference page is Markdown already; a content page's is its processed
-// MDX, with an API tag's operations in place of <Operations />.
-async function pageText(page: Page, operationLinks: boolean) {
+// A CLI reference page is Markdown already, with a version for llms-full.txt;
+// a content page's is its processed MDX, with an API tag's operations in place
+// of <Operations />.
+async function pageText(page: Page, full: boolean) {
   switch (page.type) {
     case "openapi":
       return operationText(page);
     case "cli":
-      return page.data.markdown;
+      return full ? page.data.llmsFullMarkdown : page.data.markdown;
     default:
       return renderPlaceholder(await page.data.getText("processed"), {
-        Operations: () => operationTable(page, operationLinks),
+        Operations: () => operationTable(page, !full),
       });
   }
 }
@@ -121,15 +124,19 @@ async function pageText(page: Page, operationLinks: boolean) {
 // The pages and MCP, whose get_page takes the page URL its list_pages lists.
 export const docsLlms = sourceLlms(source);
 
-// llms-full.txt, which leaves out the operations and webhooks: an API tag's
-// page names them without linking them.
-export const docsLlmsFull = sourceLlms(source, { operationLinks: false });
+// llms-full.txt, which leaves the operations out, so its pages link none.
+export const docsLlmsFull = sourceLlms(source, { full: true });
 
 // /docs/llms.txt, which lists each page by its Markdown URL (lib/shared.ts),
 // so an agent fetches the Markdown without asking for it through `Accept`.
+// The OpenAPI document is not a page, so its link is the summary above the
+// list rather than an entry in it.
 export const docsLlmsIndex = sourceLlms({
   ...source,
-  getPageTree: (locale) => withMarkdownUrls(source.getPageTree(locale)),
+  getPageTree: (locale) => ({
+    ...withMarkdownUrls(source.getPageTree(locale)),
+    description: "The server's API as one OpenAPI document: [openapi.json](/docs/openapi.json).",
+  }),
 });
 
 function withMarkdownUrls<T extends PageTree.Root | PageTree.Node>(node: T): T {

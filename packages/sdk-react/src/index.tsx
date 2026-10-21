@@ -205,6 +205,24 @@ const ZitadelSessionElementReact = createComponent({
 });
 
 /**
+ * Forwards a widget event's detail to the app callback, and registers the
+ * callback's returned promise — from an async handler or a Qwik QRL — on the
+ * detail's `waitUntil`. The three navigating events (flow-complete,
+ * flow-redirect, signout) then wait for it before the widget navigates; other
+ * events carry no `waitUntil`, so the call is a no-op.
+ */
+function withDetail<Detail>(
+  event: Event,
+  handler: ((detail: Detail) => unknown) | undefined,
+): void {
+  if (!(event instanceof CustomEvent) || !handler) {
+    return;
+  }
+  const result = handler(event.detail);
+  event.detail.waitUntil?.(result);
+}
+
+/**
  * React component wrapping the `<zitadel-login>` web component. Binds the
  * `ZitadelProject` handle as a DOM property (or the discrete project id /
  * proxy path as attributes) and forwards the widget's `zitadel-*` events as
@@ -275,11 +293,11 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
         {...projectAttributes(props)}
         resume-flow-id={resumeFlowId || undefined}
         post-sign-in-url={postSignInUrl || undefined}
-        onZitadelFlowStep={onFlowStep && ((event) => onFlowStep(event.detail))}
-        onZitadelFlowInput={onFlowInput && ((event) => onFlowInput(event.detail))}
-        onZitadelFlowComplete={onFlowComplete && ((event) => onFlowComplete(event.detail))}
-        onZitadelFlowRedirect={onFlowRedirect && ((event) => onFlowRedirect(event.detail))}
-        onZitadelFlowError={onFlowError && ((event) => onFlowError(event.detail))}
+        onZitadelFlowStep={onFlowStep && ((event) => withDetail(event, onFlowStep))}
+        onZitadelFlowInput={onFlowInput && ((event) => withDetail(event, onFlowInput))}
+        onZitadelFlowComplete={onFlowComplete && ((event) => withDetail(event, onFlowComplete))}
+        onZitadelFlowRedirect={onFlowRedirect && ((event) => withDetail(event, onFlowRedirect))}
+        onZitadelFlowError={onFlowError && ((event) => withDetail(event, onFlowError))}
       >
         {props.children}
       </ZitadelLoginElementReact>
@@ -315,7 +333,7 @@ export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogou
         {...projectAttributes(props)}
         post-sign-out-url={props.postSignOutUrl}
         ref={ref}
-        onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
+        onZitadelSignout={onSignout && ((event) => withDetail(event, onSignout))}
       />
     );
   },
@@ -352,7 +370,7 @@ export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSes
         {...projectAttributes(props)}
         post-sign-out-url={props.postSignOutUrl}
         ref={ref}
-        onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
+        onZitadelSignout={onSignout && ((event) => withDetail(event, onSignout))}
       />
     );
   },
