@@ -259,6 +259,7 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 			revoked = entity
 			return nil
 		}
+		// TODO(#2206): a concurrent deploy of this release can land after this check.
 		served, err := servedOrigins(ctx, stmts, projectID, id, time.Now())
 		if err != nil {
 			return err
