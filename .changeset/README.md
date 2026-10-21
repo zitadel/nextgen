@@ -72,9 +72,10 @@ One-line, user-facing summary.
 ```
 
 Use [public package names](#publishable-npm-packages): `patch` for a fix, and
-`minor` for a feature or a breaking change, whose summary starts with
-`**Breaking:**` ([preview versions](#preview-versions)). For the rare empty
-changeset (publishable path, nothing ships): `corepack pnpm changeset --empty`.
+`minor` for a feature or a breaking change, which says what breaks in a
+paragraph that starts with `**Breaking:**` ([preview versions](#preview-versions)).
+For the rare empty changeset (publishable path, nothing ships):
+`corepack pnpm changeset --empty`.
 
 ### The summary is the release note
 
@@ -115,10 +116,11 @@ from Go paths, so judge those from the table.
 The public packages publish to npm's `latest` tag as `0.x`
 ([ADR 074](../docs/adrs/074-preview-releases-on-0x.md)):
 
-- Until 1.0.0 a breaking change is a `minor` whose summary starts with
-  `**Breaking:**`. A `major` would release every public package as 1.0.0, so
-  `node scripts/check-changesets-status.mjs --pending` refuses it; CI runs it
-  on every PR.
+- Until 1.0.0 a breaking change is a `minor`. After the outcome, a paragraph
+  that starts with `**Breaking:**` says what breaks and what to do; the website
+  changelog lists such a change under Breaking. A `major` would release every
+  public package as 1.0.0, so `node scripts/check-changesets-status.mjs --pending`
+  refuses it; CI runs it on every PR.
 - 1.0.0 is cut by a PR that sets the version itself.
 
 ## Publishing

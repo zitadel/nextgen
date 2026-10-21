@@ -10,7 +10,7 @@ npx @zitadel/cli@latest setup --server local
 Use an exact version (`npx @zitadel/cli@0.1.0`) in bug reports and automation
 when reproducibility matters.
 
-> **Preview.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change: until 1.0.0, a breaking change ships in a minor version, and its release note starts with **Breaking:**.
+> **Preview.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change: until 1.0.0, a breaking change ships in a minor version, and its release note marks it **Breaking:**.
 
 ## Requirements
 

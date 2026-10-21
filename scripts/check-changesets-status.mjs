@@ -565,7 +565,7 @@ function nextAction({ analysis, errors, changesetStatus, pending, parsedChangese
     return "Update `.changeset/config.json` so the fixed group matches the public product package list.";
   }
   if (errors.some((error) => error.code === "preview-major")) {
-    return "Until 1.0.0, bump a breaking change as `minor` and start its summary with `**Breaking:**` (`.changeset/README.md#preview-versions`).";
+    return "Until 1.0.0, bump a breaking change as `minor` and say what breaks in a paragraph that starts with `**Breaking:**` (`.changeset/README.md#preview-versions`).";
   }
   if (errors.length > 0) {
     return "Fix the Changesets status errors above, then rerun this check.";

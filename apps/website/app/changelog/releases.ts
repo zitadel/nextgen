@@ -35,6 +35,12 @@ export type Change = {
   summary: string;
   /** The highest bump it gives any of its packages. */
   bump: Bump;
+  /**
+   * Whether a paragraph of its summary starts with `**Breaking:**`, which marks
+   * a breaking change that ships as a minor before 1.0.0
+   * (docs/adrs/074-preview-releases-on-0x.md).
+   */
+  markedBreaking: boolean;
   /** The packages it changes, in the order the release lists them. */
   packages: string[];
   /** Its pull request, or its commit when it has none. */
@@ -195,14 +201,20 @@ function parsePackageChanges(block: string): Pick<Release, "changes" | "notices"
 const CHANGE_PREFIX =
   /^(?:\[#(\d+)\]\(([^)\s]+)\) )?(?:\[`([0-9a-f]+)`\]\(([^)\s]+)\) )?(?:Thanks (.+?)! )?- /;
 
-function parseChange(text: string): Pick<Change, "summary" | "source" | "authors"> {
+// A paragraph that starts with **Breaking:**, the summary's first or one after
+// a blank line.
+const BREAKING_MARKER = /(?:^|\n[ \t]*\n)[ \t]*\*\*Breaking:\*\*/;
+
+function parseChange(
+  text: string,
+): Pick<Change, "summary" | "markedBreaking" | "source" | "authors"> {
   const match = CHANGE_PREFIX.exec(text);
   if (!match || !(match[1] || match[3] || match[5])) {
-    return { summary: text, authors: [] };
+    return { ...parseSummary(text), authors: [] };
   }
   const [prefix, pull, pullUrl, commit, commitUrl, thanks = ""] = match;
   return {
-    summary: text.slice(prefix.length),
+    ...parseSummary(text.slice(prefix.length)),
     source:
       pull && pullUrl
         ? { label: `#${pull}`, href: pullUrl }
@@ -213,6 +225,10 @@ function parseChange(text: string): Pick<Change, "summary" | "source" | "authors
       label && href ? [{ label, href }] : [],
     ),
   };
+}
+
+function parseSummary(summary: string): Pick<Change, "summary" | "markedBreaking"> {
+  return { summary, markedBreaking: BREAKING_MARKER.test(summary) };
 }
 
 // By version, which GitHub's own order does not follow (it lists

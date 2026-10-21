@@ -18,8 +18,10 @@
    with them. The READMEs say the product is a preview; the version string no
    longer does. Docs, skills and hints run the CLI as
    `npx @zitadel/cli@latest`.
-2. **A breaking change is a `minor` until 1.0.0.** Its changeset summary
-   starts with `**Breaking:**`. Fixes stay `patch`, features `minor`.
+2. **A breaking change is a `minor` until 1.0.0.** Its changeset says what
+   breaks and what to do in a paragraph that starts with `**Breaking:**`, as
+   breaking minors already did, and the website changelog lists majors and
+   such changes under Breaking. Fixes stay `patch`, features `minor`.
    `scripts/check-changesets-status.mjs --pending` refuses a `major` changeset
    while the public packages are below 1.0.0, and CI runs it on every pull
    request.
@@ -80,8 +82,8 @@ Trade-offs:
   move to 0.x. The deprecation message says what to install.
 - Links to `/releases/tag/v1.0.0-alpha.N` stop working.
 - `@alpha` stays on `0.1.0`.
-- The bump type no longer marks a breaking change; the `**Breaking:**` prefix
-  does.
+- The bump type no longer marks a breaking change; the `**Breaking:**`
+  paragraph does.
 
 ## Alternatives considered
 

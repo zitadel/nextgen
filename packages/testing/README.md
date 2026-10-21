@@ -8,7 +8,7 @@ the real login journey immediately.
 > **Status: preview.** Published to npm on the shared release train — the kit
 > carries the same version as `@zitadel/cli` and the SDKs, the train publishes
 > to npm's `latest` tag, and until 1.0.0 a minor version can change its API
-> (its release note starts with **Breaking:**). macOS/Linux (see [Known limitations](#known-limitations)).
+> (its release note marks it **Breaking:**). macOS/Linux (see [Known limitations](#known-limitations)).
 
 ## Why
 
