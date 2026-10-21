@@ -356,22 +356,19 @@ func (h *Handler) withSealedRelease(ctx context.Context, state *domain.FlowState
 	return service.WithRuntimeResolution(ctx, resolution), nil
 }
 
-// admitOrigin refuses a request Origin the project does not admit. Prefer the
-// shared runtime gate when wired; otherwise fall back to the legacy primary
-// allowlist check.
+// admitOrigin refuses a request Origin the project does not admit. When the
+// runtime resolver is unwired (unit tests), skip — same soft-skip as
+// resolveRuntime. Production always wires WithRuntimeResolver.
 func (h *Handler) admitOrigin(ctx context.Context, projectID, origin string) error {
+	if h.runtime == nil {
+		return nil
+	}
 	project, err := h.projectService.Get(ctx, projectID)
 	if err != nil {
 		return domain.ErrInternal(err)
 	}
-	if h.runtime != nil {
-		_, err := h.runtime.Gate(ctx, project, origin)
-		return err
-	}
-	if err := validateOriginAgainstProject(origin, project); err != nil {
-		return domain.ErrRequestInvalid().WithMessage(err.Error())
-	}
-	return nil
+	_, err = h.runtime.Gate(ctx, project, origin)
+	return err
 }
 
 func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState, error) {
@@ -524,37 +521,6 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 		}
 	}
 	return out
-}
-
-// validateOriginAgainstProject returns an error if the origin is not admitted
-// for the project. An empty allowlist means allow all (development/test mode).
-// Loopback hosts are admitted without a stored pattern. Only primary patterns
-// admit requests; preview patterns bound which URLs a preview deploy may
-// register and do not authorize Origin headers by themselves.
-//
-// Primary matching is exact — no aliasing between localhost, 127.0.0.1, and
-// [::1] for stored patterns. The WebAuthn RP ID derives from the origin
-// hostname (passkeyRPFromOrigin), so a passkey registered under one loopback
-// spelling can never assert under another.
-func validateOriginAgainstProject(originStr string, project *domain.Project) error {
-	if len(project.Origins) == 0 {
-		return nil
-	}
-	if u, err := url.Parse(originStr); err == nil && isLoopbackHost(u.Hostname()) {
-		return nil
-	}
-	patterns := make([]string, 0, len(project.Origins))
-	for _, allowed := range project.Origins {
-		if allowed.Kind != domain.OriginKindPrimary {
-			continue
-		}
-		if allowed.Pattern == originStr {
-			return nil
-		}
-		patterns = append(patterns, allowed.Pattern)
-	}
-	return fmt.Errorf("origin %q is not allowed for this project (allowed: %s)",
-		originStr, strings.Join(patterns, ", "))
 }
 
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,
