@@ -1,7 +1,7 @@
 import { renderPlaceholder } from "fumadocs-core/mdx-plugins/remark-llms.runtime";
 import type * as PageTree from "fumadocs-core/page-tree";
 import type { AdvancedIndex } from "fumadocs-core/search/server";
-import { llms, loader, update } from "fumadocs-core/source";
+import { getSlugs, llms, loader, update } from "fumadocs-core/source";
 import { lucideIconsPlugin } from "fumadocs-core/source/lucide-icons";
 import { metaSchema, pageSchema } from "fumadocs-core/source/schema";
 import { applyMdxPreset } from "fumadocs-mdx/config";
@@ -16,6 +16,7 @@ import { codeThemes } from "./code-theme";
 import { cliCommand, cliSample } from "./cli-sample";
 import { defaultRequest, withRefValues } from "./default-request";
 import { firstSentence, shortDescription } from "./description";
+import { type ApiOperation, errorSource } from "./error-reference";
 import { openapi } from "./openapi";
 import { authentication, sdkSample } from "./sdk-sample";
 import { docsRoute, getPageMarkdownUrl } from "./shared";
@@ -38,43 +39,106 @@ const docs = defineDocs({
   },
 });
 
+const content = docs.toFumadocsSource();
+
+const apiBaseDir = "reference/api";
+
 // A page per operation of the server's API, beside the reference's own pages
-// in content/docs/reference/api.
-const operationPages = await openapi.staticSource({
-  baseDir: "reference/api",
-  groupBy: "tag",
-  meta: true,
-});
+// in content/docs/reference/api. Fumadocs makes the operation's whole
+// description the page's description; the page's own is a line of plain text,
+// and `markdownDescription` keeps the whole (lib/description.ts).
+// The sidebar lists a tag's operations in the document's order. A tag's folder
+// takes its name from the tag's page, and the reference's own meta.json orders
+// the tags.
+const operationPages = update(
+  await openapi.staticSource({
+    baseDir: apiBaseDir,
+    groupBy: "tag",
+    meta: true,
+  }),
+)
+  .files((files) =>
+    files.filter((file) => file.type !== "meta" || file.path !== `${apiBaseDir}/meta.json`),
+  )
+  .meta((meta): typeof meta => ({ ...meta, data: { pages: meta.data.pages } }))
+  .page((page) => {
+    // The document is data: a description that is not a string is none.
+    const description: unknown = page.data.description;
+    const markdown = typeof description === "string" ? description : undefined;
+    return {
+      ...page,
+      data: {
+        ...page.data,
+        description: markdown === undefined ? undefined : shortDescription(markdown),
+        markdownDescription: markdown,
+      },
+    };
+  })
+  .build();
+
+// The API's operations for its Errors page, in the order the sidebar lists
+// them, each with its page and its section: the folder its page is in, titled
+// by the folder's own page.
+function apiOperations(): ApiOperation[] {
+  const folderOf = (path: string) => path.slice(0, path.lastIndexOf("/"));
+  const nameOf = (path: string) => path.slice(path.lastIndexOf("/") + 1).replace(/\.mdx?$/, "");
+  const sectionTitles = new Map<string, string | undefined>();
+  const listed = new Map<string, string[]>();
+  for (const file of content.files) {
+    if (file.type === "page" && nameOf(file.path) === "index") {
+      sectionTitles.set(folderOf(file.path), file.data.title);
+    }
+  }
+  // The reference's meta.json orders the sections, each section's own the
+  // operations in it.
+  for (const file of [...content.files, ...operationPages.files]) {
+    if (file.type === "meta") listed.set(folderOf(file.path), file.data.pages ?? []);
+  }
+  // Where a folder's meta.json lists a page; one it does not list comes last.
+  const rank = (path: string) => {
+    const pages = listed.get(folderOf(path)) ?? [];
+    const index = pages.indexOf(nameOf(path));
+    return index === -1 ? pages.length : index;
+  };
+
+  const pages = operationPages.files.flatMap((file) => (file.type === "page" ? [file] : []));
+  pages.sort(
+    (a, b) => rank(folderOf(a.path)) - rank(folderOf(b.path)) || rank(a.path) - rank(b.path),
+  );
+
+  return pages.flatMap((file) => {
+    const folder = folderOf(file.path);
+    const { bundled } = file.data.getSchema();
+    const { operations = [] } = file.data.getOpenAPIPageProps();
+    return operations.flatMap(({ path, method }) => {
+      const operation = bundled.paths?.[path]?.[method];
+      if (!operation?.operationId) return [];
+      return [
+        {
+          operationId: operation.operationId,
+          summary: file.data.title ?? operation.operationId,
+          method,
+          path,
+          url: `${docsRoute}/${getSlugs(file.path).join("/")}`,
+          section: {
+            title: sectionTitles.get(folder) ?? folder,
+            url: `${docsRoute}/${folder}`,
+          },
+          rateLimited: operation.responses?.["429"] !== undefined,
+        },
+      ];
+    });
+  });
+}
 
 // See https://fumadocs.dev/docs/headless/source-api for more info
 export const source = loader(
   {
-    docs: docs.toFumadocsSource(),
-    // Fumadocs makes the operation's whole description the page's
-    // description; the page's own is a line of plain text, and
-    // `markdownDescription` keeps the whole (lib/description.ts).
-    // The sidebar lists a tag's operations in the document's order. A tag's
-    // folder takes its name from the tag's page, and the reference's own
-    // meta.json orders the tags.
-    openapi: update(operationPages)
-      .files((files) =>
-        files.filter((file) => file.type !== "meta" || file.path !== "reference/api/meta.json"),
-      )
-      .meta((meta): typeof meta => ({ ...meta, data: { pages: meta.data.pages } }))
-      .page((page) => {
-        // The document is data: a description that is not a string is none.
-        const description: unknown = page.data.description;
-        const markdown = typeof description === "string" ? description : undefined;
-        return {
-          ...page,
-          data: {
-            ...page.data,
-            description: markdown === undefined ? undefined : shortDescription(markdown),
-            markdownDescription: markdown,
-          },
-        };
-      })
-      .build(),
+    docs: content,
+    openapi: operationPages,
+    // The reference's Errors page, generated from the API's error codes
+    // (lib/error-reference.ts).
+    errors: errorSource(apiBaseDir, `${docsRoute}/${apiBaseDir}`, apiOperations()),
     // A page per command of the CLI, under reference/cli, which links the
     // operation the command calls (lib/cli-reference.ts).
     cli: cliSource(commandOperations(operationPages)),
@@ -105,14 +169,15 @@ ${await pageText(page, full)}`,
   });
 }
 
-// A CLI reference page is Markdown already, with a version for llms-full.txt;
-// a content page's is its processed MDX, with an API tag's operations in place
-// of <Operations />.
+// A CLI reference page and the Errors page are Markdown already, with a
+// version for llms-full.txt; a content page's is its processed MDX, with an
+// API tag's operations in place of <Operations />.
 async function pageText(page: Page, full: boolean) {
   switch (page.type) {
     case "openapi":
       return operationText(page);
     case "cli":
+    case "errors":
       return full ? page.data.llmsFullMarkdown : page.data.markdown;
     default:
       return renderPlaceholder(await page.data.getText("processed"), {

@@ -1,11 +1,11 @@
 ---
 title: API reference
-description: OpenAPI-generated endpoint docs for the next-generation Zitadel preview.
+description: How to call the Zitadel API, and every operation it has, generated from its OpenAPI document.
 ---
 
 import { Card, Cards } from "fumadocs-ui/components/card";
 
-The API reference is generated from the server's OpenAPI document, one page per operation, grouped by the document's tags. The whole document is at [`/docs/openapi.json`](/docs/openapi.json), for client generators, API tools, and agents.
+The API reference is generated from the server's OpenAPI document, one page per operation, grouped by the document's tags. The whole document is at [`/docs/openapi.json`](/docs/openapi.json), for client generators, API tools, and agents. This page covers what every operation shares: where to send a request, how to authenticate it, and what errors and lists look like.
 
 Each operation shows its request as a call through [`@zitadel/api`](/docs/sdks/api-client), the generated TypeScript client, as the [CLI command](/docs/reference/cli) that runs it where there is one, and as cURL. All of them follow the example you pick and what you enter in the playground. An operation's Markdown, its URL plus `.md`, has the same samples for its default request, cURL against a local server at `http://localhost:8080`.
 
@@ -14,6 +14,77 @@ Use it when you need exact request bodies, response shapes, auth requirements, a
 - [Quickstart](/docs/get-started/quickstart)
 - [CLI reference](/docs/reference/cli)
 - [SDKs](/docs/sdks)
+
+## Base URL
+
+An operation's path starts at the server's origin, with no version prefix: `POST /projects` is `https://preview.zitadel.com/projects` on the hosted preview.
+
+| Server | Base URL |
+| --- | --- |
+| The hosted preview, the CLI's default | `https://preview.zitadel.com` |
+| A server [`zitadel start`](/docs/guides/local-runtime) runs on your machine | `http://localhost:8080`, or the next free port for a second directory |
+
+Setup writes the server your app uses to `.env.local` as `ZITADEL_URL`, which the SDKs and the samples on these pages read.
+
+## Authentication
+
+An operation's page names the security schemes it accepts; one that names none needs no credential. The API document declares two.
+
+### Project secret (`oauth2`)
+
+Send the project secret as a bearer token:
+
+```http
+Authorization: Bearer <project secret>
+```
+
+The document declares this scheme as OAuth 2.0, with authorization-code and client-credentials flows and their scopes; today the server accepts a project secret for it and no other token.
+
+[`zitadel setup`](/docs/get-started/quickstart) creates your project and writes its secret to `.env.local` as `ZITADEL_PROJECT_SECRET`, and to `.zitadel/secret`. [Create project](/docs/reference/api/projects) (`POST /projects`), which needs no credential, returns it as `project_secret`; no other operation returns it. Keep the secret on a server, out of source control and out of the browser ([Configuration as code](/docs/concepts/repo-config#what-stays-out-of-source-control)).
+
+### Session cookie (`nextgenSession`)
+
+The `__nextgen_session` cookie authenticates a signed-in user's requests from the browser. The server sets it when a session is created or a handoff is exchanged ([Sessions](/docs/reference/api/sessions)); an app sends it through the [SDK proxy](/docs/sdks/proxy) on its own origin.
+
+A request the cookie authenticates that changes something must come from the same origin and carry the session's CSRF token, from `GET /sessions/me/csrf`, in the `X-Zitadel-CSRF` header. `GET` requests and the `POST …/query` reads need no token. A missing or invalid cookie answers `401` with the code `auth.unauthorized`, a failed CSRF check `403` with `auth.csrf_invalid`.
+
+When a request to an operation that accepts both schemes carries a valid bearer token, the token is its credential and the cookie is not read.
+
+## Errors
+
+A request that fails answers with a `4xx` or `5xx` status and the error envelope as its body:
+
+```json
+{
+  "code": "proj.not_found",
+  "message": "project not found"
+}
+```
+
+- `code`, always present: the error, stable across releases. Branch on it. Before the dot is its namespace, such as `proj` for projects or `req` for the request itself, and after it what went wrong; a few codes, such as `internal`, have no namespace.
+- `message`, always present: an explanation for people, which may change. Never parse it.
+- `details`, optional: an object with more about the error, such as the request field at fault. Most errors carry none.
+
+[Errors](/docs/reference/api/errors) lists every code, what it means, and the operations that return it.
+
+## Pagination
+
+A list is paged with a cursor. Set the page size with `limit`, from 1 to 100, 20 when you leave it out. While more results follow, the response carries `next_page_token`; repeat the request with it as `page_token` to get the next page. On the last page `next_page_token` is absent or `null`. A list returns no total count.
+
+A `GET` list takes both as query parameters, a `POST …/query` in its JSON body:
+
+```bash
+curl -X POST "$ZITADEL_URL/users/query" \
+  -H "Authorization: Bearer $ZITADEL_PROJECT_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"limit": 50, "page_token": "<next_page_token from the previous page>"}'
+```
+
+A page token is opaque, and its format may change between releases: pass it back as you got it.
+
+## Rate limits
+
+Some operations declare a `429 Too Many Requests` response, with the error envelope as its body; [Errors](/docs/reference/api/errors#too-many-requests) lists them. The API document defines no rate-limit headers and no `Retry-After`, so a `429` does not say how long to wait: retry after a pause, and wait longer each time it answers `429` again.
 
 ## Runtime auth
 

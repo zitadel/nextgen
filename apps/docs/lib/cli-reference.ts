@@ -1,7 +1,4 @@
-import { getTableOfContents } from "fumadocs-core/content/toc";
-import { remarkGfm, type StructuredData, structure } from "fumadocs-core/mdx-plugins";
 import { getSlugs, type LoaderPlugin, type MetaData, type Source } from "fumadocs-core/source";
-import type { TOCItemType } from "fumadocs-core/toc";
 
 // The CLI's commands, from the reference its test keeps current
 // (apps/cli/command-reference.json), and its releases, from its changelog
@@ -10,15 +7,15 @@ import type { TOCItemType } from "fumadocs-core/toc";
 import reference, { releases } from "../.generated/cli.mjs";
 import { cli, namedCliCommand } from "./cli-sample.ts";
 import { shortDescription } from "./description.ts";
+import { escapeOutsideCode, type MarkdownPageData, markdownPageData, text } from "./markdown.ts";
 import type { openapi } from "./openapi.ts";
 import { gitConfig } from "./shared.ts";
 
 // The CLI reference: a page per command, under /docs/reference/cli, in the
 // groups and the order `zitadel --help` lists them, an index with the flags
-// every command takes, and the release notes. A page is Markdown, the same
-// text for the page (components/cli-page.tsx), its Markdown twin and search.
-// A command that calls the API links the operation it calls. The telemetry
-// page beside them is content (content/docs/reference/cli).
+// every command takes, and the release notes. A page is Markdown
+// (lib/markdown.ts). A command that calls the API links the operation it
+// calls. The telemetry page beside them is content (content/docs/reference/cli).
 
 /** A flag as apps/cli/src/lib/oclif/reference.ts describes it. */
 export type CliFlag = {
@@ -136,19 +133,7 @@ export function commandOperations({ files }: Awaited<ReturnType<typeof openapi.s
 
 // ---- Markdown ---------------------------------------------------------------
 
-// Outside a code span, what `pattern` matches is escaped.
-function escapeOutsideCode(value: string, pattern: RegExp) {
-  return value
-    .split(/(`[^`]*`)/)
-    .map((part, i) => (i % 2 === 1 ? part : part.replace(pattern, "\\$&")))
-    .join("");
-}
-
-// The help is plain text with code in backticks. Outside a code span, a `*`
-// and a `<` that would open an HTML tag stay what they are.
-function text(value: string) {
-  return escapeOutsideCode(value, /\*|<(?=[A-Za-z/!?])/g);
-}
+// The help is plain text with code in backticks (text, lib/markdown.ts).
 
 // A table cell is one line, and a `|` in it, even in a code span, ends it.
 function cell(value: string) {
@@ -373,34 +358,6 @@ function releaseNotesMarkdown(cliReleases: CliRelease[]) {
 
 // ---- The source ---------------------------------------------------------------
 
-export type CliPageData = {
-  title: string;
-  description: string;
-  /** The page as Markdown, for the page itself, its Markdown twin and the MCP server. */
-  markdown: string;
-  /** The page in llms-full.txt. */
-  llmsFullMarkdown: string;
-  toc: TOCItemType[];
-  structuredData: StructuredData;
-};
-
-function pageData(
-  title: string,
-  description: string,
-  markdown: string,
-  llmsFullMarkdown = markdown,
-): CliPageData {
-  return {
-    title,
-    description,
-    markdown,
-    llmsFullMarkdown,
-    toc: getTableOfContents(markdown),
-    // Search indexes the tables' cells, which the parser finds with GFM only.
-    structuredData: structure(markdown, [remarkGfm]),
-  };
-}
-
 // A command other commands sit under (`api`, beside `api ls`) is a folder of
 // the tree as well as a page: its page is the folder's index, and the folder
 // lists the commands under it. Fumadocs would otherwise take the name for the
@@ -421,7 +378,7 @@ function pagePath(id: string) {
  */
 export const cliSource = (
   operations: Map<string, CliOperation>,
-): Source<{ pageData: CliPageData; metaData: MetaData }> => ({
+): Source<{ pageData: MarkdownPageData; metaData: MetaData }> => ({
   files: [
     {
       type: "meta",
@@ -451,17 +408,21 @@ export const cliSource = (
     {
       type: "page",
       path: `${baseDir}/index.mdx`,
-      data: pageData("CLI reference", indexDescription, indexMarkdown(reference)),
+      data: markdownPageData("CLI reference", indexDescription, indexMarkdown(reference)),
     },
     {
       type: "page",
       path: `${baseDir}/${releaseNotes}.mdx`,
-      data: pageData("Release notes", releaseNotesDescription, releaseNotesMarkdown(releases)),
+      data: markdownPageData(
+        "Release notes",
+        releaseNotesDescription,
+        releaseNotesMarkdown(releases),
+      ),
     },
     ...reference.commands.map((command) => ({
       type: "page" as const,
       path: `${baseDir}/${pagePath(command.id)}.mdx`,
-      data: pageData(
+      data: markdownPageData(
         `${reference.bin} ${command.id}`,
         shortDescription(text(command.description)),
         commandMarkdown(command, operations.get(command.id), { linkOperation: true }),

@@ -3,6 +3,7 @@
   "root": true,
   "pagesIndex": "index",
   "pages": [
+    "errors",
     "---Runtime auth---",
     "flows",
     "authentication-attempts",

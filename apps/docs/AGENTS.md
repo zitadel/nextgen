@@ -62,6 +62,9 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
   (`lib/cli-reference.ts`), which the CLI's reference test writes: change the
   command, never the page ([`apps/cli/AGENTS.md`](../cli/AGENTS.md)). Its
   release notes come from the CLI's `CHANGELOG.md`: fix an entry there.
+- The API reference's Errors page comes from the error schemas and each
+  operation's error set (`lib/error-reference.ts`): change the server's errors,
+  never the page ([`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#error-codes)).
 - An operation's description is its page body; its first sentence is the
   page's description everywhere else (`lib/description.ts`). The spec's side
   is in [`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone).
