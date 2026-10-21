@@ -71,9 +71,10 @@ the interactive prompt:
 One-line, user-facing summary.
 ```
 
-Use [public package names](#publishable-npm-packages) and `patch` / `minor` /
-`major`. For the rare empty changeset (publishable path, nothing ships):
-`corepack pnpm changeset --empty`.
+Use [public package names](#publishable-npm-packages): `patch` for a fix, and
+`minor` for a feature or a breaking change, whose summary starts with
+`**Breaking:**` ([preview versions](#preview-versions)). For the rare empty
+changeset (publishable path, nothing ships): `corepack pnpm changeset --empty`.
 
 ### The summary is the release note
 
@@ -109,24 +110,16 @@ Confirm the planned bumps, then state the [decision-table](#decision-table)
 outcome in the PR. The command sees npm paths only — it can't infer server impact
 from Go paths, so judge those from the table.
 
-## Alpha prerelease mode
+## Preview versions
 
-The repo is in changesets prerelease mode, tag `alpha` (`.changeset/pre.json`):
+The public packages publish to npm's `latest` tag as `0.x`
+([ADR 074](../docs/adrs/074-preview-releases-on-0x.md)):
 
-- `changeset version` cuts `1.0.0-alpha.N`; consumed changesets are recorded in
-  `pre.json`, pending ones stay in the tree.
-- The fixed group versions together; `changeset publish` uses the `alpha` npm
-  dist-tag, except for a package whose every version on npm is an `alpha`
-  prerelease: that one goes to `latest`. `release publish` stops before
-  publishing such a package and prints the one-time fix
-  (`scripts/release-dist-tags.mjs`).
-
-Leave alpha for a stable `latest` release:
-
-```sh
-corepack pnpm changeset pre exit
-corepack pnpm changeset version   # strips -alpha
-```
+- Until 1.0.0 a breaking change is a `minor` whose summary starts with
+  `**Breaking:**`. A `major` would release every public package as 1.0.0, so
+  `node scripts/check-changesets-status.mjs --pending` refuses it; CI runs it
+  on every PR.
+- 1.0.0 is cut by a PR that sets the version itself.
 
 ## Publishing
 

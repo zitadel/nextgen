@@ -20,9 +20,9 @@ can skip the local runtime entirely by passing `--server <url>` instead of
 mkdir myapp
 cd myapp
 
-npx @zitadel/cli@alpha doctor
-npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --server local
+npx @zitadel/cli@latest doctor
+npx @zitadel/cli@latest start
+npx @zitadel/cli@latest setup --server local
 
 npm run dev
 ```
@@ -52,18 +52,18 @@ which framework and use case) and writes the app into the current directory.
 Stop preserves runtime data:
 
 ```sh
-npx @zitadel/cli@alpha stop
+npx @zitadel/cli@latest stop
 ```
 
 Delete it explicitly:
 
 ```sh
-npx @zitadel/cli@alpha reset --force
+npx @zitadel/cli@latest reset --force
 ```
 
 ## Known Rough Edges
 
-The alpha default registration form may ask for date of birth, and the profile
+The preview's default registration form may ask for date of birth, and the profile
 avatar may show a minimal `?` identity. These come from the current
 server-owned default user schema and profile surface; they are not setup
 failures.
@@ -83,7 +83,7 @@ The table shows port 8080; use the port `zitadel start` printed if your director
 | Sign-in shell (`<zitadel-login>`) | http://localhost:8080/ui/login/ |
 | Health check | http://localhost:8080/healthz |
 
-Sign in with `npx @zitadel/cli@alpha console`; the bare console URL asks for a
+Sign in with `npx @zitadel/cli@latest console`; the bare console URL asks for a
 password that is never printed.
 
 ## Manual Docker Compose

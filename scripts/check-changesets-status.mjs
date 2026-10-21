@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { forwardedArgs, isDirectRun, runCapture } from "./dev-process.mjs";
 import { PUBLIC_RELEASE_PACKAGES } from "./release-manifest.mjs";
 
-// Public product packages, mirrored by the fixed alpha group in
+// Public product packages, mirrored by the fixed group in
 // `.changeset/config.json`. `validateFixedGroup()` fails the release check if
 // the manifest and Changesets config drift.
 export const publicPackages = PUBLIC_RELEASE_PACKAGES.map((pkg) => ({
@@ -169,6 +169,10 @@ export function packageForFile(file) {
 }
 
 export function parseChangesetPackages(source) {
+  return parseChangesetReleases(source).map((release) => release.name);
+}
+
+export function parseChangesetReleases(source) {
   const normalized = source.replace(/\r\n/g, "\n");
   const match = normalized.match(/^---\n([\s\S]*?)\n---(?:\n|$)/);
   if (!match) {
@@ -183,8 +187,25 @@ export function parseChangesetPackages(source) {
       const packageMatch = line.match(
         /^["']?([^"':]+)["']?\s*:\s*["']?(major|minor|patch|none)["']?\s*$/,
       );
-      return packageMatch ? [packageMatch[1]] : [];
+      return packageMatch ? [{ name: packageMatch[1], type: packageMatch[2] }] : [];
     });
+}
+
+// Below 1.0.0 a breaking change is a minor bump. Changesets applies `major` as
+// written, and the fixed group would carry every public package to 1.0.0; GA
+// sets that version on purpose instead (docs/adrs/074-preview-releases-on-0x.md).
+export function previewMajorErrors(changesets, version) {
+  if (!/^0\./.test(version)) {
+    return [];
+  }
+  return changesets.flatMap(({ file, releases }) =>
+    releases
+      .filter((release) => release.type === "major")
+      .map((release) => ({
+        code: "preview-major",
+        message: `${file} bumps ${release.name} as major, which would release every public package as 1.0.0`,
+      })),
+  );
 }
 
 export function validateFixedGroup(config) {
@@ -193,7 +214,7 @@ export function validateFixedGroup(config) {
     return ["changesets config must define a fixed group array"];
   }
   if (config.fixed.length !== 1) {
-    errors.push(`expected exactly one fixed alpha group, found ${config.fixed.length}`);
+    errors.push(`expected exactly one fixed group, found ${config.fixed.length}`);
   }
 
   const group = Array.isArray(config.fixed[0]) ? config.fixed[0] : [];
@@ -202,13 +223,13 @@ export function validateFixedGroup(config) {
   const duplicates = group.filter((name, index) => group.indexOf(name) !== index);
 
   if (missing.length > 0) {
-    errors.push(`fixed alpha group is missing: ${missing.join(", ")}`);
+    errors.push(`fixed group is missing: ${missing.join(", ")}`);
   }
   if (extra.length > 0) {
-    errors.push(`fixed alpha group contains non-public packages: ${extra.join(", ")}`);
+    errors.push(`fixed group contains non-public packages: ${extra.join(", ")}`);
   }
   if (duplicates.length > 0) {
-    errors.push(`fixed alpha group contains duplicates: ${[...new Set(duplicates)].join(", ")}`);
+    errors.push(`fixed group contains duplicates: ${[...new Set(duplicates)].join(", ")}`);
   }
 
   return errors;
@@ -235,9 +256,12 @@ export async function checkChangesetsStatus(options) {
     const changesetSources =
       options.changesetSources ??
       (await readChangesetSources(root, analysis.currentChangesetFiles));
+    const releasesByFile = [];
 
     for (const file of analysis.currentChangesetFiles) {
-      const packages = parseChangesetPackages(changesetSources[file] ?? "");
+      const releases = parseChangesetReleases(changesetSources[file] ?? "");
+      const packages = releases.map((release) => release.name);
+      releasesByFile.push({ file, releases });
       parsedChangesets.push({ file, packages });
       for (const name of packages) {
         if (!publicPackageNameSet.has(name)) {
@@ -248,6 +272,9 @@ export async function checkChangesetsStatus(options) {
         }
       }
     }
+    errors.push(
+      ...previewMajorErrors(releasesByFile, options.version ?? (await readTrainVersion(root))),
+    );
 
     const hasPackageChangeset = parsedChangesets.some((changeset) => changeset.packages.length > 0);
     if (
@@ -307,7 +334,14 @@ export function validateChangesetStatusPackages(status) {
   }
 
   for (const release of status.releases ?? []) {
-    if (publicPackageNameSet.has(release.name) || release.type === "none") {
+    // A release no changeset asks for is one Changesets derives itself, such as
+    // a private workspace's prerelease version graduating when pre mode exits.
+    // A changeset that names a non-public package is reported above.
+    if (
+      publicPackageNameSet.has(release.name) ||
+      release.type === "none" ||
+      (release.changesets ?? []).length === 0
+    ) {
       continue;
     }
     errors.push({
@@ -405,6 +439,7 @@ export async function main(args = forwardedArgs(), options = {}) {
     changesetSources: options.changesetSources,
     changesetStatus: options.changesetStatus,
     runChangesetStatus: options.runChangesetStatus,
+    version: options.version,
   });
 
   const summary = renderStepSummary(report);
@@ -457,6 +492,13 @@ async function pendingChangesetEntries(root) {
 
 async function readChangesetsConfig(root) {
   return JSON.parse(await readFile(join(root, ".changeset/config.json"), "utf8"));
+}
+
+// The fixed group's shared version, read from the server package as the
+// release reads it.
+async function readTrainVersion(root) {
+  const server = PUBLIC_RELEASE_PACKAGES.find((pkg) => pkg.name === "@zitadel/server");
+  return JSON.parse(await readFile(join(root, server.dir, "package.json"), "utf8")).version;
 }
 
 async function readChangesetSources(root, files) {
@@ -520,7 +562,10 @@ function nextAction({ analysis, errors, changesetStatus, pending, parsedChangese
     return "Edit the changeset frontmatter so it names only public publishable packages from `.changeset/README.md`.";
   }
   if (errors.some((error) => error.code === "fixed-group")) {
-    return "Update `.changeset/config.json` so the fixed alpha group matches the public product package list.";
+    return "Update `.changeset/config.json` so the fixed group matches the public product package list.";
+  }
+  if (errors.some((error) => error.code === "preview-major")) {
+    return "Until 1.0.0, bump a breaking change as `minor` and start its summary with `**Breaking:**` (`.changeset/README.md#preview-versions`).";
   }
   if (errors.length > 0) {
     return "Fix the Changesets status errors above, then rerun this check.";
@@ -538,7 +583,7 @@ function nextAction({ analysis, errors, changesetStatus, pending, parsedChangese
     return "No pending changesets found.";
   }
   if (analysis.currentChangesetFiles.length > 0 && changesetStatus) {
-    return "Changesets are present and Changesets can calculate the planned alpha product bump.";
+    return "Changesets are present and Changesets can calculate the planned product bump.";
   }
   return "No changeset required for this diff.";
 }
@@ -555,7 +600,7 @@ function printUsage() {
   console.log(`Usage: node scripts/check-changesets-status.mjs [--base <ref>] [--pending] [--version-pr] [--summary]
 
 Checks whether the current diff has valid Changesets coverage for public packages.
-Use --pending to validate all current pending .changeset/*.md files before release prepare.
+Use --pending to validate every pending .changeset/*.md file; CI runs it on every pull request.
 Use --version-pr only for generated Changesets Version Packages PRs.
 `);
 }

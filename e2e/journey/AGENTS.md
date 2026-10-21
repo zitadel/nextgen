@@ -7,7 +7,7 @@ the repo root.
 
 ## The journey
 
-- CI runs `npx @zitadel/cli@alpha doctor --runtime binary`,
+- CI runs `npx @zitadel/cli@latest doctor --runtime binary`,
   `start --runtime binary` and `setup --framework <id> --server local`, each
   with `--non-interactive --json`, for every id in `ciFrameworkIds`
   (`e2e/journey/scripts/frameworks.mjs`). The ids in `ciExcludedFrameworkIds`

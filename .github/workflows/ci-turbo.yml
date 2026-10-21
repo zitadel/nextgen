@@ -174,6 +174,10 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: node scripts/check-pr-title.mjs --title "$PR_TITLE" --base "$BASE_SHA" --summary
 
+      - name: Check pending changesets
+        if: ${{ github.event_name == 'pull_request' }}
+        run: node scripts/check-changesets-status.mjs --pending --summary
+
       # Same outputs and gates as ci.yml; the affected set comes from turbo's
       # task graph (NEXTGEN_TASK_RUNNER above) instead of `moon query`. On a
       # push to main every lane gate stays off: its pull request ran them in

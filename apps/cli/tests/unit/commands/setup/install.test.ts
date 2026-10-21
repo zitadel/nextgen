@@ -38,7 +38,7 @@ function input(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
   };
 }
 
-const planCommand = "npx @zitadel/cli@latest plan";
+const planCommand = "npx @zitadel/cli@1.2.3 plan";
 
 describe("setup dependency installation", () => {
   it("installs when setup added a dependency", async () => {
@@ -69,7 +69,7 @@ describe("setup dependency installation", () => {
     expect(result.nextActions.join("\n")).toContain(".zitadel/schemas/");
     expect(result.nextActions.join("\n")).toContain(".zitadel/flows/");
     expect(result.nextActions.join("\n")).toContain(
-      `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@latest apply to publish.`,
+      `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@1.2.3 apply to publish.`,
     );
     expect(result.nextCommands).toEqual(["npm run dev", planCommand]);
   });
@@ -86,7 +86,7 @@ describe("setup dependency installation", () => {
       text:
         "Once login works, this shows your next steps (customizing is covered in " +
         "your README's Zitadel section):",
-      command: "npx @zitadel/cli@latest status",
+      command: "npx @zitadel/cli@1.2.3 status",
     });
     const boxText = result.boxActions
       .map((action) => [action.text, action.command].filter(Boolean).join(" "))

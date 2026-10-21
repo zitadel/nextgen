@@ -9,6 +9,7 @@ type CheckChangesetsStatusModule = {
     base?: string;
     pending?: boolean;
     versionPr?: boolean;
+    version?: string;
     entries: Array<{ status: string; file: string }>;
     config: { fixed: string[][] };
     changesetSources?: Record<string, string>;
@@ -309,7 +310,68 @@ This package is private.
     );
   });
 
-  it("rejects a fixed alpha group that omits server platform packages", async () => {
+  it("ignores a private package's bump that no changeset asks for", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      pending: true,
+      version: "0.1.0-alpha.28",
+      entries: [{ status: "A", file: ".changeset/cli-start.md" }],
+      config: validConfig(),
+      changesetSources: {
+        ".changeset/cli-start.md": `---
+"@zitadel/cli": minor
+---
+
+Improve local start behavior.
+`,
+      },
+      changesetStatus: {
+        releases: [
+          { name: "@zitadel/cli", type: "minor", changesets: ["cli-start"] },
+          { name: "@zitadel/docs", type: "patch", changesets: [] },
+        ],
+      },
+    });
+
+    expect(report.ok).toBe(true);
+  });
+
+  it("refuses a major changeset while the packages are below 1.0.0", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      pending: true,
+      version: "0.1.0",
+      entries: [{ status: "A", file: ".changeset/remove-endpoint.md" }],
+      config: validConfig(),
+      changesetSources: { ".changeset/remove-endpoint.md": MAJOR_SERVER_CHANGESET },
+      changesetStatus: {},
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.errors).toEqual([
+      expect.objectContaining({
+        code: "preview-major",
+        message: expect.stringContaining("@zitadel/server"),
+      }),
+    ]);
+    expect(report.nextAction).toContain("**Breaking:**");
+  });
+
+  it.each(["1.0.0", "1.0.0-rc.0"])("allows a major changeset at %s", async (version) => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      pending: true,
+      version,
+      entries: [{ status: "A", file: ".changeset/remove-endpoint.md" }],
+      config: validConfig(),
+      changesetSources: { ".changeset/remove-endpoint.md": MAJOR_SERVER_CHANGESET },
+      changesetStatus: {},
+    });
+
+    expect(report.ok).toBe(true);
+  });
+
+  it("rejects a fixed group that omits server platform packages", async () => {
     const { checkChangesetsStatus, publicPackages } = await loadModule();
     const report = await checkChangesetsStatus({
       entries: [{ status: "M", file: "docs/release.md" }],
@@ -593,6 +655,13 @@ describe("release publish guard", () => {
     }
   });
 });
+
+const MAJOR_SERVER_CHANGESET = `---
+"@zitadel/server": major
+---
+
+Remove the endpoint.
+`;
 
 function validConfig(): { fixed: string[][] } {
   return {
