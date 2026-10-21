@@ -406,158 +406,55 @@ func TestDeploymentServiceListWithoutExpand(t *testing.T) {
 	assert.Nil(t, result.ReleasesByID)
 }
 
-// expectNewestPrimary answers the read of the project's newest primary
-// deployment, after any other list read the test set up.
-func expectNewestPrimary(statements *servicemocks.MockAllStatements, newest *domain.Deployment) {
-	result := &database.ListResult[*domain.Deployment]{}
-	if newest != nil {
-		result.Items = []*domain.Deployment{newest}
-	}
-	statements.EXPECT().ListDeployments(unrestricted, gomock.Any()).Return(result, nil)
+// expectStatusLookup answers the unfiltered read of which listed deployments
+// are live, with live.
+func expectStatusLookup(statements *servicemocks.MockAllStatements, live ...*domain.Deployment) {
+	statements.EXPECT().ListLiveDeployments(unrestricted, gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.Deployment]{Items: live}, nil)
 }
 
-// expectStatusLookup answers the reads behind a primary deployment's status:
-// the project, whose only origin is appOrigin, and its newest primary
-// deployment.
-func expectStatusLookup(statements *servicemocks.MockAllStatements, newest *domain.Deployment) {
-	expectProjectOrigins(statements, appPrimary)
-	expectNewestPrimary(statements, newest)
-}
-
-// A primary deployment is live while it is the newest primary one; a
-// preview one while one of its URLs still serves it.
+// status is what the storage live predicate answers for the listed ids.
 func TestDeploymentServiceListStatus(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	newer := &domain.Deployment{
-		ProjectID: "proj_1", ID: "dep_newer", OriginKind: domain.DeploymentOriginKindPrimary,
-		Targets: []domain.DeploymentTarget{{Origin: appOrigin}},
-	}
+	newer := &domain.Deployment{ProjectID: "proj_1", ID: "dep_newer"}
 	preview := &domain.Deployment{ProjectID: "proj_1", ID: "dep_preview", OriginKind: domain.DeploymentOriginKindPreview}
-	expired := &domain.Deployment{ProjectID: "proj_1", ID: "dep_expired", OriginKind: domain.DeploymentOriginKindPreview}
-	older := &domain.Deployment{ProjectID: "proj_1", ID: "dep_older", OriginKind: domain.DeploymentOriginKindPrimary}
+	older := &domain.Deployment{ProjectID: "proj_1", ID: "dep_older"}
 	statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-		Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{newer, preview, expired, older}}, nil)
-	expectStatusLookup(statements, newer)
-	statements.EXPECT().ListLiveDeployments(unrestricted, gomock.Any(), gomock.Any()).
-		Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{preview}}, nil)
+		Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{newer, preview, older}}, nil)
+	expectStatusLookup(statements, newer, preview)
 
 	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1"})
 	require.NoError(t, err)
 	assert.Equal(t, map[string]bool{"dep_newer": true, "dep_preview": true}, result.Live)
 }
 
-// The live view leads with the newest primary deployment, narrowed to the
-// origins that are still primary, then the live previews newest first.
+// The live view is one page of the storage live list, with its cursor.
 func TestDeploymentServiceListLive(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1", Origins: []domain.Origin{
-		{Pattern: appOrigin, Kind: domain.OriginKindPrimary},
-	}}, nil)
-	primary := &domain.Deployment{
-		ProjectID: "proj_1", ID: "dep_primary", OriginKind: domain.DeploymentOriginKindPrimary, DeployedAt: deployedAt,
-		Targets: []domain.DeploymentTarget{{Origin: appOrigin}, {Origin: "https://removed.acme.com"}},
-	}
-	expectNewestPrimary(statements, primary)
-	newerPreview := &domain.Deployment{ID: "dep_newer", OriginKind: domain.DeploymentOriginKindPreview, DeployedAt: deployedAt.Add(time.Hour)}
-	olderPreview := &domain.Deployment{ID: "dep_older", OriginKind: domain.DeploymentOriginKindPreview, DeployedAt: deployedAt.Add(-time.Hour)}
+	served := &domain.Deployment{ProjectID: "proj_1", ID: "dep_served"}
 	statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{newerPreview, olderPreview}}, nil)
+		DoAndReturn(func(_ context.Context, _ time.Time, opts *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
+			assert.Equal(t, []byte("cursor"), opts.Pagination.Cursor)
+			return &database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{served}, NextCursor: []byte("next")}, nil
+		})
 
-	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true})
+	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, PageToken: "cursor"})
 	require.NoError(t, err)
-	require.Len(t, result.Items, 3)
-	assert.Equal(t, []string{"dep_primary", "dep_newer", "dep_older"},
-		[]string{result.Items[0].ID, result.Items[1].ID, result.Items[2].ID})
-	assert.Equal(t, []string{appOrigin}, result.Items[0].Origins())
-	assert.Len(t, primary.Targets, 2, "the stored deployment is not narrowed")
-	assert.True(t, result.Live["dep_primary"])
+	assert.Equal(t, []*domain.Deployment{served}, result.Items)
+	assert.Equal(t, "next", result.NextPageToken)
+	assert.True(t, result.Live["dep_served"])
 }
 
-// With origin, a primary origin the newest primary deployment does not cover
-// serves nothing.
-func TestDeploymentServiceListLiveOriginNotCovered(t *testing.T) {
+// With an origin, the live view keeps the deployment serving it.
+func TestDeploymentServiceListLiveOrigin(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1", Origins: []domain.Origin{
-		{Pattern: appOrigin, Kind: domain.OriginKindPrimary},
-		{Pattern: "https://www.acme.com", Kind: domain.OriginKindPrimary},
-	}}, nil)
-	expectNewestPrimary(statements, &domain.Deployment{
-		ProjectID: "proj_1", ID: "dep_primary", OriginKind: domain.DeploymentOriginKindPrimary,
-		Targets: []domain.DeploymentTarget{{Origin: appOrigin}},
-	})
+	serving := &domain.Deployment{ID: "dep_serving", Targets: []domain.DeploymentTarget{{Origin: appOrigin}}}
+	elsewhere := &domain.Deployment{ID: "dep_elsewhere", Targets: []domain.DeploymentTarget{{Origin: "https://www.acme.com"}}}
+	statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{elsewhere, serving}, NextCursor: []byte("next")}, nil)
 
-	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, Origin: new("https://www.acme.com")})
+	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, Origin: new(appOrigin)})
 	require.NoError(t, err)
-	assert.Empty(t, result.Items)
-}
-
-// With a limit of one, the first live page is the primary deployment, and it
-// hands out a token only when a live preview follows; the token resumes the
-// previews from the start.
-func TestDeploymentServiceListLivePagesPastThePrimary(t *testing.T) {
-	primary := &domain.Deployment{
-		ProjectID: "proj_1", ID: "dep_primary", OriginKind: domain.DeploymentOriginKindPrimary,
-		Targets: []domain.DeploymentTarget{{Origin: appOrigin}},
-	}
-	preview := &domain.Deployment{ID: "dep_preview", OriginKind: domain.DeploymentOriginKindPreview}
-	livePreviews := func(statements *servicemocks.MockAllStatements, items ...*domain.Deployment) {
-		statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).
-			DoAndReturn(func(_ context.Context, _ time.Time, opts *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
-				assert.Empty(t, opts.Pagination.Cursor)
-				return &database.ListResult[*domain.Deployment]{Items: items}, nil
-			})
-	}
-
-	t.Run("a preview follows", func(t *testing.T) {
-		svc, statements := newMockedDeploymentService(t)
-		expectProjectOrigins(statements, appPrimary)
-		expectNewestPrimary(statements, primary)
-		livePreviews(statements, preview)
-
-		first, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, Limit: 1})
-		require.NoError(t, err)
-		assert.Equal(t, []*domain.Deployment{primary}, first.Items)
-		require.NotEmpty(t, first.NextPageToken)
-
-		expectProjectOrigins(statements, appPrimary)
-		livePreviews(statements, preview)
-		second, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, Limit: 1, PageToken: first.NextPageToken})
-		require.NoError(t, err)
-		assert.Equal(t, []*domain.Deployment{preview}, second.Items)
-		assert.Empty(t, second.NextPageToken)
-	})
-
-	t.Run("nothing follows", func(t *testing.T) {
-		svc, statements := newMockedDeploymentService(t)
-		expectProjectOrigins(statements, appPrimary)
-		expectNewestPrimary(statements, primary)
-		livePreviews(statements)
-
-		first, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, Limit: 1})
-		require.NoError(t, err)
-		assert.Equal(t, []*domain.Deployment{primary}, first.Items)
-		assert.Empty(t, first.NextPageToken)
-	})
-}
-
-// A caller whose list filter does not admit the newest primary deployment
-// does not see it in the live view.
-func TestDeploymentServiceListLiveHonoursTheListFilter(t *testing.T) {
-	svc, statements := newMockedDeploymentService(t)
-	expectProjectOrigins(statements, appPrimary)
-	expectNewestPrimary(statements, &domain.Deployment{
-		ProjectID: "proj_1", ID: "dep_primary", OriginKind: domain.DeploymentOriginKindPrimary,
-		Targets: []domain.DeploymentTarget{{Origin: appOrigin}},
-	})
-	filtered := gomock.Cond(func(ctx context.Context) bool {
-		_, ok := service.AuthzListFilterFromContext(ctx)
-		return ok
-	})
-	statements.EXPECT().ListDeployments(filtered, gomock.Any()).Return(&database.ListResult[*domain.Deployment]{}, nil)
-	statements.EXPECT().ListLiveDeployments(filtered, gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.Deployment]{}, nil)
-
-	ctx := service.WithAuthzListFilter(t.Context(), service.AuthzListFilter{})
-	result, err := svc.List(ctx, service.ListDeploymentsInput{ProjectID: "proj_1", Live: true})
-	require.NoError(t, err)
-	assert.Empty(t, result.Items)
+	assert.Equal(t, []*domain.Deployment{serving}, result.Items)
+	assert.Empty(t, result.NextPageToken)
 }

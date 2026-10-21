@@ -264,31 +264,41 @@ func TestDeploymentStatements_OptimisticLockAdmitsOneDeploy(t *testing.T) {
 func TestDeploymentStatements_LiveView(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureReleaseProject(t, d.stmts)
+		addPrimaryOrigins(t, d.stmts, projectID, appOrigin, wwwOrigin)
 		relA := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
 		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
 
 		primaries := deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
 		previews := deploy(t, d.stmts, projectID, relB.ID, []string{gitOrigin, shaOrigin}, previewDeploy(time.Hour))
-		appOnly := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
 
 		now := time.Now()
 		got := live(t, d.stmts, projectID, now, nil)
-		require.Equal(t, []string{appOnly.ID, previews.ID, primaries.ID}, deployment.DeploymentIDs(got))
-		assert.Equal(t, []string{appOrigin}, got[0].Origins())
-		assert.Equal(t, []string{gitOrigin, shaOrigin}, got[1].Origins())
-		assert.Equal(t, []string{wwwOrigin}, got[2].Origins())
+		require.Equal(t, []string{previews.ID, primaries.ID}, deployment.DeploymentIDs(got), "newest first")
+		assert.Equal(t, []string{gitOrigin, shaOrigin}, got[0].Origins())
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, got[1].Origins())
+		assert.Equal(t, []string{previews.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, now, new(relB.ID))))
 
-		assert.Equal(t, []string{appOnly.ID, previews.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, now, new(relB.ID))))
+		// An origin no longer primary drops out of the primary deployment.
+		_, _, err := d.stmts.DeleteOriginByPattern(t.Context(), projectID, wwwOrigin)
+		require.NoError(t, err)
+		got = live(t, d.stmts, projectID, now, nil)
+		require.Equal(t, []string{previews.ID, primaries.ID}, deployment.DeploymentIDs(got))
+		assert.Equal(t, []string{appOrigin}, got[1].Origins())
 
+		// A URL that became a primary origin is no preview any more.
+		addPrimaryOrigins(t, d.stmts, projectID, gitOrigin)
+		got = live(t, d.stmts, projectID, now, nil)
+		require.Equal(t, []string{previews.ID, primaries.ID}, deployment.DeploymentIDs(got))
+		assert.Equal(t, []string{shaOrigin}, got[0].Origins())
+
+		// Expired previews serve nothing.
 		later := now.Add(2 * time.Hour)
-		assert.Equal(t, []string{appOnly.ID, primaries.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, later, nil)))
-		for _, origin := range []string{gitOrigin, shaOrigin} {
-			swept, err := d.stmts.DeleteExpiredPreview(t.Context(), projectID, origin, later)
-			require.NoError(t, err)
-			assert.True(t, swept)
-		}
-		assert.Equal(t, []string{appOnly.ID, primaries.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, now, nil)))
-		assert.Equal(t, []string{previews.ID}, deployment.DeploymentIDs(history(t, d.stmts, projectID, gitOrigin)))
+		assert.Equal(t, []string{primaries.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, later, nil)))
+
+		// Only the newest primary deployment serves.
+		newer := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
+		assert.Equal(t, []string{newer.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, later, nil)))
+		assert.Equal(t, []string{previews.ID}, deployment.DeploymentIDs(history(t, d.stmts, projectID, shaOrigin)))
 	})
 }
 
@@ -298,22 +308,26 @@ func TestDeploymentStatements_LiveView(t *testing.T) {
 func TestDeploymentStatements_LiveDeploymentOfOneOrigin(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureReleaseProject(t, d.stmts)
+		addPrimaryOrigins(t, d.stmts, projectID, appOrigin, wwwOrigin)
 		relA := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
 		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
 
 		both := deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
-		appOnly := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
 		previews := deploy(t, d.stmts, projectID, relA.ID, []string{gitOrigin, shaOrigin}, previewDeploy(time.Hour))
 		now := time.Now()
 
-		got, err := d.stmts.GetLiveDeployment(t.Context(), projectID, appOrigin, now)
-		require.NoError(t, err)
-		assert.Equal(t, appOnly.ID, got.ID)
-
-		got, err = d.stmts.GetLiveDeployment(t.Context(), projectID, wwwOrigin, now)
+		got, err := d.stmts.GetLiveDeployment(t.Context(), projectID, wwwOrigin, now)
 		require.NoError(t, err)
 		assert.Equal(t, both.ID, got.ID)
-		assert.Equal(t, []string{wwwOrigin}, got.Origins(), "narrowed to the origins it still serves")
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, got.Origins(), "narrowed to the origins it still serves")
+
+		// The newest primary deployment does not cover www, so www serves nothing.
+		appOnly := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
+		got, err = d.stmts.GetLiveDeployment(t.Context(), projectID, appOrigin, now)
+		require.NoError(t, err)
+		assert.Equal(t, appOnly.ID, got.ID)
+		_, err = d.stmts.GetLiveDeployment(t.Context(), projectID, wwwOrigin, now)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 		got, err = d.stmts.GetLiveDeployment(t.Context(), projectID, gitOrigin, now)
 		require.NoError(t, err)
@@ -327,9 +341,23 @@ func TestDeploymentStatements_LiveDeploymentOfOneOrigin(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{shaOrigin}, got.Origins())
 
+		// A URL that became a primary origin answers by the primary rule.
+		addPrimaryOrigins(t, d.stmts, projectID, shaOrigin)
+		_, err = d.stmts.GetLiveDeployment(t.Context(), projectID, shaOrigin, now)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
 		_, err = d.stmts.GetLiveDeployment(t.Context(), projectID, "https://nothing.acme.com", now)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
+}
+
+// addPrimaryOrigins registers patterns as primary origins of the project.
+func addPrimaryOrigins(t *testing.T, stmts service.AllStatements, projectID string, patterns ...string) {
+	t.Helper()
+	for _, pattern := range patterns {
+		_, err := stmts.InsertOrigin(t.Context(), projectID, domain.Origin{Pattern: pattern, Kind: domain.OriginKindPrimary})
+		require.NoError(t, err)
+	}
 }
 
 // An origin no longer deployed to keeps its history.

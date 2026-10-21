@@ -26768,7 +26768,6 @@ type GetDeploymentByIdErrorResponse struct {
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	Internal            Internal
-	ProjNotFound        ProjNotFound
 	ReqInvalid          ReqInvalid
 }
 
@@ -26781,7 +26780,6 @@ const (
 	DepNotFoundGetDeploymentByIdErrorResponse         GetDeploymentByIdErrorResponseType = "dep.not_found"
 	DepPermissionDeniedGetDeploymentByIdErrorResponse GetDeploymentByIdErrorResponseType = "dep.permission_denied"
 	InternalGetDeploymentByIdErrorResponse            GetDeploymentByIdErrorResponseType = "internal"
-	ProjNotFoundGetDeploymentByIdErrorResponse        GetDeploymentByIdErrorResponseType = "proj.not_found"
 	ReqInvalidGetDeploymentByIdErrorResponse          GetDeploymentByIdErrorResponseType = "req.invalid"
 )
 
@@ -26803,11 +26801,6 @@ func (s GetDeploymentByIdErrorResponse) IsDepPermissionDenied() bool {
 // IsInternal reports whether GetDeploymentByIdErrorResponse is Internal.
 func (s GetDeploymentByIdErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetDeploymentByIdErrorResponse
-}
-
-// IsProjNotFound reports whether GetDeploymentByIdErrorResponse is ProjNotFound.
-func (s GetDeploymentByIdErrorResponse) IsProjNotFound() bool {
-	return s.Type == ProjNotFoundGetDeploymentByIdErrorResponse
 }
 
 // IsReqInvalid reports whether GetDeploymentByIdErrorResponse is ReqInvalid.
@@ -26896,27 +26889,6 @@ func (s GetDeploymentByIdErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetDeploymentByIdErrorResponse(v Internal) GetDeploymentByIdErrorResponse {
 	var s GetDeploymentByIdErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetProjNotFound sets GetDeploymentByIdErrorResponse to ProjNotFound.
-func (s *GetDeploymentByIdErrorResponse) SetProjNotFound(v ProjNotFound) {
-	s.Type = ProjNotFoundGetDeploymentByIdErrorResponse
-	s.ProjNotFound = v
-}
-
-// GetProjNotFound returns ProjNotFound and true boolean if GetDeploymentByIdErrorResponse is ProjNotFound.
-func (s GetDeploymentByIdErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
-	if !s.IsProjNotFound() {
-		return v, false
-	}
-	return s.ProjNotFound, true
-}
-
-// NewProjNotFoundGetDeploymentByIdErrorResponse returns new GetDeploymentByIdErrorResponse from ProjNotFound.
-func NewProjNotFoundGetDeploymentByIdErrorResponse(v ProjNotFound) GetDeploymentByIdErrorResponse {
-	var s GetDeploymentByIdErrorResponse
-	s.SetProjNotFound(v)
 	return s
 }
 
@@ -35239,7 +35211,6 @@ type ListDeploymentsErrorResponse struct {
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	Internal            Internal
-	ProjNotFound        ProjNotFound
 	ReqInvalid          ReqInvalid
 }
 
@@ -35252,7 +35223,6 @@ const (
 	DepNotFoundListDeploymentsErrorResponse         ListDeploymentsErrorResponseType = "dep.not_found"
 	DepPermissionDeniedListDeploymentsErrorResponse ListDeploymentsErrorResponseType = "dep.permission_denied"
 	InternalListDeploymentsErrorResponse            ListDeploymentsErrorResponseType = "internal"
-	ProjNotFoundListDeploymentsErrorResponse        ListDeploymentsErrorResponseType = "proj.not_found"
 	ReqInvalidListDeploymentsErrorResponse          ListDeploymentsErrorResponseType = "req.invalid"
 )
 
@@ -35274,11 +35244,6 @@ func (s ListDeploymentsErrorResponse) IsDepPermissionDenied() bool {
 // IsInternal reports whether ListDeploymentsErrorResponse is Internal.
 func (s ListDeploymentsErrorResponse) IsInternal() bool {
 	return s.Type == InternalListDeploymentsErrorResponse
-}
-
-// IsProjNotFound reports whether ListDeploymentsErrorResponse is ProjNotFound.
-func (s ListDeploymentsErrorResponse) IsProjNotFound() bool {
-	return s.Type == ProjNotFoundListDeploymentsErrorResponse
 }
 
 // IsReqInvalid reports whether ListDeploymentsErrorResponse is ReqInvalid.
@@ -35367,27 +35332,6 @@ func (s ListDeploymentsErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalListDeploymentsErrorResponse(v Internal) ListDeploymentsErrorResponse {
 	var s ListDeploymentsErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetProjNotFound sets ListDeploymentsErrorResponse to ProjNotFound.
-func (s *ListDeploymentsErrorResponse) SetProjNotFound(v ProjNotFound) {
-	s.Type = ProjNotFoundListDeploymentsErrorResponse
-	s.ProjNotFound = v
-}
-
-// GetProjNotFound returns ProjNotFound and true boolean if ListDeploymentsErrorResponse is ProjNotFound.
-func (s ListDeploymentsErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
-	if !s.IsProjNotFound() {
-		return v, false
-	}
-	return s.ProjNotFound, true
-}
-
-// NewProjNotFoundListDeploymentsErrorResponse returns new ListDeploymentsErrorResponse from ProjNotFound.
-func NewProjNotFoundListDeploymentsErrorResponse(v ProjNotFound) ListDeploymentsErrorResponse {
-	var s ListDeploymentsErrorResponse
-	s.SetProjNotFound(v)
 	return s
 }
 
