@@ -46,6 +46,7 @@ where the code runs, not the root, from client modules:
 | `@zitadel/sdk-next/react`      | Client Components                 | `useAuth()`, `AuthContextProvider` |
 | `@zitadel/sdk-next/session`    | Client Components                 | `getSession()`                     |
 | `@zitadel/sdk-next/client`     | Client boundary                   | `configureZitadel()`, web components |
+| `@zitadel/sdk-next/components` | Client Components                 | `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession` |
 
 **1. Request-boundary proxy.** It proxies `/__nextgen/*` to the auth backend
 (same-origin), verifies the session JWT via JWKS, and redirects unauthenticated
@@ -100,39 +101,30 @@ pages (which the matcher does not cover), read client-side with `getSession()`
 from `@zitadel/sdk-next/session` instead — it fetches same-origin
 `{proxyPath}/sessions/me`.
 
-**4. Login page.** Render `<zitadel-login>` client-side only (via
-`next/dynamic` with `ssr: false`); call `configureZitadel({ projectId, proxyPath })`
-from `@zitadel/sdk-next/client` inside the dynamic import, and set the
-`post-sign-in-url` attribute. `<zitadel-logout>` and `<zitadel-session>` exist
-for logout and profile UI. Sign-in/out navigate to `post-sign-in-url` /
+**4. Login page.** Render `ZitadelLogin` from `@zitadel/sdk-next/components`
+client-side only (via `next/dynamic` with `ssr: false`); call
+`configureZitadel({ projectId, proxyPath })` from the same entry inside the
+dynamic import, and set the `postSignInUrl` prop. `ZitadelLogout` and
+`ZitadelSession` exist for logout and profile UI. Sign-in/out navigate to `post-sign-in-url` /
 `post-sign-out-url`, so chrome re-reads on the next page load.
 
 ## Widget props and events
 
-The widgets are rendered as raw custom elements, so set their props as the element's own kebab-case attributes (`post-sign-in-url`, `project-id`); `@zitadel/sdk-next/jsx` types them. The `@zitadel/sdk-react` skill lists each prop under its wrapper name in camelCase. The table below lists the events.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` from `@zitadel/sdk-next/components` are the `@zitadel/sdk-react` wrappers, so they take the same camelCase props, which the `@zitadel/sdk-react` skill lists. They set object props such as `project` and `locales` as element properties on React 18 and 19, through server-rendered hydration too. The table below lists the events and their callbacks.
 
-The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
+Each widget event reaches the callback in the last column, which receives the event's `detail` payload.
 
-| Widget event | Fires when | Detail | Widgets |
-| --- | --- | --- | --- |
-| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login |
-| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login |
-| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login |
-| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login |
-| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login |
-| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session |
+| Widget event | Fires when | Detail | Widgets | Callback |
+| --- | --- | --- | --- | --- |
+| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `onFlowStep` |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login | `onFlowInput` |
+| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login | `onFlowComplete` |
+| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login | `onFlowRedirect` |
+| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login | `onFlowError` |
+| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session | `onSignout` |
 
 ```tsx
-const ref = useRef<HTMLElementTagNameMap['zitadel-login']>(null);
-
-useEffect(() => {
-  const login = ref.current;
-  const onComplete = (event: Event) => track((event as CustomEvent).detail);
-  login?.addEventListener('zitadel-flow-complete', onComplete);
-  return () => login?.removeEventListener('zitadel-flow-complete', onComplete);
-}, []);
-
-return <zitadel-login ref={ref} post-sign-in-url="/admin" />;
+<ZitadelLogin project={project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
 
 ## Read these, don't guess
