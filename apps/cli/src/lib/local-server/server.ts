@@ -17,7 +17,7 @@ import {
 import { HttpHealth, TcpPorts } from "./internal/probes";
 import { withStartLock } from "./internal/start-lock";
 import { RuntimeFileStore } from "./internal/store";
-import { discoverManagedRuntimeProcesses, type ManagedRuntimeProcess } from "./processes";
+import type { LocalServers, ManagedRuntimeProcess } from "./processes";
 import {
   type RuntimeBackend,
   type RuntimeMetadata,
@@ -211,8 +211,8 @@ export class LocalServer {
    * cannot find the server: the processes are found by their command lines, not
    * by any directory's record.
    */
-  static async stopAll(): Promise<SweepResult> {
-    const discovery = await discoverManagedRuntimeProcesses();
+  static async stopAll(servers: LocalServers): Promise<SweepResult> {
+    const discovery = await servers.current();
     if (!discovery.supported) {
       return { supported: false, error: discovery.error };
     }

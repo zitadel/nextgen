@@ -52,8 +52,4 @@ post:
           schema:
             $ref: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../../components/error-details.yaml
+      $ref: initClaim-error-response.yaml

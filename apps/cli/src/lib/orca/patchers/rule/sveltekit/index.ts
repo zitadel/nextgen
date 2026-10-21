@@ -38,12 +38,26 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
     return framework === "sveltekit";
   }
 
+  protected devPortOps(ctx: PatchContext): FileOp[] {
+    return [devScriptPortOp(ctx.issuer, { strictPort: true })];
+  }
+
   protected routeOps(ctx: PatchContext): FileOp[] {
     const src = (rel: string) => join(ctx.framework.appDir, rel);
     return [
+      // The auth boundary is written on every setup; a pre-existing hook at
+      // this exact path is a genuine conflict the file-writer refuses (and
+      // --force replaces), the same way Next writes its request boundary.
       { kind: "write", path: src("hooks.server.ts"), contents: hooksServerTemplate(ctx) },
-      { kind: "write", path: src("routes/+layout.svelte"), contents: layoutTemplate() },
-      { kind: "write", path: src("routes/+page.svelte"), contents: indexPageTemplate() },
+      // The app shell and landing page are written only when setup created the
+      // skeleton itself — a pre-existing app keeps its own root layout, theme,
+      // and landing page (ADR 044), same as the Next/Nuxt homepage.
+      ...(ctx.scaffoldedFramework
+        ? ([
+            { kind: "write", path: src("routes/+layout.svelte"), contents: layoutTemplate() },
+            { kind: "write", path: src("routes/+page.svelte"), contents: indexPageTemplate() },
+          ] satisfies FileOp[])
+        : []),
       {
         kind: "write",
         path: src("routes/login/+page.svelte"),
@@ -98,6 +112,14 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
     // infrastructure: without it /__nextgen/* 404s and protected routes open, so
     // doctor fails rather than warning about a missing page.
     return [join(view.framework.appDir, "hooks.server.ts")];
+  }
+
+  protected override conditionallyScaffoldedFiles(view: PatchView): ReadonlyArray<string> {
+    // Written only when setup created the app skeleton itself; on a
+    // pre-existing app the shell and landing page stay user-owned (see routeOps),
+    // so the managed-files check must not expect them on a manifest-less app.
+    const src = (rel: string) => join(view.framework.appDir, rel);
+    return [src("routes/+layout.svelte"), src("routes/+page.svelte")];
   }
 
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {

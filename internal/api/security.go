@@ -142,6 +142,9 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.ListMyProjectsOperation:        true,
 	api.GetMyUserSchemaOperation:       true,
 	api.ListMyTeamsOperation:           true,
+	api.ListMyPasskeysOperation:        true,
+	api.ListMyIdentityLinksOperation:   true,
+	api.GetMyPasswordStateOperation:    true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous
@@ -149,18 +152,21 @@ var sessionCookieOperations = map[api.OperationName]bool{
 // session-only operation nothing else can satisfy, so the skip becomes the 401
 // the contract declares.
 var userBoundSessionOperations = map[api.OperationName]bool{
-	api.CreateGrantOperation:     true,
-	api.GetGrantOperation:        true,
-	api.DeleteGrantOperation:     true,
-	api.QueryGrantsOperation:     true,
-	api.QueryUsersOperation:      true,
-	api.QueryTeamsOperation:      true,
-	api.GetTeamOperation:         true,
-	api.ListMyProjectsOperation:  true,
-	api.GetMyUserSchemaOperation: true,
-	api.ListMyTeamsOperation:     true,
-	api.GetProjectOperation:      true,
-	api.PatchProjectOperation:    true,
+	api.CreateGrantOperation:         true,
+	api.GetGrantOperation:            true,
+	api.DeleteGrantOperation:         true,
+	api.QueryGrantsOperation:         true,
+	api.QueryUsersOperation:          true,
+	api.QueryTeamsOperation:          true,
+	api.GetTeamOperation:             true,
+	api.ListMyProjectsOperation:      true,
+	api.GetMyUserSchemaOperation:     true,
+	api.ListMyTeamsOperation:         true,
+	api.ListMyPasskeysOperation:      true,
+	api.ListMyIdentityLinksOperation: true,
+	api.GetMyPasswordStateOperation:  true,
+	api.GetProjectOperation:          true,
+	api.PatchProjectOperation:        true,
 	// Console management screens (#1300 §1). Their writes need the CSRF token
 	// (ADR 053 §5, csrf.go).
 	api.CreateUserOperation:            true,
@@ -168,6 +174,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.PatchUserByIDOperation:         true,
 	api.ListUserTeamsOperation:         true,
 	api.ListUserPasskeysOperation:      true,
+	api.GetUserPasswordStateOperation:  true,
 	api.ListUserIdentityLinksOperation: true,
 	api.DeleteUserByIDOperation:        true,
 	api.CreateTeamOperation:            true,

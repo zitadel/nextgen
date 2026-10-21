@@ -1,10 +1,5 @@
 type: object
-description: |
-  Deployments, newest first.
-
-  In the history (the default), each deployment carries every target it
-  made the release live on. In the live view (`live=true`), each deployment
-  carries only the targets it still serves.
+description: One page of deployments, ordered as the operation describes.
 required:
   - deployments
 properties:

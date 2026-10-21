@@ -9,11 +9,13 @@ import { isObject, parseJsonObject } from "../../../../json";
  * Idempotent — already-set values are left as-is. Throws `E_VALIDATION` when the
  * file is absent, the project/serve target cannot be located, or the workspace
  * has several projects with no `defaultProject` to disambiguate (rather than
- * guessing and wiring the proxy into an arbitrary one).
+ * guessing and wiring the proxy into an arbitrary one). `previousPort` moves
+ * the app: a serve port still on that port is rewritten to `port`.
  */
 export function angularProxyEdit(opts: {
   proxyConfig: string;
   port?: number;
+  previousPort?: number;
 }): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
@@ -65,7 +67,11 @@ export function angularProxyEdit(opts: {
       options.proxyConfig = opts.proxyConfig;
       changed = true;
     }
-    if (opts.port !== undefined && options.port === undefined) {
+    const moving =
+      opts.previousPort !== undefined &&
+      options.port === opts.previousPort &&
+      opts.port !== opts.previousPort;
+    if (opts.port !== undefined && (options.port === undefined || moving)) {
       options.port = opts.port;
       changed = true;
     }

@@ -132,7 +132,9 @@ describe("<zitadel-login> with identity providers", () => {
   }
 
   /** Stub navigation for the duration of `run`, returning the calls made. */
-  async function withStubbedNavigation(run: () => Promise<void>): Promise<string[]> {
+  async function withStubbedNavigation(
+    run: (assign: ReturnType<typeof vi.fn>) => Promise<void>,
+  ): Promise<string[]> {
     const assign = vi.fn();
     const { location } = window;
     Object.defineProperty(window, "location", {
@@ -140,7 +142,7 @@ describe("<zitadel-login> with identity providers", () => {
       value: { ...location, assign },
     });
     try {
-      await run();
+      await run(assign);
     } finally {
       Object.defineProperty(window, "location", { configurable: true, value: location });
     }
@@ -252,6 +254,36 @@ describe("<zitadel-login> with identity providers", () => {
 
     expect(redirects[0]?.detail.redirect_url).toBe("https://idp.mock.invalid/authorize");
     expect(completes).toHaveLength(0);
+  });
+
+  it("waits for work a zitadel-flow-redirect listener registers before navigating", async () => {
+    const element = await mountLogin();
+    const atom = providerAtom(element);
+    await atom.updateComplete;
+    const finish = new AbortController();
+    const redirected = vi.fn();
+    element.addEventListener("zitadel-flow-redirect", (event) => {
+      redirected();
+      if (event instanceof CustomEvent) {
+        event.detail.waitUntil(
+          new Promise((resolve) => finish.signal.addEventListener("abort", resolve)),
+        );
+      }
+    });
+
+    const calls = await withStubbedNavigation(async (assign) => {
+      atom.shadowRoot
+        ?.querySelectorAll("zl-button")[0]
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+      await vi.waitFor(() => expect(redirected).toHaveBeenCalledOnce());
+      await element.updateComplete;
+      expect(assign).not.toHaveBeenCalled();
+
+      finish.abort();
+      await vi.waitFor(() => expect(assign).toHaveBeenCalledOnce());
+    });
+
+    expect(calls).toEqual(["https://idp.mock.invalid/authorize"]);
   });
 
   it("does not paint the redirect step it is navigating away from", async () => {

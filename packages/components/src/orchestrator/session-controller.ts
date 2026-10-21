@@ -10,6 +10,8 @@ type Resolved = ReturnType<typeof resolveApi>;
  * The signed-in identity and the sign-out call shared by `<zitadel-session>`
  * and `<zitadel-logout>`: one `GET /sessions/me` once a project is resolvable,
  * and `DELETE /sessions/me` that fires `zitadel-signout` on success.
+ *
+ * @fires {CustomEvent<ZitadelSignoutDetail>} zitadel-signout - The session was revoked; carries the display and identifier.
  */
 export class SessionController implements ReactiveController {
   display = "";
@@ -92,7 +94,12 @@ export class SessionController implements ReactiveController {
     this.loading = false;
     this.host.requestUpdate();
     onRevoked?.();
-    emit(this.host, "zitadel-signout", { display: this.display, identifier: this.identifier });
+    await emit(
+      this.host,
+      "zitadel-signout",
+      { display: this.display, identifier: this.identifier },
+      { waitForListeners: true },
+    );
     return true;
   }
 

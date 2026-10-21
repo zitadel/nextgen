@@ -53,6 +53,30 @@ export interface SchemaField {
 }
 
 /**
+ * The `<input>` attributes a field's type decides. A number input defaults to
+ * `step=1`, which would refuse `1.5` for a `number` property before the form
+ * submits; whether an `integer` takes a fraction is the server's to say. A
+ * boolean is typed as text where a form has no switch for it.
+ */
+export function inputAttributes(entry: SchemaField): { type: string; step?: string } {
+  if (entry.inputType === "number") return { type: "number", step: "any" };
+  return { type: entry.inputType === "boolean" ? "text" : entry.inputType };
+}
+
+/**
+ * The JSON value a form control's text stands for. An input always yields a
+ * string, but JSON Schema validates a `number`/`integer` property against a
+ * JSON number, and `"42"` would be rejected. A value that will not parse is
+ * sent through untouched so the server explains why, rather than becoming
+ * `NaN` — which `JSON.stringify` would silently turn into `null`.
+ */
+export function attributeValue(entry: SchemaField, value: string): unknown {
+  if (entry.inputType !== "number") return value;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : value;
+}
+
+/**
  * Human-readable schema name for the picker.
  *
  * Schemas carry no dedicated name field: `title` is the authored document
@@ -110,25 +134,6 @@ export function schemaFields(schema: UserSchema): SchemaField[] {
       placeholder: propertyPlaceholder(property),
     }));
 }
-
-/**
- * A field's trimmed, non-empty input as the JSON its property declares. An
- * input always yields a string, but JSON Schema validates a `number`/`integer`
- * property against a JSON number, and `"42"` would be rejected. A value that
- * will not parse (typed into a text input; a number input reports it as empty)
- * is sent through untouched so the server explains why, rather than becoming
- * `NaN`, which `JSON.stringify` would silently turn into `null`. So is text
- * `Number` would read differently than typed: hex, binary or octal (`0x10` is
- * 16), and a whole number past 2^53, which it rounds.
- */
-export function attributeValue(entry: SchemaField, value: string): string | number {
-  if (entry.inputType !== "number" || !DECIMAL.test(value)) return value;
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return value;
-  return Number.isInteger(numeric) && !Number.isSafeInteger(numeric) ? value : numeric;
-}
-
-const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
 
 /**
  * The columns the users table shows, unioned across every schema the loaded

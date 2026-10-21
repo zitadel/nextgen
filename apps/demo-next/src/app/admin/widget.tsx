@@ -4,7 +4,9 @@ import dynamic from "next/dynamic";
 
 const ZitadelLogout = dynamic(
   async () => {
-    const { configureZitadel } = await import("@zitadel/sdk-next/client");
+    const { ZitadelLogout: Logout, configureZitadel } = await import(
+      "@zitadel/sdk-next/components"
+    );
     const project = configureZitadel({
       projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "proj_demo",
       proxyPath: "/__nextgen",
@@ -12,7 +14,7 @@ const ZitadelLogout = dynamic(
     return function ZitadelLogoutElement() {
       // The admin page's surface is fixed light, so declare it — same
       // contract as the login page's widget.
-      return <zitadel-logout project={project} theme="light" post-sign-out-url="/login" />;
+      return <Logout project={project} theme="light" postSignOutUrl="/login" />;
     };
   },
   { ssr: false },

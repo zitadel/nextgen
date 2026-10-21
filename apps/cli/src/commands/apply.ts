@@ -38,7 +38,7 @@ export default class Apply extends BaseCommand {
     const secret = await readZitadelSecret(cwd);
     consola.info(`Project   ${secret.project_id}`);
     consola.info(`Server    ${source}`);
-    // Verbatim: the sync loop diffs and writes back what it reads.
+    // Verbatim: the sync loop compares what it reads against the files.
     const client = createZitadelClient(
       { baseUrl: source, token: secret.project_secret },
       { verbatim: true },
@@ -65,7 +65,7 @@ export default class Apply extends BaseCommand {
         data: {
           synced: true,
           // Platform resources this run touched (with resulting ids);
-          // `files_updated` stays the local write-backs only.
+          // `files_updated` lists the local rewrites only: re-pinned flows.
           changes: applied,
           files_updated: filesUpdated,
           unsupported_deletions: unsupported.length,

@@ -19,6 +19,7 @@ import { useRequiredProjectScope } from "@/lib/project-scope";
 import {
   attributeValue,
   fetchAllSchemas,
+  inputAttributes,
   type SchemaField,
   schemaDisplayName,
   schemaFieldSummary,
@@ -235,8 +236,7 @@ function SchemaInput({
       <Input
         id={id}
         name={field.key}
-        // A boolean is typed as text here; the user detail page has a switch.
-        type={field.inputType === "boolean" ? "text" : field.inputType}
+        {...inputAttributes(field)}
         required={field.required}
         placeholder={field.placeholder}
         value={value}

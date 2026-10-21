@@ -27,16 +27,15 @@ const (
 )
 
 var (
-	deploymentSchema = deployment.NewSchema(deploymentsTable, originsTable, previewsTable)
+	deploymentTables = deployment.Tables{Deployments: deploymentsTable, Origins: originsTable, Previews: previewsTable, ProjectOrigins: "project_origins"}
+	deploymentSchema = deployment.NewSchema(deploymentTables)
 
 	originsQuery        = deployment.OriginsSelect(originsTable) + ` WHERE t.project_id = ? AND t.deployment_id IN (SELECT value FROM json_each(?))`
 	newestPerOriginStmt = deployment.OriginsSelect(originsTable) +
 		` WHERE t.project_id = ? AND t.origin IN (SELECT value FROM json_each(?)) AND NOT ` + deployment.NewerOriginRowExists(originsTable)
-	liveOriginsStmt = originsQuery + ` AND NOT ` + deployment.NewerOriginRowExists(originsTable) +
-		` AND ` + deployment.OriginServes(previewsTable, "?")
+	liveOriginsStmt    = originsQuery + ` AND ` + deployment.RowServes(deploymentTables, "?")
 	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = ?1 AND id = (SELECT t.deployment_id FROM ` + originsTable + ` t` +
-		` WHERE t.project_id = ?1 AND t.origin = ?2 AND NOT ` + deployment.NewerOriginRowExists(originsTable) +
-		` AND ` + deployment.OriginServes(previewsTable, "?3") + `)`
+		` WHERE t.project_id = ?1 AND t.origin = ?2 AND ` + deployment.RowServes(deploymentTables, "?3") + `)`
 )
 
 type deploymentStatements struct{ statement }
