@@ -12,6 +12,7 @@ export const DISPATCHED_EVENTS = [
   "zitadel-flow-input",
   "zitadel-flow-redirect",
   "zitadel-flow-step",
+  "zitadel-session-error",
   "zitadel-signout",
 ] as const;
 

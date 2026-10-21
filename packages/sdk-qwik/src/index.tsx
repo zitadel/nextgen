@@ -28,6 +28,8 @@ import {
   type ZitadelProject,
 } from "@zitadel/api/config";
 
+import { isServer } from "@qwik.dev/core/build";
+
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 import type { ZitadelWidgetAttributes } from "./types";
 
@@ -191,6 +193,41 @@ function withDetail<Detail>(event: Event, handler: ((detail: Detail) => void) | 
   if (event instanceof CustomEvent) handler?.(event.detail);
 }
 
+const sessionForwarders = new WeakMap<Element, () => void>();
+
+/**
+ * Forwards the `zitadel-session-error` event of a session widget to the
+ * consumer's QRL callback. Called from the `ref` callback, so the listener
+ * exists before the widget can start loading: the widget reports an early
+ * request failure once and never replays it, and the `document-ready` task runs
+ * a turn later. It is called from that task too, because Qwik resumes
+ * server-rendered markup without running the `ref` callback again. The handler
+ * reads the callback from `props` when the event fires, so a changed callback
+ * needs no re-registration. A prior registration on the same element is removed
+ * first (no duplicate listeners), and the returned disposer removes this one.
+ */
+function forwardSessionError(
+  el: Element,
+  props: { onSessionError$?: QRL<(detail: never) => void> },
+): () => void {
+  if (isServer) {
+    // Server rendering calls `ref` with a stand-in that has no event API, and
+    // nothing can emit there; the browser registers the listener.
+    return () => undefined;
+  }
+  sessionForwarders.get(el)?.();
+  const onSessionError = (event: Event): void => withDetail(event, props.onSessionError$);
+  el.addEventListener("zitadel-session-error", onSessionError);
+  const dispose = (): void => {
+    el.removeEventListener("zitadel-session-error", onSessionError);
+    if (sessionForwarders.get(el) === dispose) {
+      sessionForwarders.delete(el);
+    }
+  };
+  sessionForwarders.set(el, dispose);
+  return dispose;
+}
+
 /**
  * Wraps each plain-callback handler from the shared SPA contract in a Qwik
  * {@link QRL} and suffixes the prop name with `$`, so the Qwik prop set is
@@ -301,7 +338,8 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
  * {@link ZitadelProject} handle (or the discrete project id / proxy path) and
  * surface config as DOM properties (see {@link setProp}) — applied at mount in
  * the `ref` callback and re-applied reactively by the `useVisibleTask$` — and
- * forwards the widget's `zitadel-signout` event as an optional callback.
+ * forwards the widget's `zitadel-signout` and `zitadel-session-error` events as
+ * optional callbacks.
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   // The standard HTML attributes are the only extra props the element takes.
@@ -316,8 +354,19 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
       }
       track(() => ({ ...props }));
       bindLogoutConfig(el, props);
+      forwardSessionError(el, props);
       const onSignout = (event: Event): void => withDetail(event, props.onSignout$);
       cleanup(listenWithReplay(el, { "zitadel-signout": onSignout }));
+    },
+    { strategy: "document-ready" },
+  );
+  // biome-ignore lint/correctness/noQwikUseVisibleTask: removes the listener the `ref` callback registered once the component unmounts.
+  useVisibleTask$(
+    ({ track, cleanup }) => {
+      const el = track(() => host.value);
+      if (el) {
+        cleanup(() => sessionForwarders.get(el)?.());
+      }
     },
     { strategy: "document-ready" },
   );
@@ -326,6 +375,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
       {...attributes}
       {...{ [WRAPPER_MARKER]: "" }}
       ref={(el) => {
+        forwardSessionError(el, props);
         host.value = el;
         if (props.ref) {
           props.ref.value = el;
@@ -360,7 +410,7 @@ export type ZitadelSessionProps = ZitadelSessionConfig &
  * the discrete project id / proxy path) and surface config as DOM properties
  * (see {@link setProp}) — applied at mount in the `ref` callback and re-applied
  * reactively by the `useVisibleTask$` — and forwards the widget's
- * `zitadel-signout` event as an optional callback.
+ * `zitadel-signout` and `zitadel-session-error` events as optional callbacks.
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   // The standard HTML attributes are the only extra props the element takes.
@@ -375,8 +425,19 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
       }
       track(() => ({ ...props }));
       bindSessionConfig(el, props);
+      forwardSessionError(el, props);
       const onSignout = (event: Event): void => withDetail(event, props.onSignout$);
       cleanup(listenWithReplay(el, { "zitadel-signout": onSignout }));
+    },
+    { strategy: "document-ready" },
+  );
+  // biome-ignore lint/correctness/noQwikUseVisibleTask: removes the listener the `ref` callback registered once the component unmounts.
+  useVisibleTask$(
+    ({ track, cleanup }) => {
+      const el = track(() => host.value);
+      if (el) {
+        cleanup(() => sessionForwarders.get(el)?.());
+      }
     },
     { strategy: "document-ready" },
   );
@@ -385,6 +446,7 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
       {...attributes}
       {...{ [WRAPPER_MARKER]: "" }}
       ref={(el) => {
+        forwardSessionError(el, props);
         host.value = el;
         if (props.ref) {
           props.ref.value = el;

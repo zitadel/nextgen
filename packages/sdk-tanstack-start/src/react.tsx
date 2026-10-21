@@ -74,6 +74,7 @@ export type {
   ZitadelLogoutReactProps,
   ZitadelProject,
   ZitadelSessionConfig,
+  ZitadelSessionErrorDetail,
   ZitadelSessionEventMap,
   ZitadelSessionHandlers,
   ZitadelSessionProps,

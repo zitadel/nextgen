@@ -192,6 +192,7 @@ const ZitadelLogoutElementReact = createComponent({
   elementClass: asAttributes(widgetTags.logout, "url"),
   events: {
     onZitadelSignout: eventName("zitadel-signout"),
+    onZitadelSessionError: eventName("zitadel-session-error"),
   },
 });
 
@@ -201,6 +202,7 @@ const ZitadelSessionElementReact = createComponent({
   elementClass: asAttributes(widgetTags.session, "url"),
   events: {
     onZitadelSignout: eventName("zitadel-signout"),
+    onZitadelSessionError: eventName("zitadel-session-error"),
   },
 });
 
@@ -295,14 +297,14 @@ export type ZitadelLogoutReactProps = ZitadelLogoutProps & ZitadelWidgetAttribut
 /**
  * React component wrapping the `<zitadel-logout>` web component. Binds the
  * `ZitadelProject` handle as a DOM property (or the discrete project id /
- * proxy path as attributes) and forwards the widget's `zitadel-signout` event
- * as an optional callback.
+ * proxy path as attributes) and forwards the widget's `zitadel-signout` and
+ * `zitadel-session-error` events as optional callbacks.
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-logout>` DOM element,
  * so consumers can imperatively access the upgraded web component.
  */
 export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogoutReactProps>(
-  function ZitadelLogout({ onSignout, ...props }, ref) {
+  function ZitadelLogout({ onSignout, onSessionError, ...props }, ref) {
     // The standard HTML attributes are the only extra props the element takes.
     const attributes = standardAttributes(props);
     return (
@@ -316,6 +318,7 @@ export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogou
         post-sign-out-url={props.postSignOutUrl}
         ref={ref}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
+        onZitadelSessionError={onSessionError && ((event) => onSessionError(event.detail))}
       />
     );
   },
@@ -330,12 +333,13 @@ export type ZitadelSessionReactProps = ZitadelSessionProps & ZitadelWidgetAttrib
  * React component wrapping the `<zitadel-session>` web component — the
  * post-sign-in "signed in as" card. Binds the `ZitadelProject` handle as a DOM
  * property (or the discrete project id / proxy path as attributes) and forwards
- * the widget's `zitadel-signout` event as an optional callback.
+ * the widget's `zitadel-signout` and `zitadel-session-error` events as optional
+ * callbacks.
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
  */
 export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionReactProps>(
-  function ZitadelSession({ onSignout, ...props }, ref) {
+  function ZitadelSession({ onSignout, onSessionError, ...props }, ref) {
     // The standard HTML attributes are the only extra props the element takes.
     const attributes = standardAttributes(props);
     return (
@@ -353,6 +357,7 @@ export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSes
         post-sign-out-url={props.postSignOutUrl}
         ref={ref}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
+        onZitadelSessionError={onSessionError && ((event) => onSessionError(event.detail))}
       />
     );
   },

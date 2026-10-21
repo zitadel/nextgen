@@ -101,7 +101,7 @@ export async function exchangeSession(
 export async function getSession(
   api: ZitadelApi,
   projectId: string,
-): Promise<SessionIdentity | null> {
+): Promise<SessionIdentity | null | undefined> {
   if (!projectId) {
     return api.getMySession(undefined, apiRequestInit);
   }
@@ -110,7 +110,7 @@ export async function getSession(
     // A body that is not a session at all (no `project_id`) is not another
     // project's either: it goes back as it came, for the caller to reject.
     const answered = (session as { project_id?: unknown } | null)?.project_id;
-    return typeof answered === "string" && answered !== projectId ? null : session;
+    return typeof answered === "string" && answered !== projectId ? null : (session ?? undefined);
   } catch (error) {
     if (apiErrorCode(error) === "sess.project_mismatch") {
       return null;
@@ -131,19 +131,22 @@ export async function getSession(
  * out in another tab or expired (`401 auth.unauthorized`), and a session of
  * another project on the same server (`403 sess.project_mismatch`), which stays
  * live and keeps its cookie. Any other failure rejects.
+ *
+ * The server answers `204` with no body, so the answer is `undefined`; the
+ * caller checks that, since anything else did not come from the backend.
  */
-export async function revokeSession(api: ZitadelApi, projectId: string): Promise<void> {
+export async function revokeSession(api: ZitadelApi, projectId: string): Promise<unknown> {
   const params = projectId ? { project_id: projectId } : undefined;
   try {
     const { csrf_token } = await api.getMySessionCsrfToken(params, apiRequestInit);
-    await api.revokeMySession(params, {
+    return await api.revokeMySession(params, {
       ...apiRequestInit,
       headers: { [CSRF_HEADER]: csrf_token },
     });
   } catch (error) {
     const code = apiErrorCode(error);
     if (code === "auth.unauthorized" || code === "sess.project_mismatch") {
-      return;
+      return undefined;
     }
     throw error;
   }

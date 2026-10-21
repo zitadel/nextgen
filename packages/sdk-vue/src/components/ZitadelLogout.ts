@@ -1,6 +1,6 @@
 import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components";
-import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
+import type { ZitadelSessionErrorDetail, ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
 import { standardAttributes, widgetTags } from "@zitadel/sdk-core/types";
 import { defineComponent, h, type PropType, ref, toRaw } from "vue";
@@ -20,7 +20,7 @@ const Base = defineComponent({
     postSignOutUrl: { type: String, default: undefined },
     theme: { type: String as PropType<"light" | "dark" | "auto">, default: undefined },
   },
-  emits: ["signout"],
+  emits: ["signout", "sessionError"],
   setup(props, { attrs, emit, expose }) {
     // Template ref to the rendered Lit element. Exposed so a consumer's
     // component `ref` (which resolves to this instance) can reach the DOM node.
@@ -58,6 +58,9 @@ const Base = defineComponent({
         onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
           emit("signout", event.detail);
         },
+        onZitadelSessionError: (event: CustomEvent<ZitadelSessionErrorDetail>) => {
+          emit("sessionError", event.detail);
+        },
       });
     };
   },
@@ -69,7 +72,7 @@ const Base = defineComponent({
  * `configureZitadel(...)` as `:project`, or the discrete `:project-id` /
  * `:proxy-path` the widget reads instead — the widget uses whichever is
  * present. The widget's `zitadel-signout` event is re-emitted with its detail
- * as `signout`.
+ * as `signout`, and `zitadel-session-error` as `sessionError`.
  *
  * A Vue `ref` on this component resolves to the component *instance*, not the
  * inner element, so the rendered `<zitadel-logout>` DOM node is exposed as

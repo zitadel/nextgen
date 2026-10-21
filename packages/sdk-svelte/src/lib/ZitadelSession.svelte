@@ -18,6 +18,7 @@
     theme,
     suppressHeader,
     onSignout,
+    onSessionError,
     ...rest
   }: ZitadelSessionSvelteProps = $props();
 
@@ -51,9 +52,14 @@
     const onSignoutEvent = (event: Event): void => {
       if (event instanceof CustomEvent) onSignout?.(event.detail);
     };
+    const sessionError = (event: Event): void => {
+      if (event instanceof CustomEvent) onSessionError?.(event.detail);
+    };
     node.addEventListener('zitadel-signout', onSignoutEvent);
+    node.addEventListener('zitadel-session-error', sessionError);
     return () => {
       node.removeEventListener('zitadel-signout', onSignoutEvent);
+      node.removeEventListener('zitadel-session-error', sessionError);
     };
   });
 </script>

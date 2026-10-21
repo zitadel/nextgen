@@ -7,6 +7,7 @@ import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import {
   NO_SESSION,
   OUTAGES,
+  UNREADABLE_REVOCATIONS,
   UNREADABLE_SESSIONS,
   sessionNotFound,
   unauthorized,
@@ -358,6 +359,276 @@ describe("<zitadel-session>", () => {
     },
   );
 
+  it.each([...OUTAGES, ...UNREADABLE_SESSIONS])(
+    "fires zitadel-session-error with phase load for %s",
+    async (_, answer) => {
+      sessionAnswer = answer;
+      const errors: CustomEvent[] = [];
+      host.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+      const element = mount();
+      await flush(element);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.bubbles && errors[0]?.composed).toBe(true);
+      expect(errors[0]?.detail).toMatchObject({
+        phase: "load",
+        message: shadowQuery<HTMLElement>(element, ".error").textContent?.trim(),
+      });
+    },
+  );
+
+  it("reports the status and the backend's code in zitadel-session-error", async () => {
+    sessionAnswer = () =>
+      HttpResponse.json({ code: "internal", message: "Internal error" }, { status: 500 });
+    const errors: CustomEvent[] = [];
+    host.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+    await flush(mount());
+    expect(errors[0]?.detail).toMatchObject({ status: 500, code: "internal", phase: "load" });
+  });
+
+  it("reports a network error in zitadel-session-error without a status", async () => {
+    sessionAnswer = () => HttpResponse.error();
+    const errors: CustomEvent[] = [];
+    host.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+    await flush(mount());
+    expect(errors[0]?.detail).not.toHaveProperty("status");
+  });
+
+  it.each(NO_SESSION)(
+    "fires no zitadel-session-error when the request answers %s",
+    async (_, answer) => {
+      sessionAnswer = answer;
+      const errors: Event[] = [];
+      host.addEventListener("zitadel-session-error", (e) => errors.push(e));
+      await flush(mount());
+      expect(errors).toHaveLength(0);
+    },
+  );
+
+  it("reports a load failure it missed while removed, once put back", async () => {
+    let requests = 0;
+    let answer: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        requests += 1;
+        if (requests === 1) {
+          await new Promise<void>((resolve) => {
+            answer = resolve;
+          });
+        }
+        return HttpResponse.json({ code: "internal", message: "Internal error" }, { status: 500 });
+      }),
+    );
+    const errors: Event[] = [];
+    const element = mount();
+    element.addEventListener("zitadel-session-error", (e) => errors.push(e));
+    await flush(element);
+    element.remove();
+    answer();
+    await flush(element);
+    expect(errors).toHaveLength(0);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(requests).toBe(2);
+    expect(errors).toHaveLength(1);
+  });
+
+  it.each(UNREADABLE_SESSIONS)(
+    "reports status 200 in zitadel-session-error for %s",
+    async (_, answer) => {
+      sessionAnswer = answer;
+      const errors: CustomEvent[] = [];
+      host.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+      await flush(mount());
+      expect(errors[0]?.detail).toMatchObject({ status: 200, phase: "load" });
+    },
+  );
+
+  it("shows no error once a retry after being put back succeeds", async () => {
+    let requests = 0;
+    let answer: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        requests += 1;
+        if (requests === 1) {
+          await new Promise<void>((resolve) => {
+            answer = resolve;
+          });
+          return HttpResponse.json(
+            { code: "internal", message: "Internal error" },
+            { status: 500 },
+          );
+        }
+        return HttpResponse.json(sessionBody(currentEmail, currentUserId, currentProjectId));
+      }),
+    );
+    const element = mount();
+    await flush(element);
+    element.remove();
+    answer();
+    await flush(element);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(requests).toBe(2);
+    expect(element.shadowRoot?.querySelector(".error")).toBeNull();
+    expect(shadowQuery<HTMLElement>(element, ".identity").textContent?.trim()).toBe(currentEmail);
+  });
+
+  it("reports a sign-out failure it missed while removed, once put back", async () => {
+    const element = mount();
+    await flush(element);
+    let release: () => void = () => undefined;
+    server.use(
+      http.delete(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return HttpResponse.json({ code: "internal", message: "Internal error" }, { status: 500 });
+      }),
+    );
+    const errors: CustomEvent[] = [];
+    element.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    element.remove();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    expect(errors).toHaveLength(0);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.detail).toMatchObject({ phase: "signout", status: 500, code: "internal" });
+  });
+
+  it.each(UNREADABLE_REVOCATIONS)(
+    "reports status 200 and does not sign out when sign-out gets %s",
+    async (_, answer) => {
+      const element = mount();
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      const errors: CustomEvent[] = [];
+      const signouts: Event[] = [];
+      element.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+      element.addEventListener("zitadel-signout", (e) => signouts.push(e));
+
+      activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+      await new Promise((resolve) => setTimeout(resolve, 32));
+      await element.updateComplete;
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.detail).toMatchObject({ phase: "signout", status: 200 });
+      expect(signouts).toHaveLength(0);
+    },
+  );
+
+  it("keeps a sign-out failure's message when the load that follows also fails while removed", async () => {
+    let requests = 0;
+    let answerLoad: () => void = () => undefined;
+    let answerSignOut: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        requests += 1;
+        if (requests === 1) {
+          await new Promise<void>((resolve) => {
+            answerLoad = resolve;
+          });
+          return HttpResponse.json(
+            { code: "internal", message: "Internal error" },
+            { status: 500 },
+          );
+        }
+        return HttpResponse.json(sessionBody(currentEmail, currentUserId, currentProjectId));
+      }),
+      http.delete(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          answerSignOut = resolve;
+        });
+        return HttpResponse.json({ code: "internal", message: "Internal error" }, { status: 500 });
+      }),
+    );
+    const errors: CustomEvent[] = [];
+    const element = mount();
+    element.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+    await flush(element);
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    element.remove();
+    answerSignOut();
+    answerLoad();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.detail).toMatchObject({ phase: "signout", status: 500 });
+    expect(element.shadowRoot?.querySelector(".error")).not.toBeNull();
+  });
+
+  it("reports a sign-out it completed while removed, once put back", async () => {
+    const element = mount();
+    await flush(element);
+    let release: () => void = () => undefined;
+    server.use(
+      http.delete(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const events: CustomEvent[] = [];
+    element.addEventListener("zitadel-signout", (e) => events.push(e as CustomEvent));
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    element.remove();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    expect(events).toHaveLength(0);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.detail).toEqual({ display: "", identifier: "alice@acme.com" });
+  });
+
+  it("navigates to post-sign-out-url only once put back when the sign-out completed while removed", async () => {
+    const loc = stubLocation();
+    const element = mount();
+    element.postSignOutUrl = "https://app.test/login";
+    await flush(element);
+    let release: () => void = () => undefined;
+    server.use(
+      http.delete(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    element.remove();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    expect(loc.current).not.toBe("https://app.test/login");
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(loc.current).toBe("https://app.test/login");
+  });
+
   it("asks for the session in its own project", async () => {
     const element = mount();
     await flush(element);
@@ -631,6 +902,116 @@ describe("<zitadel-session>", () => {
       ).toBeGreaterThan(0);
       expect(events).toHaveLength(0);
       expect(loc.current).toBe("");
+    },
+  );
+
+  it.each(OUTAGES)(
+    "fires zitadel-session-error with phase signout when sign-out gets %s",
+    async (_, answer) => {
+      const element = mount();
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      const errors: CustomEvent[] = [];
+      element.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+
+      activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+      await new Promise((resolve) => setTimeout(resolve, 32));
+      await element.updateComplete;
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.detail).toMatchObject({
+        phase: "signout",
+        message: shadowQuery<HTMLElement>(element, ".error").textContent?.trim(),
+      });
+    },
+  );
+
+  it.each(NO_SESSION)("fires no zitadel-session-error when sign-out gets %s", async (_, answer) => {
+    const element = mount();
+    await flush(element);
+    server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+    const errors: Event[] = [];
+    element.addEventListener("zitadel-session-error", (e) => errors.push(e));
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 32));
+
+    expect(errors).toHaveLength(0);
+  });
+});
+
+describe("<zitadel-session> unset public properties", () => {
+  type Declaration = { attribute?: string | boolean; state?: boolean };
+  type Props = Record<string, unknown>;
+  const create = () => document.createElement("zitadel-session");
+  const declared = (
+    customElements.get("zitadel-session") as unknown as {
+      elementProperties: Map<string, Declaration>;
+    }
+  ).elementProperties;
+  // Every public property that has a declared default, read off a fresh element so a
+  // property added later is covered without touching this list.
+  const defaulted = [...declared]
+    .filter(([name, options]) => !options.state && (create() as unknown as Props)[name] != null)
+    .map(([name, options]) => ({
+      name,
+      attribute:
+        typeof options.attribute === "string"
+          ? options.attribute
+          : options.attribute === false
+            ? undefined
+            : name.toLowerCase(),
+      fallback: (create() as unknown as Props)[name],
+    }));
+  const other = (fallback: unknown) => (typeof fallback === "boolean" ? !fallback : "other");
+
+  it("covers the element's defaulted properties", () => {
+    expect(defaulted.length).toBeGreaterThan(0);
+  });
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned undefined",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned null",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = null;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "restores the default of $name when a set value is cleared",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = other(fallback);
+      expect(element[name]).toEqual(other(fallback));
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)("keeps a supplied value of $name", ({ name, fallback }) => {
+    const element = create() as unknown as Props;
+    element[name] = other(fallback);
+    expect(element[name]).toEqual(other(fallback));
+  });
+
+  it.each(defaulted.filter(({ attribute }) => attribute !== undefined))(
+    "restores the default of $name when its attribute is removed",
+    ({ name, attribute, fallback }) => {
+      const element = create();
+      element.setAttribute(attribute as string, typeof fallback === "boolean" ? "" : "other");
+      expect((element as unknown as Props)[name]).toEqual(other(fallback));
+      element.removeAttribute(attribute as string);
+      expect((element as unknown as Props)[name]).toEqual(fallback);
     },
   );
 });

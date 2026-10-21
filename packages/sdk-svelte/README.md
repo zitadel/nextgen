@@ -35,6 +35,8 @@ TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes]
 
 The signed-in session card is `<ZitadelSession {project} />` (exported as `ZitadelSession`).
 
+`ZitadelLogout` and `ZitadelSession` take an optional `onSessionError` callback, called when loading the session or signing out fails with something other than the backend's no-session answer (a 5xx, a network error, a gateway's page). The detail is `{ status?, code?, message, phase }`, with `phase` set to `"load"` or `"signout"`.
+
 ## Widget props and events
 
 `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default.
