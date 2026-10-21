@@ -109,9 +109,8 @@ export function SearchDialog({
       go();
     };
 
-    // Every built page, nested ones included, in sidebar order.
+    // Every built page, in sidebar order.
     const pageResults: Result[] = pages
-      .flatMap((item) => [item, ...item.children])
       .filter((item) => item.to && matches(item.nav.label))
       .map((item) => ({
         id: `page:${item.to}`,

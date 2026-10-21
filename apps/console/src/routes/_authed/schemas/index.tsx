@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Users } from "lucide-react";
+import { Braces } from "lucide-react";
 
 import { api } from "@/api/zitadel";
 import {
@@ -32,7 +32,7 @@ import { type UserSchema, schemaDisplayName, schemaSignInSummary } from "@/lib/s
 import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/schemas/")({
-  staticData: { scope: "project", nav: { label: "User schemas", order: 1, parent: "/users" } },
+  staticData: { scope: "project", nav: { label: "User schemas", order: 4, icon: Braces } },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);
@@ -161,7 +161,7 @@ function SchemaRow({
     >
       <TableCell className={`${RESOURCE_CELL} truncate`}>
         <Link to="/schemas/$schemaId" params={{ schemaId: id }} className={RESOURCE_ROW_LINK}>
-          <Users aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
+          <Braces aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
           {name}
         </Link>
       </TableCell>

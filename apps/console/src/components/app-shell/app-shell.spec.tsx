@@ -31,16 +31,18 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // order the design puts them, then the project's own settings. `User schemas`
 // nests beneath `Users` rather than adding a second
 // top-level row.
+// The design's single-level sidebar ("01 / Nav Level 1"), less the screens
+// that are not built (Deployments, Sessions).
 const NAV_ORDER = [
   "Projects",
   "Teams",
   "Users",
-  "Authentication",
+  "User schemas",
   "Login flows",
+  "Branding",
+  "Authentication",
   "Project settings",
 ];
-const NESTED_NAV = { parent: "Users", label: "User schemas" };
-const NESTED_BRANDING = { parent: "Login flows", label: "Branding" };
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
@@ -80,11 +82,9 @@ describe("app shell navigation", () => {
     await screen.findByRole("link", { name: /^Users/ });
     const nav = within(screen.getByRole("navigation", { name: "Primary" }));
 
-    // Only the top level: nested entries render inside their parent's
-    // `<li>`, so `getAllByRole("listitem")` alone would conflate the two.
-    const items = nav
-      .getAllByRole("listitem")
-      .filter((li) => li.parentElement?.dataset.slot === "sidebar-menu");
+    // One level: every row is a direct item of the menu, none nested.
+    const items = nav.getAllByRole("listitem");
+    expect(items.every((li) => li.parentElement?.dataset.slot === "sidebar-menu")).toBe(true);
     expect(items.map((li) => within(li).getAllByRole("link")[0]?.textContent?.trim())).toEqual(
       NAV_ORDER,
     );
@@ -93,38 +93,6 @@ describe("app shell navigation", () => {
     // the list), so there is no row that looks like a destination but is not.
     const linkedRows = items.filter((li) => within(li).queryAllByRole("link").length > 0);
     expect(linkedRows).toHaveLength(NAV_ORDER.length);
-  });
-
-  it("nests User schemas under Users rather than adding a top-level row", async () => {
-    renderShell();
-    await screen.findByRole("link", { name: /^Users/ });
-    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
-
-    const [parent] = nav
-      .getAllByRole("listitem")
-      .filter(
-        (li) => within(li).getAllByRole("link")[0]?.textContent?.trim() === NESTED_NAV.parent,
-      );
-    expect(parent).toBeDefined();
-    expect(
-      within(parent as HTMLElement).getByRole("link", { name: NESTED_NAV.label }),
-    ).toHaveAttribute("href", scopedPath("/schemas", "proj_1"));
-  });
-
-  it("nests Branding under Login flows rather than adding a top-level row", async () => {
-    renderShell();
-    await screen.findByRole("link", { name: /^Login flows/ });
-    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
-
-    const [parent] = nav
-      .getAllByRole("listitem")
-      .filter(
-        (li) => within(li).getAllByRole("link")[0]?.textContent?.trim() === NESTED_BRANDING.parent,
-      );
-    expect(parent).toBeDefined();
-    expect(
-      within(parent as HTMLElement).getByRole("link", { name: NESTED_BRANDING.label }),
-    ).toHaveAttribute("href", scopedPath("/branding", "proj_1"));
   });
 
   it("lists only Projects until a project is selected", async () => {

@@ -19,24 +19,10 @@ export interface NavMeta {
   label: string;
   /** Which sidebar this entry belongs to. Defaults to the portal list. */
   view?: NavView;
-  /** Sort order among siblings (top level, or within one parent's children). */
+  /** Sort order in the sidebar, which is one level. */
   order: number;
-  /**
-   * Sidebar glyph (matches the design system's Lucide icon set). Optional
-   * because a nested entry renders as text: the design's nested item carries
-   * no icon, so a nested entry that declared one would be dead data.
-   */
-  icon?: NavIcon;
-  /**
-   * Route path of the entry this one nests under, e.g. `"/users"` for
-   * `User schemas`. Nested entries render in shadcn's `SidebarMenuSub` beneath
-   * the parent and are hidden with it when the sidebar collapses to the icon
-   * rail.
-   *
-   * Matched on the parent's path rather than its label so renaming a label does
-   * not silently orphan the child.
-   */
-  parent?: string;
+  /** Sidebar glyph (matches the design system's Lucide icon set). */
+  icon: NavIcon;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Monitor, Smartphone, Sun, Workflow } from "lucide-react";
+import { Monitor, Paintbrush, Smartphone, Sun, Workflow } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -28,11 +28,11 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/branding/")({
-  // Nested under Login flows, as in the design: branding is how those flows
-  // render, not a resource of its own. Sub-rows carry no icon.
+  // Order 6: right after Login flows, whose screens it styles, as the design's
+  // single-level sidebar places it.
   staticData: {
     scope: "project",
-    nav: { label: "Branding", order: 1, parent: "/flow-definitions" },
+    nav: { label: "Branding", order: 6, icon: Paintbrush },
   },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {

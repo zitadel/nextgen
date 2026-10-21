@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Key, type LucideIcon, Shield, User, UserRoundCog } from "lucide-react";
+import { Braces, Key, type LucideIcon, Shield, User } from "lucide-react";
 import { useId } from "react";
 
 import { api } from "@/api/zitadel";
@@ -134,7 +134,7 @@ function UserDetail() {
 
         <TabsContent value="overview" className="flex flex-col gap-4">
           <Card className={DETAIL_CARD}>
-            <CardHead icon={UserRoundCog} eyebrow="User schema" title={schemaName} />
+            <CardHead icon={Braces} eyebrow="User schema" title={schemaName} />
             <Separator className={PANEL_RULE} />
             {fields.length === 0 ? (
               <p className="text-muted-foreground px-6 py-5 text-sm">

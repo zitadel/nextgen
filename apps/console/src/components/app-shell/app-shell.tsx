@@ -13,9 +13,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
@@ -208,7 +205,7 @@ function SettingsNav() {
             <SidebarMenuItem key={label}>
               <SidebarMenuButton asChild isActive={!!matchRoute({ to: item.to })} tooltip={label}>
                 <Link to={item.to} activeOptions={{ exact: true }} title={label}>
-                  {Icon && <Icon aria-hidden />}
+                  <Icon aria-hidden />
                   <span>{label}</span>
                 </Link>
               </SidebarMenuButton>
@@ -227,7 +224,7 @@ function SettingsNav() {
  */
 const NAV_MENU = "gap-0.5";
 
-/** Portal nav: the flat list, with `User schemas` nested under `Users`. */
+/** Portal nav: one flat list. */
 function PortalNav() {
   const items = useNavItems();
   const matchRoute = useMatchRoute();
@@ -248,40 +245,22 @@ function PortalNav() {
                   title={`${label} — not available yet`}
                   onClick={(event) => event.preventDefault()}
                 >
-                  {Icon && <Icon aria-hidden />}
+                  <Icon aria-hidden />
                   <span>{label}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             );
           }
-          // A parent with children highlights only on an exact match: the
-          // child paths sit under it (`/schemas` is a sibling route, but
-          // `Users` fuzzy-matching its own subtree would light both rows).
+          // Fuzzy, so a resource's detail screen keeps its list's row marked.
           const active = !!matchRoute({ to: item.to, fuzzy: item.to !== "/" });
           return (
             <SidebarMenuItem key={label}>
               <SidebarMenuButton asChild isActive={active} tooltip={label}>
                 <Link to={item.to} title={label}>
-                  {Icon && <Icon aria-hidden />}
+                  <Icon aria-hidden />
                   <span>{label}</span>
                 </Link>
               </SidebarMenuButton>
-              {item.children.length > 0 && (
-                <SidebarMenuSub>
-                  {item.children.map((child) => (
-                    <SidebarMenuSubItem key={child.nav.label}>
-                      <SidebarMenuSubButton
-                        asChild
-                        isActive={!!matchRoute({ to: child.to, fuzzy: true })}
-                      >
-                        <Link to={child.to} title={child.nav.label}>
-                          <span>{child.nav.label}</span>
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  ))}
-                </SidebarMenuSub>
-              )}
             </SidebarMenuItem>
           );
         })}

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Users } from "lucide-react";
+import { Braces } from "lucide-react";
 import { Fragment } from "react";
 
 import { api } from "@/api/zitadel";
@@ -39,7 +39,7 @@ function SchemaDetail() {
     <Page inset="panel">
       <DetailPanel>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <PanelTitle icon={Users} title={name} />
+          <PanelTitle icon={Braces} title={name} />
           {/* The same header card as Login flows. The design draws a third
               value, `EXPIRES AT`; nothing on the schema resource backs it. */}
           <MetaCard>
