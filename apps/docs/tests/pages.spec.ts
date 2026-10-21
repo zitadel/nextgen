@@ -31,7 +31,9 @@ const operationPage = /^\/docs\/reference\/api\/[^/]+\/[^/]+$/;
 
 // The CLI reference is /docs/reference/cli, and a command's page has the
 // command's words as the segments after it: /docs/reference/cli/users/list.
+// The reference's own pages beside the commands are no command's.
 const cliReferencePage = /^\/docs\/reference\/cli(?:\/(.+))?$/;
+const cliOwnPages = new Set(["telemetry", "release-notes"]);
 
 async function indexedPages(request: APIRequestContext): Promise<IndexedPage[]> {
   const response = await request.get("/docs/llms.txt");
@@ -161,6 +163,47 @@ test("every page negotiates Markdown through Accept", async ({ request }) => {
   expect(failures(results), "pages that do not negotiate Markdown").toEqual([]);
 });
 
+type Fragment = {
+  paths?: Record<string, Record<string, Operation>>;
+  components?: { parameters?: Record<string, Parameter> };
+};
+type Operation = {
+  operationId?: string;
+  security?: Record<string, unknown>[];
+  parameters?: (Parameter | { $ref: string })[];
+};
+type Parameter = { in?: string };
+
+/** The operation of an operation page, from the OpenAPI its Markdown ends with. */
+function operationOf(markdown: string): { operation: Operation; fragment: Fragment } | undefined {
+  const json = /as OpenAPI:\n\n```json\n([\s\S]*?)\n```/.exec(markdown)?.[1];
+  if (!json) return undefined;
+  const fragment = JSON.parse(json) as Fragment;
+  const operation = Object.values(Object.values(fragment.paths ?? {})[0] ?? {})[0];
+  return operation && { operation, fragment };
+}
+
+/**
+ * `api <operationId>` for an operation `zitadel api` calls: one a project
+ * secret or nothing authenticates, without a cookie parameter.
+ */
+function apiCommand(found: ReturnType<typeof operationOf>): string | undefined {
+  if (!found) return undefined;
+  const { operation, fragment } = found;
+  const security = operation.security ?? [];
+  const session =
+    security.length > 0 &&
+    !security.some((item) => Object.keys(item).length === 0 || "oauth2" in item);
+  const cookie = (operation.parameters ?? []).some((parameter) => {
+    const resolved =
+      "$ref" in parameter
+        ? fragment.components?.parameters?.[parameter.$ref.split("/").pop() ?? ""]
+        : parameter;
+    return resolved?.in === "cookie";
+  });
+  return session || cookie ? undefined : `api ${operation.operationId}`;
+}
+
 test("every API operation shows its call through @zitadel/api, its CLI command and cURL", async ({
   request,
 }) => {
@@ -180,10 +223,18 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
     operations++;
     if (!call.test(markdown)) return `${markdownUrl(url)}: no call through @zitadel/api`;
     // An operation the spec names a CLI command for (`x-zitadel-cli`, which
-    // its OpenAPI shows) is also run with that command (lib/cli-sample.ts).
-    const command = /"x-zitadel-cli": "([^"]+)"/.exec(markdown)?.[1];
+    // its OpenAPI shows) is also run with that command, and one the CLI can
+    // call without one with `zitadel api` (lib/cli-sample.ts).
+    const named = /"x-zitadel-cli": "([^"]+)"/.exec(markdown)?.[1];
+    const command = named ?? apiCommand(operationOf(markdown));
     if (command && !markdown.includes(`npx @zitadel/cli@alpha ${command}`)) {
       return `${markdownUrl(url)}: no \`${command}\` command`;
+    }
+    if (named) {
+      // The command's page links back to the operation (lib/cli-reference.ts).
+      const commandPage = markdownUrl(`/docs/reference/cli/${named.split(" ").join("/")}`);
+      const back = await (await request.get(commandPage)).text();
+      if (!back.includes(`](${url})`)) return `${commandPage}: no link to ${url}`;
     }
     // And with cURL, as the page's last sample (lib/source.ts).
     if (!/```bash\ncurl -X [A-Z]+ 'http:\/\/localhost:8080\//.test(markdown)) {
@@ -197,7 +248,31 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
   expect(failures(results), "operations without their @zitadel/api call").toEqual([]);
 });
 
-test("every CLI command shows its usage, in tables whose rows keep their two cells", async ({
+test("every API tag's page links each of its operations, as HTML and as Markdown", async ({
+  request,
+}) => {
+  test.setTimeout(120_000);
+  const tags = new Map<string, string[]>();
+  for (const { url } of await indexedPages(request)) {
+    if (!operationPage.test(url)) continue;
+    const tag = url.slice(0, url.lastIndexOf("/"));
+    tags.set(tag, [...(tags.get(tag) ?? []), url]);
+  }
+
+  // The tables lib/source.ts generates from the pages under the tag's.
+  const results = await mapLimit([...tags], concurrency, async ([tag, operations]) => {
+    const html = await (await request.get(tag)).text();
+    const markdown = await (await request.get(markdownUrl(tag))).text();
+    const missing = operations.filter(
+      (url) => !html.includes(`href="${url}"`) || !markdown.includes(`](${url})`),
+    );
+    return missing.length > 0 ? `${tag}: no link to ${missing.join(", ")}` : null;
+  });
+  expect(tags.size).toBeGreaterThan(0);
+  expect(failures(results), "API tag pages that leave out an operation").toEqual([]);
+});
+
+test("every CLI command shows its usage, in tables whose rows keep their cells", async ({
   request,
 }) => {
   test.setTimeout(120_000);
@@ -212,13 +287,22 @@ test("every CLI command shows its usage, in tables whose rows keep their two cel
   const results = await mapLimit(pages, concurrency, async ({ url }) => {
     const markdown = await (await request.get(markdownUrl(url))).text();
     const words = cliReferencePage.exec(url)?.[1];
-    if (words) {
+    if (words && !cliOwnPages.has(words)) {
       commands++;
       const usage = `## Usage\n\n\`\`\`sh\nnpx @zitadel/cli@alpha ${words.split("/").join(" ")} `;
       if (!markdown.includes(usage)) return `${markdownUrl(url)}: no usage of its command`;
     }
-    const ragged = markdown.split("\n").find((line) => line.startsWith("| ") && cells(line) !== 2);
-    return ragged ? `${markdownUrl(url)}: a table row that is not two cells: ${ragged}` : null;
+    // A row has as many cells as its table's header, the row that opens it.
+    let header = 0;
+    const ragged = markdown.split("\n").find((line) => {
+      if (!line.startsWith("| ")) {
+        header = 0;
+        return false;
+      }
+      header ||= cells(line);
+      return cells(line) !== header;
+    });
+    return ragged ? `${markdownUrl(url)}: a table row unlike its header: ${ragged}` : null;
   });
   expect(commands).toBeGreaterThan(0);
   expect(failures(results), "CLI reference pages whose Markdown is wrong").toEqual([]);

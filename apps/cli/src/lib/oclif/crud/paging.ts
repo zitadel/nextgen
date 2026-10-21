@@ -2,12 +2,19 @@ import { ZitadelError } from "../../errors";
 import { isObject } from "../../json";
 import type { Page } from "./types";
 
+/** How a command spells draining every page, and fetching one at a time, for its errors. */
+export type PagingFlags = Readonly<{ all: string; onePage: string }>;
+
+/** The list commands' own: `--all`, and `--limit` with `--page-token`. */
+const LIST_FLAGS: PagingFlags = { all: "--all", onePage: "--limit and --page-token" };
+
 /**
  * Walk a cursor-paginated endpoint. `request` performs one page; the
  * response must carry the items under `items` and, while more remain, a
  * the cursor property `nextPageToken` names. With `all` the pages are drained
  * in order and `next`
- * is `null`; otherwise one page is fetched and `next` is its token.
+ * is `null`; otherwise one page is fetched and `next` is its token. `flags`
+ * names the caller's own flags in the errors.
  */
 export const collectPages = async (
   request: (token?: string) => Promise<unknown>,
@@ -16,7 +23,14 @@ export const collectPages = async (
     all,
     token,
     nextPageToken,
-  }: Readonly<{ items?: string; all: boolean; token?: string; nextPageToken: string }>,
+    flags = LIST_FLAGS,
+  }: Readonly<{
+    items?: string;
+    all: boolean;
+    token?: string;
+    nextPageToken: string;
+    flags?: PagingFlags;
+  }>,
 ): Promise<Page> => {
   // Accumulated in one array rather than by concatenating each page onto the
   // last: these resources are unbounded, and a wide `--all` would otherwise
@@ -53,9 +67,9 @@ export const collectPages = async (
     if (seen.has(next)) {
       throw new ZitadelError(
         "E_VALIDATION",
-        "The server repeated a page cursor, so --all would never finish",
+        `The server repeated a page cursor, so ${flags.all} would never finish`,
         {
-          hint: "Fetch one page at a time with --limit and --page-token, and report the repeated cursor.",
+          hint: `Fetch one page at a time with ${flags.onePage}, and report the repeated cursor.`,
           // Named for what it is rather than for the platform's spelling of
           // it, so the error shape does not vary with the wire vocabulary.
           details: { cursor: next, pages_fetched: seen.size + 1 },

@@ -161,6 +161,9 @@ export const en: Record<string, string> = {
   // Generic fallback for the engine-injected `<step>.action.back` key on
   // custom step names (see INJECTED_KEY_FALLBACKS in liquid.ts).
   "action.back": "Back",
+  // Beside the account a step signs in to (`step.identifier`): goes back to
+  // the step that collects the identifier.
+  "action.use_another_account": "Use another account",
 
   // --- SSO ---
   "sso.redirect.title": "Redirecting to your provider…",

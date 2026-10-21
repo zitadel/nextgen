@@ -12,6 +12,7 @@ func (h *Harness) EnsureCreateUserHandler(t testing.TB) *service.FlowCreateUserW
 	t.Helper()
 	return service.NewFlowCreateUserHandler(
 		h.EnsureProjectHashers(t),
+		h.EnsurePasswordPolicy(t),
 		h.EnsureUserService(t),
 		h.EnsureSchemaStore(t),
 		h.EnsureServiceDB(t),
@@ -48,7 +49,7 @@ func (h *Harness) EnsureFlowStateMachine(t testing.TB) *domain.FlowStateMachineR
 			h.EnsureCreateUserHandler(t),
 			authAdapter,
 			service.NewFlowSSOProviderResolver(h.EnsureIDPConnectionService(t)),
-			service.NewFlowSSOIdentityResolver(h.EnsureServiceDB(t), h.EnsureIDPConnectionService(t), h.EnsureUserService(t), h.EnsureSchemaStore(t), h.EnsureProjectHashers(t)),
+			service.NewFlowSSOIdentityResolver(h.EnsureServiceDB(t), h.EnsureIDPConnectionService(t), h.EnsureUserService(t), h.EnsureSchemaStore(t), h.EnsureProjectHashers(t), h.EnsurePasswordPolicy(t)),
 			service.NewFlowSSORedirectIssuer(h.EnsureIDPConnectionService(t), h.EnsureAuthAttemptService(t), h.EnsureKeyService(t), h.EnsureVariableService(t), h.EnsureHttpClient(t)),
 			time.Now,
 		)

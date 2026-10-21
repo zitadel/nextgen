@@ -96,10 +96,11 @@ document for editors and people under the same path on this project:
 
 Two variables in both Vercel environments: `CLOUD_DATABASE_URL`, the pooled
 URL (PgBouncer, port 6432) the server serves from with at most four
-connections per function instance, because Vercel starts one instance per
-concurrent request from cold; and `CLOUD_MIGRATOR_DATABASE_URL`, the direct
-URL (port 5432) the build migrates through, because migrations hold a
-session advisory lock.
+connections per function instance, because a burst starts new instances
+and each holds its own, while the four are shared by every request the
+instance has in flight ([Operating](#operating)); and
+`CLOUD_MIGRATOR_DATABASE_URL`, the direct URL (port 5432) the build
+migrates through, because migrations hold a session advisory lock.
 
 - **Production** is the PlanetScale database `production`. Both URLs name
   its `postgres` database.
@@ -468,13 +469,28 @@ project and imports the root admin.
 - **Logs:** Vercel runtime logs of the `server` function (JSON). The
   launcher's first line names the database host and database it serves
   from. Add a log drain for retention.
-- **Cold starts:** a Go instance boots in about a second; a burst from cold
-  starts one instance per concurrent request.
+- **Cold starts:** a Go instance boots in one to two seconds.
+- **Concurrency:** an instance serves several requests at once on its one
+  vCPU, the Go service included, although Vercel's Fluid docs name only
+  Node.js and Python. A burst fills the warm instances first and starts
+  only a few new ones, not one per request: 40 parallel password checks
+  on a preview with at most 16 warm instances started 3, and the warm
+  instances' handler time rose from about 0.3 s to a median of 0.7 s.
+  To tell the two apart, compare a request's `handling request` log time
+  with the edge arrival in its Vercel request ID
+  (`<id>-<unix ms>-<hash>`): a gap of a second or more is a cold start,
+  a long handler time is sharing.
 - **Connections:** four per instance through PlanetScale's PgBouncer, which
   pools per database and role: on `preview` every preview database is a
   pool of its own, so the cluster's `max_connections` bounds how many
   previews can be busy at the same time. Raise it (Parameters tab, needs a
   restart) before raising the pool size.
+  - The four are shared by every request in flight on the instance: a
+    fifth that needs the database waits in the pgx pool for one to free
+    up, so a burst shows as handler time rather than errors.
+  - A bigger pool multiplies across instances against the same
+    `max_connections`, and handler time alone does not say whether
+    connection waits or the shared vCPU stretched it.
 - **Analytics:** the console reports page views and Web Vitals per route
   pattern (`/console/users/$userId`), the docs and the website per page,
   to the project's Analytics and Speed Insights tabs. Speed Insights samples

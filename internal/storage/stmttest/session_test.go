@@ -127,8 +127,11 @@ func createAnonymousSession(t *testing.T, stmts service.AllStatements, projectID
 func createUserBoundSession(t *testing.T, stmts service.AllStatements, projectID, userID string) *domain.Session {
 	t.Helper()
 	plain, _ := handoffCompletedAttempt(t, stmts, projectID, func(a *domain.AuthAttempt) {
-		a.RequiredChecks = []domain.AuthCheckType{domain.AuthCheckTypeUser}
-		a.Checks = []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}}
+		// A completed attempt carries a verified credential-class factor
+		// alongside the identifier; the bare user factor never completes one
+		// (see domain.AuthAttempt.IsCompleted).
+		a.RequiredChecks = []domain.AuthCheckType{domain.AuthCheckTypeUser, domain.AuthCheckTypePassword}
+		a.Checks = []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}, &domain.AuthFactorPassword{}}
 	})
 	session, err := stmts.ExchangeSession(t.Context(), projectID, plain, nil, time.Hour)
 	require.NoError(t, err)

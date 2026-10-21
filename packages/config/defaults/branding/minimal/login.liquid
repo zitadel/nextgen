@@ -4,6 +4,23 @@
 
     {% assign recover = actions | where: "name", "recover" | first %}
     {% assign password_field = fields | where: "type", "password" | first %}
+    {% comment %}
+      The account the step signs in to, when the visitor named it earlier: the
+      password step says whose password it asks for, with the way back to the
+      step that collects the identifier. A step with its own way out to sign-in
+      (the SSO conflict step's `sign_in`) keeps only that one.
+    {% endcomment %}
+    {% if identifier and identifier.value != blank %}
+      {% assign change_account = actions | where: "kind", "back" | first %}
+      {% assign sign_in_action = actions | where: "name", "sign_in" | first %}
+      <p class="zl-card-account" data-testid="zitadel-account">
+        <span class="zl-card-account__value">{{ identifier.value }}</span>
+        {% if change_account and sign_in_action == nil %}
+          <a href="#" class="zl-card-nav__link" data-action="{{ change_account.name }}" data-testid="zitadel-action-change-account">{{ 'action.use_another_account' | t }}</a>
+        {% endif %}
+      </p>
+    {% endif %}
+
     <div class="zl-field-group">
     {% for f in fields %}
       {% assign field_placeholder = f.text_key | fieldPlaceholder %}
@@ -89,7 +106,8 @@
           action="{{ a.name }}"
           data-testid="zitadel-action-{{ a.name }}"
           label="{{ a.text_key | t }}"
-          {% if loading %}loading{% endif %}
+          {% comment %} Only the control that started the submit shows progress. {% endcomment %}
+          {% if loading %}{% if pending_action == blank or pending_action == a.name %}loading{% endif %}{% endif %}
         ></zl-button>
       {% endif %}
     {% endfor %}
@@ -119,6 +137,7 @@
           action="{{ a.name }}"
           data-testid="zitadel-action-{{ a.name }}"
           label="{{ a.text_key | t }}"
+          {% if loading and pending_action == a.name %}loading{% endif %}
         ></zl-button>
       {% endunless %}
     {% endfor %}
@@ -133,6 +152,7 @@
           action="passkey"
           data-testid="zitadel-action-passkey"
           label="{{ passkey.text_key | t }}"
+          {% if loading and pending_action == "passkey" %}loading{% endif %}
         ></zl-button>
       {% endunless %}
     {% endif %}

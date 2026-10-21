@@ -2,6 +2,8 @@ package domain
 
 import (
 	"encoding/json"
+	"errors"
+	"slices"
 	"time"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -26,6 +28,21 @@ func (s UserStatus) String() string { return string(s) }
 
 func ErrUserInvalid() Error {
 	return newError(PrefixUser.ErrorCodePrefix("invalid"), "user invalid", nil, nil)
+}
+
+func ErrUserAttributesInvalid(validationErr error) Error {
+	return newError(PrefixUser.ErrorCodePrefix("attributes_invalid"),
+		"the user's attributes do not satisfy the user schema", nil, validationErr)
+}
+
+func IsUserInvalid(err error) bool {
+	return err != nil && (errors.Is(err, ErrUserInvalid()) || errors.Is(err, ErrUserAttributesInvalid(nil)))
+}
+
+// UserAttributesDetails names the attributes an error is about by key, as in
+// address.zip. The empty key is the attributes document itself.
+type UserAttributesDetails struct {
+	Keys []AttributeKey `json:"keys"`
 }
 
 func ErrUserNotFound() Error {
@@ -304,6 +321,10 @@ func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessag
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal json schema")
 	}
 	if err := jschema.Validate(doc); err != nil {
+		if jsonschema.IsValidationError(err) {
+			return nil, ErrUserAttributesInvalid(err).
+				WithDetails(UserAttributesDetails{Keys: InvalidAttributeKeys(err, doc)})
+		}
 		return nil, ErrUserInvalid().WithParent(err).WithMessage("user is not valid according to schema")
 	}
 
@@ -319,6 +340,19 @@ func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessag
 		return nil, ErrUserInvalid().WithMessage(emptyMessage)
 	}
 	return attrs, nil
+}
+
+// InvalidAttributeKeys returns the keys of the attributes a user schema
+// validation of doc failed on, sorted and without duplicates, as
+// [ValidationErrAttributeKey] names them.
+func InvalidAttributeKeys(err error, doc map[string]any) []AttributeKey {
+	var keys []AttributeKey
+	for _, ve := range ValidationFailures(err) {
+		key, _ := ValidationErrAttributeKey(ve, doc)
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return slices.Compact(keys)
 }
 
 // UserField enumerates the fields of User which can be used for filtering and
