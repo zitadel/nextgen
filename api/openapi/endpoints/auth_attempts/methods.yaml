@@ -8,7 +8,7 @@ post:
     It accepts factor challenges, verifies proofs, and completes into a session or handoff token.
     
     Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
-    also include session_id to add factors to an existing session.
+    also include session_id and that session's session_token to add factors to an existing session.
   tags:
     - Authentication Attempts
   security:

@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/website",
-  "version": "0.0.0",
+  "version": "0.0.1-alpha.2",
   "engines": {
     "node": "24.x"
   },
@@ -12,21 +12,29 @@
     "build": "next build",
     "start": "next start --port 3004",
     "typecheck": "next typegen && tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
-    "lint": "biome check ."
+    "lint": "biome check .",
+    "test": "vitest run",
+    "test:all": "pnpm run test"
   },
   "dependencies": {
     "@vercel/analytics": "catalog:",
     "@vercel/speed-insights": "catalog:",
+    "@zitadel/components": "workspace:*",
     "next": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "react-markdown": "catalog:",
+    "remark-gfm": "catalog:",
+    "semver": "catalog:"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@types/semver": "catalog:",
     "tailwindcss": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

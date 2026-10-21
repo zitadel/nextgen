@@ -21,8 +21,6 @@ export interface StepContext {
   /** Colour and stray stdout are both suppressed under `--json`. */
   readonly json: boolean;
   readonly color: boolean;
-  /** The one primary origin a deploy narrowed to with `--origin`, if any. */
-  readonly origin?: string;
   readonly bundle: ConfigurationBundle;
   /**
    * The branding descriptors as authored, before `$file` inlining, so

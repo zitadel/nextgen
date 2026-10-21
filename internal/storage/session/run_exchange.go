@@ -39,6 +39,9 @@ func RunExchange(ctx context.Context, store ExchangeStore, projectID, handoffTok
 	if !attempt.IsCompleted() {
 		return nil, domain.ErrSessionInvalidHandoffToken()
 	}
+	// Resolved once, so that a new session and an upgraded anonymous shell
+	// get the same lifetime.
+	ttl = ExchangeTTL(ttl)
 
 	var target *domain.Session
 	if attempt.SessionID != nil {
@@ -50,7 +53,7 @@ func RunExchange(ctx context.Context, store ExchangeStore, projectID, handoffTok
 			return nil, err
 		}
 	} else {
-		target = &domain.Session{ProjectID: projectID, TimeToLive: ExchangeTTL(ttl)}
+		target = &domain.Session{ProjectID: projectID, TimeToLive: ttl}
 		if err := store.InsertSession(ctx, target); err != nil {
 			return nil, exchangeConflict(err)
 		}

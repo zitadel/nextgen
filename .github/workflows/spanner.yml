@@ -36,6 +36,8 @@ jobs:
     env:
       # See ci.yml: names failed tasks in plain text and replays their output.
       MOON_SUMMARY: detailed
+      # See ci.yml: Ryuk would be the lane's only image from Docker Hub.
+      TESTCONTAINERS_RYUK_DISABLED: "true"
     steps:
       # Full history, same as ci.yml: in CI, `moon run` loads changed files
       # against `main` before running anything, and fails outright on a shallow

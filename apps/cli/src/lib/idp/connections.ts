@@ -186,7 +186,7 @@ export type StoredVariables = {
  * `client_secret` is always a `${{ NAME }}` reference — the syncer refuses to
  * upload anything else — so a value here is the server having resolved the
  * reference. Every path that reaches this has somewhere worse to put it than a
- * log: a plan preview prints it, and a canonical write-back commits it to
+ * log: a plan preview prints it, and a file written from it would commit it to
  * `.zitadel/idps/`, which is the one place the secret must never reach.
  */
 export function refuseResolvedSecret(definition: object, id: string): void {

@@ -23,13 +23,16 @@ type UserRefResolver interface {
 // Projects hold few schemas; paging is correctness, not tuning.
 const refSchemaPageSize = 100
 
-func listUserSchemas(ctx context.Context, stmts AllStatements, projectID string) func(cursor []byte) (*database.ListResult[*domain.JSONSchema], error) {
+// listUserSchemas pages the project's user schemas, narrowed by any extra
+// filters.
+func listUserSchemas(ctx context.Context, stmts userSchemaStatements, projectID string, filters ...database.Filter[domain.JSONSchemaField]) func(cursor []byte) (*database.ListResult[*domain.JSONSchema], error) {
+	filters = append([]database.Filter[domain.JSONSchemaField]{
+		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
+		database.Equal(database.Col(domain.JSONSchemaFieldKind), domain.JSONSchemaKindUserSchema.String()),
+	}, filters...)
 	return func(cursor []byte) (*database.ListResult[*domain.JSONSchema], error) {
 		return stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
-			Filter: database.And(
-				database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
-				database.Equal(database.Col(domain.JSONSchemaFieldKind), domain.JSONSchemaKindUserSchema.String()),
-			),
+			Filter: database.And(filters...),
 			Pagination: database.Page[domain.JSONSchemaField]{
 				Limit:  refSchemaPageSize,
 				Cursor: cursor,

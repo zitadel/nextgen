@@ -19,11 +19,12 @@ import (
 // Like the resolution tests these run sequentially: each one creates a
 // project, a connection and users.
 
-// ssoConflictFlowDefinition is modelled on the flow `zitadel sso enable` writes
-// for a password schema (docs/design/idp/schemas/default-login.scaffold.json),
-// pruned to what these tests walk: every user_already_exists, from a provider
-// or a typed sign-up, routes to sso-conflict. It leaves out register-sso and
-// the sso_user_not_found routes, which a bound attempt never reaches.
+// ssoConflictFlowDefinition is modelled on the flow `zitadel auth-method sso
+// enable` writes for a password schema
+// (docs/design/idp/schemas/default-login.scaffold.json), pruned to what these
+// tests walk: every user_already_exists, from a provider or a typed sign-up,
+// routes to sso-conflict. It leaves out register-sso and the
+// sso_user_not_found routes, which a bound attempt never reaches.
 const ssoConflictFlowDefinition = `{
 	"name": "sso-conflict-login",
 	"status": "active",
@@ -166,7 +167,7 @@ func (f *ssoResolutionFixture) toConflict(t *testing.T) (ssoFlow, api.FlowRespon
 	email := helpers.RandString(8) + "@example.com"
 	ownerID := "user_" + helpers.RandString(8)
 	createAttemptUser(t, f.project, f.team, defaultSchemaURL(), ownerID, map[string]string{"email": email})
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-new", map[string]any{"email": email}, map[string]bool{"email": true})
 	conflict := advance(t, &flow, f.getStep(t, flow))
 	require.Equal(t, "sso-conflict", conflict.Step.Name)
@@ -204,7 +205,7 @@ func TestSSOConflictBackAfterSignInAsksToSignIn(t *testing.T) {
 	f := newSSOConflictFixture(t)
 	email := helpers.RandString(8) + "@example.com"
 	createAttemptUser(t, f.project, f.team, defaultSchemaURL(), "user_"+helpers.RandString(8), map[string]string{"email": email})
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 
 	register := advance(t, &flow, f.submitAction(t, flow, "register", nil))
 	require.Equal(t, "register", register.Step.Name)

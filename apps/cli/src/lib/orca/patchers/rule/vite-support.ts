@@ -1,12 +1,14 @@
 import { builders, generateCode } from "magicast";
 
 import { configCandidates } from "./config-paths";
-import type { FileOp } from "./file-writer/types";
+import type { FileOp, WiringVerdict } from "./file-writer/types";
 import { PROXY_PATH } from "./proxy";
 import {
   assertNoUnreviewedProjectSecretProxy,
   PROXY_CREDENTIAL_POLICY_MARKER,
 } from "./proxy-credential-policy";
+import { indented, SESSION_COOKIE_MARKER, viteSessionCookieStatements } from "./session-cookie";
+import { lfText, withLfLineEnds } from "./utils/line-ends";
 import {
   ensureEditableObject,
   importIsPresent,
@@ -32,6 +34,9 @@ import {
  * `X-Forwarded-Proto` (`xfwd`), which the server reads before `Host`, as the
  * Next and Nuxt middleware send it. The WebAuthn relying party comes from the
  * browser's `Origin`, which the proxy passes on untouched.
+ *
+ * The session cookie travels under the app's project's name in the browser and
+ * the server's name upstream ({@link viteSessionCookieStatements}, ADR 073).
  */
 function proxyEntryCode(server: string): string {
   return `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */ {
@@ -45,26 +50,15 @@ function proxyEntryCode(server: string): string {
       throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).");
     }
     const bearer = \`Bearer \${secret}\`;
-    proxy.on("proxyReq", (proxyReq) => {
-      const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
-      if (
-        proxyReq.method === "POST" &&
-        pathname === "/sessions/exchange" &&
-        !proxyReq.getHeader("authorization")
-      ) {
-        proxyReq.setHeader("authorization", bearer);
-      }
-    });
+${bearerListener("    ")}
+${indented(viteSessionCookieStatements(), "    ")}
   },
 }`;
 }
 
-const LEGACY_PROXY_REQUEST_LISTENER =
-  /(^[\t ]*)proxy\.on\("proxyReq", \(proxyReq\) => \{\r?\n\1 {2}proxyReq\.setHeader\("authorization", bearer\);\r?\n\1\}\);/m;
-
-function exchangeOnlyProxyRequestListener(indent: string): string {
-  return `${indent}/* ${PROXY_CREDENTIAL_POLICY_MARKER} */
-${indent}proxy.on("proxyReq", (proxyReq) => {
+/** The generated hook that attaches the project secret to the session exchange only. */
+function bearerListener(indent: string): string {
+  return `${indent}proxy.on("proxyReq", (proxyReq) => {
 ${indent}  const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
 ${indent}  if (
 ${indent}    proxyReq.method === "POST" &&
@@ -74,6 +68,14 @@ ${indent}  ) {
 ${indent}    proxyReq.setHeader("authorization", bearer);
 ${indent}  }
 ${indent}});`;
+}
+
+const LEGACY_PROXY_REQUEST_LISTENER =
+  /(^[\t ]*)proxy\.on\("proxyReq", \(proxyReq\) => \{\r?\n\1 {2}proxyReq\.setHeader\("authorization", bearer\);\r?\n\1\}\);/m;
+
+function exchangeOnlyProxyRequestListener(indent: string): string {
+  return `${indent}/* ${PROXY_CREDENTIAL_POLICY_MARKER} */
+${bearerListener(indent)}`;
 }
 
 /**
@@ -137,10 +139,14 @@ const PROXY_IMPORTS = [{ from: "vite", imported: "loadEnv", local: "loadEnv" }] 
  * the host-keeping entry. Throws `E_VALIDATION` when the file is absent or the
  * config object cannot be reached (function-built/exotic configs), with a hint
  * to add the block manually.
+ *
+ * `previousPort` moves the app: a `server.port` still on that port is
+ * rewritten to `devPort`, while any other pinned port stays the user's.
  */
 export function viteProxyEdit(
   devPort: number,
   server: string,
+  previousPort?: number,
 ): (source: string | undefined) => string {
   return (source) => {
     const label = "the Vite config (vite.config.*)";
@@ -163,7 +169,10 @@ export function viteProxyEdit(
     const config = resolveDefaultExportObject(mod, label);
     let changed = workingSource !== source;
     const serverConfig = ensureEditableObject(config, "server");
-    if (serverConfig.port === undefined) {
+    if (
+      serverConfig.port === undefined ||
+      (previousPort !== undefined && serverConfig.port === previousPort && devPort !== previousPort)
+    ) {
       serverConfig.port = devPort;
       changed = true;
     }
@@ -192,6 +201,139 @@ export function viteProxyEdit(
   };
 }
 
+/** The slice of a babel AST node {@link cliConfigureStatements} walks. */
+interface AstNode {
+  readonly type: string;
+  readonly start: number;
+  readonly end: number;
+  /** An object property's key: an identifier's `name`, a string literal's `value`. */
+  readonly key?: { readonly name?: string; readonly value?: unknown };
+  readonly value?: AstNode;
+  readonly body?: AstNode | ReadonlyArray<AstNode>;
+  readonly properties?: ReadonlyArray<AstNode>;
+}
+
+/** The property `name` of an object literal node, if it has one. */
+function propertyOf(node: AstNode | undefined, name: string): AstNode | undefined {
+  return node?.properties?.find(
+    (property) =>
+      (property.type === "ObjectProperty" || property.type === "ObjectMethod") &&
+      (property.key?.name === name || property.key?.value === name),
+  );
+}
+
+/**
+ * `source` as the tokens a formatter leaves alone, so Prettier's or Biome's
+ * layout of what the CLI wrote still matches it: no whitespace, semicolons or
+ * trailing commas, double quotes, and a lone arrow-function parameter in
+ * parentheses.
+ */
+function fingerprint(source: string): string {
+  return source
+    .replace(/\s+/g, "")
+    .replace(/'/g, '"')
+    .replace(/;/g, "")
+    .replace(/,(?=[)\]}])/g, "")
+    .replace(/(^|[(,:=])([A-Za-z_$][\w$]*)=>/g, "$1($2)=>");
+}
+
+/**
+ * The statements of the `configure(proxy)` body of the `/__nextgen` entry the
+ * CLI wrote: one carrying the credential-policy marker and the CLI's own
+ * exchange-only bearer hook, however it was formatted since. A hand-written
+ * entry, or one whose hook was changed, yields `undefined`.
+ */
+function cliConfigureStatements(
+  config: unknown,
+  source: string,
+): ReadonlyArray<AstNode> | undefined {
+  const root = (config as { $ast?: AstNode }).$ast;
+  const proxy = propertyOf(propertyOf(root, "server")?.value, "proxy")?.value;
+  const entry = propertyOf(proxy, PROXY_PATH);
+  const configure = propertyOf(entry?.value, "configure");
+  const fn = configure?.type === "ObjectMethod" ? configure : configure?.value;
+  const body = fn?.body;
+  if (!entry || !body || Array.isArray(body) || (body as AstNode).type !== "BlockStatement") {
+    return undefined;
+  }
+  const block = body as AstNode;
+  const statements = block.body as ReadonlyArray<AstNode>;
+  const owned =
+    source.slice(entry.start, entry.end).includes(PROXY_CREDENTIAL_POLICY_MARKER) &&
+    fingerprint(source.slice(block.start, block.end)).includes(fingerprint(bearerListener("")));
+  return owned && statements.length > 0 ? statements : undefined;
+}
+
+/** What the session-cookie edit and its verdict call the file they read. */
+const VITE_CONFIG_LABEL = "the Vite config (vite.config.*)";
+
+/**
+ * The statements of the CLI's own `/__nextgen` entry's `configure(proxy)` body
+ * in `source` (LF line ends), or `undefined` when there is no such entry.
+ */
+function cliEntryStatements(source: string): ReadonlyArray<AstNode> | undefined {
+  // At tabWidth 1 the node offsets index the source itself; at recast's
+  // default a tab counts as four, which a tab-indented config would expose.
+  const mod = parseConfigModule(source, VITE_CONFIG_LABEL, { tabWidth: 1 });
+  return cliConfigureStatements(resolveDefaultExportObject(mod, VITE_CONFIG_LABEL), source);
+}
+
+/**
+ * Builds the `edit` transform that gives the CLI's own `/__nextgen` entry the
+ * session-cookie hooks (ADR 073), for apps set up before the entry carried
+ * them: the hooks go after the last statement of its `configure(proxy)` body,
+ * at that statement's indentation, and nothing else in the file changes. A
+ * config whose entry carries them already, a hand-written entry, and one whose
+ * bearer hook was changed are returned untouched; {@link viteSessionCookieVerdict}
+ * tells the doctor which it is. Line ends are the file's own (CRLF or LF).
+ * Throws `E_VALIDATION`, as {@link viteProxyEdit} does, when the file is absent
+ * or unreadable.
+ */
+export function viteSessionCookieEdit(): (source: string | undefined) => string {
+  return (source) => {
+    if (source === undefined) {
+      // Throws the E_VALIDATION a missing config gets everywhere.
+      parseConfigModule(source, VITE_CONFIG_LABEL, { tabWidth: 1 });
+      return "";
+    }
+    return withLfLineEnds(source, (text) => {
+      if (text.includes(SESSION_COOKIE_MARKER)) {
+        return text;
+      }
+      const last = cliEntryStatements(text)?.at(-1);
+      if (!last) {
+        return text;
+      }
+      const lineStart = text.lastIndexOf("\n", last.start - 1) + 1;
+      const indent = /^[\t ]*/.exec(text.slice(lineStart, last.start))?.[0] ?? "";
+      return `${text.slice(0, last.end)}\n${indented(viteSessionCookieStatements(), indent)}${text.slice(last.end)}`;
+    });
+  };
+}
+
+/**
+ * Whether the Vite config carries the session-cookie hooks, for the doctor.
+ * The CLI's entry without them is `detached` (`doctor --fix` adds them), and so
+ * is a config without the CLI's entry, which the proxy edit writes with them.
+ * An entry the CLI wrote whose bearer hook was changed by hand is `unknown`:
+ * the edit cannot place the hooks there, and only the developer can.
+ */
+export function viteSessionCookieVerdict(source: string): WiringVerdict {
+  const text = lfText(source);
+  if (text.includes(SESSION_COOKIE_MARKER)) {
+    return "applied";
+  }
+  if (cliEntryStatements(text)) {
+    return "detached";
+  }
+  return text.includes(PROXY_CREDENTIAL_POLICY_MARKER)
+    ? {
+        unknown:
+          "its /__nextgen proxy entry was changed since zitadel setup wrote it, so the session-cookie hooks (ADR 073) must be added by hand",
+      }
+    : "detached";
+}
+
 /**
  * Candidate Vite config filenames, in resolution priority. The patcher hands
  * this list to the generic `edit` file-op, which patches the first one that
@@ -201,25 +343,41 @@ export const VITE_CONFIG_PATHS = configCandidates("vite.config");
 
 /**
  * Capability shared by every Vite-based patcher (React, Vue, and any future
- * Vite framework): contributes the file-op that non-destructively merges the
+ * Vite framework): contributes the file-ops that non-destructively merge the
  * `/__nextgen` dev proxy into the project's Vite config. A patcher opts in by
- * declaring `implements ViteSupport` and spreading {@link viteProxyOp} into its
- * `routeOps`, so the proxy logic is written once and reused everywhere — no
- * per-framework duplication.
+ * declaring `implements ViteSupport` and spreading {@link viteProxyOp} and
+ * {@link viteSessionCookieOp} into its `routeOps`, so the proxy logic is
+ * written once and reused everywhere — no per-framework duplication.
  */
 export interface ViteSupport {
   /** The `edit` file-op that merges the `/__nextgen` proxy into the Vite config. */
-  viteProxyOp(devPort: number, server: string): FileOp;
+  viteProxyOp(devPort: number, server: string, previousPort?: number): FileOp;
+  /** The `edit` file-op that gives a proxy setup wrote before its session-cookie hooks. */
+  viteSessionCookieOp(): FileOp;
 }
 
 /** Builds the shared Vite-config proxy {@link FileOp} for a {@link ViteSupport} patcher. */
-export function buildViteProxyOp(devPort: number, server: string): FileOp {
+export function buildViteProxyOp(devPort: number, server: string, previousPort?: number): FileOp {
   return {
     kind: "edit",
     path: [...VITE_CONFIG_PATHS],
-    edit: viteProxyEdit(devPort, server),
+    edit: viteProxyEdit(devPort, server, previousPort),
     // The dev proxy is the auth request path — the doctor managed-files
     // check fails when this merge is no longer applied.
     wiring: "infrastructure",
+  };
+}
+
+/** Builds the shared session-cookie {@link FileOp} for a {@link ViteSupport} patcher. */
+export function buildViteSessionCookieOp(): FileOp {
+  return {
+    kind: "edit",
+    path: [...VITE_CONFIG_PATHS],
+    edit: viteSessionCookieEdit(),
+    // A session cookie per project (ADR 073) keeps the Console and the app
+    // from signing each other out on localhost. Sign-in works without it, so
+    // the doctor only warns while it is missing.
+    wiring: "convenience",
+    verify: viteSessionCookieVerdict,
   };
 }

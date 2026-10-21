@@ -49,6 +49,9 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *                clear button; still focusable and still submitted
  *
  * Form participation: `<zl-field>` is a form-associated custom element.
+ *
+ * @fires {CustomEvent<ZlFieldInputDetail>} zl-input - The field value changed; carries the field name and value.
+ * @fires {CustomEvent<ZlSubmitDetail>} zl-submit - A field affordance (e.g. forgot-password) requests a flow action.
  */
 @customElement("zl-field")
 export class ZlField extends FormAtom {
@@ -419,7 +422,12 @@ export class ZlField extends FormAtom {
 
   private handleClear = (): void => {
     this.value = "";
-    emit<ZlFieldInputDetail>(this, "zl-input", { name: this.name, value: this.value });
+    emit<ZlFieldInputDetail>(
+      this,
+      "zl-input",
+      { name: this.name, value: this.value },
+      { composed: false },
+    );
     this.syncFormState();
     this.dispatchNativeInput();
     this.inputEl?.focus();
@@ -441,7 +449,12 @@ export class ZlField extends FormAtom {
     const input = event.target as HTMLInputElement;
     this.value = input.value;
     this.syncFormState();
-    emit<ZlFieldInputDetail>(this, "zl-input", { name: this.name, value: this.value });
+    emit<ZlFieldInputDetail>(
+      this,
+      "zl-input",
+      { name: this.name, value: this.value },
+      { composed: false },
+    );
     this.dispatchNativeInput(event);
   };
 

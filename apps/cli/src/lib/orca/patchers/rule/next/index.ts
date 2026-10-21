@@ -3,6 +3,7 @@ import { basename, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
 import { MANAGED_MARKER } from "../../../../paths";
+import { sdkVersionForCli } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher, PREFLIGHT_FORCE_NOTE } from "../base";
@@ -77,6 +78,10 @@ export class NextPatcher extends AbstractRulePatcher {
         }
       }
     }
+  }
+
+  protected devPortOps(ctx: PatchContext): FileOp[] {
+    return [devScriptPortOp(ctx.issuer)];
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
@@ -240,7 +245,7 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     {
       kind: "add-dep",
       name: renderer.dependency.name,
-      version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
+      version: sdkVersionForCli(ctx.cliVersion),
     },
     // `next dev` takes its port from the command line only, so without this
     // the app can serve a port the project does not allow as an origin.
@@ -248,9 +253,18 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   ].filter((op): op is FileOp => op !== undefined);
 }
 
+/**
+ * The home page of an app setup scaffolded: a redirect to `/login`. The
+ * pinned `create-next-app` turns on Cache Components, whose dev server
+ * validates every page for instant navigation and logs the redirect it throws
+ * as an error on each request to `/`; `instant = false` exempts the page.
+ */
 function homePageTemplate(): string {
   return `${MANAGED_MARKER}
 import { redirect } from "next/navigation";
+
+// A redirect is never an instant navigation: tell Next.js not to validate it.
+export const instant = false;
 
 export default function Home() {
   redirect("/login");
@@ -311,13 +325,4 @@ async function isFile(path: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function dependencyVersionForCli(cliVersion: string, fallback: string): string {
-  const normalized = cliVersion.trim().replace(/^v/, "");
-  if (/^\d+\.\d+\.\d+-alpha\.\d+$/.test(normalized)) {
-    return normalized;
-  }
-  const prerelease = normalized.match(/^\d+\.\d+\.\d+-([0-9A-Za-z]+)(?:[.-]|$)/)?.[1];
-  return prerelease ?? fallback;
 }

@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { assertPrimaryOrigin, createDeployment } from "../../lib/release";
+import { createDeployment } from "../../lib/release";
 import { nextCommandsData } from "../../lib/oclif/envelope";
 
 /**
@@ -9,21 +9,17 @@ import { nextCommandsData } from "../../lib/oclif/envelope";
  *
  * The low-level counterpart of `deploy`: it deploys a release that already
  * exists rather than assembling one from `.zitadel/`. By default it targets
- * every primary origin; `--origin` narrows it to one. Deploying the release a
- * target already serves changes nothing.
+ * every primary origin: primary origins are never named one by one. Deploying
+ * the release a target already serves changes nothing.
  */
 export default class DeploymentCreate extends EnvironmentCommand {
   static override description = "Deploy an existing release to the project's origins.";
   static override group = CommandGroups.configuration;
   static override examples = [
     "<%= config.bin %> deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
-    "<%= config.bin %> deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --origin https://app.acme.com",
   ];
   static override flags = {
     release: Flags.string({ description: "The release id to deploy.", required: true }),
-    origin: Flags.string({
-      description: "Deploy to one primary origin instead of every primary origin.",
-    }),
     message: Flags.string({ char: "m", description: "A short summary of why this deploys." }),
   };
 
@@ -31,7 +27,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
     const { flags } = await this.parse(DeploymentCreate);
     await this.toMeta(flags);
 
-    const targets = flags.origin ? [flags.origin] : ["primary"];
+    const targets = ["primary"];
 
     // A dry run makes no request, so it answers before the connection — the
     // order `origin add`/`deploy` use, which keeps the no-mutation promise
@@ -46,15 +42,6 @@ export default class DeploymentCreate extends EnvironmentCommand {
     }
 
     const { client, projectId } = await this.connect();
-
-    // `--origin` names one primary origin, as for `deploy`; a preview URL is
-    // served by pull-request builds and is refused before anything is written.
-    if (flags.origin !== undefined) {
-      assertPrimaryOrigin((await client.getProject(projectId)).origins ?? [], flags.origin, {
-        hint: `Pass a primary origin, or add it first with \`zitadel origin add${this.environmentSelector()}\`.`,
-        nextCommands: [this.suggest("origin list")],
-      });
-    }
 
     const deployment = await createDeployment(client, projectId, {
       releaseId: flags.release,

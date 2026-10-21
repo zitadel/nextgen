@@ -113,8 +113,8 @@ export default class VariableResolve extends EnvironmentCommand {
 
   /**
    * The miss for an origin nothing is deployed to, with the fix that reaches
-   * it: a bare `deploy` goes to every primary origin, so a named primary is
-   * deployed to on its own, and a preview origin is only ever served by a
+   * it: `deploy` goes to every primary origin, including one added since the
+   * last deploy, and a preview origin is only ever served by a
    * pull-request build, never by `deploy`.
    */
   private async nothingDeployed(
@@ -132,7 +132,7 @@ export default class VariableResolve extends EnvironmentCommand {
     if (origins.some((entry) => entry.kind === "primary" && entry.pattern === origin)) {
       return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
         hint: "Deploy to it first, then resolve its variables.",
-        nextCommands: [this.suggest(`deploy --origin ${shellArg(origin)}`)],
+        nextCommands: [this.suggest("deploy")],
       });
     }
     if (

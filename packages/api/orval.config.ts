@@ -1,5 +1,7 @@
 import { defineConfig } from "orval";
 
+import { writeOperations } from "./scripts/operations.ts";
+
 export default defineConfig({
   zitadel: {
     input: {
@@ -40,6 +42,12 @@ export default defineConfig({
           name: "customFetch",
         },
       },
+    },
+    hooks: {
+      // The operations as data (`src/generated/operations.ts`), which the
+      // endpoints above carry only as code. Run as a hook, it reads the spec
+      // inside this task and under its `generated-sources` lock.
+      afterAllFilesWrite: writeOperations,
     },
   },
   zitadelZod: {

@@ -36,7 +36,7 @@ export function userIdentifier(user: Record<string, unknown>): string | undefine
 /**
  * The muted secondary line shown under a heading: the identifier, but only
  * when a display name is the primary (rendering the identifier twice says
- * nothing). The users list shows the identifier as its own column instead.
+ * nothing). The detail heading and the users list's User cell both use it.
  */
 export function userIdentitySecondary(user: Record<string, unknown>): string | undefined {
   return field(user, "display") ? field(user, "identifier") : undefined;

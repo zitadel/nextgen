@@ -1,6 +1,6 @@
 # @zitadel/cli
 
-Scaffolds Zitadel auth (login, register, profile, middleware/proxy) into a Next.js, Nuxt, React, Vue, Angular, Solid, Svelte, or Qwik app.
+Scaffolds Zitadel auth (login, register, profile, middleware/proxy) into a Next.js, Nuxt, SvelteKit, SolidStart, Qwik Router, TanStack Start, React, Vue, Angular, Solid, Svelte, or Qwik app.
 
 ```sh
 npx @zitadel/cli@alpha start
@@ -59,7 +59,7 @@ them yourself. The project's default user schema and login flow are provisioned
 from versioned local defaults; setup writes editable copies into
 `.zitadel/schemas/default-human-user.json` and
 `.zitadel/flows/default-login.json`, uploads them through the schema and flow
-APIs, then seeds `.zitadel/state.json` with what it uploaded.
+APIs, then seeds `.zitadel/state.json` so `zitadel plan` is immediately empty.
 Open the dev server URL printed by your framework, register a user, log out,
 log back in, and end on the signed-in profile page. That user is an end user
 of your app. The management console is a separate sign-in: run
@@ -81,8 +81,8 @@ passkey can sign in with either credential.
 
 Repo config is authoritative: edit `zitadel.json`, `.zitadel/schemas/*.json`,
 `.zitadel/flows/*.json`, or `.zitadel/branding/` (a `branding.json` descriptor
-plus a `login.liquid` LiquidJS template), then re-run `zitadel deploy`.
-Server-provisioned defaults remain a fallback for non-CLI
+plus a `login.liquid` LiquidJS template), then re-run `zitadel plan` and
+`zitadel apply`. Server-provisioned defaults remain a fallback for non-CLI
 project creation, but CLI-created projects are authored from local files first.
 Login templates are supported: scaffold them with the `branding eject` command
 (`--design centered|minimal`); setup never does;
@@ -107,8 +107,8 @@ and agent UIs may display stderr package-manager progress together with stdout.
 - `zitadel doctor`: verify the local runtime and generated project files
   (including scaffold drift and dependency-version alignment)
 - `zitadel status`: summarise the local runtime and project
-- `zitadel deploy`: build a release from `.zitadel/` and deploy it to the project
-  (`--dry-run` validates and shows the diff without publishing)
+- `zitadel plan`: validate config and preview sync changes without mutation
+- `zitadel apply`: validate and upload repo config to Zitadel
 - `zitadel branding eject`: scaffold an editable login template from a design
 - `zitadel schemas list`: list the project's user schemas
 - `zitadel variable set|get|list|rm`: manage the project's variables and secrets
@@ -129,6 +129,8 @@ which ships in this package.
 <summary>Full command reference</summary>
 
 <!-- commands -->
+* [`zitadel api [OPERATION]`](#zitadel-api-operation)
+* [`zitadel api ls [FILTER]`](#zitadel-api-ls-filter)
 * [`zitadel auth-method passkey disable`](#zitadel-auth-method-passkey-disable)
 * [`zitadel auth-method passkey enable`](#zitadel-auth-method-passkey-enable)
 * [`zitadel auth-method password disable`](#zitadel-auth-method-password-disable)
@@ -205,6 +207,112 @@ which ships in this package.
 * [`zitadel variable set NAME [VALUE]`](#zitadel-variable-set-name-value)
 * [`zitadel version`](#zitadel-version)
 * [`zitadel which`](#zitadel-which)
+
+## `zitadel api [OPERATION]`
+
+Call any operation of the Zitadel API, with this project's server and project secret.
+
+```
+USAGE
+  $ zitadel api [OPERATION...] [--json] [-c <value>] [-s <value>]
+    [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-X
+    GET|POST|PUT|PATCH|DELETE] [-F <value>...] [--input <value>] [--paginate]
+
+ARGUMENTS
+  [OPERATION...]  An operationId (queryUsers) or a path (/users/query), then the
+                  path parameters. Omit it to choose one.
+
+FLAGS
+  -F, --field=<value>...                  A field: name=value, or name:=json for
+                                          JSON, typed by the operation's schema.
+                                          A query parameter's name sets it; any
+                                          other name is a dot path into the
+                                          body. Repeatable.
+  -X, --method=GET|POST|PUT|PATCH|DELETE  The HTTP method, to choose among a
+                                          path's operations.
+  -c, --cwd=<value>                       Project directory to operate on.
+  -n, --non-interactive                   Disable prompts. Required when
+                                          scripting or running as an agent.
+  -s, --server=<value>                    Override the resolved server URL.
+  -v, --verbose                           Verbose logging.
+      --[no-]color                        Colorize human output. Disable with
+                                          --no-color; NO_COLOR and FORCE_COLOR
+                                          are honored too.
+      --debug                             Debug logging.
+      --dry-run                           Preview without mutating files or the
+                                          platform.
+      --input=<value>                     Read the JSON body from a file, or
+                                          from stdin with -. --field lays over
+                                          it.
+      --paginate                          Follow next_page_token to the last
+                                          page, and answer with every page's
+                                          items in one list.
+      --[no-]telemetry                    Send anonymous usage analytics.
+                                          Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Call any operation of the Zitadel API, with this project's server and project
+  secret.
+
+EXAMPLES
+  $ zitadel api queryUsers -F limit=5
+
+  $ zitadel api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W
+
+  $ zitadel api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json
+
+  $ zitadel api listEvents -F category=auth --paginate --json
+
+  $ zitadel api createTeam -F name=Support --dry-run
+
+  $ zitadel api createTeam --input - < team.json
+```
+
+## `zitadel api ls [FILTER]`
+
+List the operations of the Zitadel API that `zitadel api` calls.
+
+```
+USAGE
+  $ zitadel api ls [FILTER] [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--tag <value>]
+
+ARGUMENTS
+  [FILTER]  Only operations whose id, path, summary or tag contains this text.
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --tag=<value>      Only the operations of this part of the API (Users,
+                         Teams, …).
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List the operations of the Zitadel API that `zitadel api` calls.
+
+EXAMPLES
+  $ zitadel api ls
+
+  $ zitadel api ls passkey
+
+  $ zitadel api ls --tag Users --json
+
+  $ zitadel api ls --json | jq -r '.data.operations[] | select(.command == null) | .id'
+```
 
 ## `zitadel auth-method passkey disable`
 
@@ -735,7 +843,7 @@ Build a release from .zitadel/ and deploy it to the project.
 USAGE
   $ zitadel deploy [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [-m <value>] [--origin <value>]
+    <value>] [-m <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -753,8 +861,6 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
                           process environment. Cannot be combined with --env.
-      --origin=<value>    Deploy to one primary origin instead of every primary
-                          origin.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -767,8 +873,6 @@ DESCRIPTION
 EXAMPLES
   $ zitadel deploy -m 'add phone_number to human-user'
 
-  $ zitadel deploy --origin https://app.acme.com
-
   $ zitadel deploy --dry-run
 ```
 
@@ -780,7 +884,7 @@ Deploy an existing release to the project's origins.
 USAGE
   $ zitadel deployment create --release <value> [--json] [-c <value>] [-s
     <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e
-    <value>] [--env-file <value>] [--origin <value>] [-m <value>]
+    <value>] [--env-file <value>] [-m <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -798,8 +902,6 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
                           process environment. Cannot be combined with --env.
-      --origin=<value>    Deploy to one primary origin instead of every primary
-                          origin.
       --release=<value>   (required) The release id to deploy.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
@@ -812,8 +914,6 @@ DESCRIPTION
 
 EXAMPLES
   $ zitadel deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-
-  $ zitadel deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --origin https://app.acme.com
 ```
 
 ## `zitadel deployment get DEPLOYMENT_ID`
@@ -918,7 +1018,7 @@ Roll back to an earlier deployment.
 USAGE
   $ zitadel deployment rollback [DEPLOYMENT_ID] [--json] [-c <value>] [-s
     <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e
-    <value>] [--env-file <value>] [--origin <value>] [-f]
+    <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
   [DEPLOYMENT_ID]  The deployment to re-apply. Omit to undo the last deploy.
@@ -940,7 +1040,6 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
                           process environment. Cannot be combined with --env.
-      --origin=<value>    Which origin's history the bare form reads.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -955,7 +1054,7 @@ EXAMPLES
 
   $ zitadel deployment rollback dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
 
-  $ zitadel deployment rollback --origin https://app.acme.com --force
+  $ zitadel deployment rollback --force
 ```
 
 ## `zitadel doctor`
@@ -2826,11 +2925,12 @@ Create a Zitadel project and scaffold local auth.
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f] [--framework
-    next|nuxt|react|vue|solid|svelte|qwik|angular] [--renderer react]
-    [--dev-port <value>] [--skip-install] [--preset
-    password-first|passkey-first] [--use-case minimal|consumer|business] [--sso
-    google|custom] [--sso-client-id <value>] [--sso-slug <value>]
-    [--sso-display-name <value>] [--sso-issuer <value>] [--sso-scopes <value>]
+    next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|svelte|qwik-r
+    outer|qwik|angular] [--renderer react] [--dev-port <value>] [--skip-install]
+    [--preset password-first|passkey-first] [--use-case
+    minimal|consumer|business] [--sso google|custom] [--sso-client-id <value>]
+    [--sso-slug <value>] [--sso-display-name <value>] [--sso-issuer <value>]
+    [--sso-scopes <value>]
 
 FLAGS
   -c, --cwd=<value>
@@ -2859,14 +2959,16 @@ FLAGS
   --dev-port=<value>
       Dev-server port; also the issuer origin registered with Zitadel. Defaults to
       the detected port. Use distinct ports to run several scaffolded apps side by
-      side.
+      side. In an app already set up, moves it to this port: the dev script,
+      ZITADEL_ISSUER and the allowed origin.
 
   --dry-run
       Preview without mutating files or the platform.
 
   --framework=<option>
       Framework to target.
-      <options: next|nuxt|react|vue|solid|svelte|qwik|angular>
+      <options: next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|sve
+      lte|qwik-router|qwik|angular>
 
   --preset=<option>
       Sign-in preset for the scaffolded schema and login flow (default:

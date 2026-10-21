@@ -117,7 +117,7 @@ The renderer choice is explicit in config, not inferred:
 
 ```json
 {
-  "$schema": "https://schemas.zitadel.com/v2/project.schema.json",
+  "$schema": "./.zitadel/meta/project.json",
   "branding": {
     "renderer": "web-component",
     "attribution": "visible",

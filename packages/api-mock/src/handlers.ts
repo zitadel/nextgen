@@ -32,6 +32,11 @@ import { http, HttpResponse, type RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
 import { withPasskey } from "./passkey.js";
+import {
+  parseRedirectTarget,
+  RedirectTargetError,
+  type RedirectTarget,
+} from "./redirect-target.js";
 import { withSsoProviders } from "./sso-providers.js";
 import {
   doneStep,
@@ -118,28 +123,34 @@ const IDP_CALLBACK_ERROR_PAGE = `<!doctype html>
 /**
  * Why an sso submission's `return_target` is refused, or null when it is not.
  *
- * The engine binds the return to the request origin (`internal/api/flow.go`):
- * the `Origin` header, else the request's own host. The callback redirects to
- * this value, so a target on another origin would make it an open redirect,
- * and this mock is publicly deployed (`apps/mock-zitadel`).
+ * The engine (`internal/api/flow.go`) first parses the target with
+ * `httputil.ParseRedirectTarget`, ported as `parseRedirectTarget`, then binds it
+ * to the request origin: the `Origin` header, else the request's own host. The
+ * callback redirects to this value, so a target the server would refuse would
+ * make it an open redirect, and this mock is publicly deployed
+ * (`apps/mock-zitadel`). The accepted target is the one stored, as on the
+ * engine.
  */
-function returnTargetRefusal(request: Request, rawTarget: string): string | null {
-  const origin = request.headers.get("origin") ?? new URL(request.url).origin;
-  let target: URL;
+function returnTargetRefusal(
+  request: Request,
+  rawTarget: string,
+): { refusal: string } | { target: string } {
+  let parsed: RedirectTarget;
   try {
-    target = new URL(rawTarget);
-  } catch {
-    return `return_target "${rawTarget}" is not a URL`;
+    parsed = parseRedirectTarget(rawTarget);
+  } catch (error) {
+    if (error instanceof RedirectTargetError) {
+      return { refusal: `return_target ${JSON.stringify(rawTarget)} is ${error.message}` };
+    }
+    throw error;
   }
-  // No page URL carries userinfo; it is only ever a way to dress a foreign
-  // host up as the origin.
-  if (target.username || target.password) {
-    return "return_target must not carry userinfo";
+  const origin = request.headers.get("origin") ?? new URL(request.url).origin;
+  if (parsed.origin.toLowerCase() !== origin.toLowerCase()) {
+    return {
+      refusal: `return_target ${JSON.stringify(rawTarget)} is not on the request origin ${JSON.stringify(origin)}`,
+    };
   }
-  if (target.origin.toLowerCase() !== origin.toLowerCase()) {
-    return `return_target "${rawTarget}" is not on the request origin "${origin}"`;
-  }
-  return null;
+  return { target: parsed.href };
 }
 
 /**
@@ -380,13 +391,19 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       captured.push({ kind: "submitFlowStep", flowId, body });
       // The engine refuses an sso submission without `return_target`, the
       // page the callback sends the browser back to, before anything else.
+      let acceptedTarget: string | null = null;
       if (body.action === "sso") {
-        const refusal = body.return_target
-          ? returnTargetRefusal(request, body.return_target)
-          : "return_target is required for action sso";
-        if (refusal) {
-          return HttpResponse.json({ code: "req.invalid", message: refusal }, { status: 400 });
+        const checked =
+          body.return_target === undefined || body.return_target === null
+            ? { refusal: "return_target is required for action sso" }
+            : returnTargetRefusal(request, body.return_target);
+        if ("refusal" in checked) {
+          return HttpResponse.json(
+            { code: "req.invalid", message: checked.refusal },
+            { status: 400 },
+          );
         }
+        acceptedTarget = checked.target;
       }
       const before = actor.getSnapshot().value as FlowStepName | "idle";
       // Only the provider's return to the callback route leaves for the
@@ -398,7 +415,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         );
       }
       if (body.action === "sso") {
-        returnTarget = body.return_target ?? null;
+        returnTarget = acceptedTarget;
       }
       const fields = (body.fields ?? {}) as Record<string, string>;
       const email = fields.email;
@@ -517,9 +534,15 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       return getExchangeHandoffResponseMock();
     }),
     // The session endpoints `<zitadel-session>` and `<zitadel-logout>` read on
-    // mount. In-process there is no session cookie to present, so both answer
-    // the contract's 401 for a signed-out browser.
+    // mount and on sign-out. In-process there is no session cookie to present,
+    // so all of them answer the contract's 401 for a signed-out browser.
     http.get("*/sessions/me", () =>
+      HttpResponse.json(
+        { code: "auth.unauthorized", message: "no session cookie" },
+        { status: 401, headers: { "Cache-Control": "private, no-store" } },
+      ),
+    ),
+    http.get("*/sessions/me/csrf", () =>
       HttpResponse.json(
         { code: "auth.unauthorized", message: "no session cookie" },
         { status: 401, headers: { "Cache-Control": "private, no-store" } },

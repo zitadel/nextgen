@@ -2,7 +2,6 @@ import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import {
-  assertPrimaryOrigin,
   buildBundle,
   createDeployment,
   DEPLOY_ARGS,
@@ -22,7 +21,6 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import { ZitadelError } from "../lib/errors";
 import { reportWarning } from "../lib/warnings";
 import { nextCommandsData } from "../lib/oclif/envelope";
-import { shellArg } from "../lib/shell";
 
 /**
  * `zitadel deploy` — publish `.zitadel/` to the project's primary origins.
@@ -30,8 +28,8 @@ import { shellArg } from "../lib/shell";
  * It assembles a release bundle from the files on disk, validates it and syncs
  * identity-provider connections, shows what changed since the live release as a
  * git diff, then creates the release and deploys it to every primary origin
- * (or the one `--origin` names). `--dry-run` stops after the diff, writing
- * nothing to the server.
+ * (primary origins are never named one by one). `--dry-run` stops after the
+ * diff, writing nothing to the server.
  *
  * It replaces `plan` and `apply`: a release is published as one immutable unit
  * and deployed, rather than each resource being synced in place.
@@ -43,16 +41,12 @@ export default class Deploy extends EnvironmentCommand {
   static override groupOrder = 1;
   static override examples = [
     "<%= config.bin %> deploy -m 'add phone_number to human-user'",
-    "<%= config.bin %> deploy --origin https://app.acme.com",
     "<%= config.bin %> deploy --dry-run",
   ];
   static override flags = {
     message: Flags.string({
       char: "m",
       description: "A short summary of what this release changes.",
-    }),
-    origin: Flags.string({
-      description: "Deploy to one primary origin instead of every primary origin.",
     }),
   };
 
@@ -77,30 +71,16 @@ export default class Deploy extends EnvironmentCommand {
 
     const { client, projectId } = await this.connect();
 
-    // --origin narrows the deploy to one primary origin. A preview origin is
-    // deployed from a pull-request build, not here, so it is refused. A primary
-    // pattern is an exact URL, so a literal match is a primary target — and a
-    // literal beats a wildcard. A preview pattern may be a wildcard, so it is
-    // matched by glob, not string equality: a concrete URL covered by a preview
-    // wildcard (say `https://pr-7.preview.acme.com` under
-    // `https://*.preview.acme.com`) is still a preview and must be refused here,
-    // not slip through as a primary target.
-    const origin = flags.origin;
     // The origins this deploy lands on, for the optimistic guard below.
-    let landing: string[] = origin === undefined ? [] : [origin];
-    if (origin !== undefined) {
-      assertPrimaryOrigin((await client.getProject(projectId)).origins ?? [], origin, {
-        hint: `Pass a primary origin, or add it first with \`zitadel origin add${this.environmentSelector()}\`.`,
-        nextCommands: [this.suggest("origin list")],
-      });
-    } else if (!dryRun) {
-      // With no --origin the deploy goes to every primary origin, so the
-      // project must have at least one. Checked here, before the bundle is
-      // built and the IdP connections are synced, so a project with no primary
-      // origin fails before the IdP step does a partial write rather than
-      // after it, when the final deploy would report the missing origin. A dry
-      // run writes nothing and never reaches the deploy, so it is exempt: it
-      // still validates and previews a project that has no primary origin yet.
+    let landing: string[] = [];
+    if (!dryRun) {
+      // The deploy goes to every primary origin, so the project must have at
+      // least one. Checked here, before the bundle is built and the IdP
+      // connections are synced, so a project with no primary origin fails
+      // before the IdP step does a partial write rather than after it, when the
+      // final deploy would report the missing origin. A dry run writes nothing
+      // and never reaches the deploy, so it is exempt: it still validates and
+      // previews a project that has no primary origin yet.
       const origins = (await client.getProject(projectId)).origins ?? [];
       landing = origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
       if (landing.length === 0) {
@@ -122,7 +102,6 @@ export default class Deploy extends EnvironmentCommand {
       dryRun,
       json,
       color,
-      origin,
       bundle,
       brandingSources,
       suggest: (args) => this.suggest(args),
@@ -138,7 +117,7 @@ export default class Deploy extends EnvironmentCommand {
         data: {
           dry_run: true,
           resources: resourceCount,
-          targets: origin ? [origin] : ["primary"],
+          targets: ["primary"],
         },
         pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
       });
@@ -165,11 +144,11 @@ export default class Deploy extends EnvironmentCommand {
     // preview, which never targets a primary, is never it. It guards the
     // create against another deploy that raced in since we inspected: the
     // server refuses with 409 rather than overwriting that deploy unseen (#538).
-    const live = await listLiveDeployments(client, projectId, origin ? { origin } : {});
+    const live = await listLiveDeployments(client, projectId);
     const observed = live.find((deployment) =>
       deployment.targets.some((entry) => landing.includes(entry.origin)),
     )?.id;
-    const targets = origin ? [origin] : ["primary"];
+    const targets = ["primary"];
     let deployment: Awaited<ReturnType<typeof createDeployment>>;
     try {
       deployment = await createDeployment(client, projectId, {
@@ -204,14 +183,12 @@ export default class Deploy extends EnvironmentCommand {
         );
       }
       // The deployment that raced in on a primary origin, not a live preview.
-      const current = (await listLiveDeployments(client, projectId, origin ? { origin } : {})).find(
-        servesPrimary,
-      );
+      const current = (await listLiveDeployments(client, projectId)).find(servesPrimary);
       throw new ZitadelError(
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",
         {
-          hint: `Re-run \`zitadel ${DEPLOY_ARGS}${origin === undefined ? "" : ` --origin ${shellArg(origin)}`}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
+          hint: `Re-run \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
           details: current === undefined ? undefined : { current_deployment: current },
           nextCommands: [this.suggest("deployment list --live")],
         },

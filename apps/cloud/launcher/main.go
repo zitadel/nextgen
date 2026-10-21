@@ -8,8 +8,8 @@
 //     PgBouncer) and CLOUD_MIGRATOR_DATABASE_URL (direct) name PlanetScale
 //     Postgres; a preview gets a database of its own on the preview cluster,
 //     created by its build. The server serves from the pooled URL with a small
-//     pgx pool, because Vercel starts an instance per concurrent request from
-//     cold and every instance holds its own pool.
+//     pgx pool, because a burst starts new instances and every instance holds
+//     its own pool, shared by the requests the instance has in flight.
 //   - The master key. server.master_keys can only come from a config file
 //     (the server ignores NEXTGEN_SERVER_MASTER_KEYS_*), so
 //     MASTER_KEY_PEM_B64 and MASTER_KEY_ID become <data_dir>/nextgen.yaml.

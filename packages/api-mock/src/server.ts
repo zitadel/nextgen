@@ -105,6 +105,35 @@ function lookupSession(req: express.Request): SessionLookup {
   }
   return { status: "active", token, session };
 }
+
+/**
+ * Holds the request's session to its `project_id`, as the server does on every
+ * `/sessions/me` route once the cookie has authenticated the request: a value
+ * outside the project-id pattern (or not a single string) is a bad request, and
+ * a session of another project is refused with `403 sess.project_mismatch`, the
+ * way an app on a shared host sees one. The refusal clears no cookie: the
+ * session is live in its own project. Answers the refusal and returns `true`.
+ */
+function refuseForProject(
+  req: express.Request,
+  res: express.Response,
+  session: StoredSession,
+): boolean {
+  const projectId = req.query.project_id;
+  if (projectId === undefined) return false;
+  if (typeof projectId !== "string" || !/^[a-zA-Z0-9_-]+$/.test(projectId)) {
+    res.status(400).json(errorBody("req.invalid", "project_id is not a valid project id."));
+    return true;
+  }
+  if (session.project_id !== projectId) {
+    res
+      .status(403)
+      .json(errorBody("sess.project_mismatch", "The session belongs to a different project."));
+    return true;
+  }
+  return false;
+}
+
 /**
  * A session's CSRF token (ADR 053 §5), served by GET /sessions/me/csrf and
  * checked on claim/complete. Derived from the session cookie exactly as the Go
@@ -374,8 +403,10 @@ export function createMockApp(options: { issuer: string }): express.Express {
       case "expired":
         res.status(401).json(errorBody("unauthenticated", "session expired"));
         return;
-      case "active":
+      case "active": {
+        if (refuseForProject(req, res, found.session)) return;
         res.json(found.session);
+      }
     }
   });
 
@@ -385,10 +416,14 @@ export function createMockApp(options: { issuer: string }): express.Express {
     // Both the token and the 401 are session state: neither may be stored.
     res.setHeader("Cache-Control", "private, no-store");
     const found = lookupSession(req);
+    // The server's token gate refuses a missing, unknown, revoked or expired
+    // cookie before the handler runs, so its project check, like this one,
+    // only ever sees a live session.
     if (found.status !== "active") {
       res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
       return;
     }
+    if (refuseForProject(req, res, found.session)) return;
     res.json({ csrf_token: csrfTokenFor(found.token) });
   });
 
@@ -396,19 +431,28 @@ export function createMockApp(options: { issuer: string }): express.Express {
   // Go server's revokeMySession handler and the SDK proxy's logout call.
   app.delete("/sessions/me", (req: express.Request, res: express.Response) => {
     const found = lookupSession(req);
-    switch (found.status) {
-      case "missing":
-        res.status(401).json(errorBody("unauthenticated", "no session cookie"));
-        return;
-      case "unknown":
-        res.status(404).json(errorBody("session_not_found", "session not found"));
-        return;
-      case "expired":
-        res.status(409).json(errorBody("session_revoked", "session already revoked or expired"));
-        return;
-      case "active":
-        sessionStore.delete(found.token);
+    // As on GET /sessions/me/csrf: the server's token gate answers these 401
+    // before the handler, whatever project the request names.
+    if (found.status !== "active") {
+      res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
+      return;
     }
+    // ADR 053 §5: sign-out is a cookie-authenticated write, so it carries the
+    // session's CSRF token. Checked before the project hold, in the same order
+    // as the Go server's security handler.
+    if (req.get("x-zitadel-csrf") !== csrfTokenFor(found.token)) {
+      res
+        .status(403)
+        .json(
+          errorBody(
+            "auth.csrf_invalid",
+            "The request failed cross-site request forgery validation.",
+          ),
+        );
+      return;
+    }
+    if (refuseForProject(req, res, found.session)) return;
+    sessionStore.delete(found.token);
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,

@@ -1555,9 +1555,10 @@ export function setupPlatformHandlers() {
           continue;
         }
         if (primaries.includes(target)) {
-          resolved.add(target);
-          sawPrimary = true;
-          continue;
+          return HttpResponse.json(
+            errorBody("dep.invalid", "deployment: deploy primary origins with the primary keyword"),
+            { status: 400 },
+          );
         }
         if (matchesPreviewPattern(project, target)) {
           resolved.add(target);
@@ -2559,9 +2560,8 @@ export function setupPlatformHandlers() {
           }
         }
       }
-      // 200 with the project's variables read back, both kinds, including what
-      // the write did not touch (a write to one kind reads the other too).
-      const response = variablesResponse(store.variables, projectId, ["primary", "preview"]);
+      // 200 with the variables read back, including what the write did not touch.
+      const response = variablesResponse(store.variables, projectId, kinds);
       const out = parse(UpdateVariablesResponse, response, "mock_response_invalid");
       if (!out.ok) {
         return out.response;

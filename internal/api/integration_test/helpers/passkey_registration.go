@@ -24,7 +24,7 @@ var PasskeyRelyingParty = virtualwebauthn.RelyingParty{
 // The user factor is pinned on the attempt first, so the ceremony targets the
 // existing user and excludes credentials already registered for it — hence a
 // fresh virtual authenticator per call.
-func (h *Harness) RegisterPasskey(t *testing.T, projectID, userID, passkeyName string) {
+func (h *Harness) RegisterPasskey(t testing.TB, projectID, userID, passkeyName string) {
 	t.Helper()
 
 	svc := h.EnsureAuthAttemptService(t)

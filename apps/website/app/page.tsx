@@ -1,78 +1,116 @@
-import Image from "next/image";
-import { Fragment } from "react";
+import { CommandBlock } from "./command-block";
+import { Words } from "./command-line";
+import { CallToAction } from "./cta";
+import { appPath, commands, skillsCommand } from "./commands";
 import { CopyButton } from "./copy-button";
-import hero from "./hero.avif";
-import heroStill from "./hero-still.webp";
-import { Logo } from "./logo";
-import { Stage } from "./stage";
+import { Showcase, stepLink } from "./showcase/showcase";
+import { SiteFooter } from "./site-footer";
+import { SiteHeader } from "./site-header";
 
-// The local preview with the published CLI, as the docs' quickstart runs it
-// (AGENTS.md).
-const commands = [
-  "mkdir my-app && cd my-app",
-  "npx @zitadel/cli@alpha start",
-  "npx @zitadel/cli@alpha setup --server local",
-];
-
-// The website's homepage hero (AGENTS.md): animated, or its first frame for
-// reduced motion and for browsers without AVIF. Decoration, so no alt text.
-function Hero({ className, first = false }: { className: string; first?: boolean }) {
+/**
+ * One of the three things the hero's line says are yours, in the color of
+ * the step that changes it, linking down to that step.
+ */
+function Yours({ step, children }: { step: string; children: string }) {
+  const { href, number, style } = stepLink(step);
   return (
-    <picture className={className}>
-      <source media="(prefers-reduced-motion: reduce)" srcSet={heroStill.src} />
-      <source type="image/avif" srcSet={hero.src} />
-      <Image
-        src={heroStill}
-        alt=""
-        unoptimized
-        loading="eager"
-        fetchPriority={first ? "high" : undefined}
-        className="size-full"
-      />
-    </picture>
+    <a href={href} style={style} title={`Step ${number}: ${step}`} className="yours">
+      {children}
+    </a>
   );
 }
 
+// The page follows zitadel/new-website's narrative (AGENTS.md): the benefit
+// and the commands that deliver it, then the steps those commands take and
+// what they let you change (the showcase), and nothing after it.
 export default function Home() {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center overflow-hidden px-6 py-8">
-      <Stage>
-        <Logo className="stage-logo" />
-        <div className="stage-frame">
-          <Hero className="stage-glow" />
-          <Hero className="stage-art" first />
-        </div>
-        <h1 className="stage-caption">Coming soon</h1>
-      </Stage>
-      <figure className="teaser mt-6 flex max-w-full flex-col items-center gap-3">
-        <figcaption className="text-center text-text-secondary">
-          Until then, try it locally:
-        </figcaption>
-        <div className="relative max-w-full rounded-2xl border border-border-primary">
-          {/* A line too long for a phone wraps between words, never after the
-              hyphens or slashes inside one, and under its command, not its $.
-              The first leaves room for the copy button at its end. */}
-          <pre className="whitespace-pre-wrap px-4 py-4 font-mono text-xs leading-6 sm:px-5 sm:text-sm">
-            <code>
-              {commands.map((command) => (
-                <span key={command} className="block pl-[2ch] -indent-[2ch] first:pr-7">
-                  <span aria-hidden="true" className="select-none text-text-muted">
-                    {"$ "}
-                  </span>
-                  {command.split(" ").map((word, index) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: the words of a fixed command, never reordered
-                    <Fragment key={index}>
-                      {index > 0 && " "}
-                      <span className="whitespace-nowrap">{word}</span>
-                    </Fragment>
-                  ))}
-                </span>
-              ))}
-            </code>
-          </pre>
-          <CopyButton text={commands.join("\n")} label="Copy the commands" />
-        </div>
-      </figure>
-    </main>
+    <>
+      {/* The light over the top of the page: the accent's purple on the left
+          meeting the finish's green on the right (showcase/finish.tsx). */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[60rem] bg-[radial-gradient(45%_55%_at_28%_0%,color-mix(in_oklch,var(--color-text-accent)_16%,transparent),transparent),radial-gradient(45%_55%_at_74%_0%,color-mix(in_oklch,var(--color-step-end)_9%,transparent),transparent)]"
+      />
+      <SiteHeader />
+      <main>
+        <section
+          aria-labelledby="hero-title"
+          className="hero relative flex flex-col items-center overflow-hidden px-6 pt-10 pb-28"
+        >
+          {/* As much air over the content as under it, so it stays centered. */}
+          <div aria-hidden="true" className="flex-1" />
+          {/* The title sets the width; the line under it fills it and wraps
+              inside it (.hero-lede), so the two read as one block. */}
+          <div className="grid w-fit max-w-full justify-items-center">
+            <h1 id="hero-title" className="hero-title">
+              <span className="display-title">
+                Your login <br className="sm:hidden" />
+                in one minute.
+              </span>
+            </h1>
+            <p className="hero-lede teaser mt-5 text-balance text-center text-base text-text-secondary leading-7 md:text-lg md:leading-8">
+              Open-source auth that lives in your repo:{" "}
+              <Yours step="Add a field">your user model</Yours>,{" "}
+              <Yours step="Change the flow">your flows</Yours>,{" "}
+              <Yours step="Match your brand">your look</Yours>.
+            </p>
+          </div>
+          {/* The commands with the coding agents' one under them, and the ways
+              on. The commands keep to their longest line's width. */}
+          <div className="teaser mt-9 flex w-full max-w-[40rem] flex-col items-center">
+            <div className="w-full">
+              <CommandBlock
+                title={appPath}
+                note="Node 24+"
+                lines={commands}
+                footer={
+                  <div className="flex items-start gap-3 text-xs leading-5">
+                    <p className="flex flex-1 flex-wrap gap-x-3">
+                      <span className="text-text-muted">Using a coding agent?</span>
+                      <code className="font-mono text-text-secondary">
+                        <Words text={skillsCommand} />
+                      </code>
+                    </p>
+                    <CopyButton text={skillsCommand} label="the skills command" className="-my-1" />
+                  </div>
+                }
+              />
+            </div>
+            <CallToAction className="mt-7" />
+          </div>
+          {/* The air under the content, a little more than over it, so it
+              sits just above the middle; the cue down to the steps under it. */}
+          <div aria-hidden="true" className="flex-[1.15]" />
+          <a
+            href={stepLink("Start Zitadel").href}
+            className="scroll-cue group absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 rounded-md px-2 py-1 font-mono text-text-muted text-xs leading-4 transition-colors hover:text-text-primary"
+          >
+            How it works
+            <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="size-4">
+              <path
+                d="M4 6l4 4 4-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </a>
+        </section>
+
+        {/* What the commands do, step by step, with no title of its own: the
+            numbered rows speak for themselves under the hero. */}
+        <section
+          aria-label="Step by step"
+          className="overflow-x-clip px-6 pt-12 pb-16 md:pt-16 md:pb-24"
+        >
+          <div className="mx-auto max-w-6xl">
+            <Showcase />
+          </div>
+        </section>
+      </main>
+      <SiteFooter />
+    </>
   );
 }
