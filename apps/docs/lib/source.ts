@@ -10,7 +10,7 @@ import type { RequestData } from "fumadocs-openapi/requests";
 import { pathnameFromRequest } from "fumadocs-openapi/requests/generators";
 import { curl } from "fumadocs-openapi/requests/generators/curl";
 
-import { cliCommandUrl, cliSidebarNames, cliSource } from "./cli-reference";
+import { cliCommandUrl, cliSidebarNames, cliSource, commandOperations } from "./cli-reference";
 import { codeThemes } from "./code-theme";
 import { cliCommand, cliSample } from "./cli-sample";
 import { defaultRequest, withRefValues } from "./default-request";
@@ -123,8 +123,9 @@ export const source = loader(
     // The reference's Errors page, generated from the API's error codes
     // (lib/error-reference.ts).
     errors: errorSource(apiBaseDir, `${docsRoute}/${apiBaseDir}`, apiOperations()),
-    // A page per command of the CLI, under reference/cli (lib/cli-reference.ts).
-    cli: cliSource,
+    // A page per command of the CLI, under reference/cli, which links the
+    // operation the command calls (lib/cli-reference.ts).
+    cli: cliSource(commandOperations(operationPages)),
   },
   {
     baseUrl: docsRoute,
@@ -137,7 +138,7 @@ type OpenAPIPage = Extract<Page, { type: "openapi" }>;
 
 // llms.txt and MCP's list_pages have room for an operation's whole first
 // sentence (lib/description.ts); otherwise Fumadocs' own description.
-function sourceLlms(input: typeof source) {
+function sourceLlms(input: typeof source, { full = false } = {}) {
   return llms(input, {
     renderDescription: (node) => {
       const data =
@@ -148,19 +149,19 @@ function sourceLlms(input: typeof source) {
     },
     renderPage: async (page) => `# ${page.data.title} (${page.url})
 
-${await pageText(page)}`,
+${await pageText(page, full)}`,
   });
 }
 
-// A CLI reference page and the Errors page are Markdown already; a content
-// page's is its processed MDX.
-async function pageText(page: Page) {
+// A CLI reference page and the Errors page are Markdown already, with a
+// version for llms-full.txt; a content page's is its processed MDX.
+async function pageText(page: Page, full: boolean) {
   switch (page.type) {
     case "openapi":
       return operationText(page);
     case "cli":
     case "errors":
-      return page.data.markdown;
+      return full ? page.data.llmsFullMarkdown : page.data.markdown;
     default:
       return page.data.getText("processed");
   }
@@ -170,11 +171,19 @@ async function pageText(page: Page) {
 // list_pages lists.
 export const docsLlms = sourceLlms(source);
 
+// llms-full.txt, which leaves the operations out, so its pages link none.
+export const docsLlmsFull = sourceLlms(source, { full: true });
+
 // /docs/llms.txt, which lists each page by its Markdown URL (lib/shared.ts),
 // so an agent fetches the Markdown without asking for it through `Accept`.
+// The OpenAPI document is not a page, so its link is the summary above the
+// list rather than an entry in it.
 export const docsLlmsIndex = sourceLlms({
   ...source,
-  getPageTree: (locale) => withMarkdownUrls(source.getPageTree(locale)),
+  getPageTree: (locale) => ({
+    ...withMarkdownUrls(source.getPageTree(locale)),
+    description: "The server's API as one OpenAPI document: [openapi.json](/docs/openapi.json).",
+  }),
 });
 
 function withMarkdownUrls<T extends PageTree.Root | PageTree.Node>(node: T): T {

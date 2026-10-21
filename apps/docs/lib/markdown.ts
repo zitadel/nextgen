@@ -20,8 +20,10 @@ export function text(value: string) {
 export type MarkdownPageData = {
   title: string;
   description: string;
-  /** The page as Markdown, for the page itself, its Markdown twin and llms-full.txt. */
+  /** The page as Markdown, for the page itself, its Markdown twin and the MCP server. */
   markdown: string;
+  /** The page in llms-full.txt, which leaves the operations out and so links none. */
+  llmsFullMarkdown: string;
   toc: TOCItemType[];
   structuredData: StructuredData;
 };
@@ -30,11 +32,13 @@ export function markdownPageData(
   title: string,
   description: string,
   markdown: string,
+  llmsFullMarkdown = markdown,
 ): MarkdownPageData {
   return {
     title,
     description,
     markdown,
+    llmsFullMarkdown,
     toc: getTableOfContents(markdown),
     // Search indexes the tables' cells, which the parser finds with GFM only.
     structuredData: structure(markdown, [remarkGfm]),

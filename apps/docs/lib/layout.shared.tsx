@@ -7,9 +7,12 @@ import { Logo } from "@/components/logo";
 import { docsRoute, gitConfig } from "./shared";
 
 // The classes of the Spacious layout's own sidebar items (`itemVariants` in
-// fumadocs-ui's layouts/spacious/slots/sidebar), so these sit among them.
-const SIDEBAR_ITEM =
-  "relative flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-start text-fd-muted-foreground outline-none transition-colors hover:text-fd-accent-foreground focus-visible:ring-2 focus-visible:ring-fd-ring [&_svg]:size-4 [&_svg]:shrink-0";
+// fumadocs-ui's layouts/spacious/slots/sidebar), so these sit among them, and
+// their colours when inactive and active.
+export const SIDEBAR_ITEM =
+  "relative flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-start outline-none transition-colors focus-visible:ring-2 focus-visible:ring-fd-ring [&_svg]:size-4 [&_svg]:shrink-0";
+export const SIDEBAR_ITEM_IDLE = "text-fd-muted-foreground hover:text-fd-accent-foreground";
+export const SIDEBAR_ITEM_ACTIVE = "bg-fd-primary/10 text-fd-primary";
 
 // A link to another app of the cloud's host. Fumadocs renders a link item
 // through next/link, which would prefetch the page from this app and route
@@ -19,7 +22,7 @@ function hostLink(href: string, icon: ReactNode, text: string) {
   return {
     type: "custom" as const,
     children: (
-      <a href={href} className={SIDEBAR_ITEM}>
+      <a href={href} className={`${SIDEBAR_ITEM} ${SIDEBAR_ITEM_IDLE}`}>
         {icon}
         {text}
       </a>

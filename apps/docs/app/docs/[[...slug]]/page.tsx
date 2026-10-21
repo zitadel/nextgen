@@ -12,7 +12,7 @@ import { notFound } from "next/navigation";
 
 import { OpenAPIPage } from "@/components/api-page";
 import { MarkdownPage } from "@/components/markdown-page";
-import { getMDXComponents } from "@/components/mdx";
+import { getMDXComponents, MdxLink } from "@/components/mdx";
 import { getPageImageUrl, getPageMarkdownUrl, gitConfig } from "@/lib/shared";
 import { openapiPageProps, source } from "@/lib/source";
 
@@ -77,7 +77,7 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
         <MDX
           components={getMDXComponents({
             // this allows you to link to other pages with relative file paths
-            a: createRelativeLink(source, page),
+            a: createRelativeLink(source, page, MdxLink),
           })}
         />
       </DocsBody>
