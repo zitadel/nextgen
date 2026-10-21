@@ -499,6 +499,16 @@ type Handler interface {
 	//
 	// GET /livez
 	GetLive(ctx context.Context) (GetLiveRes, error)
+	// GetMyPasswordState implements getMyPasswordState operation.
+	//
+	// Reports when the signed-in user's current password was set, and leaves
+	// `set_at` out when they have none. The password and its hash are never
+	// returned.
+	// With `project_id`, the state is read only when the session belongs to that
+	// project.
+	//
+	// GET /users/me/password
+	GetMyPasswordState(ctx context.Context, params GetMyPasswordStateParams) (GetMyPasswordStateRes, error)
 	// GetMySession implements getMySession operation.
 	//
 	// Returns the current state of the current session including its factors and all currently
@@ -709,6 +719,25 @@ type Handler interface {
 	//
 	// GET /idps/{id}/revisions
 	ListIdpRevisions(ctx context.Context, params ListIdpRevisionsParams) (ListIdpRevisionsRes, error)
+	// ListMyIdentityLinks implements listMyIdentityLinks operation.
+	//
+	// The identity provider accounts a sign-in linked to the signed-in user,
+	// oldest first. The provider's subject and claims are never returned.
+	// With `project_id`, the links are listed only when the session belongs to
+	// that project.
+	//
+	// GET /users/me/identity_links
+	ListMyIdentityLinks(ctx context.Context, params ListMyIdentityLinksParams) (ListMyIdentityLinksRes, error)
+	// ListMyPasskeys implements listMyPasskeys operation.
+	//
+	// The signed-in user's own passkeys, newest first, paginated with a cursor.
+	// Each passkey carries its id, its name and when it was registered, never the
+	// credential itself.
+	// With `project_id`, the passkeys are listed only when the session belongs to
+	// that project.
+	//
+	// GET /users/me/passkeys
+	ListMyPasskeys(ctx context.Context, params ListMyPasskeysParams) (ListMyPasskeysRes, error)
 	// ListMyProjects implements listMyProjects operation.
 	//
 	// The projects the signed-in user holds an active grant on, either directly or

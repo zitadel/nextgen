@@ -618,6 +618,19 @@ func (UnimplementedHandler) GetLive(ctx context.Context) (r GetLiveRes, _ error)
 	return r, ht.ErrNotImplemented
 }
 
+// GetMyPasswordState implements getMyPasswordState operation.
+//
+// Reports when the signed-in user's current password was set, and leaves
+// `set_at` out when they have none. The password and its hash are never
+// returned.
+// With `project_id`, the state is read only when the session belongs to that
+// project.
+//
+// GET /users/me/password
+func (UnimplementedHandler) GetMyPasswordState(ctx context.Context, params GetMyPasswordStateParams) (r GetMyPasswordStateRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetMySession implements getMySession operation.
 //
 // Returns the current state of the current session including its factors and all currently
@@ -888,6 +901,31 @@ func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params List
 //
 // GET /idps/{id}/revisions
 func (UnimplementedHandler) ListIdpRevisions(ctx context.Context, params ListIdpRevisionsParams) (r ListIdpRevisionsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListMyIdentityLinks implements listMyIdentityLinks operation.
+//
+// The identity provider accounts a sign-in linked to the signed-in user,
+// oldest first. The provider's subject and claims are never returned.
+// With `project_id`, the links are listed only when the session belongs to
+// that project.
+//
+// GET /users/me/identity_links
+func (UnimplementedHandler) ListMyIdentityLinks(ctx context.Context, params ListMyIdentityLinksParams) (r ListMyIdentityLinksRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListMyPasskeys implements listMyPasskeys operation.
+//
+// The signed-in user's own passkeys, newest first, paginated with a cursor.
+// Each passkey carries its id, its name and when it was registered, never the
+// credential itself.
+// With `project_id`, the passkeys are listed only when the session belongs to
+// that project.
+//
+// GET /users/me/passkeys
+func (UnimplementedHandler) ListMyPasskeys(ctx context.Context, params ListMyPasskeysParams) (r ListMyPasskeysRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

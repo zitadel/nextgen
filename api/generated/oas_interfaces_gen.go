@@ -225,6 +225,10 @@ type GetLiveRes interface {
 	getLiveRes()
 }
 
+type GetMyPasswordStateRes interface {
+	getMyPasswordStateRes()
+}
+
 type GetMySessionCsrfTokenRes interface {
 	getMySessionCsrfTokenRes()
 }
@@ -319,6 +323,14 @@ type ListFlowDefinitionsRes interface {
 
 type ListIdpRevisionsRes interface {
 	listIdpRevisionsRes()
+}
+
+type ListMyIdentityLinksRes interface {
+	listMyIdentityLinksRes()
+}
+
+type ListMyPasskeysRes interface {
+	listMyPasskeysRes()
 }
 
 type ListMyProjectsRes interface {
