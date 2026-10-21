@@ -62,6 +62,53 @@
       "default": true
     }
   ],
+  "env": [
+    {
+      "name": "ZITADEL_API_BASE",
+      "flag": "server",
+      "description": "The server URL, or `local`, as `--server` takes it.",
+      "precedence": "`--server` wins over it, and it wins over `server` in `zitadel.json`."
+    },
+    {
+      "name": "NO_COLOR",
+      "flag": "color",
+      "description": "A non-empty value turns color off, as `--no-color` does (https://no-color.org).",
+      "precedence": "Turns color off even with `--color` or `FORCE_COLOR`."
+    },
+    {
+      "name": "FORCE_COLOR",
+      "flag": "color",
+      "description": "Turns color on where it would be off, such as in a pipe, as `--color` does.",
+      "precedence": "`--no-color` and `NO_COLOR` win over it."
+    },
+    {
+      "name": "DO_NOT_TRACK",
+      "flag": "telemetry",
+      "description": "Any value but `0` or an empty one turns telemetry off (https://consoledonottrack.com).",
+      "precedence": "Turns telemetry off even with `--telemetry`."
+    },
+    {
+      "name": "ZITADEL_TELEMETRY",
+      "flag": "telemetry",
+      "description": "An empty value or one of `0`, `false`, `off`, `no` turns telemetry off.",
+      "precedence": "Turns telemetry off even with `--telemetry`."
+    }
+  ],
+  "exitCodes": {
+    "E_ALREADY_INIT": 0,
+    "E_FRAMEWORK_NOT_DETECTED": 3,
+    "E_UNSUPPORTED_PROJECT_SHAPE": 3,
+    "E_NETWORK": 4,
+    "E_AUTH": 1,
+    "E_CONFLICT": 5,
+    "E_LOCAL_SERVER_NOT_RUNNING": 4,
+    "E_NOT_FOUND": 4,
+    "E_PORT_IN_USE": 5,
+    "E_VALIDATION": 3,
+    "E_CREDENTIAL_MISSING": 3,
+    "E_NOT_IMPLEMENTED": 2,
+    "E_CANCELLED": 130
+  },
   "commands": [
     {
       "id": "setup",

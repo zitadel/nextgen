@@ -4,18 +4,21 @@ import { getSlugs, type LoaderPlugin, type MetaData, type Source } from "fumadoc
 import type { TOCItemType } from "fumadocs-core/toc";
 
 // The CLI's commands, from the reference its test keeps current
-// (apps/cli/command-reference.json), bundled by scripts/bundle-cli.mjs and
-// imported as a module, so it ships inside the build.
-import reference from "../.generated/cli.mjs";
+// (apps/cli/command-reference.json), and its releases, from its changelog
+// (apps/cli/CHANGELOG.md), bundled by scripts/bundle-cli.mjs and imported as a
+// module, so they ship inside the build.
+import reference, { releases } from "../.generated/cli.mjs";
 import { cli, namedCliCommand } from "./cli-sample.ts";
 import { shortDescription } from "./description.ts";
 import type { openapi } from "./openapi.ts";
+import { gitConfig } from "./shared.ts";
 
 // The CLI reference: a page per command, under /docs/reference/cli, in the
-// groups and the order `zitadel --help` lists them, and an index with the
-// flags every command takes. A page is Markdown, the same text for the page
-// (components/cli-page.tsx), its Markdown twin and search. A command that
-// calls the API links the operation it calls.
+// groups and the order `zitadel --help` lists them, an index with the flags
+// every command takes, and the release notes. A page is Markdown, the same
+// text for the page (components/cli-page.tsx), its Markdown twin and search.
+// A command that calls the API links the operation it calls. The telemetry
+// page beside them is content (content/docs/reference/cli).
 
 /** A flag as apps/cli/src/lib/oclif/reference.ts describes it. */
 export type CliFlag = {
@@ -49,15 +52,41 @@ export type CliCommand = {
   examples: { command: string; description?: string }[];
 };
 
+/** An environment variable that sets what a global flag sets. */
+export type CliVariable = { name: string; flag: string; description: string; precedence: string };
+
 export type CliReference = {
   bin: string;
   groups: string[];
   globalFlags: CliFlag[];
+  env: CliVariable[];
+  /** The exit code of each error `code` an envelope can carry. */
+  exitCodes: Record<string, number>;
   commands: CliCommand[];
+};
+
+/** A version of the CLI as scripts/bundle-cli.mjs reads it from the changelog. */
+export type CliRelease = {
+  version: string;
+  sections: {
+    /** Changesets' bump: `major`, `minor` or `patch`. */
+    kind: string;
+    /** Each change's Markdown, with the pull request that made it. */
+    changes: { text: string; pull?: { number: number; url: string } }[];
+  }[];
 };
 
 const baseDir = "reference/cli";
 const indexUrl = "/docs/reference/cli";
+
+// The reference's own pages besides its index, listed before the commands. A
+// command of the same name would take the same URL.
+const releaseNotes = "release-notes";
+const ownPages = ["telemetry", releaseNotes];
+const taken = reference.commands.find((command) =>
+  ownPages.includes(command.id.split(" ")[0] ?? ""),
+);
+if (taken) throw new Error(`zitadel ${taken.id} takes the URL of a CLI reference page`);
 
 /** A command's page: `users list` is /docs/reference/cli/users/list. */
 export function cliCommandUrl(command: string) {
@@ -107,13 +136,18 @@ export function commandOperations({ files }: Awaited<ReturnType<typeof openapi.s
 
 // ---- Markdown ---------------------------------------------------------------
 
+// Outside a code span, what `pattern` matches is escaped.
+function escapeOutsideCode(value: string, pattern: RegExp) {
+  return value
+    .split(/(`[^`]*`)/)
+    .map((part, i) => (i % 2 === 1 ? part : part.replace(pattern, "\\$&")))
+    .join("");
+}
+
 // The help is plain text with code in backticks. Outside a code span, a `*`
 // and a `<` that would open an HTML tag stay what they are.
 function text(value: string) {
-  return value
-    .split(/(`[^`]*`)/)
-    .map((part, i) => (i % 2 === 1 ? part : part.replace(/\*|<(?=[A-Za-z/!?])/g, "\\$&")))
-    .join("");
+  return escapeOutsideCode(value, /\*|<(?=[A-Za-z/!?])/g);
 }
 
 // A table cell is one line, and a `|` in it, even in a code span, ends it.
@@ -121,11 +155,12 @@ function cell(value: string) {
   return text(value.replace(/\s+/g, " ").trim()).replaceAll("|", "\\|");
 }
 
-function table(head: [string, string], rows: [string, string][]) {
+// The first column is Markdown already, a name or a link; the others are text.
+function table(head: string[], rows: string[][]) {
   return [
-    `| ${head[0]} | ${head[1]} |`,
-    "| --- | --- |",
-    ...rows.map(([left, right]) => `| ${left} | ${cell(right)} |`),
+    `| ${head.join(" | ")} |`,
+    `|${" --- |".repeat(head.length)}`,
+    ...rows.map(([first, ...rest]) => `| ${[first, ...rest.map(cell)].join(" | ")} |`),
   ].join("\n");
 }
 
@@ -248,7 +283,35 @@ function commandMarkdown(
 
 const indexDescription = "Every zitadel command, with its flags and examples.";
 
-/** The reference's own page: how to run a command, the global flags, the commands. */
+// The variables that stand in for a global flag, with how each ranks against it.
+function variableTable(variables: CliVariable[]) {
+  return table(
+    ["Variable", "Flag", "Description", "Precedence"],
+    variables.map((variable) => [
+      code(variable.name),
+      code(`--${variable.flag}`),
+      variable.description,
+      variable.precedence,
+    ]),
+  );
+}
+
+// A row per exit code, lowest first, with the error codes that end in it.
+function exitCodeTable(exitCodes: Record<string, number>) {
+  const codes = [...new Set(Object.values(exitCodes))].sort((a, b) => a - b);
+  return table(
+    ["Exit code", "Error codes"],
+    codes.map((exit) => [
+      code(String(exit)),
+      list(Object.keys(exitCodes).filter((error) => exitCodes[error] === exit)),
+    ]),
+  );
+}
+
+/**
+ * The reference's own page: how to run a command, the global flags with the
+ * environment variables that stand in for them, the exit codes, the commands.
+ */
 function indexMarkdown(cliReference: CliReference) {
   const groups = cliReference.groups.flatMap((group) => {
     const rows = cliReference.commands
@@ -267,8 +330,44 @@ function indexMarkdown(cliReference: CliReference) {
     "## Global flags",
     "Every command takes these.",
     flagTable(cliReference.globalFlags),
+    "## Environment variables",
+    "These set what a global flag sets, for every command.",
+    variableTable(cliReference.env),
+    "## Exit codes",
+    "A command that succeeds, or skips because there is nothing to do, exits `0`. One that fails exits with the code of the error its envelope names in `code`.",
+    exitCodeTable(cliReference.exitCodes),
     ...groups,
     `\`${cli} --help\` also lists oclif's own commands, such as \`help\` and \`version\`, under Additional commands.`,
+  ].join("\n\n");
+}
+
+const releaseNotesDescription = "What changed in each version of the zitadel CLI.";
+
+// A change is Markdown already, of one paragraph or several, and a `<` that
+// would open an HTML tag, as in "No <value> supplied", stays what it is. Its
+// pull request closes its first paragraph.
+function changeItem({ text: markdown, pull }: CliRelease["sections"][number]["changes"][number]) {
+  const lines = escapeOutsideCode(markdown, /<(?=[A-Za-z/!?])/g).split("\n");
+  if (pull) {
+    const end = lines.findIndex(
+      (line, i) => i > 0 && (line === "" || /^(?:[-*+]|\d+\.) /.test(line)),
+    );
+    lines[(end === -1 ? lines.length : end) - 1] += ` ([#${pull.number}](${pull.url}))`;
+  }
+  return `- ${lines.map((line, i) => (i === 0 || line === "" ? line : `  ${line}`)).join("\n")}`;
+}
+
+/** Every version, newest first, as the changelog lists it: a heading each. */
+function releaseNotesMarkdown(cliReleases: CliRelease[]) {
+  return [
+    `What changed in each version of the \`${reference.bin}\` CLI, newest first, from [its changelog](https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/apps/cli/CHANGELOG.md). \`--version\` prints the version you run: \`${cli} --version\`.`,
+    ...cliReleases.flatMap(({ version, sections }) => [
+      `## ${version}`,
+      ...sections.flatMap(({ kind, changes }) => [
+        `**${kind.charAt(0).toUpperCase()}${kind.slice(1)} changes**`,
+        changes.map(changeItem).join("\n\n"),
+      ]),
+    ]),
   ].join("\n\n");
 }
 
@@ -330,22 +429,34 @@ export const cliSource = (
       data: {
         title: "CLI reference",
         // A section the sidebar steps down into (components/sidebar.tsx), whose
-        // index is its own page, so it is not listed.
+        // index is its own page, so it is not listed; the reference's own
+        // pages come before the commands' groups.
         root: true,
         pagesIndex: "index",
-        pages: reference.groups.flatMap((group) => {
-          const commands = reference.commands.filter(
-            (command) => command.group === group && !commandIds.has(parentOf(command.id)),
-          );
-          if (commands.length === 0) return [];
-          return [`---${group}---`, ...commands.map((command) => command.id.split(" ").join("/"))];
-        }),
+        pages: [
+          ...ownPages,
+          ...reference.groups.flatMap((group) => {
+            const commands = reference.commands.filter(
+              (command) => command.group === group && !commandIds.has(parentOf(command.id)),
+            );
+            if (commands.length === 0) return [];
+            return [
+              `---${group}---`,
+              ...commands.map((command) => command.id.split(" ").join("/")),
+            ];
+          }),
+        ],
       },
     },
     {
       type: "page",
       path: `${baseDir}/index.mdx`,
       data: pageData("CLI reference", indexDescription, indexMarkdown(reference)),
+    },
+    {
+      type: "page",
+      path: `${baseDir}/${releaseNotes}.mdx`,
+      data: pageData("Release notes", releaseNotesDescription, releaseNotesMarkdown(releases)),
     },
     ...reference.commands.map((command) => ({
       type: "page" as const,
