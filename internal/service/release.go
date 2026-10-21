@@ -227,7 +227,11 @@ func (s *releaseService) Get(ctx context.Context, projectID, id string) (_ *doma
 	ctx, end := startSpan(ctx, "ReleaseService.Get")
 	defer end(&err)
 
-	entity, err := s.v2Pool.Statements().GetReleaseByID(ctx, projectID, id)
+	return getRelease(ctx, s.v2Pool.Statements(), projectID, id)
+}
+
+func getRelease(ctx context.Context, stmts ReleaseStatements, projectID, id string) (*domain.Release, error) {
+	entity, err := stmts.GetReleaseByID(ctx, projectID, id)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrReleaseNotFound()
@@ -248,12 +252,9 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 	var revoked *domain.Release
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
-		entity, err := stmts.GetReleaseByID(ctx, projectID, id)
+		entity, err := getRelease(ctx, stmts, projectID, id)
 		if err != nil {
-			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-				return domain.ErrReleaseNotFound()
-			}
-			return domain.ErrInternal(err).WithMessage("failed to get release from database")
+			return err
 		}
 		if entity.RevokedAt != nil {
 			revoked = entity
@@ -288,11 +289,8 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 	return revoked, nil
 }
 
-// servedOrigins lists, sorted, the origins that serve the release at now,
-// each with the deployment that pins it. It is the live view the deployments
-// list reads, which keeps an origin removed from the project until a later
-// deployment replaces its row: adding the origin back would serve the release
-// again, so a revoke counts it.
+// servedOrigins lists, sorted, the origins serving the release at now and the
+// deployment pinning each, from the same live view the deployments list reads.
 func servedOrigins(ctx context.Context, stmts AllStatements, projectID, releaseID string, now time.Time) ([]domain.ReleaseInUseOrigin, error) {
 	var served []domain.ReleaseInUseOrigin
 	opts := deployment.LiveListOptions(projectID, &releaseID, liveDeploymentPageSize)

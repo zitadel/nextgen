@@ -70,6 +70,22 @@ func (f deploymentFixture) deploy(t *testing.T, releaseID api.ReleaseID) api.Cre
 	return resp
 }
 
+// deployPreview deploys the release to previewOrigin through the service: the
+// API does not take preview targets yet.
+func (f deploymentFixture) deployPreview(t *testing.T, releaseID api.ReleaseID) *service.CreateDeploymentOutput {
+	t.Helper()
+	out, err := service.NewDeploymentService(harness.EnsureServiceDB(t)).Create(t.Context(), service.CreateDeploymentInput{
+		ProjectID:  f.project,
+		ReleaseID:  string(releaseID),
+		OriginKind: domain.DeploymentOriginKindPreview,
+		Origins:    []string{previewOrigin},
+		Reason:     domain.DeploymentReasonDeploy,
+		PreviewTTL: time.Hour,
+	})
+	require.NoError(t, err)
+	return out
+}
+
 // refused asserts the create answered with the response type of its status
 // and the error code.
 func refused(t *testing.T, resp api.CreateDeploymentRes, wantType api.CreateDeploymentRes, wantCode string) {
@@ -362,7 +378,7 @@ func TestRevokeRelease(t *testing.T) {
 		var served []string
 		for _, origin := range conflict.Details.Origins {
 			assert.Equal(t, live.ID, origin.DeploymentID)
-			served = append(served, origin.Origin.String())
+			served = append(served, string(origin.Origin))
 		}
 		assert.Equal(t, origins(live.Targets), served)
 	})
@@ -372,32 +388,16 @@ func TestRevokeRelease(t *testing.T) {
 	require.IsType(t, &api.CreateDeploymentCreated{}, replaced, helpers.MustMarshal(t, replaced))
 
 	t.Run("refused while a live preview serves it", func(t *testing.T) {
-		preview, err := service.NewDeploymentService(harness.EnsureServiceDB(t)).Create(t.Context(), service.CreateDeploymentInput{
-			ProjectID:  fixture.project,
-			ReleaseID:  string(fixture.release.ID),
-			OriginKind: domain.DeploymentOriginKindPreview,
-			Origins:    []string{previewOrigin},
-			Reason:     domain.DeploymentReasonDeploy,
-			PreviewTTL: time.Hour,
-		})
-		require.NoError(t, err)
+		preview := fixture.deployPreview(t, fixture.release.ID)
 		resp := revoke(t, fixture.release.ID)
 		require.IsType(t, &api.RevokeReleaseConflict{}, resp, helpers.MustMarshal(t, resp))
 		conflict := resp.(*api.RevokeReleaseConflict)
 		require.Len(t, conflict.Details.Origins, 1)
-		assert.Equal(t, previewOrigin, conflict.Details.Origins[0].Origin.String())
+		assert.Equal(t, api.Origin(previewOrigin), conflict.Details.Origins[0].Origin)
 		assert.Equal(t, api.DeploymentID(preview.Deployment.ID), conflict.Details.Origins[0].DeploymentID)
 
 		// The preview moves on to the other release, so nothing serves it.
-		_, err = service.NewDeploymentService(harness.EnsureServiceDB(t)).Create(t.Context(), service.CreateDeploymentInput{
-			ProjectID:  fixture.project,
-			ReleaseID:  string(other),
-			OriginKind: domain.DeploymentOriginKindPreview,
-			Origins:    []string{previewOrigin},
-			Reason:     domain.DeploymentReasonDeploy,
-			PreviewTTL: time.Hour,
-		})
-		require.NoError(t, err)
+		fixture.deployPreview(t, other)
 	})
 
 	var revokedAt time.Time

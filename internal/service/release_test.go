@@ -457,14 +457,14 @@ func TestReleaseServiceCreateResolvesBuiltinSchemaUnderAnotherBase(t *testing.T)
 func TestReleaseServiceRevoke(t *testing.T) {
 	revokedAt := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
 	unrevoked := &domain.Release{ProjectID: "proj_1", ID: "rel_1", ContentHash: "abc"}
+	revoked := *unrevoked
+	revoked.RevokedAt = &revokedAt
 	nothingLive := &database.ListResult[*domain.Deployment]{}
 
 	t.Run("revokes a release nothing serves", func(t *testing.T) {
 		svc, statements := newMockedReleaseService(t)
 		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(unrevoked, nil)
 		statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).Return(nothingLive, nil)
-		revoked := *unrevoked
-		revoked.RevokedAt = &revokedAt
 		statements.EXPECT().RevokeRelease(gomock.Any(), "proj_1", "rel_1").Return(&revoked, nil)
 
 		got, err := svc.Revoke(t.Context(), "proj_1", "rel_1")
@@ -474,8 +474,6 @@ func TestReleaseServiceRevoke(t *testing.T) {
 
 	t.Run("a revoked release comes back unchanged", func(t *testing.T) {
 		svc, statements := newMockedReleaseService(t)
-		revoked := *unrevoked
-		revoked.RevokedAt = &revokedAt
 		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&revoked, nil)
 
 		got, err := svc.Revoke(t.Context(), "proj_1", "rel_1")

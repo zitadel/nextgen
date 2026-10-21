@@ -73026,14 +73026,13 @@ func (s *RevokeReleaseConflictDetails) SetOrigins(val []RevokeReleaseConflictDet
 }
 
 type RevokeReleaseConflictDetailsOriginsItem struct {
-	// The origin, as scheme and host.
-	Origin url.URL `json:"origin"`
+	Origin Origin `json:"origin"`
 	// The newest deployment to the origin, which pins the release.
 	DeploymentID DeploymentID `json:"deployment_id"`
 }
 
 // GetOrigin returns the value of Origin.
-func (s *RevokeReleaseConflictDetailsOriginsItem) GetOrigin() url.URL {
+func (s *RevokeReleaseConflictDetailsOriginsItem) GetOrigin() Origin {
 	return s.Origin
 }
 
@@ -73043,7 +73042,7 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) GetDeploymentID() DeploymentID
 }
 
 // SetOrigin sets the value of Origin.
-func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val url.URL) {
+func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val Origin) {
 	s.Origin = val
 }
 

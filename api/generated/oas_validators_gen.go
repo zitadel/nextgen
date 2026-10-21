@@ -12462,6 +12462,17 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := s.Origin.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "origin",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.DeploymentID.Validate(); err != nil {
 			return err
 		}

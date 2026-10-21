@@ -107637,7 +107637,7 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) Encode(e *jx.Encoder) {
 func (s *RevokeReleaseConflictDetailsOriginsItem) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("origin")
-		json.EncodeURI(e, s.Origin)
+		s.Origin.Encode(e)
 	}
 	{
 		e.FieldStart("deployment_id")
@@ -107662,9 +107662,7 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) Decode(d *jx.Decoder) error {
 		case "origin":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.Origin = v
-				if err != nil {
+				if err := s.Origin.Decode(d); err != nil {
 					return err
 				}
 				return nil
