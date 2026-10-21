@@ -113,11 +113,12 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 		return nil, err
 	}
 	if dep == nil {
-		// Empty allowlist and loopback admit without a stored pattern. Until the
-		// project default target lands, that open admission keeps the
-		// pre-resolution newest-revision path when nothing is deployed yet —
-		// the same interim createFlow uses for a missing Origin header.
-		// A primary/preview pattern match still refuses with rel.not_deployed.
+		// TODO(#1616): an open admission (empty allowlist or loopback) with
+		// nothing deployed keeps the newest-revision path. The project default
+		// target is what gives that request a release; until then this returns
+		// nil instead of rel.not_deployed, so console and platform login work
+		// before a deploy exists. A primary or preview pattern match still
+		// refuses with rel.not_deployed.
 		if matched.open {
 			return nil, nil
 		}
@@ -243,6 +244,11 @@ func ReleaseFromContext(ctx context.Context) *domain.Release {
 type PinnedRevisions map[string]string
 
 // PinsFor returns the revision ids a release pins for one kind, keyed by handle.
+//
+// TODO(#1441): the password policy is not a pointer kind yet. The gate on
+// main resolves no stored instance. Pin the operation's revision here once
+// that issue adds the kind; do not read the newest policy revision from this
+// stack.
 func PinsFor(release *domain.Release, kind domain.ReleasePointerKind) PinnedRevisions {
 	pinned := make(PinnedRevisions)
 	if release == nil {
