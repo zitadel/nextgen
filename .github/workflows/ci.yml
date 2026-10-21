@@ -128,10 +128,14 @@ jobs:
 
       # Below 1.0.0 a `major` changeset would release every public package as
       # 1.0.0 (docs/adrs/074-preview-releases-on-0x.md), so the pending ones are
-      # checked before they reach the version PR.
+      # checked before they reach the version PR. `changeset status` compares
+      # HEAD with the base branch by its local name, which a pull request's
+      # checkout does not have.
       - name: Check pending changesets
         if: ${{ github.event_name == 'pull_request' }}
-        run: node scripts/check-changesets-status.mjs --pending --summary
+        run: |
+          git branch --force main origin/main
+          node scripts/check-changesets-status.mjs --pending --summary
 
       # Emits `mode`, per-lane affected gates (go_tests, e2e, snapshot,
       # journey_fresh_app, journey_passkey, journey_preexisting,
