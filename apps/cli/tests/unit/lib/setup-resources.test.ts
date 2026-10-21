@@ -7,7 +7,11 @@ import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_CONFIG_PATH, DEFAULT_SCHEMA_CONFIG_PATH } from "@zitadel/config/defaults";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+import {
+  normalizeFlowBody,
+  normalizeIdpBody,
+  normalizeSchemaBody,
+} from "@zitadel/config/normalize";
 
 import {
   assertNoSetupResourceConflicts,
@@ -17,6 +21,7 @@ import { IDPS_DIR } from "../../../src/lib/idp";
 import { acmeSelection, googleSelection } from "../../helpers/idp-values";
 import { FLOWS_DIR } from "../../../src/lib/flows";
 import { SCHEMAS_DIR } from "../../../src/lib/user-schema";
+import { stableStringify } from "../../../src/lib/json";
 import { hashForState } from "../../../src/lib/sync";
 import type { ZitadelState } from "../../../src/lib/sync/types";
 
@@ -92,22 +97,9 @@ describe("materializeSetupResources", () => {
     expect(flowFile.user_schema).toBe("human-user");
   });
 
-  it("reconciles the schema file with the server's stored body and seeds its hash", async () => {
-    const canonical = {
-      objectType: "human-user",
-      kind: "user-schema",
-      title: "ServerCanonicalTitle",
-      properties: { email: { type: "string", "x-audit": false } },
-    };
+  it("keeps the schema file as written and seeds its hash from it", async () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      // `GET /schemas/{id}` serves the `{id, schema, metadata}` envelope;
-      // write-back must unwrap the document before it reaches disk.
-      getSchemaById: vi.fn().mockResolvedValue({
-        id: "sch_01KWHF",
-        schema: canonical,
-        metadata: { created_at: "2026-01-01T00:00:00Z" },
-      }),
       createFlowDefinition: vi.fn().mockResolvedValue({
         id: "flow_01KWHG",
         status: "active",
@@ -122,48 +114,15 @@ describe("materializeSetupResources", () => {
       cliVersion: TEST_CLI_VERSION,
     });
 
-    const schemaFile = JSON.parse(
-      await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
-    ) as Record<string, unknown>;
-    // The file holds the server's stored body VERBATIM: the server keeps
-    // schema bytes as uploaded, so a spelled-out meta-schema default must
-    // survive write-back or the next revision would publish without it.
-    expect(schemaFile.title).toBe("ServerCanonicalTitle");
-    expect(schemaFile.properties).toEqual({ email: { type: "string", "x-audit": false } });
-
+    const written = await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8");
+    const posted = vi.mocked(client.createSchema).mock.calls[0]?.[0];
+    expect(written).toBe(`${stableStringify(posted)}\n`);
     const state = JSON.parse(
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
     ) as ZitadelState;
     expect(state.resources[DEFAULT_SCHEMA_CONFIG_PATH]?.hash).toBe(
-      hashForState({ normalize: normalizeSchemaBody }, schemaFile),
+      hashForState({ normalize: normalizeSchemaBody }, JSON.parse(written) as object),
     );
-  });
-
-  // Setup reconciliation used to pre-encode the created schema's id. The
-  // generated client owns the encoding now (#1272), so pre-encoding here sent
-  // `%25` for every delimiter in a `$id` URL and the fetch 404'd.
-  it("fetches the created schema by its id verbatim, leaving encoding to the client", async () => {
-    const id = "https://nextgen.com/api/schemas/default-human-user.json";
-    const getSchemaById = vi.fn().mockResolvedValue({
-      id,
-      schema: { objectType: "human-user", kind: "user-schema", title: "T" },
-      metadata: { created_at: "2026-01-01T00:00:00Z" },
-    });
-    const client = {
-      createSchema: vi.fn().mockResolvedValue({ id }),
-      getSchemaById,
-      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG", status: "active" }),
-    } as unknown as ZitadelClient;
-
-    await materializeSetupResources({
-      cwd,
-      client,
-      projectId: "project_123",
-      force: false,
-      cliVersion: TEST_CLI_VERSION,
-    });
-
-    expect(getSchemaById).toHaveBeenCalledWith(id);
   });
 
   it("keeps the server's empty audience echo out of the flow file and hashes past it", async () => {
@@ -384,40 +343,60 @@ describe("materializeSetupResources with a social provider", () => {
     expect(state.resources[`${IDPS_DIR}/google.json`]).toMatchObject({ id: "idp_01KWHE" });
   });
 
-  it("refuses to write back a connection the server returned with a secret value", async () => {
-    // The write-back commits the canonical body to `.zitadel/idps/`, so a
-    // resolved secret must stop here rather than reach a committed file.
+  it("writes the connection it uploaded, whatever the server stored", async () => {
+    // The server spells out defaults the file leaves to it, and a server that
+    // resolved the secret would hand back a credential: neither reaches the
+    // committed file, which holds what setup uploaded and nothing else.
     const client = recordingClient();
-    const leaking = {
-      ...client,
-      createIdp: () =>
-        Promise.resolve({
-          id: "idp_1",
-          revision_id: "idprev_1",
-          slug: "google",
-          definition: {
-            slug: "google",
-            protocol: "oidc",
-            oidc: { issuer: "https://accounts.google.com", client_secret: "GOCSPX-real" },
-          },
-        }),
-    } as unknown as typeof client;
+    const createIdp = vi.fn().mockImplementation(async ({ idp }: { idp: object }) => ({
+      id: "idp_1",
+      revision_id: "idprev_1",
+      slug: "google",
+      definition: {
+        ...idp,
+        oidc: {
+          ...(idp as { oidc: object }).oidc,
+          client_secret: "GOCSPX-real",
+          pkce_enabled: true,
+          token_endpoint_auth_method: "client_secret_basic",
+        },
+      },
+    }));
 
-    await expect(
-      materializeSetupResources({
-        cwd,
-        cliVersion: TEST_CLI_VERSION,
-        client: leaking,
-        projectId: "project_123",
-        force: false,
-        sso: google,
-      }),
-    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: { ...client, createIdp } as unknown as typeof client,
+      projectId: "project_123",
+      force: false,
+      sso: google,
+    });
 
-    const written = existsSync(join(cwd, IDPS_DIR, "google.json"))
-      ? await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8")
-      : "";
+    const written = await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8");
+    expect(written).toBe(`${stableStringify(createIdp.mock.calls[0]?.[0].idp)}\n`);
     expect(written).not.toContain("GOCSPX-real");
+    expect(written).not.toContain("pkce_enabled");
+  });
+
+  it("records the hash plan computes for the connection file", async () => {
+    const client = recordingClient();
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client,
+      projectId: "project_123",
+      force: false,
+      sso: google,
+    });
+
+    const file = JSON.parse(await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8")) as object;
+    const state = JSON.parse(
+      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
+    ) as ZitadelState;
+    expect(state.resources[`${IDPS_DIR}/google.json`]?.hash).toBe(
+      hashForState({ normalize: normalizeIdpBody }, file),
+    );
   });
 
   it("leaves no connection file behind when the create fails", async () => {

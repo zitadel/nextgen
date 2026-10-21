@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import "./zl-select.js";
 import type { ZlSelect, ZlSelectChangeDetail, ZlSelectOption } from "./zl-select.js";
@@ -156,6 +156,33 @@ describe("<zl-select> markup", () => {
     await el.updateComplete;
     expect(el.value).toBe("us");
     expect(changes).toEqual([{ name: "country", value: "us" }]);
+  });
+
+  it("keeps zl-change inside the widget", async () => {
+    // Arrange
+    const heardOnPage = vi.fn();
+    const heardInWidget = vi.fn();
+    const host = document.body.appendChild(document.createElement("div"));
+    const root = host.attachShadow({ mode: "open" });
+    const element = document.createElement("zl-select");
+    element.name = "country";
+    element.options = OPTIONS;
+    window.addEventListener("zl-change", heardOnPage, true);
+    element.addEventListener("zl-change", heardInWidget);
+    onTestFinished(() => {
+      window.removeEventListener("zl-change", heardOnPage, true);
+      host.remove();
+    });
+    root.append(element);
+    await element.updateComplete;
+
+    // Act
+    native(element).value = "us";
+    native(element).dispatchEvent(new Event("change", { bubbles: true }));
+
+    // Assert
+    expect(heardInWidget).toHaveBeenCalledOnce();
+    expect(heardOnPage).not.toHaveBeenCalled();
   });
 
   it("lets the user clear back to the empty option", async () => {

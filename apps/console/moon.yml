@@ -68,9 +68,8 @@ tasks:
   # project graph, because server:build depends on console:build.
   dev-real:
     command: "corepack pnpm run dev:real"
-    # dev's deps, plus the built `zitadel` CLI the instance boots through.
+    # The built `zitadel` CLI the instance boots through.
     deps:
-      - "sdk-react:build"
       - "cli:build"
     options:
       persistent: true
@@ -83,7 +82,6 @@ tasks:
   dev-claim:
     command: "corepack pnpm run dev:claim"
     deps:
-      - "sdk-react:build"
       - "cli:build"
     options:
       persistent: true

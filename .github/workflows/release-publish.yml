@@ -113,6 +113,7 @@ jobs:
           cache-dependency-path: |
             go.sum
             tools/bench/go.sum
+            tools/oidc-mock/go.sum
 
       - uses: pnpm/action-setup@v5
         with:
@@ -164,7 +165,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_PROVENANCE: "false"
+          PNPM_CONFIG_PROVENANCE: "false"
           RECOVER_VERSION: ${{ inputs.recover_version }}
 
       - name: Publish release
@@ -184,5 +185,5 @@ jobs:
           # Depot runners are self-hosted from npm's provenance verifier's
           # perspective. Keep trusted publishing via OIDC, but do not request
           # npm provenance until the release job runs on GitHub-hosted runners.
-          NPM_CONFIG_PROVENANCE: "false"
+          PNPM_CONFIG_PROVENANCE: "false"
           RECOVER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.recover_version || '' }}

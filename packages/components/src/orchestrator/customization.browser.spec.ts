@@ -103,7 +103,6 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     appStyle?.remove();
     appStyle = undefined;
     stub?.restore();
-    document.getElementById("zl-default-font-link")?.remove();
     document.getElementById("zl-font-link")?.remove();
   });
 
@@ -370,7 +369,6 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     const element = await mount(fontStep);
     expect(element.variant).not.toBe("page");
     expect(document.getElementById("zl-font-link")).toBeNull();
-    expect(document.getElementById("zl-default-font-link")).toBeNull();
   });
 
   it("page mode does inject it, because the document is ours", async () => {

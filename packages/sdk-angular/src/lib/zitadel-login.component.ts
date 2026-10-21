@@ -59,10 +59,11 @@ import "@zitadel/components";
     [attr.proxy-path]="project?.proxyPath ?? proxyPath ?? null"
     [attr.url]="project?.url ?? null"
     [locales]="locales"
-    [lang]="lang"
+    [attr.lang]="lang ?? null"
     [attr.purpose]="purpose"
     [attr.flow-name]="flowName"
     [attr.post-sign-in-url]="postSignInUrl"
+    [forcePostSignInUrl]="forcePostSignInUrl"
     [attr.resume-flow-id]="resumeFlowId"
     [attr.variant]="variant ?? null"
     [attr.theme]="theme ?? null"
@@ -82,6 +83,7 @@ export class ZitadelLoginComponent {
   @Input() purpose: CreateFlowBodyPurpose = "login";
   @Input() flowName?: string;
   @Input() postSignInUrl?: string;
+  @Input() forcePostSignInUrl?: boolean;
   @Input() resumeFlowId?: string | null;
   @Input() locales?: Record<string, Partial<Record<string, string>>>;
   @Input() lang?: string;
@@ -104,22 +106,22 @@ export class ZitadelLoginComponent {
   }
 
   onFlowStep(event: Event): void {
-    this.flowStep.emit((event as CustomEvent<ZitadelFlowStepDetail>).detail);
+    if (event instanceof CustomEvent) this.flowStep.emit(event.detail);
   }
 
   onFlowInput(event: Event): void {
-    this.flowInput.emit((event as CustomEvent<ZitadelFlowInputDetail>).detail);
+    if (event instanceof CustomEvent) this.flowInput.emit(event.detail);
   }
 
   onFlowComplete(event: Event): void {
-    this.flowComplete.emit((event as CustomEvent<ZitadelFlowCompleteDetail>).detail);
+    if (event instanceof CustomEvent) this.flowComplete.emit(event.detail);
   }
 
   onFlowRedirect(event: Event): void {
-    this.flowRedirect.emit((event as CustomEvent<ZitadelFlowRedirectDetail>).detail);
+    if (event instanceof CustomEvent) this.flowRedirect.emit(event.detail);
   }
 
   onFlowError(event: Event): void {
-    this.flowError.emit((event as CustomEvent<ZitadelFlowErrorDetail>).detail);
+    if (event instanceof CustomEvent) this.flowError.emit(event.detail);
   }
 }

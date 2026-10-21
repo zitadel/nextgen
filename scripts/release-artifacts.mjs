@@ -5,7 +5,7 @@ import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mapWithConcurrency, run } from "./dev-process.mjs";
+import { mapWithConcurrency, run, runReplayed } from "./dev-process.mjs";
 import {
   PUBLIC_PACKAGE_DIRS,
   PUBLIC_RELEASE_PACKAGES,
@@ -216,17 +216,17 @@ export async function createArchives(options = {}) {
 
 export async function packPublicPackages(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
-  const version = options.version ?? (await readServerRelease(repoRoot)).version;
-  const outDir = options.outDir ?? releaseDir(repoRoot, version);
-  const runFn = options.run ?? run;
-  const tarballsDir = join(outDir, "npm");
+  // The packs run side by side, so none may write to this process's stdout
+  // (see runReplayed); each pack's output arrives in one piece once it is done.
+  const runFn = options.run ?? runReplayed;
+  const tarballsDir = options.tarballsDir ?? (await defaultTarballsDir(repoRoot, options));
   await rm(tarballsDir, { recursive: true, force: true });
   await mkdir(tarballsDir, { recursive: true });
 
   // Packs are independent (distinct package dirs, distinct tarball names in a
   // shared destination); cap concurrency so the cli prepack rebuild and the
   // larger packages do not stampede the runner.
-  await mapWithConcurrency(PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
+  await mapWithConcurrency(options.dirs ?? PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
     const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
     await assertPublishDirectoryReady({ repoRoot, dir, manifest });
     await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
@@ -236,6 +236,11 @@ export async function packPublicPackages(options = {}) {
   });
 
   return tarballsDir;
+}
+
+async function defaultTarballsDir(repoRoot, options) {
+  const version = options.version ?? (await readServerRelease(repoRoot)).version;
+  return join(options.outDir ?? releaseDir(repoRoot, version), "npm");
 }
 
 async function assertPublishDirectoryReady({ repoRoot, dir, manifest }) {

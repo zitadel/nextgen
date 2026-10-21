@@ -102,7 +102,12 @@ export type PromptContext = {
    * answered yes without asking. This one never is.
    */
   readonly input: Asker;
-  readonly framework: FrameworkFacts;
+  /**
+   * The framework of the app setup integrates. Only its id: a new app does not
+   * exist while the wizard asks, because setup creates it once it has every
+   * answer.
+   */
+  readonly framework: Pick<FrameworkFacts, "id">;
   /**
    * The app directory setup runs in. {@link import("./server").ServerPrompt}
    * reads the local runtime metadata (`.zitadel/local/runtime.json`) under it

@@ -1,13 +1,22 @@
 import { ZitadelError } from "./errors";
 import { LocalServer } from "./local-server/server";
 import type { Parsed } from "@zitadel/config/idp";
+import type { FlagVariable } from "./oclif/types";
 
 /**
  * Server URL `setup` connects to when `--server` is not given. Also surfaced
  * in hints and the interactive setup prompt as the suggested value, so it is
  * exported rather than kept private.
  */
-export const DEFAULT_SERVER = "https://api.zitadel.cloud";
+export const DEFAULT_SERVER = "https://preview.zitadel.com";
+
+/** The variable {@link resolveServer} reads when `--server` is not given. */
+export const SERVER_VARIABLE: FlagVariable = {
+  name: "ZITADEL_API_BASE",
+  flag: "server",
+  description: "The server URL, or `local`, as `--server` takes it.",
+  precedence: "`--server` wins over it, and it wins over `server` in `zitadel.json`.",
+};
 
 /**
  * The resolved target server plus the source it came from. `origin` is

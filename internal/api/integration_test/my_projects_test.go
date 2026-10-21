@@ -3,7 +3,6 @@
 package integration_test
 
 import (
-	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -245,16 +244,10 @@ func TestListMyProjects(t *testing.T) {
 // refuses to send an empty credential.
 func getMyProjectsRaw(t *testing.T, sessionToken string) (int, *api.ErrorDetails) {
 	t.Helper()
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet,
-		harness.EnsureTestServer(t).URL+"/users/me/projects", nil)
-	require.NoError(t, err)
+	var cookie *http.Cookie
 	if sessionToken != "" {
-		req.AddCookie(&http.Cookie{Name: "__nextgen_session", Value: sessionToken})
+		cookie = &http.Cookie{Name: "__nextgen_session", Value: sessionToken}
 	}
-	resp, err := harness.EnsureHttpClient(t).Do(req)
-	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
-	raw, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	return resp.StatusCode, helpers.MustUnmarshal[api.ErrorDetails](t, raw)
+	status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/projects", "", nil)
+	return status, helpers.MustUnmarshal[api.ErrorDetails](t, []byte(body))
 }

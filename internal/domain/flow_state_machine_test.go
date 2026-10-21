@@ -41,11 +41,13 @@ func attemptFor(projectID, sessionID string) gomock.Matcher {
 }
 
 // identifiedBy matches an identifier submission against the attempt it lands
-// on and the value it carries, so a test pinning rotation cannot pass on a
+// on, the value it carries and the flow's bound schema (every caller starts
+// the flow on defaultSchemaURL), so a test pinning rotation cannot pass on a
 // call that went to the wrong attempt.
 func identifiedBy(attemptID, attribute, value string) gomock.Matcher {
 	return gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-		return in.AttemptID == attemptID && in.AttributeName == attribute && in.Value == value
+		return in.AttemptID == attemptID && in.AttributeName == attribute && in.Value == value &&
+			in.UserSchemaURL == defaultSchemaURL
 	})
 }
 
@@ -682,12 +684,8 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Any()).
-		Return("", domain.ErrAuthAttemptProofRejected(nil))
-	w.createUser.EXPECT().
-		Handle(gomock.Any(), gomock.Any()).
-		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
+	// No identifier or on_success expectation: the action is refused before
+	// either runs, so no user is created for a submission that fails.
 
 	def := signupDefinition()
 
@@ -707,6 +705,62 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 		},
 	})
 	require.ErrorIs(t, err, domain.ErrFlowInvalidAction())
+}
+
+// An outcome name, or no name at all, is not an action the step declares,
+// so it is refused before the identifier is looked up. Before #1457 it ran
+// the identifier challenge and then took the route the engine keeps for
+// that outcome, which for sso_authenticated reached the terminal step
+// without any factor proven.
+func TestFlowStateMachine_Process_UndeclaredActionRefusedBeforeIdentifierLookup(t *testing.T) {
+	t.Parallel()
+	ssoLogin := func() *domain.FlowDefinition {
+		def := loginRegisterFlipDefinition()
+		def.Steps[0].SSOProviders = []string{"google"}
+		def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = domain.FlowStepTransition{Target: "done"}
+		return def
+	}
+	tests := []struct {
+		name   string
+		def    func() *domain.FlowDefinition
+		action string
+	}{
+		{name: "sso_authenticated", def: ssoLogin, action: domain.FlowImplicitOutcomeSSOAuthenticated},
+		{name: "user_not_found", def: loginRegisterFlipDefinition, action: domain.FlowImplicitOutcomeUserNotFound},
+		{name: "empty action", def: loginRegisterFlipDefinition, action: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			w := newFlowTestWorld(t)
+			def := tt.def()
+			w.schemaResolver.EXPECT().
+				Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+				Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+				AnyTimes()
+			w.ssoProviders.EXPECT().
+				Resolve(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}}, nil).
+				AnyTimes()
+			w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+			// No SubmitIdentifier or Handoff expectation: the controller
+			// fails the test on either call.
+
+			start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+				Definition:    def,
+				Purpose:       domain.FlowDefinitionPurposeLogin,
+				Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+				UserSchemaURL: defaultSchemaURL,
+			})
+			require.NoError(t, err)
+
+			_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+				Action: tt.action,
+				Fields: map[string]any{"email": "alice@example.com"},
+			})
+			require.ErrorIs(t, err, domain.ErrFlowInvalidAction())
+		})
+	}
 }
 
 // startSSOStepFlow starts a flow on the sso step and returns its state.
@@ -1605,8 +1659,8 @@ func passkeyIdentifierDefinition() *domain.FlowDefinition {
 				Name:   "identifier",
 				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
-					{Name: domain.FlowActionPasskey},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: domain.FlowActionPasskey, Kind: domain.FlowActionKindPasskey},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit:                {Target: "password"},
@@ -1618,7 +1672,7 @@ func passkeyIdentifierDefinition() *domain.FlowDefinition {
 				Name:   "password",
 				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
@@ -1628,7 +1682,7 @@ func passkeyIdentifierDefinition() *domain.FlowDefinition {
 				Name:   "register",
 				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
@@ -1706,7 +1760,7 @@ func loginNoUserNotFoundDefinition() *domain.FlowDefinition {
 				Name:   "credentials",
 				Fields: []domain.Field{"email", "x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
@@ -2693,7 +2747,8 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictPinsExistingUser(t *tes
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
 			return assert.Equal(t, "email", in.AttributeName) &&
-				assert.Equal(t, email, in.Value)
+				assert.Equal(t, email, in.Value) &&
+				assert.Equal(t, defaultSchemaURL, in.UserSchemaURL)
 		})).
 		Return(existingUserID, nil)
 
@@ -6947,6 +7002,13 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 			},
 			wantErr: domain.FlowStepErrorSSOUserInvalid,
 		},
+		"password the policy rejects": {
+			expect: func(w *flowTestWorld) {
+				probeMisses(w)
+				w.expectCreateLinked(complete, "", "", domain.ErrUserPasswordPolicyViolation(map[string]any{"max_length": int64(64)}))
+			},
+			wantErr: "error.x-auth-methods#password_max_length",
+		},
 		"taken value without an owner": {
 			expect: func(w *flowTestWorld) {
 				probeMisses(w)
@@ -7086,22 +7148,26 @@ func TestFlowStateMachine_Process_SSOCollectionStaleRow(t *testing.T) {
 func TestFlowStateMachine_Process_SSOCollectionRefusedSubmit(t *testing.T) {
 	t.Parallel()
 	for name, tc := range map[string]struct {
-		edit    func(state *domain.FlowState, in *domain.FlowSubmitInput)
-		wantErr error
+		edit      func(state *domain.FlowState, in *domain.FlowSubmitInput)
+		wantErr   error
+		wantReads int
 	}{
 		"undeclared action": {
 			edit: func(_ *domain.FlowState, in *domain.FlowSubmitInput) {
 				in.Action = domain.FlowImplicitOutcomeUserAlreadyExists
 			},
-			wantErr: domain.ErrFlowInvalidAction(),
+			wantErr:   domain.ErrFlowInvalidAction(),
+			wantReads: 0,
 		},
 		"no resolved identity": {
-			edit:    func(state *domain.FlowState, _ *domain.FlowSubmitInput) { state.SSOResolvedCheckID = "" },
-			wantErr: domain.ErrFlowIntegrity(),
+			edit:      func(state *domain.FlowState, _ *domain.FlowSubmitInput) { state.SSOResolvedCheckID = "" },
+			wantErr:   domain.ErrFlowIntegrity(),
+			wantReads: 1,
 		},
 		"user already recorded": {
-			edit:    func(state *domain.FlowState, _ *domain.FlowSubmitInput) { state.CollectedData.UserID = "user-1" },
-			wantErr: domain.ErrFlowRestartRequired(),
+			edit:      func(state *domain.FlowState, _ *domain.FlowSubmitInput) { state.CollectedData.UserID = "user-1" },
+			wantErr:   domain.ErrFlowRestartRequired(),
+			wantReads: 1,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -7109,8 +7175,9 @@ func TestFlowStateMachine_Process_SSOCollectionRefusedSubmit(t *testing.T) {
 			w, def, state := submittableCollectionStepWorld(t)
 			in := collectionSubmit(func(map[string]any) {})
 			tc.edit(state, &in)
-			// Only the prefill reads the row.
-			w.ssoIdentities.EXPECT().LoadCollected(gomock.Any(), gomock.Any()).Return(nil, nil)
+			// Only the prefill reads the row. An undeclared action is refused
+			// before the prefill, so it reads nothing.
+			w.ssoIdentities.EXPECT().LoadCollected(gomock.Any(), gomock.Any()).Return(nil, nil).Times(tc.wantReads)
 
 			_, err := w.sm.Process(t.Context(), def, state, in)
 			require.ErrorIs(t, err, tc.wantErr)

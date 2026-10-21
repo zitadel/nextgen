@@ -48,7 +48,7 @@ each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
 
 **Not in the sidebar:**
 
-- `/` redirects to Teams, `/settings` to Profile, and `/projects/$projectId` to
+- `/` redirects to Users, `/settings` to Profile, and `/projects/$projectId` to
   `/project` with that project selected.
 - `/system` shows server health.
 - `/login` and `/claim` render outside the app shell.

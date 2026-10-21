@@ -133,7 +133,7 @@ describe("env add", () => {
         );
       });
 
-      it("registers the app url as a preview origin on the project it creates", async () => {
+      it("registers the app url as a primary origin on the project it creates", async () => {
         const app = await aSetUpApp();
         await app.run([...ADD, "--app-url", "https://app.example.com"]);
 
@@ -141,7 +141,7 @@ describe("env add", () => {
 
         expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toContainEqual({
           pattern: "https://app.example.com",
-          kind: "preview",
+          kind: "primary",
         });
       });
 

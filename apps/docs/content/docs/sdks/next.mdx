@@ -73,16 +73,28 @@ The Next.js SDK wires App Router applications through one server-side middleware
     };
     ```
 
-    Set `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `NEXT_PUBLIC_ZITADEL_PROJECT_ID` in `.env.local`. The middleware adds the project secret to the session exchange; without it, sign-in cannot finish. See [SDK proxy](/docs/concepts/sdk-proxy).
+    Set `ZITADEL_URL`, `ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_SECRET`, and `NEXT_PUBLIC_ZITADEL_PROJECT_ID` in `.env.local`. The middleware adds the project secret to the session exchange; without it, sign-in cannot finish. The middleware and `auth()` count a session only when it belongs to `ZITADEL_PROJECT_ID` (else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`); with neither, nobody is signed in. See [SDK proxy](/docs/sdks/proxy).
   </Tab>
 </Tabs>
+
+## Change the dev port
+
+The project allows one origin, `http://localhost:<port>`, so setup pins the `dev` script to that port: `next dev --port 3000`. When the port is taken, `next dev` exits with `EADDRINUSE` instead of moving to another port the project does not allow. To run the app on another port, run setup again in the app with the port you want:
+
+```sh
+npx @zitadel/cli@alpha setup --dev-port 3101
+```
+
+It allows the new origin on the server, then moves the `dev` script, `ZITADEL_ISSUER` in `.env.local` and `zitadel.json` to the new port. If the server refuses, nothing changes. Restart the dev server and open `http://localhost:3101/login`. A social sign-in provider has the redirect URI registered with the old port: the command prints the new one to add at the provider.
+
+Don't change the port in only one of these places. Starting the app with `PORT=3101` or `npm run dev -- --port 3101` leaves `ZITADEL_ISSUER` and the allowed origin on the old port, and sign-in breaks.
 
 ## Runtime model
 
 <Steps>
   <Step>Proxy `/__nextgen/*` requests to the Zitadel backend.</Step>
   <Step>Validate the encrypted session token against `GET /sessions/me`.</Step>
-  <Step>Redirect unauthenticated users from protected routes to `loginPath`.</Step>
+  <Step>Redirect unauthenticated users from protected routes to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
 </Steps>
 
 ## Usage
@@ -90,9 +102,18 @@ The Next.js SDK wires App Router applications through one server-side middleware
 Read auth state in a server component:
 
 ```tsx
-import { auth } from "@zitadel/sdk-next";
+import { auth } from "@zitadel/sdk-next/server";
+import { Suspense } from "react";
 
-export default async function Page() {
+export default function Page() {
+  return (
+    <Suspense fallback={<p>Loading…</p>}>
+      <Greeting />
+    </Suspense>
+  );
+}
+
+async function Greeting() {
   const session = await auth();
   if (!session.isAuthenticated) return <p>Not signed in</p>;
 
@@ -101,32 +122,25 @@ export default async function Page() {
 }
 ```
 
-`auth()` sees a session only on routes the middleware's `matcher` covers.
+`auth()` reads the request, so the component that calls it renders inside `<Suspense>`: with Cache Components on, which `create-next-app` enables, Next.js refuses request data outside it.
+
+`auth()` sees a session only on routes the middleware's `matcher` covers. Add the page's route to the `matcher` in `proxy.ts`, for example `"/dashboard/:path*"`.
 
 ## Widget events
 
-The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
+Each widget event reaches the callback in the last column, which receives the event's `detail` payload.
 
-| Widget event | Fires when | Detail | Widgets |
-| --- | --- | --- | --- |
-| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login |
-| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login |
-| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login |
-| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login |
-| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login |
-| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session |
+| Widget event | Fires when | Detail | Widgets | Callback |
+| --- | --- | --- | --- | --- |
+| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `onFlowStep` |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login | `onFlowInput` |
+| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login | `onFlowComplete` |
+| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login | `onFlowRedirect` |
+| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login | `onFlowError` |
+| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session | `onSignout` |
 
 ```tsx
-const ref = useRef<HTMLElementTagNameMap['zitadel-login']>(null);
-
-useEffect(() => {
-  const login = ref.current;
-  const onComplete = (event: Event) => track((event as CustomEvent).detail);
-  login?.addEventListener('zitadel-flow-complete', onComplete);
-  return () => login?.removeEventListener('zitadel-flow-complete', onComplete);
-}, []);
-
-return <zitadel-login ref={ref} post-sign-in-url="/admin" />;
+<ZitadelLogin project={project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
 
 ## Verify
@@ -138,6 +152,6 @@ return <zitadel-login ref={ref} post-sign-in-url="/admin" />;
 
 ## See also
 
-- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
 - [`apps/demo-next`](https://github.com/zitadel/nextgen/tree/main/apps/demo-next) — a runnable Next.js example in this repo.
 - [`@zitadel/sdk-next` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-next) and the [CLI Next.js patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/next).

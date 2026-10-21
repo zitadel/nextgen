@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -23,6 +24,7 @@ type Handler struct {
 	teamService           *service.TeamService
 	brandingService       *service.BrandingService
 	releaseService        service.ReleaseService
+	deploymentService     *service.DeploymentService
 	idpConnectionService  service.IDPConnectionService
 	eventService          *service.EventService
 	tokenService          service.TokenService
@@ -39,6 +41,10 @@ type Handler struct {
 	// personalTeams is optional (see WithPersonalTeamEnsurer); nil skips the
 	// exchange-time ensure.
 	personalTeams service.PersonalTeamEnsurer
+	// builtinBases resolves a schema path id given as a built-in schema's
+	// `$id` under whichever base the project stores it (see
+	// WithBuiltinSchemaBases); the zero value resolves ids as written.
+	builtinBases domain.BuiltinSchemaBases
 }
 
 func NewHandler(
@@ -52,6 +58,7 @@ func NewHandler(
 	teamService *service.TeamService,
 	brandingService *service.BrandingService,
 	releaseService service.ReleaseService,
+	deploymentService *service.DeploymentService,
 	idpConnectionService service.IDPConnectionService,
 	eventService *service.EventService,
 	tokenService service.TokenService,
@@ -73,6 +80,7 @@ func NewHandler(
 		teamService:           teamService,
 		brandingService:       brandingService,
 		releaseService:        releaseService,
+		deploymentService:     deploymentService,
 		idpConnectionService:  idpConnectionService,
 		eventService:          eventService,
 		tokenService:          tokenService,
@@ -91,6 +99,15 @@ func NewHandler(
 // untouched; without it the exchange simply skips the ensure.
 func (h *Handler) WithPersonalTeamEnsurer(e service.PersonalTeamEnsurer) *Handler {
 	h.personalTeams = e
+	return h
+}
+
+// WithBuiltinSchemaBases wires the built-in schema namespace the schema
+// routes resolve a path id through, so `GET /schemas/{id}` finds a built-in
+// named under another base than the one the project stores it at. Same
+// chainable shape as WithPersonalTeamEnsurer, for the same reason.
+func (h *Handler) WithBuiltinSchemaBases(bases domain.BuiltinSchemaBases) *Handler {
+	h.builtinBases = bases
 	return h
 }
 

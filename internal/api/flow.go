@@ -64,9 +64,13 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 	if id, ok := req.AuthRequestID.Get(); ok {
 		startReq.AuthRequestID = &id
 	}
-	if id, ok := req.SessionID.Get(); ok {
-		startReq.SessionID = &id
+	sessionID, err := h.provenSessionID(ctx, string(req.ProjectID),
+		req.SessionID.Or(""), string(req.SessionToken.Or("")),
+		domain.ErrRequestInvalid)
+	if err != nil {
+		return nil, err
 	}
+	startReq.SessionID = sessionID
 	if ua, ok := middleware.UserAgentFromContext(ctx); ok {
 		startReq.UserAgent = ua
 	}

@@ -154,8 +154,9 @@ its card below 576px rather than squeezing the cells.
 Two things are deliberately **not** shared, because the designs genuinely differ:
 
 - **Column widths.** Teams sits on a fixed 248px grid, Projects on thirds, and
-  the Users table is schema-driven and scrolls horizontally, so it has no fixed
-  grid to share.
+  the Users table is schema-driven, so it has no fixed grid to share. It shows
+  each value once (D20): its ID column absorbs the slack and truncates, so the
+  default schema fits 1024px, and a schema with more columns scrolls.
 - **The header block above the table.** Each frame places its own toolbar, so
   the table's top margin stays with the screen.
 
@@ -177,7 +178,10 @@ Detail screens come in three compositions, and each has one shell:
   cards. Compose `DetailPage` + `DetailHeader` from
   `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`. A
   body card with a titled section is a `DetailSection`; a single name field with
-  its Save button is a `RenameCard` (`src/components/rename-card.tsx`).
+  its Save button is a `RenameCard` (`src/components/rename-card.tsx`). A body
+  card the design titles by name rather than an eyebrow (Users: the profile,
+  under its schema's name) leads with `PanelTitle as="h2"`; the header owns the
+  `h1`.
 - **Configuration panel** (User schemas, Login flows): the whole screen is one
   `DetailPanel` headed by a `PanelTitle` (both in
   `src/components/detail-page.tsx`), inside `DETAIL_PANEL_PAGE`

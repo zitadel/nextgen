@@ -5,17 +5,15 @@
  * generated editor meta-schema accepts `{ "$file": "<path>" }` in its place,
  * so a long value such as a login template lives in its own file instead of a
  * JSON-escaped string. The API never sees a reference: before upload every
- * one is replaced by the referenced file's content, and after a write the
- * server's canonical value goes back into that file while the JSON keeps the
- * reference.
+ * one is replaced by the referenced file's content.
  *
  * Resolution is generic. Nothing here knows which fields may carry a
  * reference; the Zod gate and the editor schema decide that.
  *
  * Paths are relative to the directory of the resource file that holds them
- * and must stay inside the project, because upload reads them and write-back
- * writes to them. The check applies to the real target: a symlink, or a
- * symlinked directory on the way, that leads outside the project is refused.
+ * and must stay inside the project, because upload reads them. The check
+ * applies to the real target: a symlink, or a symlinked directory on the way,
+ * that leads outside the project is refused.
  */
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -97,9 +95,8 @@ function isSymlink(path: string): boolean {
 
 /**
  * `path` with every symlink resolved, symlinked parent directories included,
- * even when its last segments do not exist yet (write-back may create the
- * file). Undefined when a segment is a symlink that resolves nowhere, since a
- * write through it would land wherever the link names.
+ * even when its last segments do not exist yet. Undefined when a segment is a
+ * symlink that resolves nowhere, since what it names could be anywhere.
  */
 function realTarget(path: string): string | undefined {
   const missing: string[] = [];

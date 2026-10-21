@@ -1,3 +1,4 @@
+import type { FlagVariable } from "../oclif/types";
 import { resolveTelemetryToken } from "./config";
 
 /**
@@ -25,7 +26,28 @@ export type ConsentInput = {
   readonly flag?: boolean;
 };
 
+/** The cross-tool opt-out. */
+export const DO_NOT_TRACK: FlagVariable = {
+  name: "DO_NOT_TRACK",
+  flag: "telemetry",
+  description:
+    "Any value but `0` or an empty one turns telemetry off (https://consoledonottrack.com).",
+  precedence: "Turns telemetry off even with `--telemetry`.",
+};
+
+/** The values of {@link ZITADEL_TELEMETRY}, trimmed and lowercased, that turn telemetry off. */
 const DISABLED_VALUES = new Set(["", "0", "false", "off", "no"]);
+
+/** The CLI's own opt-out. */
+export const ZITADEL_TELEMETRY: FlagVariable = {
+  name: "ZITADEL_TELEMETRY",
+  flag: "telemetry",
+  description: `An empty value or one of ${[...DISABLED_VALUES]
+    .filter((value) => value !== "")
+    .map((value) => `\`${value}\``)
+    .join(", ")} turns telemetry off.`,
+  precedence: "Turns telemetry off even with `--telemetry`.",
+};
 
 /**
  * Resolve telemetry consent under an opt-out model: on by default, but any of
@@ -52,12 +74,12 @@ export function resolveConsent(input: ConsentInput): Consent {
     return { enabled: false, reason: "flag-opt-out" };
   }
 
-  const doNotTrack = input.env.DO_NOT_TRACK?.trim();
+  const doNotTrack = input.env[DO_NOT_TRACK.name]?.trim();
   if (doNotTrack && doNotTrack !== "0") {
     return { enabled: false, reason: "do-not-track" };
   }
 
-  const explicit = input.env.ZITADEL_TELEMETRY?.trim().toLowerCase();
+  const explicit = input.env[ZITADEL_TELEMETRY.name]?.trim().toLowerCase();
   if (explicit !== undefined && DISABLED_VALUES.has(explicit)) {
     return { enabled: false, reason: "env-opt-out" };
   }
