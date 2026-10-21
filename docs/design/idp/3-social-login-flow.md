@@ -506,6 +506,16 @@ user_already_exists → authored step: "an account with this email already exist
   shared with the `password` step. The credential must still be correct; what
   the step confirms about account existence is covered by the enumeration note
   below.
+* **What the step shows the bound user:** it adds nothing to what the note
+  below already confirms.
+  It names the account (`step.identifier`) only by the identifier claim the
+  provider verified, which the visitor proved they hold, or by a value the
+  visitor typed on the flow; an unverified claim names nothing.
+  It leaves out the provider whose sign-in collided, since choosing it again
+  collides again.
+  It offers a passkey only to an account that has one: the ceremony for a
+  bound user lists that user's passkeys as `allowCredentials`, so choosing
+  the action already tells the visitor as much.
 
 ### Navigation Mechanics: `switch` vs. `pivot`
 

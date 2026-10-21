@@ -12474,6 +12474,10 @@ func NewSchemaURLConfigurationBundleSchemasItem(v SchemaURL) ConfigurationBundle
 	return s
 }
 
+type CreateAuthAttemptConflict ErrorDetails
+
+func (*CreateAuthAttemptConflict) createAuthAttemptRes() {}
+
 // CreateAuthAttemptErrorResponse represents sum type.
 type CreateAuthAttemptErrorResponse struct {
 	Type                CreateAuthAttemptErrorResponseType // switch on this field
@@ -12765,6 +12769,10 @@ func (s *CreateAuthAttemptErrorResponseStatusCode) SetResponse(val CreateAuthAtt
 }
 
 func (*CreateAuthAttemptErrorResponseStatusCode) createAuthAttemptRes() {}
+
+type CreateAuthAttemptForbidden ErrorDetails
+
+func (*CreateAuthAttemptForbidden) createAuthAttemptRes() {}
 
 // Request to create a new authentication attempt.
 // Ref: #
@@ -13754,6 +13762,14 @@ func (s *CreateDeploymentRequest) SetExpectedDeploymentID(val OptDeploymentID) {
 	s.ExpectedDeploymentID = val
 }
 
+type CreateFlowBadRequest ErrorDetails
+
+func (*CreateFlowBadRequest) createFlowRes() {}
+
+type CreateFlowConflict ErrorDetails
+
+func (*CreateFlowConflict) createFlowRes() {}
+
 // CreateFlowDefinitionErrorResponse represents sum type.
 type CreateFlowDefinitionErrorResponse struct {
 	Type                     CreateFlowDefinitionErrorResponseType // switch on this field
@@ -14186,6 +14202,12 @@ type CreateFlowErrorResponse struct {
 	TknInvalid             TknInvalid
 	TknInvalidTknid        TknInvalidTknid
 	NotImplemented         NotImplemented
+	ProjNotFound           ProjNotFound
+	ProjOriginNotAllowed   ProjOriginNotAllowed
+	ProjPreviewNotLive     ProjPreviewNotLive
+	RelNotDeployed         RelNotDeployed
+	RelNotFound            RelNotFound
+	RelRevoked             RelRevoked
 	ReqInvalid             ReqInvalid
 	EncKeyUnknownAlg       EncKeyUnknownAlg
 	Unavailable            Unavailable
@@ -14209,6 +14231,12 @@ const (
 	TknInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "tkn.invalid"
 	TknInvalidTknidCreateFlowErrorResponse        CreateFlowErrorResponseType = "tkn.invalid_tknid"
 	NotImplementedCreateFlowErrorResponse         CreateFlowErrorResponseType = "not_implemented"
+	ProjNotFoundCreateFlowErrorResponse           CreateFlowErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedCreateFlowErrorResponse   CreateFlowErrorResponseType = "proj.origin_not_allowed"
+	ProjPreviewNotLiveCreateFlowErrorResponse     CreateFlowErrorResponseType = "proj.preview_not_live"
+	RelNotDeployedCreateFlowErrorResponse         CreateFlowErrorResponseType = "rel.not_deployed"
+	RelNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "rel.not_found"
+	RelRevokedCreateFlowErrorResponse             CreateFlowErrorResponseType = "rel.revoked"
 	ReqInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateFlowErrorResponse       CreateFlowErrorResponseType = "enc_key.unknown_alg"
 	UnavailableCreateFlowErrorResponse            CreateFlowErrorResponseType = "unavailable"
@@ -14275,6 +14303,36 @@ func (s CreateFlowErrorResponse) IsTknInvalidTknid() bool {
 // IsNotImplemented reports whether CreateFlowErrorResponse is NotImplemented.
 func (s CreateFlowErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedCreateFlowErrorResponse
+}
+
+// IsProjNotFound reports whether CreateFlowErrorResponse is ProjNotFound.
+func (s CreateFlowErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundCreateFlowErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether CreateFlowErrorResponse is ProjOriginNotAllowed.
+func (s CreateFlowErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedCreateFlowErrorResponse
+}
+
+// IsProjPreviewNotLive reports whether CreateFlowErrorResponse is ProjPreviewNotLive.
+func (s CreateFlowErrorResponse) IsProjPreviewNotLive() bool {
+	return s.Type == ProjPreviewNotLiveCreateFlowErrorResponse
+}
+
+// IsRelNotDeployed reports whether CreateFlowErrorResponse is RelNotDeployed.
+func (s CreateFlowErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedCreateFlowErrorResponse
+}
+
+// IsRelNotFound reports whether CreateFlowErrorResponse is RelNotFound.
+func (s CreateFlowErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundCreateFlowErrorResponse
+}
+
+// IsRelRevoked reports whether CreateFlowErrorResponse is RelRevoked.
+func (s CreateFlowErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedCreateFlowErrorResponse
 }
 
 // IsReqInvalid reports whether CreateFlowErrorResponse is ReqInvalid.
@@ -14565,6 +14623,132 @@ func NewNotImplementedCreateFlowErrorResponse(v NotImplemented) CreateFlowErrorR
 	return s
 }
 
+// SetProjNotFound sets CreateFlowErrorResponse to ProjNotFound.
+func (s *CreateFlowErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundCreateFlowErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if CreateFlowErrorResponse is ProjNotFound.
+func (s CreateFlowErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from ProjNotFound.
+func NewProjNotFoundCreateFlowErrorResponse(v ProjNotFound) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets CreateFlowErrorResponse to ProjOriginNotAllowed.
+func (s *CreateFlowErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedCreateFlowErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if CreateFlowErrorResponse is ProjOriginNotAllowed.
+func (s CreateFlowErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedCreateFlowErrorResponse returns new CreateFlowErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedCreateFlowErrorResponse(v ProjOriginNotAllowed) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
+// SetProjPreviewNotLive sets CreateFlowErrorResponse to ProjPreviewNotLive.
+func (s *CreateFlowErrorResponse) SetProjPreviewNotLive(v ProjPreviewNotLive) {
+	s.Type = ProjPreviewNotLiveCreateFlowErrorResponse
+	s.ProjPreviewNotLive = v
+}
+
+// GetProjPreviewNotLive returns ProjPreviewNotLive and true boolean if CreateFlowErrorResponse is ProjPreviewNotLive.
+func (s CreateFlowErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, ok bool) {
+	if !s.IsProjPreviewNotLive() {
+		return v, false
+	}
+	return s.ProjPreviewNotLive, true
+}
+
+// NewProjPreviewNotLiveCreateFlowErrorResponse returns new CreateFlowErrorResponse from ProjPreviewNotLive.
+func NewProjPreviewNotLiveCreateFlowErrorResponse(v ProjPreviewNotLive) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNotDeployed sets CreateFlowErrorResponse to RelNotDeployed.
+func (s *CreateFlowErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedCreateFlowErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if CreateFlowErrorResponse is RelNotDeployed.
+func (s CreateFlowErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedCreateFlowErrorResponse returns new CreateFlowErrorResponse from RelNotDeployed.
+func NewRelNotDeployedCreateFlowErrorResponse(v RelNotDeployed) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetRelNotDeployed(v)
+	return s
+}
+
+// SetRelNotFound sets CreateFlowErrorResponse to RelNotFound.
+func (s *CreateFlowErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundCreateFlowErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if CreateFlowErrorResponse is RelNotFound.
+func (s CreateFlowErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from RelNotFound.
+func NewRelNotFoundCreateFlowErrorResponse(v RelNotFound) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets CreateFlowErrorResponse to RelRevoked.
+func (s *CreateFlowErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedCreateFlowErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if CreateFlowErrorResponse is RelRevoked.
+func (s CreateFlowErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedCreateFlowErrorResponse returns new CreateFlowErrorResponse from RelRevoked.
+func NewRelRevokedCreateFlowErrorResponse(v RelRevoked) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetRelRevoked(v)
+	return s
+}
+
 // SetReqInvalid sets CreateFlowErrorResponse to ReqInvalid.
 func (s *CreateFlowErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateFlowErrorResponse
@@ -14655,6 +14839,10 @@ func (s *CreateFlowErrorResponseStatusCode) SetResponse(val CreateFlowErrorRespo
 }
 
 func (*CreateFlowErrorResponseStatusCode) createFlowRes() {}
+
+type CreateFlowForbidden ErrorDetails
+
+func (*CreateFlowForbidden) createFlowRes() {}
 
 // Ref: #
 type CreateFlowRequest struct {
@@ -22003,12 +22191,14 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 
 func (*ErrorDetails) createBrandingRes()       {}
 func (*ErrorDetails) createFlowDefinitionRes() {}
-func (*ErrorDetails) createFlowRes()           {}
+func (*ErrorDetails) createHandoffRes()        {}
 func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
+func (*ErrorDetails) getAuthAttemptRes()       {}
 func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
+func (*ErrorDetails) issueChallengeRes()       {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
 func (*ErrorDetails) listMyIdentityLinksRes()  {}
 func (*ErrorDetails) listMyPasskeysRes()       {}
@@ -22016,6 +22206,7 @@ func (*ErrorDetails) listMyTeamsRes()          {}
 func (*ErrorDetails) revokeMySessionRes()      {}
 func (*ErrorDetails) rollbackDeploymentRes()   {}
 func (*ErrorDetails) submitFlowStepRes()       {}
+func (*ErrorDetails) verifyChallengeProofRes() {}
 
 // Additional error-specific context.
 type ErrorDetailsDetails map[string]jx.Raw
@@ -23394,6 +23585,10 @@ type ExchangeHandoffBadRequest ErrorDetails
 
 func (*ExchangeHandoffBadRequest) exchangeHandoffRes() {}
 
+type ExchangeHandoffConflict ErrorDetails
+
+func (*ExchangeHandoffConflict) exchangeHandoffRes() {}
+
 // ExchangeHandoffErrorResponse represents sum type.
 type ExchangeHandoffErrorResponse struct {
 	Type                    ExchangeHandoffErrorResponseType // switch on this field
@@ -23909,6 +24104,10 @@ func (s *ExchangeHandoffErrorResponseStatusCode) SetResponse(val ExchangeHandoff
 }
 
 func (*ExchangeHandoffErrorResponseStatusCode) exchangeHandoffRes() {}
+
+type ExchangeHandoffForbidden ErrorDetails
+
+func (*ExchangeHandoffForbidden) exchangeHandoffRes() {}
 
 type ExchangeHandoffUnauthorized ErrorDetails
 
@@ -26743,8 +26942,10 @@ type FlowStep struct {
 	// with CSS over `type="hidden"`: a manager looks for a
 	// credential-shaped control, and a hidden-typed input is easy to
 	// skip.
-	// It is not display text: do not render it as a greeting or a label.
-	// `texts.description_key` is the place for that.
+	// The client may also show it as the account being signed in to, next
+	// to a way to change it (the step's `back` action, which returns to
+	// the step that collects the identifier). Do not build other text from
+	// it; `texts.description_key` is the place for that.
 	Identifier OptFlowStepIdentifier `json:"identifier"`
 	// Ordered list of available user actions. The LiquidJS template iterates
 	// this array and builds a name-indexed map locally for keyed lookup.
@@ -27194,11 +27395,16 @@ func (s *FlowStepGates) init() FlowStepGates {
 // with CSS over `type="hidden"`: a manager looks for a
 // credential-shaped control, and a hidden-typed input is easy to
 // skip.
-// It is not display text: do not render it as a greeting or a label.
-// `texts.description_key` is the place for that.
+// The client may also show it as the account being signed in to, next
+// to a way to change it (the step's `back` action, which returns to
+// the step that collects the identifier). Do not build other text from
+// it; `texts.description_key` is the place for that.
 type FlowStepIdentifier struct {
 	// The identifier the user supplied. Use it as the input's
-	// `value`, verbatim.
+	// `value`, verbatim. After an identity provider's sign-in
+	// collided with an existing account, it is the address that
+	// provider verified; an address the provider did not verify is
+	// not sent unless the user typed it.
 	Value string `json:"value"`
 	// Value for the input's HTML `autocomplete` attribute, used
 	// verbatim. `username` is the token that pairs an identifier
@@ -57579,6 +57785,52 @@ func (o OptProjNotFoundDetails) Or(d ProjNotFoundDetails) ProjNotFoundDetails {
 	return d
 }
 
+// NewOptProjOriginNotAllowedDetails returns new OptProjOriginNotAllowedDetails with value set to v.
+func NewOptProjOriginNotAllowedDetails(v ProjOriginNotAllowedDetails) OptProjOriginNotAllowedDetails {
+	return OptProjOriginNotAllowedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjOriginNotAllowedDetails is optional ProjOriginNotAllowedDetails.
+type OptProjOriginNotAllowedDetails struct {
+	Value ProjOriginNotAllowedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjOriginNotAllowedDetails was set.
+func (o OptProjOriginNotAllowedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjOriginNotAllowedDetails) Reset() {
+	var v ProjOriginNotAllowedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjOriginNotAllowedDetails) SetTo(v ProjOriginNotAllowedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjOriginNotAllowedDetails) Get() (v ProjOriginNotAllowedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjOriginNotAllowedDetails) Or(d ProjOriginNotAllowedDetails) ProjOriginNotAllowedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjPasswordHashInvalidDetails returns new OptProjPasswordHashInvalidDetails with value set to v.
 func NewOptProjPasswordHashInvalidDetails(v ProjPasswordHashInvalidDetails) OptProjPasswordHashInvalidDetails {
 	return OptProjPasswordHashInvalidDetails{
@@ -57665,6 +57917,52 @@ func (o OptProjPermissionDeniedDetails) Get() (v ProjPermissionDeniedDetails, ok
 
 // Or returns value if set, or given parameter if does not.
 func (o OptProjPermissionDeniedDetails) Or(d ProjPermissionDeniedDetails) ProjPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjPreviewNotLiveDetails returns new OptProjPreviewNotLiveDetails with value set to v.
+func NewOptProjPreviewNotLiveDetails(v ProjPreviewNotLiveDetails) OptProjPreviewNotLiveDetails {
+	return OptProjPreviewNotLiveDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjPreviewNotLiveDetails is optional ProjPreviewNotLiveDetails.
+type OptProjPreviewNotLiveDetails struct {
+	Value ProjPreviewNotLiveDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjPreviewNotLiveDetails was set.
+func (o OptProjPreviewNotLiveDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjPreviewNotLiveDetails) Reset() {
+	var v ProjPreviewNotLiveDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjPreviewNotLiveDetails) SetTo(v ProjPreviewNotLiveDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjPreviewNotLiveDetails) Get() (v ProjPreviewNotLiveDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjPreviewNotLiveDetails) Or(d ProjPreviewNotLiveDetails) ProjPreviewNotLiveDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -58177,6 +58475,52 @@ func (o OptRelInvalidDetails) Or(d RelInvalidDetails) RelInvalidDetails {
 	return d
 }
 
+// NewOptRelNotDeployedDetails returns new OptRelNotDeployedDetails with value set to v.
+func NewOptRelNotDeployedDetails(v RelNotDeployedDetails) OptRelNotDeployedDetails {
+	return OptRelNotDeployedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelNotDeployedDetails is optional RelNotDeployedDetails.
+type OptRelNotDeployedDetails struct {
+	Value RelNotDeployedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelNotDeployedDetails was set.
+func (o OptRelNotDeployedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelNotDeployedDetails) Reset() {
+	var v RelNotDeployedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelNotDeployedDetails) SetTo(v RelNotDeployedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelNotDeployedDetails) Get() (v RelNotDeployedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelNotDeployedDetails) Or(d RelNotDeployedDetails) RelNotDeployedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptRelNotFoundDetails returns new OptRelNotFoundDetails with value set to v.
 func NewOptRelNotFoundDetails(v RelNotFoundDetails) OptRelNotFoundDetails {
 	return OptRelNotFoundDetails{
@@ -58401,6 +58745,52 @@ func (o OptRelRevisionUnpinnableDetails) Get() (v RelRevisionUnpinnableDetails, 
 
 // Or returns value if set, or given parameter if does not.
 func (o OptRelRevisionUnpinnableDetails) Or(d RelRevisionUnpinnableDetails) RelRevisionUnpinnableDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptRelRevokedDetails returns new OptRelRevokedDetails with value set to v.
+func NewOptRelRevokedDetails(v RelRevokedDetails) OptRelRevokedDetails {
+	return OptRelRevokedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelRevokedDetails is optional RelRevokedDetails.
+type OptRelRevokedDetails struct {
+	Value RelRevokedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelRevokedDetails was set.
+func (o OptRelRevokedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelRevokedDetails) Reset() {
+	var v RelRevokedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelRevokedDetails) SetTo(v RelRevokedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelRevokedDetails) Get() (v RelRevokedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelRevokedDetails) Or(d RelRevokedDetails) RelRevokedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -65933,6 +66323,59 @@ func (s *ProjNotFoundDetails) init() ProjNotFoundDetails {
 
 // Merged schema.
 // Ref: #
+type ProjOriginNotAllowed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjOriginNotAllowedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjOriginNotAllowed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjOriginNotAllowed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjOriginNotAllowed) GetDetails() OptProjOriginNotAllowedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjOriginNotAllowed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjOriginNotAllowed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjOriginNotAllowed) SetDetails(val OptProjOriginNotAllowedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjOriginNotAllowedDetails map[string]jx.Raw
+
+func (s *ProjOriginNotAllowedDetails) init() ProjOriginNotAllowedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type ProjPasswordHashInvalid struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -66031,6 +66474,59 @@ func (*ProjPermissionDenied) getClaimStatusRes() {}
 type ProjPermissionDeniedDetails map[string]jx.Raw
 
 func (s *ProjPermissionDeniedDetails) init() ProjPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjPreviewNotLive struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjPreviewNotLiveDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjPreviewNotLive) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjPreviewNotLive) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjPreviewNotLive) GetDetails() OptProjPreviewNotLiveDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjPreviewNotLive) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjPreviewNotLive) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjPreviewNotLive) SetDetails(val OptProjPreviewNotLiveDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjPreviewNotLiveDetails map[string]jx.Raw
+
+func (s *ProjPreviewNotLiveDetails) init() ProjPreviewNotLiveDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -70430,6 +70926,59 @@ func (s *RelInvalidDetails) init() RelInvalidDetails {
 
 // Merged schema.
 // Ref: #
+type RelNotDeployed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelNotDeployedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelNotDeployed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelNotDeployed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelNotDeployed) GetDetails() OptRelNotDeployedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelNotDeployed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelNotDeployed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelNotDeployed) SetDetails(val OptRelNotDeployedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelNotDeployedDetails map[string]jx.Raw
+
+func (s *RelNotDeployedDetails) init() RelNotDeployedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type RelNotFound struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -70685,6 +71234,59 @@ func (s *RelRevisionUnpinnable) SetDetails(val OptRelRevisionUnpinnableDetails) 
 type RelRevisionUnpinnableDetails map[string]jx.Raw
 
 func (s *RelRevisionUnpinnableDetails) init() RelRevisionUnpinnableDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type RelRevoked struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelRevokedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelRevoked) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelRevoked) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelRevoked) GetDetails() OptRelRevokedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelRevoked) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelRevoked) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelRevoked) SetDetails(val OptRelRevokedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelRevokedDetails map[string]jx.Raw
+
+func (s *RelRevokedDetails) init() RelRevokedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

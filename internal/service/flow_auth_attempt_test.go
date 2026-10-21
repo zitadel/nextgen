@@ -216,7 +216,9 @@ func TestFlowAuthAttemptAdapter_SubmitPassword_ProofRejectedSurfaces(t *testing.
 
 func attemptWithHandoff(t *testing.T, handedOffAt time.Time) *domain.AuthAttempt {
 	t.Helper()
-	att := &domain.AuthAttempt{}
+	// A completed attempt carries a verified credential-class factor; the bare
+	// identifier never completes one (see domain.AuthAttempt.IsCompleted).
+	att := &domain.AuthAttempt{Checks: []domain.AuthCheck{domain.SetAuthFactorPassword(time.Now())}}
 	require.NoError(t, att.PrepareHandoff())
 	att.HandedOffAt = &handedOffAt
 	return att

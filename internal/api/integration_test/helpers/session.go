@@ -68,8 +68,11 @@ func (h *Harness) CreateActiveSession(t testing.TB, projectID, userID string) *d
 	for range 3 {
 		attempt := &domain.AuthAttempt{
 			ProjectID:      projectID,
-			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
-			Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser, domain.AuthCheckTypePassword},
+			// A completed attempt carries a verified credential-class factor
+			// alongside the identifier; the bare user factor never completes
+			// one (see domain.AuthAttempt.IsCompleted).
+			Checks: []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}, &domain.AuthFactorPassword{}},
 		}
 		require.NoError(t, stmts.CreateAuthAttempt(t.Context(), attempt))
 
