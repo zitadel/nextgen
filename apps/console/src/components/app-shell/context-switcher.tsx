@@ -105,7 +105,7 @@ function TeamSwitcher({ projectId, teamId }: { projectId: string; teamId: string
     <Switcher
       icon={Box}
       heading="Teams"
-      label={openTeam?.loaderData?.name}
+      label={openTeam?.loaderData?.team.name}
       currentId={teamId}
       options={teams?.map((team) => ({
         id: team.id,

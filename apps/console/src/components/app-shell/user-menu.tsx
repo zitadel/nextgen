@@ -1,12 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronRight, Sun } from "lucide-react";
+import { ChevronRight, type LucideIcon, Monitor, Moon, Sun } from "lucide-react";
 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -14,7 +13,6 @@ import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSessionCached } from "@/hooks/use-async";
 import { readAccountTeam } from "@/lib/account";
-import { displayNameProperty, readOwnUserSchema } from "@/lib/user-schema";
 import { type ThemePreference, useTheme } from "@/theme";
 
 /** Route prefix that puts the shell into its Settings view. */
@@ -33,32 +31,29 @@ export interface ShellUser {
  */
 const AVATAR = "size-6 shrink-0 rounded-full bg-(image:--zl-gradient-red)";
 
-/**
- * The account rows sit flush, 32px tall with the design's 32px right inset;
- * the separators sit flush against them, so the default `-mx-1 my-1` comes off.
- */
-const MENU_ITEM = "h-8 pr-8";
+/** The separators sit flush against the rows, so the default `-mx-1 my-1` comes off. */
 const MENU_SEPARATOR = "mx-0 my-0";
 
 /** The footer's second line: the email under a name, else the account. */
 const FOOTER_SECOND_LINE = "truncate text-xs font-light text-muted-foreground";
 
-const THEMES: { value: ThemePreference; label: string }[] = [
-  { value: "system", label: "System" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
+const THEMES: { value: ThemePreference; label: string; icon: LucideIcon }[] = [
+  { value: "system", label: "System", icon: Monitor },
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
 ];
 
 /**
- * One segment of the theme control: a compact menu item, filled when chosen.
+ * One segment of the theme control: a compact icon-only menu item, filled when
+ * chosen; the label names it for screen readers and on hover.
  * Tinted with `foreground` rather than `muted`/`accent`, which on the dark
  * theme are the popover's own colour and would leave the choice invisible.
  */
 const THEME_SEGMENT =
-  "h-6 rounded-sm px-2 text-xs text-muted-foreground data-[highlighted]:bg-foreground/5 aria-checked:bg-foreground/10 aria-checked:text-foreground";
+  "size-6 justify-center rounded-sm p-0 text-muted-foreground data-[highlighted]:bg-foreground/5 aria-checked:bg-foreground/10 aria-checked:text-foreground";
 
 /**
- * Theme, as a segmented control on one row — System, Light, Dark. It lives
+ * Theme, as a segmented control on one row — System, Light, Dark, drawn as icons. It lives
  * here rather than in the top bar so the bar holds context and search only,
  * and so the Settings view, which has no top bar, can change it too.
  *
@@ -71,27 +66,28 @@ function ThemeRow() {
   const { preference, setPreference } = useTheme();
 
   return (
-    <div className="flex h-10 items-center justify-between gap-2 px-2">
-      <span className="flex items-center gap-2 text-sm">
-        <Sun className="size-4 text-muted-foreground" aria-hidden />
-        Theme
-      </span>
+    // `px-3`: the clickable rows sit in a `p-1` box with their own `px-2`, so
+    // the label lines up with theirs.
+    <div className="flex h-10 items-center justify-between gap-2 px-3">
+      <span className="text-sm">Theme</span>
       <DropdownMenuGroup
         aria-label="Theme"
-        className="flex rounded-md border border-foreground/10 p-0.5"
+        className="flex gap-0.5 rounded-md border border-foreground/10 p-0.5"
       >
         {THEMES.map((theme) => (
           <DropdownMenuItem
             key={theme.value}
             role="menuitemradio"
             aria-checked={preference === theme.value}
+            aria-label={theme.label}
+            title={theme.label}
             className={THEME_SEGMENT}
             onSelect={(event) => {
               event.preventDefault();
               setPreference(theme.value);
             }}
           >
-            {theme.label}
+            <theme.icon aria-hidden />
           </DropdownMenuItem>
         ))}
       </DropdownMenuGroup>
@@ -106,22 +102,19 @@ function ThemeRow() {
  * The person is named in ADR 058's order (display → identifier → user id):
  * once a name is set it leads, with the email beneath it; until then the
  * email leads, with the account beneath it — their team in the sign-in project
- * (`lib/account.ts`), which the dropdown also lists.
+ * (`lib/account.ts`).
  *
- * The design draws a plan badge (`Pro`) beside the account; it is left out
- * until billing (#667) can say which plan an account is on. `Documentation` and
- * `Feedback` are parked for the same reason the sidebar's Documentation row is:
- * neither has a destination yet, and a row that does nothing reads as broken.
+ * The dropdown follows Vercel's: the person heads it and is the one way into
+ * account settings, whose sidebar lists Overview (their teams, the account
+ * among them) and Settings (their profile); then Theme and Log out.
+ * Nothing else repeats a Settings page. `Documentation` and `Feedback` are
+ * parked: neither has a destination yet, and a row that does nothing reads as
+ * broken.
  */
 export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
   const email = user?.identifier ?? user?.userId ?? "Signed in";
   const name = user?.display ?? email;
   const account = useSessionCached(readAccountTeam, null);
-  // Asked only while there is no name: once `display` is set there is nothing
-  // to prompt for.
-  const nameProperty = displayNameProperty(
-    useSessionCached(readOwnUserSchema, undefined, !user?.display),
-  );
 
   return (
     <SidebarMenuItem>
@@ -153,34 +146,19 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
           sideOffset={8}
           className="w-64 border-foreground/10 p-0"
         >
-          {!user?.display && nameProperty ? (
-            // No name yet, and the schema has room for one: the header is the
-            // way to add it, where the name would otherwise be.
-            <DropdownMenuItem asChild className="flex-col items-start gap-0.5 py-2 pr-8">
-              <Link to="/settings/profile" hash={nameProperty}>
-                <span className="truncate text-sm text-muted-foreground italic">Add your name</span>
-                <span className="truncate text-xs leading-none text-muted-foreground">{email}</span>
+          <div className="p-1">
+            <DropdownMenuItem asChild className="flex-col items-start gap-1 py-2">
+              <Link to={SETTINGS_PATH}>
+                <span className="max-w-full truncate text-sm font-medium">{name}</span>
+                {user?.display && (
+                  <span className="max-w-full truncate text-xs leading-none text-muted-foreground">
+                    {email}
+                  </span>
+                )}
               </Link>
             </DropdownMenuItem>
-          ) : (
-            <DropdownMenuLabel className="flex flex-col gap-0.5 py-2 pr-8 font-normal">
-              <span className="truncate text-sm">{name}</span>
-              {user?.display && (
-                <span className="truncate text-xs leading-none text-muted-foreground">{email}</span>
-              )}
-            </DropdownMenuLabel>
-          )}
+          </div>
           <DropdownMenuSeparator className={MENU_SEPARATOR} />
-          {account && (
-            <DropdownMenuItem asChild className={MENU_ITEM}>
-              <Link to="/settings/account">
-                <span className="truncate">{account.name}</span>
-              </Link>
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem asChild className={MENU_ITEM}>
-            <Link to="/settings/profile">Profile</Link>
-          </DropdownMenuItem>
           <ThemeRow />
           <DropdownMenuSeparator className={MENU_SEPARATOR} />
           <div className="p-1">

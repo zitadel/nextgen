@@ -138,7 +138,10 @@ export function SearchDialog({
               icon: Building2,
               label: "Account settings",
               context: account.name,
-              go: close(() => void navigate({ to: "/settings/account" })),
+              go: close(
+                () =>
+                  void navigate({ to: "/settings/teams/$teamId", params: { teamId: account.id } }),
+              ),
             },
           ]
         : [];

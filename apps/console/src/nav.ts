@@ -14,23 +14,11 @@ import type { NavIcon } from "./components/app-shell/icons";
  */
 export type NavView = "portal" | "settings";
 
-/**
- * A heading in the Settings nav. The design groups its rows under `ACCOUNT`
- * (the signed-in person) and `WORKSPACE` (what they share with their team — the
- * account, `lib/account.ts`).
- *
- * A heading renders only when a route claims it, so a group never advertises a
- * section with nothing under it.
- */
-export type NavGroup = "ACCOUNT" | "WORKSPACE";
-
 export interface NavMeta {
   /** Sidebar label. */
   label: string;
   /** Which sidebar this entry belongs to. Defaults to the portal list. */
   view?: NavView;
-  /** Settings-nav heading this entry sits under. Ignored in the portal list. */
-  group?: NavGroup;
   /** Sort order among siblings (top level, or within one parent's children). */
   order: number;
   /**

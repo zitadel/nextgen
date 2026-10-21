@@ -1,12 +1,13 @@
-import { createFileRoute, useLocation, useRouter } from "@tanstack/react-router";
-import { CircleUserRound } from "lucide-react";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { Settings } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
 import { DETAIL_TITLE } from "@/components/detail-page";
 import { FormError } from "@/components/form-error";
 import { Page, SettingsColumn } from "@/components/layout";
 import { SettingsCard } from "@/components/settings-card";
-import { PAGE_TITLE_ROW } from "@/components/typography";
+import { RESOURCE_TABLE_TOP } from "@/components/resource-list";
+import { EYEBROW, PAGE_TITLE_ROW } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -20,14 +21,14 @@ import { readOwnUserSchema } from "@/lib/user-schema";
 import { userAttributes } from "@/lib/user";
 
 /**
- * Settings → Profile, generated from the person's own user schema as Add user
+ * Account settings → Settings: the person's own profile, generated from the person's own user schema as Add user
  * is (`schemaFields`): a row per property, nothing named in code. The schema's
  * `x-identifier` is read-only (D16); the rest saves through `PATCH /users/me`.
  * Without a readable schema, the record's own identifier shows alone.
  */
 export const Route = createFileRoute("/_authed/settings/profile")({
   staticData: {
-    nav: { label: "Profile", order: 0, icon: CircleUserRound, view: "settings", group: "ACCOUNT" },
+    nav: { label: "Settings", order: 1, icon: Settings, view: "settings" },
   },
   loader: async () => {
     // A failed schema read leaves the identifier alone (below), never a boundary.
@@ -122,9 +123,18 @@ function ProfileScreen() {
         {/* No header gutter: the settings design aligns the title with the card,
             where a resource detail insets its title lockup by 8px. */}
         <div className={PAGE_TITLE_ROW}>
-          <h1 className={DETAIL_TITLE}>Profile</h1>
+          <h1 className={DETAIL_TITLE}>Settings</h1>
         </div>
-        <SettingsCard>
+        {/* Says whose settings these are, as Overview's Teams heading says what
+            it lists: the nav label alone does not. */}
+        <div className={RESOURCE_TABLE_TOP}>
+          <h2 className={EYEBROW}>Your profile</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            How you appear in the account menu and to the teams you are on. What you sign in with
+            cannot be changed here.
+          </p>
+        </div>
+        <SettingsCard className="mt-4">
           {fixed.map((entry) => (
             <ProfileRow key={entry.key} field={entry} value={saved(entry)} readOnly />
           ))}
@@ -175,9 +185,6 @@ function ProfileRow({
   onEnter?: () => void;
 }) {
   const id = useId();
-  // The account menu's "Add your name" lands here with the property as the
-  // hash (`#name`): focus that field, so the prompt ends where typing starts.
-  const focus = useLocation({ select: (location) => location.hash === entry.key });
 
   return (
     <Field orientation="responsive" className={ROW}>
@@ -200,7 +207,6 @@ function ProfileRow({
           disabled={readOnly}
           readOnly={readOnly}
           required={!readOnly && entry.required}
-          autoFocus={!readOnly && focus}
           onChange={(event) => onChange?.(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") onEnter?.();

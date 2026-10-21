@@ -174,16 +174,15 @@ describe("settings view", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
     expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
-    // The selection rides along, so `Back to dashboard` returns to the same project.
-    expect(screen.getByRole("menuitem", { name: "Profile" })).toHaveAttribute(
+    // The person heads the menu and is the way into Settings. The selection
+    // rides along, so `Back to dashboard` returns to the same project.
+    expect(screen.getByRole("menuitem", { name: /^Test User/ })).toHaveAttribute(
       "href",
-      scopedPath("/settings/profile", "proj_1"),
+      scopedPath("/settings", "proj_1"),
     );
-    // The account row opens the screen that renames it.
-    expect(screen.getByRole("menuitem", { name: "Test account" })).toHaveAttribute(
-      "href",
-      scopedPath("/settings/account", "proj_1"),
-    );
+    // Settings' own pages are not repeated beside it.
+    expect(screen.queryByRole("menuitem", { name: "Profile" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Test account" })).not.toBeInTheDocument();
   });
 
   it("swaps the portal nav for the settings view on a settings URL", async () => {
@@ -241,14 +240,6 @@ describe("sidebar chrome", () => {
     } finally {
       vi.mocked(fetchSession).mockImplementation(async () => makeTestSession());
     }
-  });
-
-  it("shows the person alone when they are on no team", async () => {
-    server.use(http.get("*/api/users/me/teams", () => HttpResponse.json({ teams: [] })));
-    renderShell();
-    await userEvent.click(await screen.findByRole("button", { name: /^Account:/ }));
-    expect(await screen.findByRole("menuitem", { name: "Profile" })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Test account" })).not.toBeInTheDocument();
   });
 
   it("collapses from the toggle beside the logo", async () => {

@@ -98,7 +98,7 @@ test("a platform operator reaches every management screen without an error", asy
 
 /**
  * A platform operator names themselves (#1801, #1802): the platform project's
- * user schema designates an optional `name` for display, Profile is generated
+ * user schema designates an optional `name` for display, the profile is generated
  * from the operator's own schema — read through the self-access
  * `GET /users/me/schema`, since they hold no grant in the platform project —
  * and once saved the account menu shows the name over the email.
@@ -112,12 +112,16 @@ test("a platform operator adds their name from the account menu", async ({ page,
 
   const account = page.getByRole("button", { name: `Account: ${operator.email}` });
   await account.click();
-  await page.getByRole("menuitem", { name: /Add your name/ }).click();
+  // The person heading the menu opens account settings; Settings is the profile.
+  await page.getByRole("menuitem", { name: operator.email }).click();
+  await page
+    .getByRole("navigation", { name: "Account settings" })
+    .getByRole("link", { name: "Settings" })
+    .click();
 
   await expect(page).toHaveURL(/\/settings\/profile/);
   await expect(page.getByLabel("Email", { exact: true })).toBeDisabled();
   const name = page.getByLabel("Name", { exact: true });
-  await expect(name).toBeFocused();
   await name.fill("Ada Lovelace");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expectNoErrorBoundary(page);
@@ -126,13 +130,13 @@ test("a platform operator adds their name from the account menu", async ({ page,
   const named = page.getByRole("button", { name: "Account: Ada Lovelace" });
   await expect(named).toContainText(operator.email);
   await named.click();
-  await expect(page.getByRole("menu").getByText("Ada Lovelace")).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: /Add your name/ })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: /^Ada Lovelace/ })).toContainText(operator.email);
 });
 
 /**
- * Settings → Account renames the operator's account: the personal team created
- * for them at sign-up (#1890 grants them its rename), shown in the footer.
+ * Account settings → Overview lists the operator's account: the personal team
+ * created for them at sign-up, which opens to its rename (#1890 grants them it),
+ * shown in the footer.
  */
 test("a platform operator renames their account", async ({ page, seed }) => {
   const operator = seed.identity();
@@ -143,8 +147,10 @@ test("a platform operator renames their account", async ({ page, seed }) => {
   // The landing redirect must settle first, or it interrupts the next goto.
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
 
-  await page.goto("/ui/console/settings/account");
-  const field = page.getByLabel("Account name");
+  await page.goto("/ui/console/settings");
+  // Their only team, the one created at sign-up.
+  await page.getByRole("main").getByRole("link").first().click();
+  const field = page.getByLabel("Team name");
   await field.fill("Acme Platform");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expectNoErrorBoundary(page);

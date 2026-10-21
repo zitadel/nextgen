@@ -15,6 +15,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 
 const TEAM_ID = "team_1";
 const TEAM_URL = `http://localhost/api/teams/${TEAM_ID}`;
+const USERS_QUERY_URL = "*/api/users/query";
 
 function team(overrides: Record<string, unknown> = {}) {
   return {
@@ -40,9 +41,13 @@ async function renderDetail() {
 }
 
 describe("team detail", () => {
-  // The top bar's team switcher lists the project's teams beside the open one.
+  // The top bar's team switcher lists the project's teams beside the open one,
+  // and the Members tab's first page loads with the team.
   beforeEach(() =>
-    server.use(http.post("*/api/teams/query", () => HttpResponse.json({ teams: [team()] }))),
+    server.use(
+      http.post("*/api/teams/query", () => HttpResponse.json({ teams: [team()] })),
+      http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
+    ),
   );
 
   it("renders the name, the id and the created date", async () => {
@@ -129,5 +134,54 @@ describe("team detail", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(switcher).toHaveTextContent("Acme Group"));
+  });
+
+  it("lists the team's members on the Members tab", async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      http.get(TEAM_URL, () => HttpResponse.json(team())),
+      http.post(USERS_QUERY_URL, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              display: "Ada Lovelace",
+              identifier: "ada@example.com",
+              metadata: { status: "active" },
+            },
+          ],
+        });
+      }),
+    );
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Members" }));
+    expect(await screen.findByRole("link", { name: "Ada Lovelace" })).toHaveAttribute(
+      "href",
+      scopedPath("/users/user_1"),
+    );
+    expect(screen.getByText("ada@example.com")).toBeInTheDocument();
+    // Membership is the `team_id` filter, not a per-user roster read.
+    expect(bodies).toEqual([
+      expect.objectContaining({
+        filter: [{ field: "team_id", operation: "equals", value: TEAM_ID }],
+      }),
+    ]);
+  });
+
+  it("keeps the team's page when its members may not be read", async () => {
+    server.use(
+      http.get(TEAM_URL, () => HttpResponse.json(team())),
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({ code: "user.permission_denied" }, { status: 403 }),
+      ),
+    );
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Members" }));
+    expect(
+      await screen.findByText("Your access does not include this team's members."),
+    ).toBeInTheDocument();
   });
 });

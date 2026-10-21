@@ -1,4 +1,4 @@
-import { Link, useMatchRoute } from "@tanstack/react-router";
+import { Link, useMatch, useMatchRoute } from "@tanstack/react-router";
 // `BookOpen` / `Search` return with the parked footer items below.
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
@@ -8,7 +8,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -21,7 +20,6 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import type { NavGroup } from "@/nav";
 
 import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./icons";
@@ -191,62 +189,66 @@ function SettingsHeader() {
 }
 
 /**
- * Settings nav: the design's grouped list, `ACCOUNT` over `WORKSPACE`.
+ * Settings nav: one flat list, as Vercel's account view draws it — Overview
+ * (the teams the person is on) over Settings (the person themselves).
  *
  * Rows attach the same way Portal's do, through `staticData.nav` on the route,
- * and declare `view: "settings"` so they leave the primary list alone.
+ * and declare `view: "settings"` so they leave the primary list alone. Each
+ * marks only its own page: Overview's path is the prefix of every settings
+ * path.
  *
- * A heading renders only when a route claims it. Profile claims `ACCOUNT`.
- * No screen claims `WORKSPACE` yet, so that heading is absent rather than a
- * heading over nothing.
+ * A team opened from Overview nests under it, the way User schemas sits under
+ * Users: the nested row says where you are, and Overview is the way back up
+ * (D13: no back buttons or breadcrumbs).
  */
 function SettingsNav() {
   const items = useNavItems("settings");
   const matchRoute = useMatchRoute();
+  const openTeam = useMatch({ from: "/_authed/settings/teams/$teamId", shouldThrow: false });
 
   return (
-    <>
-      {SETTINGS_GROUPS.map((group) => {
-        const rows = items.filter((item) => item.nav.group === group);
-        if (rows.length === 0) return null;
-        return (
-          <SidebarGroup key={group} role="navigation" aria-label={group}>
-            <SidebarGroupLabel>{group}</SidebarGroupLabel>
-            <SidebarMenu className={NAV_MENU}>
-              {rows.map((item) => {
-                const Icon = item.nav.icon;
-                const label = item.nav.label;
-                // Every settings row is a built route: `useNavItems` merges the
-                // design-only entries into the portal list only.
-                if (!item.to) return null;
-                return (
-                  <SidebarMenuItem key={label}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={!!matchRoute({ to: item.to, fuzzy: true })}
-                      tooltip={label}
-                    >
-                      <Link to={item.to} title={label}>
-                        {Icon && <Icon aria-hidden />}
-                        <span>{label}</span>
+    <SidebarGroup role="navigation" aria-label="Account settings" className="pt-4 pb-0">
+      <SidebarMenu className={NAV_MENU}>
+        {items.map((item) => {
+          const Icon = item.nav.icon;
+          const label = item.nav.label;
+          // Every settings row is a built route: `useNavItems` merges the
+          // design-only entries into the portal list only.
+          if (!item.to) return null;
+          return (
+            <SidebarMenuItem key={label}>
+              <SidebarMenuButton asChild isActive={!!matchRoute({ to: item.to })} tooltip={label}>
+                <Link to={item.to} activeOptions={{ exact: true }} title={label}>
+                  {Icon && <Icon aria-hidden />}
+                  <span>{label}</span>
+                </Link>
+              </SidebarMenuButton>
+              {item.to === SETTINGS_PATH && openTeam && (
+                <SidebarMenuSub>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive>
+                      <Link
+                        to="/settings/teams/$teamId"
+                        params={{ teamId: openTeam.params.teamId }}
+                        title={openTeam.loaderData?.team?.name}
+                      >
+                        {/* A team the person may not read has no name to show. */}
+                        <span>{openTeam.loaderData?.team?.name ?? "Team"}</span>
                       </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroup>
-        );
-      })}
-    </>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                </SidebarMenuSub>
+              )}
+            </SidebarMenuItem>
+          );
+        })}
+      </SidebarMenu>
+    </SidebarGroup>
   );
 }
 
 /** Both navs: a 2px gap between rows, widened to the rail's 4px when collapsed. */
 const NAV_MENU = "gap-0.5 group-data-[collapsible=icon]:gap-1";
-
-/** Heading order in the Settings nav, top to bottom, as the design draws it. */
-const SETTINGS_GROUPS: NavGroup[] = ["ACCOUNT", "WORKSPACE"];
 
 /** Portal nav: the flat list, with `User schemas` nested under `Users`. */
 function PortalNav() {

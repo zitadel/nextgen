@@ -63,7 +63,7 @@ describe("settings profile", () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
 
-    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
     const email = screen.getByLabelText("Email");
     expect(email).toHaveValue("maya@example.com");
     expect(email).toBeDisabled();
@@ -75,7 +75,7 @@ describe("settings profile", () => {
     // field shown cannot change, so the screen has no Save.
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
-    await screen.findByRole("heading", { name: "Profile" });
+    await screen.findByRole("heading", { name: "Settings" });
 
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
     expect(screen.queryByDisplayValue("Maya")).not.toBeInTheDocument();
@@ -101,20 +101,19 @@ describe("settings profile", () => {
     expect(email).toHaveAttribute("placeholder", "No email address");
   });
 
-  it("lists Profile under ACCOUNT, and the account under WORKSPACE", async () => {
+  it("marks Settings in the flat account nav, under Overview", async () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
-    await screen.findByRole("heading", { name: "Profile" });
+    await screen.findByRole("heading", { name: "Settings" });
 
-    const account = screen.getByRole("navigation", { name: "ACCOUNT" });
-    expect(within(account).getByRole("link", { name: "Profile" })).toHaveAttribute(
+    const nav = screen.getByRole("navigation", { name: "Account settings" });
+    const links = within(nav).getAllByRole("link");
+    expect(links.map((link) => link.textContent)).toEqual(["Overview", "Settings"]);
+    expect(within(nav).getByRole("link", { name: "Settings" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    const workspace = screen.getByRole("navigation", { name: "WORKSPACE" });
-    expect(within(workspace).getByRole("link", { name: "Account" })).not.toHaveAttribute(
-      "aria-current",
-    );
+    expect(within(nav).getByRole("link", { name: "Overview" })).not.toHaveAttribute("aria-current");
   });
 
   it("offers the name the schema designates for display, and saves it", async () => {
