@@ -120,7 +120,7 @@ func TestLoadConfigDefaultsToArgon2id(t *testing.T) {
 	require.NoError(t, err)
 
 	const password = "Passw0rd!"
-	encoded, err := hasher.Hash(password)
+	encoded, err := hasher.Hash(t.Context(), password)
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(encoded, argon2.Prefix), "default hasher should produce argon2id, got %q", encoded)
 
@@ -181,4 +181,33 @@ func TestLoadConfigAcceptsStreamsFromEnv(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []zlog.Stream{zlog.StreamRequest, zlog.StreamService}, cfg.Instrumentation.Log.Streams)
+}
+
+// The hashing bound is on by default, with a wait before a refusal: a fresh
+// deployment degrades a burst of sign-ins into retries, not into an OOM kill.
+func TestLoadConfigDefaultsHashConcurrency(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, 0, cfg.PasswordHasher.Concurrency.MaxOperations, "one per CPU")
+	assert.Equal(t, int64(512<<20), cfg.PasswordHasher.Concurrency.MemoryBudget)
+	assert.Equal(t, time.Second, cfg.PasswordHasher.Concurrency.MaxWait)
+}
+
+// The keys are multi-word and reach the struct through their mapstructure
+// tags, from a file and from the environment alike.
+func TestLoadConfigHashConcurrencyOverrides(t *testing.T) {
+	t.Setenv("NEXTGEN_PASSWORD_HASHER_CONCURRENCY_MAX_WAIT", "250ms")
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, []byte("password_hasher:\n  concurrency:\n    max_operations: 3\n    memory_budget: 1048576\n"), 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, 3, cfg.PasswordHasher.Concurrency.MaxOperations)
+	assert.Equal(t, int64(1<<20), cfg.PasswordHasher.Concurrency.MemoryBudget)
+	assert.Equal(t, 250*time.Millisecond, cfg.PasswordHasher.Concurrency.MaxWait)
 }

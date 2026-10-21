@@ -190,12 +190,15 @@ func (p *PasswordPolicy) historyMatches(ctx context.Context, bound *policy.Bound
 	candidate := domain.NormalizePassword(in.Password)
 	matches := make([]bool, 0, min(int64(len(kept)), depth))
 	for _, pw := range kept[:min(int64(len(kept)), depth)] {
-		err := p.verifier.VerifyHash(pw.EncodedHash, candidate)
+		err := p.verifier.VerifyHash(ctx, pw.EncodedHash, candidate)
 		switch {
 		case err == nil:
 			matches = append(matches, true)
 		case errors.Is(err, crypto.ErrHashMismatch):
 			matches = append(matches, false)
+		case errors.Is(err, crypto.ErrHashingBusy):
+			// Not a verdict on the password either way: the client retries.
+			return nil, PasswordCheck{}, domain.ErrUserPasswordHashingBusy().WithParent(err)
 		default:
 			return nil, PasswordCheck{}, domain.ErrInternal(err).WithMessage("failed to compare with a kept password")
 		}

@@ -172,7 +172,7 @@ func createAttemptUser(t *testing.T, project *domain.Project, team *domain.Team,
 
 func setAttemptPassword(t *testing.T, project *domain.Project, userID, password string) {
 	t.Helper()
-	encodedHash, err := harness.EnsureHasher(t).Hash(password)
+	encodedHash, err := harness.EnsureHasher(t).Hash(t.Context(), password)
 	require.NoError(t, err)
 	require.NoError(t, harness.EnsureUserFixture(t).SetPassword(t.Context(), &domain.SetUserPassword{
 		ProjectID:   project.ID,

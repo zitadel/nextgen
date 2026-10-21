@@ -54,6 +54,17 @@ password_hasher:
     # To keep bcrypt as the hashing algorithm instead:
     # algorithm: bcrypt
     # cost: 10
+  # How much hashing runs at once. A hash is the one request that is expensive
+  # by design, so a burst of sign-ins is bounded here instead of by the
+  # container's memory limit. Every hash takes at least memory_budget /
+  # max_operations of the budget, so cheap algorithms are still capped in
+  # number; a memory-hard hash takes its own size. A hash that finds no room
+  # within max_wait is answered with HTTP 429 and `Retry-After`, and never
+  # counts as a failed sign-in.
+  concurrency:
+    max_operations: 0 # 0 = one per CPU the process may use
+    memory_budget: 536870912 # bytes; 512 MiB fits eight hashes at the default argon2id cost
+    max_wait: 1s # 0 refuses at once
   verifiers:
     - argon2
     - bcrypt

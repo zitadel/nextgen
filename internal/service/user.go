@@ -1028,8 +1028,8 @@ func (o *SetPasswordUserAction) Prepare(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	_, end := startSpan(ctx, "password.Hash")
-	o.hash, err = domain.HashPassword(o.Password, hasher)
+	hashCtx, end := startSpan(ctx, "password.Hash")
+	o.hash, err = domain.HashPassword(hashCtx, o.Password, hasher)
 	end(&err)
 	return err
 }

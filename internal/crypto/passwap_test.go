@@ -453,7 +453,7 @@ func TestPasswordHashConfig_PasswordHasher(t *testing.T) {
 			if tt.wantPrefixes != nil {
 				require.NotNil(t, got)
 				assert.Equal(t, tt.wantPrefixes, got.Prefixes)
-				encoded, err := got.Hash("password")
+				encoded, err := got.Hash(t.Context(), "password")
 				require.NoError(t, err)
 				assert.NotEmpty(t, encoded)
 			}
@@ -486,7 +486,7 @@ func TestPasswordHasher_Argon2idRehashesBcrypt(t *testing.T) {
 	require.NoError(t, err)
 
 	// New passwords are hashed with argon2id.
-	fresh, err := hasher.Hash(password)
+	fresh, err := hasher.Hash(t.Context(), password)
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(fresh, argon2.Prefix), "new hash should use argon2id, got %q", fresh)
 
@@ -535,7 +535,7 @@ func TestHasher_ValidateEncodedHash(t *testing.T) {
 		{
 			name: "valid hash, ok",
 			hash: func() string {
-				valid, err := hasher.Hash("password")
+				valid, err := hasher.Hash(t.Context(), "password")
 				require.NoError(t, err)
 				return valid
 			}(),
@@ -1023,7 +1023,7 @@ func TestHasherFactory(t *testing.T) {
 	}
 
 	t.Run("the default is the configured hasher", func(t *testing.T) {
-		encoded, err := newFactory(t).Default().Hash(password)
+		encoded, err := newFactory(t).Default().Hash(t.Context(), password)
 		require.NoError(t, err)
 		assert.True(t, strings.HasPrefix(encoded, argon2.Prefix), "got %q", encoded)
 	})
@@ -1036,7 +1036,7 @@ func TestHasherFactory(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		encoded, err := hasher.Hash(password)
+		encoded, err := hasher.Hash(t.Context(), password)
 		require.NoError(t, err)
 		assert.True(t, strings.HasPrefix(encoded, bcrypt.Prefix), "got %q", encoded)
 	})
@@ -1052,24 +1052,24 @@ func TestHasherFactory(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		writtenWithBcrypt, err := bcryptHasher.Hash(password)
+		writtenWithBcrypt, err := bcryptHasher.Hash(t.Context(), password)
 		require.NoError(t, err)
-		writtenWithArgon2, err := factory.Default().Hash(password)
+		writtenWithArgon2, err := factory.Default().Hash(t.Context(), password)
 		require.NoError(t, err)
 
-		assert.NoError(t, factory.Default().VerifyHash(writtenWithBcrypt, password))
-		assert.NoError(t, bcryptHasher.VerifyHash(writtenWithArgon2, password))
+		assert.NoError(t, factory.Default().VerifyHash(t.Context(), writtenWithBcrypt, password))
+		assert.NoError(t, bcryptHasher.VerifyHash(t.Context(), writtenWithArgon2, password))
 	})
 
 	// A mismatch is told apart from a hash the verifier cannot read, so a
 	// caller comparing against kept passwords can fail closed on the latter.
 	t.Run("VerifyHash tells a mismatch from an unreadable hash", func(t *testing.T) {
 		factory := newFactory(t)
-		encoded, err := factory.Default().Hash(password)
+		encoded, err := factory.Default().Hash(t.Context(), password)
 		require.NoError(t, err)
 
-		assert.ErrorIs(t, factory.Default().VerifyHash(encoded, password+"x"), ErrHashMismatch)
-		err = factory.Default().VerifyHash("$unknown$hash", password)
+		assert.ErrorIs(t, factory.Default().VerifyHash(t.Context(), encoded, password+"x"), ErrHashMismatch)
+		err = factory.Default().VerifyHash(t.Context(), "$unknown$hash", password)
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, ErrHashMismatch)
 	})
@@ -1143,7 +1143,7 @@ func TestHasherFactory(t *testing.T) {
 		}
 		factory, err := cfg.NewHasherFactory()
 		require.NoError(t, err)
-		encoded, err := factory.Default().Hash(password)
+		encoded, err := factory.Default().Hash(t.Context(), password)
 		require.NoError(t, err)
 		assert.NotEmpty(t, encoded)
 	})
@@ -1157,9 +1157,9 @@ func TestPasswapHasher_HashRejectsWhatBcryptCannotTake(t *testing.T) {
 	h, err := config.NewHasher()
 	require.NoError(t, err)
 
-	_, err = h.Hash(strings.Repeat("a", 72))
+	_, err = h.Hash(t.Context(), strings.Repeat("a", 72))
 	require.NoError(t, err, "72 bytes fit")
 
-	_, err = h.Hash(strings.Repeat("a", 73))
+	_, err = h.Hash(t.Context(), strings.Repeat("a", 73))
 	assert.ErrorIs(t, err, ErrPasswordTooLong)
 }

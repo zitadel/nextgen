@@ -784,7 +784,7 @@ func TestFlowSSOIdentityResolver_CreateLinked_AppliesActionsInOneTransaction(t *
 			}
 			var stored *domain.SetUserPassword
 			if password != "" {
-				f.hasher.EXPECT().Hash(password).Return("hash-s3cret", nil)
+				f.hasher.EXPECT().Hash(gomock.Any(), password).Return("hash-s3cret", nil)
 				calls = append(calls, f.stmts.EXPECT().SetUserPassword(gomock.Any(), gomock.Any()).
 					DoAndReturn(func(_ context.Context, pw *domain.SetUserPassword) error {
 						stored = pw

@@ -10,6 +10,7 @@
 package cryptomock
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -40,18 +41,18 @@ func (m *MockHasher) EXPECT() *MockHasherMockRecorder {
 }
 
 // Hash mocks base method.
-func (m *MockHasher) Hash(arg0 string) (string, error) {
+func (m *MockHasher) Hash(ctx context.Context, password string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Hash", arg0)
+	ret := m.ctrl.Call(m, "Hash", ctx, password)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Hash indicates an expected call of Hash.
-func (mr *MockHasherMockRecorder) Hash(arg0 any) *MockHasherHashCall {
+func (mr *MockHasherMockRecorder) Hash(ctx, password any) *MockHasherHashCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Hash", reflect.TypeOf((*MockHasher)(nil).Hash), arg0)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Hash", reflect.TypeOf((*MockHasher)(nil).Hash), ctx, password)
 	return &MockHasherHashCall{Call: call}
 }
 
@@ -67,13 +68,13 @@ func (c *MockHasherHashCall) Return(arg0 string, arg1 error) *MockHasherHashCall
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockHasherHashCall) Do(f func(string) (string, error)) *MockHasherHashCall {
+func (c *MockHasherHashCall) Do(f func(context.Context, string) (string, error)) *MockHasherHashCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockHasherHashCall) DoAndReturn(f func(string) (string, error)) *MockHasherHashCall {
+func (c *MockHasherHashCall) DoAndReturn(f func(context.Context, string) (string, error)) *MockHasherHashCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -103,17 +104,17 @@ func (m *MockHashVerifier) EXPECT() *MockHashVerifierMockRecorder {
 }
 
 // VerifyHash mocks base method.
-func (m *MockHashVerifier) VerifyHash(encoded, target string) error {
+func (m *MockHashVerifier) VerifyHash(ctx context.Context, encoded, target string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyHash", encoded, target)
+	ret := m.ctrl.Call(m, "VerifyHash", ctx, encoded, target)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // VerifyHash indicates an expected call of VerifyHash.
-func (mr *MockHashVerifierMockRecorder) VerifyHash(encoded, target any) *MockHashVerifierVerifyHashCall {
+func (mr *MockHashVerifierMockRecorder) VerifyHash(ctx, encoded, target any) *MockHashVerifierVerifyHashCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyHash", reflect.TypeOf((*MockHashVerifier)(nil).VerifyHash), encoded, target)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyHash", reflect.TypeOf((*MockHashVerifier)(nil).VerifyHash), ctx, encoded, target)
 	return &MockHashVerifierVerifyHashCall{Call: call}
 }
 
@@ -129,13 +130,13 @@ func (c *MockHashVerifierVerifyHashCall) Return(arg0 error) *MockHashVerifierVer
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockHashVerifierVerifyHashCall) Do(f func(string, string) error) *MockHashVerifierVerifyHashCall {
+func (c *MockHashVerifierVerifyHashCall) Do(f func(context.Context, string, string) error) *MockHashVerifierVerifyHashCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockHashVerifierVerifyHashCall) DoAndReturn(f func(string, string) error) *MockHashVerifierVerifyHashCall {
+func (c *MockHashVerifierVerifyHashCall) DoAndReturn(f func(context.Context, string, string) error) *MockHashVerifierVerifyHashCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

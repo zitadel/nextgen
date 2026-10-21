@@ -177,7 +177,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
 
-	hasherFactory, err := cfg.PasswordHasher.NewHasherFactory()
+	hasherFactory, err := cfg.PasswordHasher.NewHasherFactory(metrics.WithMeterProvider(telemetry.MeterProvider()))
 	if err != nil {
 		return fmt.Errorf("failed to build password hasher: %w", err)
 	}
@@ -603,6 +603,14 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 			MinSha512Rounds: 5_000, MaxSha512Rounds: 1_000_000,
 		},
 	})
+	// How much hashing runs at once: one hash per CPU the process may use,
+	// inside a memory budget that fits eight hashes at the default argon2id
+	// cost. A hash that finds no slot within max_wait is refused with a 429
+	// rather than queued without end, so a burst degrades into retries
+	// instead of into an OOM kill or a stalled server.
+	v.SetDefault("password_hasher.concurrency.max_operations", 0)
+	v.SetDefault("password_hasher.concurrency.memory_budget", crypto.DefaultHashMemoryBudget)
+	v.SetDefault("password_hasher.concurrency.max_wait", time.Second)
 	v.SetDefault("schema.lru_cache_size", 1000) // todo: temp, review
 	v.SetDefault("keys.crypter_lru_cache_size", 1000)
 	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
@@ -818,6 +826,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		return middleware.Chain(h,
 			func(next http.Handler) http.Handler { return middleware.WithRequestContextMiddleware(reqIdGen, next) },
 			func(next http.Handler) http.Handler { return middleware.WithLogging(next, redactQuery...) },
+			middleware.WithRetryAfter,
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,

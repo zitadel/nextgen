@@ -1,7 +1,8 @@
 // Package metrics holds the instrument sets the server reports through, one
 // per kind of thing worth measuring, so a component becomes observable by
 // passing an option to its constructor rather than by declaring instruments of
-// its own. Cache instruments live in cache.go; a new family is a new file here.
+// its own. Cache instruments live in cache.go, the password hashing limiter's
+// in password_hashing.go; a new family is a new file here.
 //
 // Everything in this package takes primitives -- a name, a func() int -- and
 // never a domain or storage type. That is what keeps it importable from any
