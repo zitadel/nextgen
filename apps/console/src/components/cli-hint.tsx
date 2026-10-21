@@ -12,8 +12,15 @@ const CLI = "npx @zitadel/cli@alpha";
 /** `apply`: writes the local definitions to the project. */
 export const CLI_APPLY = `${CLI} apply`;
 
-/** `setup`: creates a project and connects the app in the current directory. */
-export const CLI_SETUP = `${CLI} setup`;
+/**
+ * `setup`: creates a project and connects the app in the current directory.
+ * It names the server, which the CLI would otherwise take from its config or
+ * its hosted default; a local server is recognised by its URL, so the project
+ * is attached to the local admin's team as with `--server local`.
+ */
+export function cliSetup(server: string): string {
+  return `${CLI} setup --server ${server}`;
+}
 
 /**
  * The footer line under a document or a resource table that says how to change
