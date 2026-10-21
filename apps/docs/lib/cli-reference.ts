@@ -235,6 +235,20 @@ function pageData(title: string, description: string, markdown: string): CliPage
   };
 }
 
+// A command other commands sit under (`api`, beside `api ls`) is a folder of
+// the tree as well as a page: its page is the folder's index, and the folder
+// lists the commands under it. Fumadocs would otherwise take the name for the
+// folder alone and leave the command's page out.
+const commandIds = new Set(reference.commands.map((command) => command.id));
+const parentOf = (id: string) => id.split(" ").slice(0, -1).join(" ");
+const isTopic = (id: string) => reference.commands.some((command) => parentOf(command.id) === id);
+
+/** A command's file under the reference, without its extension. */
+function pagePath(id: string) {
+  const path = id.split(" ").join("/");
+  return isTopic(id) ? `${path}/index` : path;
+}
+
 /** The reference's pages, beside the content and the API reference in lib/source.ts. */
 export const cliSource: Source<{ pageData: CliPageData; metaData: MetaData }> = {
   files: [
@@ -245,7 +259,9 @@ export const cliSource: Source<{ pageData: CliPageData; metaData: MetaData }> = 
         title: "CLI reference",
         // The index is the folder's own page, so it is not listed.
         pages: reference.groups.flatMap((group) => {
-          const commands = reference.commands.filter((command) => command.group === group);
+          const commands = reference.commands.filter(
+            (command) => command.group === group && !commandIds.has(parentOf(command.id)),
+          );
           if (commands.length === 0) return [];
           return [`---${group}---`, ...commands.map((command) => command.id.split(" ").join("/"))];
         }),
@@ -258,7 +274,7 @@ export const cliSource: Source<{ pageData: CliPageData; metaData: MetaData }> = 
     },
     ...reference.commands.map((command) => ({
       type: "page" as const,
-      path: `${baseDir}/${command.id.split(" ").join("/")}.mdx`,
+      path: `${baseDir}/${pagePath(command.id)}.mdx`,
       data: pageData(
         `${reference.bin} ${command.id}`,
         shortDescription(text(command.description)),
