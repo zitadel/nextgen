@@ -407,6 +407,20 @@ describe("the CLI covers the API client", () => {
   });
 });
 
+/**
+ * Commands that call no operation of their own, with the command the reference
+ * shows for the operation they share. An operation carries one
+ * `x-zitadel-cli` line, so where two commands drive the same endpoint the line
+ * names the one a developer reaches for first, and the other is listed here
+ * with the reason. Checked below against what the commands really call, so an
+ * entry cannot outlive the sharing that justifies it.
+ */
+const SHARES_OPERATION: Readonly<Record<string, string>> = {
+  // Reads the project to report its origin patterns; `projects get` is the
+  // command the reference shows for `GET /projects/{id}`.
+  "origin list": "projects get",
+};
+
 describe("the spec names the command behind each operation", () => {
   it("names one operation of every command with that command", async () => {
     const named = await specCommands();
@@ -415,6 +429,7 @@ describe("the spec names the command behind each operation", () => {
       ...(await standaloneCommandOperations()),
     ]);
     const unnamed = [...commands]
+      .filter(([command]) => !(command in SHARES_OPERATION))
       .filter(
         ([command, called]) => [...called].filter((op) => named.get(op) === command).length !== 1,
       )
@@ -426,6 +441,28 @@ describe("the spec names the command behind each operation", () => {
         "In api/openapi/endpoints, give exactly one operation each command calls an " +
         "`x-zitadel-cli: <command>` line right after its operationId.",
     ).toEqual([]);
+  });
+
+  it("keeps every shared-operation reason pointed at something real", async () => {
+    const named = await specCommands();
+    const commands = new Map([
+      ...(await verbOperations()),
+      ...(await standaloneCommandOperations()),
+    ]);
+
+    for (const [command, shownAs] of Object.entries(SHARES_OPERATION)) {
+      const called = commands.get(command);
+      expect(called, `SHARES_OPERATION lists "${command}", which is not a command`).toBeDefined();
+      const shared = [...(called ?? [])].filter((operation) => named.get(operation) === shownAs);
+      expect(
+        shared,
+        `SHARES_OPERATION says "${command}" shows as "${shownAs}", but they share no operation`,
+      ).not.toEqual([]);
+      expect(
+        [...(called ?? [])].filter((operation) => named.get(operation) === command),
+        `"${command}" now has an operation of its own — delete its SHARES_OPERATION entry`,
+      ).toEqual([]);
+    }
   });
 
   it("names only a command that calls the operation", async () => {
