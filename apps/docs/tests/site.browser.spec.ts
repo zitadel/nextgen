@@ -26,6 +26,36 @@ test("a page renders, navigates client-side and logs no errors", async ({ page }
 });
 
 /**
+ * A section is one row of the sidebar's top level; inside it the sidebar lists
+ * only the section, under a row that steps back up without leaving the page
+ * (components/sidebar.tsx).
+ */
+test("the sidebar steps down into a section and back up", async ({ page }) => {
+  const sidebar = page.locator("#nd-sidebar");
+  await page.goto("/docs/get-started/quickstart");
+
+  await sidebar.getByRole("link", { name: "CLI reference" }).click();
+  await expect(page).toHaveURL(/\/docs\/reference\/cli$/);
+  await expect(sidebar.getByRole("link", { name: "Overview" })).toHaveAttribute(
+    "data-active",
+    "true",
+  );
+  await expect(sidebar.getByRole("link", { name: "Quickstart" })).toHaveCount(0);
+
+  // The row back up lines up with the rows under it.
+  const back = sidebar.getByRole("button", { name: "Back to all sections from CLI reference" });
+  const left = async (row: typeof back) => (await row.boundingBox())?.x;
+  expect(await left(back)).toBe(await left(sidebar.getByRole("link", { name: "Overview" })));
+
+  await back.click();
+  await expect(sidebar.getByRole("link", { name: "API reference" })).toBeVisible();
+  await expect(page).toHaveURL(/\/docs\/reference\/cli$/);
+
+  await sidebar.getByRole("button", { name: "CLI reference", exact: true }).click();
+  await expect(sidebar.getByRole("link", { name: "Overview" })).toBeVisible();
+});
+
+/**
  * app/global.css reaches into Fumadocs' layout by its element ids (the
  * Spacious frame, the page panel, the page's title), so a Fumadocs upgrade
  * that renames one would quietly drop part of the look. Each value is compared

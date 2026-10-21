@@ -1,5 +1,7 @@
 {
   "title": "API reference",
+  "root": true,
+  "pagesIndex": "index",
   "pages": [
     "---Runtime auth---",
     "flows",
