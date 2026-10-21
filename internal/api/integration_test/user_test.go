@@ -395,6 +395,49 @@ func TestDeleteUser(t *testing.T) {
 	})
 }
 
+func TestGetUserPasswordState(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID:  project.ID,
+		SchemaURL:  test_data.UserSchemaURL,
+		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuserpassword@example.com"),
+	})
+	require.NoError(t, err)
+	params := api.GetUserPasswordStateParams{UserID: api.UserID(user.ID)}
+	setAt := func(t *testing.T) api.OptDateTime {
+		t.Helper()
+		resp, err := client.GetUserPasswordState(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.UserPasswordState{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.UserPasswordState).SetAt
+	}
+	assert.False(t, setAt(t).IsSet(), "a user without a password has no set_at")
+
+	resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "fake-password"},
+		api.SetUserPasswordParams{UserID: params.UserID})
+	require.NoError(t, err)
+	require.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
+
+	got := setAt(t)
+	require.True(t, got.IsSet())
+	// The database stamps it, on its own clock.
+	assert.WithinDuration(t, time.Now(), got.Value, time.Minute)
+
+	t.Run("unknown user", func(t *testing.T) {
+		resp, err := client.GetUserPasswordState(t.Context(), api.GetUserPasswordStateParams{UserID: "user_unknown"})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetUserPasswordStateNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.GetUserPasswordStateNotFound).Code)
+	})
+}
+
 func TestSetUserPassword(t *testing.T) {
 	t.Parallel()
 
