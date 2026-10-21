@@ -1590,6 +1590,9 @@ importers:
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
+      '@zitadel/sdk-react':
+        specifier: workspace:*
+        version: link:../sdk-react
       server-only:
         specifier: ^0.0.1
         version: 0.0.1
@@ -1612,6 +1615,9 @@ importers:
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.14
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.3(@types/react@19.2.14)
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
