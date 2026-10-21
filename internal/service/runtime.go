@@ -243,10 +243,12 @@ func WithRelease(ctx context.Context, release *domain.Release) context.Context {
 	return WithRuntimeResolution(ctx, &RuntimeResolution{Release: release})
 }
 
-// PinnedRevisions returns the revision ids a release pins for one kind,
-// keyed by handle.
-func PinnedRevisions(release *domain.Release, kind domain.ReleasePointerKind) map[string]string {
-	pinned := make(map[string]string)
+// PinnedRevisions is handle → revision id for one release pointer kind.
+type PinnedRevisions map[string]string
+
+// PinsFor returns the revision ids a release pins for one kind, keyed by handle.
+func PinsFor(release *domain.Release, kind domain.ReleasePointerKind) PinnedRevisions {
+	pinned := make(PinnedRevisions)
 	if release == nil {
 		return pinned
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
 )
 
 // FlowService is the flow engine's use-case surface. The API handler
@@ -103,17 +104,19 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 	ctx, end := startSpan(ctx, "FlowService.Resolve")
 	defer end(&err)
 
-	pinned := PinnedRevisions(ReleaseFromContext(ctx), domain.ReleasePointerKindFlowDefinition)
+	pinned := PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindFlowDefinition)
 	if len(pinned) > 0 {
 		return s.resolvePinned(ctx, req, pinned)
 	}
+	// TODO: drop this newest-revision fallback once releases work end to end;
+	// every public request should resolve through a pinned release.
 	if req.Name != nil {
 		return s.resolveByName(ctx, req)
 	}
 	return s.resolveByAudience(ctx, req)
 }
 
-func (s *flowService) resolvePinned(ctx context.Context, req ResolveFlowRequest, pinned map[string]string) (*domain.FlowDefinition, error) {
+func (s *flowService) resolvePinned(ctx context.Context, req ResolveFlowRequest, pinned PinnedRevisions) (*domain.FlowDefinition, error) {
 	if req.Name != nil {
 		revisionID, ok := pinned[*req.Name]
 		if !ok {
@@ -135,16 +138,20 @@ func (s *flowService) resolvePinned(ctx context.Context, req ResolveFlowRequest,
 		return def, nil
 	}
 
+	revisionIDs := make([]string, 0, len(pinned))
+	for _, revisionID := range pinned {
+		revisionIDs = append(revisionIDs, revisionID)
+	}
+	result, err := s.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: flowdefinition.ByIDs(req.ProjectID, revisionIDs),
+	}, FlowDefinitionQueryOptions{})
+	if err != nil {
+		return nil, err
+	}
+
 	var best *domain.FlowDefinition
 	bestScore := -1
-	for _, revisionID := range pinned {
-		def, err := s.v2Pool.Statements().GetFlowDefinitionByID(ctx, req.ProjectID, revisionID)
-		if err != nil {
-			if isNoRowFound(err) {
-				continue
-			}
-			return nil, err
-		}
+	for _, def := range result.Items {
 		if req.SchemaVersion != nil && def.SchemaVersion != *req.SchemaVersion {
 			continue
 		}
