@@ -77899,12 +77899,14 @@ type SubmitFlowStepErrorResponse struct {
 	IdpScopesMissingOpenid      IdpScopesMissingOpenid
 	Internal                    Internal
 	TknInvalid                  TknInvalid
+	NotImplemented              NotImplemented
 	ProjOriginNotAllowed        ProjOriginNotAllowed
 	ProjPreviewNotLive          ProjPreviewNotLive
 	RelNotFound                 RelNotFound
 	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
 	EncKeyUnknownAlg            EncKeyUnknownAlg
+	Unavailable                 Unavailable
 	UserAlreadyExists           UserAlreadyExists
 	UserConflict                UserConflict
 	UserInvalid                 UserInvalid
@@ -77943,12 +77945,14 @@ const (
 	IdpScopesMissingOpenidSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "idp.scopes_missing_openid"
 	InternalSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "tkn.invalid"
+	NotImplementedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "not_implemented"
 	ProjOriginNotAllowedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "proj.origin_not_allowed"
 	ProjPreviewNotLiveSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "proj.preview_not_live"
 	RelNotFoundSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "rel.not_found"
 	RelRevokedSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UnavailableSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "unavailable"
 	UserAlreadyExistsSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "user.already_exists"
 	UserConflictSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "user.conflict"
 	UserInvalidSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "user.invalid"
@@ -78078,6 +78082,11 @@ func (s SubmitFlowStepErrorResponse) IsTknInvalid() bool {
 	return s.Type == TknInvalidSubmitFlowStepErrorResponse
 }
 
+// IsNotImplemented reports whether SubmitFlowStepErrorResponse is NotImplemented.
+func (s SubmitFlowStepErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedSubmitFlowStepErrorResponse
+}
+
 // IsProjOriginNotAllowed reports whether SubmitFlowStepErrorResponse is ProjOriginNotAllowed.
 func (s SubmitFlowStepErrorResponse) IsProjOriginNotAllowed() bool {
 	return s.Type == ProjOriginNotAllowedSubmitFlowStepErrorResponse
@@ -78106,6 +78115,11 @@ func (s SubmitFlowStepErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether SubmitFlowStepErrorResponse is EncKeyUnknownAlg.
 func (s SubmitFlowStepErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgSubmitFlowStepErrorResponse
+}
+
+// IsUnavailable reports whether SubmitFlowStepErrorResponse is Unavailable.
+func (s SubmitFlowStepErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableSubmitFlowStepErrorResponse
 }
 
 // IsUserAlreadyExists reports whether SubmitFlowStepErrorResponse is UserAlreadyExists.
@@ -78647,6 +78661,27 @@ func NewTknInvalidSubmitFlowStepErrorResponse(v TknInvalid) SubmitFlowStepErrorR
 	return s
 }
 
+// SetNotImplemented sets SubmitFlowStepErrorResponse to NotImplemented.
+func (s *SubmitFlowStepErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedSubmitFlowStepErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if SubmitFlowStepErrorResponse is NotImplemented.
+func (s SubmitFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from NotImplemented.
+func NewNotImplementedSubmitFlowStepErrorResponse(v NotImplemented) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetProjOriginNotAllowed sets SubmitFlowStepErrorResponse to ProjOriginNotAllowed.
 func (s *SubmitFlowStepErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
 	s.Type = ProjOriginNotAllowedSubmitFlowStepErrorResponse
@@ -78770,6 +78805,27 @@ func (s SubmitFlowStepErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, 
 func NewEncKeyUnknownAlgSubmitFlowStepErrorResponse(v EncKeyUnknownAlg) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetUnavailable sets SubmitFlowStepErrorResponse to Unavailable.
+func (s *SubmitFlowStepErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableSubmitFlowStepErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if SubmitFlowStepErrorResponse is Unavailable.
+func (s SubmitFlowStepErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from Unavailable.
+func NewUnavailableSubmitFlowStepErrorResponse(v Unavailable) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
