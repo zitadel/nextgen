@@ -27,12 +27,12 @@ describe("avatarVars", () => {
 });
 
 describe("UserAvatar", () => {
-  it("speeds its light up from where it is, without restarting it", () => {
-    // jsdom runs no CSS animations, so stand in for the two the light runs.
+  it("speeds its spin up from where it is, without restarting it", () => {
+    // jsdom runs no CSS animations, so stand in for the spin.
     const updatePlaybackRate = vi.fn();
     Object.defineProperty(HTMLElement.prototype, "getAnimations", {
       configurable: true,
-      value: () => [{ updatePlaybackRate }, { updatePlaybackRate }],
+      value: () => [{ updatePlaybackRate }],
     });
     try {
       const { rerender } = render(<UserAvatar seed="user_1" />);

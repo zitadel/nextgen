@@ -106,7 +106,7 @@ function ThemeRow() {
 export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
   const email = user?.identifier ?? user?.userId ?? "Signed in";
   const name = user?.display ?? email;
-  // The avatar's light speeds up while the row is hovered or its menu is open.
+  // The avatar spins faster while the row is hovered or its menu is open.
   const [hovered, setHovered] = useState(false);
   const [open, setOpen] = useState(false);
 
