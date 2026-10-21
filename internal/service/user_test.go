@@ -625,7 +625,7 @@ func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]str
 
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
 	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(&domain.JSONSchema{Schema: []byte(takenAttributesSchema)}, nil).AnyTimes()
+		Return(&domain.JSONSchema{URL: "https://example.test/schema.json", Schema: []byte(takenAttributesSchema)}, nil).AnyTimes()
 
 	stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{
 		// The patch's read of the user it merges into.
@@ -657,7 +657,7 @@ func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]str
 	).AnyTimes()
 
 	svcPool := service.NewPool(pool)
-	return service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool}), stmts
+	return service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{}), stmts
 }
 
 func requireTakenFields(t *testing.T, err error, keys ...domain.AttributeKey) {
