@@ -174,9 +174,10 @@ export class SessionController implements ReactiveController {
         // an answer that nobody is signed in, so the surface stays.
         missing = false;
       } else {
-        // A 200 without the session JSON's `session_id` (an SPA host's `index.html`
-        // served for an unrewritten proxy path) did not come from the backend.
-        if (typeof session.session_id !== "string") {
+        // A 200 without the session JSON's non-empty `session_id` (an SPA host's
+        // `index.html` served for an unrewritten proxy path, a proxy's `{}`, an empty
+        // id) did not come from the backend. The server SDKs reject the same bodies.
+        if (typeof session.session_id !== "string" || session.session_id === "") {
           throw new Error("Could not load the session: the response is not a session.");
         }
         this.display = session.user?.display ?? "";

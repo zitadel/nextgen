@@ -383,6 +383,9 @@ catalogs:
     next:
       specifier: ^16.3.8
       version: 16.4.1
+    normalize-url:
+      specifier: ^10.0.0
+      version: 10.0.0
     nuxt:
       specifier: ^4.5.1
       version: 4.5.2
@@ -1346,6 +1349,9 @@ importers:
       lucide:
         specifier: 'catalog:'
         version: 1.16.0
+      normalize-url:
+        specifier: 'catalog:'
+        version: 10.0.0
     devDependencies:
       '@edge-runtime/vm':
         specifier: 'catalog:'
@@ -12662,6 +12668,10 @@ packages:
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
     engines: {node: '>=0.10.0'}
+
+  normalize-url@10.0.0:
+    resolution: {integrity: sha512-aZEiiOP3lVdNrCCdPELWvJHbjJjoPfbWRLPAZLSsGA6l4ckvPmZSB+uX6JB4QQu33SeXCsd6v75jKivr43n/EQ==}
+    engines: {node: '>=22'}
 
   normalize-url@8.1.1:
     resolution: {integrity: sha512-JYc0DPlpGWB40kH5g07gGTrYuMqV653k3uBKY6uITPWds3M0ov3GaWGp9lbE3Bzngx8+XkfzgvASb9vk9JDFXQ==}
@@ -28392,6 +28402,8 @@ snapshots:
       validate-npm-package-license: 3.0.4
 
   normalize-path@3.0.0: {}
+
+  normalize-url@10.0.0: {}
 
   normalize-url@8.1.1: {}
 

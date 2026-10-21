@@ -92,7 +92,8 @@
     "dompurify": "catalog:",
     "liquidjs": "catalog:",
     "lit": "catalog:",
-    "lucide": "catalog:"
+    "lucide": "catalog:",
+    "normalize-url": "catalog:"
   },
   "devDependencies": {
     "@edge-runtime/vm": "catalog:",

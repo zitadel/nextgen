@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -113,6 +113,7 @@ afterEach(() => {
   revokeStatus = 204;
   csrfStatus = 200;
   server.resetHandlers(getHandler, csrfHandler, deleteHandler);
+  vi.restoreAllMocks();
 });
 
 afterAll(() => {
@@ -132,12 +133,16 @@ function activate(button: Element): void {
   button.dispatchEvent(new CustomEvent("zl-submit", { bubbles: true, composed: true }));
 }
 
-/** Replaces `window.location` with a stub recording `assign()` calls. */
-function stubLocation(): { current: string } {
+/**
+ * Replaces `window.location` with a stub recording `assign()` calls, on
+ * `href` when given.
+ */
+function stubLocation(href = window.location.href, base = href): { current: string } {
   const record = { current: "" };
+  Object.defineProperty(document, "baseURI", { configurable: true, value: base });
   Object.defineProperty(window, "location", {
     configurable: true,
-    value: { ...window.location, assign: (url: string) => (record.current = url) },
+    value: { ...window.location, href, assign: (url: string) => (record.current = url) },
     writable: true,
   });
   return record;
@@ -242,6 +247,98 @@ describe("<zitadel-session>", () => {
     const loc = stubLocation();
     await flush(mount());
     expect(loc.current).toBe("");
+  });
+
+  it.each([
+    "/account?tab=me",
+    "https://app.test/account?tab=me",
+    "account?tab=me",
+    "/account?tab=me#top",
+  ])("renders nothing and stays when post-sign-out-url %j is the page it is on", async (url) => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation("https://app.test/account?tab=me");
+    const element = mount(`<zitadel-session post-sign-out-url="${url}"></zitadel-session>`);
+    await flush(element);
+    expect(loc.current).toBe("");
+    expect(element.shadowRoot?.querySelector(".title")).toBeNull();
+  });
+
+  it.each([
+    ["https://app.test/account/", "/account"],
+    ["https://app.test/account", "/account/"],
+    ["https://app.test/", ""],
+    ["https://app.test/account?b=2&a=1", "/account?a=1&b=2"],
+  ])("renders nothing and stays on %s when post-sign-out-url is %j", async (href, url) => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation(href);
+    const element = mount(`<zitadel-session post-sign-out-url="${url || "/"}"></zitadel-session>`);
+    await flush(element);
+    expect(loc.current).toBe("");
+  });
+
+  /** Mounts the card on `href`, arriving from `referrer`, and returns where it went. */
+  async function loadPage(href: string, url: string, referrer: string): Promise<string> {
+    host.innerHTML = "";
+    vi.spyOn(document, "referrer", "get").mockReturnValue(referrer);
+    const loc = stubLocation(href);
+    const element = mount(`<zitadel-session post-sign-out-url="${url}"></zitadel-session>`);
+    await flush(element);
+    return loc.current;
+  }
+
+  it("does not navigate when the visitor was sent here from the target", async () => {
+    sessionAnswer = unauthorized;
+    // `/` redirected back to `/account`: the page must stay put.
+    expect(await loadPage("https://app.test/account", "/", "https://app.test/")).toBe("");
+    expect(host.querySelector("zitadel-session")?.shadowRoot?.querySelector(".title")).toBeNull();
+  });
+
+  it("does not navigate when the visitor was sent here from this page", async () => {
+    sessionAnswer = unauthorized;
+    // The card navigated from `/account` and a redirect brought the visitor back to it.
+    expect(await loadPage("https://app.test/account", "/", "https://app.test/account/")).toBe("");
+  });
+
+  it("navigates when the visitor arrives from another page", async () => {
+    sessionAnswer = unauthorized;
+    expect(await loadPage("https://app.test/account", "/", "https://app.test/settings")).toBe("/");
+  });
+
+  it("navigates when there is no referrer", async () => {
+    sessionAnswer = unauthorized;
+    expect(await loadPage("https://app.test/account", "/", "")).toBe("/");
+  });
+
+  it("navigates when the referrer cannot be read", async () => {
+    sessionAnswer = unauthorized;
+    expect(await loadPage("https://app.test/account", "/", "not a url")).toBe("/");
+  });
+
+  it("resolves a relative post-sign-out-url against the document base, as navigation does", async () => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation("https://app.test/app/account", "https://app.test/");
+    const element = mount(`<zitadel-session post-sign-out-url="account"></zitadel-session>`);
+    await flush(element);
+    expect(loc.current).toBe("account");
+  });
+
+  it("stays when a relative post-sign-out-url resolves to the page itself through the document base", async () => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation("https://app.test/x/account", "https://app.test/");
+    const element = mount(`<zitadel-session post-sign-out-url="x/account"></zitadel-session>`);
+    await flush(element);
+    expect(loc.current).toBe("");
+  });
+
+  it.each([
+    ["/account", "/account"],
+    ["https://other.test/account?tab=me", "https://other.test/account?tab=me"],
+  ])("navigates when post-sign-out-url %j is another page", async (url, expected) => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation("https://app.test/account?tab=me");
+    const element = mount(`<zitadel-session post-sign-out-url="${url}"></zitadel-session>`);
+    await flush(element);
+    expect(loc.current).toBe(expected);
   });
 
   it.each([...OUTAGES, ...UNREADABLE_SESSIONS])(

@@ -1,5 +1,6 @@
 import { css, html, nothing } from "lit";
 import { customElement } from "lit/decorators.js";
+import normalizeUrl from "normalize-url";
 import { property } from "../internal/property.js";
 
 import { resolveApi } from "./resolve-api.js";
@@ -8,6 +9,18 @@ import { ZitadelSurface } from "./surface.js";
 import { baseHostStyles, t } from "../styles/index.js";
 
 import "../atoms/index.js";
+
+/**
+ * How two URLs are compared to tell whether they name the same page: a trailing
+ * slash (hosts add or strip it with a redirect), the order of the query
+ * parameters and the fragment do not matter (assigning a fragment does not
+ * reload). `www.` and tracking parameters do, so they are kept.
+ */
+const SAME_PAGE = {
+  stripHash: true,
+  stripWWW: false,
+  removeQueryParameters: false,
+} as const;
 
 /**
  * `<zitadel-session>` — the "signed in" card.
@@ -40,9 +53,15 @@ import "../atoms/index.js";
  * - **No session.** When the backend answers that request with its
  *   `401 auth.unauthorized` or `404 sess.not_found` (or names no user) the
  *   visitor is signed out: the element navigates to `post-sign-out-url` when
- *   one is set and otherwise renders nothing. Anything else is not "signed
- *   out": a network error, a 5xx, a gateway's 401 or 404 without the backend's
- *   code, or a 200 that is not a session keeps the card and shows the error.
+ *   one is set and otherwise renders nothing. It never navigates to the page
+ *   it is on (same origin, path with or without a trailing slash, and query):
+ *   it renders nothing there instead, so a card whose sign-out comes back to
+ *   its own page does not reload it forever. Nor does it navigate when the
+ *   visitor was sent here from the target or from this page (the browser's
+ *   referrer), which stops the loop when the target redirects back here. Anything else is
+ *   not "signed out": a network error, a 5xx, a gateway's 401 or 404 without
+ *   the backend's code, or a 200 that is not a session keeps the card and
+ *   shows the error.
  * - **Sign out** calls the typed `revokeMySession` operation
  *   (`DELETE /sessions/me`); the server clears the session cookie. On success
  *   (the backend's no-session answer counts, the session is already gone) the
@@ -104,7 +123,12 @@ export class ZitadelSession extends ZitadelSurface {
     `,
   ];
 
-  /** URL to navigate to after a successful sign-out. */
+  /**
+   * URL to navigate to after a successful sign-out, and when the visitor has no
+   * session, unless it is the page the card is on (a trailing slash, the query
+   * order and the fragment aside) or this page sent the visitor there moments
+   * ago and got them back.
+   */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
 
   /** Heading text. Defaults to the English label. */
@@ -116,7 +140,10 @@ export class ZitadelSession extends ZitadelSurface {
   private readonly session = new SessionController(
     this,
     () => resolveApi(this.project, this.projectAttrs, "<zitadel-session>"),
-    { onSessionMissing: () => this.leave() },
+    // A card on the page its `post-sign-out-url` names ("sign out and come
+    // back here") would otherwise reload that page on every signed-out visit,
+    // and find no session again each time.
+    { onSessionMissing: () => this.leaveWithoutSession() },
   );
 
   /** Navigates to `postSignOutUrl` when one is set; reports whether it did. */
@@ -124,6 +151,44 @@ export class ZitadelSession extends ZitadelSurface {
     if (!this.postSignOutUrl || typeof window === "undefined") return false;
     window.location.assign(this.postSignOutUrl);
     return true;
+  }
+
+  /**
+   * The no-session navigation to `postSignOutUrl`. It is skipped when that URL is
+   * this page, or when the visitor was sent here from this page or from that URL
+   * (the browser keeps the original referrer across redirects): navigating again
+   * would reload the two pages forever.
+   */
+  private leaveWithoutSession(): void {
+    if (this.postSignOutUrl && typeof window !== "undefined") {
+      // `location.assign()` resolves a relative URL against the document base
+      // (a `<base href>`), not the page's own URL, so the check must too.
+      if (URL.canParse(this.postSignOutUrl, document.baseURI)) {
+        const target = normalizeUrl(new URL(this.postSignOutUrl, document.baseURI).href, SAME_PAGE);
+        const here = normalizeUrl(window.location.href, SAME_PAGE);
+        // An empty or unreadable referrer proves nothing about where the visitor was.
+        const referrer = URL.canParse(document.referrer)
+          ? normalizeUrl(document.referrer, SAME_PAGE)
+          : undefined;
+
+        if (target === here) {
+          // Stay: the sign-out page is this page, so navigating would reload it forever.
+        } else if (referrer === here) {
+          // Stay: the visitor was sent here from this page, so a redirect brought
+          // them straight back and another hop would loop.
+        } else if (referrer === target) {
+          // Stay: the visitor was sent here from the sign-out page, which redirected
+          // back to this page, so another hop would loop.
+        } else {
+          // The visitor arrived from somewhere else, so this is a normal sign-out.
+          this.leave();
+        }
+      } else {
+        // Stay: a URL the browser cannot read is one it cannot navigate to either.
+      }
+    } else {
+      // Stay: there is no sign-out page to go to, or no browser to navigate in.
+    }
   }
 
   override willUpdate(): void {

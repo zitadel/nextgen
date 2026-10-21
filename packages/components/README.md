@@ -353,13 +353,27 @@ and signs out through `revokeMySession`, like `<zitadel-logout>`.
 
 | Property | Type | Notes |
 | --- | --- | --- |
-| `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out, and when the visitor has no session |
+| `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out, and when the visitor has no session unless it is the card's own page |
 
 When the backend answers that there is no session (decided as for
 `<zitadel-logout>` above), so a page reached without a session never shows
 "Signed in as" for nobody, the card navigates to `post-sign-out-url` when one is
 set and otherwise renders nothing. Anything else is not "signed out": the card
 stays and shows the error.
+
+The card never redirects to the page it is on. When `post-sign-out-url`
+resolves to the current page (same origin, path with or without a trailing
+slash, and query parameters in any order; the fragment is ignored), a visit
+without a session renders nothing instead of navigating, so a page that shows
+the card and is also its sign-out target (`/account` with
+`post-sign-out-url="/account"`, or `/account/` once the host adds the slash)
+does not reload itself forever. A sign-out on that page still navigates there,
+which reloads it once.
+
+The card also does not navigate when the visitor was sent to it from the target or from the card's own page, judged by the browser's referrer, which survives redirects. Do not point `post-sign-out-url` at a page that leads back to a page with this card; the card stays put on the second visit.
+
+A `200` from `GET /sessions/me` with an empty `session_id` is an error the
+widgets show, not a signed-out visitor, matching the server SDKs.
 
 ### `<zl-field>`
 
