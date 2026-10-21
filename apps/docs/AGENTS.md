@@ -58,7 +58,8 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
   `moon run docs:generate` bundles it into `.generated/openapi.mjs`.
 - The CLI reference pages come from the CLI's `command-reference.json`
   (`lib/cli-reference.ts`), which the CLI's reference test writes: change the
-  command, never the page ([`apps/cli/AGENTS.md`](../cli/AGENTS.md)).
+  command, never the page ([`apps/cli/AGENTS.md`](../cli/AGENTS.md)). Its
+  release notes come from the CLI's `CHANGELOG.md`: fix an entry there.
 - An operation's description is its page body; its first sentence is the
   page's description everywhere else (`lib/description.ts`). The spec's side
   is in [`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone).

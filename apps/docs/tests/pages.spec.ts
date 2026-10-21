@@ -31,7 +31,9 @@ const operationPage = /^\/docs\/reference\/api\/[^/]+\/[^/]+$/;
 
 // The CLI reference is /docs/reference/cli, and a command's page has the
 // command's words as the segments after it: /docs/reference/cli/users/list.
+// The reference's own pages beside the commands are no command's.
 const cliReferencePage = /^\/docs\/reference\/cli(?:\/(.+))?$/;
+const cliOwnPages = new Set(["telemetry", "release-notes"]);
 
 async function indexedPages(request: APIRequestContext): Promise<IndexedPage[]> {
   const response = await request.get("/docs/llms.txt");
@@ -218,7 +220,7 @@ test("every CLI command shows its usage, in tables whose rows keep their cells",
   const results = await mapLimit(pages, concurrency, async ({ url }) => {
     const markdown = await (await request.get(markdownUrl(url))).text();
     const words = cliReferencePage.exec(url)?.[1];
-    if (words) {
+    if (words && !cliOwnPages.has(words)) {
       commands++;
       const usage = `## Usage\n\n\`\`\`sh\nnpx @zitadel/cli@alpha ${words.split("/").join(" ")} `;
       if (!markdown.includes(usage)) return `${markdownUrl(url)}: no usage of its command`;

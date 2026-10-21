@@ -60,6 +60,8 @@ Anonymous product analytics through Mixpanel's Node SDK (`mixpanel`).
   sets `DO_NOT_TRACK=1`.
 - `ci_provider` and `host_agent` also travel in the HTTP `User-Agent`
   (`src/lib/user-agent.ts`) and obey the same opt-out.
+- The docs' [telemetry page](../docs/content/docs/reference/cli/telemetry.mdx)
+  tells users what is sent and how to opt out: change it with any of the above.
 
 ### Adding a dimension
 
@@ -70,9 +72,10 @@ from `BaseCommand` for every command. Add a dimension rather than an event:
    after it, so not `started`. Never fetch data just to record it.
 2. Name it `snake_case`; a boolean starts with `is_`, `has_`, `dry_` or
    `non_`. Leave out empty values; `compact()` drops them.
-3. List it below, then cover it in `tests/unit/lib/telemetry/`. The
-   `setup-dimensions` and `variables-dimensions` tests fail on a recorded
-   dimension their line below does not name.
+3. List it below and on the telemetry page, then cover it in
+   `tests/unit/lib/telemetry/`. The `setup-dimensions` and
+   `variables-dimensions` tests fail on a recorded dimension their line below
+   does not name.
 4. Check that it arrives in Mixpanel's Live View. The region defaults to `eu`;
    set `ZITADEL_TELEMETRY_REGION=us` for a US project, or events are silently
    dropped.
