@@ -613,7 +613,8 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrUserInvalid().Code,
 		domain.ErrUserPasswordEmpty().Code,
-		domain.ErrUserPasswordTooLong().Code:
+		domain.ErrUserPasswordTooLong().Code,
+		domain.ErrUserPasswordPolicyViolation(nil).Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrUserAttributesInvalid(nil).Code:
 		// Outside the /users endpoints (which answer req.invalid, see

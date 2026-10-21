@@ -127,12 +127,13 @@ One template per operation, defined by Zitadel and versioned with the server.
   ],
   "context": {
     "candidate":       { "length": "int" },
+    "self_service":    "bool",
     "history_matches": "list<bool>"
   },
   "rules": [
     { "name": "min_length",    "expression": "candidate.length >= config.min_length" },
     { "name": "max_length",    "expression": "candidate.length <= config.max_length" },
-    { "name": "history_depth", "expression": "!history_matches.slice(0, size(history_matches) < config.history_depth ? size(history_matches) : config.history_depth).exists(m, m)" }
+    { "name": "history_depth", "expression": "!self_service || !history_matches.slice(0, size(history_matches) < config.history_depth ? size(history_matches) : config.history_depth).exists(m, m)" }
   ]
 }
 ```
@@ -145,8 +146,8 @@ bound, never per evaluation. `context` is the schema of the derived values the r
 `rules` is a list of named boolean expressions. Each reads exactly one
 setting and carries its name, so the name is at once the rule, the setting,
 the key of a violation and the key of a constraint; `policy.New()` refuses
-a template that breaks this, and so does server startup once the gate wires
-the engine in. How a template is validated is in
+a template that breaks this, and the server calls it at startup, so it does
+not start. How a template is validated is in
 [Template](../design/policies/1-template.md).
 
 A template is not release content: templates ship with the server and evolve with it,
@@ -237,8 +238,7 @@ server runs.
 Adding an operation is five things, and nothing else registers it:
 
 1. a template file under `internal/policy/templates/`, named after its
-   operation and compiled and checked by `policy.New()` (at server start,
-   once the gate wires the engine in);
+   operation and compiled and checked by `policy.New()` at server start;
 2. its settings and config rules recorded in
    `internal/policy/testdata/settings_compat.json`, so a later template
    change that would reject stored instances shows up in review;
@@ -247,22 +247,31 @@ Adding an operation is five things, and nothing else registers it:
 4. a context builder in Go that derives the values the rules see for that
    operation, keeping the raw input out;
 5. one gate call in the operation's shared write path, so no API, SDK or
-   journey can reach the operation without it.
+   journey can reach the operation without it. For passwords the one path
+   outside it is the bootstrap user import, which stores hashes it was given
+   and cannot check them.
 
-For `auth.factor.password.set` the gate will sit in
-`service.SetPasswordUserAction.Prepare`, the single function every password
-set goes through (admin API, registration and SSO sign-up alike), before the
-password is hashed, so a rejected password costs neither a hash nor a
-transaction. History is only checked where the user sets their own password;
-the other paths have no history to compare with, or must not learn it.
-Instances will be resolved as the newest stored revision of the project's
-instance for the operation, and no instance means no active rule. That is a
-stand-in: ADR 035 says an environment sees only what its active release pins,
-so resolution moves to the release's pinned policy revision once
+For `auth.factor.password.set` the gate is `service.PasswordPolicy.CheckPassword`,
+called from `service.SetPasswordUserAction.Prepare`, the single function
+every password set goes through (admin API, registration and SSO sign-up
+alike), before the password is hashed, so a rejected password costs neither
+a hash nor a transaction. History counts only where the user sets their own
+password: the template's `history_depth` rule reads a `self_service` flag
+from the context, so the other paths, which have no history to compare with
+or must not learn it, pass it without a hash being verified. The write checks
+that the password it replaces is still the one the history was compared
+with, and fails with `user.conflict` when another change landed in between.
+Instances are resolved through `service.PolicyResolver`. Until instances can be stored
+(the policy resource), it resolves none, so no project has a policy and the
+gate applies only the server's own length cap; registration and SSO sign-up
+also keep the flow field's own minimum of 8 until the field reads the policy
+([#1449](https://github.com/zitadel/nextgen/issues/1449)). Once they can, it returns the newest
+stored revision of the project's instance for the operation; that in turn is
+a stand-in: ADR 035 says an environment sees only what its active release
+pins, so resolution moves to the release's pinned policy revision once
 release-pinned reads exist (scope table in
-[`docs/design/policies/`](../design/policies/README.md)). None of this is
-wired yet; the [catalog index](../design/policies/catalog.md) names the
-functions as they land.
+[`docs/design/policies/`](../design/policies/README.md)). The
+[catalog index](../design/policies/catalog.md) names the functions.
 
 ### Policy evaluation trigger (relation to domain events)
 
@@ -331,6 +340,20 @@ the same flat shape as the flow field's `validation` object
 and treats an absent key as no rule. No derived value (the candidate's
 length, which kept password matched) is ever echoed.
 
+For `auth.factor.password.set` a denial is the error
+`user.password_policy_violation` (HTTP 400) whose details carry
+`{ "violations": { "min_length": 12 } }`; like every domain error's details,
+they sit in the response's `details.details` slot (ADR 030). A password over the
+server's cap is reported the same way, as `max_length` with the effective
+maximum (the instance's `max_length` when set, 64 otherwise), whether or not a
+policy exists, so a client handles one shape. An empty password is a domain
+guard and keeps `user.password_empty`. In a flow, at registration and at SSO
+sign-up, the gate's denial becomes field errors on the step that creates the
+user (`error.x-auth-methods#password_min_length`). In the default flows that
+is the step where the password is entered, so the error sits next to the
+field; a flow that collects the password on an earlier step shows it on the
+creating step, which has no password field to correct.
+
 Every rule and its setting are disclosed, before the operation through
 `constraints` and after it in a denial. All rules today are requirements a
 caller fixes by changing the input. A rule that must stay hidden (a lockout
@@ -365,13 +388,14 @@ needs a misbehaving policy out of the way publishes a revision with an empty
 
 ### End to end: a user enters their password during sign-up (via flow-engine)
 
-The intended flow once the gate and the flow field are wired, for an
-instance that sets `min_length: 12`. A new user has no password history, so
-history belongs to a self-service change, not to sign-up. The engine cannot
-tell the two apart yet: an instance that also sets `history_depth` puts it
-into the sign-up constraints too, and the sign-up context has to carry an
-empty `history_matches`. Modelling "self-service only" in the template is the
-gate's job ([#1448](https://github.com/zitadel/nextgen/issues/1448)).
+The flow for an instance that sets `min_length: 12`; the step's constraints
+come from the policy once the flow field reads them
+([#1449](https://github.com/zitadel/nextgen/issues/1449)). A new user has no
+password history and sign-up is not a self-service change, so the gate sends
+`self_service: false` and the `history_depth` rule passes without a hash
+being verified, even when the instance sets it. The constraints projection
+needs no context and still lists `history_depth`; a sign-up form has no
+field it applies to.
 
 ```mermaid
 sequenceDiagram
@@ -392,7 +416,7 @@ sequenceDiagram
     S->>P: evaluate(instance, context)
     P-->>S: decision
     alt deny
-        S-->>C: invalid password + violated rules
+        S-->>C: step error per violated rule
     else allow
         S->>S: HashPassword
         S->>DB: SetUserPassword
@@ -406,7 +430,7 @@ sequenceDiagram
 4. Domain operation. The flow engine calls `SetPasswordUserAction`. This is the guarded operation.
 5. Prepare context. Per-operation Go code derives the context (see [Evaluation](../design/policies/2-evaluation.md)).
 6. Evaluate. Every active rule runs over config plus context.
-7. Return the error, or proceed with the operation.
+7. Return the error, or proceed with the operation. In a flow the violated rules come back as field errors on the step that creates the user (`error.x-auth-methods#password_min_length`), here the step with the password field.
 
 ### The rule language: CEL
 
@@ -530,7 +554,7 @@ Duplication across operations. A control relevant at two operations is configure
 
 Long expressions in JSON. A rule list invites the temptation of one long expression. Mitigated by the caps (length, cost, `bool` result) and by the rule that a violation names one requirement.
 
-Expression language drift. cel-go gains features per release. Mitigated by the minimal environment: a rule uses the standard library and two extensions, and every template is compiled and checked by `policy.New()`, which runs at server start once the gate is wired in.
+Expression language drift. cel-go gains features per release. Mitigated by the minimal environment: a rule uses the standard library and two extensions, and every template is compiled and checked by `policy.New()` at server start.
 
 ## Design documents
 

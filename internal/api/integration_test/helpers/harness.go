@@ -28,6 +28,7 @@ type Harness struct {
 	httpClient      dependency[*http.Client]
 	testServer      dependency[*httptest.Server]
 	hasherFactory   dependency[*crypto.HasherFactory]
+	passwordPolicy  dependency[*service.PasswordPolicy]
 	masterKeys      dependency[*domain.MasterKeys]
 	secretGenerator dependency[secrets.Generator]
 	joseSigner      dependency[jose.Signer]

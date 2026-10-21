@@ -29,11 +29,13 @@ environment.
   "candidate": {
     "length": "int"
   },
+  "self_service": "bool",
   "history_matches": "list<bool>"
 }
 ```
 
-Every field is a derived value. `history_matches[i]` says whether the
+Every field is a derived value. `self_service` says whether the user sets
+their own password. `history_matches[i]` says whether the
 candidate matched the i-th most recent kept password, the current one first;
 the rule never sees a hash, let alone a password. A rule referencing a field
 outside the schema fails the type check at startup, which is what makes the
@@ -58,8 +60,8 @@ for a decision log.
 
 Each operation has one Go function that derives the context, listed per
 operation in the [catalog](catalog.md). For `auth.factor.password.set` it is
-not built yet ([#1448](https://github.com/zitadel/nextgen/issues/1448)); it is
-where #898's password handling will live:
+part of `service.PasswordPolicy.CheckPassword`, and it is where #898's
+password handling lives:
 
 - the candidate is NFC-normalized before anything else
   (`domain.NormalizePassword`, applied on hashing and verification too);
@@ -72,11 +74,18 @@ where #898's password handling will live:
   hands over the kept passwords newest first, current one first, and may
   hand over more than the depth: the rule only looks at the first N entries,
   so a builder that sends too many cannot deny a password that matches none
-  of the last N. History is
-  checked only when the user sets their own password; an administrator
-  setting it, and a new user, have none to compare with, and an
+  of the last N. The gate reads and verifies no more than N. History is
+  checked only when the user sets their own password: the rule reads
+  `self_service`, and the gate verifies hashes only then. An administrator
+  setting a password, and a new user, have none to compare with, and an
   administrator learning that a guess matches an old password would be an
-  oracle on the user's previous passwords.
+  oracle on the user's previous passwords. No self-service path sets the flag
+  yet; the password change and reset journeys will. A candidate over the
+  64 code-point cap is refused without reading or verifying anything. The
+  comparison runs before the write's transaction, so the write checks that
+  the password it replaces is still the one the comparison saw as current;
+  when another change landed in between, it fails with `user.conflict` (409)
+  and the retry compares against that change.
 
 ## Limits
 
@@ -97,10 +106,8 @@ server start for every rule in every template, the last on every evaluation:
   aborts past a budget. The rule also runs under the request's context
   deadline.
 
-A template that fails one of these checks fails `policy.New()`, and the
-server calls it at startup once the gate is wired in, so a bad rule never
-reaches a running system. Until then the package's tests compile the
-embedded catalog. The values live in
+A template that fails one of these checks fails `policy.New()`, which the
+server calls at startup, so a bad rule never reaches a running system. The values live in
 `policy.DefaultLimits()` and are sized for a handful of scalar comparisons per
 rule. Kubernetes enforces the same pair (a static per-expression limit and a
 per-request runtime budget); OpenFGA caps condition cost the same way.
@@ -110,6 +117,11 @@ extensions, nothing else.
 
 Evaluating the three password rules on a bound instance takes about 2.8 µs
 and 76 allocations; the same checks written in Go take about 0.08 µs
-(`BenchmarkEvaluate_CEL` / `BenchmarkEvaluate_Go`, Apple M5 Pro). CEL costs
-roughly 30 times plain Go here, still a few microseconds per evaluation. Building the context and verifying history
-hashes are not included.
+(`BenchmarkEvaluate_CEL` / `BenchmarkEvaluate_Go`, Apple M5 Pro), without
+building the context. CEL costs
+roughly 30 times plain Go here, still a few microseconds per evaluation. The
+whole gate a password set goes through (resolve, bind, normalize and count,
+build the context, evaluate the length rules) takes about 1.9 µs and 50
+allocations (`BenchmarkPasswordPolicy_Check`), without the storage read that
+resolution becomes once instances are stored, without history verification
+and without hashing.

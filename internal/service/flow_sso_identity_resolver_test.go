@@ -76,14 +76,14 @@ func newSSOResolverFixture(t *testing.T) *ssoResolverFixture {
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
 	hasher := cryptomock.NewMockHasher(ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
-	users := service.NewUserService(pool, schemaStore, nil, nil, domain.BuiltinSchemaBases{})
+	users := service.NewUserService(pool, schemaStore, nil, nil, nil, domain.BuiltinSchemaBases{})
 	return &ssoResolverFixture{
 		pool:        pool,
 		stmts:       stmts,
 		connections: connections,
 		schemaStore: schemaStore,
 		hasher:      hasher,
-		resolver:    service.NewFlowSSOIdentityResolver(pool, connections, users, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}),
+		resolver:    service.NewFlowSSOIdentityResolver(pool, connections, users, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}, noPolicyGate(t)),
 	}
 }
 
