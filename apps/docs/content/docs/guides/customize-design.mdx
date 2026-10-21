@@ -39,7 +39,7 @@ Brand assets live in `branding.json` and must be hosted `https://` URLs. While y
   "logo_url": "https://cdn.example.com/logo.svg",
   "typography": {
     "font_family": "Inter, ui-sans-serif, sans-serif",
-    "font_url": "https://fonts.googleapis.com/css2?family=Inter&display=swap"
+    "font_url": "https://cdn.example.com/fonts/inter.css"
   },
   "liquid_template": { "$file": "./login.liquid" }
 }
@@ -48,6 +48,8 @@ Brand assets live in `branding.json` and must be hosted `https://` URLs. While y
 Each design decides which images it shows: `centered` shows the logo, `minimal` shows none, and neither shows `hero_url`. A URL the design doesn't use is stored but not shown, and `plan` still checks it.
 
 `typography.font_family` sets the typeface for body and headings; include a generic family as a fallback. `typography.font_url` is a stylesheet that loads the face. It needs a `font_family`, must be `https://`, and is loaded only when the login runs as `variant="page"`. Setup generates page-variant sign-in pages only when it creates the Next.js or Nuxt app itself, in an empty directory. In a Next.js or Nuxt app that already exists, even a new one, and in every SPA template, the login runs as a widget, so load the font from your own page there.
+
+Without `font_url` the login loads no font of its own: it renders in Arimo where the browser already has it, and in the system font otherwise, so it sends no request to a font host. A `font_url` on a third-party host such as Google Fonts sends every visitor's IP address to that host, which under the GDPR can require their consent. Serve the stylesheet and font files from your own domain to avoid that.
 
 ## Publish and iterate
 
@@ -64,4 +66,4 @@ The scaffolded `README.md` in `.zitadel/branding/` documents the template rules 
 
 ## Ownership trade-off
 
-An ejected template is yours: it stops receiving improvements to the built-in designs. Eject when you want to change the login's structure and look; to change only wording, the `locales` prop covers copy without touching templates (see Customize copy). Staying on the built-in template costs nothing — `branding eject` is always one command away.
+An ejected template is yours: it stops receiving improvements to the built-in designs. Eject when you want to change the login's structure and look; to change only the wording, the `locales` prop does that without touching templates (see [Customize the login text](/docs/guides/customize-copy)). Staying on the built-in template costs nothing — `branding eject` is always one command away.

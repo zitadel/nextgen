@@ -33,7 +33,7 @@ import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
-import { en, builtinLocales, mergeLocale, type Locale } from "./locales/index.js";
+import { localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { resolveApi } from "./resolve-api.js";
 import { returnPathFromLocation } from "./return-path.js";
@@ -301,7 +301,8 @@ export class ZitadelLogin extends ZitadelSurface {
    * Custom locale dictionaries keyed by language code. Entries may be
    * partial — each is merged over the built-in dictionary for its language,
    * so a preset like {@link businessLocales} (or a hand-written subset) is
-   * directly assignable:
+   * directly assignable. The `en` entries also fill whatever another language
+   * has no text for ({@link localeFor}):
    *
    * ```ts
    * import { businessLocales } from "@zitadel/components";
@@ -455,27 +456,18 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Resolves the effective locale dictionary. The built-in dictionary for the
-   * resolved language is used as the base; entries from the `locales` map (if
-   * set) are merged on top by {@link mergeLocale}, so partial overrides work
-   * without importing the full base dictionary. The merge also drops a
-   * built-in `<step>.description.sso` when the integrator rewrote that step's
-   * description without one, so their text is what the `t` fallback shows.
+   * Resolves the effective locale dictionary for the resolved language, with
+   * the `locales` map merged over the built-in copy ({@link localeFor}).
    *
    * Priority: explicit `lang` attr → `navigator.language` (user preference)
-   * → `document.documentElement.lang` (page default) → English fallback.
+   * → `document.documentElement.lang` (page default).
    */
   private resolveLocale(): Locale {
     const code =
       this.lang ||
       (typeof navigator !== "undefined" ? navigator.language : "") ||
       (typeof document !== "undefined" ? document.documentElement.lang : "");
-    const primary = (code.split("-")[0] ?? "").toLowerCase();
-    const builtin = builtinLocales[primary] ?? en;
-    const custom = this.locales?.[primary];
-    if (!custom) return builtin;
-
-    return mergeLocale(builtin, custom);
+    return localeFor(code, this.locales);
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
@@ -1281,6 +1273,16 @@ export class ZitadelLogin extends ZitadelSurface {
     this.formValues = { ...this.formValues, [name]: value };
     this.syncFieldElementValue(name, value);
     this.clearStaleErrors(name);
+    // The widget never broadcasts a password or one-time-code value through its
+    // own events. It cannot hide the input from other scripts on the same page.
+    const field = this.response?.step.fields?.find((candidate) => candidate.name === name);
+    const autocompleteTokens = (field?.autocomplete ?? "").toLowerCase().split(/\s+/);
+    const secretTokens = ["current-password", "new-password", "one-time-code"];
+    const hasSecretToken = autocompleteTokens.some((token) => secretTokens.includes(token));
+    const isSecret = field?.type === "password" || hasSecretToken;
+    if (isSecret) {
+      return;
+    }
     emit(this, "zitadel-flow-input", { name, value });
   };
 

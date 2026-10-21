@@ -1,9 +1,9 @@
 {
-  "title": "CLI",
+  "title": "Guides",
   "pages": [
-    "index",
     "local-runtime",
     "plan-apply",
+    "social-sign-in",
     "customize-design",
     "customize-copy",
     "troubleshooting"

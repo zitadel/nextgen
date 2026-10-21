@@ -10,12 +10,14 @@ import {
   getDefaultBrandingConfig,
   getDefaultLoginFlow,
   SETUP_PRESETS,
+  SETUP_USE_CASES,
 } from "./defaults.js";
 import {
   BRANDING_FILE_SCHEMA_REF,
   FLOW_FILE_SCHEMA_REF,
   META_SCHEMA_DIR,
   metaSchemaFiles,
+  PROJECT_FILE_SCHEMA_REF,
 } from "./meta-schemas.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -45,6 +47,7 @@ describe("meta-schemas", () => {
       "sso-auth-method.json",
       "idp-connection.json",
       "branding.json",
+      "project.json",
     ]);
   });
 
@@ -61,6 +64,18 @@ describe("meta-schemas", () => {
         );
       }
     }
+  });
+
+  it("the zitadel.json $schema ref resolves from the project root into the meta dir", () => {
+    expect(join(PROJECT_FILE_SCHEMA_REF)).toBe(join(META_SCHEMA_DIR, "project.json"));
+  });
+
+  it("the zitadel.json schema enumerates every setup preset and use case", () => {
+    const project = metaSchemaFiles().find((f) => f.name === "project.json")?.body as {
+      properties: Record<string, { enum?: unknown[] }>;
+    };
+    expect(project.properties.preset?.enum).toEqual([...SETUP_PRESETS]);
+    expect(project.properties.useCase?.enum).toEqual([...SETUP_USE_CASES]);
   });
 
   it("the flow $schema ref resolves from .zitadel/flows/ into the meta dir", () => {

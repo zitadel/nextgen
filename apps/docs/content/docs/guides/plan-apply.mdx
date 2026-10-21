@@ -1,0 +1,76 @@
+---
+title: Edit the login flow and schema
+description: Change your user schema and login flows in .zitadel/, preview the change with plan, and publish it with apply.
+---
+
+`.zitadel/schemas/*.json` and `.zitadel/flows/*.json` are the source of truth for your project's user schemas and login flows; `.zitadel/branding/` and `.zitadel/idps/` sync the same way. Edit them, preview with `plan`, publish with `apply`. How the sync decides what changed, and what it checks before it uploads anything: [Configuration as code](/docs/concepts/repo-config#how-syncing-works).
+
+`plan` previews the configuration sync diff without mutating files or platform state:
+
+```sh
+npx @zitadel/cli@alpha plan
+```
+
+`apply` validates and uploads repo configuration:
+
+```sh
+npx @zitadel/cli@alpha apply
+```
+
+In a script or as an agent:
+
+```sh
+npx @zitadel/cli@alpha plan --non-interactive --json
+npx @zitadel/cli@alpha apply --non-interactive --json
+```
+
+## Walkthrough: add a field to registration
+
+Add an optional `company` property to `.zitadel/schemas/default-human-user.json`:
+
+```json
+"properties": {
+  "company": { "type": "string", "description": "Company name" }
+}
+```
+
+(Leave `required` untouched to keep the field optional.)
+
+Then let users enter it during registration — add `"company"` to the `register` step's `fields` in `.zitadel/flows/default-login.json`.
+
+Preview and publish:
+
+```sh
+npx @zitadel/cli@alpha plan
+npx @zitadel/cli@alpha apply
+```
+
+## Walkthrough: a second flow, selected by name
+
+All files in `.zitadel/flows/` sync on `apply`, but the widget runs exactly one flow per sign-in — an extra flow needs a distinct `name` so the app can ask for it.
+
+Drop `.zitadel/flows/kiosk-login.json` next to the default flow. Same shape as `default-login.json` (start from a copy), with its own `name`, an `audience`, and whatever steps the journey needs:
+
+```json
+{
+  "$schema": "../meta/flow-definition.json",
+  "name": "kiosk-login",
+  "status": "active",
+  "user_schema": "human-user",
+  "purposes": { "login": "identifier" },
+  "audience": { "app_ids": ["kiosk"] },
+  "steps": [ "…copied from default-login.json, then edited…" ]
+}
+```
+
+The `audience` keeps the new flow from becoming the default. Without one, it would be the newest active flow without an audience for `login`, so every login page that doesn't name a flow would start rendering it — `plan` warns about this before you apply. Add the `audience` before the first `apply`: adding it in a later edit doesn't undo this, because the revision without one stays active. Selecting a flow by name ignores its audience.
+
+Publish with `plan` / `apply`, then point the widget at it:
+
+```tsx
+<ZitadelLogin flowName="kiosk-login" />
+```
+
+(or `flow-name="kiosk-login"` on the plain `<zitadel-login>` element). An unknown name or a flow that doesn't serve the requested purpose surfaces as a startup error in the widget.
+
+Without `flowName`, the server serves the newest active revision that has no `audience` and serves the requested purpose, whatever its flow's name. Older revisions count too. A flow scoped via `audience.app_ids` / `audience.team_ids` is preferred when the flow-start request's hints identify that app or team (app match beats team match), and is used otherwise only when no unscoped flow serves the purpose. `<zitadel-login>` sends no app or team hints, so audience targeting applies to direct `POST /flow` callers.

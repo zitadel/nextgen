@@ -6,14 +6,9 @@ dependsOn:
   # The showcase's login previews render the atoms of @zitadel/components.
   - "components"
 
-workspace:
-  inheritedTasks:
-    # One static page and no unit tests yet; `typecheck` and `build` check it.
-    exclude:
-      - "test"
-
 tasks:
-  # lint is the inherited task unchanged, and so are the commands below.
+  # lint and test are the inherited tasks unchanged, and so are the commands
+  # below.
   typecheck:
     deps:
       # After the build, never beside it: `next typegen` and `next build`
