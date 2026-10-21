@@ -3,37 +3,24 @@ title: Overview
 description: Start here for the current Zitadel preview docs, shipped boundaries, and navigation.
 ---
 
+import { Card, Cards } from "fumadocs-ui/components/card";
+
 Zitadel's next-generation preview is the successor track for the platform, built around local-first setup, repo-owned configuration, and auth flows that are easy for humans and coding agents to prove end to end.
 
 Zitadel v4 remains maintained while this preview evolves. The preview is pre-release: APIs, CLI flags, packages, and docs can change before this becomes a future major version. The public product name may also change.
 
-## Current shipped boundary
+## Where to start
 
-The current shipped path is local auth setup through the `@zitadel/cli` alpha package, in a new, empty directory:
+<Cards>
+  <Card title="Quickstart" href="/docs/get-started/quickstart" description="From an empty directory to a local app with working sign-in." />
+  <Card title="Add Zitadel to an existing app" href="/docs/get-started/existing-app" description="Run setup in an app you already have." />
+  <Card title="Agent setup" href="/docs/get-started/agents" description="Let a coding agent drive the CLI and prove sign-in in a browser." />
+  <Card title="CLI reference" href="/docs/reference/cli" description="Every zitadel command, with its flags and examples." />
+</Cards>
 
-```sh
-mkdir myapp
-cd myapp
-npx @zitadel/cli@alpha doctor
-npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --server local
-npx @zitadel/cli@alpha console
-```
+## What ships today
 
-For an app you already have, follow [Add Zitadel to an existing app](/docs/get-started/quickstart#add-zitadel-to-an-existing-app) instead.
-
-`zitadel start` runs the released `@zitadel/server` npm binary by default. It does not require Docker, Go, Moon, or a source checkout. The binary runtime defaults to SQLite. Docker is still available explicitly with `zitadel start --runtime docker`. It also creates a local admin, `admin@zitadel.localhost`, and `zitadel console` prints a one-time link that signs you in to the management console as that admin.
-
-Create-first, claim-later remains product direction, and the claim flow is implemented end to end: the `zitadel claim` CLI command, the OpenAPI claim endpoints, the server-side handlers, and the console claim page (the browser leg where you sign in on the platform project and complete the claim) are all shipped. Locally there is nothing to claim: `zitadel setup --server local` by default attaches the new project to the local admin's team, so it is owned as soon as setup finishes.
-
-## What to read first
-
-- [Quickstart](/docs/get-started/quickstart) for the local CLI path.
-- [Agent setup](/docs/get-started/agents) for `--non-interactive --json` and browser proof expectations.
-- [Concepts](/docs/concepts) for project, team, user, local runtime, databases, repo config, flows, schemas, SDK proxy, sessions, and auth attempts.
-- [CLI](/docs/cli) for command groups and troubleshooting.
-- [SDKs](/docs/sdks) for framework package entrypoints.
-- [API reference](/docs/reference/api) for OpenAPI-generated endpoint docs.
+The shipped path is local auth setup through the `@zitadel/cli` alpha package. `zitadel start` runs the released `@zitadel/server` npm binary, with no Docker, Go, Moon, or source checkout ([Run Zitadel locally](/docs/guides/local-runtime)), and `zitadel setup` scaffolds auth into a new app or adds it to yours. The claim flow is shipped end to end, though a local project needs none ([Claim](/docs/concepts/project-team-user#claim)).
 
 ## LLM support
 

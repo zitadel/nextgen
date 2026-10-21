@@ -42,6 +42,7 @@ function artifactEdge(project, target) {
 const UNREACHED_ALLOWED = new Set([
   "cli:@zitadel/server", // the runtime wrapper; cli:test lists it as an input
   "console:@zitadel/testing", // dev-real only, resolved from source
+  "docs:@zitadel/cli", // its committed command-reference.json; docs:generate lists it as an input
 ]);
 
 // moon's own entry point under this node: no package manager in between, so

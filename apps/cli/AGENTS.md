@@ -5,6 +5,9 @@
 - [`SKILL.md`](skills/zitadel-cli/SKILL.md) is the agent-facing contract (JSON
   envelope, invocation rules, claim, doctor repair). Update it with every
   change to the command surface.
+- `command-reference.json` is the docs site's CLI reference, generated from
+  `COMMANDS`: after a change to a command's help, rerun
+  `tests/unit/lib/oclif/reference.test.ts` with `--update`.
 - Tests: [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving
   a test.
 - `start`, `stop`, `status`, `logs`, `reset`, `console`, `doctor` and how
