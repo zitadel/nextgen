@@ -25,6 +25,24 @@ test("a page renders, navigates client-side and logs no errors", async ({ page }
   expect(errors).toEqual([]);
 });
 
+test("a link to a file the docs serve opens it, without fetching it as a page", async ({
+  page,
+}) => {
+  // A plain <a> (components/mdx.tsx): next/link would fetch the document for
+  // its React Server Components payload first, which it is not.
+  const asPage: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/docs/openapi.json" && request.headers().rsc) {
+      asPage.push(request.url());
+    }
+  });
+
+  await page.goto("/docs/reference/api");
+  await page.getByRole("link", { name: "/docs/openapi.json" }).click();
+  await expect(page).toHaveURL(/\/docs\/openapi\.json$/);
+  expect(asPage).toEqual([]);
+});
+
 /**
  * A section is one row of the sidebar's top level; inside it the sidebar lists
  * only the section, under a row that steps back up without leaving the page

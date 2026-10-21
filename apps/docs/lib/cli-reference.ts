@@ -1,6 +1,6 @@
 import { getTableOfContents } from "fumadocs-core/content/toc";
 import { remarkGfm, type StructuredData, structure } from "fumadocs-core/mdx-plugins";
-import type { LoaderPlugin, MetaData, Source } from "fumadocs-core/source";
+import { getSlugs, type LoaderPlugin, type MetaData, type Source } from "fumadocs-core/source";
 import type { TOCItemType } from "fumadocs-core/toc";
 
 // The CLI's commands, from the reference its test keeps current
@@ -8,15 +8,17 @@ import type { TOCItemType } from "fumadocs-core/toc";
 // (apps/cli/CHANGELOG.md), bundled by scripts/bundle-cli.mjs and imported as a
 // module, so they ship inside the build.
 import reference, { releases } from "../.generated/cli.mjs";
-import { cli } from "./cli-sample.ts";
+import { cli, cliCommand } from "./cli-sample.ts";
 import { shortDescription } from "./description.ts";
+import type { openapi } from "./openapi.ts";
 import { gitConfig } from "./shared.ts";
 
 // The CLI reference: a page per command, under /docs/reference/cli, in the
 // groups and the order `zitadel --help` lists them, an index with the flags
 // every command takes, and the release notes. A page is Markdown, the same
 // text for the page (components/cli-page.tsx), its Markdown twin and search.
-// The telemetry page beside them is content (content/docs/reference/cli).
+// A command that calls the API links the operation it calls. The telemetry
+// page beside them is content (content/docs/reference/cli).
 
 /** A flag as apps/cli/src/lib/oclif/reference.ts describes it. */
 export type CliFlag = {
@@ -83,6 +85,47 @@ if (taken) throw new Error(`zitadel ${taken.id} takes the URL of a CLI reference
 /** A command's page: `users list` is /docs/reference/cli/users/list. */
 export function cliCommandUrl(command: string) {
   return `${indexUrl}/${command.split(" ").join("/")}`;
+}
+
+/** The API operation a command calls, and the pages of the operation and of its tag. */
+type CliOperation = {
+  title: string;
+  /** `POST /users`. */
+  endpoint: string;
+  url: string;
+  tag: { title: string; url: string };
+};
+
+/**
+ * Each command's operation, from the API reference's operation pages: an
+ * operation names the command that calls it in `x-zitadel-cli`
+ * (lib/cli-sample.ts), and the CLI's api-coverage test keeps it to one
+ * operation a command.
+ */
+export function commandOperations({ files }: Awaited<ReturnType<typeof openapi.staticSource>>) {
+  const operations = new Map<string, CliOperation>();
+  for (const file of files) {
+    if (file.type !== "page") continue;
+    const { bundled } = file.data.getSchema();
+    const slugs = getSlugs(file.path);
+    for (const { method, path } of file.data.getOpenAPIPageProps().operations ?? []) {
+      const operation = bundled.paths?.[path]?.[method];
+      const command = operation && cliCommand(operation);
+      if (!operation || !command) continue;
+      const endpoint = `${method.toUpperCase()} ${path}`;
+      operations.set(command, {
+        title: file.data.title ?? endpoint,
+        endpoint,
+        url: `/docs/${slugs.join("/")}`,
+        // The tag's folder holds its operations, and its index is the tag's page.
+        tag: {
+          title: sectionName(operation.tags?.[0] ?? ""),
+          url: `/docs/${slugs.slice(0, -1).join("/")}`,
+        },
+      });
+    }
+  }
+  return operations;
 }
 
 // ---- Markdown ---------------------------------------------------------------
@@ -154,8 +197,9 @@ function flagTable(flags: CliFlag[]) {
   );
 }
 
-// The help's sections are capitalised (`REQUIRED FIELD`); a heading is in
-// sentence case, except for an abbreviation.
+// The help's sections are capitalised (`REQUIRED FIELD`), as are the API's
+// tags (`Flow Definitions`); a heading is in sentence case, except for an
+// abbreviation.
 const abbreviations = new Set(["API", "ID", "JSON", "OIDC", "SAML", "SSO", "URL"]);
 function sectionName(group: string) {
   const words = group
@@ -170,8 +214,15 @@ function usage(command: CliCommand) {
   return [cli, command.id, ...args, "[flags]"].join(" ");
 }
 
-/** A command's page, as Markdown. */
-function commandMarkdown(command: CliCommand) {
+/**
+ * A command's page, as Markdown. llms-full.txt leaves the operations out, so
+ * there the operation's name is text, and the link is to its tag's page.
+ */
+function commandMarkdown(
+  command: CliCommand,
+  operation: CliOperation | undefined,
+  { linkOperation }: { linkOperation: boolean },
+) {
   const sections = [text(command.description)];
   if (command.state) sections.push(`This command is ${command.state}.`);
   if (command.aliases) {
@@ -211,6 +262,14 @@ function commandMarkdown(command: CliCommand) {
       `${cli} ${line}`,
     ]);
     sections.push("## Examples", `\`\`\`sh\n${lines.join("\n")}\n\`\`\``);
+  }
+
+  if (operation) {
+    const name = linkOperation
+      ? `[${text(operation.title)}](${operation.url})`
+      : text(operation.title);
+    const tag = `[${operation.tag.title}](${operation.tag.url})`;
+    sections.push("## API", `It calls ${name}, ${code(operation.endpoint)}, in the ${tag} API.`);
   }
   return sections.join("\n\n");
 }
@@ -276,25 +335,38 @@ function releaseNotesMarkdown(cliReleases: CliRelease[]) {
 export type CliPageData = {
   title: string;
   description: string;
-  /** The page as Markdown, for the page itself, its Markdown twin and llms-full.txt. */
+  /** The page as Markdown, for the page itself, its Markdown twin and the MCP server. */
   markdown: string;
+  /** The page in llms-full.txt. */
+  llmsFullMarkdown: string;
   toc: TOCItemType[];
   structuredData: StructuredData;
 };
 
-function pageData(title: string, description: string, markdown: string): CliPageData {
+function pageData(
+  title: string,
+  description: string,
+  markdown: string,
+  llmsFullMarkdown = markdown,
+): CliPageData {
   return {
     title,
     description,
     markdown,
+    llmsFullMarkdown,
     toc: getTableOfContents(markdown),
     // Search indexes the tables' cells, which the parser finds with GFM only.
     structuredData: structure(markdown, [remarkGfm]),
   };
 }
 
-/** The reference's pages, beside the content and the API reference in lib/source.ts. */
-export const cliSource: Source<{ pageData: CliPageData; metaData: MetaData }> = {
+/**
+ * The reference's pages, beside the content and the API reference in
+ * lib/source.ts. A command's page links the operation it calls.
+ */
+export const cliSource = (
+  operations: Map<string, CliOperation>,
+): Source<{ pageData: CliPageData; metaData: MetaData }> => ({
   files: [
     {
       type: "meta",
@@ -335,11 +407,12 @@ export const cliSource: Source<{ pageData: CliPageData; metaData: MetaData }> = 
       data: pageData(
         `${reference.bin} ${command.id}`,
         shortDescription(text(command.description)),
-        commandMarkdown(command),
+        commandMarkdown(command, operations.get(command.id), { linkOperation: true }),
+        commandMarkdown(command, operations.get(command.id), { linkOperation: false }),
       ),
     })),
   ],
-};
+});
 
 /**
  * The sidebar names a command as `zitadel --help` lists it, after the bin,
