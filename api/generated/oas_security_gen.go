@@ -57,6 +57,7 @@ var operationRolesNextgenSession = map[string][]string{
 	GetFlowDefinitionOperation:     []string{},
 	GetGrantOperation:              []string{},
 	GetIdpByIdOperation:            []string{},
+	GetIdpRevisionByIdOperation:    []string{},
 	GetMyPasswordStateOperation:    []string{},
 	GetMySessionOperation:          []string{},
 	GetMySessionCsrfTokenOperation: []string{},
