@@ -6,6 +6,7 @@ dependsOn:
   - "api"
   - "components"
   - "sdk-core"
+  - "sdk-react"
 
 tasks:
   typecheck:
@@ -15,16 +16,14 @@ tasks:
 
   build:
     deps:
-      - "components:build"
-      - "sdk-core:build"
+      - "sdk-react:build"
 
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
-      - "components:build-release"
-      - "sdk-core:build-release"
+      - "sdk-react:build-release"
     outputs:
       - "dist/**/*"
     options:

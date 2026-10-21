@@ -403,7 +403,8 @@ export class ZlPasskey extends LitElement {
       method: this.method,
       proof,
     };
-    emit(this, "zl-passkey-result", detail);
+    // The WebAuthn proof is a credential, and only the widget consumes it.
+    emit(this, "zl-passkey-result", detail, { composed: false });
   }
 
   private emitError(message: string, aborted: boolean, timedOut = false): void {

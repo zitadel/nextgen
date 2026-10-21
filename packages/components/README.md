@@ -289,7 +289,7 @@ Cloudflare Workers and Vercel Edge have no DOM, and bundlers target them with th
 | `flowName` / `flow-name` | `string` | Run the flow definition with this `name` instead of the project default |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property (not an attribute). When unset, the element falls back to the global handle from `getZitadelConfig()` |
 | `lang` | `string` | BCP 47 tag (e.g. `"de"`, `"en-US"`). Resolves to a built-in dictionary; falls back to `<html lang>` / `navigator.language` |
-| `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work |
+| `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work. The `en` entries also fill whatever another language has no text for |
 | `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` for a session cookie and navigate here, or back to the path in the page's `next` query parameter when that is a path on the page's origin: every server SDK's middleware sends a signed-out visit to a protected route to the login page with `?next=<path>`. A `next` that is a URL, starts with `//`, or holds a `\` or a control character is ignored |
 | `forcePostSignInUrl` / `force-post-sign-in-url` | `boolean` | Navigate to `post-sign-in-url` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own |
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh. Unset, `null` or `""` fall back to the `flow` query parameter. Every SDK's login wrapper takes it as `resumeFlowId` |
@@ -309,7 +309,10 @@ is a full-page destination on another origin, so there is nothing a router
 could do with it. The event is a notification, not a hook — it is not
 cancelable, and a host listener cannot substitute its own navigation. Use it
 to record the hand-off (analytics, a spinner, saving scroll state) before the
-page goes away. The framework wrappers surface it as `onFlowRedirect`, except
+page goes away. The detail carries `waitUntil(promise)`: the widget waits for
+the promises its listeners pass, up to two seconds, before it navigates.
+`zitadel-flow-complete` and `zitadel-signout` carry it too, for the navigation
+that follows them. The framework wrappers surface it as `onFlowRedirect`, except
 Vue and Angular, which emit `flowRedirect`, and Qwik, which takes
 `onFlowRedirect$`.
 The orchestrator exposes `::part(form)` for tenant-side CSS hooks. Adopts

@@ -42,7 +42,9 @@ export default defineConfig({
     projects: [
       {
         cacheDir: ".vitest/jsdom",
-        resolve: { alias },
+        // The browser build of @lit/react binds element properties; its Node
+        // build only collects them for server rendering.
+        resolve: { alias, conditions: ["browser"] },
         test: {
           name: "jsdom",
           globals: true,

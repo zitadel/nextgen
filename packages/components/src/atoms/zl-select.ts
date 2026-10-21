@@ -315,7 +315,12 @@ export class ZlSelect extends FormAtom {
     }
     this.value = next;
     this.syncFormState();
-    emit<ZlSelectChangeDetail>(this, "zl-change", { name: this.name, value: this.value });
+    emit<ZlSelectChangeDetail>(
+      this,
+      "zl-change",
+      { name: this.name, value: this.value },
+      { composed: false },
+    );
     this.dispatchNativeChange();
   }
 

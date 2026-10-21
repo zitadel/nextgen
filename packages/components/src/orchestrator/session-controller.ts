@@ -92,7 +92,12 @@ export class SessionController implements ReactiveController {
     this.loading = false;
     this.host.requestUpdate();
     onRevoked?.();
-    emit(this.host, "zitadel-signout", { display: this.display, identifier: this.identifier });
+    await emit(
+      this.host,
+      "zitadel-signout",
+      { display: this.display, identifier: this.identifier },
+      { waitForListeners: true },
+    );
     return true;
   }
 
