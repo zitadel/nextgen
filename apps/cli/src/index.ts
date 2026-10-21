@@ -1,5 +1,7 @@
 import type { Command } from "@oclif/core";
 
+import Api from "./commands/api/index";
+import ApiLs from "./commands/api/ls";
 import Apply from "./commands/apply";
 import AuthMethodPasskeyDisable from "./commands/auth-method/passkey/disable";
 import AuthMethodPasskeyEnable from "./commands/auth-method/passkey/enable";
@@ -39,6 +41,7 @@ import VariablesSet from "./commands/variables/set";
  * `commands/resources.ts`, so a new backend resource is one registry entry.
  */
 export const COMMANDS: Record<string, typeof Command> = {
+  api: Api,
   apply: Apply,
   claim: Claim,
   console: Console,
@@ -59,6 +62,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   "auth-method:passkey:disable": AuthMethodPasskeyDisable,
   "auth-method:sso:enable": AuthMethodSsoEnable,
   "auth-method:sso:disable": AuthMethodSsoDisable,
+  "api:ls": ApiLs,
   "branding:eject": BrandingEject,
   "env:add": EnvAdd,
   "env:list": EnvList,

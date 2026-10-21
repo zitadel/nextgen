@@ -1,6 +1,12 @@
 get:
   operationId: GetUserByID
+  x-zitadel-cli: users get
   summary: Get user by ID
+  description: |
+    Returns a user by its id, with the attributes its schema defines.
+
+    With `team_id`, the user is returned only while they are an active member of
+    that team.
   tags:
     - Users
   parameters:
@@ -28,11 +34,7 @@ get:
         Otherwise the answer is `403 user.permission_denied`.
       schema:
         $ref: ../../../components/schemas/team-id.yaml
-    - name: user_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/user-id.yaml
+    - $ref: ../../../components/parameters/user-id.yaml
   security:
     - oauth2:
         - user.read
@@ -61,6 +63,7 @@ get:
 
 patch:
   operationId: PatchUserByID
+  x-zitadel-cli: users update
   summary: Update user by ID
   description: |
     Partially updates a user's schema-defined attributes, and optionally
@@ -70,14 +73,11 @@ patch:
   tags:
     - Users
   parameters:
-    - name: user_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/user-id.yaml
+    - $ref: ../../../components/parameters/user-id.yaml
   security:
     - oauth2:
         - user.write
+    - nextgenSession: []
   requestBody:
     description: The changes to merge into the user.
     required: true
@@ -93,7 +93,18 @@ patch:
           schema:
             $ref: ../user.yaml
     '400':
-      description: Invalid request body, empty patch, unknown schema, or merged attributes failing schema validation.
+      description: |
+        Invalid request body, empty patch, unknown schema, or merged attributes
+        failing schema validation.
+
+        Merged attributes that fail the target schema answer `req.invalid`,
+        the same way a malformed body does and the same way a create does:
+        `details.details.fields` lists the dotted path of every failing field
+        from the request body, such as `attributes.country` or
+        `attributes.address.zip`. A field the patch did not touch is named
+        too when the merged document fails on it, as after a move to a schema
+        that requires it. Only the field names are reported, never the
+        rejected values.
       content:
         application/json:
           schema:
@@ -120,6 +131,13 @@ patch:
       description: |
         A patched value is unique and already taken by another user, or
         concurrent writes kept the user changing under the patch; retry.
+
+        A taken value answers `user.already_exists`, as on create, with
+        `details.details.fields` naming the attributes whose value is taken in
+        the same dotted form as a `400`, such as `attributes.email`. The user
+        holding the value is not named. When no attribute can be named, as
+        when the value was freed again since, `details` is absent. Concurrent
+        writes answer `user.conflict`.
       content:
         application/json:
           schema:
@@ -129,15 +147,18 @@ patch:
 
 delete:
     operationId: DeleteUserByID
+    x-zitadel-cli: users delete
     summary: Delete user by ID
+    description: |
+      Deletes a user and removes them from every team they belong to.
+
+      The user is removed, not deactivated, and the deletion emits `user.deleted`.
+      With a project secret the request is idempotent: deleting a user that exists
+      in no project succeeds without changing anything.
     tags:
       - Users
     parameters:
-      - name: user_id
-        in: path
-        required: true
-        schema:
-          $ref: ../../../components/schemas/user-id.yaml
+      - $ref: ../../../components/parameters/user-id.yaml
     security:
       - oauth2:
           - user.delete

@@ -1,5 +1,6 @@
 post:
   operationId: queryTeams
+  x-zitadel-cli: teams list
   summary: Query teams
   description: |
     Returns the teams of a project, paginated with a cursor.
@@ -58,8 +59,4 @@ post:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: queryTeams-error-response.yaml

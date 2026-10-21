@@ -42,8 +42,8 @@ func cookieRequest(t *testing.T, cookie *http.Cookie, method, path, body string,
 }
 
 // TestSessionCSRF pins ADR 053 §5 as scoped for #1300: every unsafe request
-// the session cookie authenticates must be same-origin, and, except sign-out and
-// the POST query reads, must also carry the session-bound X-Zitadel-CSRF token
+// the session cookie authenticates must be same-origin, and, except the POST
+// query reads, must also carry the session-bound X-Zitadel-CSRF token
 // that GET /sessions/me/csrf hands out. A Bearer caller is untouched.
 func TestSessionCSRF(t *testing.T) {
 	t.Parallel()
@@ -144,18 +144,23 @@ func TestSessionCSRF(t *testing.T) {
 		})
 	}
 
-	// Logout gets the origin check only: customer apps sign out through the
-	// SDK proxies, which cannot send the token yet. It signs out its own
-	// session, so a regression cannot revoke the one the other subtests share.
-	t.Run("logout needs no token but must be same-origin", func(t *testing.T) {
+	// Logout needs the token like every other write, so a forged sign-out is
+	// refused even from the same site. It signs out its own session, so a
+	// regression cannot revoke the one the other subtests share.
+	t.Run("logout needs the token and must be same-origin", func(t *testing.T) {
 		t.Parallel()
 		own := sessionCookieIn(t, home, operatorID)
+		token := internalapi.CSRFToken(own.Value)
 		status, body := cookieRequest(t, own, http.MethodDelete, "/sessions/me", "",
-			map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"})
+			map[string]string{internalapi.CSRFHeader: token, "Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"})
 		requireCSRFRefused(t, status, body)
 
 		status, body = cookieRequest(t, own, http.MethodDelete, "/sessions/me", "",
 			map[string]string{"Sec-Fetch-Site": "same-origin"})
+		requireCSRFRefused(t, status, body)
+
+		status, body = cookieRequest(t, own, http.MethodDelete, "/sessions/me", "",
+			map[string]string{internalapi.CSRFHeader: token, "Sec-Fetch-Site": "same-origin"})
 		assert.Equal(t, http.StatusNoContent, status, body)
 	})
 
@@ -177,12 +182,10 @@ func TestSessionCSRF(t *testing.T) {
 
 		patch := &api.PatchMyUserRequest{}
 		require.NoError(t, patch.UnmarshalJSON([]byte(`{"attributes":{"nickname":"Myself"}}`)))
-		me, err := session.PatchMyUser(t.Context(), patch)
+		me, err := session.PatchMyUser(t.Context(), patch, api.PatchMyUserParams{})
 		require.NoError(t, err)
-		require.IsType(t, &api.PatchMyUserErrorResponseStatusCode{}, me, helpers.MustMarshal(t, me))
-		refused := me.(*api.PatchMyUserErrorResponseStatusCode)
-		assert.Equal(t, http.StatusForbidden, refused.StatusCode)
-		assert.True(t, refused.Response.IsAuthCsrfInvalid(), helpers.MustMarshal(t, me))
+		require.IsType(t, &api.PatchMyUserForbidden{}, me, helpers.MustMarshal(t, me))
+		assert.Equal(t, api.ErrorCode("auth.csrf_invalid"), me.(*api.PatchMyUserForbidden).Code)
 
 		claim, err := session.CompleteClaim(t.Context(), &api.CompleteClaimRequest{ChallengeID: "ch_any"},
 			api.CompleteClaimParams{ProjectID: api.ProjectID(home.ID)})

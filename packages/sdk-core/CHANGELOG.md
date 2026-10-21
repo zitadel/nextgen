@@ -1,5 +1,158 @@
 # @zitadel/sdk-core
 
+## 1.0.0-alpha.28
+
+### Minor Changes
+
+- [#2071](https://github.com/zitadel/nextgen/pull/2071) [`fa301b9`](https://github.com/zitadel/nextgen/commit/fa301b96daf57512cef6ffb4eb60fdd49cff33e4) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now keep each app's session in a cookie named after its
+  project, `__nextgen_session_<project id>`, instead of the `__nextgen_session`
+  cookie every project on a host shared. On `localhost`, signing in to an app no
+  longer signs you out of the Console of `zitadel start` or of another app, and
+  signing in to the Console no longer signs you out of your apps.
+
+  The `/__nextgen` proxy renames the cookie Zitadel sets on its way to the
+  browser, sends the app's cookie to Zitadel under Zitadel's name, and passes no
+  other project's session cookie on. Users who signed in before the upgrade stay
+  signed in: the first time the middleware, or the widgets' session check, finds
+  that the old cookie holds a session of the app's project, the session is copied
+  to the new cookie. The old cookie stays until the user next signs in or out
+  through the app, since the Console may share the app's project; then the proxy
+  clears it, and on sign-out ends its session too, so it cannot sign the user
+  back in. A response that sets a session cookie is never stored by a shared
+  cache (`Cache-Control: private, no-store`). With no project configured, the
+  proxy passes cookies through unchanged.
+
+  If your server-SDK app reads the session cookie itself, or its tests set it,
+  use `sessionCookieName(projectId)` (from `@zitadel/sdk-core`, or from
+  `@zitadel/testing` in tests) instead of `__nextgen_session` or
+  `SESSION_COOKIE_NAME`: the app's session is no longer kept there.
+
+  `@zitadel/testing` adds `sessionCookieName(projectId)`, the cookie a server-SDK
+  app keeps its session in, and `authenticatedPage` now signs its browser context
+  in under both names, so it works for SPAs and server-SDK apps alike.
+  `SESSION_COOKIE_NAME` stays Zitadel's own name. `@zitadel/sdk-core` adds
+  `sessionCookieName`, `proxySessionCookies`, `serializeSessionCookie` and
+  `SESSION_COOKIE_CACHE_CONTROL`.
+
+- [#2076](https://github.com/zitadel/nextgen/pull/2076) [`12b3226`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now count a session as signed in only when it belongs to the
+  app's own project. A session of another project on the same server, such as a
+  second app on the same host or the console of a local `zitadel start`, reads
+  as signed out in `protectedRoutes`, `auth()` and `getAuth()`, and its cookie is
+  left in place for the app it belongs to.
+
+  The project comes from the new `projectId` middleware option, else
+  `ZITADEL_PROJECT_ID`, else the framework's public project id variable
+  (`NEXT_PUBLIC_`, `VITE_` or `PUBLIC_ZITADEL_PROJECT_ID`). `zitadel setup`
+  already writes these to `.env.local`. A deployment that sets none of them must
+  set `ZITADEL_PROJECT_ID`, or nobody is signed in. With `@zitadel/sdk-nuxt`, the
+  public project id (`NUXT_PUBLIC_ZITADEL_PROJECT_ID`) decides unless
+  `nextgen.projectId` names one, so a built server follows it at runtime. A JWT
+  session token must name the project in its `aud` claim. `auth()` in
+  `@zitadel/sdk-next` also takes the project of `configureZitadel()`; with
+  `createProxy(config)`, pass the same project to `auth()` when it lives only in
+  that handle.
+
+  `GET /sessions/me` takes an optional `project_id` and answers a session of
+  another project with `403 sess.project_mismatch`. The SDKs send it, and so do
+  `getSession()` in `@zitadel/sdk-next`, `<zitadel-session>`, `<zitadel-logout>`
+  and the console. `getSession()` takes the project from its `projectId` option,
+  `configureZitadel()` or `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, and without one reads
+  as signed out. Signing out with `<zitadel-logout>` or `<zitadel-session>` no
+  longer ends another project's session. The `AGENTS.md` guidance that
+  `zitadel setup` writes now tells agents to read the session this way.
+
+  A Bearer token that is not this app's no longer decides what happens to the
+  session cookie that came with it: the cookie is judged, and cleared only when
+  the backend refuses it, on its own.
+
+  In `@zitadel/api`, `getMySession()` now takes its query parameters first: call
+  `getMySession(undefined, init)` where you called `getMySession(init)`. In
+  `@zitadel/sdk-core`, `checkOpaqueSessionToken()` and
+  `validateOpaqueSessionToken()` take the project id as a fourth argument, and
+  `resolveSession()` is the one implementation of these rules behind every server
+  SDK's middleware.
+
+  The `@zitadel/sdk-next` middleware also no longer lets a session that has not
+  finished signing in through `protectedRoutes`.
+
+- [#2075](https://github.com/zitadel/nextgen/pull/2075) [`f64c9c4`](https://github.com/zitadel/nextgen/commit/f64c9c46b0475e143abd68c2c16e67f134773f08) Thanks [@mridang](https://github.com/mridang)! - The ZitadelLogin, ZitadelLogout and ZitadelSession wrappers of the React, Vue, Svelte, Solid and Qwik SDKs now pass the standard HTML attributes (class, style, id, title, slot, hidden, role, tabindex, data-* and aria-*) to the widget element, so an app can position, style and label a widget without an extra wrapper element, and their props types accept exactly those attributes besides the widget's own props. All five use one definition, standardAttributes in @zitadel/sdk-core/types, which also exports the widgetTags constant that names the three widget elements. This changes behaviour for React and Vue callers: those wrappers used to pass every extra prop or attribute on to the element, and now pass only the standard attributes, so a prop such as an event handler, srcdoc or part no longer reaches the element. In Svelte, removing the title prop leaves title="null" on the element. In Angular the component tag already carries the standard attributes, so that SDK is unchanged. The TanStack Start entry re-exports the new React types.
+
+### Patch Changes
+
+- [#2097](https://github.com/zitadel/nextgen/pull/2097) [`fce5b01`](https://github.com/zitadel/nextgen/commit/fce5b01506a1941f743c25a51a4011955c7b9bd8) Thanks [@mridang](https://github.com/mridang)! - A `ZITADEL_URL` or `url` option that ends in a slash no longer breaks sign-in. Previously the SDKs requested `//auth/keys` and `//sessions/me` and rejected every token on an issuer mismatch; they now join the backend address and the path properly, and the issuer check stays strict against the address without its trailing slash.
+
+- Updated dependencies [[`0f4b901`](https://github.com/zitadel/nextgen/commit/0f4b901f60f2ed20bff71e321564d3b1fc187eab), [`628e101`](https://github.com/zitadel/nextgen/commit/628e101e5c254ab8bdaca830fc6e4acbd084b41e), [`12b3226`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f), [`f65cebe`](https://github.com/zitadel/nextgen/commit/f65cebe8142daaab33882a8ae22822a75bd94e6f), [`e90dade`](https://github.com/zitadel/nextgen/commit/e90dade940d52ce4827ed63d0171d0de68cf2959)]:
+  - @zitadel/api@1.0.0-alpha.28
+
+## 1.0.0-alpha.27
+
+### Minor Changes
+
+- [#2055](https://github.com/zitadel/nextgen/pull/2055) [`bdf4347`](https://github.com/zitadel/nextgen/commit/bdf4347950868e3c35d3e6109d48f16dbe17781d) Thanks [@fforootd](https://github.com/fforootd)! - Signing in from a deep link now brings you back with its query string. The middleware of `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`, `@zitadel/sdk-sveltekit`, `@zitadel/sdk-solid-start`, `@zitadel/sdk-qwik-city` and `@zitadel/sdk-tanstack-start` sent a signed-out visit to `/dashboard?tab=billing` to `/login?next=%2Fdashboard`, so the filters and tabs in the link were lost after sign-in. It now keeps the query in `next` (`/login?next=%2Fdashboard%3Ftab%3Dbilling`), and `<zitadel-login>` returns to `/dashboard?tab=billing`. A `next` parameter on the visited URL itself is left out, so one login redirect never nests inside another. `@zitadel/sdk-core/middleware` exports the rule as `loginRedirectUrl(loginPath, requestUrl)` for custom integrations.
+
+- [#2055](https://github.com/zitadel/nextgen/pull/2055) [`bdf4347`](https://github.com/zitadel/nextgen/commit/bdf4347950868e3c35d3e6109d48f16dbe17781d) Thanks [@fforootd](https://github.com/fforootd)! - Signing in after a protected route sent you to the login page now takes you back to that route. The middleware of `@zitadel/sdk-next`, `@zitadel/sdk-nuxt` and the other server SDKs sends a signed-out visit to `/login?next=<path>`, and `<zitadel-login>` now returns to that path after sign-in instead of always going to its `post-sign-in-url`, which pages generated by `zitadel setup` set to `/profile`. Only a path on the login page's own origin is followed: a `next` that is a full URL, starts with `//`, or contains a backslash or a control character is ignored, and the widget goes to `post-sign-in-url` as before. Pages that use `next` for something of their own can keep the old behavior with `force-post-sign-in-url` on the element, or `forcePostSignInUrl` on every SDK's `ZitadelLogin`.
+
+### Patch Changes
+
+- [#2069](https://github.com/zitadel/nextgen/pull/2069) [`eec415d`](https://github.com/zitadel/nextgen/commit/eec415d551befd25e3e057b36274fed31743db20) Thanks [@fforootd](https://github.com/fforootd)! - A Zitadel outage or a slow response no longer signs your users out of your app. The middleware of `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`, `@zitadel/sdk-sveltekit`, `@zitadel/sdk-solid-start`, `@zitadel/sdk-qwik-city` and `@zitadel/sdk-tanstack-start` checks the session cookie against `GET /sessions/me`, and cleared every `__nextgen*` cookie whenever that check failed, a `500`, a timeout or a network error included. It now clears them only when Zitadel refuses the session: a `401`, or a `404` for a session that is gone. When the check gets no answer it can act on, the request renders signed out but keeps its cookie, and a protected route answers `503 Service Unavailable` instead of redirecting a user who may well be signed in to the login page; the next request checks again. `@zitadel/sdk-core/middleware` exports the check as `checkOpaqueSessionToken`, which tells a refused session apart from one Zitadel could not judge.
+
+- Updated dependencies []:
+  - @zitadel/api@1.0.0-alpha.27
+
+## 1.0.0-alpha.26
+
+### Minor Changes
+
+- [#373](https://github.com/zitadel/nextgen/pull/373) [`7f82bfc`](https://github.com/zitadel/nextgen/commit/7f82bfc46930d2b8ca4132e569dfa4db4abfd5c7) Thanks [@mridang](https://github.com/mridang)! - Add SvelteKit, TanStack Start, SolidStart and Qwik City meta-framework SDKs, mirroring sdk-next and sdk-nuxt. Each ships a server integration that proxies `/__nextgen/*` to the auth backend (attaching the project secret to the `POST /sessions/exchange` handoff only, and forwarding the identity-provider callback's redirect onto the app), verifies the session JWT via JWKS with the Web Crypto API, and redirects unauthenticated requests on protected routes, plus a `getAuth` helper. The SvelteKit, SolidStart and Qwik City SDKs are server-only; their pages render the login, logout and session widgets with the matching framework component SDK (`@zitadel/sdk-svelte`, `@zitadel/sdk-solid`, `@zitadel/sdk-qwik`). The server glue uses each framework's native primitive: a SvelteKit `handle` hook (`createNextgenHandle`), a SolidStart `onRequest` middleware (`createNextgenMiddleware`), a Qwik City `RequestHandler` (`createNextgenOnRequest`), and a TanStack Start request middleware (`createNextgenRequestMiddleware`, with the framework-agnostic `handleNextgenRequest` core exported too). All JWT verification and proxy logic is shared from `@zitadel/sdk-core`.
+
+  Like the Nuxt SDK, these SDKs sign in only a session that names a user. The backend sets the session cookie before a sign-in verifies any factor, so an anonymous session reads as signed out, and its cookie is kept so its sign-in can still complete. The signed-in session carries the user's `identifier`, `identifierProperty` and `display`, and a dead session cookie is cleared on every unauthenticated response. `protectedRoutes` guards full page loads, while the `ZitadelSession` card covers client-side navigation; each README shows how to guard a page on the server before it renders: a `+page.server.ts` load in SvelteKit, a preloaded server query in SolidStart, a `routeLoader$` in Qwik City and a `beforeLoad` server function in TanStack Start.
+
+  `@zitadel/sdk-core/middleware` exports `validateOpaqueSessionToken`, the backend session check these SDKs share, and `requiresProjectSecret`, the rule that only the `POST /sessions/exchange` handoff carries the project secret.
+
+  `@zitadel/sdk-tanstack-start` also ships the widgets, so a TanStack Start app installs no other Zitadel package. Its `/react` entry exports `@zitadel/sdk-react`'s `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` components (every event callback, `children` slots and the signed-in session card), `businessLocales`, and every type `@zitadel/sdk-react` exports, such as `ZitadelFlowCompleteDetail` for typing a callback. Because TanStack Start server-renders every route, the components render nothing on the server and during hydration and mount right after with every prop in place, so a widget never starts a flow with its defaults. The `/client` entry exports `configureZitadel`, `getApi` and `getZitadelConfig`. The README's `src/start.ts` example registers `createCsrfMiddleware` ahead of auth, because adding that file turns off TanStack Start's automatic CSRF protection for server functions.
+
+  sdk-sveltekit peers `@sveltejs/kit` `^2.0.0 || ^3.0.0` and `svelte` `^5.0.0`, the Svelte range `@zitadel/sdk-svelte` supports. sdk-solid-start peers `solid-js` `^1.8.0`, the range `@zitadel/sdk-solid` supports.
+
+  sdk-qwik-city targets Qwik 2: it peers `@qwik.dev/core` and `@qwik.dev/router` (`^2.0.0-beta.45`), like `@zitadel/sdk-qwik`, whose widgets its pages render. A Qwik 1 City app (`@builder.io/qwik-city`) must migrate to `@qwik.dev/*` first. It reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` per request from Qwik City's `ev.env`, which carries `.env.local`, falling back to `process.env`.
+
+  The CLI now detects, scaffolds, and integrates all four meta-frameworks end to end. New detectors recognise SvelteKit (`@sveltejs/kit`), SolidStart (`@solidjs/start`), Qwik City on Qwik 2 (`@qwik.dev/router`) and TanStack Start (`@tanstack/react-start`) and run before their base-SPA detectors so a meta-framework app is no longer mistaken for a bare SPA (the React detector now also excludes TanStack Start). Each gains a scaffolder and a patcher that wires the framework-native server entrypoint (`src/hooks.server.ts`; `src/middleware.ts` registered via the `solidStart()` plugin in `vite.config.ts`; `src/routes/plugin@nextgen.ts`; and a `src/start.ts` request middleware respectively), the landing/login/register/profile routes rendering the widgets from the framework component SDK (from `@zitadel/sdk-tanstack-start/react` for TanStack Start), the public project-id env var, and the matching `@zitadel/sdk-*` dependency. SvelteKit pages read the project id from `VITE_ZITADEL_PROJECT_ID`, which setup seeds in `.env.local`. The generated `/profile` page renders the "signed in as" session card with sign-out, and `setup --use-case business` wires the `businessLocales` work-email copy into the login and register pages. Setup pins the app's `dev` script to the port it registers as the project's origin, with `--strictPort`, and refuses a SolidStart 1 app up front with the reason. `doctor` treats the auth entrypoint, and SolidStart's `vite.config` middleware registration, as managed infrastructure and fails when either is missing.
+
+- [#1630](https://github.com/zitadel/nextgen/pull/1630) [`3949dab`](https://github.com/zitadel/nextgen/commit/3949daba71747aa6590ef6d454df482329f3322b) Thanks [@peintnermax](https://github.com/peintnermax)! - feat: password fields in `<zitadel-login>` now have a show/hide button, as
+  NIST SP 800-63B recommends. It is on by default; set `suppress-password-toggle`
+  on the element (a `suppressPasswordToggle` prop on every framework wrapper) to
+  hide it. The setting belongs to the embedding page and is not stored with the
+  branding.
+
+  The button replaces the clear button on password fields, so the field shows
+  one icon. It sits in the tab order right after the input, so keyboard users
+  can reach it, while a pointer click keeps focus in the field. A revealed
+  field opts out of spellcheck and autocorrect, and it is hidden again on
+  submit, form reset and step change. The widget applies the setting to its
+  fields directly, so it also holds for ejected templates; it is not a
+  `<zl-field>` attribute.
+
+  `@zitadel/testing`: the flow helpers' label fallback (`flowField` with a
+  `label`, used by `loginWithPassword` and `registerWithPassword`) now matches
+  the field by its textbox role, so the toggle's "Show password" name never
+  competes with the password field.
+
+- [#1938](https://github.com/zitadel/nextgen/pull/1938) [`9564ecf`](https://github.com/zitadel/nextgen/commit/9564ecf403a6e3383c7bf2215708e897aed1f124) Thanks [@mridang](https://github.com/mridang)! - Every SDK's `ZitadelLogin` now takes `resumeFlowId`, documented in its README, so a page can resume an existing sign-in flow (for example one kept across a reload) without reaching for the element. Clearing it, or passing `null` or an empty string, on `<zitadel-login>` now means "no handle" in every framework, which falls back to the `flow` query parameter as before.
+
+### Patch Changes
+
+- [#1633](https://github.com/zitadel/nextgen/pull/1633) [`290dfe6`](https://github.com/zitadel/nextgen/commit/290dfe6f1c9b45d592e42703573a6acd5b16fa2a) Thanks [@wim07101993](https://github.com/wim07101993)! - Each sign-in provider connection now has its own callback route, `GET /__nextgen/idp/{slug}/callback`, also served as `/idp/{slug}/callback` for a scaffolded app's SDK proxy. The authorize request and the token exchange send it as `redirect_uri`. The shared `/__nextgen/idp/callback` route is removed. This is a breaking change: if you registered it at a provider, register the connection's own URI instead, for example `http://localhost:3000/__nextgen/idp/google/callback`, or sign-in with that provider fails. `zitadel sso enable --provider <slug>` prints it. The route defends against the IdP mix-up attack (RFC 9700 §4.4): a callback whose path names another connection than the one the sign-in started with is refused before any code exchange, the step the sign-in started from shows `error.sso_failed`, and the events stream records `auth.sso.exchange.failed`, or `auth.sso.authorization.failed` when no code arrived. When the provider sends the RFC 9207 `iss` parameter, the callback also refuses a value that is not the connection's issuer, the same way. A response without `iss` is not refused, even from a provider that advertises it. The SDK `proxyPath` docs name the new route.
+
+- [#1900](https://github.com/zitadel/nextgen/pull/1900) [`a76143e`](https://github.com/zitadel/nextgen/commit/a76143ef82829d098a30de40542f1c9bffb8eb99) Thanks [@mridang](https://github.com/mridang)! - JWT verification now caches each issuer's whole JWKS document instead of one key per `kid`. A token naming a `kid` the cached keys lack refreshes them — how a rotated key is picked up — at most once every 30 seconds, and concurrent misses share one fetch; previously any token with a made-up `kid` cost a JWKS request, an unauthenticated way to load the backend on every request. An EC key that names no `alg` now verifies (its curve decides the algorithm), and a token whose `alg` cannot fit the key is rejected quietly instead of logging an error. `clearJwksCache()` drops the cached keys, for example after a key compromise. An expired key set is never used when its refresh fails, a failed fetch counts toward the 30 second throttle so a failing endpoint is not retried on every request, and `clearJwksCache()` also discards fetches that were already in flight.
+
+- [#1901](https://github.com/zitadel/nextgen/pull/1901) [`4a5578b`](https://github.com/zitadel/nextgen/commit/4a5578bf825132c047f37d124d616a3a4f9e9da9) Thanks [@mridang](https://github.com/mridang)! - `protectedRoutes` and `ignoredRoutes` entries now match with or without a trailing slash, so `/profile/` can no longer bypass `protectedRoutes: ["/profile"]`.
+
+- [#1902](https://github.com/zitadel/nextgen/pull/1902) [`40c35c8`](https://github.com/zitadel/nextgen/commit/40c35c8f49e4e967ff701cf510b6cc6a4e776fc8) Thanks [@mridang](https://github.com/mridang)! - The proxy no longer forwards the client's `content-length` header with a re-sent body, which undici rejected as an invalid argument and which surfaced only as an opaque "fetch failed".
+
+- [#373](https://github.com/zitadel/nextgen/pull/373) [`7f82bfc`](https://github.com/zitadel/nextgen/commit/7f82bfc46930d2b8ca4132e569dfa4db4abfd5c7) Thanks [@mridang](https://github.com/mridang)! - - `@zitadel/sdk-qwik` applied the widget config only imperatively, from a `ref` callback and a `useVisibleTask$`. Qwik resumes server-rendered markup instead of re-rendering it, so under SSR the `ref` never ran and the widget upgraded unconfigured ("requires a configured project", and a `login` flow on a register page) before the visible task re-bound it. The components now also emit their attribute-backed config declaratively — `project-id` / `proxy-path` / `url` (from the `project` handle or the discrete props), `purpose`, `post-sign-in-url`, `post-sign-out-url` and the rest — which Qwik serialises into the server-rendered HTML, so the widget is configured the instant it upgrades. Property-only config (the full `project` handle, `locales`) is still bound on the client.
+  - `@zitadel/sdk-core`'s `HOP_BY_HOP` set now includes `content-length`, so a proxy that re-sends a buffered body no longer forwards the client's value. undici computes the length itself and rejects a forwarded one with `UND_ERR_INVALID_ARG`, which surfaced as an opaque "fetch failed".
+- Updated dependencies [[`17f56de`](https://github.com/zitadel/nextgen/commit/17f56de60ea40128898b6142d93a22c6fc6f2acd), [`c3e8fa4`](https://github.com/zitadel/nextgen/commit/c3e8fa47306d9f286d07303fea977e3f6d910d7d), [`b4886f9`](https://github.com/zitadel/nextgen/commit/b4886f98de362ef6e80cb5e49a38e97daa2288b0), [`4a4132f`](https://github.com/zitadel/nextgen/commit/4a4132fd2dc13f3a833a7aa0ab1dd35ef9b8fd6b), [`44abdb8`](https://github.com/zitadel/nextgen/commit/44abdb8e827ce34d7aae8d620d43904b3142baf9), [`36fbcb4`](https://github.com/zitadel/nextgen/commit/36fbcb4e5383a0d6764efc44e9ac6da4e5c8d596), [`c205f49`](https://github.com/zitadel/nextgen/commit/c205f49fa0c6c0ea44407da6776cdb6e5dcfdfc9), [`8182584`](https://github.com/zitadel/nextgen/commit/8182584001fe2115851022e8f92e696db52ee8be)]:
+  - @zitadel/api@1.0.0-alpha.26
+
 ## 1.0.0-alpha.25
 
 ### Minor Changes

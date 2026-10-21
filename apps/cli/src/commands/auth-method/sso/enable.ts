@@ -21,6 +21,7 @@ import {
 } from "@zitadel/config/idp";
 
 import type { ZitadelClient } from "../../../lib/api-client";
+import { loopbackReach } from "../../../lib/local-server/runtime";
 import { refuseBrokenFlows, refuseUneditable } from "../../../lib/auth-methods";
 import { isDevelopmentBuild } from "../../../lib/build-channel";
 import { ZitadelError } from "../../../lib/errors";
@@ -134,8 +135,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     });
     // Resolved before anything is asked for: being turned away after typing a
     // secret would mean typing it again.
-    const { client, projectId } = await this.connect({ quiet: true });
+    const { client, projectId, server } = await this.connect({ quiet: true });
     const { nonInteractive, dryRun } = this.meta;
+    // A loopback issuer works only on a server that may fetch from this machine.
+    const loopback = loopbackIssuerWarning(selection, await loopbackReach(cwd, server));
+    if (loopback !== undefined) {
+      reportWarning(loopback);
+    }
     const provider = selectionName(selection);
     // `--cwd` and the run's `--env`/`--env-file`/`--server`, so every follow-up
     // reaches the project this run published to.
@@ -573,10 +579,6 @@ async function readProject(
     ENABLE_FLAG_NAMES,
     customExample(ENABLE_FLAG_NAMES),
   );
-  const loopback = loopbackIssuerWarning(selection);
-  if (loopback !== undefined) {
-    reportWarning(loopback);
-  }
   const entry = providerOf(selection);
   if (issuer === undefined) {
     throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {

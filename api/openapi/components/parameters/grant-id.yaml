@@ -1,0 +1,7 @@
+name: id
+in: path
+required: true
+description: Managed assignment id (`asgn_<opaque>`).
+schema:
+  type: string
+example: asgn_01KWH9D4R2V7F0N9WD3P2E4YM8

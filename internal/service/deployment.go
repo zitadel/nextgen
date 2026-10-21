@@ -35,10 +35,24 @@ type CreateDeploymentOutput struct {
 	Created    bool
 }
 
+// DeployInput carries the targets as the request gives them.
+type DeployInput struct {
+	// HasTTL reports a ttl in the request, which only a preview deploy takes.
+	HasTTL               bool
+	ProjectID            string
+	ReleaseID            string
+	Targets              []string
+	Reason               domain.DeploymentReason
+	Message              *string
+	ExpectedDeploymentID *string
+}
+
 type ListDeploymentsInput struct {
 	ProjectID string
 	// Origin narrows the list to one origin's history.
 	Origin *string
+	// Live lists what is served now instead of the history.
+	Live bool
 	// IncludeReleases embeds the release each deployment made live (ADR 059).
 	IncludeReleases bool
 	PageToken       string
@@ -50,7 +64,9 @@ type ListDeploymentsOutput struct {
 	// ReleasesByID holds the releases the listed deployments point at, keyed
 	// by id, when IncludeReleases asked for them. Nil otherwise: the caller
 	// distinguishes "did not ask" from "none found".
-	ReleasesByID  map[string]*domain.Release
+	ReleasesByID map[string]*domain.Release
+	// Live holds the ids of the listed deployments that are live now.
+	Live          map[string]bool
 	NextPageToken string
 }
 
@@ -70,7 +86,10 @@ const maxDeployAttempts = 3
 // what each origin serves and writes without holding a lock, and a concurrent
 // deploy to one of the origins makes the write fail. A guarded deploy then
 // answers a conflict with the winner; an unguarded one retries on top of it.
-func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentInput) (*CreateDeploymentOutput, error) {
+func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentInput) (_ *CreateDeploymentOutput, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.Create")
+	defer end(&err)
+
 	actor, _ := audit.ActorFromContext(ctx)
 	entity, err := domain.NewDeployment(input.ProjectID, input.ReleaseID, input.OriginKind, input.Origins, domain.DeploymentMetadata{
 		Reason:         input.Reason,
@@ -83,7 +102,7 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 		return nil, err
 	}
 	if entity.OriginKind == domain.DeploymentOriginKindPreview && input.PreviewTTL <= 0 {
-		return nil, domain.ErrDeploymentInvalid("a deployment to preview URLs needs a ttl", nil)
+		return nil, domain.ErrDeploymentInvalid().WithMessage("a deployment to preview URLs needs a ttl")
 	}
 
 	for attempt := 1; ; attempt++ {
@@ -104,8 +123,47 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 	}
 }
 
-// conflict answers a deploy that lost the optimistic lock with the newest
-// deployment to its origins.
+// Deploy resolves the targets against the project's origins, then creates
+// the deployment.
+func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *CreateDeploymentOutput, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.Deploy")
+	defer end(&err)
+
+	origins, err := s.projectOrigins(ctx, input.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	kind, resolved, err := domain.ResolveDeploymentTargets(origins, input.Targets)
+	if err != nil {
+		return nil, err
+	}
+	if input.HasTTL && kind == domain.DeploymentOriginKindPrimary {
+		return nil, domain.ErrDeploymentInvalid().WithMessage("ttl is only valid for preview URLs")
+	}
+	return s.Create(ctx, CreateDeploymentInput{
+		ProjectID:            input.ProjectID,
+		ReleaseID:            input.ReleaseID,
+		OriginKind:           kind,
+		Origins:              resolved,
+		Reason:               input.Reason,
+		Message:              input.Message,
+		ExpectedDeploymentID: input.ExpectedDeploymentID,
+	})
+}
+
+func (s *DeploymentService) projectOrigins(ctx context.Context, projectID string) ([]domain.Origin, error) {
+	project, err := s.v2Pool.Statements().GetProjectByID(ctx, projectID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrProjectNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get project from database")
+	}
+	return project.Origins, nil
+}
+
+// conflict answers a deploy that lost the optimistic lock with the deployment
+// it would have replaced.
 func (s *DeploymentService) conflict(ctx context.Context, entity *domain.Deployment) error {
 	_, current, err := servedBy(ctx, s.v2Pool.Statements(), entity)
 	if err != nil {
@@ -114,12 +172,18 @@ func (s *DeploymentService) conflict(ctx context.Context, entity *domain.Deploym
 	return domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: current})
 }
 
-// servedBy reads what entity's origins serve, and the newest deployment to
-// them, nil when nothing was deployed there.
+// servedBy reads what entity's origins hold, for the optimistic lock, and the
+// deployment entity replaces: the project's newest primary deployment, or the
+// newest deployment to its preview URLs. nil when there is none.
+// TODO(#1572): lock primary deploys per project.
 func servedBy(ctx context.Context, stmts AllStatements, entity *domain.Deployment) ([]domain.OriginDeployment, *domain.Deployment, error) {
 	read, err := stmts.GetNewestPerOrigin(ctx, entity.ProjectID, entity.Origins())
 	if err != nil {
 		return nil, nil, err
+	}
+	if entity.OriginKind == domain.DeploymentOriginKindPrimary {
+		current, err := newestPrimary(ctx, stmts, entity.ProjectID)
+		return read, current, err
 	}
 	newest := domain.NewestOriginDeployment(read)
 	if newest == nil {
@@ -148,7 +212,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 		if err := domain.CheckExpectedDeployment(current, input.ExpectedDeploymentID); err != nil {
 			return err
 		}
-		if entity.Unchanged(read) {
+		if domain.DeploymentsEqual(entity, current) {
 			output = &CreateDeploymentOutput{Deployment: current}
 			return nil
 		}
@@ -163,6 +227,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
+		// TODO(#1781): freeze the deployment's variables here, in this transaction.
 		if written.OriginKind == domain.DeploymentOriginKindPreview {
 			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
 				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {
@@ -189,7 +254,10 @@ func emitDeploymentCreated(ctx context.Context, stmts EventStatements, entity *d
 	})
 }
 
-func (s *DeploymentService) Get(ctx context.Context, projectID, id string) (*domain.Deployment, error) {
+func (s *DeploymentService) Get(ctx context.Context, projectID, id string) (_ *domain.Deployment, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.Get")
+	defer end(&err)
+
 	entity, err := s.v2Pool.Statements().GetDeploymentByID(ctx, projectID, id)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -202,7 +270,10 @@ func (s *DeploymentService) Get(ctx context.Context, projectID, id string) (*dom
 
 // GetByIDs reads the named deployments keyed by id. Ids nothing answers to
 // are simply absent.
-func (s *DeploymentService) GetByIDs(ctx context.Context, projectID string, ids []string) (map[string]*domain.Deployment, error) {
+func (s *DeploymentService) GetByIDs(ctx context.Context, projectID string, ids []string) (_ map[string]*domain.Deployment, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.GetByIDs")
+	defer end(&err)
+
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -217,17 +288,22 @@ func (s *DeploymentService) GetByIDs(ctx context.Context, projectID string, ids 
 	return byID, nil
 }
 
-func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput) (*ListDeploymentsOutput, error) {
-	opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
-	opts.Pagination.Cursor = []byte(input.PageToken)
+func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput) (_ *ListDeploymentsOutput, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.List")
+	defer end(&err)
 
-	result, err := s.v2Pool.Statements().ListDeployments(ctx, opts)
+	list := s.listHistory
+	if input.Live {
+		list = s.listLive
+	}
+	result, live, err := list(ctx, input)
 	if err != nil {
-		return nil, mapListError(err, "failed to list deployments")
+		return nil, err
 	}
 
 	output := &ListDeploymentsOutput{
 		Items:         result.Items,
+		Live:          live,
 		NextPageToken: string(result.NextCursor),
 	}
 	if input.IncludeReleases {
@@ -238,6 +314,40 @@ func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput
 		output.ReleasesByID = releases
 	}
 	return output, nil
+}
+
+// listHistory lists the project's deployments newest first, with the ids of
+// the listed ones that are live now.
+func (s *DeploymentService) listHistory(ctx context.Context, input ListDeploymentsInput) (*database.ListResult[*domain.Deployment], map[string]bool, error) {
+	opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
+	opts.Pagination.Cursor = []byte(input.PageToken)
+	result, err := s.v2Pool.Statements().ListDeployments(ctx, opts)
+	if err != nil {
+		return nil, nil, mapListError(err, "failed to list deployments")
+	}
+	live, err := s.liveIDs(ctx, input.ProjectID, result.Items)
+	return result, live, err
+}
+
+// listLive is the live view, newest first: the deployments some origin serves
+// now, each narrowed to the origins it serves, so all of them are live. With
+// an origin, it is the one deployment serving it.
+func (s *DeploymentService) listLive(ctx context.Context, input ListDeploymentsInput) (*database.ListResult[*domain.Deployment], map[string]bool, error) {
+	now := time.Now()
+	opts := deployment.LiveListOptions(input.ProjectID, nil, uint32(normalizeLimit(input.Limit)))
+	opts.Pagination.Cursor = []byte(input.PageToken)
+	if input.Origin != nil {
+		opts.Filter = database.And(opts.Filter, deployment.ServesOrigin(*input.Origin, now))
+	}
+	result, err := s.v2Pool.Statements().ListLiveDeployments(ctx, now, opts)
+	if err != nil {
+		return nil, nil, mapListError(err, "failed to list live deployments")
+	}
+	live := make(map[string]bool, len(result.Items))
+	for _, entity := range result.Items {
+		live[entity.ID] = true
+	}
+	return result, live, nil
 }
 
 // releasesFor hydrates the releases a page of deployments points at, batched:
@@ -261,4 +371,50 @@ func (s *DeploymentService) releasesFor(ctx context.Context, projectID string, i
 		byID[release.ID] = release
 	}
 	return byID, nil
+}
+
+// Read gets a deployment and whether it is live now.
+func (s *DeploymentService) Read(ctx context.Context, projectID, id string) (_ *domain.Deployment, _ bool, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.Read")
+	defer end(&err)
+
+	entity, err := s.Get(ctx, projectID, id)
+	if err != nil {
+		return nil, false, err
+	}
+	live, err := s.liveIDs(ctx, projectID, []*domain.Deployment{entity})
+	if err != nil {
+		return nil, false, err
+	}
+	return entity, live[entity.ID], nil
+}
+
+// liveIDs reports which of items are live, by the storage live predicate. It
+// is a status lookup, not the caller's list, so it reads unfiltered.
+func (s *DeploymentService) liveIDs(ctx context.Context, projectID string, items []*domain.Deployment) (map[string]bool, error) {
+	live := make(map[string]bool, len(items))
+	if len(items) == 0 {
+		return live, nil
+	}
+	result, err := s.v2Pool.Statements().ListLiveDeployments(WithAuthzListUnrestricted(ctx), time.Now(), &database.ListOptions[domain.DeploymentField]{
+		Filter:     deployment.ByIDs(projectID, deployment.DeploymentIDs(items)),
+		Pagination: database.Page[domain.DeploymentField]{Limit: uint32(len(items)), OrderBy: deployment.NewestFirst()},
+	})
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the live deployments")
+	}
+	for _, entity := range result.Items {
+		live[entity.ID] = true
+	}
+	return live, nil
+}
+
+// newestPrimary is the project's newest primary deployment, nil when none.
+// It is a lookup, not the caller's list, so it reads unfiltered.
+func newestPrimary(ctx context.Context, stmts DeploymentStatements, projectID string) (*domain.Deployment, error) {
+	result, err := stmts.ListDeployments(WithAuthzListUnrestricted(ctx), deployment.NewestOfKindOptions(projectID, domain.DeploymentOriginKindPrimary))
+	if err != nil || len(result.Items) == 0 {
+		return nil, err
+	}
+	return result.Items[0], nil
 }

@@ -1,6 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
-import { ApiError } from "@zitadel/api/runtime/fetch";
+import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
 import { AlertCircle, Loader2, TriangleAlert } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
@@ -54,11 +54,16 @@ export function PendingState() {
  *   Console session, for instance). Redirecting would bounce straight back and
  *   loop, so this renders an honest error state instead.
  *
- * 403 stays a rendered state — signed in, but no access.
+ * A `403 sess.project_mismatch` is probed the same way: the cookie now holds a
+ * session of another project, such as an app's on the same host, so the
+ * console's own session is gone. Any other 403 stays a rendered state —
+ * signed in, but no access.
  */
 export function ErrorState({ error }: ErrorComponentProps) {
   const router = useRouter();
-  const unauthenticated = error instanceof ApiError && error.status === 401;
+  const unauthenticated =
+    error instanceof ApiError &&
+    (error.status === 401 || apiErrorCode(error) === "sess.project_mismatch");
   // null = probing, true = signed in (render copy), false = redirecting.
   const [sessionAlive, setSessionAlive] = useState<boolean | null>(null);
 

@@ -87,6 +87,28 @@ does not cover IAM setup.
 
 Migrations run automatically when the server starts.
 
+## Sessions
+
+| YAML key              | Environment                   | Default          | Description                                                                                      |
+| --------------------- | ----------------------------- | ---------------- | ------------------------------------------------------------------------------------------------ |
+| `session.default_ttl` | `NEXTGEN_SESSION_DEFAULT_TTL` | `24h`            | How long a session lasts after a completed sign-in, when the sign-in does not ask for a lifetime |
+| `session.max_ttl`     | `NEXTGEN_SESSION_MAX_TTL`     | `720h` (30 days) | Longest lifetime a sign-in may ask for. `default_ttl` must not exceed it                         |
+
+Both take Go durations (`90m`, `24h`, `168h`); there is no unit for days.
+
+The lifetime starts when the sign-in completes (`POST /sessions/exchange`). Using the session does not extend it. When
+it runs out, the session cookie stops working, `GET /sessions/me` answers `401`, and the user signs in again. A sign-in
+can ask for another lifetime with the `ttl` field of the exchange, up to `session.max_ttl`; the SDKs do not set it.
+
+An anonymous session, which a client can create before anyone signs in (`POST /sessions`), lasts 10 minutes. This is
+not configurable. When a sign-in completes on that session, it gets the full lifetime above.
+
+```yaml
+session:
+  default_ttl: 168h # a week
+  max_ttl: 720h
+```
+
 ## Logging
 
 | YAML key                      | Environment                           | Default                                       | Description                   |
@@ -112,6 +134,42 @@ instrumentation:
     level: debug
     format: json
     streams: [request, service]
+```
+
+## Tracing
+
+| YAML key                                        | Environment                                             | Default | Description                                 |
+| ----------------------------------------------- | ------------------------------------------------------- | ------- | ------------------------------------------- |
+| `instrumentation.trace.exporter.type`           | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE`           | unset   | Where spans are sent                        |
+| `instrumentation.trace.exporter.endpoint`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT`       | unset   | Collector address for `grpc` and `http`     |
+| `instrumentation.trace.exporter.insecure`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE`       | `false` | Plain-text connection for `grpc` and `http` |
+| `instrumentation.trace.exporter.batch_duration` | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION` | unset   | Longest wait before buffered spans are sent |
+| `instrumentation.trace.fraction`                | `NEXTGEN_INSTRUMENTATION_TRACE_FRACTION`                | `1.0`   | Share of incoming requests that are traced  |
+
+- `exporter.type`: `none`, `stdout`, `stderr`, `grpc`, `http`, `google` (set
+  `exporter.google_project_id`), `auto`.
+- Spans are exported only when an exporter type is set and is not `none`.
+  Without an exporter, requests are still sampled at `fraction` and get trace
+  and span IDs, so exported log records can still be grouped by request. The
+  spans themselves are dropped.
+- `auto` reads the standard OpenTelemetry environment variables
+  (`OTEL_TRACES_EXPORTER`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and the others). When
+  none of them is set, no spans are exported.
+- Always set `exporter.batch_duration` together with an exporter. Left unset,
+  it is zero, and the exporter keeps one CPU core busy even when the server
+  is idle.
+- A traced request keeps all of its spans, including one span per database
+  statement.
+
+```yaml
+instrumentation:
+  trace:
+    fraction: 0.01
+    exporter:
+      type: grpc
+      endpoint: otel-collector:4317
+      insecure: true
+      batch_duration: 5s
 ```
 
 ## Config file search paths

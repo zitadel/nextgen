@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import { frameworkForId, frameworkIds } from "./frameworks.mjs";
 
 // The pre-existing-app lane covers the widget posture (ADR 044), which is
@@ -63,6 +65,21 @@ export function assertPrebuiltTarballs(options, env) {
         "(`moon run release:pack`) and hand them over with " +
         "JOURNEY_TARBALLS_DIR=dist/release/<version>/npm, or run the journey " +
         "alone with `moon run e2e:journey -- --ci`, which packs its own",
+    );
+  }
+}
+
+/**
+ * The framework lanes start the mock OIDC provider (tools/oidc-mock) when
+ * `moon run oidc-mock:build` has built it; run by hand without it, the specs
+ * that need it skip themselves. Under --ci a missing binary stops the run, so
+ * those specs never skip silently there.
+ */
+export function assertOidcMock(options, binary) {
+  if (options.ci && !existsSync(binary)) {
+    throw new Error(
+      `the mock OIDC provider binary is missing (${binary}); ` +
+        "build it with `moon run oidc-mock:build`",
     );
   }
 }

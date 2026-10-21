@@ -13,6 +13,7 @@ type ReleasePackage = {
 };
 
 type ReleaseManifestModule = {
+  APP_RELEASE_PACKAGES: ReleasePackage[];
   SERVER_PLATFORM_PACKAGES: Array<{ packageName: string }>;
   PUBLIC_PACKAGE_BUILD_TARGETS: string[];
   PUBLIC_PACKAGE_DIRS: string[];
@@ -69,6 +70,29 @@ describe("release manifest", () => {
 
       const moonConfig = await readFile(join(repoRoot, pkg.dir, "moon.yml"), "utf8");
       expect(moonConfig).toContain(`  ${task}:`);
+    }
+  });
+
+  it("gives a generated app every @zitadel package its SDKs depend on", async () => {
+    const appNames = new Set(manifest.APP_RELEASE_PACKAGES.map((pkg) => pkg.name));
+    expect(appNames).toContain("@zitadel/sdk-next");
+    expect(appNames).not.toContain("@zitadel/cli");
+    expect(appNames).not.toContain("@zitadel/server");
+    expect(appNames).not.toContain("@zitadel/testing");
+
+    for (const pkg of manifest.APP_RELEASE_PACKAGES) {
+      // The wrapper builds each one through its moon `build` task.
+      expect(pkg.moonProject).toBeTruthy();
+      const packageJson = JSON.parse(
+        await readFile(join(repoRoot, pkg.dir, "package.json"), "utf8"),
+      ) as Record<string, Record<string, string> | undefined>;
+      for (const field of ["dependencies", "peerDependencies", "optionalDependencies"]) {
+        for (const name of Object.keys(packageJson[field] ?? {})) {
+          if (name.startsWith("@zitadel/")) {
+            expect(appNames, `${pkg.name} ${field}`).toContain(name);
+          }
+        }
+      }
     }
   });
 

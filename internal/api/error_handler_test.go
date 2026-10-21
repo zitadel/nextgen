@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -248,6 +251,7 @@ var dualSchemeRequests = []struct {
 	{"user create", http.MethodPost, "/users?project_id=proj_1", `{}`},
 	{"user get", http.MethodGet, "/users/user_1", ""},
 	{"user passkeys", http.MethodGet, "/users/user_1/passkeys", ""},
+	{"user patch", http.MethodPatch, "/users/user_1", `{"attributes":{"nickname":"x"}}`},
 	{"user delete", http.MethodDelete, "/users/user_1", ""},
 	{"team create", http.MethodPost, "/teams?project_id=proj_1", `{"name":"x"}`},
 	{"team update", http.MethodPatch, "/teams/team_1", `{"name":"x"}`},
@@ -275,6 +279,7 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		api.GetTeamOperation,
 		api.CreateUserOperation,
 		api.GetUserByIDOperation,
+		api.PatchUserByIDOperation,
 		api.DeleteUserByIDOperation,
 		api.CreateTeamOperation,
 		api.UpdateTeamOperation,
@@ -430,6 +435,74 @@ func TestValidationFieldPaths(t *testing.T) {
 	require.Nil(t, validationFieldPaths(&ogenerrors.DecodeRequestError{Err: errors.New("unexpected end of JSON input")}))
 }
 
+// unmappedClientCodes are the codes errorResponse answers with 500 only because
+// no mapper lists them, though they are not server faults: they can be caused
+// by client input or a caller's mistake. A service span keeps status Unset for
+// them. Map such a code to its 4xx when it reaches a handler, then drop it here.
+var unmappedClientCodes = map[string]bool{
+	"att.sso_state_invalid":       true,
+	"auth.csrf_invalid":           true,
+	"claim.session_expired":       true,
+	"claim.session_not_active":    true,
+	"claim.session_wrong_project": true,
+	"enc_key.no_replacement_key":  true,
+	"enc_key.not_found":           true,
+	"idp.endpoint_cleartext":      true,
+	"idp.endpoints_partial":       true,
+	"idp.protocol_block_missing":  true,
+	"idp.scopes_missing_openid":   true,
+	"tkn.invalid":                 true,
+	"tkn.invalid_tknid":           true,
+	"tkn.revoked":                 true,
+	"user.password_invalid":       true,
+}
+
+// serverFaultStatus is the status each server-fault code is answered with.
+// A code missing here is answered with a 500.
+var serverFaultStatus = map[string]int{
+	domain.ErrNotImplemented().Code: http.StatusNotImplemented,
+	domain.ErrUnavailable().Code:    http.StatusServiceUnavailable,
+}
+
+// TestErrorResponse_serverFaultsAre5xx keeps the HTTP status and
+// domain.IsServerFault, which a service span reads, from drifting apart: every
+// code in the generated error catalog that gets a 5xx must be a server fault,
+// or be listed in unmappedClientCodes.
+func TestErrorResponse_serverFaultsAre5xx(t *testing.T) {
+	t.Parallel()
+
+	files, err := filepath.Glob("../../api/openapi/components/schemas/errors/*.yaml")
+	require.NoError(t, err)
+	require.NotEmpty(t, files, "the generated error catalog is missing")
+	constRe := regexp.MustCompile(`(?m)^\s+const: (\S+)$`)
+	for _, file := range files {
+		raw, err := os.ReadFile(file)
+		require.NoError(t, err)
+		m := constRe.FindSubmatch(raw)
+		require.NotNil(t, m, "no code in %s", file)
+		code := string(m[1])
+
+		// The parent carries another server-fault code, so a status read from
+		// the parent instead of the body code fails here.
+		e := domain.Error{Code: code, Parent: domain.ErrUnavailable()}
+		resp := errorResponse(e)
+		is5xx := resp.StatusCode >= http.StatusInternalServerError
+		switch {
+		case domain.IsServerFault(e):
+			require.Equal(t, api.ErrorCode(code), resp.Response.Code)
+			want, ok := serverFaultStatus[code]
+			if !ok {
+				want = http.StatusInternalServerError
+			}
+			require.Equal(t, want, resp.StatusCode, "%s is a server fault answered with the wrong status", code)
+		case unmappedClientCodes[code]:
+			require.True(t, is5xx, "%s is mapped now: remove it from unmappedClientCodes", code)
+		default:
+			require.False(t, is5xx, "%s gets a 5xx: add it to the server faults in internal/domain/error.go, or map it to a 4xx", code)
+		}
+	}
+}
+
 // A security handler that cannot reach a decision (the CSRF request state is
 // missing because WithCSRFRequest is not wired) is a server fault: 500, not
 // the 401 a refused credential gets.
@@ -444,6 +517,67 @@ func TestOgenErrorHandlerSecurityInternalErrorIs500(t *testing.T) {
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 	require.JSONEq(t, `{"code":"internal","message":"An unexpected error occurred."}`, rec.Body.String())
+}
+
+// Attributes failing the user schema keep their own code inside the server,
+// but answer as request validation does: req.invalid with the stable message
+// and the failing field paths, never the validator text.
+func TestErrorResponseUserAttributesInvalidIsRequestInvalid(t *testing.T) {
+	t.Parallel()
+
+	_, validationErr := domain.NewCreateUser(domain.CreateUserParams{
+		ProjectID:  "proj_1",
+		SchemaURL:  "https://example.test/schema.json",
+		Schema:     []byte(`{"type": "object", "required": ["country"], "properties": {"age": {"type": "integer"}, "country": {"type": "string"}}}`),
+		Attributes: map[string]any{"age": "secret-value"},
+	})
+	require.ErrorIs(t, validationErr, domain.ErrUserAttributesInvalid(nil))
+
+	got := errorResponse(userAttributesRequestInvalid(validationErr))
+
+	require.Equal(t, http.StatusBadRequest, got.StatusCode)
+	require.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), got.Response.Code)
+	require.Equal(t, domain.ErrRequestInvalid().Message, got.Response.Message)
+	body, err := got.Response.MarshalJSON()
+	require.NoError(t, err)
+	require.JSONEq(t, `{"code":"req.invalid","message":`+fmt.Sprintf("%q", domain.ErrRequestInvalid().Message)+
+		`,"details":{"details":{"fields":["attributes.age","attributes.country"]}}}`, string(body))
+	require.NotContains(t, string(body), "secret-value")
+
+	// Outside the /users endpoints no request body carries attributes, so a
+	// flow answers the failure as before.
+	flow := errorResponse(validationErr)
+	require.Equal(t, http.StatusBadRequest, flow.StatusCode)
+	require.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), flow.Response.Code)
+	require.Equal(t, "user is not valid according to schema", flow.Response.Message)
+	require.False(t, flow.Response.Details.Set)
+}
+
+// The domain names attributes by key; the API names them by their path from
+// the request body, and a failure on the document itself names attributes.
+func TestErrorResponseUserAttributesAreNamedByBodyPath(t *testing.T) {
+	t.Parallel()
+
+	conflict := errorResponse(domain.ErrUserAlreadyExists().WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"email"}}))
+	require.Equal(t, http.StatusConflict, conflict.StatusCode)
+	require.Equal(t, api.ErrorCode(domain.ErrUserAlreadyExists().Code), conflict.Response.Code)
+	require.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Response.Details.Value["details"]))
+
+	invalid := errorResponse(userAttributesRequestInvalid(domain.ErrUserAttributesInvalid(nil).
+		WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"", "address.zip"}})))
+	require.Equal(t, http.StatusBadRequest, invalid.StatusCode)
+	require.JSONEq(t, `{"fields":["attributes","attributes.address.zip"]}`, string(invalid.Response.Details.Value["details"]))
+}
+
+// A schema failure that names no attributes has no fields to report, so it is
+// answered as a schema failure, never as req.invalid with an empty list.
+func TestErrorResponseUserAttributesInvalidWithoutKeysStaysUserInvalid(t *testing.T) {
+	t.Parallel()
+
+	got := errorResponse(userAttributesRequestInvalid(domain.ErrUserAttributesInvalid(nil)))
+	require.Equal(t, http.StatusBadRequest, got.StatusCode)
+	require.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), got.Response.Code)
+	require.False(t, got.Response.Details.Set)
 }
 
 // A credential IntrospectToken refuses is a 401; an introspection that could

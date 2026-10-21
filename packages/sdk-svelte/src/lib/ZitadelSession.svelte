@@ -1,9 +1,11 @@
 <script lang="ts">
   import '@zitadel/components';
+  import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelSession as ZitadelSessionElement } from '@zitadel/components';
 
-  import type { ZitadelSessionProps, ZitadelSignoutDetail } from './types';
+  import type { ZitadelSessionSvelteProps } from './types';
   import { assignGiven } from './given';
+  import { withDetail } from './events';
   import { onClient, proxyPathAttr } from './attributes';
 
   let {
@@ -17,7 +19,11 @@
     theme,
     suppressHeader,
     onSignout,
-  }: ZitadelSessionProps = $props();
+    ...rest
+  }: ZitadelSessionSvelteProps = $props();
+
+  // The standard HTML attributes are the only extra props the element takes.
+  const attributes = $derived(standardAttributes(rest));
 
   let el: ZitadelSessionElement | undefined = $state();
 
@@ -43,8 +49,9 @@
     if (!node) {
       return;
     }
-    const onSignoutEvent = (event: Event): void =>
-      onSignout?.((event as CustomEvent<ZitadelSignoutDetail>).detail);
+    const onSignoutEvent = (event: Event): void => {
+      withDetail(event, onSignout);
+    };
     node.addEventListener('zitadel-signout', onSignoutEvent);
     return () => {
       node.removeEventListener('zitadel-signout', onSignoutEvent);
@@ -53,6 +60,7 @@
 </script>
 
 <zitadel-session
+  {...attributes}
   bind:this={el}
   project={onClient(project)}
   project-id={project?.projectId ?? projectId}

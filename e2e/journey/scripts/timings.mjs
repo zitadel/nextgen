@@ -16,6 +16,8 @@ import { readFile } from "node:fs/promises";
  * The table's phase columns in the order a lane runs them; a table shows the
  * ones its lanes recorded.
  *
+ * - oidc-mock: starting the mock OIDC provider before prepare-app (framework
+ *   lanes, when its binary is built).
  * - doctor, start, setup: prepare-app's CLI steps. doctor is the lane's first
  *   `npx`, so it includes installing the CLI into the lane's npm cache.
  * - drift: the managed-file drift probe (the fresh-app Next lane only).
@@ -26,6 +28,7 @@ import { readFile } from "node:fs/promises";
  * - teardown: stopping the app and resetting the local runtime.
  */
 export const PHASES = [
+  "oidc-mock",
   "doctor",
   "start",
   "setup",

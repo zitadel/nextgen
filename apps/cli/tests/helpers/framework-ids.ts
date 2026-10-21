@@ -8,4 +8,8 @@ export const FRAMEWORK_IDS = [
   "svelte",
   "qwik",
   "angular",
+  "sveltekit",
+  "tanstack-start",
+  "solid-start",
+  "qwik-router",
 ] as const;

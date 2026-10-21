@@ -312,9 +312,8 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
   afterEach(async () => {
     host.remove();
     stub?.restore();
-    // The font links are document-level state the orchestrator manages on
+    // The font link is document-level state the orchestrator manages on
     // update; isolate tests from each other.
-    document.getElementById("zl-default-font-link")?.remove();
     document.getElementById("zl-font-link")?.remove();
     if (resetViewport) {
       resetViewport = false;
@@ -379,25 +378,19 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(getComputedStyle(surface).padding).toBe("0px");
   });
 
-  it("widget default: no design-system font is injected into the host document", async () => {
-    await mount(identifierStep);
-    expect(document.getElementById("zl-default-font-link")).toBeNull();
-  });
-
   it("widget default: does not steal focus on initial load", async () => {
     const element = await mount(identifierStep);
     expect(element.shadowRoot?.activeElement).toBeNull();
     expect(document.activeElement).toBe(document.body);
   });
 
-  it("variant=page restores the full-page shape, font, and initial focus", async () => {
+  it("variant=page restores the full-page shape and initial focus", async () => {
     const element = await mount(identifierStep, (el) => {
       el.variant = "page";
     });
     const mountNode = element.shadowRoot?.querySelector(".zl-mount") as HTMLElement;
     expect(mountNode.getBoundingClientRect().height).toBeGreaterThanOrEqual(window.innerHeight - 1);
     expect(getComputedStyle(element).backgroundColor).not.toBe(TRANSPARENT);
-    expect(document.getElementById("zl-default-font-link")).not.toBeNull();
     const field = element.shadowRoot?.querySelector("zl-field");
     await waitFor(() => (element.shadowRoot?.activeElement === field ? field : null));
     expect(element.shadowRoot?.activeElement).toBe(field);

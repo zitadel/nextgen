@@ -54,7 +54,9 @@ func TestAuthAttemptService_VerifyProof_integration(t *testing.T) {
 			ProjectID:   projectID,
 			AttemptID:   attemptID,
 			ChallengeID: challengeID,
-			Proof:       service.UserProof{AttributeName: "email", LoginName: "ghost@example.com"},
+			// The direct-API proof: the flow path needs a stored schema to scope
+			// its lookup, and this bare project holds none.
+			Proof: service.UserProof{LoginName: "ghost@example.com"},
 		})
 		require.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
 

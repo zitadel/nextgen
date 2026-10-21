@@ -9,10 +9,6 @@
         "name": "next"
       }
     ],
-    // SWC reads these to compile the Lit decorators of the transpiled
-    // `@zitadel/components` (see next.config.ts `transpilePackages`).
-    "experimentalDecorators": true,
-    "useDefineForClassFields": false,
     "paths": {
       "@/*": ["./src/*"]
     }

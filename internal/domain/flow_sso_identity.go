@@ -51,6 +51,10 @@ type FlowSSOIdentityService interface {
 	// CreateLinked creates the user, its identity link and the attempt
 	// factors in one transaction, and returns the new user's id.
 	CreateLinked(ctx context.Context, in FlowSSOCreateInput) (userID string, err error)
+	// UserHasPasskey reports whether the user has a passkey registered, so
+	// the step shown after a collision offers a passkey only to an account
+	// that can use one.
+	UserHasPasskey(ctx context.Context, projectID, userID string) (bool, error)
 }
 
 type FlowSSOLoadInput struct {

@@ -9,11 +9,7 @@ post:
   tags:
     - Projects
   parameters:
-    - name: project_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../../../components/schemas/project-id.yaml
+    - $ref: ../../../../../components/parameters/project-id-path.yaml
   security:
     - nextgenSession: []
   requestBody:
@@ -123,8 +119,4 @@ post:
           schema:
             $ref: ../../../../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../../components/error-details.yaml
+      $ref: completeClaim-error-response.yaml

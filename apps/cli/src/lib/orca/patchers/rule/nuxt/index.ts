@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { npmDistTagForCliVersion } from "../../../../public-cli";
+import { sdkVersionForCli } from "../../../../public-cli";
 import { configCandidates } from "../config-paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
@@ -10,8 +10,6 @@ import { PUBLIC_PROJECT_ID_VARIABLE } from "../public-project-id";
 import { nuxtConfigEdit } from "./nuxt-config";
 import {
   appVueTemplate,
-  authPluginTemplate,
-  componentsPluginTemplate,
   indexPageTemplate,
   loginPageTemplate,
   profilePageTemplate,
@@ -20,6 +18,14 @@ import {
 
 const SDK_DEPENDENCY = "@zitadel/sdk-nuxt";
 
+/**
+ * Written by older setups, before `@zitadel/sdk-nuxt`'s module seeded the auth
+ * state and loaded the elements itself. No longer written; still listed so
+ * eject removes them and doctor does not fail on their absence.
+ */
+const RETIRED_AUTH_PLUGIN = "plugins/auth.server.ts";
+const RETIRED_COMPONENTS_PLUGIN = "plugins/zitadel-components.client.ts";
+
 const NUXT_CONFIG_PATHS = configCandidates("nuxt.config");
 
 /**
@@ -27,11 +33,16 @@ const NUXT_CONFIG_PATHS = configCandidates("nuxt.config");
  * verifies the session through server middleware — here the `@zitadel/sdk-nuxt`
  * module, registered via a non-destructive `nuxt.config.*` edit. Contributes
  * the login/register/profile pages (the raw `<zitadel-login>`/`<zitadel-session>`
- * elements), the client/server plugins, the `app.vue` router, and the SDK dep.
+ * elements), the `app.vue` router, and the SDK dep. The SDK module itself loads the elements
+ * and seeds the auth state, so no plugin is scaffolded.
  */
 export class NuxtPatcher extends AbstractRulePatcher {
   canPatch(framework: string): boolean {
     return framework === "nuxt";
+  }
+
+  protected devPortOps(ctx: PatchContext): FileOp[] {
+    return [devScriptPortOp(ctx.issuer)];
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
@@ -52,12 +63,6 @@ export class NuxtPatcher extends AbstractRulePatcher {
       { kind: "write", path: src("pages/register.vue"), contents: registerPageTemplate(ctx) },
       { kind: "write", path: src("pages/profile.vue"), contents: profilePageTemplate(ctx) },
       {
-        kind: "write",
-        path: src("plugins/zitadel-components.client.ts"),
-        contents: componentsPluginTemplate(),
-      },
-      { kind: "write", path: src("plugins/auth.server.ts"), contents: authPluginTemplate() },
-      {
         kind: "edit",
         path: [...NUXT_CONFIG_PATHS],
         edit: nuxtConfigEdit(),
@@ -77,7 +82,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: npmDistTagForCliVersion(ctx.cliVersion),
+        version: sdkVersionForCli(ctx.cliVersion),
       },
       // `nuxt dev` takes its port from the command line only, so without this
       // the app can serve a port the project does not allow as an origin.
@@ -93,24 +98,22 @@ export class NuxtPatcher extends AbstractRulePatcher {
       src("pages/login.vue"),
       src("pages/register.vue"),
       src("pages/profile.vue"),
-      src("plugins/zitadel-components.client.ts"),
-      src("plugins/auth.server.ts"),
+      src(RETIRED_COMPONENTS_PLUGIN),
+      src(RETIRED_AUTH_PLUGIN),
     ];
-  }
-
-  protected override infrastructureFiles(view: PatchView): ReadonlyArray<string> {
-    const src = (rel: string) => join(view.framework.appDir, rel);
-    // The plugins are the auth plumbing: component registration on the
-    // client and the server-side auth/session hook. The pages and app shell
-    // are the user's customization surface.
-    return [src("plugins/zitadel-components.client.ts"), src("plugins/auth.server.ts")];
   }
 
   protected override conditionallyScaffoldedFiles(view: PatchView): ReadonlyArray<string> {
     // Written only when setup created the app skeleton itself; on a
     // pre-existing app the shell and homepage stay user-owned (see routeOps).
     const src = (rel: string) => join(view.framework.appDir, rel);
-    return [src("app.vue"), src("pages/index.vue")];
+    // The retired plugins exist only in apps an older setup wrote.
+    return [
+      src("app.vue"),
+      src("pages/index.vue"),
+      src(RETIRED_COMPONENTS_PLUGIN),
+      src(RETIRED_AUTH_PLUGIN),
+    ];
   }
 
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {
@@ -127,7 +130,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
     return {
       title: "Nuxt integration",
       detail:
-        "Wrote login/register/profile pages + plugins and registered @zitadel/sdk-nuxt in nuxt.config.*.",
+        "Wrote login/register/profile pages and registered @zitadel/sdk-nuxt in nuxt.config.*.",
     };
   }
 }

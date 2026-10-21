@@ -60,6 +60,22 @@
       "cache": false,
       "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
     },
+    // The built-in schemas the `schemas` service publishes under /schemas/v1/
+    // on the deployment CLOUD_URL names, beside the console's suite in
+    // `pnpm check:cloud` and the deployment-checks workflow. The spec renders
+    // the expected documents with the repo's own renderer, so its inputs
+    // reach outside the package.
+    "schemas-deployment": {
+      "inputs": [
+        "schemas/**",
+        "package.json",
+        "playwright.shared.ts",
+        "$TURBO_ROOT$/scripts/render-builtin-schemas.mjs",
+        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json"
+      ],
+      "cache": false,
+      "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
+    },
     // Mock lanes run api-mock's `start` and the demo's `dev`, so they need what
     // those need rather than a production build of the demo.
     "demo-next-mock": {
@@ -83,8 +99,9 @@
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
-    // The journey harness drives the real CLI binary and imports the kit's
-    // virtual-passkey helper, and its claim suite the console copy in
+    // The journey harness drives the real CLI binary and the mock OIDC
+    // provider binary, imports the kit's virtual-passkey helper, and its claim
+    // suite the console copy in
     // console/support/copy.ts. The scripts default ZITADEL_TELEMETRY to 0.
     // `e2e-local` is the runner with caller-supplied flags (ci-turbo.yml passes
     // `--ci …`); `journey` is the by-hand alias; `journey-local` bakes in the
@@ -93,13 +110,13 @@
     // cli#build).
     "e2e-local": {
       "inputs": ["journey/**", "package.json", "console/support/copy.ts"],
-      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"],
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey": {
       "inputs": ["journey/**", "package.json", "console/support/copy.ts"],
-      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"],
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -108,6 +125,7 @@
       "dependsOn": [
         "@zitadel/cli#build",
         "@zitadel/testing#build",
+        "@zitadel/oidc-mock#build",
         "@zitadel/sdk-nuxt#build",
         "@zitadel/sdk-react#build",
         "@zitadel/sdk-vue#build",

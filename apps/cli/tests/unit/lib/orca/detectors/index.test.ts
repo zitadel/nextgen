@@ -16,10 +16,21 @@ afterEach(async () => {
 });
 
 /** A project a detector would recognise, declaring `spec` for its framework package. */
+/** What a detector needs besides the package it floors before it recognises a project. */
+const COMPANION_DEPENDENCIES: Record<string, Record<string, string>> = {
+  "qwik-router": { "@qwik.dev/core": "^2.0.0-beta.45" },
+  "solid-start": { "solid-js": "^1" },
+  "tanstack-start": { react: "^19" },
+};
+
 async function project(detector: (typeof detectors)[number], spec: string): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "detectors-index-"));
   dirs.push(cwd);
-  const dependencies: Record<string, string> = { [detector.versionPackage]: spec, vite: "^5" };
+  const dependencies: Record<string, string> = {
+    ...COMPANION_DEPENDENCIES[detector.framework],
+    [detector.versionPackage]: spec,
+    vite: "^5",
+  };
   await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies }));
   await mkdir(join(cwd, "app"));
   return cwd;

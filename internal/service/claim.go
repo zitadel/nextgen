@@ -143,7 +143,10 @@ func NewClaimService(v2Pool *DB, consoleBaseURL, platformProjectID string) Claim
 	}
 }
 
-func (s *claimService) Init(ctx context.Context, projectID, secretHash string) (*ClaimInitResult, error) {
+func (s *claimService) Init(ctx context.Context, projectID, secretHash string) (_ *ClaimInitResult, err error) {
+	ctx, end := startSpan(ctx, "ClaimService.Init")
+	defer end(&err)
+
 	var stmts claimStatements = s.v2Pool.Statements()
 	project, grant, err := claimedProjectState(ctx, stmts, projectID)
 	if err != nil {
@@ -176,7 +179,10 @@ func (s *claimService) Init(ctx context.Context, projectID, secretHash string) (
 	}, nil
 }
 
-func (s *claimService) Status(ctx context.Context, projectID, challengeID, secretHash string) (*ClaimStatusResult, error) {
+func (s *claimService) Status(ctx context.Context, projectID, challengeID, secretHash string) (_ *ClaimStatusResult, err error) {
+	ctx, end := startSpan(ctx, "ClaimService.Status")
+	defer end(&err)
+
 	var stmts claimStatements = s.v2Pool.Statements()
 	challenge, err := stmts.GetChallengeByID(ctx, projectID, domain.HashClaimChallengeToken(challengeID))
 	if err != nil {
@@ -228,10 +234,13 @@ func (s *claimService) Status(ctx context.Context, projectID, challengeID, secre
 	return &ClaimStatusResult{Status: domain.ClaimChallengeStatusPending}, nil
 }
 
-func (s *claimService) Complete(ctx context.Context, projectID, challengeID, userID string) (*ClaimCompleteResult, error) {
+func (s *claimService) Complete(ctx context.Context, projectID, challengeID, userID string) (_ *ClaimCompleteResult, err error) {
+	ctx, end := startSpan(ctx, "ClaimService.Complete")
+	defer end(&err)
+
 	challengeIDHash := domain.HashClaimChallengeToken(challengeID)
 	var result *ClaimCompleteResult
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		var stmts claimStatements = tx.Statements()
 		challenge, err := stmts.GetChallengeByID(ctx, projectID, challengeIDHash)
 		if err != nil {
@@ -338,7 +347,10 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 // An expired or already-completed challenge still answers: the page shows the
 // window beside the outcome it is explaining, and the window is a property of
 // the project rather than of the challenge.
-func (s *claimService) Window(ctx context.Context, projectID, challengeID string) (*ClaimWindowResult, error) {
+func (s *claimService) Window(ctx context.Context, projectID, challengeID string) (_ *ClaimWindowResult, err error) {
+	ctx, end := startSpan(ctx, "ClaimService.Window")
+	defer end(&err)
+
 	var stmts claimStatements = s.v2Pool.Statements()
 	if _, err := stmts.GetChallengeByID(ctx, projectID, domain.HashClaimChallengeToken(challengeID)); err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {

@@ -109,8 +109,8 @@ func TestBranding(t *testing.T) {
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &api.ErrorDetailsStatusCode{}, listResp, "cross-project list: %s", helpers.MustMarshal(t, listResp))
-		listErr := listResp.(*api.ErrorDetailsStatusCode)
+		require.IsType(t, &api.ListBrandingErrorResponseStatusCode{}, listResp, "cross-project list: %s", helpers.MustMarshal(t, listResp))
+		listErr := listResp.(*api.ListBrandingErrorResponseStatusCode)
 		assert.Equal(t, 404, listErr.StatusCode)
 	})
 
@@ -127,17 +127,17 @@ func TestBranding(t *testing.T) {
 			LiquidTemplate: api.NewOptString(templateRev1),
 		}, params)
 		require.NoError(t, err)
-		require.IsType(t, &api.ErrorDetailsStatusCode{}, createResp, "preview create: %s", helpers.MustMarshal(t, createResp))
-		createErr := createResp.(*api.ErrorDetailsStatusCode)
+		require.IsType(t, &api.CreateBrandingErrorResponseStatusCode{}, createResp, "preview create: %s", helpers.MustMarshal(t, createResp))
+		createErr := createResp.(*api.CreateBrandingErrorResponseStatusCode)
 		assert.Equal(t, 403, createErr.StatusCode)
-		assert.Equal(t, api.ErrorCode("brnd.permission_denied"), createErr.Response.Code)
+		assert.True(t, createErr.Response.IsBrndPermissionDenied(), helpers.MustMarshal(t, createResp))
 
 		listResp, err := preview.ListBranding(t.Context(), api.ListBrandingParams{
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &api.ErrorDetailsStatusCode{}, listResp, "preview list: %s", helpers.MustMarshal(t, listResp))
-		listErr := listResp.(*api.ErrorDetailsStatusCode)
+		require.IsType(t, &api.ListBrandingErrorResponseStatusCode{}, listResp, "preview list: %s", helpers.MustMarshal(t, listResp))
+		listErr := listResp.(*api.ListBrandingErrorResponseStatusCode)
 		assert.Equal(t, 403, listErr.StatusCode)
 	})
 

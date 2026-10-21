@@ -12,7 +12,9 @@ pnpm add @zitadel/sdk-angular@alpha
 
 Peer dependencies: `@angular/core` and `@angular/common`, both `>=17`.
 
-TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
+Edge support follows Angular's own: its server rendering targets Node, and the application builder produces a bundle without Node APIs only through the experimental `ssr.platform: "neutral"` option. In an Angular 22.2.3 app built with that option and `conditions: ["workerd", "browser"]`, the three wrappers bundle, load and server-render inside the `edge-runtime` VM, each as its custom element tag with its attributes. The package's tests cover the built package in that VM with the Angular linker applied, as a consumer's build applies it: they load it without a DOM, render each widget by its tag name, and check the attributes written into the login markup and that `lang` is left out when unset. Without those `conditions` the build stops while extracting routes with `document is not defined`, because the components root then loads Lit. The builder applies `conditions` to the browser bundle too, and the edge build of `@zitadel/components` registers no elements, so that bundle does not register the widgets; the browser side of an edge deployment has not been verified.
+
+TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
 
 ## Usage
 
@@ -56,7 +58,8 @@ The signed-in session card is `<zitadel-auth-session>` (exported as `ZitadelSess
 | `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
 | `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
 | `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
-| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. |
+| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
+| `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
 | `postSignOutUrl` | `string` | unset | Logout, Session | Where to navigate after sign-out. |
 | `resumeFlowId` | `string` or `null` | unset | Login | An existing flow's id to resume instead of starting a new flow; unset, `null` or `""` falls back to the `flow` query parameter, and an id that no longer resolves starts a new flow. |
 | `variant` | `"widget"` or `"page"` | `"widget"` | Login, Session | `widget` is content-sized and paints no page chrome; `page` claims the viewport, paints the surface background and loads the brand font, and on Login focuses the first field. |
@@ -81,6 +84,16 @@ Each widget event reaches the callback in the last column, which receives the ev
 
 ```html
 <zitadel-auth-login [project]="project" theme="light" (flowComplete)="track($event)" />
+```
+
+The `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` details carry a `waitUntil(promise)`; call it from your handler to make the widget wait for your async work before it navigates.
+
+## Standard HTML attributes
+
+The Angular components are tags (`zitadel-auth-login`, `zitadel-auth-logout` and `zitadel-auth-session`), and a tag already carries the standard HTML attributes: put `class`, `style`, `id`, `data-*` or `aria-*` on it and Angular applies them to the tag, not to the widget inside it.
+
+```html
+<zitadel-auth-login [project]="project" class="login" data-testid="login" aria-label="Sign in" />
 ```
 
 ## Server rendering
