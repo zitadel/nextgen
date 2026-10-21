@@ -65,6 +65,14 @@ These are examples, not required properties for every event.
 - Express units in measurement names, such as `duration_ms`.
 - Tracking tickets define the exact properties and allowed values.
 
+Keep the action separate from what it acts on:
+
+- `action` describes what happened, such as `create`, `update`, `enable`, `disable` or `test`.
+- `resource_type` describes what was acted on, such as `team`, `authentication_method` or `identity_provider`.
+- Additional properties describe relevant choices, such as `method: "password"`.
+
+For example: `action_completed` with `{ action: "enable", resource_type: "authentication_method", method: "password" }`.
+
 ## Identity and attribution
 
 Identify developers and administrators consistently across interfaces so we can follow their journeys between the website, documentation, CLI and Console.
