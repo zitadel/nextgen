@@ -139,9 +139,9 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, got, helpers.MustMarshal(t, got))
 
-		password, err := session.GetUserPassword(t.Context(), api.GetUserPasswordParams{UserID: user.ID})
+		password, err := session.GetUserPasswordState(t.Context(), api.GetUserPasswordStateParams{UserID: user.ID})
 		require.NoError(t, err)
-		require.IsType(t, &api.GetUserPasswordResponse{}, password, helpers.MustMarshal(t, password))
+		require.IsType(t, &api.UserPasswordState{}, password, helpers.MustMarshal(t, password))
 
 		patched, err := session.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": "Patched"},
@@ -234,10 +234,10 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.ListUserPasskeysNotFound{}, passkeys, helpers.MustMarshal(t, passkeys))
 
-		password, err := session.GetUserPassword(t.Context(), api.GetUserPasswordParams{UserID: api.UserID(foreignUserID)})
+		password, err := session.GetUserPasswordState(t.Context(), api.GetUserPasswordStateParams{UserID: api.UserID(foreignUserID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.GetUserPasswordNotFound{}, password, helpers.MustMarshal(t, password))
-		assert.Equal(t, api.ErrorCode("user.not_found"), password.(*api.GetUserPasswordNotFound).Code)
+		require.IsType(t, &api.GetUserPasswordStateNotFound{}, password, helpers.MustMarshal(t, password))
+		assert.Equal(t, api.ErrorCode("user.not_found"), password.(*api.GetUserPasswordStateNotFound).Code)
 
 		links, err := session.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: api.UserID(foreignUserID)})
 		require.NoError(t, err)

@@ -168,3 +168,7 @@ func IsServerFault(err error) bool {
 type RequestInvalidFieldDetails struct {
 	Field string `json:"field"`
 }
+
+type InvalidFieldPathsDetails struct {
+	Fields []string `json:"fields"`
+}

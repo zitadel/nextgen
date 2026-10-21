@@ -4208,9 +4208,9 @@ func encodeGetUserByIDResponse(response GetUserByIDRes, w http.ResponseWriter, s
 	}
 }
 
-func encodeGetUserPasswordResponse(response GetUserPasswordRes, w http.ResponseWriter, span trace.Span) error {
+func encodeGetUserPasswordStateResponse(response GetUserPasswordStateRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *GetUserPasswordResponse:
+	case *UserPasswordState:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
 		span.SetStatus(codes.Ok, http.StatusText(200))
@@ -4223,7 +4223,7 @@ func encodeGetUserPasswordResponse(response GetUserPasswordRes, w http.ResponseW
 
 		return nil
 
-	case *GetUserPasswordUnauthorized:
+	case *GetUserPasswordStateUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 		span.SetStatus(codes.Error, http.StatusText(401))
@@ -4236,7 +4236,7 @@ func encodeGetUserPasswordResponse(response GetUserPasswordRes, w http.ResponseW
 
 		return nil
 
-	case *GetUserPasswordForbidden:
+	case *GetUserPasswordStateForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 		span.SetStatus(codes.Error, http.StatusText(403))
@@ -4249,7 +4249,7 @@ func encodeGetUserPasswordResponse(response GetUserPasswordRes, w http.ResponseW
 
 		return nil
 
-	case *GetUserPasswordNotFound:
+	case *GetUserPasswordStateNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 		span.SetStatus(codes.Error, http.StatusText(404))
@@ -4262,7 +4262,7 @@ func encodeGetUserPasswordResponse(response GetUserPasswordRes, w http.ResponseW
 
 		return nil
 
-	case *GetUserPasswordInternalServerError:
+	case *GetUserPasswordStateInternalServerError:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(500)
 		span.SetStatus(codes.Error, http.StatusText(500))
@@ -4275,7 +4275,7 @@ func encodeGetUserPasswordResponse(response GetUserPasswordRes, w http.ResponseW
 
 		return nil
 
-	case *GetUserPasswordErrorResponseStatusCode:
+	case *GetUserPasswordStateErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {

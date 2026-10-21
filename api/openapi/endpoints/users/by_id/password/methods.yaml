@@ -1,5 +1,5 @@
 get:
-  operationId: getUserPassword
+  operationId: getUserPasswordState
   summary: Get user password state
   description: |
     Reports when the user's current password was set, and leaves `set_at` out
@@ -23,7 +23,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: get-user-password-response.yaml
+            $ref: user-password-state.yaml
     '401':
       description: Client was not authorized or the session is anonymous.
       content:
@@ -49,7 +49,7 @@ get:
           schema:
             $ref: ../../../../components/error-details.yaml
     default:
-      $ref: getUserPassword-error-response.yaml
+      $ref: getUserPasswordState-error-response.yaml
 put:
   operationId: setUserPassword
   summary: Set user password

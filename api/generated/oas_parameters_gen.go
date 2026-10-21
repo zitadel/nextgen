@@ -4619,12 +4619,12 @@ func decodeGetUserByIDParams(args [1]string, argsEscaped bool, r *http.Request) 
 	return params, nil
 }
 
-// GetUserPasswordParams is parameters of getUserPassword operation.
-type GetUserPasswordParams struct {
+// GetUserPasswordStateParams is parameters of getUserPasswordState operation.
+type GetUserPasswordStateParams struct {
 	UserID UserID
 }
 
-func unpackGetUserPasswordParams(packed middleware.Parameters) (params GetUserPasswordParams) {
+func unpackGetUserPasswordStateParams(packed middleware.Parameters) (params GetUserPasswordStateParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "user_id",
@@ -4635,7 +4635,7 @@ func unpackGetUserPasswordParams(packed middleware.Parameters) (params GetUserPa
 	return params
 }
 
-func decodeGetUserPasswordParams(args [1]string, argsEscaped bool, r *http.Request) (params GetUserPasswordParams, _ error) {
+func decodeGetUserPasswordStateParams(args [1]string, argsEscaped bool, r *http.Request) (params GetUserPasswordStateParams, _ error) {
 	// Decode path: user_id.
 	if err := func() error {
 		param := args[0]

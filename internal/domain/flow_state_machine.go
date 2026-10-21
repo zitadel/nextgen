@@ -667,7 +667,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 		}
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}
-	if errors.Is(err, ErrUserInvalid()) {
+	if IsUserInvalid(err) {
 		// A claim the user may edit fails the schema (too long, bad format):
 		// collect it so the user can fix it.
 		return FlowImplicitOutcomeSSOUserNotFound, nil
@@ -1538,28 +1538,20 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		return r.renderStepError(pc, resolved, new(FlowStepErrorUserAlreadyExists))
 	case errors.Is(err, ErrSSOStateInvalid()):
 		return r.resolveStaleSSOSubmit(pc, resolved, loadInput)
-	case errors.Is(err, ErrUserInvalid()):
+	case IsUserInvalid(err):
 		// RequiredPaths does not see a property that allOf or a reference
 		// requires. The schema library locates it by keyword, as in
 		// properties/account allOf/0 required/id. It reports a property a then
 		// requires the same way, without the condition, so that one is treated
 		// as required too. anyOf and oneOf report no location, so their
 		// failures stay sso_user_invalid.
-	failures:
 		for _, ve := range ValidationFailures(err) {
 			if ve.Loc == nil || len(*ve.Loc) == 0 || !strings.HasPrefix((*ve.Loc)[len(*ve.Loc)-1], "required/") {
 				continue
 			}
-			var path AttributeKey
-			for _, segment := range *ve.Loc {
-				keyword, name, _ := strings.Cut(segment, "/")
-				switch keyword {
-				case "properties", "required":
-					path = path.AppendNode(name)
-				case "allOf":
-				default:
-					continue failures
-				}
+			path, complete := ValidationErrAttributeKey(ve, attributes)
+			if !complete {
+				continue
 			}
 			if !slices.ContainsFunc(resolved.Fields, func(f FlowField) bool { return f.Name == string(path) }) {
 				return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUserCannotBeCreated))

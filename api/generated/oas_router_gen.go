@@ -2394,7 +2394,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 									// Leaf node.
 									switch r.Method {
 									case "GET":
-										s.handleGetUserPasswordRequest([1]string{
+										s.handleGetUserPasswordStateRequest([1]string{
 											args[0],
 										}, elemIsEscaped, w, r)
 									case "PUT":
@@ -4763,9 +4763,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 									// Leaf node.
 									switch method {
 									case "GET":
-										r.name = GetUserPasswordOperation
+										r.name = GetUserPasswordStateOperation
 										r.summary = "Get user password state"
-										r.operationID = "getUserPassword"
+										r.operationID = "getUserPasswordState"
 										r.operationGroup = ""
 										r.pathPattern = "/users/{user_id}/password"
 										r.args = args
