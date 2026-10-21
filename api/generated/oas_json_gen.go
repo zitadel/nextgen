@@ -52531,6 +52531,38 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelNotFoundGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -52773,6 +52805,12 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "tkn.invalid":
 					s.Type = TknInvalidGetFlowStepErrorResponse
 					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundGetFlowStepErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedGetFlowStepErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetFlowStepErrorResponse
 					found = true
@@ -52908,6 +52946,14 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case TknInvalidGetFlowStepErrorResponse:
 		if err := s.TknInvalid.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundGetFlowStepErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedGetFlowStepErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidGetFlowStepErrorResponse:
@@ -116963,11 +117009,59 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedSubmitFlowStepErrorResponse:
+	case ProjOriginNotAllowedSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
-		e.Str("not_implemented")
+		e.Str("proj.origin_not_allowed")
 		{
-			s := s.NotImplemented
+			s := s.ProjOriginNotAllowed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjPreviewNotLiveSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.preview_not_live")
+		{
+			s := s.ProjPreviewNotLive
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotFoundSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -117000,22 +117094,6 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("enc_key.unknown_alg")
 		{
 			s := s.EncKeyUnknownAlg
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableSubmitFlowStepErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -117237,17 +117315,23 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "tkn.invalid":
 					s.Type = TknInvalidSubmitFlowStepErrorResponse
 					found = true
-				case "not_implemented":
-					s.Type = NotImplementedSubmitFlowStepErrorResponse
+				case "proj.origin_not_allowed":
+					s.Type = ProjOriginNotAllowedSubmitFlowStepErrorResponse
+					found = true
+				case "proj.preview_not_live":
+					s.Type = ProjPreviewNotLiveSubmitFlowStepErrorResponse
+					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundSubmitFlowStepErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedSubmitFlowStepErrorResponse
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidSubmitFlowStepErrorResponse
 					found = true
 				case "enc_key.unknown_alg":
 					s.Type = EncKeyUnknownAlgSubmitFlowStepErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableSubmitFlowStepErrorResponse
 					found = true
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsSubmitFlowStepErrorResponse
@@ -117380,8 +117464,20 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.TknInvalid.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedSubmitFlowStepErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
+	case ProjOriginNotAllowedSubmitFlowStepErrorResponse:
+		if err := s.ProjOriginNotAllowed.Decode(d); err != nil {
+			return err
+		}
+	case ProjPreviewNotLiveSubmitFlowStepErrorResponse:
+		if err := s.ProjPreviewNotLive.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundSubmitFlowStepErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedSubmitFlowStepErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidSubmitFlowStepErrorResponse:
@@ -117390,10 +117486,6 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case EncKeyUnknownAlgSubmitFlowStepErrorResponse:
 		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableSubmitFlowStepErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserAlreadyExistsSubmitFlowStepErrorResponse:
