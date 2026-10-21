@@ -3,7 +3,7 @@ import { format } from "node:util";
 
 import { run } from "@oclif/core";
 
-import type { LocalServers } from "../../src/lib/local-server/processes";
+import type { LocalServers, ManagedRuntimeProcess } from "../../src/lib/local-server/processes";
 import { publicCliCommand } from "../../src/lib/public-cli";
 import { cliPackageRoot } from "./oclif-build";
 
@@ -27,7 +27,7 @@ export async function runCliForTest(
   argv: string[],
   env: NodeJS.ProcessEnv = {},
   root: string = cliPackageRoot,
-  machine?: LocalServers,
+  machine: LocalServers = aMachineRunning(),
 ) {
   let stdout = "";
   let stderr = "";
@@ -80,19 +80,43 @@ export async function runCliForTest(
   return { exitCode, stdout, stderr };
 }
 
+/** A machine that runs exactly the given servers, whatever it really runs. */
+export function aMachineRunning(
+  ...processes: ReadonlyArray<Omit<ManagedRuntimeProcess, "kind">>
+): LocalServers {
+  return {
+    current: () =>
+      Promise.resolve({
+        supported: true,
+        processes: processes.map((entry) => ({ ...entry, kind: "server-wrapper" as const })),
+      }),
+  };
+}
+
 /** The source command that asks `machine` which servers run, for the commands that ask. */
 async function commandSeeing(
   name: string | undefined,
-  machine: LocalServers | undefined,
+  machine: LocalServers,
 ): Promise<{ run(argv: string[], root: string): Promise<unknown> } | undefined> {
-  if (name !== "doctor" && name !== "stop") {
-    return undefined;
-  }
   // Loaded here, not at the top: this module is loaded by the test setup, ahead
   // of any test's mocks, and the commands must not be.
-  const { aMachineRunning, doctorSeeing, stopSeeing } = await import("./local-servers");
-  const servers = machine ?? aMachineRunning();
-  return name === "doctor" ? doctorSeeing(servers) : stopSeeing(servers);
+  if (name === "doctor") {
+    const { default: Doctor } = await import("../../src/commands/doctor");
+    return class extends Doctor {
+      protected override localServers(): LocalServers {
+        return machine;
+      }
+    };
+  }
+  if (name === "stop") {
+    const { default: Stop } = await import("../../src/commands/stop");
+    return class extends Stop {
+      protected override localServers(): LocalServers {
+        return machine;
+      }
+    };
+  }
+  return undefined;
 }
 
 function exitCodeOf(error: unknown): number {

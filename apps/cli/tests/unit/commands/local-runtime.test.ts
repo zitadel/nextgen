@@ -21,8 +21,12 @@ import {
 } from "../../../src/lib/local-server/runtime";
 import Reset from "../../../src/commands/reset";
 import { nextPort } from "../../helpers/ports";
-import { aMachineRunning } from "../../helpers/local-servers";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
+import {
+  aMachineRunning,
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+} from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];

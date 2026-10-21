@@ -9,9 +9,13 @@ import { failureAdvice } from "../../../src/commands/doctor";
 import type { LocalServers } from "../../../src/lib/local-server/processes";
 import { publicCliCommand } from "../../../src/lib/public-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
-import { aMachineRunning } from "../../helpers/local-servers";
 import { nextPort } from "../../helpers/ports";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
+import {
+  aMachineRunning,
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+} from "../../helpers/run-cli";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
 
