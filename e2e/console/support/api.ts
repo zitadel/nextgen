@@ -135,3 +135,43 @@ export async function addPrimaryOrigin(zitadel: ConnectedZitadel, origin: string
     zitadel.api.addOrigin(zitadel.handle.projectId, { pattern: origin, kind: "primary" }),
   );
 }
+
+/**
+ * Builds a release unlike any other on the instance: it pins the seeded
+ * schemas and flows plus a branding revision published here with a template
+ * of its own. A release is one per pinned set, so two calls give two
+ * releases, which is what a rollback or a revoke needs.
+ */
+export async function createDistinctRelease(
+  zitadel: ConnectedZitadel,
+  message: string,
+): Promise<{ id: string; message: string }> {
+  const projectId = zitadel.handle.projectId;
+  const [schemas, flows, branding] = await Promise.all([
+    withErrorBody(zitadel.api.listSchemas({ project_id: projectId, revisions: "latest" })),
+    withErrorBody(zitadel.api.listFlowDefinitions({ project_id: projectId, revisions: "latest" })),
+    withErrorBody(
+      zitadel.api.createBranding(
+        { liquid_template: `<zl-page-shell>${message} {% mandatory_gates %}</zl-page-shell>` },
+        { project_id: projectId },
+      ),
+    ),
+  ]);
+  const release = await withErrorBody(
+    zitadel.api.createRelease(
+      {
+        message,
+        pointers: [
+          ...schemas.schemas.map((schema) => ({ kind: "schema" as const, revision_id: schema.id })),
+          ...flows.flow_definitions.map((flow) => ({
+            kind: "flow_definition" as const,
+            revision_id: flow.id,
+          })),
+          { kind: "branding" as const, revision_id: branding.id },
+        ],
+      },
+      { project_id: projectId },
+    ),
+  );
+  return { id: release.id, message: release.metadata.message ?? "" };
+}

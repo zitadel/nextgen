@@ -39,20 +39,36 @@ const LABEL_ROW = "flex w-full items-center gap-2";
  */
 const LEGEND = "font-serif text-sm leading-5 font-normal";
 /**
- * A target as a choice card: the label's own card styling, at the design's
- * 12px inset. `p-3!`: the label's `[&>*]:data-[slot=field]:p-4` is a variant
+ * A choice card, shared with the Rollback drawer: the label's own card
+ * styling, at the design's 12px inset. `p-3!`: the label's `[&>*]:data-[slot=field]:p-4` is a variant
  * and out-specifies a plain `p-3`. The chosen card keeps the input border; the
  * label's own `border-primary` is a solid highlight the design does not draw.
  * The card's text is the sans face: the label it sits in is the display face,
  * which its children would inherit.
  */
-const TARGET_CARD = "font-sans has-data-[state=checked]:border-input [&>*]:data-[slot=field]:p-3!";
+export const CHOICE_CARD =
+  "font-sans has-data-[state=checked]:border-input [&>*]:data-[slot=field]:p-3!";
 
 const RELEASE_TRIGGER =
   "w-full *:data-[slot=select-value]:flex-1 *:data-[slot=select-value]:text-left";
 
 /** What a deployed release says, from either entry point. */
 export const DEPLOYED_MESSAGE = "Release deployed";
+/** What a redeployed release says. */
+export const REDEPLOYED_MESSAGE = "Release redeployed";
+
+/**
+ * The drawer's two intents share one form; the copy differs. A redeploy is a
+ * deploy of the same release to the same targets again: on the primary
+ * origins the server writes nothing and answers with the live deployment,
+ * on a preview it refreshes the URL.
+ */
+export type DeployIntent = "deploy" | "redeploy";
+
+const COPY: Record<DeployIntent, { title: string; submit: string; done: string }> = {
+  deploy: { title: "Deploy release", submit: "Deploy release", done: DEPLOYED_MESSAGE },
+  redeploy: { title: "Redeploy release", submit: "Redeploy release", done: REDEPLOYED_MESSAGE },
+};
 
 /**
  * The Deploy release drawer (decisions log D15): the release, where it goes,
@@ -60,7 +76,8 @@ export const DEPLOYED_MESSAGE = "Release deployed";
  *
  * Opened from a release's header the release is that one. Opened from the
  * Deployments directory's **New deployment** the operator picks one of the
- * project's releases that is not revoked.
+ * project's releases that is not revoked. **Redeploy**, from either menu, is
+ * the same drawer for the release in hand with its own copy.
  *
  * Where it goes is the project's primary origins, which is what
  * `POST /deployments` resolves `primary` to; the card lists them so the
@@ -75,31 +92,43 @@ export const DEPLOYED_MESSAGE = "Release deployed";
 export function DeploySheet({
   children,
   release,
+  intent = "deploy",
+  open,
+  onOpenChange,
   onDeployed,
 }: {
-  /** The trigger. */
-  children: ReactNode;
+  /** The trigger, for callers that have one. */
+  children?: ReactNode;
   /** The release to deploy. Omitted, the operator picks one. */
   release?: { id: string };
+  intent?: DeployIntent;
+  /** Controlled open state, for a drawer opened from a menu. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   /** Called once the deployment is recorded, so the caller refreshes what it shows. */
   onDeployed: () => void | Promise<void>;
 }) {
   return (
-    <FormSheet trigger={children}>
-      {(close) => <DeployForm release={release} onDeployed={onDeployed} onClose={close} />}
+    <FormSheet trigger={children} open={open} onOpenChange={onOpenChange}>
+      {(close) => (
+        <DeployForm release={release} intent={intent} onDeployed={onDeployed} onClose={close} />
+      )}
     </FormSheet>
   );
 }
 
 function DeployForm({
   release,
+  intent,
   onDeployed,
   onClose,
 }: {
   release?: { id: string };
+  intent: DeployIntent;
   onDeployed: () => void | Promise<void>;
   onClose: () => void;
 }) {
+  const copy = COPY[intent];
   const projectId = useRequiredProjectScope();
   const releaseFieldId = useId();
   const primaryId = useId();
@@ -136,15 +165,15 @@ function DeployForm({
 
   const deploy = useSubmit(async () => {
     await deployToPrimary(projectId, releaseId, message.trim() || undefined);
-    toast.success(DEPLOYED_MESSAGE);
+    toast.success(copy.done);
     onClose();
     await onDeployed();
   }, "The release could not be deployed.");
 
   return (
     <FormSheetForm
-      title="Deploy release"
-      submitLabel="Deploy release"
+      title={copy.title}
+      submitLabel={copy.submit}
       canSubmit={releaseId !== "" && origins !== undefined && origins.length > 0}
       pending={deploy.pending}
       error={deploy.error ?? loadError}
@@ -186,7 +215,7 @@ function DeployForm({
           {/* One card, checked: the server deploys to primary origins only, and
               the card is where the preview choice slots in. */}
           <RadioGroup value="primary" aria-label="Deploy to">
-            <FieldLabel htmlFor={primaryId} className={TARGET_CARD}>
+            <FieldLabel htmlFor={primaryId} className={CHOICE_CARD}>
               <Field orientation="horizontal">
                 <FieldContent className="gap-3">
                   <FieldTitle className="leading-none">Primary</FieldTitle>

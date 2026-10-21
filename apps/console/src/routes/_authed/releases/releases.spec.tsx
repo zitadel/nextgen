@@ -294,10 +294,174 @@ describe("release detail", () => {
   });
 });
 
-describe("deploy from the release", () => {
-  it("deploys this release to the primary origins from the header", async () => {
+describe("release actions", () => {
+  const ORIGINS_PROJECT = {
+    id: "proj_test",
+    name: "Test project",
+    origins: [{ pattern: "https://app.acme.com", kind: "primary" }],
+    created_at: CREATED_AT,
+    updated_at: CREATED_AT,
+  };
+
+  /** Opens the header menu and picks `item`. */
+  async function pick(item: string) {
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for rel_1" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: item }));
+  }
+
+  it("revokes a release nothing serves, after asking", async () => {
     servePointers();
-    let posted: { projectId: string | null; body: unknown } | undefined;
+    let revoked: string | null | undefined;
+    server.use(
+      http.get(`${API}/releases/rel_1`, () =>
+        HttpResponse.json(revoked === undefined ? release() : release({ revoked_at: revoked })),
+      ),
+      http.get(DEPLOYMENTS_URL, () =>
+        HttpResponse.json({ deployments: [deployment("dep_old", { status: "inactive" })] }),
+      ),
+      http.post(`${API}/releases/rel_1/revoke`, ({ request }) => {
+        revoked = "2026-10-21T10:00:00Z";
+        return HttpResponse.json(
+          release({
+            revoked_at: revoked,
+            project_id: new URL(request.url).searchParams.get("project_id"),
+          }),
+        );
+      }),
+    );
+    await renderAt("/releases/rel_1");
+
+    await pick("Revoke release");
+    const dialog = await screen.findByRole("alertdialog", { name: "Revoke" });
+    expect(
+      within(dialog).getByText(
+        "This release will no longer be available for use after revocation.",
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Revoke release" }));
+
+    expect(await screen.findByText("Release revoked")).toBeInTheDocument();
+    // The screen reads the release again: revoked, with nothing to deploy or revoke.
+    expect(await screen.findByText("Revoked")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Actions for rel_1" })).not.toBeInTheDocument();
+  });
+
+  it("refuses to revoke a release an origin serves, without asking the server", async () => {
+    servePointers();
+    let posted = false;
+    server.use(
+      http.get(`${API}/releases/rel_1`, () => HttpResponse.json(release())),
+      http.get(DEPLOYMENTS_URL, () => HttpResponse.json({ deployments: [deployment("dep_live")] })),
+      http.post(`${API}/releases/rel_1/revoke`, () => {
+        posted = true;
+        return HttpResponse.json({ code: "rel.in_use", message: "in use" }, { status: 409 });
+      }),
+    );
+    await renderAt("/releases/rel_1");
+
+    await pick("Revoke release");
+    const dialog = await screen.findByRole("alertdialog", { name: "Release cannot be revoked" });
+    expect(
+      within(dialog).getByText("This release is still used by active deployments."),
+    ).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(posted).toBe(false);
+  });
+
+  it("shows the server's refusal when an origin took the release meanwhile", async () => {
+    servePointers();
+    server.use(
+      http.get(`${API}/releases/rel_1`, () => HttpResponse.json(release())),
+      http.get(DEPLOYMENTS_URL, () => HttpResponse.json({ deployments: [] })),
+      http.post(`${API}/releases/rel_1/revoke`, () =>
+        HttpResponse.json(
+          {
+            code: "rel.in_use",
+            message: "release: still served by an origin",
+            details: { origins: [{ origin: "https://app.acme.com", deployment_id: "dep_live" }] },
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+    await renderAt("/releases/rel_1");
+
+    await pick("Revoke release");
+    const dialog = await screen.findByRole("alertdialog", { name: "Revoke" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Revoke release" }));
+    expect(
+      await screen.findByRole("alertdialog", { name: "Release cannot be revoked" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Release revoked")).not.toBeInTheDocument();
+  });
+
+  it("rolls back to this release's superseded deployment from the header", async () => {
+    servePointers();
+    let posted: { deploymentId: string; projectId: string | null; body: unknown } | undefined;
+    server.use(
+      http.get(`${API}/releases/rel_1`, () => HttpResponse.json(release())),
+      http.get(PROJECT_URL, () => HttpResponse.json(ORIGINS_PROJECT)),
+      http.get(DEPLOYMENTS_URL, () =>
+        HttpResponse.json({
+          deployments: [
+            deployment("dep_live", { release_id: "rel_2" }),
+            deployment("dep_mine", { status: "inactive", deployed_at: "2026-10-01T09:00:00Z" }),
+          ],
+        }),
+      ),
+      http.post(`${API}/deployments/:id/rollback`, async ({ request, params }) => {
+        posted = {
+          deploymentId: String(params.id),
+          projectId: new URL(request.url).searchParams.get("project_id"),
+          body: await request.json(),
+        };
+        return HttpResponse.json(
+          deployment("dep_new", { metadata: { reason: "rollback", rollback_to: "dep_mine" } }),
+          { status: 201 },
+        );
+      }),
+    );
+    await renderAt("/releases/rel_1");
+
+    await pick("Rollback");
+    const drawer = await screen.findByRole("dialog", { name: "Rollback deployment" });
+    const inDrawer = within(drawer);
+    // What the origins serve now, and this release's own deployment chosen.
+    expect(await inDrawer.findByText("rel_2")).toBeInTheDocument();
+    const choice = inDrawer.getByRole("radio", { name: "dep_mine" });
+    expect(choice).toBeChecked();
+    expect(inDrawer.getByText(formatDateTime("2026-10-01T09:00:00Z"))).toBeInTheDocument();
+    await userEvent.type(inDrawer.getByLabelText("Message"), "phone_number broke sign-up");
+    await userEvent.click(inDrawer.getByRole("button", { name: "Rollback deployment" }));
+
+    expect(await screen.findByText("Deployment rolled back")).toBeInTheDocument();
+    expect(posted).toEqual({
+      deploymentId: "dep_mine",
+      projectId: "proj_test",
+      body: { message: "phone_number broke sign-up", expected_deployment_id: "dep_live" },
+    });
+    expect(screen.queryByRole("dialog", { name: "Rollback deployment" })).not.toBeInTheDocument();
+  });
+
+  it("offers no actions on a revoked release", async () => {
+    servePointers();
+    server.use(
+      http.get(`${API}/releases/rel_1`, () =>
+        HttpResponse.json(release({ revoked_at: "2026-10-01T00:00:00Z" })),
+      ),
+    );
+    await renderAt("/releases/rel_1");
+
+    expect(await screen.findByRole("heading", { name: "rel_1" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Actions for rel_1" })).not.toBeInTheDocument();
+  });
+});
+
+describe("redeploy", () => {
+  it("redeploys this release from the header, with the drawer's own copy", async () => {
+    servePointers();
+    let posted: unknown;
     server.use(
       http.get(`${API}/releases/rel_1`, () => HttpResponse.json(release())),
       http.get(PROJECT_URL, () =>
@@ -309,43 +473,24 @@ describe("deploy from the release", () => {
           updated_at: CREATED_AT,
         }),
       ),
+      http.get(DEPLOYMENTS_URL, () => HttpResponse.json({ deployments: [deployment("dep_live")] })),
       http.post(DEPLOYMENTS_URL, async ({ request }) => {
-        posted = {
-          projectId: new URL(request.url).searchParams.get("project_id"),
-          body: await request.json(),
-        };
-        return HttpResponse.json(deployment("dep_new"), { status: 201 });
+        posted = await request.json();
+        // The origins serve it already: the server writes nothing.
+        return HttpResponse.json(deployment("dep_live"), { status: 200 });
       }),
     );
     await renderAt("/releases/rel_1");
 
-    await userEvent.click(await screen.findByRole("button", { name: "Deploy release" }));
-    const drawer = await screen.findByRole("dialog", { name: "Deploy release" });
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for rel_1" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Redeploy" }));
+    const drawer = await screen.findByRole("dialog", { name: "Redeploy release" });
     const inDrawer = within(drawer);
-    // The release is this one, and not for picking; no list of releases is read.
-    const picker = inDrawer.getByRole("combobox", { name: "Release" });
-    expect(picker).toHaveTextContent("rel_1");
-    expect(picker).toBeDisabled();
+    expect(inDrawer.getByRole("combobox", { name: "Release" })).toHaveTextContent("rel_1");
     await inDrawer.findByRole("link", { name: "https://app.acme.com" });
-    await userEvent.click(inDrawer.getByRole("button", { name: "Deploy release" }));
+    await userEvent.click(inDrawer.getByRole("button", { name: "Redeploy release" }));
 
-    expect(await screen.findByText("Release deployed")).toBeInTheDocument();
-    expect(posted).toEqual({
-      projectId: "proj_test",
-      body: { release_id: "rel_1", targets: ["primary"] },
-    });
-  });
-
-  it("offers no deploy on a revoked release", async () => {
-    servePointers();
-    server.use(
-      http.get(`${API}/releases/rel_1`, () =>
-        HttpResponse.json(release({ revoked_at: "2026-10-01T00:00:00Z" })),
-      ),
-    );
-    await renderAt("/releases/rel_1");
-
-    expect(await screen.findByRole("heading", { name: "rel_1" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Deploy release" })).not.toBeInTheDocument();
+    expect(await screen.findByText("Release redeployed")).toBeInTheDocument();
+    expect(posted).toEqual({ release_id: "rel_1", targets: ["primary"] });
   });
 });

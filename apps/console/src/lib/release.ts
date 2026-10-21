@@ -154,3 +154,15 @@ export async function listDeployableReleases(projectId: string): Promise<Release
   } while (pageToken);
   return releases.filter((release) => release.revoked_at === null);
 }
+
+/** `POST /releases/{id}/revoke` refuses with this while an origin serves the release. */
+export const RELEASE_IN_USE = "rel.in_use";
+
+/**
+ * Revokes the release, so it is never served again. Already revoked, the
+ * server answers with the release unchanged; still served by an origin, it
+ * refuses with {@link RELEASE_IN_USE}.
+ */
+export function revokeRelease(projectId: string, releaseId: string) {
+  return api.revokeRelease(releaseId, { project_id: projectId });
+}

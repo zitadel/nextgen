@@ -138,6 +138,29 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		}, api.CreateDeploymentParams{ProjectID: ownedID})
 		require.NoError(t, err)
 		require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
+
+		// The directory embeds each deployment's release to know whether it is
+		// revoked: the session's project-wide read stands in for release.read.
+		history, err := session.ListDeployments(t.Context(), api.ListDeploymentsParams{
+			ProjectID: ownedID, Expand: []api.DeploymentExpand{api.DeploymentExpandRelease},
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListDeploymentsResponse{}, history, helpers.MustMarshal(t, history))
+		require.NotEmpty(t, history.(*api.ListDeploymentsResponse).Deployments)
+		assert.Equal(t, created.ID, history.(*api.ListDeploymentsResponse).Deployments[0].Release.Value.ID)
+
+		// And rolls back: to the deployment that is live, which changes
+		// nothing and answers 200.
+		rolledBack, err := session.RollbackDeployment(t.Context(), api.OptRollbackDeploymentRequest{},
+			api.RollbackDeploymentParams{ProjectID: ownedID, DeploymentID: deployed.(*api.CreateDeploymentCreated).ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.RollbackDeploymentOK{}, rolledBack, helpers.MustMarshal(t, rolledBack))
+
+		// And revokes: the origin just deployed to still serves the release,
+		// so the answer is the typed refusal, past the authentication.
+		revoked, err := session.RevokeRelease(t.Context(), api.RevokeReleaseParams{ProjectID: ownedID, ReleaseID: created.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.RevokeReleaseConflict{}, revoked, helpers.MustMarshal(t, revoked))
 	})
 
 	t.Run("teams", func(t *testing.T) {
@@ -372,6 +395,15 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.CreateDeploymentNotFound{}, deployed, helpers.MustMarshal(t, deployed))
 		assert.Equal(t, api.ErrorCode(domain.ErrEnvironmentProjectNotFound().Code), deployed.(*api.CreateDeploymentNotFound).Code)
+
+		// Nor roll back or revoke there.
+		rolledBack, err := session.RollbackDeployment(t.Context(), api.OptRollbackDeploymentRequest{},
+			api.RollbackDeploymentParams{ProjectID: otherID, DeploymentID: "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"})
+		require.NoError(t, err)
+		assertAuthzError(t, rolledBack, domain.ErrEnvironmentProjectNotFound().Code)
+		revoked, err := session.RevokeRelease(t.Context(), api.RevokeReleaseParams{ProjectID: otherID, ReleaseID: created.ID})
+		require.NoError(t, err)
+		assertAuthzError(t, revoked, domain.ErrReleaseProjectNotFound().Code)
 	})
 
 	t.Run("cannot read another project's schema", func(t *testing.T) {
