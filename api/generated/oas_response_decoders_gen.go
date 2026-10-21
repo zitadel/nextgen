@@ -861,7 +861,7 @@ func decodeCompleteClaimResponse(resp *http.Response) (res CompleteClaimRes, _ e
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response CompleteClaimErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -878,7 +878,7 @@ func decodeCompleteClaimResponse(resp *http.Response) (res CompleteClaimRes, _ e
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &CompleteClaimErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -1080,7 +1080,7 @@ func decodeCreateBrandingResponse(resp *http.Response) (res CreateBrandingRes, _
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response CreateBrandingErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -1097,7 +1097,7 @@ func decodeCreateBrandingResponse(resp *http.Response) (res CreateBrandingRes, _
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &CreateBrandingErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -3111,7 +3111,7 @@ func decodeCreateTeamResponse(resp *http.Response) (res CreateTeamRes, _ error) 
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response CreateTeamErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -3128,7 +3128,7 @@ func decodeCreateTeamResponse(resp *http.Response) (res CreateTeamRes, _ error) 
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &CreateTeamErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -3725,7 +3725,7 @@ func decodeDeleteTeamResponse(resp *http.Response) (res DeleteTeamRes, _ error) 
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response DeleteTeamErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -3742,7 +3742,7 @@ func decodeDeleteTeamResponse(resp *http.Response) (res DeleteTeamRes, _ error) 
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &DeleteTeamErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -4571,7 +4571,7 @@ func decodeGetBrandingByIdResponse(resp *http.Response) (res GetBrandingByIdRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response GetBrandingByIdErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -4588,7 +4588,7 @@ func decodeGetBrandingByIdResponse(resp *http.Response) (res GetBrandingByIdRes,
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &GetBrandingByIdErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -4838,7 +4838,7 @@ func decodeGetClaimStatusResponse(resp *http.Response) (res GetClaimStatusRes, _
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response GetClaimStatusErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -4855,7 +4855,7 @@ func decodeGetClaimStatusResponse(resp *http.Response) (res GetClaimStatusRes, _
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &GetClaimStatusErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -4991,7 +4991,7 @@ func decodeGetClaimWindowResponse(resp *http.Response) (res GetClaimWindowRes, _
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response GetClaimWindowErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5008,7 +5008,7 @@ func decodeGetClaimWindowResponse(resp *http.Response) (res GetClaimWindowRes, _
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &GetClaimWindowErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -5372,7 +5372,7 @@ func decodeGetEventResponse(resp *http.Response) (res GetEventRes, _ error) {
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response GetEventErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5389,7 +5389,7 @@ func decodeGetEventResponse(resp *http.Response) (res GetEventRes, _ error) {
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &GetEventErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -6050,7 +6050,7 @@ func decodeGetHealthResponse(resp *http.Response) (res GetHealthRes, _ error) {
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response GetHealthErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -6067,7 +6067,7 @@ func decodeGetHealthResponse(resp *http.Response) (res GetHealthRes, _ error) {
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &GetHealthErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -6557,7 +6557,7 @@ func decodeGetLiveResponse(resp *http.Response) (res GetLiveRes, _ error) {
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response GetLiveErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -6574,7 +6574,7 @@ func decodeGetLiveResponse(resp *http.Response) (res GetLiveRes, _ error) {
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &GetLiveErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -7896,7 +7896,7 @@ func decodeGetReadyResponse(resp *http.Response) (res GetReadyRes, _ error) {
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response GetReadyErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -7913,7 +7913,7 @@ func decodeGetReadyResponse(resp *http.Response) (res GetReadyRes, _ error) {
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &GetReadyErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -8439,7 +8439,7 @@ func decodeGetTeamResponse(resp *http.Response) (res GetTeamRes, _ error) {
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response GetTeamErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -8456,7 +8456,7 @@ func decodeGetTeamResponse(resp *http.Response) (res GetTeamRes, _ error) {
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &GetTeamErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -9026,7 +9026,7 @@ func decodeInitClaimResponse(resp *http.Response) (res InitClaimRes, _ error) {
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response InitClaimErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -9043,7 +9043,7 @@ func decodeInitClaimResponse(resp *http.Response) (res InitClaimRes, _ error) {
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &InitClaimErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -9210,7 +9210,7 @@ func decodeListBrandingResponse(resp *http.Response) (res ListBrandingRes, _ err
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response ListBrandingErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -9227,7 +9227,7 @@ func decodeListBrandingResponse(resp *http.Response) (res ListBrandingRes, _ err
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &ListBrandingErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -9499,7 +9499,7 @@ func decodeListEventsResponse(resp *http.Response) (res ListEventsRes, _ error) 
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response ListEventsErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -9516,7 +9516,7 @@ func decodeListEventsResponse(resp *http.Response) (res ListEventsRes, _ error) 
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &ListEventsErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -13265,7 +13265,7 @@ func decodeQueryTeamsResponse(resp *http.Response) (res QueryTeamsRes, _ error) 
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response QueryTeamsErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -13282,7 +13282,7 @@ func decodeQueryTeamsResponse(resp *http.Response) (res QueryTeamsRes, _ error) 
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &QueryTeamsErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -14978,7 +14978,7 @@ func decodeUpdateTeamResponse(resp *http.Response) (res UpdateTeamRes, _ error) 
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response UpdateTeamErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -14995,7 +14995,7 @@ func decodeUpdateTeamResponse(resp *http.Response) (res UpdateTeamRes, _ error) 
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &UpdateTeamErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil

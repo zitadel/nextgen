@@ -24,8 +24,4 @@ get:
           schema:
             $ref: ../../components/error-details.yaml
     default:
-      description: Something went wrong on the server. This was not your fault.
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
+      $ref: getReady-error-response.yaml

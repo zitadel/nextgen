@@ -395,7 +395,7 @@ func encodeCompleteClaimResponse(response CompleteClaimRes, w http.ResponseWrite
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *CompleteClaimErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -514,7 +514,7 @@ func encodeCreateBrandingResponse(response CreateBrandingRes, w http.ResponseWri
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *CreateBrandingErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1513,7 +1513,7 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *CreateTeamErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1798,7 +1798,7 @@ func encodeDeleteTeamResponse(response DeleteTeamRes, w http.ResponseWriter, spa
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *DeleteTeamErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2225,7 +2225,7 @@ func encodeGetBrandingByIdResponse(response GetBrandingByIdRes, w http.ResponseW
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *GetBrandingByIdErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2343,7 +2343,7 @@ func encodeGetClaimStatusResponse(response GetClaimStatusRes, w http.ResponseWri
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *GetClaimStatusErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2414,7 +2414,7 @@ func encodeGetClaimWindowResponse(response GetClaimWindowRes, w http.ResponseWri
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *GetClaimWindowErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2612,7 +2612,7 @@ func encodeGetEventResponse(response GetEventRes, w http.ResponseWriter, span tr
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *GetEventErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2965,6 +2965,31 @@ func encodeGetHealthResponse(response GetHealthRes, w http.ResponseWriter, span 
 		}
 		return nil
 
+	case *GetHealthErrorResponseStatusCode:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		code := response.StatusCode
+		if code == 0 {
+			// Set default status code.
+			code = http.StatusOK
+		}
+		w.WriteHeader(code)
+		if st := http.StatusText(code); code >= http.StatusBadRequest {
+			span.SetStatus(codes.Error, st)
+		} else {
+			span.SetStatus(codes.Ok, st)
+		}
+
+		e := new(jx.Encoder)
+		response.Response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		if code >= http.StatusInternalServerError {
+			return errors.Wrapf(ht.ErrInternalServerErrorResponse, "code: %d, message: %s", code, http.StatusText(code))
+		}
+		return nil
+
 	default:
 		return errors.Errorf("unexpected response type: %T", response)
 	}
@@ -3172,6 +3197,31 @@ func encodeGetLiveResponse(response GetLiveRes, w http.ResponseWriter, span trac
 		return nil
 
 	case *ErrorDetailsStatusCode:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		code := response.StatusCode
+		if code == 0 {
+			// Set default status code.
+			code = http.StatusOK
+		}
+		w.WriteHeader(code)
+		if st := http.StatusText(code); code >= http.StatusBadRequest {
+			span.SetStatus(codes.Error, st)
+		} else {
+			span.SetStatus(codes.Ok, st)
+		}
+
+		e := new(jx.Encoder)
+		response.Response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		if code >= http.StatusInternalServerError {
+			return errors.Wrapf(ht.ErrInternalServerErrorResponse, "code: %d, message: %s", code, http.StatusText(code))
+		}
+		return nil
+
+	case *GetLiveErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3821,6 +3871,31 @@ func encodeGetReadyResponse(response GetReadyRes, w http.ResponseWriter, span tr
 		}
 		return nil
 
+	case *GetReadyErrorResponseStatusCode:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		code := response.StatusCode
+		if code == 0 {
+			// Set default status code.
+			code = http.StatusOK
+		}
+		w.WriteHeader(code)
+		if st := http.StatusText(code); code >= http.StatusBadRequest {
+			span.SetStatus(codes.Error, st)
+		} else {
+			span.SetStatus(codes.Ok, st)
+		}
+
+		e := new(jx.Encoder)
+		response.Response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		if code >= http.StatusInternalServerError {
+			return errors.Wrapf(ht.ErrInternalServerErrorResponse, "code: %d, message: %s", code, http.StatusText(code))
+		}
+		return nil
+
 	default:
 		return errors.Errorf("unexpected response type: %T", response)
 	}
@@ -4073,7 +4148,7 @@ func encodeGetTeamResponse(response GetTeamRes, w http.ResponseWriter, span trac
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *GetTeamErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4371,7 +4446,7 @@ func encodeInitClaimResponse(response InitClaimRes, w http.ResponseWriter, span 
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *InitClaimErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4477,7 +4552,7 @@ func encodeListBrandingResponse(response ListBrandingRes, w http.ResponseWriter,
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *ListBrandingErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4622,7 +4697,7 @@ func encodeListEventsResponse(response ListEventsRes, w http.ResponseWriter, spa
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *ListEventsErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6368,7 +6443,7 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *QueryTeamsErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -7246,7 +7321,7 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *UpdateTeamErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
