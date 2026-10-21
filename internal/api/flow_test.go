@@ -361,6 +361,30 @@ func TestSubmitFlowStep_HappyPath_RotatesCookie(t *testing.T) {
 	}
 }
 
+// A sealed deployment pins the release; it does not skip Origin admission on
+// later submits. Without a RuntimeResolver the handler falls back to the
+// project primary allowlist (req.invalid).
+func TestSubmitFlowStep_SealedDeploymentStillAdmitsOrigin(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{
+		ID:           "flow_1",
+		ProjectID:    "proj_1",
+		SessionID:    "sess_1",
+		DeploymentID: "dep_1",
+		IssuedAt:     time.Now(),
+	}
+	ts.projects.EXPECT().Get(gomock.Any(), "proj_1").Return(&domain.Project{
+		Origins: []domain.Origin{{Pattern: "https://login.example.com", Kind: domain.OriginKindPrimary}},
+	}, nil)
+
+	resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action": "submit",
+	}, ts.sealCookie(t, state), "https://evil.example.com")
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
+	require.Contains(t, string(body), "req.invalid")
+	require.Empty(t, ts.fake.gotSubmitReq.Action, "disallowed origin must not reach the engine")
+}
+
 func TestSubmitFlowStep_TerminalClearsCookie(t *testing.T) {
 	ts := newTestServer(t)
 	state := &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()}
