@@ -8,9 +8,11 @@ import (
 )
 
 // resolveRuntime decides which release serves a request from Origin and puts
-// the answer on the context. A missing Origin, or an open admission (empty
-// allowlist / loopback) with nothing deployed yet, keeps the pre-resolution
-// path until the project default target lands.
+// the answer on the context.
+//
+// TODO(#1616): a missing Origin keeps the pre-resolution path. Answer
+// rel.not_deployed once the project default target exists. An open admission
+// with nothing deployed takes the same path inside RuntimeResolver.Resolve.
 func (h *Handler) resolveRuntime(ctx context.Context, projectID, origin string) (context.Context, error) {
 	if h.runtime == nil || origin == "" {
 		return ctx, nil
