@@ -88,4 +88,5 @@ Dimensions each command records:
 - **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (check names, never messages).
 - **start** — `runtime` (`binary` / `docker`).
 - **variables** — `is_secret`, `variable_count`. Never the variable's name or value.
+- **api** — `operation` (an `operationId` of the spec, never a path, an id or a field), `is_paginated`.
 - **claim** — `claim_outcome` (`completed` / `already_claimed` / `expired` / `window_expired` / `timeout` / `dry_run`), `poll_count`, `browser_opened`. Never an id or a URL.

@@ -1246,6 +1246,9 @@ importers:
       '@faker-js/faker':
         specifier: 'catalog:'
         version: 10.6.0
+      '@redocly/openapi-core':
+        specifier: 'catalog:'
+        version: 2.31.5
       '@types/node':
         specifier: ^24.19.1
         version: 24.19.1
