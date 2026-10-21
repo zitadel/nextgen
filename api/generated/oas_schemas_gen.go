@@ -13253,21 +13253,22 @@ func (*CreateDeploymentCreated) createDeploymentRes() {}
 
 // CreateDeploymentErrorResponse represents sum type.
 type CreateDeploymentErrorResponse struct {
-	Type                CreateDeploymentErrorResponseType // switch on this field
-	AuthUnauthorized    AuthUnauthorized
-	DepConflict         DepConflict
-	DepInvalid          DepInvalid
-	DepNotFound         DepNotFound
-	DepPermissionDenied DepPermissionDenied
-	EnvProjectNotFound  EnvProjectNotFound
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	NotImplemented      NotImplemented
-	ProjNotFound        ProjNotFound
-	RelNotFound         RelNotFound
-	RelRevoked          RelRevoked
-	ReqInvalid          ReqInvalid
-	Unavailable         Unavailable
+	Type                 CreateDeploymentErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	DepConflict          DepConflict
+	DepInvalid           DepInvalid
+	DepNotFound          DepNotFound
+	DepPermissionDenied  DepPermissionDenied
+	EnvProjectNotFound   EnvProjectNotFound
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	NotImplemented       NotImplemented
+	ProjNotFound         ProjNotFound
+	ProjOriginNotAllowed ProjOriginNotAllowed
+	RelNotFound          RelNotFound
+	RelRevoked           RelRevoked
+	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 }
 
 // CreateDeploymentErrorResponseType is oneOf type of CreateDeploymentErrorResponse.
@@ -13275,20 +13276,21 @@ type CreateDeploymentErrorResponseType string
 
 // Possible values for CreateDeploymentErrorResponseType.
 const (
-	AuthUnauthorizedCreateDeploymentErrorResponse    CreateDeploymentErrorResponseType = "auth.unauthorized"
-	DepConflictCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "dep.conflict"
-	DepInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.invalid"
-	DepNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "dep.not_found"
-	DepPermissionDeniedCreateDeploymentErrorResponse CreateDeploymentErrorResponseType = "dep.permission_denied"
-	EnvProjectNotFoundCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "env.project_not_found"
-	EvtInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "evt.invalid"
-	InternalCreateDeploymentErrorResponse            CreateDeploymentErrorResponseType = "internal"
-	NotImplementedCreateDeploymentErrorResponse      CreateDeploymentErrorResponseType = "not_implemented"
-	ProjNotFoundCreateDeploymentErrorResponse        CreateDeploymentErrorResponseType = "proj.not_found"
-	RelNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "rel.not_found"
-	RelRevokedCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "rel.revoked"
-	ReqInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "req.invalid"
-	UnavailableCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "unavailable"
+	AuthUnauthorizedCreateDeploymentErrorResponse     CreateDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "dep.invalid"
+	DepNotFoundCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.not_found"
+	DepPermissionDeniedCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "dep.permission_denied"
+	EnvProjectNotFoundCreateDeploymentErrorResponse   CreateDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "evt.invalid"
+	InternalCreateDeploymentErrorResponse             CreateDeploymentErrorResponseType = "internal"
+	NotImplementedCreateDeploymentErrorResponse       CreateDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedCreateDeploymentErrorResponse CreateDeploymentErrorResponseType = "proj.origin_not_allowed"
+	RelNotFoundCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "rel.not_found"
+	RelRevokedCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "rel.revoked"
+	ReqInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "req.invalid"
+	UnavailableCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether CreateDeploymentErrorResponse is AuthUnauthorized.
@@ -13339,6 +13341,11 @@ func (s CreateDeploymentErrorResponse) IsNotImplemented() bool {
 // IsProjNotFound reports whether CreateDeploymentErrorResponse is ProjNotFound.
 func (s CreateDeploymentErrorResponse) IsProjNotFound() bool {
 	return s.Type == ProjNotFoundCreateDeploymentErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether CreateDeploymentErrorResponse is ProjOriginNotAllowed.
+func (s CreateDeploymentErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedCreateDeploymentErrorResponse
 }
 
 // IsRelNotFound reports whether CreateDeploymentErrorResponse is RelNotFound.
@@ -13571,6 +13578,27 @@ func NewProjNotFoundCreateDeploymentErrorResponse(v ProjNotFound) CreateDeployme
 	return s
 }
 
+// SetProjOriginNotAllowed sets CreateDeploymentErrorResponse to ProjOriginNotAllowed.
+func (s *CreateDeploymentErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedCreateDeploymentErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if CreateDeploymentErrorResponse is ProjOriginNotAllowed.
+func (s CreateDeploymentErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedCreateDeploymentErrorResponse(v ProjOriginNotAllowed) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
 // SetRelNotFound sets CreateDeploymentErrorResponse to RelNotFound.
 func (s *CreateDeploymentErrorResponse) SetRelNotFound(v RelNotFound) {
 	s.Type = RelNotFoundCreateDeploymentErrorResponse
@@ -13705,8 +13733,8 @@ type CreateDeploymentRequest struct {
 	// `sha256:` prefix.
 	ContentHash OptReleaseContentHash    `json:"content_hash"`
 	Targets     DeploymentTargetsRequest `json:"targets"`
-	// Preview URLs only: how long each preview stays live, counted from this
-	// deployment. Omitted, the project's default applies.
+	// Preview URLs only. Each preview stays live for 7 days (`7d`) from this
+	// deployment; a sent value is accepted but not applied.
 	TTL OptPreviewTTL `json:"ttl"`
 	// Why this deployment happens. Omitted, the server records `deploy`.
 	Reason OptDeploymentReason `json:"reason"`
@@ -77684,21 +77712,22 @@ func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
 
 // RollbackDeploymentErrorResponse represents sum type.
 type RollbackDeploymentErrorResponse struct {
-	Type                RollbackDeploymentErrorResponseType // switch on this field
-	AuthUnauthorized    AuthUnauthorized
-	DepConflict         DepConflict
-	DepInvalid          DepInvalid
-	DepNotFound         DepNotFound
-	DepPermissionDenied DepPermissionDenied
-	EnvProjectNotFound  EnvProjectNotFound
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	NotImplemented      NotImplemented
-	ProjNotFound        ProjNotFound
-	RelNotFound         RelNotFound
-	RelRevoked          RelRevoked
-	ReqInvalid          ReqInvalid
-	Unavailable         Unavailable
+	Type                 RollbackDeploymentErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	DepConflict          DepConflict
+	DepInvalid           DepInvalid
+	DepNotFound          DepNotFound
+	DepPermissionDenied  DepPermissionDenied
+	EnvProjectNotFound   EnvProjectNotFound
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	NotImplemented       NotImplemented
+	ProjNotFound         ProjNotFound
+	ProjOriginNotAllowed ProjOriginNotAllowed
+	RelNotFound          RelNotFound
+	RelRevoked           RelRevoked
+	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 }
 
 // RollbackDeploymentErrorResponseType is oneOf type of RollbackDeploymentErrorResponse.
@@ -77706,20 +77735,21 @@ type RollbackDeploymentErrorResponseType string
 
 // Possible values for RollbackDeploymentErrorResponseType.
 const (
-	AuthUnauthorizedRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "auth.unauthorized"
-	DepConflictRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.conflict"
-	DepInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.invalid"
-	DepNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.not_found"
-	DepPermissionDeniedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.permission_denied"
-	EnvProjectNotFoundRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "env.project_not_found"
-	EvtInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "evt.invalid"
-	InternalRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "internal"
-	NotImplementedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "not_implemented"
-	ProjNotFoundRollbackDeploymentErrorResponse        RollbackDeploymentErrorResponseType = "proj.not_found"
-	RelNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "rel.not_found"
-	RelRevokedRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.revoked"
-	ReqInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "req.invalid"
-	UnavailableRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "unavailable"
+	AuthUnauthorizedRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "dep.invalid"
+	DepNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.not_found"
+	DepPermissionDeniedRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.permission_denied"
+	EnvProjectNotFoundRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "evt.invalid"
+	InternalRollbackDeploymentErrorResponse             RollbackDeploymentErrorResponseType = "internal"
+	NotImplementedRollbackDeploymentErrorResponse       RollbackDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "proj.origin_not_allowed"
+	RelNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.not_found"
+	RelRevokedRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "rel.revoked"
+	ReqInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "req.invalid"
+	UnavailableRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether RollbackDeploymentErrorResponse is AuthUnauthorized.
@@ -77770,6 +77800,11 @@ func (s RollbackDeploymentErrorResponse) IsNotImplemented() bool {
 // IsProjNotFound reports whether RollbackDeploymentErrorResponse is ProjNotFound.
 func (s RollbackDeploymentErrorResponse) IsProjNotFound() bool {
 	return s.Type == ProjNotFoundRollbackDeploymentErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether RollbackDeploymentErrorResponse is ProjOriginNotAllowed.
+func (s RollbackDeploymentErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedRollbackDeploymentErrorResponse
 }
 
 // IsRelNotFound reports whether RollbackDeploymentErrorResponse is RelNotFound.
@@ -77999,6 +78034,27 @@ func (s RollbackDeploymentErrorResponse) GetProjNotFound() (v ProjNotFound, ok b
 func NewProjNotFoundRollbackDeploymentErrorResponse(v ProjNotFound) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets RollbackDeploymentErrorResponse to ProjOriginNotAllowed.
+func (s *RollbackDeploymentErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedRollbackDeploymentErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if RollbackDeploymentErrorResponse is ProjOriginNotAllowed.
+func (s RollbackDeploymentErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedRollbackDeploymentErrorResponse(v ProjOriginNotAllowed) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetProjOriginNotAllowed(v)
 	return s
 }
 

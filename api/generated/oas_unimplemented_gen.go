@@ -139,7 +139,7 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 // - `400 dep.variables_missing`: a referenced variable has no value for
 // the kind; `details` names the kind and every missing variable.
 // - `403 proj.origin_not_allowed`: a preview URL matches no preview
-// pattern.
+// pattern, or is a loopback URL.
 // - `404 rel.not_found`: the release id or digest names no release here.
 // - `409 dep.conflict`: `expected_deployment_id` is not the deployment
 // this write replaces; `details.deployment` is that deployment.
