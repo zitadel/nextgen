@@ -95,8 +95,6 @@ func settingCELType(t SettingType) (*cel.Type, error) {
 		return cel.IntType, nil
 	case SettingTypeBoolean:
 		return cel.BoolType, nil
-	case SettingTypeString:
-		return cel.StringType, nil
 	}
 	return nil, fmt.Errorf("unsupported setting type %q", t)
 }

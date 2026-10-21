@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"math"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -148,6 +149,7 @@ func TestParseTemplate_RejectsStructure(t *testing.T) {
     "max"`, `"minimum": 11, "maximum": 10 },
     "max"`}, "minimum 11 is above maximum 10"},
 		{"unsupported type", [2]string{`"max": { "type": "integer"`, `"max": { "type": "number"`}, "unsupported type"},
+		{"string setting, which the cost estimator cannot bound", [2]string{`"max": { "type": "integer"`, `"max": { "type": "string"`}, "string settings are not supported"},
 		{"setting not snake_case", [2]string{`"max": { "type"`, `"maxValue": { "type"`}, "names must be snake_case"},
 		{"rule not snake_case", [2]string{`{ "name": "min_not_above_max"`, `{ "name": "Min-Not-Above"`}, "names must be snake_case"},
 		{"context type CEL accepts but the engine cannot coerce", [2]string{`"counts": "list<int>"`, `"counts": "list<list<int>>"`}, "unsupported type"},
@@ -289,6 +291,34 @@ func TestBound_Evaluate_RuntimeCostLimit(t *testing.T) {
 	_, err = b.Evaluate(t.Context(), map[string]any{"value": 3, "counts": make([]int64, 1_000)})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cost limit")
+}
+
+// One bound policy serves every request that runs the operation, so Evaluate
+// runs concurrently on it. Each goroutine checks its own decision, so a
+// shared evaluation state would show as a wrong answer; run with -race to
+// catch the data race itself.
+func TestBound_Evaluate_Concurrent(t *testing.T) {
+	b := bindTest(t, testEngine(t), map[string]any{"min": 2, "max": 5})
+	var wg sync.WaitGroup
+	for i := range 64 {
+		wg.Go(func() {
+			value := int64(i % 8)
+			for range 50 {
+				decision, err := b.Evaluate(t.Context(), map[string]any{
+					"value":  value,
+					"flags":  []bool{},
+					"counts": []int64{value},
+				})
+				if !assert.NoError(t, err) {
+					return
+				}
+				if !assert.Equal(t, value >= 2 && value <= 5, decision.Allow, "value %d", value) {
+					return
+				}
+			}
+		})
+	}
+	wg.Wait()
 }
 
 func TestBound_Evaluate_StopsOnCancelledContext(t *testing.T) {

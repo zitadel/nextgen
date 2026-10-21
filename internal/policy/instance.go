@@ -111,12 +111,6 @@ func coerceSetting(name string, setting Setting, raw any) (any, error) {
 			return nil, fmt.Errorf("setting %q: expected a boolean, got %v", name, raw)
 		}
 		return b, nil
-	case SettingTypeString:
-		s, ok := raw.(string)
-		if !ok {
-			return nil, fmt.Errorf("setting %q: expected a string, got %v", name, raw)
-		}
-		return s, nil
 	}
 	return nil, fmt.Errorf("setting %q: unsupported type %q", name, setting.Type)
 }

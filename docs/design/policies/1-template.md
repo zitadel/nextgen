@@ -33,9 +33,11 @@ all hold, as far as they are active, for the operation to proceed.
 
 ## `config`
 
-One entry per setting: its type (`integer`, `boolean`, `string`) and, for an
+One entry per setting: its type (`integer` or `boolean`) and, for an
 integer, `minimum` and `maximum`. There is nothing else: no default, no
-recommendation, no marker.
+recommendation, no marker. There are no string settings: a string has no
+size the startup cost estimate could bound a rule by, so one needs a length
+bound that also feeds the estimator before a template may declare it.
 
 - Omitted means off. A setting the instance does not set switches off the
   rule that reads it, and an instance with an empty `config` enforces

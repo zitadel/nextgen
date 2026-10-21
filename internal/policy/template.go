@@ -63,7 +63,6 @@ type SettingType string
 const (
 	SettingTypeInteger SettingType = "integer"
 	SettingTypeBoolean SettingType = "boolean"
-	SettingTypeString  SettingType = "string"
 )
 
 // Rule is one named boolean CEL expression.
@@ -180,7 +179,13 @@ func (t *Template) validate() error {
 			return fmt.Errorf("setting %q: names must be snake_case", name)
 		}
 		switch setting.Type {
-		case SettingTypeInteger, SettingTypeBoolean, SettingTypeString:
+		case SettingTypeInteger, SettingTypeBoolean:
+		case "string":
+			// A string has no size the cost estimator could bound a rule by,
+			// so a rule over one could not be checked at startup. Adding
+			// string settings needs a length bound that also feeds the
+			// estimator.
+			return fmt.Errorf("setting %q: string settings are not supported; they need a length bound the cost estimator can use", name)
 		default:
 			return fmt.Errorf("setting %q: unsupported type %q", name, setting.Type)
 		}
