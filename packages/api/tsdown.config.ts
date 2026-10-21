@@ -28,6 +28,7 @@ export default defineConfig({
     "generated/endpoints/zitadelNextGen": "src/generated/endpoints/zitadelNextGen.ts",
     "generated/endpoints/zitadelNextGen.msw": "src/generated/endpoints/zitadelNextGen.msw.ts",
     "generated/endpoints/zitadelNextGen.zod": "src/generated/endpoints/zitadelNextGen.zod.ts",
+    "generated/operations": "src/generated/operations.ts",
   },
   outDir: "dist",
   format: ["esm"],

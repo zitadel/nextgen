@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import { formatDateTime } from "@/lib/date";
 import { TEST_PROJECT_ID, scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -47,12 +48,16 @@ function stub({
   passkeysStatus = 200,
   identityLinks = [],
   identityLinksStatus = 200,
+  password = { set_at: "2026-04-28T13:32:00Z" },
+  passwordStatus = 200,
 }: {
   user?: Record<string, unknown>;
   passkeys?: unknown[];
   passkeysStatus?: number;
   identityLinks?: unknown[];
   identityLinksStatus?: number;
+  password?: { set_at?: string };
+  passwordStatus?: number;
 } = {}) {
   server.use(
     http.get(`${USERS_URL}/${USER_ID}`, () => HttpResponse.json(user)),
@@ -72,6 +77,11 @@ function stub({
       identityLinksStatus === 200
         ? HttpResponse.json({ identity_links: identityLinks })
         : new HttpResponse(null, { status: identityLinksStatus }),
+    ),
+    http.get(`${USERS_URL}/${USER_ID}/password`, () =>
+      passwordStatus === 200
+        ? HttpResponse.json(password)
+        : new HttpResponse(null, { status: passwordStatus }),
     ),
   );
 }
@@ -185,6 +195,15 @@ describe("user detail", () => {
     expect(panel).not.toHaveTextContent(/latest|outdated/i);
   });
 
+  it("titles the profile card as the user's schema", async () => {
+    // The design names the card "User schema"; the schema's own name is the
+    // revision link beside it. The detail header owns the `h1`.
+    stub();
+    await renderDetail();
+
+    expect(await screen.findByRole("heading", { level: 2, name: "User schema" })).toBeVisible();
+  });
+
   it("reads the user's schema in the selected project", async () => {
     // Schema ids are unique per project only, and the server resolves an
     // ambiguous one in the caller's own project unless `project_id` names it.
@@ -216,7 +235,7 @@ describe("user detail", () => {
           schema: "sch_business",
           identifier: "maya@acme.com",
           identifier_property: "email",
-          attributes: { email: "maya@acme.com", headcount: 42, verified: false },
+          attributes: { email: "maya@acme.com", headcount: 42, verified: false, active: true },
         }),
       ),
       http.get(`${SCHEMAS_URL}/sch_business`, () =>
@@ -228,6 +247,7 @@ describe("user detail", () => {
               email: { type: "string", format: "email" },
               headcount: { type: "integer", title: "Headcount" },
               verified: { type: "boolean", title: "Verified" },
+              active: { type: ["boolean", "null"], title: "Active" },
             },
           },
           metadata: { created_at: "2026-07-01T00:00:00Z" },
@@ -237,24 +257,68 @@ describe("user detail", () => {
       http.get(`${USERS_URL}/${USER_ID}/identity_links`, () =>
         HttpResponse.json({ identity_links: [] }),
       ),
+      http.get(`${USERS_URL}/${USER_ID}/password`, () => HttpResponse.json({})),
     );
     await renderDetail();
 
-    expect(await screen.findByLabelText("Headcount")).toHaveValue("42");
-    // `false` is a value, not an absence — it must not render as empty.
+    // An integer property edits through a number input.
+    expect(await screen.findByLabelText("Headcount")).toHaveValue(42);
+    // `step="any"`: a fraction must not fail the input's own validation.
+    expect(screen.getByLabelText("Headcount")).toHaveAttribute("step", "any");
+    // `false` is a value, not an absence — it must not render as empty. No text
+    // control writes a boolean, so it stays read-only.
     expect(screen.getByLabelText("Verified")).toHaveValue("false");
+    expect(screen.getByLabelText("Verified")).toHaveAttribute("readonly");
+    // A union is no different: a text input would write `"true"`.
+    expect(screen.getByLabelText("Active")).toHaveAttribute("readonly");
   });
 
-  it("renders the profile read-only", async () => {
-    // There is no update endpoint (#693). An editable field with no Save would
-    // promise an edit the console cannot make, so the fields are inert and the
-    // design's Save is absent rather than disabled.
+  it("saves only the changed attributes, and keeps Save disabled until one changes", async () => {
     stub();
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({});
+      }),
+    );
     await renderDetail();
 
-    expect(await screen.findByLabelText("Company name")).toHaveAttribute("readonly");
-    expect(screen.getByLabelText("Email")).toHaveAttribute("readonly");
-    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    const save = await screen.findByRole("button", { name: "Save" });
+    expect(save).toBeDisabled();
+
+    const company = screen.getByLabelText("Company name");
+    await userEvent.clear(company);
+    await userEvent.type(company, "Sea Industries");
+    expect(save).toBeEnabled();
+    await userEvent.click(save);
+
+    // The patch merges key by key, so the untouched email is not resent.
+    await waitFor(() =>
+      expect(bodies).toEqual([{ attributes: { companyName: "Sea Industries" } }]),
+    );
+  });
+
+  it("deletes a cleared optional attribute and refuses to clear a required one", async () => {
+    stub();
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({});
+      }),
+    );
+    await renderDetail();
+
+    const save = await screen.findByRole("button", { name: "Save" });
+    await userEvent.clear(screen.getByLabelText("Email"));
+    expect(save).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("Email"), "maya@acme.com");
+
+    // `""` would fail a `format`; `null` is the patch's delete.
+    await userEvent.clear(screen.getByLabelText("Company name"));
+    await userEvent.click(save);
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { companyName: null } }]));
   });
 
   it("shows the status and created date the server stamped", async () => {
@@ -317,7 +381,46 @@ describe("user detail", () => {
     expect(screen.queryByText(/Last sign-in/i)).not.toBeInTheDocument();
   });
 
-  it("reports the real passkey count on the Authentication tab", async () => {
+  it("shows when the passkey was verified on the Authentication tab", async () => {
+    stub();
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(
+      panel.getByText(`Verified ${formatDateTime("2026-07-01T00:00:00Z")}`),
+    ).toBeInTheDocument();
+  });
+
+  it("shows when the password was set, in the same card as the passkey", async () => {
+    stub();
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(panel.getByText("Password")).toBeInTheDocument();
+    // "Set", not the design's "Verified": the API records when it was set, and
+    // no check of it.
+    expect(panel.getByText(`Set ${formatDateTime("2026-04-28T13:32:00Z")}`)).toBeInTheDocument();
+  });
+
+  it("says when the user has no password", async () => {
+    stub({ password: {} });
+    await renderDetail();
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    expect(within(screen.getByRole("tabpanel")).getByText("Not set")).toBeInTheDocument();
+  });
+
+  it("keeps the card when the password read fails", async () => {
+    stub({ passwordStatus: 500 });
+    await renderDetail();
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(panel.getByText("Could not be loaded")).toBeInTheDocument();
+    expect(panel.getByText(/^Verified /)).toBeInTheDocument();
+  });
+
+  it("counts several passkeys and dates the latest", async () => {
     stub({
       passkeys: [
         { id: "pk_1", name: "MacBook", created_at: "2026-07-01T00:00:00Z" },
@@ -327,9 +430,19 @@ describe("user detail", () => {
     await renderDetail();
 
     await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
-    const panel = within(screen.getByRole("tabpanel"));
-    expect(panel.getByText("2 registered")).toBeInTheDocument();
-    expect(panel.getByText("Enabled")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("tabpanel")).getByText(
+        `2 registered, last verified ${formatDateTime("2026-07-02T00:00:00Z")}`,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says when no passkey is set up", async () => {
+    stub({ passkeys: [] });
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    expect(within(screen.getByRole("tabpanel")).getByText("Not set up")).toBeInTheDocument();
   });
 
   it("still renders the screen when the passkey list fails", async () => {
@@ -349,6 +462,7 @@ describe("user detail", () => {
     stub({
       identityLinks: [
         { id: "idplink_1", connection_id: "idp_google", created_at: "2026-07-03T00:00:00Z" },
+        { id: "idplink_2", connection_id: "idp_github", created_at: "2026-07-04T00:00:00Z" },
       ],
     });
     const projects: (string | null)[] = [];
@@ -356,7 +470,10 @@ describe("user detail", () => {
       http.post(IDPS_QUERY_URL, ({ request }) => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json({
-          idps: [{ id: "idp_google", slug: "google", definition: { display_name: "Google" } }],
+          idps: [
+            { id: "idp_google", slug: "google", definition: { display_name: "Google" } },
+            { id: "idp_github", slug: "github", definition: { display_name: "GitHub" } },
+          ],
         });
       }),
     );
@@ -364,10 +481,14 @@ describe("user detail", () => {
 
     await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
     const panel = within(screen.getByRole("tabpanel"));
-    // Passkeys stay their own row; the provider is not folded into them.
+    // Passkeys stay their own row; each provider account is a row of its own
+    // after it, in the order the links are listed.
     expect(panel.getByText("Passkey")).toBeInTheDocument();
-    expect(panel.getByRole("link", { name: "Google" })).toBeInTheDocument();
-    expect(panel.getByText(/^Linked .*2026/)).toBeInTheDocument();
+    const providers = panel.getAllByRole("link").map((link) => link.textContent);
+    expect(providers).toEqual(["Google", "GitHub"]);
+    expect(panel.getAllByText(/^Linked .*2026/)).toHaveLength(2);
+    // With accounts linked, the placeholder row is gone.
+    expect(panel.queryByText("Identity providers")).not.toBeInTheDocument();
     expect(projects).toEqual([TEST_PROJECT_ID]);
   });
 
@@ -393,11 +514,9 @@ describe("user detail", () => {
     await renderDetail();
 
     await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
-    expect(
-      within(screen.getByRole("tabpanel")).getByText(
-        "No identity provider is linked to this user.",
-      ),
-    ).toBeInTheDocument();
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(panel.getByText("Identity providers")).toBeInTheDocument();
+    expect(panel.getByText("None linked")).toBeInTheDocument();
   });
 
   it("still renders the screen when the identity link list fails", async () => {
@@ -408,7 +527,7 @@ describe("user detail", () => {
     const panel = within(screen.getByRole("tabpanel"));
     expect(panel.getByText("Could not be loaded")).toBeInTheDocument();
     // The passkey row is unaffected.
-    expect(panel.getByText("1 registered")).toBeInTheDocument();
+    expect(panel.getByText(/^Verified /)).toBeInTheDocument();
   });
 
   it("offers delete, and returns to the list once it succeeds", async () => {

@@ -35,6 +35,7 @@ web components' `project` property.
 | `@zitadel/api/generated/model` | Generated request/response types |
 | `@zitadel/api/generated/endpoints/zitadelNextGen.zod` | Zod schemas per endpoint |
 | `@zitadel/api/generated/endpoints/zitadelNextGen.msw` | MSW handlers for tests |
+| `@zitadel/api/generated/operations` | Every operation as data: method, path, parameters, authentication, paging |
 | `@zitadel/api/runtime/base-url` | `setProxyPath()` / `getProxyPath()` — the low-level slot `configureZitadel()` writes; call it directly only when you manage configuration yourself |
 | `@zitadel/api/runtime/auth` | `getApiAuthToken()` and bearer plumbing; `setApiCsrfToken()` / `getApiCsrfToken()` / `setApiCsrfRejectionHandler()` for session-cookie writes (see below) |
 | `@zitadel/api/runtime/fetch` | The shared `customFetch` interceptor |

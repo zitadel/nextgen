@@ -1,10 +1,6 @@
 title: DeploymentMetadata
 type: object
-description: |
-  Why the release went live and who made it happen. Set when the deployment
-  is created and never mutated afterwards — enrichment of the record, while
-  the release, targets and timestamp on the deployment itself say what ran
-  where and when.
+description: Why the release went live and who made it happen.
 required:
   - reason
 properties:
@@ -21,18 +17,14 @@ properties:
     example: add phone_number to human-user
   rollback_to:
     description: |
-      The deployment `POST /deployments/{deployment_id}/rollback` re-applied,
-      with its release and its targets. Null or absent for every other
-      deployment, including one created by `POST /deployments` with
-      `reason: rollback`.
+      The deployment the rollback operation re-applied; null otherwise.
     oneOf:
       - $ref: ../../components/schemas/deployment-id.yaml
       - type: 'null'
   deployed_by:
     description: |
-      The identity that created the deployment. Absent when the caller is a
-      machine principal carrying no user identity, which is the common case
-      for deployments made from CI.
+      The identity that created the deployment. Null when the caller is a
+      machine principal carrying no user identity, as from CI.
     oneOf:
       - type: string
       - type: 'null'

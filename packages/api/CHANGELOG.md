@@ -1,5 +1,85 @@
 # @zitadel/api
 
+## 1.0.0-alpha.28
+
+### Minor Changes
+
+- [#1802](https://github.com/zitadel/nextgen/pull/1802) [`0f4b901`](https://github.com/zitadel/nextgen/commit/0f4b901f60f2ed20bff71e321564d3b1fc187eab) Thanks [@peintnermax](https://github.com/peintnermax)! - Add `GET /users/me/schema` and `GET /users/me/teams`: the signed-in user's own schema and team roster, readable with the session alone. Every `/users/me` endpoint now answers a refused session with `401 auth.unauthorized`. The `@zitadel/api` client gains `getMyUserSchema()` and `listMyTeams()`.
+
+- [#2080](https://github.com/zitadel/nextgen/pull/2080) [`628e101`](https://github.com/zitadel/nextgen/commit/628e101e5c254ab8bdaca830fc6e4acbd084b41e) Thanks [@fforootd](https://github.com/fforootd)! - `DELETE /sessions/me` and `GET /sessions/me/csrf` take the same optional
+  `project_id` as `GET /sessions/me`, and answer a session of another project
+  with `403 sess.project_mismatch`. A refused sign-out leaves that session signed
+  in and keeps its cookie. `<zitadel-session>`, `<zitadel-logout>` and the console
+  send their project when they sign out, and the console also when it reads its
+  CSRF token. Signing out with `<zitadel-session>` or `<zitadel-logout>` after the
+  session already ended, in another tab or by expiring, now completes instead of
+  showing an error.
+
+  In `@zitadel/api`, `revokeMySession()` and `getMySessionCsrfToken()` now take
+  their query parameters first: call `revokeMySession(undefined, init)` and
+  `getMySessionCsrfToken(undefined, init)` where you passed `init` alone.
+
+- [#2076](https://github.com/zitadel/nextgen/pull/2076) [`12b3226`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now count a session as signed in only when it belongs to the
+  app's own project. A session of another project on the same server, such as a
+  second app on the same host or the console of a local `zitadel start`, reads
+  as signed out in `protectedRoutes`, `auth()` and `getAuth()`, and its cookie is
+  left in place for the app it belongs to.
+
+  The project comes from the new `projectId` middleware option, else
+  `ZITADEL_PROJECT_ID`, else the framework's public project id variable
+  (`NEXT_PUBLIC_`, `VITE_` or `PUBLIC_ZITADEL_PROJECT_ID`). `zitadel setup`
+  already writes these to `.env.local`. A deployment that sets none of them must
+  set `ZITADEL_PROJECT_ID`, or nobody is signed in. With `@zitadel/sdk-nuxt`, the
+  public project id (`NUXT_PUBLIC_ZITADEL_PROJECT_ID`) decides unless
+  `nextgen.projectId` names one, so a built server follows it at runtime. A JWT
+  session token must name the project in its `aud` claim. `auth()` in
+  `@zitadel/sdk-next` also takes the project of `configureZitadel()`; with
+  `createProxy(config)`, pass the same project to `auth()` when it lives only in
+  that handle.
+
+  `GET /sessions/me` takes an optional `project_id` and answers a session of
+  another project with `403 sess.project_mismatch`. The SDKs send it, and so do
+  `getSession()` in `@zitadel/sdk-next`, `<zitadel-session>`, `<zitadel-logout>`
+  and the console. `getSession()` takes the project from its `projectId` option,
+  `configureZitadel()` or `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, and without one reads
+  as signed out. Signing out with `<zitadel-logout>` or `<zitadel-session>` no
+  longer ends another project's session. The `AGENTS.md` guidance that
+  `zitadel setup` writes now tells agents to read the session this way.
+
+  A Bearer token that is not this app's no longer decides what happens to the
+  session cookie that came with it: the cookie is judged, and cleared only when
+  the backend refuses it, on its own.
+
+  In `@zitadel/api`, `getMySession()` now takes its query parameters first: call
+  `getMySession(undefined, init)` where you called `getMySession(init)`. In
+  `@zitadel/sdk-core`, `checkOpaqueSessionToken()` and
+  `validateOpaqueSessionToken()` take the project id as a fourth argument, and
+  `resolveSession()` is the one implementation of these rules behind every server
+  SDK's middleware.
+
+  The `@zitadel/sdk-next` middleware also no longer lets a session that has not
+  finished signing in through `protectedRoutes`.
+
+- [#2098](https://github.com/zitadel/nextgen/pull/2098) [`f65cebe`](https://github.com/zitadel/nextgen/commit/f65cebe8142daaab33882a8ae22822a75bd94e6f) Thanks [@fforootd](https://github.com/fforootd)! - `GET /users/me`, `PATCH /users/me` and `GET /users/me/projects` take the same
+  optional `project_id` as `GET /sessions/me`, and answer a session of another
+  project with `403 sess.project_mismatch` without reading or changing the user.
+  The console sends its project on these calls: when the cookie holds an app's
+  session instead, as on `localhost` after an app on another port signs in, the
+  console asks you to sign in again rather than showing that app's user or
+  projects.
+
+  In `@zitadel/api`, `getMyUser()` and `patchMyUser()` now take their query
+  parameters before the request options: call `getMyUser(undefined, init)` and
+  `patchMyUser(body, undefined, init)` where you passed `init` directly.
+
+- [#2134](https://github.com/zitadel/nextgen/pull/2134) [`e90dade`](https://github.com/zitadel/nextgen/commit/e90dade940d52ce4827ed63d0171d0de68cf2959) Thanks [@fforootd](https://github.com/fforootd)! - `GET /users/me/schema` and `GET /users/me/teams` take the same optional
+  `project_id` as `GET /users/me`, and answer a session of another project with
+  `403 sess.project_mismatch` without reading that user's schema or teams.
+
+  In `@zitadel/api`, `getMyUserSchema()` now takes its query parameters before the
+  request options: call `getMyUserSchema(undefined, init)` where you passed `init`
+  directly.
+
 ## 1.0.0-alpha.27
 
 ## 1.0.0-alpha.26

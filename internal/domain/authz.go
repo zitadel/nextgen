@@ -27,6 +27,7 @@ const (
 	ResourceKindRelease        ResourceKind = "release"
 	ResourceKindIDPConnection  ResourceKind = "idp_connection"
 	ResourceKindDeployment     ResourceKind = "deployment"
+	ResourceKindPolicy         ResourceKind = "policy"
 )
 
 func (k ResourceKind) String() string { return string(k) }

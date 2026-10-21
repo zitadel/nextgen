@@ -43,6 +43,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
@@ -302,12 +303,26 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		idpConnectionService,
 		builtinBases,
 	)
+	deploymentService := service.NewDeploymentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
+	// Operation policies (ADR 066). Every template is compiled and checked
+	// here, so a template the server cannot evaluate stops it before it
+	// serves traffic. No project can store an instance yet, so the gate holds
+	// passwords to the server's length cap only.
+	policyEngine, err := policy.New()
+	if err != nil {
+		return fmt.Errorf("failed to compile the policy catalog: %w", err)
+	}
+	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, service.NoPolicyResolver{}, passwordHasher, serviceDBPool)
+	if err != nil {
+		return err
+	}
 	userService := service.NewUserService(
 		serviceDBPool,
 		schemaStore,
 		projectHashers,
+		passwordPolicy,
 		userRefs,
 		builtinBases,
 	)
@@ -329,6 +344,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore)
 	createUserHandler := service.NewFlowCreateUserHandler(
 		projectHashers,
+		passwordPolicy,
 		userService,
 		schemaStore,
 		serviceDBPool,
@@ -343,7 +359,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		createUserHandler,
 		flowAuth,
 		service.NewFlowSSOProviderResolver(idpConnectionService),
-		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers),
+		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers, passwordPolicy),
 		service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
 		time.Now,
 	)
@@ -401,6 +417,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			teamService,
 			brandingService,
 			releaseService,
+			deploymentService,
 			idpConnectionService,
 			eventService,
 			tokenService,

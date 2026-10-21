@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+import {
+  normalizeFlowBody,
+  normalizeIdpBody,
+  normalizeSchemaBody,
+} from "@zitadel/config/normalize";
 
 import {
   collectPlanWarnings,
@@ -414,6 +418,168 @@ describe("renderPlan — nested structures", () => {
   });
 });
 
+describe("renderPlan — changed arrays", () => {
+  const revisedFlow = makeSyncer("flow", ".zitadel/flows", { revisioned: true });
+  const step = (name: string, fields: string[], extra: Record<string, unknown> = {}) => ({
+    name,
+    fields,
+    actions: [{ name: "submit", kind: "submit", primary: true }],
+    transitions: { submit: { target: "done" } },
+    ...extra,
+  });
+  const steps = [
+    step("identifier", ["email"]),
+    step("password", ["x-auth-methods#password"]),
+    step("register", ["email"]),
+    { name: "done", complete: "show" },
+  ];
+  /** The block a revision of a flow whose `steps` went from `before` to `after` renders. */
+  const revise = (before: unknown[], after: unknown[], extra: Record<string, unknown> = {}) =>
+    renderPlan(
+      [
+        {
+          kind: "revise",
+          path: ".zitadel/flows/default-login.json",
+          syncer: revisedFlow,
+          content: { name: "default-login", steps: after, ...extra },
+          hash: "h",
+          previousId: "flowdef_1",
+          oldContent: { name: "default-login", steps: before },
+          affectedPaths: [],
+        },
+      ],
+      false,
+    );
+
+  it("renders one field added to one step as that one line under that step", () => {
+    const after = structuredClone(steps);
+    after[2] = step("register", ["email", "company"]);
+
+    expect(revise(steps, after)).toBe(
+      [
+        "Zitadel will perform the following actions:",
+        "",
+        "  # .zitadel/flows/default-login.json will publish a new revision",
+        '  ~ resource "flow" "default-login.json" {',
+        '      ~ id    = "flowdef_1" -> (known after apply)',
+        '        name  = "default-login"',
+        "      ~ steps = [",
+        "            # (2 unchanged elements hidden)",
+        "          ~ {",
+        "              ~ fields = [",
+        '                    "email",',
+        '                  + "company",',
+        "                ]",
+        '                name   = "register"',
+        "                # (2 unchanged attributes hidden)",
+        "            },",
+        "            # (1 unchanged element hidden)",
+        "        ]",
+        "    }",
+        "",
+        "Plan: 1 new revision.",
+      ].join("\n"),
+    );
+  });
+
+  it("renders a changed action by its name inside its step", () => {
+    const after = structuredClone(steps);
+    after[0] = step("identifier", ["email"], {
+      actions: [{ name: "submit", kind: "submit", primary: true, text_key: "continue" }],
+    });
+
+    const out = revise(steps, after);
+
+    expect(out).toContain('                      + text_key = "continue"');
+    expect(out).toContain('                        name     = "submit"');
+    expect(out).not.toMatch(/^\s*[-+] \{/m);
+  });
+
+  it("renders an added step whole and leaves the others hidden", () => {
+    const after = [...steps.slice(0, 3), step("mfa", ["otp"]), steps[3]];
+
+    const out = revise(steps, after);
+
+    expect(out).toContain("          + {");
+    expect(out).toContain('              + name        = "mfa"');
+    expect(out).toContain("            # (3 unchanged elements hidden)");
+    expect(out).toContain("            # (1 unchanged element hidden)");
+    expect(out).not.toMatch(/^\s*- /m);
+  });
+
+  it("renders a removed step whole as a removal", () => {
+    const after = steps.filter((s) => s.name !== "password");
+
+    const out = revise(steps, after);
+
+    expect(out).toContain("          - {");
+    expect(out).toContain('              - name        = "password"');
+    expect(out).not.toMatch(/^\s*\+ /m);
+  });
+
+  it("falls back to a whole remove and add when elements share no unique name", () => {
+    const out = revise([{ kind: "a" }, { kind: "b" }], [{ kind: "a" }, { kind: "c" }]);
+
+    expect(out).toContain("      - steps = [");
+    expect(out).toContain("      + steps = [");
+  });
+
+  it("collapses an unchanged list of steps when only a top-level field changed", () => {
+    const out = revise(steps, steps, { status: "inactive" });
+
+    expect(out).toContain(
+      "        steps  = [\n            # (4 unchanged elements hidden)\n        ]",
+    );
+    expect(out).not.toContain("identifier");
+  });
+
+  it("keeps an unchanged list of scalars in full", () => {
+    const out = renderPlan(
+      [
+        {
+          kind: "update",
+          path: ".zitadel/flows/default.json",
+          syncer: flow,
+          id: "flow-1",
+          content: { status: "active", team_ids: ["alpha"] },
+          hash: "h",
+          oldContent: { status: "inactive", team_ids: ["alpha"] },
+        },
+      ],
+      false,
+    );
+
+    expect(out).toContain('        team_ids = [\n            "alpha",\n        ]');
+  });
+
+  it("marks the removed and added items of a changed list of scalars", () => {
+    const out = renderPlan(
+      [
+        {
+          kind: "update",
+          path: ".zitadel/flows/default.json",
+          syncer: flow,
+          id: "flow-1",
+          content: { team_ids: ["alpha", "gamma"] },
+          hash: "h",
+          oldContent: { team_ids: ["alpha", "beta"] },
+        },
+      ],
+      false,
+    );
+
+    expect(out).toContain(
+      [
+        "      ~ team_ids = [",
+        '            "alpha",',
+        '          - "beta",',
+        '          + "gamma",',
+        "        ]",
+      ].join("\n"),
+    );
+  });
+});
+
 describe("renderPlan — ANSI colours", () => {
   it("omits ANSI codes when tty=false", () => {
     const actions: SyncAction[] = [
@@ -576,6 +742,45 @@ describe("renderPlan — normalized diffs", () => {
     // spelled out on the server side must not read as removals.
     expect(out).not.toContain("x-audit");
     expect(out).toContain("company");
+  });
+
+  it("does not render the defaults a stored connection spells out as removals", () => {
+    const connectionSyncer = makeSyncer("idp", ".zitadel/idps", {
+      mutable: true,
+      normalize: normalizeIdpBody,
+    });
+    const oidc = {
+      issuer: "https://accounts.google.com",
+      client_id: "${{ GOOGLE_CLIENT_ID }}",
+      client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+      scopes: ["openid", "profile", "email"],
+    };
+    const actions: SyncAction[] = [
+      {
+        kind: "update",
+        path: ".zitadel/idps/google.json",
+        syncer: connectionSyncer,
+        id: "idp_1",
+        content: { slug: "google", display_name: "Google Workspace", oidc },
+        hash: "h",
+        oldContent: {
+          slug: "google",
+          display_name: "Google",
+          oidc: {
+            ...oidc,
+            id_token_mapping: false,
+            pkce_enabled: true,
+            token_endpoint_auth_method: "client_secret_basic",
+          },
+        },
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+
+    expect(out).toContain('~ display_name = "Google" -> "Google Workspace"');
+    expect(out).not.toMatch(/pkce_enabled|token_endpoint_auth_method|id_token_mapping/);
+    expect(out).not.toMatch(/^\s*[-+] /m);
   });
 });
 

@@ -21,10 +21,11 @@ type FlowSSOIdentityResolver struct {
 	users       UserService
 	schemaStore domain.JSONSchemaStore
 	hashers     ProjectHasherResolver
+	passwords   PasswordGate
 }
 
-func NewFlowSSOIdentityResolver(db StatementPool, connections IDPConnectionService, users UserService, schemaStore domain.JSONSchemaStore, hashers ProjectHasherResolver) *FlowSSOIdentityResolver {
-	return &FlowSSOIdentityResolver{db: db, connections: connections, users: users, schemaStore: schemaStore, hashers: hashers}
+func NewFlowSSOIdentityResolver(db StatementPool, connections IDPConnectionService, users UserService, schemaStore domain.JSONSchemaStore, hashers ProjectHasherResolver, passwords PasswordGate) *FlowSSOIdentityResolver {
+	return &FlowSSOIdentityResolver{db: db, connections: connections, users: users, schemaStore: schemaStore, hashers: hashers, passwords: passwords}
 }
 
 var _ domain.FlowSSOIdentityService = (*FlowSSOIdentityResolver)(nil)
@@ -302,13 +303,15 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 	// a unique value, and is not mistaken for a collision.
 	actions := []UserAction{&ssoClaimAction{bind: bind}, createUser}
 	if in.Password != "" {
-		actions = append(actions, NewSetUserPasswordAction(SetPasswordInput{ProjectID: in.ProjectID, UserID: userID, Password: in.Password}, r.hashers))
+		actions = append(actions, NewSetUserPasswordAction(SetPasswordInput{ProjectID: in.ProjectID, UserID: userID, Password: in.Password}, r.hashers, r.passwords))
 	}
 	actions = append(actions, &ssoLinkAction{subject: in.Subject, bind: bind})
 	if err := r.users.ApplyActions(ctx, actions...); err != nil {
-		// Audited like a create through the user API.
-		emitUserCreateFailedBestEffort(ctx, r.db, createUser, err)
-		if errors.Is(err, domain.ErrUserInvalid()) {
+		if unique, ok := errors.AsType[*database.UniqueError](err); ok {
+			// Audited like a create through the user API.
+			emitUserCreateFailedBestEffort(ctx, r.db.Statements(), in.ProjectID, unique)
+		}
+		if domain.IsUserInvalid(err) {
 			// The validator's messages quote the values, so only where they
 			// failed is logged.
 			var locations []string

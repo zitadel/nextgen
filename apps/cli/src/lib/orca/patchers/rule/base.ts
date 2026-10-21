@@ -1,11 +1,17 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { metaSchemaFiles, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
+import {
+  metaSchemaFiles,
+  META_SCHEMA_DIR,
+  PROJECT_FILE_SCHEMA_REF,
+} from "@zitadel/config/meta-schemas";
 
 import { stableStringify } from "../../../json";
 import { normalizePublicCliJson } from "../../../public-cli";
 import { DEFAULT_SERVER } from "../../../server";
+import { portFromIssuer } from "../../detectors/port";
+import { configIssuerOp, envIssuerOp } from "./dev-port-move";
 import { scaffold } from "./file-writer";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 import {
@@ -102,6 +108,21 @@ export abstract class AbstractRulePatcher implements Patcher {
     }
     const execOpts = opts.missingOnly ? { ...opts, force: false } : opts;
     return scaffold({ ops, summary: plan.summary }, execOpts);
+  }
+
+  /** See {@link Patcher.moveDevPort}. */
+  async moveDevPort(
+    ctx: PatchContext,
+    previousIssuer: string,
+    opts: PatchExecOptions,
+  ): Promise<PatchResult> {
+    const ops: FileOp[] = [
+      ...this.devPortOps(ctx, portFromIssuer(previousIssuer)),
+      envIssuerOp(ctx.issuer),
+      configIssuerOp(previousIssuer, ctx.issuer),
+      ...guidanceOps(ctx),
+    ];
+    return scaffold({ ops, summary: [this.summary(ctx)] }, opts);
   }
 
   /**
@@ -307,9 +328,10 @@ export abstract class AbstractRulePatcher implements Patcher {
         path: ".zitadel/state.json",
         contents: `${stableStringify({ framework: ctx.framework.id, resources: {} })}\n`,
       },
-      // The dialect meta-schemas, committed with the project so flow files'
-      // relative `$schema` pointers resolve offline (editor validation) and
-      // agents can read the flow/schema dialect without the docs site. Their
+      // The dialect meta-schemas, committed with the project so the relative
+      // `$schema` pointers of `zitadel.json` and the flow files resolve
+      // offline (editor validation) and agents can read the flow/schema
+      // dialect without the docs site. Their
       // descriptions become editor tooltips inside the generated app, so the
       // `zitadel …` mentions are rewritten to the runnable public form on the
       // way out — the shared source keeps the bare spelling the server wants.
@@ -321,21 +343,21 @@ export abstract class AbstractRulePatcher implements Patcher {
           contents: `${JSON.stringify(normalizePublicCliJson(file.body, ctx.cliVersion), null, 2)}\n`,
         }),
       ),
-      // Guidance for humans (README) and agents (AGENTS.md): the golden
-      // journey and the customize→plan→apply loop. Marker-fenced managed
-      // sections — existing content is never clobbered.
-      {
-        kind: "edit",
-        path: "AGENTS.md",
-        edit: (source) => upsertGuidanceSection(source, agentsGuidanceSection(ctx), AGENTS_HEADER),
-      },
-      {
-        kind: "edit",
-        path: "README.md",
-        edit: (source) => upsertGuidanceSection(source, readmeGuidanceSection(ctx), README_HEADER),
-      },
+      ...guidanceOps(ctx),
     ];
   }
+
+  /**
+   * The ops that hold the dev server to `ctx.framework.devPort`, for
+   * {@link moveDevPort}. `previousPort` is the port the app is moving off: a
+   * config pin still on it is rewritten, any other pin is left alone. Each
+   * framework names its own, because the port lives in the dev script for
+   * some and in the dev-server config for others.
+   */
+  protected abstract devPortOps(
+    ctx: PatchContext,
+    previousPort: number | undefined,
+  ): ReadonlyArray<FileOp>;
 
   /** Framework-specific route/middleware write ops plus the SDK dependency. */
   protected abstract routeOps(ctx: PatchContext): ReadonlyArray<FileOp>;
@@ -348,6 +370,26 @@ export abstract class AbstractRulePatcher implements Patcher {
   protected abstract routeDeps(view: PatchView): ReadonlyArray<string>;
   /** One-line summary of what the integration scaffolded. */
   protected abstract summary(ctx: PatchContext): { title: string; detail: string };
+}
+
+/**
+ * Guidance for humans (README) and agents (AGENTS.md): the golden journey and
+ * the customize→plan→apply loop. Marker-fenced managed sections — existing
+ * content is never clobbered.
+ */
+function guidanceOps(ctx: PatchContext): FileOp[] {
+  return [
+    {
+      kind: "edit",
+      path: "AGENTS.md",
+      edit: (source) => upsertGuidanceSection(source, agentsGuidanceSection(ctx), AGENTS_HEADER),
+    },
+    {
+      kind: "edit",
+      path: "README.md",
+      edit: (source) => upsertGuidanceSection(source, readmeGuidanceSection(ctx), README_HEADER),
+    },
+  ];
 }
 
 /** Reads a text file, mapping every failure to `undefined`. */
@@ -373,7 +415,9 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
     };
   }
   return {
-    $schema: "https://schemas.zitadel.com/v2/project.schema.json",
+    // The copy setup writes into .zitadel/meta/, so an editor validates the
+    // file offline against the CLI version that wrote it.
+    $schema: PROJECT_FILE_SCHEMA_REF,
     project: ctx.project.id,
     server: resolveServerOrigin(ctx.server),
     framework: { id: ctx.framework.id },
