@@ -89,7 +89,6 @@ async function dispatchUntilForwarded(
   detail: Record<string, unknown>,
   received: readonly Record<string, unknown>[],
 ): Promise<void> {
-  detail.waitUntil = () => {};
   const deadline = Date.now() + 1000;
   while (!received.includes(detail)) {
     el.dispatchEvent(new CustomEvent(eventName, { detail }));
@@ -305,28 +304,23 @@ describe("ZitadelLogout", () => {
     },
   );
 
-  it("registers its lazy callback with waitUntil so the widget navigates only after it ran", async () => {
-    const finished: string[] = [];
-    const registered: Promise<unknown>[] = [];
+  it("passes an async callback's promise to the event's waitUntil", async () => {
+    const ran = vi.fn();
+    const registered: Array<Promise<unknown>> = [];
     const host = await renderWidget(
-      <ZitadelLogout
-        project={project}
-        onSignout$={$(async () => {
-          await Promise.resolve();
-          finished.push("signout");
-        })}
-      />,
+      <ZitadelLogout project={project} onSignout$={$(() => Promise.resolve().then(() => ran()))} />,
     );
     const el = widgetIn(host, widgetTags.logout);
-    const detail = { waitUntil: (work: Promise<unknown>) => registered.push(work) };
-
     await vi.waitFor(() => {
-      el.dispatchEvent(new CustomEvent("zitadel-signout", { detail }));
+      el.dispatchEvent(
+        new CustomEvent("zitadel-signout", {
+          detail: { waitUntil: (work: Promise<unknown>) => registered.push(work) },
+        }),
+      );
       expect(registered).not.toHaveLength(0);
     });
-    await Promise.all(registered);
-
-    expect(finished).not.toHaveLength(0);
+    await registered[0];
+    expect(ran).toHaveBeenCalled();
   });
 
   it("populates a consumer ref with the underlying element", async () => {

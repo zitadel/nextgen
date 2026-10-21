@@ -78,7 +78,7 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin project={project} theme="light" onFlowComplete$={(detail) => track(detail)} />
 ```
 
-The widget waits for the `on…$` callbacks of `zitadel-flow-redirect`, `zitadel-flow-complete` and `zitadel-signout` to finish, up to two seconds, before it navigates, so a lazily loaded callback runs before the page unloads; the wrapper passes each callback's promise to the event's `waitUntil` for you.
+When your callback for `zitadel-flow-complete`, `zitadel-flow-redirect` or `zitadel-signout` returns a promise, the widget waits for it to settle (up to two seconds) before it navigates.
 
 ## Standard HTML attributes
 

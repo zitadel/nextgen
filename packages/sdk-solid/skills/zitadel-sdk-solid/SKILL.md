@@ -111,6 +111,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin project={project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
 
+When your callback for `zitadel-flow-complete`, `zitadel-flow-redirect` or `zitadel-signout` returns a promise, the widget waits for it to settle (up to two seconds) before it navigates.
+
 ## Read these, don't guess
 
 Treat the installed package as authoritative over anything here — this skill
