@@ -4,10 +4,10 @@ import { useState } from "react";
 
 import {
   LoginPreview,
-  PreviewStage,
   type PreviewJourney,
   type PreviewState,
 } from "@/components/branding/login-preview";
+import { PreviewStage } from "@/components/branding/preview-stage";
 import { SettingsPanel } from "@/components/branding/settings-panel";
 import { ResourceTitle } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
