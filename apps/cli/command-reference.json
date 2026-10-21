@@ -983,6 +983,120 @@
       ]
     },
     {
+      "id": "origin add",
+      "group": "Configuration commands",
+      "description": "Add an origin pattern to the project.",
+      "args": [
+        {
+          "name": "pattern",
+          "description": "The origin pattern to add.",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "kind",
+          "description": "What the pattern is for.",
+          "type": "option",
+          "required": true,
+          "options": [
+            "primary",
+            "preview"
+          ]
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "origin add https://app.acme.com --kind primary"
+        },
+        {
+          "command": "origin add 'https://*-acme.vercel.app' --kind preview"
+        }
+      ]
+    },
+    {
+      "id": "origin list",
+      "group": "Configuration commands",
+      "description": "List the origin patterns on the project.",
+      "args": [],
+      "flags": [
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "origin list"
+        },
+        {
+          "command": "origin list --plain"
+        }
+      ]
+    },
+    {
+      "id": "origin rm",
+      "group": "Configuration commands",
+      "description": "Remove an origin pattern from the project.",
+      "args": [
+        {
+          "name": "pattern",
+          "description": "The origin pattern to remove.",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Remove the pattern without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "origin rm https://app.acme.com"
+        },
+        {
+          "command": "origin rm https://app.acme.com --force"
+        }
+      ]
+    },
+    {
       "id": "releases get",
       "group": "Configuration commands",
       "description": "Get one release by id.",
