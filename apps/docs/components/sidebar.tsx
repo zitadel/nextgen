@@ -94,7 +94,11 @@ function insideSection(full: PageTree.Root, open: PageTree.Folder): PageTree.Roo
 }
 
 // A row of the sidebar's own is a button, which the page tree carries in a
-// separator (app/global.css takes the separator's look off it).
+// separator. The sidebar takes the separator's look off its paragraph, so the
+// row sits as the tree's other rows do.
+const ROW_PARAGRAPH =
+  "[&_p:has(>[data-sidebar-row])]:m-0 [&_p:has(>[data-sidebar-row])]:p-0 [&_p:has(>[data-sidebar-row])]:[font:inherit]";
+
 function stepRow(name: ReactNode, up: boolean): PageTree.Separator {
   return { type: "separator", name: <StepRow up={up}>{name}</StepRow> };
 }
@@ -143,18 +147,21 @@ export function SidebarProvider(props: ComponentProps<typeof SpaciousSidebarProv
   );
 }
 
-export function Sidebar(props: ComponentProps<typeof SpaciousSidebar>) {
+export function Sidebar({ className, ...props }: ComponentProps<typeof SpaciousSidebar>) {
   return (
     <TreeContextProvider tree={useSidebarTree().tree}>
-      <SpaciousSidebar {...props} />
+      <SpaciousSidebar className={`${ROW_PARAGRAPH} ${className ?? ""}`} {...props} />
     </TreeContextProvider>
   );
 }
 
+// Fumadocs' drawer takes no class, so a box that draws nothing carries it.
 export function SidebarDrawer() {
   return (
     <TreeContextProvider tree={useSidebarTree().tree}>
-      <SpaciousSidebarDrawer />
+      <div className={`contents ${ROW_PARAGRAPH}`}>
+        <SpaciousSidebarDrawer />
+      </div>
     </TreeContextProvider>
   );
 }

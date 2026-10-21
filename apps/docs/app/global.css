@@ -111,16 +111,6 @@
   }
 }
 
-/* The sidebar's own rows (components/sidebar.tsx) travel in the page tree as
-   separators: their paragraph keeps none of a separator's look, so they sit
-   as the tree's other rows do. */
-:is(#nd-sidebar, #nd-sidebar-mobile) p:has(> [data-sidebar-row]) {
-  margin: 0;
-  padding: 0;
-  font: inherit;
-  color: inherit;
-}
-
 /* Headings in the display face, at its one weight: the page's title and the
    sections of its text. */
 #nd-page > h1,

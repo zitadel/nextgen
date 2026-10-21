@@ -42,7 +42,12 @@ test("the sidebar steps down into a section and back up", async ({ page }) => {
   );
   await expect(sidebar.getByRole("link", { name: "Quickstart" })).toHaveCount(0);
 
-  await sidebar.getByRole("button", { name: "Back to all sections from CLI reference" }).click();
+  // The row back up lines up with the rows under it.
+  const back = sidebar.getByRole("button", { name: "Back to all sections from CLI reference" });
+  const left = async (row: typeof back) => (await row.boundingBox())?.x;
+  expect(await left(back)).toBe(await left(sidebar.getByRole("link", { name: "Overview" })));
+
+  await back.click();
   await expect(sidebar.getByRole("link", { name: "API reference" })).toBeVisible();
   await expect(page).toHaveURL(/\/docs\/reference\/cli$/);
 
