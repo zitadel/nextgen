@@ -1,6 +1,42 @@
 import { spawn } from "node:child_process";
-import { realpathSync } from "node:fs";
+import { accessSync, constants, realpathSync, statSync } from "node:fs";
+import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+const defaultRepoRoot = fileURLToPath(new URL("..", import.meta.url));
+
+/**
+ * `env` with a PATH on which every process a contributor script starts finds
+ * the workspace's tools. The checkout needs only corepack, but package scripts
+ * (`pnpm run build`), the CLI's install in a generated app and moon's tasks
+ * call a bare `pnpm`: without one on PATH, scripts/shims/pnpm stands in and
+ * runs `corepack pnpm`. The workspace's node_modules/.bin goes last, so moon
+ * and turbo resolve when the script runs outside `pnpm run` and a global
+ * install still wins.
+ */
+export function withWorkspaceTools(env, options = {}) {
+  const repoRoot = options.repoRoot ?? defaultRepoRoot;
+  const isExecutable = options.isExecutable ?? isExecutableFile;
+  const entries = (env.PATH ?? "").split(delimiter).filter(Boolean);
+  const shimDir = join(repoRoot, "scripts", "shims");
+  const binDir = join(repoRoot, "node_modules", ".bin");
+  const hasPnpm = entries.some((dir) => isExecutable(join(dir, "pnpm")));
+  const path = [
+    ...(hasPnpm || entries.includes(shimDir) ? [] : [shimDir]),
+    ...entries,
+    ...(entries.includes(binDir) ? [] : [binDir]),
+  ];
+  return { ...env, PATH: path.join(delimiter) };
+}
+
+function isExecutableFile(path) {
+  try {
+    accessSync(path, constants.X_OK);
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
 
 export function run(command, args = [], options = {}) {
   return new Promise((resolve, reject) => {

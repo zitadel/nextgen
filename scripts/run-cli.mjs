@@ -11,7 +11,7 @@ import {
   stopLocalRegistry,
 } from "../e2e/journey/scripts/local-registry.mjs";
 import { buildLocalRuntimeImage, LOCAL_RUNTIME_IMAGE } from "./build-local-runtime-image.mjs";
-import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
+import { forwardedArgs, isDirectRun, run, runCapture, withWorkspaceTools } from "./dev-process.mjs";
 import { readServerBuildMetadata } from "./server-build.mjs";
 import { runnerCommand, runnerLabel } from "./task-runner.mjs";
 
@@ -23,7 +23,7 @@ const localRegistryWorkDir = join(repoRoot, "tmp", "cli-local-registry");
 
 export async function main(options = {}) {
   const args = options.args ?? forwardedArgs();
-  const env = options.env ?? process.env;
+  const env = withWorkspaceTools(options.env ?? process.env, options);
   const runFn = options.run ?? run;
   const assertFreshInstallFn = options.assertFreshInstall ?? assertFreshInstall;
   const runCaptureFn = options.runCapture ?? runCapture;
@@ -33,7 +33,7 @@ export async function main(options = {}) {
   const prepareLocalRegistryFn = options.prepareLocalRegistry ?? prepareLocalRegistry;
   const stopLocalRegistryFn = options.stopLocalRegistry ?? stopLocalRegistry;
   const stderr = options.stderr ?? process.stderr;
-  const cliEnv = { ...env };
+  const cliEnv = withDevelopmentTelemetry(env);
   const cliCwd = options.cwd ?? cliCwdFor(env);
   let registryProcess;
 
@@ -46,42 +46,49 @@ export async function main(options = {}) {
     cliEnv.ZITADEL_SERVER_BINARY_VERSION = localServer.version;
   }
 
-  if (shouldPrepareLocalPackages(args, env)) {
-    const registryWorkDir = options.localRegistryWorkDir ?? localRegistryWorkDir;
-    const registryPort = localRegistryPort(repoRoot, env);
-    const registryUrl = `http://127.0.0.1:${registryPort}`;
-    const registryPaths = localRegistryPaths(registryWorkDir);
-    const packageRegistry = await prepareLocalRegistryFn({
-      env,
-      log: (message) => {
-        stderr.write(`[zitadel-cli] ${message}\n`);
-      },
-      onStarted: (registry) => {
-        registryProcess = registry;
-      },
-      paths: registryPaths,
-      registryPort,
-      registryUrl,
-      repoRoot,
-      run: wrapperRun({ jsonMode: hasJsonFlag(args), runCaptureFn, runFn, stderr }),
-      workDir: registryWorkDir,
-    });
-    registryProcess = packageRegistry.registry;
-    Object.assign(cliEnv, packageRegistry.env);
-  }
-
-  if (shouldAutoBuildLocalRuntimeImage(args, env)) {
-    await buildLocalRuntimeImageFn({ env });
-    cliEnv.ZITADEL_LOCAL_IMAGE = LOCAL_RUNTIME_IMAGE;
-  }
-
+  // Once started, the registry stops however the wrapper ends, also when
+  // packing or publishing fails.
   try {
+    if (shouldPrepareLocalPackages(args, env)) {
+      const registryWorkDir = options.localRegistryWorkDir ?? localRegistryWorkDir;
+      const registryPort = localRegistryPort(repoRoot, env);
+      const registryUrl = `http://127.0.0.1:${registryPort}`;
+      const packageRegistry = await prepareLocalRegistryFn({
+        env,
+        log: (message) => {
+          stderr.write(`[zitadel-cli] ${message}\n`);
+        },
+        onStarted: (registry) => {
+          registryProcess = registry;
+        },
+        paths: localRegistryPaths(registryWorkDir),
+        registryPort,
+        registryUrl,
+        repoRoot,
+        run: wrapperRun({ jsonMode: hasJsonFlag(args), runCaptureFn, runFn, stderr }),
+        workDir: registryWorkDir,
+      });
+      registryProcess = packageRegistry.registry;
+      Object.assign(cliEnv, packageRegistry.env);
+    }
+
+    if (shouldAutoBuildLocalRuntimeImage(args, env)) {
+      await buildLocalRuntimeImageFn({ env });
+      cliEnv.ZITADEL_LOCAL_IMAGE = LOCAL_RUNTIME_IMAGE;
+    }
+
     await runFn(process.execPath, [cliBin, ...args], { cwd: cliCwd, env: cliEnv });
   } finally {
     if (registryProcess) {
       await stopLocalRegistryFn(registryProcess);
     }
   }
+}
+
+// Local builds report the version they will be released as, so their
+// telemetry goes to the development project unless the caller picked one.
+export function withDevelopmentTelemetry(env) {
+  return env.ZITADEL_TELEMETRY_ENV ? { ...env } : { ...env, ZITADEL_TELEMETRY_ENV: "development" };
 }
 
 // A stale install (lockfile changed since the last `pnpm install`) makes the

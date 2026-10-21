@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, test } from "vitest";
@@ -10,6 +11,7 @@ import {
   npmEnvironment,
   packageDirs,
   prepareLocalRegistry,
+  startLocalRegistry,
 } from "./local-registry.mjs";
 
 const tempDirs = [];
@@ -227,6 +229,29 @@ test("keeps a reused store's proxied packages and trusts their metadata for an h
     verdaccioConfig.includes("  npmjs:\n    url: https://registry.npmjs.org/\n    maxage: 1h\n"),
     verdaccioConfig,
   );
+});
+
+test("refuses to start Verdaccio on a port something already serves", async () => {
+  const server = createServer((_request, response) => response.end("{}"));
+  await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  tempDirs.push(workDir);
+  try {
+    const { port } = server.address();
+    await assert.rejects(
+      startLocalRegistry({
+        env: {},
+        paths: localRegistryPaths(workDir),
+        registryPort: port,
+        repoRoot: workDir,
+      }),
+      new RegExp(`127\\.0\\.0\\.1:${port} is already in use`),
+    );
+    // Refused before anything was started or logged.
+    await assert.rejects(stat(localRegistryPaths(workDir).registryLogPath), { code: "ENOENT" });
+  } finally {
+    await new Promise((resolveClose) => server.close(resolveClose));
+  }
 });
 
 test("validates explicit local registry ports and derives stable defaults", () => {
