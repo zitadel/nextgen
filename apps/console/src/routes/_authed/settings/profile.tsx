@@ -171,11 +171,7 @@ function ProfileScreen() {
           <Field orientation="responsive" className={ROW}>
             <FieldContent className={LABEL_HALF}>
               <FieldTitle>Avatar</FieldTitle>
-              {/* One sentence a line, rather than both wrapping mid-sentence. */}
-              <FieldDescription>
-                <span className="block">Generated from your account.</span>
-                <span className="block">Pictures are not supported yet.</span>
-              </FieldDescription>
+              <FieldDescription>Generated from your account.</FieldDescription>
             </FieldContent>
             <FieldContent className="items-start @md/field-group:items-end">
               <UserAvatar
