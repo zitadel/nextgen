@@ -9,6 +9,7 @@ content:
         - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
+        - $ref: '../../components/schemas/errors/proj-mismatch.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
       discriminator:
@@ -19,6 +20,7 @@ content:
           enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
+          proj.mismatch: '../../components/schemas/errors/proj-mismatch.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
     examples:
@@ -47,6 +49,11 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      proj.mismatch:
+        summary: proj.mismatch
+        value:
+          code: proj.mismatch
+          message: 'the project named in the request is not the one the credential belongs to'
       req.invalid:
         summary: req.invalid
         value:
