@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
@@ -110,14 +110,98 @@ describe("user detail", () => {
     expect(screen.getByLabelText("Email")).toHaveValue("maya@acme.com");
   });
 
-  it("says on hover and focus that the card's title is the user's schema", async () => {
+  it("links the user's schema revision to its schema page", async () => {
     stub();
     await renderDetail();
 
-    const title = await screen.findByRole("heading", { name: "Business" });
-    const trigger = title.closest<HTMLElement>("[data-slot=tooltip-trigger]");
-    act(() => trigger?.focus());
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("User schema");
+    const panel = within(await screen.findByRole("tabpanel"));
+    const link = await panel.findByRole("link", { name: "Business sch_business" });
+    // The `_authed` layout retains the selected project across navigation.
+    expect(link).toHaveAttribute("href", scopedPath("/schemas/sch_business"));
+  });
+
+  it("shows a URI schema id verbatim and links to it encoded", async () => {
+    // The seeded default schema's id is its `$id` URL, not an `sch_*` id.
+    const uri = "https://server.test/schemas/user.json";
+    stub({
+      user: {
+        id: USER_ID,
+        schema: uri,
+        identifier: "maya@acme.com",
+        identifier_property: "email",
+        attributes: { email: "maya@acme.com" },
+      },
+    });
+    server.use(
+      http.get(`${SCHEMAS_URL}/:schemaId`, () =>
+        HttpResponse.json({ id: uri, schema: { ...BUSINESS, title: "Default" } }),
+      ),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    const link = await panel.findByRole("link", { name: `Default ${uri}` });
+    expect(link).toHaveAttribute("href", scopedPath(`/schemas/${encodeURIComponent(uri)}`));
+  });
+
+  it("names an untitled schema by its id in the revision link", async () => {
+    stub();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({ id: "sch_business", schema: { ...BUSINESS, title: undefined } }),
+      ),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    expect(await panel.findByRole("link", { name: "sch_business sch_business" })).toBeVisible();
+  });
+
+  it("renders no revision link when the schema cannot be read", async () => {
+    stub();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () => new HttpResponse(null, { status: 403 })),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    expect(await panel.findByText(/This user’s schema could not be read/)).toBeInTheDocument();
+    expect(panel.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("says a readable schema has no attributes to show, rather than that it failed", async () => {
+    stub();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({ id: "sch_business", schema: { title: "Business", properties: {} } }),
+      ),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    expect(
+      await panel.findByText("This schema defines no attributes that can be shown."),
+    ).toBeInTheDocument();
+    expect(panel.queryByText(/could not be read/)).not.toBeInTheDocument();
+  });
+
+  it("does not rank the revision as latest or outdated", async () => {
+    // A user's revision is shown as a fact; no marker says how it compares.
+    stub();
+    await renderDetail();
+    const panel = await screen.findByRole("tabpanel");
+    await within(panel).findByRole("link", { name: "Business sch_business" });
+
+    expect(panel).not.toHaveTextContent(/latest|outdated/i);
+  });
+
+  it("titles the profile card as the user's schema", async () => {
+    // The design names the card "User schema"; the schema's own name is the
+    // revision link beside it. The detail header owns the `h1`.
+    stub();
+    await renderDetail();
+
+    expect(await screen.findByRole("heading", { level: 2, name: "User schema" })).toBeVisible();
   });
 
   it("reads the user's schema in the selected project", async () => {
