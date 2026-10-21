@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import {
   LoginPreview,
+  PreviewStage,
   type PreviewJourney,
   type PreviewState,
 } from "@/components/branding/login-preview";
@@ -252,20 +253,23 @@ function BrandingScreen() {
           302px is the design's 300 plus the 1px card border each side, so the
           content the rows align to is the 276 the design lays them out in. */}
       <div className="mt-3 grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_302px] lg:px-2">
-        <Card className="flex min-h-[29rem] items-center justify-center overflow-auto border-foreground/10 p-6 shadow-xs lg:min-h-[32rem]">
-          {/* The widget is content-sized, so the preview constrains the width
-              rather than the element: that is what an embedding page does. */}
-          <div className={narrow ? "w-96" : "w-full max-w-lg"}>
-            <LoginPreview
-              journey={activeJourney}
-              flowName={activeFlowName}
-              theme={theme}
-              state={activeState}
-              successStep={selected?.successStep}
-              onStates={(next) => setServed({ preview, states: next })}
-            />
-          </div>
-        </Card>
+        <PreviewStage className="flex min-h-[29rem] items-center justify-center overflow-auto rounded-md border border-foreground/10 bg-card p-6 shadow-xs transition-colors duration-300 lg:min-h-[32rem]">
+          {(onGround) => (
+            // The widget is content-sized, so the preview constrains the width
+            // rather than the element: that is what an embedding page does.
+            <div className={narrow ? "w-96" : "w-full max-w-lg"}>
+              <LoginPreview
+                journey={activeJourney}
+                flowName={activeFlowName}
+                theme={theme}
+                state={activeState}
+                successStep={selected?.successStep}
+                onStates={(next) => setServed({ preview, states: next })}
+                onGround={onGround}
+              />
+            </div>
+          )}
+        </PreviewStage>
 
         <Card className="min-h-0 overflow-hidden border-foreground/10 p-0 shadow-xs">
           <SettingsPanel revision={revision} />
