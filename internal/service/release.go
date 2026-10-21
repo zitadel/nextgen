@@ -248,7 +248,6 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 	ctx, end := startSpan(ctx, "ReleaseService.Revoke")
 	defer end(&err)
 
-	now := time.Now()
 	var revoked *domain.Release
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
@@ -260,7 +259,7 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 			revoked = entity
 			return nil
 		}
-		served, err := servedOrigins(ctx, stmts, projectID, id, now)
+		served, err := servedOrigins(ctx, stmts, projectID, id, time.Now())
 		if err != nil {
 			return err
 		}
@@ -291,7 +290,7 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 
 // servedOrigins lists, sorted, the origins serving the release at now and the
 // deployment pinning each, from the same live view the deployments list reads.
-func servedOrigins(ctx context.Context, stmts AllStatements, projectID, releaseID string, now time.Time) ([]domain.ReleaseInUseOrigin, error) {
+func servedOrigins(ctx context.Context, stmts DeploymentStatements, projectID, releaseID string, now time.Time) ([]domain.ReleaseInUseOrigin, error) {
 	var served []domain.ReleaseInUseOrigin
 	opts := deployment.LiveListOptions(projectID, &releaseID, liveDeploymentPageSize)
 	for {
