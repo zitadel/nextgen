@@ -1,37 +1,26 @@
 title: CreateDeploymentRequest
 type: object
 description: |
-  The release to make live and the targets to make it live on. The release
-  is named by exactly one of `release_id` or `content_hash`; a request with
-  both or neither answers `400` with `dep.invalid`.
-
-  `deployed_at` and `deployed_by` are derived server-side from the caller's
-  authentication context and are not accepted here.
+  The release to make live, named by exactly one of `release_id` or
+  `content_hash`, and the targets to make it live on.
 required:
   - targets
 additionalProperties: false
 properties:
   release_id:
-    description: |
-      The release to make live. Must exist in the project; deploying never
-      assembles a release.
+    description: The release to make live.
     $ref: ../../components/schemas/release-id.yaml
   content_hash:
     description: |
       The content digest of the release to make live, in full with its
-      `sha256:` prefix. A digest no release of the project carries answers
-      `404` with `rel.not_found`; deploying never assembles a release.
+      `sha256:` prefix.
     $ref: ../../components/schemas/release-content-hash.yaml
   targets:
     $ref: deployment-targets-request.yaml
   ttl:
     description: |
-      How long each preview URL in `targets` stays live, counted from this
-      deployment. Every preview it writes gets the same expiry, renewing a
-      preview that already exists. Omitted, the project's default applies; a
-      value above the project's maximum answers `400` with `dep.invalid`.
-      Only valid when the targets are preview URLs: with primary origins it
-      answers `400` with `dep.invalid`.
+      Preview URLs only: how long each preview stays live, counted from this
+      deployment. Omitted, the project's default applies.
     $ref: ../../components/schemas/preview-ttl.yaml
   reason:
     description: |
@@ -41,18 +30,13 @@ properties:
     type: string
     maxLength: 1024
     description: |
-      A short free-form summary of why this deployment happened, analogous to
-      a git commit message. Recorded on the deployment's metadata and shown
-      when listing the history.
+      A short free-form summary of why this deployment happened, recorded on
+      its metadata.
     example: add phone_number to human-user
   expected_deployment_id:
     description: |
-      An optimistic-concurrency guard: the deployment the caller believes is
-      the newest one to any of its targets. When present, the deployment
-      is only created if the newest deployment to any of the resolved
-      targets is exactly this one; otherwise the request answers `409`
-      with `dep.conflict`, carrying the actual newest deployment, and
-      nothing changes.
-
-      Not persisted; it guards the write, it is not part of the record.
+      Deploy only if the deployment this write replaces — the project's
+      newest primary deployment, or the newest deployment to any of the
+      preview URLs — is this one. Otherwise the request fails with
+      `409 dep.conflict` and nothing changes. Not stored.
     $ref: ../../components/schemas/deployment-id.yaml
