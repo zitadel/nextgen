@@ -942,6 +942,7 @@ var operationExcludedErrors = map[string][]string{
 	"listMyTeams":         {"domain.ErrSessionTokenInvalid"},
 	"listMyPasskeys":      {"domain.ErrSessionTokenInvalid"},
 	"listMyIdentityLinks": {"domain.ErrSessionTokenInvalid"},
+	"getMyPasswordState":  {"domain.ErrSessionTokenInvalid"},
 	"listMyProjects":      {"domain.ErrSessionTokenInvalid"},
 	// The flow engine catches a stale parked SSO row with errors.Is and renders
 	// the step; the analysis cannot see that check prune the error. The SSO

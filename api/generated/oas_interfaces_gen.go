@@ -225,6 +225,10 @@ type GetLiveRes interface {
 	getLiveRes()
 }
 
+type GetMyPasswordStateRes interface {
+	getMyPasswordStateRes()
+}
+
 type GetMySessionCsrfTokenRes interface {
 	getMySessionCsrfTokenRes()
 }
