@@ -167,6 +167,7 @@ allowBuilds:
   "lmdb": false
   "msgpackr-extract": false
   "msw": false
+  "rs-module-lexer": false
   "vue-demi": false
 overrides:
   "@types/react": "^19.2.14"
