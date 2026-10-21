@@ -11,9 +11,16 @@ import { RESOURCE_TABLE_TOP } from "@/components/resource-list";
 import { EYEBROW, PAGE_TITLE_ROW } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldLabel,
+  FieldTitle,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { UserAvatar } from "@/components/user-avatar";
 
 import { api } from "@/api/zitadel";
 import { consoleSessionProject, invalidateSessionCache } from "@/auth/session";
@@ -30,6 +37,9 @@ import { userAttributes } from "@/lib/user";
  * is (`schemaFields`): a row per property, nothing named in code. The schema's
  * `x-identifier` is read-only (D16); the rest saves through `PATCH /users/me`.
  * Without a readable schema, the record's own identifier shows alone.
+ *
+ * The card opens with the person's avatar, generated from their user id as in
+ * the sidebar footer, so the page reads as theirs at a glance.
  *
  * Under it, the person's sign-in methods, read with the session alone
  * (`/users/me/passkeys`, `/users/me/identity_links`). Read-only: adding or
@@ -159,6 +169,20 @@ function ProfileScreen() {
           </p>
         </div>
         <SettingsCard className="mt-4">
+          <Field orientation="responsive" className={ROW}>
+            <FieldContent className={LABEL_HALF}>
+              <FieldTitle>Avatar</FieldTitle>
+              <FieldDescription>
+                Generated from your account. Pictures are not supported yet.
+              </FieldDescription>
+            </FieldContent>
+            <FieldContent className="items-start @md/field-group:items-end">
+              <UserAvatar
+                seed={field(user as Record<string, unknown>, "id") ?? ""}
+                className="size-10"
+              />
+            </FieldContent>
+          </Field>
           {fixed.map((entry) => (
             <ProfileRow key={entry.key} field={entry} value={saved(entry)} readOnly />
           ))}

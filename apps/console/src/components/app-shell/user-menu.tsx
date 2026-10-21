@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { UserAvatar } from "@/components/user-avatar";
 import { useSessionCached } from "@/hooks/use-async";
 import { readAccountTeam } from "@/lib/account";
 import { type ThemePreference, useTheme } from "@/theme";
@@ -24,12 +25,6 @@ export interface ShellUser {
   identifier?: string;
   userId?: string;
 }
-
-/**
- * The design's `Gradient/Red`, a placeholder portrait: no avatar image source
- * exists on the session yet. 24px in the footer row.
- */
-const AVATAR = "size-6 shrink-0 rounded-full bg-(image:--zl-gradient-red)";
 
 /** The separators sit flush against the rows, so the default `-mx-1 my-1` comes off. */
 const MENU_SEPARATOR = "mx-0 my-0";
@@ -126,7 +121,8 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             aria-label={`Account: ${name}`}
             className="h-auto min-h-12 py-2"
           >
-            <span aria-hidden className={AVATAR} />
+            {/* 24px in the footer row, generated from the user id. */}
+            <UserAvatar seed={user?.userId ?? email} />
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="truncate text-sm leading-none font-semibold">{name}</span>
               {user?.display ? (
