@@ -99,6 +99,60 @@ func TestExpandCreatesSiblingSiteOnUS1(t *testing.T) {
 	}
 }
 
+func TestOrphanWorkspaceUserDoesNotFloatToPlatform(t *testing.T) {
+	platform, _, c1 := startCell(t, "http://platform", "platform", true)
+	defer c1()
+	eu1, _, c2 := startCell(t, "http://eu-1", "eu-1", false)
+	defer c2()
+
+	createProject(t, platform, "platform", true, true)
+	// Workspace root with lookup enabled but NO attach to platform.
+	createProjectWS(t, eu1, "acme", "acme", false, true)
+
+	created := postJSON(t, eu1, "/v1/projects/acme/users", map[string]any{"email": "orphan@example.com"})
+	defer created.Body.Close()
+	if created.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(created.Body)
+		t.Fatalf("status=%d body=%s", created.StatusCode, body)
+	}
+
+	plat := getJSON(t, platform, "/v1/projects/platform")
+	defer plat.Body.Close()
+	var platBody struct {
+		Lookup []struct {
+			Key string `json:"key"`
+		} `json:"lookup"`
+	}
+	decode(t, plat, &platBody)
+	for _, e := range platBody.Lookup {
+		if e.Key == "orphan@example.com" {
+			t.Fatalf("platform lookup must stay empty for orphan workspace user; got %+v", platBody.Lookup)
+		}
+	}
+
+	home := getJSON(t, eu1, "/v1/projects/acme")
+	defer home.Body.Close()
+	var homeBody struct {
+		Lookup []struct {
+			Key    string `json:"key"`
+			Source string `json:"source"`
+		} `json:"lookup"`
+	}
+	decode(t, home, &homeBody)
+	found := false
+	for _, e := range homeBody.Lookup {
+		if e.Key == "orphan@example.com" {
+			found = true
+			if e.Source != "local" {
+				t.Fatalf("source=%s want local", e.Source)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected local lookup on workspace root")
+	}
+}
+
 func TestLookupProvenanceChildVsLocal(t *testing.T) {
 	platform, platformURL, c1 := startCell(t, "http://platform", "platform", true)
 	defer c1()

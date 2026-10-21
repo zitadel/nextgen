@@ -104,8 +104,8 @@ func TestWorkspaceCreateRequiresCellAndTeam(t *testing.T) {
 			if !p.LookupEnabled {
 				t.Fatal("lookup_enabled want true on workspace root")
 			}
-			if p.ParentProjectID != "platform" {
-				t.Fatalf("parent=%s want platform", p.ParentProjectID)
+			if p.ParentProjectID != "" {
+				t.Fatalf("parent=%q want empty (workspace must not attach to platform)", p.ParentProjectID)
 			}
 			break
 		}
@@ -116,6 +116,32 @@ func TestWorkspaceCreateRequiresCellAndTeam(t *testing.T) {
 	ws, ok := app.getWorkspace("demo")
 	if !ok || ws.CustomerTeamID != "acme" || ws.Cell != "eu-1" {
 		t.Fatalf("registry workspace=%v ok=%v", ws, ok)
+	}
+
+	// User on orphan workspace root must not float a lookup row onto platform.
+	userForm := url.Values{"email": {"root@example.com"}}
+	req = httptest.NewRequest(http.MethodPost, "/projects/demo/users", strings.NewReader(userForm.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("id", "demo")
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
+		t.Fatalf("create user: %s", rec.Header().Get("Location"))
+	}
+	platformURL, err := app.cellURLByLabel("platform")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var platRaw struct {
+		Lookup []lookupRow `json:"lookup"`
+	}
+	if err := app.Peer.DoRaw(ctx, http.MethodGet, cell.NormalizeURL(platformURL)+"/v1/projects/platform", nil, "", &platRaw); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range platRaw.Lookup {
+		if e.Key == "root@example.com" {
+			t.Fatalf("platform lookup must stay empty for workspace-root user; got %+v", e)
+		}
 	}
 }
 
@@ -164,7 +190,7 @@ func TestAddChildSiteFloatAndLookupWalk(t *testing.T) {
 		t.Fatalf("child linkage workspace=%s team=%s", child.WorkspaceID, child.CustomerTeamID)
 	}
 
-	// Create user on child → float to acme → platform.
+	// Create user on child → float to acme only (not platform).
 	userForm := url.Values{"email": {"joe@example.com"}}
 	req = httptest.NewRequest(http.MethodPost, "/projects/acme-us2/users", strings.NewReader(userForm.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -193,6 +219,23 @@ func TestAddChildSiteFloatAndLookupWalk(t *testing.T) {
 	}
 	if !floated {
 		t.Fatalf("expected floated key on parent acme: %+v", parentRaw.Lookup)
+	}
+
+	// Platform must NOT receive the floated customer key.
+	platformURL, err := app.cellURLByLabel("platform")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var platRaw struct {
+		Lookup []lookupRow `json:"lookup"`
+	}
+	if err := app.Peer.DoRaw(ctx, http.MethodGet, cell.NormalizeURL(platformURL)+"/v1/projects/platform", nil, "", &platRaw); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range platRaw.Lookup {
+		if e.Key == "joe@example.com" {
+			t.Fatalf("platform lookup must not hold customer float; got %+v", e)
+		}
 	}
 
 	// Lookup from parent (sibling/parent walk) finds home.

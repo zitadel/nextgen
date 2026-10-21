@@ -83,15 +83,17 @@ for u in "$PLATFORM" "$EU1" "$EU2" "$US1" "$US2"; do
   wait_healthy "$u"
 done
 
-# Hoster: platform project (lookup zone) + customer team acme.
-# Customer: optional root workspace/site "acme" on eu-1 attached to platform.
+# Hoster: platform project + customer team acme (ops / teams — not customer user lookup).
+# Customer: workspace/site "acme" on eu-1 with NO attach to platform.
+# Lookup parent chain is site-only (child → parent site → workspace root). Never floats to platform.
 # Expand further sites (US-2, US-2-1, …) from the site page UI — parent picker.
 # Users + lookup only; no apps/tuples/groups seeded.
 create_project "$PLATFORM" "platform" "platform" true true "" ""
 create_team "$PLATFORM" "platform" "acme" "acme"
 
 create_project "$EU1" "acme" "acme" false true "acme" "acme"
-attach_project "$EU1" "acme" "platform" "$PLATFORM"
+# intentionally no attach_project to platform — customer_team_id links the workspace
 
-echo "project bootstrap complete (platform + team acme + workspace/site acme @ eu-1)"
+echo "project bootstrap complete (platform + team acme + workspace/site acme @ eu-1, no platform attach)"
 echo "Next: open /projects/acme → create user → add child site → lookup from sibling"
+echo "Note: wipe .local/*.db (or .local/data/) after pull if old floated platform rows linger"

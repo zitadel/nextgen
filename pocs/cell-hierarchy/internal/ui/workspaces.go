@@ -142,7 +142,8 @@ func (a *App) handleWorkspacesList(w http.ResponseWriter, r *http.Request) {
 		if s.IsPlatform {
 			continue
 		}
-		if s.WorkspaceID == s.ID || (s.WorkspaceID != "" && s.ParentProjectID == "platform") {
+		// Workspace root = self-id, or empty parent with workspace_id set (not platform attach).
+		if s.WorkspaceID == s.ID || (s.ParentProjectID == "" && s.WorkspaceID != "") {
 			roots = append(roots, s)
 		}
 	}
@@ -202,6 +203,8 @@ func (a *App) handleWorkspaceCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.beginTrace("create workspace " + id)
+	// Workspace root is a site with no project parent. Link to customer team via
+	// customer_team_id only — do NOT AttachProject to platform (lookup stays site-only).
 	proj, err := a.Peer.CreateProject(ctx, hostURL, map[string]any{
 		"id": id, "name": name,
 		"is_parent": false, "lookup_enabled": true,
@@ -210,18 +213,6 @@ func (a *App) handleWorkspaceCreate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		a.endTrace(err.Error(), nil)
 		http.Redirect(w, r, "/workspaces?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
-		return
-	}
-
-	platformHost, err := a.cellURLByLabel("platform")
-	if err != nil {
-		a.endTrace("created but attach failed: "+err.Error(), nil)
-		http.Redirect(w, r, "/workspaces?err="+url.QueryEscape("created but attach to platform failed: "+err.Error()), http.StatusSeeOther)
-		return
-	}
-	if err := a.Peer.AttachProject(ctx, hostURL, proj.ID, "platform", platformHost); err != nil {
-		a.endTrace("created but attach failed: "+err.Error(), nil)
-		http.Redirect(w, r, "/projects/"+url.PathEscape(proj.ID)+"?err="+url.QueryEscape("created but attach failed: "+err.Error()), http.StatusSeeOther)
 		return
 	}
 

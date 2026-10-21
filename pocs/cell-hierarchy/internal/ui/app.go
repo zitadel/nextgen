@@ -342,35 +342,33 @@ type childRow struct {
 
 func (a *App) handleHome(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	tree, unjoined := a.buildTree(ctx)
-	sites := a.listSites(ctx)
-	a.ensureWorkspaceFromSites(sites)
-	parents, unjoinedOpts := a.joinOptions(ctx)
+	flashErr := r.URL.Query().Get("err")
+	tree, unjoined, err := a.buildTreeFromPlatform(ctx)
+	if err != nil && flashErr == "" {
+		flashErr = err.Error()
+	}
+	parents, unjoinedOpts := a.platformJoinOptions(unjoined)
 	a.render(w, "home", pageData{
 		Title:       "Cells",
 		NavActive:   "cells",
 		Tree:        tree,
 		Unjoined:    unjoined,
-		ProjectTree: a.buildProjectTree(ctx),
 		Parents:     parents,
 		UnjoinedO:   unjoinedOpts,
 		Now:         time.Now().UTC().Format(time.RFC3339),
-		Workspaces:  a.listWorkspaceIDs(sites),
-		Sites:       sites,
 		DelayPairs:  a.delayPairViews(),
 		Flash:       r.URL.Query().Get("ok"),
-		FlashErr:    r.URL.Query().Get("err"),
+		FlashErr:    flashErr,
 		LatestTrace: a.latestTrace(),
 	})
 }
 
 func (a *App) handleTree(w http.ResponseWriter, r *http.Request) {
-	tree, unjoined := a.buildTree(r.Context())
+	tree, unjoined, _ := a.buildTreeFromPlatform(r.Context())
 	a.render(w, "tree", pageData{
-		Tree:        tree,
-		Unjoined:    unjoined,
-		ProjectTree: a.buildProjectTree(r.Context()),
-		Now:         time.Now().UTC().Format(time.RFC3339),
+		Tree:     tree,
+		Unjoined: unjoined,
+		Now:      time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
@@ -1460,163 +1458,98 @@ func (a *App) findByLabel(label string) (CellRef, bool) {
 	return CellRef{}, false
 }
 
-func (a *App) joinOptions(ctx context.Context) (parents, unjoined []CellRef) {
-	for _, c := range a.Cells {
-		me, err := a.Peer.GetMe(ctx, c.URL)
-		if err != nil {
-			continue
-		}
-		if me.IsParent {
-			parents = append(parents, CellRef{Label: me.Label, URL: me.URL})
-		}
-		if me.ParentURL == "" && !me.IsParent {
-			unjoined = append(unjoined, CellRef{Label: me.Label, URL: me.URL})
-		}
+// platformJoinOptions returns platform as the only join parent and unjoined
+// options from the config-diff set (no per-cell GetMe probing).
+func (a *App) platformJoinOptions(unjoined []*snapshotNode) (parents, opts []CellRef) {
+	if ref, ok := a.findByLabel("platform"); ok {
+		parents = []CellRef{{Label: ref.Label, URL: ref.URL}}
 	}
-	sort.Slice(parents, func(i, j int) bool { return parents[i].Label < parents[j].Label })
-	sort.Slice(unjoined, func(i, j int) bool { return unjoined[i].Label < unjoined[j].Label })
-	return parents, unjoined
+	for _, n := range unjoined {
+		opts = append(opts, CellRef{Label: n.Label, URL: n.URL})
+	}
+	sort.Slice(opts, func(i, j int) bool { return opts[i].Label < opts[j].Label })
+	return parents, opts
 }
 
-func (a *App) buildTree(ctx context.Context) (roots, unjoined []*snapshotNode) {
-	type live struct {
-		ref CellRef
-		me  cell.MeResponse
-		err error
+// buildTreeFromPlatform builds the Cells page tree by contacting only the
+// platform cell: GetMe + GET /v1/children. Unjoined cells are the configured
+// a.Cells labels/URLs not present in that children list (and not platform).
+// No GetMe to leaf cells, no ListProjects, no listSites.
+func (a *App) buildTreeFromPlatform(ctx context.Context) (roots, unjoined []*snapshotNode, err error) {
+	platform, ok := a.findByLabel("platform")
+	if !ok {
+		return nil, nil, fmt.Errorf("platform cell not configured")
 	}
-	lives := make([]live, len(a.Cells))
-	var wg sync.WaitGroup
-	for i, c := range a.Cells {
-		wg.Add(1)
-		go func(i int, c CellRef) {
-			defer wg.Done()
-			me, err := a.Peer.GetMe(ctx, c.URL)
-			lives[i] = live{ref: c, me: me, err: err}
-		}(i, c)
+	me, err := a.Peer.GetMe(ctx, platform.URL)
+	if err != nil {
+		return nil, nil, err
 	}
-	wg.Wait()
-
-	byURL := map[string]*snapshotNode{}
-	var all []*snapshotNode
-	for _, l := range lives {
-		n := &snapshotNode{
-			Label:     l.ref.Label,
-			URL:       l.ref.URL,
-			Reachable: l.err == nil,
-			Alive:     l.err == nil,
-		}
-		if l.err != nil {
-			n.Error = l.err.Error()
-			n.Status = "unreachable"
-		} else {
-			n.Label = l.me.Label
-			n.URL = l.me.URL
-			n.IsParent = l.me.IsParent
-			n.ParentURL = l.me.ParentURL
-			n.Status = l.me.Status
-		}
-		byURL[cell.NormalizeURL(n.URL)] = n
-		all = append(all, n)
+	root := &snapshotNode{
+		Label:     me.Label,
+		URL:       me.URL,
+		IsParent:  me.IsParent,
+		ParentURL: me.ParentURL,
+		Status:    me.Status,
+		Alive:     true,
+		Reachable: true,
+	}
+	if root.Label == "" {
+		root.Label = platform.Label
+	}
+	if root.URL == "" {
+		root.URL = platform.URL
 	}
 
-	for _, l := range lives {
-		if l.err != nil || !l.me.IsParent {
-			continue
-		}
-		children, err := a.fetchChildren(ctx, l.ref.URL)
-		if err != nil {
-			continue
-		}
-		for _, ch := range children {
-			if node, ok := byURL[cell.NormalizeURL(ch.ChildURL)]; ok {
-				node.Alive = ch.Alive
-			}
-		}
+	children, err := a.fetchChildren(ctx, platform.URL)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	for _, n := range all {
-		if !n.Reachable {
-			unjoined = append(unjoined, n)
-			continue
-		}
-		if n.ParentURL == "" {
-			if n.IsParent || n.Status == "root" {
-				roots = append(roots, n)
-			} else {
-				unjoined = append(unjoined, n)
-			}
-			continue
-		}
-		pURL := cell.NormalizeURL(n.ParentURL)
-		if parent, ok := byURL[pURL]; ok {
-			parent.Children = append(parent.Children, n)
-		} else {
-			roots = append(roots, n)
-		}
-	}
-	sortNodes(roots)
-	sortNodes(unjoined)
-	for _, n := range all {
-		sortNodes(n.Children)
-	}
-	return roots, unjoined
-}
-
-func (a *App) buildProjectTree(ctx context.Context) []*projectNode {
 	labelByURL := map[string]string{}
 	for _, c := range a.Cells {
 		labelByURL[cell.NormalizeURL(c.URL)] = c.Label
 	}
-	byID := map[string]*projectNode{}
-	var all []*projectNode
+	joined := map[string]bool{cell.NormalizeURL(platform.URL): true}
+
+	for _, ch := range children {
+		nURL := cell.NormalizeURL(ch.ChildURL)
+		joined[nURL] = true
+		label := ch.Label
+		if label == "" {
+			label = labelByURL[nURL]
+		}
+		if label == "" {
+			label = ch.ChildURL
+		}
+		root.Children = append(root.Children, &snapshotNode{
+			Label:     label,
+			URL:       ch.ChildURL,
+			ParentURL: root.URL,
+			Status:    "joined",
+			Alive:     ch.Alive,
+			Reachable: true,
+		})
+	}
+	sortNodes(root.Children)
+
 	for _, c := range a.Cells {
-		projects, err := a.Peer.ListProjects(ctx, c.URL)
-		if err != nil {
+		if joined[cell.NormalizeURL(c.URL)] {
 			continue
 		}
-		for _, p := range projects {
-			host := p.HostCellURL
-			if host == "" {
-				host = c.URL
-			}
-			n := &projectNode{
-				ID:            p.ID,
-				Name:          p.Name,
-				HostCellURL:   host,
-				HostLabel:     labelByURL[cell.NormalizeURL(host)],
-				IsParent:      p.IsParent,
-				LookupEnabled: p.LookupEnabled,
-				ParentID:      p.ParentProjectID,
-			}
-			byID[p.ID] = n
-			all = append(all, n)
-		}
+		unjoined = append(unjoined, &snapshotNode{
+			Label:     c.Label,
+			URL:       c.URL,
+			Status:    "unjoined",
+			Reachable: true,
+			Alive:     true,
+		})
 	}
-	var roots []*projectNode
-	for _, n := range all {
-		if n.ParentID == "" {
-			roots = append(roots, n)
-			continue
-		}
-		if parent, ok := byID[n.ParentID]; ok {
-			parent.Children = append(parent.Children, n)
-		} else {
-			roots = append(roots, n)
-		}
-	}
-	sortProjectNodes(roots)
-	for _, n := range all {
-		sortProjectNodes(n.Children)
-	}
-	return roots
+	sortNodes(unjoined)
+	return []*snapshotNode{root}, unjoined, nil
 }
 
 func sortNodes(nodes []*snapshotNode) {
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Label < nodes[j].Label })
-}
-
-func sortProjectNodes(nodes []*projectNode) {
-	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Name < nodes[j].Name })
 }
 
 func (a *App) fetchChildren(ctx context.Context, baseURL string) ([]childRow, error) {

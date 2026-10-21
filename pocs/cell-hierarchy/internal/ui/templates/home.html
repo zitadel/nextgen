@@ -18,7 +18,13 @@
       {{if .Flash}}<div class="flash-ok">{{.Flash}}</div>{{end}}
       {{if .FlashErr}}<div class="flash-err">{{.FlashErr}}</div>{{end}}
 
-      <div id="tree" hx-get="/tree" hx-trigger="every 5s" hx-swap="innerHTML">
+      <div class="panel" style="margin-bottom:1rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+        <form method="get" action="/" style="margin:0">
+          <button type="submit">Refresh tree</button>
+        </form>
+        <span class="muted">Platform-only · no auto-poll (avoids pairwise delay amplification)</span>
+      </div>
+      <div id="tree">
         {{template "tree" .}}
       </div>
 

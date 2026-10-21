@@ -1,35 +1,22 @@
 {{define "tree"}}
-<div class="grid">
-  <div class="panel">
-    <h2>Cell tree</h2>
-    <div class="muted">Updated {{.Now}}</div>
-    {{if .Tree}}
-    <ul class="tree root">
-      {{range .Tree}}{{template "node" .}}{{end}}
-    </ul>
-    {{else}}
-    <p class="muted">No rooted cells reachable.</p>
-    {{end}}
-    <h2 style="margin-top:1rem">Unjoined</h2>
-    {{if .Unjoined}}
-    <ul class="tree root">
-      {{range .Unjoined}}{{template "node" .}}{{end}}
-    </ul>
-    {{else}}
-    <p class="muted">None</p>
-    {{end}}
-  </div>
-  <div class="panel">
-    <h2>Project tree</h2>
-    <div class="muted">Parent + lookup badges · hosted cell in code</div>
-    {{if .ProjectTree}}
-    <ul class="tree root">
-      {{range .ProjectTree}}{{template "projectNode" .}}{{end}}
-    </ul>
-    {{else}}
-    <p class="muted">No projects yet — run bootstrap-projects.</p>
-    {{end}}
-  </div>
+<div class="panel">
+  <h2>Cell tree</h2>
+  <div class="muted">Updated {{.Now}} · from platform GetMe + children only</div>
+  {{if .Tree}}
+  <ul class="tree root">
+    {{range .Tree}}{{template "node" .}}{{end}}
+  </ul>
+  {{else}}
+  <p class="muted">No rooted cells reachable.</p>
+  {{end}}
+  <h2 style="margin-top:1rem">Unjoined</h2>
+  {{if .Unjoined}}
+  <ul class="tree root">
+    {{range .Unjoined}}{{template "node" .}}{{end}}
+  </ul>
+  {{else}}
+  <p class="muted">None</p>
+  {{end}}
 </div>
 {{end}}
 

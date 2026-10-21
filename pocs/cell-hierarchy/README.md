@@ -5,34 +5,39 @@ Prove multi-cell site hierarchy and lookup float-up — not an IAM admin console
 ## Mental model
 
 ```text
-hoster:  platform PROJECT (lookup zone)
+hoster:  platform PROJECT (teams / ops — not customer user lookup)
            └── team per customer (e.g. acme)
 
 customer:  workspace = FIRST site/project on a chosen cell
-             linked to that customer team (customer_team_id)
+             linked to customer team via customer_team_id (tuple / breaking-glass deferred)
+             NO project-parent attach to platform
            expand: add CHILD site on another cell
-             parent_project = chosen parent site (default = workspace root)
-             lookup walks UP: US-2-1 → US-2 → EU-1 (first site) → platform
+             parent_project = chosen parent site (workspace root or intermediate)
+             lookup walks UP site-only: US-2-1 → US-2 → acme (workspace root)
+             never floats to platform
 ```
 
 Rules:
 
 - All objects live in **one cell only**.
 - Parent site’s lookup table holds floated keys from children (float-up).
+- **Lookup parent chain is site-only** — never platform. Platform holds teams/ops, not customer user lookup rows.
+- Workspace ↔ customer team = `customer_team_id` (tuple binding deferred).
 - **Users + lookup only** for now (apps / grants / interests / tuples / groups deferred).
-- Restart proof: create user on a site → float to parents → lookup from sibling/child finds home via parent chain.
+- Restart proof: create user on a child site → float to parent sites → lookup from sibling finds home via site chain.
 
 ## UI
 
 | Nav | Role |
 |---|---|
-| **Cells** `/` | Ops: topology tree, join spare, read-only delay defaults |
+| **Cells** `/` | Ops: platform membership tree + join spare (platform API only; manual refresh) |
 | **Platform** `/platform` | Hoster: platform project + create/list customer teams |
 | **Workspaces** `/workspaces` | Customer: list root sites; create workspace (= first site) |
 
-- **Create workspace** requires cell + customer team → creates the project immediately (`workspace_id` = self, `lookup_enabled=true`, attach to `platform`) → redirects to `/projects/{id}`.
-- **Child sites** also enable lookup so intermediate parents can hold floated keys (US-2-1 → US-2 → EU-1 → platform).
+- **Create workspace** requires cell + customer team → creates the project (`workspace_id` = self, `lookup_enabled=true`, **empty parent** — not attached to platform) → redirects to `/projects/{id}`.
+- **Child sites** attach to a **parent site** (workspace root or intermediate) so keys float within the customer site tree only.
 - **Site page** `/projects/{id}`: meta, child sites, create user, lookup-from-here, delete user (tombstone), add child site (parent picker), **Latest hop** inline.
+- **Cell detail** `/cells/{label}`: per-cell me / children / projects (loaded only when you open that cell).
 - No Lab. `/lab` and `/scenarios` redirect to `/workspaces`.
 - No sticky Global Trace drawer. Latest action hops render inline on the page that ran the action. Optional `/trace-view` stays for debugging (not in nav).
 
@@ -47,7 +52,9 @@ platform (parent cell)     port 8100
 spare (unjoined)           port 8105
 ```
 
-Site tree is separate from cell membership. Workspace root attaches to **platform** so keys can float into the platform lookup zone; child sites attach to a **parent site** (default = workspace root).
+Cell membership tree (eu-1 joins platform as a **cell**) is separate from the **site/project** tree. Workspace roots are not project-children of platform; child sites attach only to parent sites.
+
+Cells `/` contacts **only the platform cell** (`GetMe` + `/v1/children`). Leaf cell detail lives under `/cells/{label}`. Project trees belong on Workspaces / site pages.
 
 ## Pairwise delays (fixed)
 
@@ -77,14 +84,20 @@ cd pocs/cell-hierarchy
 | Seeded site | http://localhost:3000/projects/acme |
 | Cells | http://localhost:3000 |
 
-Bootstrap: joins (leaves → platform) then `scripts/bootstrap-projects.sh`  
-→ platform project + team `acme` + workspace/site `acme` on eu-1.
+Bootstrap: joins (leaves → platform **as cells**) then `scripts/bootstrap-projects.sh`  
+→ platform project + team `acme` + workspace/site `acme` on eu-1 (**no** project attach to platform).
+
+After pulling model changes, wipe local DBs so old floated platform lookup rows disappear:
+
+```bash
+rm -rf .local/data .local/*.db
+```
 
 ### Demo script
 
-1. Open `/projects/acme` → **Create user** `joe@example.com` (floats to platform).
+1. Open `/projects/acme` → **Create user** `joe@example.com` (local + floats only if parents exist; root has none → stays on acme).
 2. **Add child site** e.g. `acme-us2` on `us-2`, parent = `acme`.
-3. On `/projects/acme-us2` → **Lookup** `joe@example.com` → hit via parent chain.
+3. On `/projects/acme-us2` → create another user or **Lookup** `joe@example.com` → hit via site parent chain (not platform).
 4. Optionally add `acme-us2-1` under `acme-us2` and lookup from there.
 
 ## Deferred
@@ -99,7 +112,7 @@ Cell APIs for apps/tuples/FGA remain; the UI does not surface them.
 ## Locked decisions
 
 - Cell tree = membership only; site/project tree is separate.
-- Lookup floats on PROJECT parents only; never walks children.
+- Lookup floats on PROJECT parents only; never walks children; never onto platform for customer workspaces.
 - Lookup provenance: `source=local|child`, `via_project` = child project id when floated.
 - `customer_team_id` on projects links a site to its hoster team (tuple binding later).
 
