@@ -317,6 +317,14 @@ type ListIdpRevisionsRes interface {
 	listIdpRevisionsRes()
 }
 
+type ListMyIdentityLinksRes interface {
+	listMyIdentityLinksRes()
+}
+
+type ListMyPasskeysRes interface {
+	listMyPasskeysRes()
+}
+
 type ListMyProjectsRes interface {
 	listMyProjectsRes()
 }

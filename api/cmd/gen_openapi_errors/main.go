@@ -936,11 +936,13 @@ var remappedErrors = []string{
 var operationExcludedErrors = map[string][]string{
 	// Self-access operations answer any refused session as auth.unauthorized
 	// (requireSelf, #553).
-	"getMyUser":       {"domain.ErrSessionTokenInvalid"},
-	"patchMyUser":     {"domain.ErrSessionTokenInvalid"},
-	"getMyUserSchema": {"domain.ErrSessionTokenInvalid"},
-	"listMyTeams":     {"domain.ErrSessionTokenInvalid"},
-	"listMyProjects":  {"domain.ErrSessionTokenInvalid"},
+	"getMyUser":           {"domain.ErrSessionTokenInvalid"},
+	"patchMyUser":         {"domain.ErrSessionTokenInvalid"},
+	"getMyUserSchema":     {"domain.ErrSessionTokenInvalid"},
+	"listMyTeams":         {"domain.ErrSessionTokenInvalid"},
+	"listMyPasskeys":      {"domain.ErrSessionTokenInvalid"},
+	"listMyIdentityLinks": {"domain.ErrSessionTokenInvalid"},
+	"listMyProjects":      {"domain.ErrSessionTokenInvalid"},
 	// The flow engine catches a stale parked SSO row with errors.Is and renders
 	// the step; the analysis cannot see that check prune the error. The SSO
 	// resolver turns a user schema the project does not hold into

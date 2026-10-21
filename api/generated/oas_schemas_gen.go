@@ -6676,11 +6676,13 @@ func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
 	s.Details = val
 }
 
-func (*AuthUnauthorized) completeClaimRes()   {}
-func (*AuthUnauthorized) getMyUserSchemaRes() {}
-func (*AuthUnauthorized) listMyProjectsRes()  {}
-func (*AuthUnauthorized) listMyTeamsRes()     {}
-func (*AuthUnauthorized) revokeMySessionRes() {}
+func (*AuthUnauthorized) completeClaimRes()       {}
+func (*AuthUnauthorized) getMyUserSchemaRes()     {}
+func (*AuthUnauthorized) listMyIdentityLinksRes() {}
+func (*AuthUnauthorized) listMyPasskeysRes()      {}
+func (*AuthUnauthorized) listMyProjectsRes()      {}
+func (*AuthUnauthorized) listMyTeamsRes()         {}
+func (*AuthUnauthorized) revokeMySessionRes()     {}
 
 // Additional error-specific context.
 type AuthUnauthorizedDetails map[string]jx.Raw
@@ -19048,6 +19050,8 @@ func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
+func (*ErrorDetails) listMyIdentityLinksRes()  {}
+func (*ErrorDetails) listMyPasskeysRes()       {}
 func (*ErrorDetails) listMyTeamsRes()          {}
 func (*ErrorDetails) revokeMySessionRes()      {}
 func (*ErrorDetails) rollbackDeploymentRes()   {}
@@ -36057,6 +36061,366 @@ type ListIdpRevisionsUnauthorized ErrorDetails
 
 func (*ListIdpRevisionsUnauthorized) listIdpRevisionsRes() {}
 
+// ListMyIdentityLinksErrorResponse represents sum type.
+type ListMyIdentityLinksErrorResponse struct {
+	Type                ListMyIdentityLinksErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
+}
+
+// ListMyIdentityLinksErrorResponseType is oneOf type of ListMyIdentityLinksErrorResponse.
+type ListMyIdentityLinksErrorResponseType string
+
+// Possible values for ListMyIdentityLinksErrorResponseType.
+const (
+	AuthUnauthorizedListMyIdentityLinksErrorResponse    ListMyIdentityLinksErrorResponseType = "auth.unauthorized"
+	InternalListMyIdentityLinksErrorResponse            ListMyIdentityLinksErrorResponseType = "internal"
+	ReqInvalidListMyIdentityLinksErrorResponse          ListMyIdentityLinksErrorResponseType = "req.invalid"
+	SessProjectMismatchListMyIdentityLinksErrorResponse ListMyIdentityLinksErrorResponseType = "sess.project_mismatch"
+	UserNotFoundListMyIdentityLinksErrorResponse        ListMyIdentityLinksErrorResponseType = "user.not_found"
+)
+
+// IsAuthUnauthorized reports whether ListMyIdentityLinksErrorResponse is AuthUnauthorized.
+func (s ListMyIdentityLinksErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListMyIdentityLinksErrorResponse
+}
+
+// IsInternal reports whether ListMyIdentityLinksErrorResponse is Internal.
+func (s ListMyIdentityLinksErrorResponse) IsInternal() bool {
+	return s.Type == InternalListMyIdentityLinksErrorResponse
+}
+
+// IsReqInvalid reports whether ListMyIdentityLinksErrorResponse is ReqInvalid.
+func (s ListMyIdentityLinksErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListMyIdentityLinksErrorResponse
+}
+
+// IsSessProjectMismatch reports whether ListMyIdentityLinksErrorResponse is SessProjectMismatch.
+func (s ListMyIdentityLinksErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchListMyIdentityLinksErrorResponse
+}
+
+// IsUserNotFound reports whether ListMyIdentityLinksErrorResponse is UserNotFound.
+func (s ListMyIdentityLinksErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundListMyIdentityLinksErrorResponse
+}
+
+// SetAuthUnauthorized sets ListMyIdentityLinksErrorResponse to AuthUnauthorized.
+func (s *ListMyIdentityLinksErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListMyIdentityLinksErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListMyIdentityLinksErrorResponse is AuthUnauthorized.
+func (s ListMyIdentityLinksErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListMyIdentityLinksErrorResponse(v AuthUnauthorized) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListMyIdentityLinksErrorResponse to Internal.
+func (s *ListMyIdentityLinksErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListMyIdentityLinksErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListMyIdentityLinksErrorResponse is Internal.
+func (s ListMyIdentityLinksErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from Internal.
+func NewInternalListMyIdentityLinksErrorResponse(v Internal) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListMyIdentityLinksErrorResponse to ReqInvalid.
+func (s *ListMyIdentityLinksErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListMyIdentityLinksErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListMyIdentityLinksErrorResponse is ReqInvalid.
+func (s ListMyIdentityLinksErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from ReqInvalid.
+func NewReqInvalidListMyIdentityLinksErrorResponse(v ReqInvalid) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets ListMyIdentityLinksErrorResponse to SessProjectMismatch.
+func (s *ListMyIdentityLinksErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchListMyIdentityLinksErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if ListMyIdentityLinksErrorResponse is SessProjectMismatch.
+func (s ListMyIdentityLinksErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchListMyIdentityLinksErrorResponse(v SessProjectMismatch) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUserNotFound sets ListMyIdentityLinksErrorResponse to UserNotFound.
+func (s *ListMyIdentityLinksErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundListMyIdentityLinksErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if ListMyIdentityLinksErrorResponse is UserNotFound.
+func (s ListMyIdentityLinksErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from UserNotFound.
+func NewUserNotFoundListMyIdentityLinksErrorResponse(v UserNotFound) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// ListMyIdentityLinksErrorResponseStatusCode wraps ListMyIdentityLinksErrorResponse with StatusCode.
+type ListMyIdentityLinksErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListMyIdentityLinksErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListMyIdentityLinksErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyIdentityLinksErrorResponseStatusCode) GetResponse() ListMyIdentityLinksErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListMyIdentityLinksErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyIdentityLinksErrorResponseStatusCode) SetResponse(val ListMyIdentityLinksErrorResponse) {
+	s.Response = val
+}
+
+func (*ListMyIdentityLinksErrorResponseStatusCode) listMyIdentityLinksRes() {}
+
+// ListMyPasskeysErrorResponse represents sum type.
+type ListMyPasskeysErrorResponse struct {
+	Type                ListMyPasskeysErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
+}
+
+// ListMyPasskeysErrorResponseType is oneOf type of ListMyPasskeysErrorResponse.
+type ListMyPasskeysErrorResponseType string
+
+// Possible values for ListMyPasskeysErrorResponseType.
+const (
+	AuthUnauthorizedListMyPasskeysErrorResponse    ListMyPasskeysErrorResponseType = "auth.unauthorized"
+	InternalListMyPasskeysErrorResponse            ListMyPasskeysErrorResponseType = "internal"
+	ReqInvalidListMyPasskeysErrorResponse          ListMyPasskeysErrorResponseType = "req.invalid"
+	SessProjectMismatchListMyPasskeysErrorResponse ListMyPasskeysErrorResponseType = "sess.project_mismatch"
+	UserNotFoundListMyPasskeysErrorResponse        ListMyPasskeysErrorResponseType = "user.not_found"
+)
+
+// IsAuthUnauthorized reports whether ListMyPasskeysErrorResponse is AuthUnauthorized.
+func (s ListMyPasskeysErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListMyPasskeysErrorResponse
+}
+
+// IsInternal reports whether ListMyPasskeysErrorResponse is Internal.
+func (s ListMyPasskeysErrorResponse) IsInternal() bool {
+	return s.Type == InternalListMyPasskeysErrorResponse
+}
+
+// IsReqInvalid reports whether ListMyPasskeysErrorResponse is ReqInvalid.
+func (s ListMyPasskeysErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListMyPasskeysErrorResponse
+}
+
+// IsSessProjectMismatch reports whether ListMyPasskeysErrorResponse is SessProjectMismatch.
+func (s ListMyPasskeysErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchListMyPasskeysErrorResponse
+}
+
+// IsUserNotFound reports whether ListMyPasskeysErrorResponse is UserNotFound.
+func (s ListMyPasskeysErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundListMyPasskeysErrorResponse
+}
+
+// SetAuthUnauthorized sets ListMyPasskeysErrorResponse to AuthUnauthorized.
+func (s *ListMyPasskeysErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListMyPasskeysErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListMyPasskeysErrorResponse is AuthUnauthorized.
+func (s ListMyPasskeysErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListMyPasskeysErrorResponse(v AuthUnauthorized) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListMyPasskeysErrorResponse to Internal.
+func (s *ListMyPasskeysErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListMyPasskeysErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListMyPasskeysErrorResponse is Internal.
+func (s ListMyPasskeysErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from Internal.
+func NewInternalListMyPasskeysErrorResponse(v Internal) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListMyPasskeysErrorResponse to ReqInvalid.
+func (s *ListMyPasskeysErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListMyPasskeysErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListMyPasskeysErrorResponse is ReqInvalid.
+func (s ListMyPasskeysErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from ReqInvalid.
+func NewReqInvalidListMyPasskeysErrorResponse(v ReqInvalid) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets ListMyPasskeysErrorResponse to SessProjectMismatch.
+func (s *ListMyPasskeysErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchListMyPasskeysErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if ListMyPasskeysErrorResponse is SessProjectMismatch.
+func (s ListMyPasskeysErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchListMyPasskeysErrorResponse(v SessProjectMismatch) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUserNotFound sets ListMyPasskeysErrorResponse to UserNotFound.
+func (s *ListMyPasskeysErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundListMyPasskeysErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if ListMyPasskeysErrorResponse is UserNotFound.
+func (s ListMyPasskeysErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from UserNotFound.
+func NewUserNotFoundListMyPasskeysErrorResponse(v UserNotFound) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// ListMyPasskeysErrorResponseStatusCode wraps ListMyPasskeysErrorResponse with StatusCode.
+type ListMyPasskeysErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListMyPasskeysErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListMyPasskeysErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyPasskeysErrorResponseStatusCode) GetResponse() ListMyPasskeysErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListMyPasskeysErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyPasskeysErrorResponseStatusCode) SetResponse(val ListMyPasskeysErrorResponse) {
+	s.Response = val
+}
+
+func (*ListMyPasskeysErrorResponseStatusCode) listMyPasskeysRes() {}
+
 type ListMyProjectsBadRequest ErrorDetails
 
 func (*ListMyProjectsBadRequest) listMyProjectsRes() {}
@@ -37418,6 +37782,34 @@ func (s *ListUserIdentityLinksResponse) SetNextPageToken(val OptNilPageToken) {
 
 func (*ListUserIdentityLinksResponse) listUserIdentityLinksRes() {}
 
+// ListUserIdentityLinksResponseHeaders wraps ListUserIdentityLinksResponse with response headers.
+type ListUserIdentityLinksResponseHeaders struct {
+	CacheControl OptString
+	Response     ListUserIdentityLinksResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *ListUserIdentityLinksResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *ListUserIdentityLinksResponseHeaders) GetResponse() ListUserIdentityLinksResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *ListUserIdentityLinksResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListUserIdentityLinksResponseHeaders) SetResponse(val ListUserIdentityLinksResponse) {
+	s.Response = val
+}
+
+func (*ListUserIdentityLinksResponseHeaders) listMyIdentityLinksRes() {}
+
 type ListUserIdentityLinksUnauthorized ErrorDetails
 
 func (*ListUserIdentityLinksUnauthorized) listUserIdentityLinksRes() {}
@@ -37648,6 +38040,34 @@ func (s *ListUserPasskeysResponse) SetNextPageToken(val OptNilPageToken) {
 }
 
 func (*ListUserPasskeysResponse) listUserPasskeysRes() {}
+
+// ListUserPasskeysResponseHeaders wraps ListUserPasskeysResponse with response headers.
+type ListUserPasskeysResponseHeaders struct {
+	CacheControl OptString
+	Response     ListUserPasskeysResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *ListUserPasskeysResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *ListUserPasskeysResponseHeaders) GetResponse() ListUserPasskeysResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *ListUserPasskeysResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListUserPasskeysResponseHeaders) SetResponse(val ListUserPasskeysResponse) {
+	s.Response = val
+}
+
+func (*ListUserPasskeysResponseHeaders) listMyPasskeysRes() {}
 
 type ListUserPasskeysResponsePasskeysItem struct {
 	// The unique identifier of the passkey.
@@ -66643,10 +67063,12 @@ func (s *SessProjectMismatch) SetDetails(val OptSessProjectMismatchDetails) {
 	s.Details = val
 }
 
-func (*SessProjectMismatch) getMyUserRes()       {}
-func (*SessProjectMismatch) getMyUserSchemaRes() {}
-func (*SessProjectMismatch) listMyProjectsRes()  {}
-func (*SessProjectMismatch) listMyTeamsRes()     {}
+func (*SessProjectMismatch) getMyUserRes()           {}
+func (*SessProjectMismatch) getMyUserSchemaRes()     {}
+func (*SessProjectMismatch) listMyIdentityLinksRes() {}
+func (*SessProjectMismatch) listMyPasskeysRes()      {}
+func (*SessProjectMismatch) listMyProjectsRes()      {}
+func (*SessProjectMismatch) listMyTeamsRes()         {}
 
 // Additional error-specific context.
 type SessProjectMismatchDetails map[string]jx.Raw
