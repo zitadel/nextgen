@@ -44,8 +44,11 @@ export interface SchemaField {
   key: string;
   label: string;
   required: boolean;
-  /** `<input type>` chosen from the property's JSON Schema `format`. */
-  inputType: "text" | "email" | "number" | "url" | "tel" | "date";
+  /**
+   * `<input type>` chosen from the property's JSON Schema `format`, or
+   * `boolean`, which no `<input type>` names: each form picks its own control.
+   */
+  inputType: "text" | "email" | "number" | "url" | "tel" | "date" | "boolean";
   placeholder?: string;
 }
 
@@ -373,6 +376,7 @@ function propertyInputType(property: Record<string, unknown>): SchemaField["inpu
       break;
   }
   const type = field(property, "type");
+  if (type === "boolean") return "boolean";
   return type === "number" || type === "integer" ? "number" : "text";
 }
 

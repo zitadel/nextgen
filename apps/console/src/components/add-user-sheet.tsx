@@ -235,7 +235,8 @@ function SchemaInput({
       <Input
         id={id}
         name={field.key}
-        type={field.inputType}
+        // A boolean is typed as text here; the user detail page has a switch.
+        type={field.inputType === "boolean" ? "text" : field.inputType}
         required={field.required}
         placeholder={field.placeholder}
         value={value}

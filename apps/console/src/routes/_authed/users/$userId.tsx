@@ -18,10 +18,11 @@ import { EYEBROW } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Field, FieldContent, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { MetaItem } from "@/components/ui/meta-item";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSubmit } from "@/hooks/use-submit";
 import { formatDate } from "@/lib/date";
@@ -334,9 +335,14 @@ function ProfileForm({
       const value = displayValue(attributes, entry.key);
       stored[entry.key] = value ?? "";
       // Stored but not as text (an array or object under a union type): an
-      // empty box would invite typing over the structured value.
+      // empty box would invite typing over the structured value. Likewise a
+      // boolean stored as something else (`"yes"` from before a type change):
+      // the switch would show it as off, and a toggle would overwrite it.
       const raw = attributes[entry.key];
-      if (value === undefined && raw !== undefined && raw !== null) locked.add(entry.key);
+      const notBoolean = entry.inputType === "boolean" && typeof raw !== "boolean";
+      if ((value === undefined || notBoolean) && raw !== undefined && raw !== null) {
+        locked.add(entry.key);
+      }
     }
     return { stored, locked };
   }, [fields, user]);
@@ -352,7 +358,7 @@ function ProfileForm({
   );
   // Only the changed fields: a required value the form cannot show (an array)
   // reads as empty without being emptied.
-  const missingRequired = changed.some((entry) => entry.required && !values[entry.key]?.trim());
+  const missing = changed.filter((entry) => entry.required && !values[entry.key]?.trim());
 
   const save = useSubmit(async () => {
     const attributes: Record<string, unknown> = {};
@@ -381,6 +387,7 @@ function ProfileForm({
           }
           // Marked, since it is the only reason on screen why Save is off.
           invalid={unreadable[entry.key] ?? false}
+          missing={missing.includes(entry)}
           readOnly={locked.has(entry.key)}
           // The reload after a save resets the draft, so typing meanwhile
           // would be lost.
@@ -395,7 +402,7 @@ function ProfileForm({
           size="sm"
           className="gap-1 px-2.5 text-xs"
           onClick={() => void save.run()}
-          disabled={changed.length === 0 || missingRequired || blocked}
+          disabled={changed.length === 0 || missing.length > 0 || blocked}
           loading={save.pending}
         >
           Save
@@ -408,9 +415,11 @@ function ProfileForm({
 /**
  * A field's draft as the patch carries it: the typed value, or `null` to
  * delete an emptied attribute (the schema refuses that for a required one,
- * which `missingRequired` catches first).
+ * which `missing` catches first).
  */
-function patchValue(entry: SchemaField, draft = ""): string | number | null {
+function patchValue(entry: SchemaField, draft = ""): string | number | boolean | null {
+  // The switch shows an absent value as off, so off reads as `false` either way.
+  if (entry.inputType === "boolean") return draft === "true";
   const trimmed = draft.trim();
   return trimmed === "" ? null : attributeValue(entry, trimmed);
 }
@@ -422,6 +431,7 @@ function ProfileField({
   onChange,
   onBadInput,
   invalid,
+  missing,
   readOnly,
   disabled,
 }: {
@@ -435,10 +445,13 @@ function ProfileField({
    */
   onBadInput: (badInput: boolean) => void;
   invalid: boolean;
+  /** A required value the draft has emptied. */
+  missing: boolean;
   readOnly: boolean;
   disabled: boolean;
 }) {
   const id = useId();
+  const errorId = `${id}-error`;
   // A number field is a text input: a number input reports text it cannot
   // parse as empty, which would read as emptied and delete the value. No
   // decimal keypad either, since iOS's has no minus key.
@@ -455,19 +468,41 @@ function ProfileField({
         {!field.required && <MetaItem>Optional</MetaItem>}
       </div>
       <FieldContent>
-        <Input
-          id={id}
-          name={field.key}
-          type={number ? "text" : field.inputType}
-          required={field.required}
-          placeholder={field.placeholder}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          onInput={(event) => onBadInput(event.currentTarget.validity.badInput)}
-          aria-invalid={invalid || undefined}
-          readOnly={readOnly}
-          disabled={disabled}
-        />
+        {field.inputType === "boolean" ? (
+          <div className="flex items-center gap-2">
+            {/* A switch cannot be read-only, so a locked value disables it. */}
+            <Switch
+              id={id}
+              checked={value === "true"}
+              onCheckedChange={(checked) => onChange(String(checked))}
+              required={field.required}
+              disabled={disabled || readOnly}
+            />
+            {/* The switch reports its own state, so Yes/No is for the eye. A
+                locked value shows as stored instead, which the switch cannot
+                report. */}
+            <span className="text-foreground text-sm font-medium" aria-hidden={!readOnly}>
+              {readOnly ? value : value === "true" ? "Yes" : "No"}
+            </span>
+          </div>
+        ) : (
+          <Input
+            id={id}
+            name={field.key}
+            type={number ? "text" : field.inputType}
+            required={field.required}
+            placeholder={field.placeholder}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            onInput={(event) => onBadInput(event.currentTarget.validity.badInput)}
+            aria-invalid={invalid || missing || undefined}
+            // `aria-invalid` says the field is wrong; this says why.
+            aria-describedby={missing ? errorId : undefined}
+            readOnly={readOnly}
+            disabled={disabled}
+          />
+        )}
+        {missing && <FieldError id={errorId}>This field is required.</FieldError>}
       </FieldContent>
     </Field>
   );
