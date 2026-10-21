@@ -111,9 +111,14 @@ export const docsLlms = sourceLlms(source);
 
 // /docs/llms.txt, which lists each page by its Markdown URL (lib/shared.ts),
 // so an agent fetches the Markdown without asking for it through `Accept`.
+// The OpenAPI document is not a page, so its link is the summary above the
+// list rather than an entry in it.
 export const docsLlmsIndex = sourceLlms({
   ...source,
-  getPageTree: (locale) => withMarkdownUrls(source.getPageTree(locale)),
+  getPageTree: (locale) => ({
+    ...withMarkdownUrls(source.getPageTree(locale)),
+    description: "The server's API as one OpenAPI document: [openapi.json](/docs/openapi.json).",
+  }),
 });
 
 function withMarkdownUrls<T extends PageTree.Root | PageTree.Node>(node: T): T {
