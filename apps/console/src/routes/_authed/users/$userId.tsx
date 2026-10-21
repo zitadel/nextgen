@@ -135,6 +135,7 @@ function UserDetail() {
   const name = userIdentity(user) ?? userId;
   const secondary = userIdentitySecondary(user);
   const metadata = userMetadata(user);
+  const [tab, setTab] = useState("overview");
 
   return (
     <DetailPage>
@@ -158,13 +159,20 @@ function UserDetail() {
         }
       />
 
-      <Tabs defaultValue="overview" className={`${DETAIL_BODY} gap-6`}>
+      <Tabs value={tab} onValueChange={setTab} className={`${DETAIL_BODY} gap-6`}>
         <TabsList aria-label="User detail sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="authentication">Authentication</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="flex flex-col gap-6">
+        {/* Kept mounted, and hidden while another tab is open, so the profile
+            draft survives a look at Authentication. */}
+        <TabsContent
+          value="overview"
+          forceMount
+          hidden={tab !== "overview"}
+          className="flex flex-col gap-6"
+        >
           <ProfileCard
             userId={userId}
             schema={schema}

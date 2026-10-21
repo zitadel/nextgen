@@ -555,6 +555,21 @@ describe("user detail", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
+  it("keeps the draft while another tab is open", async () => {
+    stub();
+    await renderDetail();
+
+    await userEvent.type(await screen.findByLabelText("Company name"), " Inc");
+    await userEvent.click(screen.getByRole("tab", { name: "Authentication" }));
+    // Hidden, not unmounted, and out of the accessibility tree.
+    expect(screen.getByLabelText("Company name")).not.toBeVisible();
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    await userEvent.click(screen.getByRole("tab", { name: "Overview" }));
+
+    expect(screen.getByLabelText("Company name")).toHaveValue("Acme Inc");
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
   it("shows the status and created date the server stamped", async () => {
     stub();
     await renderDetail();
