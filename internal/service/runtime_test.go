@@ -137,6 +137,40 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		assert.Equal(t, "dep_1", got.Deployment.ID)
 		assert.Equal(t, "rel_1", got.Release.ID)
 		assert.Equal(t, "origin", got.Source)
+		assert.Equal(t, origin, got.Origin)
+		assert.Equal(t, origin, got.Target)
+	})
+
+	t.Run("preview wildcard keeps request Origin and matched pattern Target", func(t *testing.T) {
+		resolver, statements, releases := newMockedRuntimeResolver(t)
+		previewURL := "https://branch-acme.vercel.app"
+		pattern := "https://*-acme.vercel.app"
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+			Origins: []domain.Origin{
+				{Pattern: pattern, Kind: domain.OriginKindPreview},
+			},
+		}, nil)
+		statements.EXPECT().GetPreview(gomock.Any(), projectID, previewURL).Return(&domain.Preview{
+			ProjectID: projectID, Origin: previewURL, ExpiresAt: time.Now().Add(time.Hour),
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{previewURL}).Return([]domain.OriginDeployment{{
+			Origin: previewURL, DeploymentID: "dep_1", ReleaseID: "rel_1", DeployedAt: time.Now(),
+		}}, nil)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), projectID, "dep_1").Return(&domain.Deployment{
+			ID: "dep_1", ProjectID: projectID, ReleaseID: "rel_1",
+		}, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, "rel_1").Return(&domain.Release{
+			ID: "rel_1", ProjectID: projectID, ContentHash: "sha256:abc",
+		}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, previewURL)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, previewURL, got.Origin)
+		assert.Equal(t, pattern, got.Target)
+		assert.Equal(t, "origin", got.Source)
+		assert.Equal(t, "dep_1", got.Deployment.ID)
 	})
 
 	t.Run("revoked release refused", func(t *testing.T) {

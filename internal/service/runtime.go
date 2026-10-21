@@ -14,9 +14,12 @@ import (
 // the origin it arrived on.
 type RuntimeResolution struct {
 	Project *domain.Project
-	// Origin is the browser origin the gate admitted, "" when the request
-	// carried none.
+	// Origin is the normalized request Origin the gate admitted, "" when the
+	// request carried none.
 	Origin string
+	// Target is the project origin pattern that admitted Origin, "" when
+	// admission was open (empty allowlist or loopback) rather than a stored
+	// pattern.
 	Target string
 	// Source is "origin" when a deployment to the exact origin answered, or
 	// empty when resolution refused before a target was found.
@@ -104,6 +107,7 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 	}
 
 	resolution.Origin = matched.origin
+	resolution.Target = matched.pattern
 	dep, err := r.newestDeployment(ctx, projectID, matched.origin)
 	if err != nil {
 		return nil, err
@@ -121,7 +125,6 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 			WithMessage("nothing is deployed to " + matched.origin)
 	}
 
-	resolution.Target = matched.origin
 	resolution.Source = "origin"
 	resolution.Deployment = dep
 
@@ -156,11 +159,13 @@ func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origi
 	return dep, nil
 }
 
-// matchedOrigin is an origin the gate admitted: the exact string, whether it
-// was admitted by a preview row rather than a primary pattern, and whether
-// admission was open (empty allowlist or loopback) rather than a stored pattern.
+// matchedOrigin is an origin the gate admitted: the normalized request
+// origin, the project origin pattern that matched it (empty when open),
+// whether it was admitted by a preview row rather than a primary pattern,
+// and whether admission was open (empty allowlist or loopback).
 type matchedOrigin struct {
 	origin  string
+	pattern string
 	preview bool
 	open    bool
 }
@@ -188,7 +193,7 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 			WithMessage(normalized + " is not an origin of this project")
 	}
 	if entry.Kind == domain.OriginKindPrimary {
-		return &matchedOrigin{origin: normalized}, nil
+		return &matchedOrigin{origin: normalized, pattern: entry.Pattern}, nil
 	}
 	row, err := r.v2Pool.Statements().GetPreview(ctx, project.ID, normalized)
 	if err != nil {
@@ -202,7 +207,7 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 		return nil, domain.ErrProjectPreviewNotLive(map[string]string{"origin": normalized}).
 			WithMessage("no live preview for " + normalized + "; run zitadel preview on this branch")
 	}
-	return &matchedOrigin{origin: normalized, preview: true}, nil
+	return &matchedOrigin{origin: normalized, pattern: entry.Pattern, preview: true}, nil
 }
 
 type runtimeResolutionKey struct{}
