@@ -3,10 +3,7 @@
 package integration_test
 
 import (
-	"encoding/json"
 	"net/http"
-	"net/url"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,26 +68,19 @@ func (f deploymentFixture) deploy(t *testing.T, releaseID api.ReleaseID) api.Cre
 	return resp
 }
 
-// postDeployment posts body to /deployments and returns the status and error code,
-// so an error is checked without decoding it into the declared response shape.
-func (f releaseFixture) postDeployment(t *testing.T, body string) (int, string) {
+// refused asserts the create answered with the response type of its status
+// and the error code.
+func refused(t *testing.T, resp api.CreateDeploymentRes, wantType api.CreateDeploymentRes, wantCode string) {
 	t.Helper()
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.EnsureTestServer(t).URL+"/deployments?project_id="+url.QueryEscape(f.project),
-		strings.NewReader(body),
-	)
-	require.NoError(t, err)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+f.client.Token())
+	require.IsType(t, wantType, resp, helpers.MustMarshal(t, resp))
+	assertAuthzError(t, resp, wantCode)
+}
 
-	resp, err := harness.EnsureHttpClient(t).Do(req)
+func (f releaseFixture) createDeployment(t *testing.T, req *api.CreateDeploymentRequest) api.CreateDeploymentRes {
+	t.Helper()
+	resp, err := f.client.CreateDeployment(t.Context(), req, api.CreateDeploymentParams{ProjectID: api.ProjectID(f.project)})
 	require.NoError(t, err)
-	defer resp.Body.Close()
-	var parsed struct {
-		Code string `json:"code"`
-	}
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&parsed))
-	return resp.StatusCode, parsed.Code
+	return resp
 }
 
 func origins(targets []api.DeploymentTarget) []string {
@@ -161,11 +151,6 @@ func TestCreateDeployment(t *testing.T) {
 	})
 
 	t.Run("a stale guard conflicts with the deployment it replaces", func(t *testing.T) {
-		status, code := fixture.postDeployment(t, `{"release_id":"`+string(fixture.otherRelease(t))+
-			`","targets":["primary"],"expected_deployment_id":"`+string(first.ID)+`"}`)
-		assert.Equal(t, http.StatusConflict, status)
-		assert.Equal(t, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code, code)
-
 		resp, err := fixture.client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
 			ReleaseID:            api.NewOptReleaseID(releaseID),
 			Targets:              api.DeploymentTargetsRequest{"primary"},
@@ -181,48 +166,74 @@ func TestCreateDeployment(t *testing.T) {
 	})
 
 	for name, tc := range map[string]struct {
-		body       string
-		wantStatus int
-		wantCode   string
+		req      *api.CreateDeploymentRequest
+		wantType api.CreateDeploymentRes
+		wantCode string
 	}{
 		"both release_id and content_hash": {
-			body:       `{"release_id":"` + string(releaseID) + `","content_hash":"` + string(fixture.release.ContentHash) + `","targets":["primary"]}`,
-			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid().Code,
+			req: &api.CreateDeploymentRequest{
+				ReleaseID:   api.NewOptReleaseID(releaseID),
+				ContentHash: api.NewOptReleaseContentHash(fixture.release.ContentHash),
+				Targets:     api.DeploymentTargetsRequest{"primary"},
+			},
+			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
 		"a ttl for primary origins": {
-			body:       `{"release_id":"` + string(releaseID) + `","targets":["primary"],"ttl":"1h"}`,
-			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid().Code,
+			req: &api.CreateDeploymentRequest{
+				ReleaseID: api.NewOptReleaseID(releaseID),
+				Targets:   api.DeploymentTargetsRequest{"primary"},
+				TTL:       api.NewOptPreviewTTL("1h"),
+			},
+			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
 		"a ttl for an exact primary origin": {
-			body:       `{"release_id":"` + string(releaseID) + `","targets":["` + appOrigin + `"],"ttl":"1h"}`,
-			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid().Code,
+			req: &api.CreateDeploymentRequest{
+				ReleaseID: api.NewOptReleaseID(releaseID),
+				Targets:   api.DeploymentTargetsRequest{appOrigin},
+				TTL:       api.NewOptPreviewTTL("1h"),
+			},
+			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
 		"a ttl for mixed targets": {
-			body:       `{"release_id":"` + string(releaseID) + `","targets":["primary","` + previewOrigin + `"],"ttl":"1h"}`,
-			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid().Code,
+			req: &api.CreateDeploymentRequest{
+				ReleaseID: api.NewOptReleaseID(releaseID),
+				Targets:   api.DeploymentTargetsRequest{"primary", previewOrigin},
+				TTL:       api.NewOptPreviewTTL("1h"),
+			},
+			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
 		"primary and a preview URL mixed": {
-			body:       `{"release_id":"` + string(releaseID) + `","targets":["primary","` + previewOrigin + `"]}`,
-			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid().Code,
+			req: &api.CreateDeploymentRequest{
+				ReleaseID: api.NewOptReleaseID(releaseID),
+				Targets:   api.DeploymentTargetsRequest{"primary", previewOrigin},
+			},
+			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
 		"an exact primary origin": {
-			body:       `{"release_id":"` + string(releaseID) + `","targets":["` + appOrigin + `"]}`,
-			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid().Code,
+			req: &api.CreateDeploymentRequest{
+				ReleaseID: api.NewOptReleaseID(releaseID),
+				Targets:   api.DeploymentTargetsRequest{appOrigin},
+			},
+			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
 		// Deploying to preview URLs lands on top of this.
 		"a preview URL": {
-			body:       `{"release_id":"` + string(releaseID) + `","targets":["` + previewOrigin + `"]}`,
-			wantStatus: http.StatusNotImplemented, wantCode: domain.ErrNotImplemented().Code,
+			req: &api.CreateDeploymentRequest{
+				ReleaseID: api.NewOptReleaseID(releaseID),
+				Targets:   api.DeploymentTargetsRequest{previewOrigin},
+			},
+			wantType: &api.CreateDeploymentErrorResponseStatusCode{}, wantCode: domain.ErrNotImplemented().Code,
 		},
 		"an unknown release": {
-			body:       `{"release_id":"rel_01KX5N7C9D2E7F0N9WD3P2E4YM6","targets":["primary"]}`,
-			wantStatus: http.StatusNotFound, wantCode: domain.ErrReleaseNotFound().Code,
+			req: &api.CreateDeploymentRequest{
+				ReleaseID: api.NewOptReleaseID("rel_01KX5N7C9D2E7F0N9WD3P2E4YM6"),
+				Targets:   api.DeploymentTargetsRequest{"primary"},
+			},
+			wantType: &api.CreateDeploymentNotFound{}, wantCode: domain.ErrReleaseNotFound().Code,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			status, code := fixture.postDeployment(t, tc.body)
-			assert.Equal(t, tc.wantStatus, status)
-			assert.Equal(t, tc.wantCode, code)
+			refused(t, fixture.createDeployment(t, tc.req), tc.wantType, tc.wantCode)
 		})
 	}
 
@@ -230,9 +241,11 @@ func TestCreateDeployment(t *testing.T) {
 		bare := newReleaseFixture(t)
 		created := bare.create(t, &api.CreateReleaseRequest{Pointers: bare.pointers()})
 		require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
-		status, code := bare.postDeployment(t, `{"release_id":"`+string(created.(*api.CreateReleaseCreated).ID)+`","targets":["primary"]}`)
-		assert.Equal(t, http.StatusBadRequest, status)
-		assert.Equal(t, domain.ErrDeploymentInvalid().Code, code)
+		resp := bare.createDeployment(t, &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(created.(*api.CreateReleaseCreated).ID),
+			Targets:   api.DeploymentTargetsRequest{"primary"},
+		})
+		refused(t, resp, &api.CreateDeploymentBadRequest{}, domain.ErrDeploymentInvalid().Code)
 	})
 }
 
