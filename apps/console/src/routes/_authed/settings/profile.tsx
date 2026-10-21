@@ -2,19 +2,24 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Settings } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
-import { DETAIL_TITLE } from "@/components/detail-page";
+import { DETAIL_CARD, DETAIL_TITLE } from "@/components/detail-page";
 import { FormError } from "@/components/form-error";
 import { Page, SettingsColumn } from "@/components/layout";
 import { SettingsCard } from "@/components/settings-card";
+import { IdentityLinks, Passkeys } from "@/components/sign-in-methods";
 import { RESOURCE_TABLE_TOP } from "@/components/resource-list";
 import { EYEBROW, PAGE_TITLE_ROW } from "@/components/typography";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 import { api } from "@/api/zitadel";
 import { consoleSessionProject, invalidateSessionCache } from "@/auth/session";
 import { useSubmit } from "@/hooks/use-submit";
+import { fetchAllIdps, fetchMyIdentityLinks } from "@/lib/idp";
+import { fetchMyPasskeys } from "@/lib/passkeys";
 import { displayValue, field } from "@/lib/record";
 import { type SchemaField, attributeValue, schemaFields } from "@/lib/schema";
 import { readOwnUserSchema } from "@/lib/user-schema";
@@ -25,18 +30,32 @@ import { userAttributes } from "@/lib/user";
  * is (`schemaFields`): a row per property, nothing named in code. The schema's
  * `x-identifier` is read-only (D16); the rest saves through `PATCH /users/me`.
  * Without a readable schema, the record's own identifier shows alone.
+ *
+ * Under it, the person's sign-in methods, read with the session alone
+ * (`/users/me/passkeys`, `/users/me/identity_links`). Read-only: adding or
+ * removing one has no self-service endpoint yet, and whether a password is
+ * set is not readable, so password is not listed.
  */
 export const Route = createFileRoute("/_authed/settings/profile")({
   staticData: {
     nav: { label: "Settings", order: 1, icon: Settings, view: "settings" },
   },
   loader: async () => {
-    // A failed schema read leaves the identifier alone (below), never a boundary.
-    const [user, schema] = await Promise.all([
+    // A failed schema read leaves the identifier alone (below), and a failed
+    // sign-in method read costs its list, never the screen.
+    const [user, schema, passkeys, identityLinks] = await Promise.all([
       api.getMyUser(consoleSessionProject()),
       readOwnUserSchema().catch(() => undefined),
+      fetchMyPasskeys().catch(() => undefined),
+      fetchMyIdentityLinks().catch(() => undefined),
     ]);
-    return { user, schema };
+    // A link names its connection by id; the connections give it a name. They
+    // need `idp.read` in the person's own project, which a platform user does
+    // not hold, so the id stands in when they cannot be read.
+    const projectId = consoleSessionProject()?.project_id;
+    const idps =
+      projectId && identityLinks?.length ? await fetchAllIdps(projectId).catch(() => null) : null;
+    return { user, schema, passkeys, identityLinks, idps };
   },
   component: ProfileScreen,
 });
@@ -46,6 +65,11 @@ export const Route = createFileRoute("/_authed/settings/profile")({
 // variant that out-specifies a plain utility, hence the important suffix.
 const LABEL_HALF = "@md/field-group:min-w-px @md/field-group:flex-[1_0_0]!";
 const ROW = "@md/field-group:items-center!";
+// A section under the profile card sits as far below it as the first sits
+// below the title.
+const SECTION_TOP = "mt-8";
+// A sign-in method's heading inside the card, on the rows' 24px inset.
+const METHOD_HEAD = "px-6 pt-5 text-sm font-medium text-foreground";
 
 /**
  * The identifier row when the schema could not be read: built from the user
@@ -59,7 +83,7 @@ function identifierFallback(user: Record<string, unknown>): SchemaField[] {
 }
 
 function ProfileScreen() {
-  const { user, schema } = Route.useLoaderData();
+  const { user, schema, passkeys, identityLinks, idps } = Route.useLoaderData();
   const router = useRouter();
   const attributes = userAttributes(user as Record<string, unknown>);
   // The read-only row is whatever the schema designates as the identifier, or,
@@ -166,6 +190,26 @@ function ProfileScreen() {
             </div>
           )}
         </SettingsCard>
+
+        <div className={SECTION_TOP}>
+          <h2 className={EYEBROW}>Sign-in methods</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The passkeys you registered, and the identity provider accounts linked to you when you
+            signed in with them.
+          </p>
+        </div>
+        <Card className={`${DETAIL_CARD} mt-4`}>
+          <h3 className={METHOD_HEAD}>Passkeys</h3>
+          <Passkeys passkeys={passkeys} empty="You have not added a passkey." />
+          <Separator />
+          <h3 className={METHOD_HEAD}>Linked accounts</h3>
+          <IdentityLinks
+            links={identityLinks}
+            idps={idps}
+            empty="No identity provider account is linked to you."
+            linkIdps={false}
+          />
+        </Card>
       </SettingsColumn>
     </Page>
   );

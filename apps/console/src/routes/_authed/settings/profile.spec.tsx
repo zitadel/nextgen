@@ -16,6 +16,8 @@ vi.mock("@/auth/session", async (importOriginal) => {
 
 const ME_URL = "http://localhost/api/users/me";
 const SCHEMA_URL = "*/api/users/me/schema";
+const PASSKEYS_URL = "*/api/users/me/passkeys";
+const LINKS_URL = "*/api/users/me/identity_links";
 
 /** The shipped default: email only, nothing designated for display. */
 const DEFAULT_SCHEMA = {
@@ -225,5 +227,49 @@ describe("settings profile, generated from the schema", () => {
     await userEvent.type(screen.getByLabelText("Name"), "Maya");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(patched).toEqual({ attributes: { name: "Maya" } }));
+  });
+
+  it("lists the person's own passkeys and linked accounts", async () => {
+    server.use(
+      http.get(ME_URL, () => HttpResponse.json(me())),
+      http.get(PASSKEYS_URL, () =>
+        HttpResponse.json({
+          passkeys: [{ id: "pk_1", name: "MacBook", created_at: "2026-09-01T10:00:00Z" }],
+        }),
+      ),
+      http.get(LINKS_URL, () =>
+        HttpResponse.json({
+          identity_links: [
+            { id: "link_1", connection_id: "idp_google", created_at: "2026-09-02T10:00:00Z" },
+          ],
+        }),
+      ),
+    );
+    await renderAt("/settings/profile");
+
+    expect(await screen.findByText("MacBook")).toBeInTheDocument();
+    // The connections are not readable here, so the id names the provider.
+    expect(screen.getByText("idp_google")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "idp_google" })).not.toBeInTheDocument();
+  });
+
+  it("says so when the person has no sign-in methods beyond their identifier", async () => {
+    server.use(http.get(ME_URL, () => HttpResponse.json(me())));
+    await renderAt("/settings/profile");
+
+    expect(await screen.findByText("You have not added a passkey.")).toBeInTheDocument();
+    expect(screen.getByText("No identity provider account is linked to you.")).toBeInTheDocument();
+  });
+
+  it("keeps the profile when a sign-in method read fails", async () => {
+    server.use(
+      http.get(ME_URL, () => HttpResponse.json(me())),
+      http.get(PASSKEYS_URL, () => HttpResponse.json({ code: "internal" }, { status: 500 })),
+    );
+    await renderAt("/settings/profile");
+
+    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByText("Could not be loaded")).toBeInTheDocument();
+    expect(screen.getByText("No identity provider account is linked to you.")).toBeInTheDocument();
   });
 });

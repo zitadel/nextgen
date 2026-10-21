@@ -1,4 +1,4 @@
-import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Key, type LucideIcon, Shield, User, UserRoundCog } from "lucide-react";
 import { useId } from "react";
 
@@ -6,6 +6,7 @@ import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DETAIL_CARD, DetailHeader, ICON_PLATE } from "@/components/detail-page";
+import { IdentityLinks, METHOD_NOTE, METHOD_ROW } from "@/components/sign-in-methods";
 import { StatusBadge } from "@/components/status-badge";
 import { EYEBROW } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
@@ -16,12 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate } from "@/lib/date";
-import {
-  type IdpConnection,
-  type UserIdentityLink,
-  fetchAllIdps,
-  fetchUserIdentityLinks,
-} from "@/lib/idp";
+import { fetchAllIdps, fetchUserIdentityLinks } from "@/lib/idp";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { displayValue, field } from "@/lib/record";
 import { type UserSchema, schemaDisplayName, schemaFields } from "@/lib/schema";
@@ -91,9 +87,6 @@ export const Route = createFileRoute("/_authed/users/$userId")({
 const CARD_HEAD = "flex items-center gap-3 px-6 pt-5 pb-4";
 // 18px between fields on both axes.
 const GRID = "grid gap-4.5 px-6 pt-4 pb-5 sm:grid-cols-2";
-const ROW = "flex items-center justify-between gap-4 px-6 pt-4 pb-5";
-// A row's secondary text: counts, dates, and the states that stand in for them.
-const ROW_NOTE = "text-muted-foreground text-[13px] leading-[22px]";
 // The divider sits inside the body padding rather than spanning the card, and
 // `w-full` is applied by an orientation variant that out-specifies a plain
 // utility — so the override has to carry the same variant.
@@ -194,13 +187,13 @@ function UserDetail() {
             {/* Only Passkey is listed. The design's Password row shows a "last
                 changed" date the API does not expose, and its `Set` pill would
                 be a claim the console cannot check. */}
-            <div className={ROW}>
+            <div className={METHOD_ROW}>
               <span className="text-foreground text-sm font-medium">Passkey</span>
               {passkeys === undefined ? (
-                <span className={ROW_NOTE}>Could not be loaded</span>
+                <span className={METHOD_NOTE}>Could not be loaded</span>
               ) : (
                 <div className="flex items-center gap-3">
-                  <span className={ROW_NOTE}>{passkeys.length} registered</span>
+                  <span className={METHOD_NOTE}>{passkeys.length} registered</span>
                   {/* The design's only badge here is `Enabled`.
                       With nothing registered the count already says so, and a
                       second capsule reading `None` restates it. */}
@@ -213,62 +206,15 @@ function UserDetail() {
           <Card className={DETAIL_CARD}>
             <CardHead icon={Shield} eyebrow="Identity providers" title="Linked accounts" />
             <Separator className={PANEL_RULE} />
-            <IdentityLinks links={identityLinks} idps={idps} />
+            <IdentityLinks
+              links={identityLinks}
+              idps={idps}
+              empty="No identity provider is linked to this user."
+            />
           </Card>
         </TabsContent>
       </Tabs>
     </Page>
-  );
-}
-
-/**
- * The provider accounts linked to the user, one row each. A link is written
- * when a sign-in through the connection resolves to this user, so these are
- * the providers the user actually signs in with — not the ones the schema
- * merely allows.
- */
-function IdentityLinks({
-  links,
-  idps,
-}: {
-  links: UserIdentityLink[] | undefined;
-  idps: IdpConnection[] | null;
-}) {
-  if (!links?.length) {
-    return (
-      <p className={`${ROW_NOTE} px-6 pt-4 pb-5`}>
-        {links ? "No identity provider is linked to this user." : "Could not be loaded"}
-      </p>
-    );
-  }
-
-  const byId = new Map((idps ?? []).map((idp) => [idp.id, idp]));
-  return (
-    <ul className="flex flex-col">
-      {links.map((link) => {
-        const idp = byId.get(link.connection_id);
-        return (
-          <li key={link.id} className={ROW}>
-            {idp ? (
-              <Link
-                to="/authentication/idps/$idpId"
-                params={{ idpId: idp.id }}
-                className="text-foreground text-sm font-medium hover:underline"
-              >
-                {idp.definition.display_name}
-              </Link>
-            ) : (
-              // The connection list may be refused (`idp.read`); the id is
-              // still the honest name for it.
-              <span className="text-foreground truncate font-mono text-sm">
-                {link.connection_id}
-              </span>
-            )}
-            <span className={`${ROW_NOTE} shrink-0`}>Linked {formatDate(link.created_at)}</span>
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 

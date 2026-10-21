@@ -38,8 +38,8 @@ const shellHandlers = [
   http.get("*/api/users/me/projects", () =>
     HttpResponse.json({ projects: [{ id: TEST_PROJECT_ID, name: "Test project" }] }),
   ),
-  // The signed-in person's own schema (Profile, and the footer's "Add your
-  // name"): the shipped default, email only, nothing designated for display.
+  // The signed-in person's own schema (account settings' profile): the shipped
+  // default, email only, nothing designated for display.
   http.get("*/api/users/me/schema", () =>
     HttpResponse.json({
       id: "https://example.test/default-human-user.json",
@@ -50,6 +50,9 @@ const shellHandlers = [
       },
     }),
   ),
+  // The person's own sign-in methods, on account settings' profile: none.
+  http.get("*/api/users/me/passkeys", () => HttpResponse.json({ passkeys: [] })),
+  http.get("*/api/users/me/identity_links", () => HttpResponse.json({ identity_links: [] })),
   // The person's own roster, which names the account in the sidebar footer.
   http.get("*/api/users/me/teams", () =>
     HttpResponse.json({

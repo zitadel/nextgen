@@ -6,6 +6,7 @@ import type {
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { api } from "@/api/zitadel";
+import { consoleSessionProject } from "@/auth/session";
 import type { FlowDefinitionEntry } from "./flow-definition";
 import { readAllPages } from "./paging";
 import {
@@ -64,6 +65,22 @@ export type UserIdentityLink = ListUserIdentityLinks200IdentityLinksItem;
 export function fetchUserIdentityLinks(userId: string): Promise<UserIdentityLink[]> {
   return readAllPages(async (pageToken) => {
     const page = await api.listUserIdentityLinks(userId, { limit: 100, page_token: pageToken });
+    return { items: page.identity_links, next: page.next_page_token };
+  });
+}
+
+/**
+ * The signed-in person's own linked provider accounts, oldest first, read with
+ * the session alone (`GET /users/me/identity_links`): no grant needed, so it
+ * answers for a platform user who holds none.
+ */
+export function fetchMyIdentityLinks(): Promise<UserIdentityLink[]> {
+  return readAllPages(async (pageToken) => {
+    const page = await api.listMyIdentityLinks({
+      limit: 100,
+      page_token: pageToken,
+      ...consoleSessionProject(),
+    });
     return { items: page.identity_links, next: page.next_page_token };
   });
 }

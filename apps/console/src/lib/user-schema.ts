@@ -1,4 +1,5 @@
 import { api } from "@/api/zitadel";
+import { consoleSessionProject } from "@/auth/session";
 import type { UserSchema } from "./schema";
 import { sessionCached } from "./session-cache";
 
@@ -9,6 +10,6 @@ import { sessionCached } from "./session-cache";
  * platform user who holds none.
  */
 export const readOwnUserSchema = sessionCached(
-  async () => (await api.getMyUserSchema()).schema as UserSchema,
+  async () => (await api.getMyUserSchema(consoleSessionProject())).schema as UserSchema,
   5 * 60_000,
 );

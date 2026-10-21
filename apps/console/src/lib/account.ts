@@ -1,4 +1,5 @@
 import { api } from "@/api/zitadel";
+import { consoleSessionProject } from "@/auth/session";
 import { sessionCached } from "./session-cache";
 
 /**
@@ -12,6 +13,6 @@ export interface AccountTeam {
 }
 
 export const readAccountTeam = sessionCached(async (): Promise<AccountTeam | null> => {
-  const team = (await api.listMyTeams({ limit: 1 })).teams[0];
+  const team = (await api.listMyTeams({ limit: 1, ...consoleSessionProject() })).teams[0];
   return team ? { id: team.id, name: team.name } : null;
 }, 5 * 60_000);

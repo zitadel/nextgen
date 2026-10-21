@@ -3,6 +3,7 @@ import { Box, ChevronRight, LayoutGrid } from "lucide-react";
 import { useMemo } from "react";
 
 import { api } from "@/api/zitadel";
+import { consoleSessionProject } from "@/auth/session";
 import { DETAIL_TITLE } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import {
@@ -41,7 +42,7 @@ import { formatDate } from "@/lib/date";
 export const Route = createFileRoute("/_authed/settings/")({
   staticData: { nav: { label: "Overview", order: 0, icon: LayoutGrid, view: "settings" } },
   loader: async () => {
-    const page = await api.listMyTeams({ limit: PAGE_SIZE });
+    const page = await api.listMyTeams({ limit: PAGE_SIZE, ...consoleSessionProject() });
     return { teams: page.teams, nextPageToken: page.next_page_token ?? undefined };
   },
   component: OverviewScreen,
@@ -56,7 +57,11 @@ function OverviewScreen() {
   const paging = useLoadMore(
     loaded,
     async (pageToken) => {
-      const page = await api.listMyTeams({ limit: PAGE_SIZE, page_token: pageToken });
+      const page = await api.listMyTeams({
+        limit: PAGE_SIZE,
+        page_token: pageToken,
+        ...consoleSessionProject(),
+      });
       return { items: page.teams, nextPageToken: page.next_page_token ?? undefined };
     },
     "Could not load more teams.",
