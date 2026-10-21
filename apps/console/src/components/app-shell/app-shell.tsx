@@ -83,7 +83,7 @@ function readSidebarOpen(): boolean {
  * centres — there is no room for both, and the toggle brings the logo back.
  */
 const BRAND_HEADER =
-  "h-14 shrink-0 flex-row items-center justify-between py-0 pr-3 pl-6 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0";
+  "h-14 shrink-0 flex-row items-center justify-between py-0 pr-3 pl-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0";
 
 /** The design's `Sidebar / Header Button`: 28px square around a 16px glyph. */
 const HEADER_BUTTON = "size-7! text-sidebar-foreground";
@@ -142,7 +142,7 @@ function BrandHeader() {
         aria-label="Home"
         className="inline-flex items-center text-sidebar-foreground group-data-[collapsible=icon]:hidden"
       >
-        <ZitadelLogo aria-hidden className="h-[21px] w-[89px]" />
+        <ZitadelLogo className="h-[21px] w-auto" />
       </Link>
       <SidebarTrigger className={HEADER_BUTTON} />
     </SidebarHeader>

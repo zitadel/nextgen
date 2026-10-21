@@ -230,3 +230,40 @@ select:-webkit-autofill {
     transition: none;
   }
 }
+
+/* The sidebar's logo (`ZitadelLogo`, components/app-shell/icons.tsx), as the
+   website's nav plays it: the Lottie's 150 frames at 30 a second, without its
+   still tail. The mark turns once in 60 frames and each letter rolls down in
+   30 (its start set in the component), once a hover or a quiet spell sets
+   data-playing, to the end even when the pointer leaves. */
+.logo-icon {
+  transform-box: view-box;
+  transform-origin: 63px 63px;
+}
+
+@keyframes logo-spin {
+  from {
+    rotate: -360deg;
+    animation-timing-function: cubic-bezier(0.108, 0, 0, 1);
+  }
+}
+
+@keyframes logo-roll {
+  from {
+    animation-timing-function: cubic-bezier(0.199, 0, 0.121, 1);
+  }
+
+  to {
+    translate: 0 100px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .logo[data-playing] .logo-icon {
+    animation: logo-spin 2s;
+  }
+
+  .logo[data-playing] .logo-letter {
+    animation: logo-roll 1s both;
+  }
+}
