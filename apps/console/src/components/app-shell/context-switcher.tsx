@@ -62,18 +62,23 @@ export function ContextSwitcher() {
   const selected = useProjectScope();
   const current = useSelectedOption(selected, projects);
   const teamId = useParams({ strict: false, select: (params) => params.teamId });
+  // The Projects list is where a project is chosen, and it marks the selected
+  // one, so the pill would only repeat it: no switcher there.
+  const onProjects = useMatch({ from: "/_authed/projects/", shouldThrow: false });
 
   return (
     <nav aria-label="Context" className="flex min-w-0 items-center gap-2">
-      <Switcher
-        icon={Boxes}
-        heading="Projects"
-        label={current?.label}
-        currentId={current?.id}
-        options={projects}
-        emptyLabel={projects?.length === 0 ? NO_PROJECTS : NO_SELECTION}
-        ariaLabel="Switch project"
-      />
+      {!onProjects && (
+        <Switcher
+          icon={Boxes}
+          heading="Projects"
+          label={current?.label}
+          currentId={current?.id}
+          options={projects}
+          emptyLabel={projects?.length === 0 ? NO_PROJECTS : NO_SELECTION}
+          ariaLabel="Switch project"
+        />
+      )}
       {/* The team switcher joins the bar once a team is open — the team is the
           context then, and following another team from the list switches it.
           Teams are not a standing selection the way projects are: no screen

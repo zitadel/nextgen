@@ -123,7 +123,7 @@ describe("landing routes", () => {
 
   it("asks for the person's projects once for the guard and the switcher", async () => {
     // The Projects screen pages the list itself (`limit`); the guard and the
-    // switcher share one unpaged read.
+    // switcher share one unpaged read. System is a screen with both.
     let unpaged = 0;
     server.use(
       http.get("http://localhost/api/users/me/projects", ({ request }) => {
@@ -133,9 +133,9 @@ describe("landing routes", () => {
         });
       }),
     );
-    const router = await renderAt("/");
+    server.use(http.get("*/api/healthz", () => HttpResponse.json({ status: "ok" })));
+    await renderAt("/system");
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     const pill = await screen.findByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
     expect(unpaged).toBe(1);
