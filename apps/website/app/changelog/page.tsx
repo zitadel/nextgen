@@ -97,7 +97,7 @@ export default async function ChangelogPage() {
           <p className="mt-4 text-base text-text-secondary leading-7 md:text-lg md:leading-8">
             What each release of the preview changes, from its release notes on {github}.
           </p>
-          {releases ? (
+          {releases && releases.length > 0 ? (
             <ChangelogFilter
               components={components}
               kinds={kindsIn(releases)}
@@ -132,7 +132,14 @@ export default async function ChangelogPage() {
             </ChangelogFilter>
           ) : (
             <p className="mt-12 rounded-xl border border-window-border bg-window px-5 py-4 text-sm text-text-secondary leading-6">
-              The release notes did not load. Read them on {github}.
+              {releases ? (
+                <>
+                  The first release, {FIRST_RELEASE}, is not out yet; {github} has the alpha
+                  previews before it.
+                </>
+              ) : (
+                <>The release notes did not load. Read them on {github}.</>
+              )}
             </p>
           )}
         </div>
