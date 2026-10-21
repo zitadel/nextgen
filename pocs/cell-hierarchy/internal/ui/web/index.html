@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>cell hierarchy</title>
+  <link rel="stylesheet" href="/assets/app.css"/>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">cell hierarchy</div>
+    <div class="nav-group">Ops</div>
+    <a href="/" data-nav="cells">Cells</a>
+    <div class="nav-group">Hoster</div>
+    <a href="/platform" data-nav="platform">Platform</a>
+    <div class="nav-group">Customer</div>
+    <a href="/workspaces" data-nav="workspaces">Workspaces</a>
+    <div class="nav-group">Debug</div>
+    <button type="button" id="toggle-requests" class="secondary nav-btn">Requests</button>
+  </aside>
+  <div class="content">
+    <div class="content-main">
+      <div id="flash"></div>
+      <div id="view">Loading…</div>
+    </div>
+    <aside id="requests-panel" class="requests-panel" hidden>
+      <header>
+        <h2>Requests</h2>
+        <div class="req-actions">
+          <button type="button" id="clear-requests" class="secondary">Clear</button>
+          <button type="button" id="close-requests" class="secondary">Hide</button>
+        </div>
+      </header>
+      <p class="muted hint">SPA <code>fetch</code> to <code>/api/v1/*</code> (UI origin only — no browser→cell calls).</p>
+      <ol id="request-log" class="request-log"></ol>
+    </aside>
+  </div>
+</div>
+<script src="/assets/app.js" defer></script>
+</body>
+</html>

@@ -13,17 +13,17 @@ import (
 )
 
 type siteSummary struct {
-	ID              string
-	Name            string
-	WorkspaceID     string
-	CustomerTeamID  string
-	ParentProjectID string
-	HostLabel       string
-	HostDisplay     string
-	HostURL         string
-	UserCount       int
-	LookupEnabled   bool
-	IsPlatform      bool
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	WorkspaceID     string `json:"workspace_id,omitempty"`
+	CustomerTeamID  string `json:"customer_team_id,omitempty"`
+	ParentProjectID string `json:"parent_project_id,omitempty"`
+	HostLabel       string `json:"host_label"`
+	HostDisplay     string `json:"host_display,omitempty"`
+	HostURL         string `json:"host_url,omitempty"`
+	UserCount       int    `json:"user_count"`
+	LookupEnabled   bool   `json:"lookup_enabled"`
+	IsPlatform      bool   `json:"is_platform,omitempty"`
 }
 
 func (a *App) cellDisplayMap(ctx context.Context) map[string]string {

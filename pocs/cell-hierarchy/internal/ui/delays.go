@@ -14,10 +14,10 @@ import (
 )
 
 type delayPairView struct {
-	Key   string
-	Left  string
-	Right string
-	Ms    int
+	Key   string `json:"key"`
+	Left  string `json:"left"`
+	Right string `json:"right"`
+	Ms    int    `json:"ms"`
 }
 
 func (a *App) seedDefaultDelays() {

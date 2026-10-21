@@ -11,49 +11,49 @@ import (
 
 // timelineView is the display model for the Latest hop panel.
 type timelineView struct {
-	At        string
-	AtShort   string
-	Action    string
-	Note      string
-	TotalMs   int64
-	StepCount int
-	Outcome   string
-	Steps     []timelineStep
-	Swimlanes []timelineSwimlane
+	At        string             `json:"at"`
+	AtShort   string             `json:"at_short"`
+	Action    string             `json:"action"`
+	Note      string             `json:"note"`
+	TotalMs   int64              `json:"total_ms"`
+	StepCount int                `json:"step_count"`
+	Outcome   string             `json:"outcome"`
+	Steps     []timelineStep     `json:"steps"`
+	Swimlanes []timelineSwimlane `json:"swimlanes"`
 }
 
 type timelineStep struct {
-	N            int
-	Caller       string
-	CellLabel    string
-	Method       string
-	ProjectID    string
-	Result       string
-	ResultClass  string
-	IsHit        bool
-	WireMs       int64
-	PairDelayMs  int64
-	PairHint     string // "entry" or "us-1↔us-2"
-	StepMs       int64
-	CumulativeMs int64
-	HomeHint     string
-	Parent       *timelineParent
+	N            int             `json:"n"`
+	Caller       string          `json:"caller"`
+	CellLabel    string          `json:"cell_label"`
+	Method       string          `json:"method"`
+	ProjectID    string          `json:"project_id"`
+	Result       string          `json:"result"`
+	ResultClass  string          `json:"result_class"`
+	IsHit        bool            `json:"is_hit"`
+	WireMs       int64           `json:"wire_ms"`
+	PairDelayMs  int64           `json:"pair_delay_ms"`
+	PairHint     string          `json:"pair_hint"` // "entry" or "us-1↔us-2"
+	StepMs       int64           `json:"step_ms"`
+	CumulativeMs int64           `json:"cumulative_ms"`
+	HomeHint     string          `json:"home_hint,omitempty"`
+	Parent       *timelineParent `json:"parent,omitempty"`
 }
 
 type timelineParent struct {
-	Caller    string
-	CellLabel string
-	Method    string
-	Result    string
-	Ms        int64
-	NextHint  string
+	Caller    string `json:"caller"`
+	CellLabel string `json:"cell_label"`
+	Method    string `json:"method"`
+	Result    string `json:"result"`
+	Ms        int64  `json:"ms"`
+	NextHint  string `json:"next_hint"`
 }
 
 type timelineSwimlane struct {
-	Label   string
-	DelayMs int64
-	Result  string
-	IsHit   bool
+	Label   string `json:"label"`
+	DelayMs int64  `json:"delay_ms"`
+	Result  string `json:"result"`
+	IsHit   bool   `json:"is_hit"`
 }
 
 type rawTimelineStep struct {

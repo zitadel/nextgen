@@ -21,8 +21,8 @@ import (
 var templateFS embed.FS
 
 type CellRef struct {
-	Label string
-	URL   string
+	Label string `json:"label"`
+	URL   string `json:"url"`
 }
 
 type App struct {
@@ -97,38 +97,19 @@ func labObserveHint(projectID string) string {
 
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", a.handleHome)
-	mux.HandleFunc("GET /tree", a.handleTree)
-	mux.HandleFunc("POST /cells/delays", a.handleCellsDelays)
 
-	mux.HandleFunc("GET /platform", a.handlePlatform)
-	mux.HandleFunc("POST /platform/teams", a.handlePlatformCreateTeam)
-
-	mux.HandleFunc("GET /workspaces", a.handleWorkspacesList)
-	mux.HandleFunc("POST /workspaces", a.handleWorkspaceCreate)
-	mux.HandleFunc("GET /workspaces/{id}", a.handleWorkspaceHome)
-	mux.HandleFunc("POST /workspaces/{id}/sites", a.handleWorkspaceAddSite)
+	// Client-rendered SPA shell + static assets (primary UX).
+	a.registerSPA(mux)
+	// JSON API consumed by the SPA (all browser traffic stays on UI origin).
+	a.registerAPI(mux)
 
 	mux.HandleFunc("GET /join", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	})
-	mux.HandleFunc("POST /join", a.handleJoinSubmit)
-
 	mux.HandleFunc("GET /create", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/workspaces", http.StatusSeeOther)
 	})
-	mux.HandleFunc("POST /create/site", a.handleCreateSiteLegacy)
-	mux.HandleFunc("POST /create/expand", a.handleExpandSite)
-	mux.HandleFunc("POST /create/project", a.handleCreateProject)
-	mux.HandleFunc("POST /create/team", a.handleCreateTeam)
-	mux.HandleFunc("POST /create/app", a.handleCreateAppForm)
-
-	mux.HandleFunc("GET /cells/{label}", a.handleCellDetail)
-	mux.HandleFunc("GET /projects/{id}", a.handleProjectDetail)
-	mux.HandleFunc("POST /projects/{id}/users", a.handleProjectCreateUser)
-	mux.HandleFunc("POST /projects/{id}/lookup", a.handleProjectLookup)
-	mux.HandleFunc("POST /projects/{id}/users/delete", a.handleProjectDeleteUser)
-	mux.HandleFunc("POST /projects/{id}/sites", a.handleProjectAddSite)
+	mux.HandleFunc("GET /workspaces/{id}", a.handleWorkspaceHome)
 
 	// Lab removed from primary UI — redirect to workspaces.
 	mux.HandleFunc("GET /lab", func(w http.ResponseWriter, r *http.Request) {
@@ -157,9 +138,6 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /lab/delete-joe", a.handleScenarioDeleteJoe)
 	mux.HandleFunc("POST /lab/global-login", a.handleScenarioGlobalLogin)
 
-	mux.HandleFunc("GET /trace", a.handleTracePartial)
-	mux.HandleFunc("GET /trace-view", a.handleTracePage)
-	mux.HandleFunc("GET /trace-page", a.handleTracePage)
 	mux.HandleFunc("POST /trace/clear", a.handleTraceClear)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -169,15 +147,15 @@ func (a *App) Handler() http.Handler {
 }
 
 type snapshotNode struct {
-	Label     string
-	URL       string
-	IsParent  bool
-	ParentURL string
-	Status    string
-	Alive     bool
-	Reachable bool
-	Children  []*snapshotNode
-	Error     string
+	Label     string          `json:"label"`
+	URL       string          `json:"url"`
+	IsParent  bool            `json:"is_parent"`
+	ParentURL string          `json:"parent_url,omitempty"`
+	Status    string          `json:"status"`
+	Alive     bool            `json:"alive"`
+	Reachable bool            `json:"reachable"`
+	Children  []*snapshotNode `json:"children,omitempty"`
+	Error     string          `json:"error,omitempty"`
 }
 
 type projectNode struct {

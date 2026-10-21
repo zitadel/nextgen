@@ -2,9 +2,9 @@ package ui
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"testing"
 
@@ -52,21 +52,23 @@ func TestBuildTreeFromPlatformOnlyHitsPlatform(t *testing.T) {
 	spy := &countingTransport{base: http.DefaultTransport}
 	app.Peer.HTTP = &http.Client{Transport: spy, Timeout: app.Peer.HTTP.Timeout}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/cells", nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("home status=%d body=%s", rec.Code, rec.Body.String())
+		t.Fatalf("cells api status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	body := rec.Body.String()
-	if !strings.Contains(body, `href="/cells/platform"`) {
-		t.Fatal("home tree must link platform cell")
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
 	}
-	if strings.Contains(body, "Project tree") {
-		t.Fatal("Cells page must not render project tree")
+	tree, ok := body["tree"].([]any)
+	if !ok || len(tree) == 0 {
+		t.Fatalf("expected platform tree, got %+v", body["tree"])
 	}
-	if strings.Contains(body, `hx-trigger="every 5s"`) {
-		t.Fatal("Cells page must not auto-poll /tree")
+	root, _ := tree[0].(map[string]any)
+	if root["label"] != "platform" {
+		t.Fatalf("root label=%v want platform", root["label"])
 	}
 
 	hits := spy.hosts()
@@ -77,7 +79,7 @@ func TestBuildTreeFromPlatformOnlyHitsPlatform(t *testing.T) {
 		t.Fatalf("expected requests to platform %s; hits=%v", platHost, hits)
 	}
 	if hits[euHost] != 0 || hits[usHost] != 0 {
-		t.Fatalf("Cells home must only contact platform; hits=%v", hits)
+		t.Fatalf("Cells API must only contact platform; hits=%v", hits)
 	}
 }
 
@@ -90,7 +92,6 @@ func TestBuildTreeFromPlatformUnjoinedFromConfig(t *testing.T) {
 	if len(roots) != 1 || roots[0].Label != "platform" {
 		t.Fatalf("roots=%v", roots)
 	}
-	// No cell joins in this fixture → eu-1 and us-2 are unjoined (config diff).
 	labels := map[string]bool{}
 	for _, n := range unjoined {
 		labels[n.Label] = true

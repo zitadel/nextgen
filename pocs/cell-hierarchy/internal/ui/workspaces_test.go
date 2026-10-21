@@ -2,9 +2,9 @@ package ui
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -65,25 +65,37 @@ func startPlatformEU(t *testing.T) (app *App, platformURL, euURL string, mux htt
 	return app, platformHTTP.URL, euHTTP.URL, app.Handler()
 }
 
+func postJSON(t *testing.T, mux http.Handler, path, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	if strings.Contains(path, "{") {
+		t.Fatal("use concrete path")
+	}
+	// Set path values for Go 1.22+ ServeMux patterns when needed by callers via SetPathValue.
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	return rec
+}
+
 func TestWorkspaceCreateRequiresCellAndTeam(t *testing.T) {
 	app, _, euURL, mux := startPlatformEU(t)
 
-	form := url.Values{
-		"id": {"demo"}, "name": {"Demo"}, "cell": {"eu-1"}, "customer_team_id": {"acme"},
-	}
-	req := httptest.NewRequest(http.MethodPost, "/workspaces", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusSeeOther {
+	rec := postJSON(t, mux, "/api/v1/workspaces",
+		`{"id":"demo","name":"Demo","cell":"eu-1","customer_team_id":"acme"}`)
+	if rec.Code != http.StatusOK {
 		t.Fatalf("create workspace status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	loc := rec.Header().Get("Location")
-	if !strings.HasPrefix(loc, "/projects/demo") {
-		t.Fatalf("expected redirect to /projects/demo, got %s", loc)
+	var out map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
 	}
-	if strings.Contains(loc, "err=") {
-		t.Fatalf("create failed: %s", loc)
+	if errMsg, _ := out["error"].(string); errMsg != "" {
+		t.Fatalf("create failed: %s", errMsg)
+	}
+	redir, _ := out["redirect"].(string)
+	if !strings.HasPrefix(redir, "/projects/demo") {
+		t.Fatalf("expected redirect to /projects/demo, got %v", out["redirect"])
 	}
 
 	ctx := context.Background()
@@ -119,14 +131,14 @@ func TestWorkspaceCreateRequiresCellAndTeam(t *testing.T) {
 	}
 
 	// User on orphan workspace root must not float a lookup row onto platform.
-	userForm := url.Values{"email": {"root@example.com"}}
-	req = httptest.NewRequest(http.MethodPost, "/projects/demo/users", strings.NewReader(userForm.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/projects/demo/users",
+		strings.NewReader(`{"email":"root@example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
 	req.SetPathValue("id", "demo")
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
-		t.Fatalf("create user: %s", rec.Header().Get("Location"))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create user: %s", rec.Body.String())
 	}
 	platformURL, err := app.cellURLByLabel("platform")
 	if err != nil {
@@ -148,30 +160,20 @@ func TestWorkspaceCreateRequiresCellAndTeam(t *testing.T) {
 func TestAddChildSiteFloatAndLookupWalk(t *testing.T) {
 	app, _, euURL, mux := startPlatformEU(t)
 
-	// Create workspace root on eu-1.
-	form := url.Values{
-		"id": {"acme"}, "name": {"Acme"}, "cell": {"eu-1"}, "customer_team_id": {"acme"},
-	}
-	req := httptest.NewRequest(http.MethodPost, "/workspaces", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
-		t.Fatalf("create workspace: %s", rec.Header().Get("Location"))
+	rec := postJSON(t, mux, "/api/v1/workspaces",
+		`{"id":"acme","name":"Acme","cell":"eu-1","customer_team_id":"acme"}`)
+	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), `"error"`) {
+		t.Fatalf("create workspace: %s", rec.Body.String())
 	}
 
-	// Add child on us-2 under acme.
-	siteForm := url.Values{
-		"id": {"acme-us2"}, "name": {"acme-us2"}, "cell": {"us-2"},
-		"parent_project_id": {"acme"}, "workspace_id": {"acme"},
-	}
-	req = httptest.NewRequest(http.MethodPost, "/projects/acme/sites", strings.NewReader(siteForm.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/projects/acme/sites", strings.NewReader(
+		`{"id":"acme-us2","name":"acme-us2","cell":"us-2","parent_project_id":"acme","workspace_id":"acme"}`))
+	req.Header.Set("Content-Type", "application/json")
 	req.SetPathValue("id", "acme")
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
-		t.Fatalf("add site: %s", rec.Header().Get("Location"))
+	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), `"error"`) {
+		t.Fatalf("add site: %s", rec.Body.String())
 	}
 
 	ctx := context.Background()
@@ -190,18 +192,16 @@ func TestAddChildSiteFloatAndLookupWalk(t *testing.T) {
 		t.Fatalf("child linkage workspace=%s team=%s", child.WorkspaceID, child.CustomerTeamID)
 	}
 
-	// Create user on child → float to acme only (not platform).
-	userForm := url.Values{"email": {"joe@example.com"}}
-	req = httptest.NewRequest(http.MethodPost, "/projects/acme-us2/users", strings.NewReader(userForm.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/projects/acme-us2/users",
+		strings.NewReader(`{"email":"joe@example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
 	req.SetPathValue("id", "acme-us2")
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "err=") {
-		t.Fatalf("create user: %s", rec.Header().Get("Location"))
+	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), `"error"`) {
+		t.Fatalf("create user: %s", rec.Body.String())
 	}
 
-	// Parent site lookup table should see floated key.
 	var parentRaw struct {
 		Lookup []lookupRow `json:"lookup"`
 	}
@@ -221,7 +221,6 @@ func TestAddChildSiteFloatAndLookupWalk(t *testing.T) {
 		t.Fatalf("expected floated key on parent acme: %+v", parentRaw.Lookup)
 	}
 
-	// Platform must NOT receive the floated customer key.
 	platformURL, err := app.cellURLByLabel("platform")
 	if err != nil {
 		t.Fatal(err)
@@ -238,21 +237,26 @@ func TestAddChildSiteFloatAndLookupWalk(t *testing.T) {
 		}
 	}
 
-	// Lookup from parent (sibling/parent walk) finds home.
-	lookForm := url.Values{"key": {"joe@example.com"}}
-	req = httptest.NewRequest(http.MethodPost, "/projects/acme/lookup", strings.NewReader(lookForm.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/projects/acme/lookup",
+		strings.NewReader(`{"key":"joe@example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
 	req.SetPathValue("id", "acme")
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
-	loc := rec.Header().Get("Location")
-	if rec.Code != http.StatusSeeOther || strings.Contains(loc, "err=") {
-		t.Fatalf("lookup: %s", loc)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("lookup: %s", rec.Body.String())
 	}
-	u, _ := url.Parse(loc)
-	ok := u.Query().Get("ok")
-	if !strings.Contains(ok, "hit") {
-		t.Fatalf("lookup ok=%q want hit", ok)
+	var lookOut map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &lookOut); err != nil {
+		t.Fatal(err)
+	}
+	okMsg, _ := lookOut["ok"].(string)
+	if !strings.Contains(okMsg, "hit") {
+		t.Fatalf("lookup ok=%q want hit", okMsg)
+	}
+	tlRaw, ok := lookOut["timeline"].(map[string]any)
+	if !ok || tlRaw == nil {
+		t.Fatal("lookup response must include timeline")
 	}
 
 	lt := app.latestTrace()
@@ -263,7 +267,6 @@ func TestAddChildSiteFloatAndLookupWalk(t *testing.T) {
 	if tl == nil || tl.StepCount < 1 {
 		t.Fatalf("expected timeline steps after lookup, got %+v", tl)
 	}
-	// Single UI→entry OnHop plus server walk chain (not one UI caller per site).
 	uiCallers := 0
 	for _, s := range tl.Steps {
 		if s.Caller == "UI" {
@@ -313,7 +316,7 @@ func TestLabRedirectsAndNoTraceDrawer(t *testing.T) {
 	if strings.Contains(body, `href="/lab"`) {
 		t.Fatal("nav must not link Lab")
 	}
-	if !strings.Contains(body, `href="/platform"`) {
+	if !strings.Contains(body, `href="/platform"`) && !strings.Contains(body, `data-nav="platform"`) {
 		t.Fatal("nav must link Platform")
 	}
 }

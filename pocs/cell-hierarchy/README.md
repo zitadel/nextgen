@@ -29,18 +29,22 @@ Rules:
 
 ## UI
 
+The console is a **client-rendered SPA** (`internal/ui/web/`). The Go UI process serves `index.html` for primary routes and a JSON API under `/api/v1/*`. Open DevTools → Network and filter XHR/fetch: you should see `/api/v1/...` calls, not full HTML document navigations on Cells / Platform / Workspaces / Project actions. An in-app **Requests** panel logs each SPA `fetch` (method, path, status, duration).
+
+**CORS / direct cell calls:** the browser never talks to docker cell hostnames. All browser traffic stays on the UI origin (`/api/...`). Nested cell→cell lookup walks remain server-side; the Latest hop timeline still shows us-1→us-2→eu-1 from the API response `timeline` / trace.
+
 | Nav | Role |
 |---|---|
 | **Cells** `/` | Ops: platform membership tree + join spare (platform API only; manual refresh) |
 | **Platform** `/platform` | Hoster: platform project + create/list customer teams |
 | **Workspaces** `/workspaces` | Customer: list root sites; create workspace (= first site) |
 
-- **Create workspace** requires cell + customer team → creates the project (`workspace_id` = self, `lookup_enabled=true`, **empty parent** — not attached to platform) → redirects to `/projects/{id}`.
+- **Create workspace** requires cell + customer team → creates the project (`workspace_id` = self, `lookup_enabled=true`, **empty parent** — not attached to platform) → client navigates to `/projects/{id}`.
 - **Child sites** attach to a **parent site** (workspace root or intermediate) so keys float within the customer site tree only.
-- **Site page** `/projects/{id}`: meta, child sites, create user, lookup-from-here, delete user (tombstone), add child site (parent picker), **Latest hop** inline.
+- **Site page** `/projects/{id}`: meta, child sites, create user, lookup-from-here, delete user (tombstone), add child site (parent picker), **Latest hop** inline (from mutating JSON `timeline`).
 - **Cell detail** `/cells/{label}`: per-cell me / children / projects (loaded only when you open that cell).
 - No Lab. `/lab` and `/scenarios` redirect to `/workspaces`.
-- No sticky Global Trace drawer. Latest action hops render inline on the page that ran the action. Optional `/trace-view` stays for debugging (not in nav).
+- No sticky Global Trace drawer. Latest action hops render inline on the page that ran the action.
 
 ## Topology
 
