@@ -12,7 +12,9 @@ content:
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid_tknid.yaml'
-        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/proj-mismatch.yaml'
+        - $ref: '../../../components/schemas/errors/rel-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/sess-exchange_conflict.yaml'
         - $ref: '../../../components/schemas/errors/sess-invalid_handoff_token.yaml'
@@ -20,7 +22,6 @@ content:
         - $ref: '../../../components/schemas/errors/sess-not_found.yaml'
         - $ref: '../../../components/schemas/errors/sess-token_creation_failed.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
-        - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
@@ -32,7 +33,9 @@ content:
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           tkn.invalid_tknid: '../../../components/schemas/errors/tkn-invalid_tknid.yaml'
-          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          proj.mismatch: '../../../components/schemas/errors/proj-mismatch.yaml'
+          rel.not_found: '../../../components/schemas/errors/rel-not_found.yaml'
+          rel.revoked: '../../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           sess.exchange_conflict: '../../../components/schemas/errors/sess-exchange_conflict.yaml'
           sess.invalid_handoff_token: '../../../components/schemas/errors/sess-invalid_handoff_token.yaml'
@@ -40,7 +43,6 @@ content:
           sess.not_found: '../../../components/schemas/errors/sess-not_found.yaml'
           sess.token_creation_failed: '../../../components/schemas/errors/sess-token_creation_failed.yaml'
           enc_key.unknown_alg: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
-          unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
       att.not_found:
         summary: att.not_found
@@ -82,11 +84,21 @@ content:
         value:
           code: tkn.invalid_tknid
           message: 'token identifiers do not match token type'
-      not_implemented:
-        summary: not_implemented
+      proj.mismatch:
+        summary: proj.mismatch
         value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
+          code: proj.mismatch
+          message: 'the project named in the request is not the one the credential belongs to'
+      rel.not_found:
+        summary: rel.not_found
+        value:
+          code: rel.not_found
+          message: 'release: not found'
+      rel.revoked:
+        summary: rel.revoked
+        value:
+          code: rel.revoked
+          message: 'the release this attempt runs on was revoked'
       req.invalid:
         summary: req.invalid
         value:
@@ -122,8 +134,3 @@ content:
         value:
           code: enc_key.unknown_alg
           message: 'unsupported encryption algorithm'
-      unavailable:
-        summary: unavailable
-        value:
-          code: unavailable
-          message: 'The service could not complete the request right now. Try again.'
