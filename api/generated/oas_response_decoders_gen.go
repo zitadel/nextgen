@@ -8702,7 +8702,7 @@ func decodeGetUserByIDResponse(resp *http.Response) (res GetUserByIDRes, _ error
 	return res, nil
 }
 
-func decodeGetUserPasswordResponse(resp *http.Response) (res GetUserPasswordRes, _ error) {
+func decodeGetUserPasswordStateResponse(resp *http.Response) (res GetUserPasswordStateRes, _ error) {
 	switch resp.StatusCode {
 	case 200:
 		// Code 200.
@@ -8718,7 +8718,7 @@ func decodeGetUserPasswordResponse(resp *http.Response) (res GetUserPasswordRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetUserPasswordResponse
+			var response UserPasswordState
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -8753,7 +8753,7 @@ func decodeGetUserPasswordResponse(resp *http.Response) (res GetUserPasswordRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetUserPasswordUnauthorized
+			var response GetUserPasswordStateUnauthorized
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -8788,7 +8788,7 @@ func decodeGetUserPasswordResponse(resp *http.Response) (res GetUserPasswordRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetUserPasswordForbidden
+			var response GetUserPasswordStateForbidden
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -8823,7 +8823,7 @@ func decodeGetUserPasswordResponse(resp *http.Response) (res GetUserPasswordRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetUserPasswordNotFound
+			var response GetUserPasswordStateNotFound
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -8858,7 +8858,7 @@ func decodeGetUserPasswordResponse(resp *http.Response) (res GetUserPasswordRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetUserPasswordInternalServerError
+			var response GetUserPasswordStateInternalServerError
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -8881,7 +8881,7 @@ func decodeGetUserPasswordResponse(resp *http.Response) (res GetUserPasswordRes,
 		}
 	}
 	// Default response.
-	res, err := func() (res GetUserPasswordRes, err error) {
+	res, err := func() (res GetUserPasswordStateRes, err error) {
 		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 		if err != nil {
 			return res, errors.Wrap(err, "parse media type")
@@ -8894,7 +8894,7 @@ func decodeGetUserPasswordResponse(resp *http.Response) (res GetUserPasswordRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetUserPasswordErrorResponse
+			var response GetUserPasswordStateErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -8911,7 +8911,7 @@ func decodeGetUserPasswordResponse(resp *http.Response) (res GetUserPasswordRes,
 				}
 				return res, err
 			}
-			return &GetUserPasswordErrorResponseStatusCode{
+			return &GetUserPasswordStateErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil

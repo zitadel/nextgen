@@ -9668,18 +9668,18 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 	}
 }
 
-// handleGetUserPasswordRequest handles getUserPassword operation.
+// handleGetUserPasswordStateRequest handles getUserPasswordState operation.
 //
 // Reports when the user's current password was set, and leaves `set_at` out
 // when the user has none. The password and its hash are never returned;
 // setting one is `PUT` on the same path.
 //
 // GET /users/{user_id}/password
-func (s *Server) handleGetUserPasswordRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetUserPasswordStateRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getUserPassword"),
+		otelogen.OperationID("getUserPasswordState"),
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.HTTPRouteKey.String("/users/{user_id}/password"),
 	}
@@ -9687,7 +9687,7 @@ func (s *Server) handleGetUserPasswordRequest(args [1]string, argsEscaped bool, 
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetUserPasswordOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetUserPasswordStateOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -9742,15 +9742,15 @@ func (s *Server) handleGetUserPasswordRequest(args [1]string, argsEscaped bool, 
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: GetUserPasswordOperation,
-			ID:   "getUserPassword",
+			Name: GetUserPasswordStateOperation,
+			ID:   "getUserPasswordState",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetUserPasswordOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, GetUserPasswordStateOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -9767,7 +9767,7 @@ func (s *Server) handleGetUserPasswordRequest(args [1]string, argsEscaped bool, 
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetUserPasswordOperation, r)
+			sctx, ok, err := s.securityNextgenSession(ctx, GetUserPasswordStateOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -9808,7 +9808,7 @@ func (s *Server) handleGetUserPasswordRequest(args [1]string, argsEscaped bool, 
 			return
 		}
 	}
-	params, err := decodeGetUserPasswordParams(args, argsEscaped, r)
+	params, err := decodeGetUserPasswordStateParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -9821,13 +9821,13 @@ func (s *Server) handleGetUserPasswordRequest(args [1]string, argsEscaped bool, 
 
 	var rawBody []byte
 
-	var response GetUserPasswordRes
+	var response GetUserPasswordStateRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    GetUserPasswordOperation,
+			OperationName:    GetUserPasswordStateOperation,
 			OperationSummary: "Get user password state",
-			OperationID:      "getUserPassword",
+			OperationID:      "getUserPasswordState",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -9841,8 +9841,8 @@ func (s *Server) handleGetUserPasswordRequest(args [1]string, argsEscaped bool, 
 
 		type (
 			Request  = struct{}
-			Params   = GetUserPasswordParams
-			Response = GetUserPasswordRes
+			Params   = GetUserPasswordStateParams
+			Response = GetUserPasswordStateRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -9851,14 +9851,14 @@ func (s *Server) handleGetUserPasswordRequest(args [1]string, argsEscaped bool, 
 		](
 			m,
 			mreq,
-			unpackGetUserPasswordParams,
+			unpackGetUserPasswordStateParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetUserPassword(ctx, params)
+				response, err = s.h.GetUserPasswordState(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetUserPassword(ctx, params)
+		response, err = s.h.GetUserPasswordState(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -9866,7 +9866,7 @@ func (s *Server) handleGetUserPasswordRequest(args [1]string, argsEscaped bool, 
 		return
 	}
 
-	if err := encodeGetUserPasswordResponse(response, w, span); err != nil {
+	if err := encodeGetUserPasswordStateResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)

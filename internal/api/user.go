@@ -375,7 +375,7 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	return &api.SetUserPasswordNoContent{}, nil
 }
 
-func (h *Handler) GetUserPassword(ctx context.Context, params api.GetUserPasswordParams) (api.GetUserPasswordRes, error) {
+func (h *Handler) GetUserPasswordState(ctx context.Context, params api.GetUserPasswordStateParams) (api.GetUserPasswordStateRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
 	if err != nil {
 		return nil, err
@@ -388,7 +388,7 @@ func (h *Handler) GetUserPassword(ctx context.Context, params api.GetUserPasswor
 		return nil, err
 	}
 
-	res := &api.GetUserPasswordResponse{}
+	res := &api.UserPasswordState{}
 	if setAt != nil {
 		res.SetAt = api.NewOptDateTime(*setAt)
 	}

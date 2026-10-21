@@ -51456,16 +51456,16 @@ func (s *GetUserByIDUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes GetUserPasswordErrorResponse as json.
-func (s GetUserPasswordErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes GetUserPasswordStateErrorResponse as json.
+func (s GetUserPasswordStateErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s GetUserPasswordErrorResponse) encodeFields(e *jx.Encoder) {
+func (s GetUserPasswordStateErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AuthUnauthorizedGetUserPasswordErrorResponse:
+	case AuthUnauthorizedGetUserPasswordStateErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -51481,7 +51481,7 @@ func (s GetUserPasswordErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalGetUserPasswordErrorResponse:
+	case InternalGetUserPasswordStateErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -51497,7 +51497,7 @@ func (s GetUserPasswordErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidGetUserPasswordErrorResponse:
+	case ReqInvalidGetUserPasswordStateErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -51513,7 +51513,7 @@ func (s GetUserPasswordErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserNotFoundGetUserPasswordErrorResponse:
+	case UserNotFoundGetUserPasswordStateErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.not_found")
 		{
@@ -51529,7 +51529,7 @@ func (s GetUserPasswordErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserPermissionDeniedGetUserPasswordErrorResponse:
+	case UserPermissionDeniedGetUserPasswordStateErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.permission_denied")
 		{
@@ -51548,10 +51548,10 @@ func (s GetUserPasswordErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes GetUserPasswordErrorResponse from json.
-func (s *GetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes GetUserPasswordStateErrorResponse from json.
+func (s *GetUserPasswordStateErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetUserPasswordErrorResponse to nil")
+		return errors.New("invalid: unable to decode GetUserPasswordStateErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -51572,19 +51572,19 @@ func (s *GetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetUserPasswordErrorResponse
+					s.Type = AuthUnauthorizedGetUserPasswordStateErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalGetUserPasswordErrorResponse
+					s.Type = InternalGetUserPasswordStateErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidGetUserPasswordErrorResponse
+					s.Type = ReqInvalidGetUserPasswordStateErrorResponse
 					found = true
 				case "user.not_found":
-					s.Type = UserNotFoundGetUserPasswordErrorResponse
+					s.Type = UserNotFoundGetUserPasswordStateErrorResponse
 					found = true
 				case "user.permission_denied":
-					s.Type = UserPermissionDeniedGetUserPasswordErrorResponse
+					s.Type = UserPermissionDeniedGetUserPasswordStateErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -51600,23 +51600,23 @@ func (s *GetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AuthUnauthorizedGetUserPasswordErrorResponse:
+	case AuthUnauthorizedGetUserPasswordStateErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case InternalGetUserPasswordErrorResponse:
+	case InternalGetUserPasswordStateErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidGetUserPasswordErrorResponse:
+	case ReqInvalidGetUserPasswordStateErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UserNotFoundGetUserPasswordErrorResponse:
+	case UserNotFoundGetUserPasswordStateErrorResponse:
 		if err := s.UserNotFound.Decode(d); err != nil {
 			return err
 		}
-	case UserPermissionDeniedGetUserPasswordErrorResponse:
+	case UserPermissionDeniedGetUserPasswordStateErrorResponse:
 		if err := s.UserPermissionDenied.Decode(d); err != nil {
 			return err
 		}
@@ -51627,29 +51627,29 @@ func (s *GetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s GetUserPasswordErrorResponse) MarshalJSON() ([]byte, error) {
+func (s GetUserPasswordStateErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetUserPasswordErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *GetUserPasswordStateErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetUserPasswordForbidden as json.
-func (s *GetUserPasswordForbidden) Encode(e *jx.Encoder) {
+// Encode encodes GetUserPasswordStateForbidden as json.
+func (s *GetUserPasswordStateForbidden) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetUserPasswordForbidden from json.
-func (s *GetUserPasswordForbidden) Decode(d *jx.Decoder) error {
+// Decode decodes GetUserPasswordStateForbidden from json.
+func (s *GetUserPasswordStateForbidden) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetUserPasswordForbidden to nil")
+		return errors.New("invalid: unable to decode GetUserPasswordStateForbidden to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -51660,34 +51660,34 @@ func (s *GetUserPasswordForbidden) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetUserPasswordForbidden(unwrapped)
+	*s = GetUserPasswordStateForbidden(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetUserPasswordForbidden) MarshalJSON() ([]byte, error) {
+func (s *GetUserPasswordStateForbidden) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetUserPasswordForbidden) UnmarshalJSON(data []byte) error {
+func (s *GetUserPasswordStateForbidden) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetUserPasswordInternalServerError as json.
-func (s *GetUserPasswordInternalServerError) Encode(e *jx.Encoder) {
+// Encode encodes GetUserPasswordStateInternalServerError as json.
+func (s *GetUserPasswordStateInternalServerError) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetUserPasswordInternalServerError from json.
-func (s *GetUserPasswordInternalServerError) Decode(d *jx.Decoder) error {
+// Decode decodes GetUserPasswordStateInternalServerError from json.
+func (s *GetUserPasswordStateInternalServerError) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetUserPasswordInternalServerError to nil")
+		return errors.New("invalid: unable to decode GetUserPasswordStateInternalServerError to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -51698,34 +51698,34 @@ func (s *GetUserPasswordInternalServerError) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetUserPasswordInternalServerError(unwrapped)
+	*s = GetUserPasswordStateInternalServerError(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetUserPasswordInternalServerError) MarshalJSON() ([]byte, error) {
+func (s *GetUserPasswordStateInternalServerError) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetUserPasswordInternalServerError) UnmarshalJSON(data []byte) error {
+func (s *GetUserPasswordStateInternalServerError) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes GetUserPasswordNotFound as json.
-func (s *GetUserPasswordNotFound) Encode(e *jx.Encoder) {
+// Encode encodes GetUserPasswordStateNotFound as json.
+func (s *GetUserPasswordStateNotFound) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetUserPasswordNotFound from json.
-func (s *GetUserPasswordNotFound) Decode(d *jx.Decoder) error {
+// Decode decodes GetUserPasswordStateNotFound from json.
+func (s *GetUserPasswordStateNotFound) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetUserPasswordNotFound to nil")
+		return errors.New("invalid: unable to decode GetUserPasswordStateNotFound to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -51736,97 +51736,34 @@ func (s *GetUserPasswordNotFound) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetUserPasswordNotFound(unwrapped)
+	*s = GetUserPasswordStateNotFound(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetUserPasswordNotFound) MarshalJSON() ([]byte, error) {
+func (s *GetUserPasswordStateNotFound) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetUserPasswordNotFound) UnmarshalJSON(data []byte) error {
+func (s *GetUserPasswordStateNotFound) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode implements json.Marshaler.
-func (s *GetUserPasswordResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *GetUserPasswordResponse) encodeFields(e *jx.Encoder) {
-	{
-		if s.SetAt.Set {
-			e.FieldStart("set_at")
-			s.SetAt.Encode(e, json.EncodeDateTime)
-		}
-	}
-}
-
-var jsonFieldsNameOfGetUserPasswordResponse = [1]string{
-	0: "set_at",
-}
-
-// Decode decodes GetUserPasswordResponse from json.
-func (s *GetUserPasswordResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetUserPasswordResponse to nil")
-	}
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "set_at":
-			if err := func() error {
-				s.SetAt.Reset()
-				if err := s.SetAt.Decode(d, json.DecodeDateTime); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"set_at\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode GetUserPasswordResponse")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *GetUserPasswordResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetUserPasswordResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetUserPasswordUnauthorized as json.
-func (s *GetUserPasswordUnauthorized) Encode(e *jx.Encoder) {
+// Encode encodes GetUserPasswordStateUnauthorized as json.
+func (s *GetUserPasswordStateUnauthorized) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes GetUserPasswordUnauthorized from json.
-func (s *GetUserPasswordUnauthorized) Decode(d *jx.Decoder) error {
+// Decode decodes GetUserPasswordStateUnauthorized from json.
+func (s *GetUserPasswordStateUnauthorized) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode GetUserPasswordUnauthorized to nil")
+		return errors.New("invalid: unable to decode GetUserPasswordStateUnauthorized to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -51837,19 +51774,19 @@ func (s *GetUserPasswordUnauthorized) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = GetUserPasswordUnauthorized(unwrapped)
+	*s = GetUserPasswordStateUnauthorized(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *GetUserPasswordUnauthorized) MarshalJSON() ([]byte, error) {
+func (s *GetUserPasswordStateUnauthorized) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetUserPasswordUnauthorized) UnmarshalJSON(data []byte) error {
+func (s *GetUserPasswordStateUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -112880,6 +112817,69 @@ func (s UserPasswordEmptyDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *UserPasswordEmptyDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *UserPasswordState) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *UserPasswordState) encodeFields(e *jx.Encoder) {
+	{
+		if s.SetAt.Set {
+			e.FieldStart("set_at")
+			s.SetAt.Encode(e, json.EncodeDateTime)
+		}
+	}
+}
+
+var jsonFieldsNameOfUserPasswordState = [1]string{
+	0: "set_at",
+}
+
+// Decode decodes UserPasswordState from json.
+func (s *UserPasswordState) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPasswordState to nil")
+	}
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "set_at":
+			if err := func() error {
+				s.SetAt.Reset()
+				if err := s.SetAt.Decode(d, json.DecodeDateTime); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"set_at\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserPasswordState")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UserPasswordState) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPasswordState) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

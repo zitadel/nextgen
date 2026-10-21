@@ -395,7 +395,7 @@ func TestDeleteUser(t *testing.T) {
 	})
 }
 
-func TestGetUserPassword(t *testing.T) {
+func TestGetUserPasswordState(t *testing.T) {
 	t.Parallel()
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
@@ -410,13 +410,13 @@ func TestGetUserPassword(t *testing.T) {
 		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuserpassword@example.com"),
 	})
 	require.NoError(t, err)
-	params := api.GetUserPasswordParams{UserID: api.UserID(user.ID)}
+	params := api.GetUserPasswordStateParams{UserID: api.UserID(user.ID)}
 	setAt := func(t *testing.T) api.OptDateTime {
 		t.Helper()
-		resp, err := client.GetUserPassword(t.Context(), params)
+		resp, err := client.GetUserPasswordState(t.Context(), params)
 		require.NoError(t, err)
-		require.IsType(t, &api.GetUserPasswordResponse{}, resp, helpers.MustMarshal(t, resp))
-		return resp.(*api.GetUserPasswordResponse).SetAt
+		require.IsType(t, &api.UserPasswordState{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.UserPasswordState).SetAt
 	}
 	assert.False(t, setAt(t).IsSet(), "a user without a password has no set_at")
 
@@ -431,10 +431,10 @@ func TestGetUserPassword(t *testing.T) {
 	assert.WithinDuration(t, time.Now(), got.Value, time.Minute)
 
 	t.Run("unknown user", func(t *testing.T) {
-		resp, err := client.GetUserPassword(t.Context(), api.GetUserPasswordParams{UserID: "user_unknown"})
+		resp, err := client.GetUserPasswordState(t.Context(), api.GetUserPasswordStateParams{UserID: "user_unknown"})
 		require.NoError(t, err)
-		require.IsType(t, &api.GetUserPasswordNotFound{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.GetUserPasswordNotFound).Code)
+		require.IsType(t, &api.GetUserPasswordStateNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.GetUserPasswordStateNotFound).Code)
 	})
 }
 

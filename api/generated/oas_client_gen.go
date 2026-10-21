@@ -627,14 +627,14 @@ type Invoker interface {
 	//
 	// GET /users/{user_id}
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
-	// GetUserPassword invokes getUserPassword operation.
+	// GetUserPasswordState invokes getUserPasswordState operation.
 	//
 	// Reports when the user's current password was set, and leaves `set_at` out
 	// when the user has none. The password and its hash are never returned;
 	// setting one is `PUT` on the same path.
 	//
 	// GET /users/{user_id}/password
-	GetUserPassword(ctx context.Context, params GetUserPasswordParams) (GetUserPasswordRes, error)
+	GetUserPasswordState(ctx context.Context, params GetUserPasswordStateParams) (GetUserPasswordStateRes, error)
 	// GetVariable invokes getVariable operation.
 	//
 	// Reads one variable by name, with its value per kind. A name with no
@@ -8100,21 +8100,21 @@ func (c *Client) sendGetUserByID(ctx context.Context, params GetUserByIDParams) 
 	return result, nil
 }
 
-// GetUserPassword invokes getUserPassword operation.
+// GetUserPasswordState invokes getUserPasswordState operation.
 //
 // Reports when the user's current password was set, and leaves `set_at` out
 // when the user has none. The password and its hash are never returned;
 // setting one is `PUT` on the same path.
 //
 // GET /users/{user_id}/password
-func (c *Client) GetUserPassword(ctx context.Context, params GetUserPasswordParams) (GetUserPasswordRes, error) {
-	res, err := c.sendGetUserPassword(ctx, params)
+func (c *Client) GetUserPasswordState(ctx context.Context, params GetUserPasswordStateParams) (GetUserPasswordStateRes, error) {
+	res, err := c.sendGetUserPasswordState(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetUserPassword(ctx context.Context, params GetUserPasswordParams) (res GetUserPasswordRes, err error) {
+func (c *Client) sendGetUserPasswordState(ctx context.Context, params GetUserPasswordStateParams) (res GetUserPasswordStateRes, err error) {
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getUserPassword"),
+		otelogen.OperationID("getUserPasswordState"),
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.URLTemplateKey.String("/users/{user_id}/password"),
 	}
@@ -8132,7 +8132,7 @@ func (c *Client) sendGetUserPassword(ctx context.Context, params GetUserPassword
 	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
 
 	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, GetUserPasswordOperation,
+	ctx, span := c.cfg.Tracer.Start(ctx, GetUserPasswordStateOperation,
 		trace.WithAttributes(otelAttrs...),
 		clientSpanKind,
 	)
@@ -8186,7 +8186,7 @@ func (c *Client) sendGetUserPassword(ctx context.Context, params GetUserPassword
 		var satisfied bitset
 		{
 			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, GetUserPasswordOperation, r); {
+			switch err := c.securityOAuth2(ctx, GetUserPasswordStateOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
@@ -8197,7 +8197,7 @@ func (c *Client) sendGetUserPassword(ctx context.Context, params GetUserPassword
 		}
 		{
 			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetUserPasswordOperation, r); {
+			switch err := c.securityNextgenSession(ctx, GetUserPasswordStateOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
@@ -8235,7 +8235,7 @@ func (c *Client) sendGetUserPassword(ctx context.Context, params GetUserPassword
 	defer body.Close()
 
 	stage = "DecodeResponse"
-	result, err := decodeGetUserPasswordResponse(resp)
+	result, err := decodeGetUserPasswordStateResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
