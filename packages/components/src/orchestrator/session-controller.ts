@@ -1,15 +1,57 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 
-import { getSession, revokeSession } from "./api-client.js";
+import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
+
+import { getSession, revokeSession, type SessionIdentity } from "./api-client.js";
 import type { resolveApi } from "./resolve-api.js";
 import { emit } from "../internal/emit.js";
 
 type Resolved = ReturnType<typeof resolveApi>;
 
 /**
+ * What the host knows about the visitor's session:
+ *
+ * - `unknown` until the identity request settles, while no project is
+ *   configured, or when the request failed without the backend answering (see
+ *   {@link isNoSession}): the session may well be fine, so the host keeps its
+ *   surface and shows the error;
+ * - `signed-in` once `GET /sessions/me` named a user;
+ * - `signed-out` when the backend answered that there is no session, or named
+ *   no user.
+ */
+export type SessionState = "unknown" | "signed-in" | "signed-out";
+
+/**
+ * The backend itself answered that the request carries no live session: a
+ * `401` with its `auth.unauthorized` code (a missing, invalid, expired or
+ * revoked cookie) or a `404` with `sess.not_found`. A gateway, a WAF, an
+ * ingress default backend or a wrong base path answers 401 and 404 too, but
+ * without the backend's code. That says nothing about the session, so it is an
+ * error like a 5xx. The server SDKs decide a session check the same way.
+ */
+function isNoSession(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return false;
+  const code = apiErrorCode(error);
+  return (
+    (error.status === 401 && code === "auth.unauthorized") ||
+    (error.status === 404 && code === "sess.not_found")
+  );
+}
+
+export interface SessionControllerOptions {
+  /** Runs after the identity fetch resolves or fails. */
+  readonly onIdentitySettled?: () => void;
+  /** Runs when the identity request finds that the visitor has no session. */
+  readonly onSessionMissing?: () => void;
+}
+
+/**
  * The signed-in identity and the sign-out call shared by `<zitadel-session>`
  * and `<zitadel-logout>`: one `GET /sessions/me` once a project is resolvable,
- * and `DELETE /sessions/me` that fires `zitadel-signout` on success.
+ * and `DELETE /sessions/me` that fires `zitadel-signout` on success. A visitor
+ * the backend says has no session is `signed-out`, so the host can stop
+ * offering a sign-out to nobody; any other failure keeps the host's surface
+ * and sets `errorMessage`.
  */
 export class SessionController implements ReactiveController {
   display = "";
@@ -22,31 +64,41 @@ export class SessionController implements ReactiveController {
 
   errorMessage = "";
 
+  state: SessionState = "unknown";
+
   // One-shot guard: the fetch runs once config is resolvable, at connect time
   // or after a framework assigns `project` post-mount.
   private identityRequested = false;
 
+  // The "no session" answer settled while the host was detached: it must not
+  // act for the page then (the redirect would leave a page the card is not on),
+  // so it is replayed once the host is back.
+  private missedSessionMissing = false;
+
+  private readonly host: ReactiveControllerHost & HTMLElement;
+  private readonly resolve: () => Resolved;
+  private readonly options: SessionControllerOptions;
+
   /**
    * @param resolve Returns the host's project and API handle, throwing while no
    *   project is resolvable.
-   * @param onIdentitySettled Runs after the identity fetch resolves or fails.
    */
-  private readonly host: ReactiveControllerHost & HTMLElement;
-  private readonly resolve: () => Resolved;
-  private readonly onIdentitySettled?: () => void;
-
   constructor(
     host: ReactiveControllerHost & HTMLElement,
     resolve: () => Resolved,
-    onIdentitySettled?: () => void,
+    options: SessionControllerOptions = {},
   ) {
     this.host = host;
     this.resolve = resolve;
-    this.onIdentitySettled = onIdentitySettled;
+    this.options = options;
     host.addController(this);
   }
 
   hostConnected(): void {
+    if (this.missedSessionMissing) {
+      this.missedSessionMissing = false;
+      this.options.onSessionMissing?.();
+    }
     this.maybeLoadIdentity();
   }
 
@@ -67,11 +119,14 @@ export class SessionController implements ReactiveController {
   /**
    * Revokes the session in the host's project with credentials; the server
    * clears the cookie. Fires `zitadel-signout` (after `onRevoked`) and resolves
-   * `true` on success; on failure sets `errorMessage` and resolves `false`.
-   * The revoke is sent whatever the identity read found, since the cookie may
-   * have changed since: a session that is already gone, or one of another
-   * project that the server refuses to revoke, leaves nobody signed in here, so
-   * sign-out completes and the other project's session stays.
+   * `true` on success. The backend answering that there is no session (see
+   * {@link isNoSession}) means it is already gone, which is what signing out
+   * asks for, so it succeeds the same way. Any other failure, a gateway's 401
+   * or 404 included, revoked nothing: it sets `errorMessage` and resolves
+   * `false`. The revoke is sent whatever the identity read found, since the
+   * cookie may have changed since: one of another project that the server
+   * refuses to revoke leaves nobody signed in here, so sign-out completes and
+   * the other project's session stays.
    */
   async signOut(onRevoked?: () => void): Promise<boolean> {
     this.loading = true;
@@ -82,11 +137,13 @@ export class SessionController implements ReactiveController {
       const { api, project } = this.resolve();
       await revokeSession(api, project.projectId);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      this.errorMessage = message || "Sign-out failed. Please try again.";
-      this.loading = false;
-      this.host.requestUpdate();
-      return false;
+      if (!isNoSession(error)) {
+        const message = error instanceof Error ? error.message : "";
+        this.errorMessage = message || "Sign-out failed. Please try again.";
+        this.loading = false;
+        this.host.requestUpdate();
+        return false;
+      }
     }
 
     this.loading = false;
@@ -109,18 +166,42 @@ export class SessionController implements ReactiveController {
   }
 
   private async loadIdentity({ api, project }: Resolved): Promise<void> {
+    let missing: boolean;
     try {
-      const session = await getSession(api, project.projectId);
-      // A live session of another project: nobody to show here.
-      if (session === null) return;
-      this.display = session.user?.display ?? "";
-      this.identifier = session.user?.identifier ?? "";
-      this.userId = session.user_id ?? "";
-      this.host.requestUpdate();
-    } catch {
-      // No active session, or not configured: render without an identity.
-    } finally {
-      this.onIdentitySettled?.();
+      const session = (await getSession(api, project.projectId)) as Partial<SessionIdentity> | null;
+      if (session === null) {
+        // A live session of another project: not this app's to show, and not
+        // an answer that nobody is signed in, so the surface stays.
+        missing = false;
+      } else {
+        // A 200 without the session JSON's `session_id` (an SPA host's `index.html`
+        // served for an unrewritten proxy path) did not come from the backend.
+        if (typeof session.session_id !== "string") {
+          throw new Error("Could not load the session: the response is not a session.");
+        }
+        this.display = session.user?.display ?? "";
+        this.identifier = session.user?.identifier ?? "";
+        this.userId = session.user_id ?? "";
+        missing = !this.userId;
+        this.state = missing ? "signed-out" : "signed-in";
+      }
+    } catch (error) {
+      missing = isNoSession(error);
+      if (missing) {
+        this.state = "signed-out";
+      } else {
+        // An outage, not an answer: keep the surface and say what went wrong.
+        const message = error instanceof Error ? error.message : "";
+        this.errorMessage = message || "Could not load the session. Please try again.";
+      }
     }
+    this.host.requestUpdate();
+    this.options.onIdentitySettled?.();
+    if (missing) this.notifyMissing();
+  }
+
+  private notifyMissing(): void {
+    if (this.host.isConnected) this.options.onSessionMissing?.();
+    else this.missedSessionMissing = true;
   }
 }

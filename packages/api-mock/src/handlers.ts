@@ -538,7 +538,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     // so all of them answer the contract's 401 for a signed-out browser.
     http.get("*/sessions/me", () =>
       HttpResponse.json(
-        { code: "auth.unauthorized", message: "no session cookie" },
+        { code: "auth.unauthorized", message: "Missing or invalid session token." },
         { status: 401, headers: { "Cache-Control": "private, no-store" } },
       ),
     ),
@@ -550,7 +550,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     ),
     http.delete("*/sessions/me", () =>
       HttpResponse.json(
-        { code: "auth.unauthorized", message: "no session cookie" },
+        { code: "auth.unauthorized", message: "Missing or invalid session token." },
         { status: 401 },
       ),
     ),

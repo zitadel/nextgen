@@ -36,13 +36,18 @@ import "../atoms/index.js";
  *   authenticates it. The card shows `name`, then `email`, then the
  *   always-present `user_id`. NOTE: the current server response includes only
  *   the `user_id`, so the card displays the raw id until the backend returns a
- *   human-readable `name`/`email` on `/sessions/me`. A failed or
- *   unauthenticated request renders the card without an identity line rather
- *   than throwing.
+ *   human-readable `name`/`email` on `/sessions/me`.
+ * - **No session.** When the backend answers that request with its
+ *   `401 auth.unauthorized` or `404 sess.not_found` (or names no user) the
+ *   visitor is signed out: the element navigates to `post-sign-out-url` when
+ *   one is set and otherwise renders nothing. Anything else is not "signed
+ *   out": a network error, a 5xx, a gateway's 401 or 404 without the backend's
+ *   code, or a 200 that is not a session keeps the card and shows the error.
  * - **Sign out** calls the typed `revokeMySession` operation
  *   (`DELETE /sessions/me`); the server clears the session cookie. On success
- *   the element fires `zitadel-signout` (detail `{ display, identifier }`, matching the
- *   shared SPA contract) and optionally navigates to `post-sign-out-url`.
+ *   (the backend's no-session answer counts, the session is already gone) the
+ *   element fires `zitadel-signout` (detail `{ display, identifier }`, matching
+ *   the shared SPA contract) and optionally navigates to `post-sign-out-url`.
  *
  * A "Continue" action is intentionally omitted for now: the post-sign-in
  * destination contract is still being decided. Consumers redirect after
@@ -108,9 +113,18 @@ export class ZitadelSession extends ZitadelSurface {
   /** Sign-out action label. */
   @property({ type: String, attribute: "logout-label" }) accessor logoutLabel = "Sign out";
 
-  private readonly session = new SessionController(this, () =>
-    resolveApi(this.project, this.projectAttrs, "<zitadel-session>"),
+  private readonly session = new SessionController(
+    this,
+    () => resolveApi(this.project, this.projectAttrs, "<zitadel-session>"),
+    { onSessionMissing: () => this.leave() },
   );
+
+  /** Navigates to `postSignOutUrl` when one is set; reports whether it did. */
+  private leave(): boolean {
+    if (!this.postSignOutUrl || typeof window === "undefined") return false;
+    window.location.assign(this.postSignOutUrl);
+    return true;
+  }
 
   override willUpdate(): void {
     // No tenant branding payload on this surface (yet) — the theme resolves
@@ -121,9 +135,7 @@ export class ZitadelSession extends ZitadelSurface {
   /** Signs out, then optionally navigates to `postSignOutUrl`; a failure stays put. */
   private async doLogout(): Promise<void> {
     if (!(await this.session.signOut())) return;
-    if (this.postSignOutUrl && typeof window !== "undefined") {
-      window.location.assign(this.postSignOutUrl);
-    }
+    this.leave();
   }
 
   private handleLogout(event: Event): void {
@@ -132,6 +144,9 @@ export class ZitadelSession extends ZitadelSurface {
   }
 
   override render() {
+    // No session at load: a "Signed in as" card with a Sign out button would
+    // describe nobody.
+    if (this.session.state === "signed-out") return nothing;
     // Static template, so widget polarity is a plain binding — unlike
     // `<zitadel-login>`, whose `zl-page-shell` lives in unsafeHTML-parsed
     // markup and needs the imperative re-stamp loop.

@@ -115,3 +115,42 @@ describe("<zitadel-logout> open/close (chromium)", () => {
     expect(new Headers(init.headers).get("X-Zitadel-CSRF")).toBe("csrf_test");
   });
 });
+
+describe("<zitadel-logout> without a session (chromium)", () => {
+  let host: HTMLDivElement;
+  let originalFetch: typeof fetch;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () =>
+      Response.json(
+        { code: "auth.unauthorized", message: "Missing or invalid session token." },
+        { status: 401 },
+      ),
+    ) as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    host.remove();
+    globalThis.fetch = originalFetch;
+  });
+
+  it("shows no avatar and no projected template", async () => {
+    host.innerHTML = `
+      <zitadel-logout></zitadel-logout>
+      <zitadel-logout>
+        <template><button data-action="logout">Sign out</button></template>
+      </zitadel-logout>
+    `;
+    const [avatar, templated] = host.querySelectorAll("zitadel-logout");
+    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await (avatar as ZitadelLogout).updateComplete;
+
+    expect(avatar?.shadowRoot?.querySelector(".trigger")).toBeNull();
+    expect(templated?.querySelector("button[data-action='logout']")).toBeNull();
+    expect(avatar?.getBoundingClientRect().width).toBe(0);
+  });
+});

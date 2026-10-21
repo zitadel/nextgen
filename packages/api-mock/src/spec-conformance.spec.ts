@@ -408,6 +408,68 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(allowed).toContain("x-zitadel-csrf");
   });
 
+  describe("/sessions/me without a live session answers 401 auth.unauthorized, as the Go server does", () => {
+    /** A fresh session's cookie (`name=value`), minted by a handoff exchange. */
+    const newSessionCookie = async (projectId: string): Promise<string> => {
+      const handoff = await signHandoffToken({ sub: projectId, iss: BASE });
+      const exchange = await fetch(`${BASE}/sessions/exchange?project_id=${projectId}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ handoff_token: handoff }),
+      });
+      const setCookie = exchange.headers
+        .getSetCookie()
+        .find((c) => c.startsWith("__nextgen_session="));
+      return setCookie?.split(";")[0] ?? "";
+    };
+
+    const cookies: readonly (readonly [string, () => Promise<string | undefined>])[] = [
+      ["no cookie", async () => undefined],
+      ["a cookie it never issued", async () => "__nextgen_session=deadbeefdeadbeef"],
+      [
+        "a revoked session's cookie",
+        async () => {
+          const cookie = await newSessionCookie("proj_gone");
+          await fetch(`${BASE}/sessions/me`, {
+            method: "DELETE",
+            headers: { cookie, "x-zitadel-csrf": csrfTokenFor(cookie.split("=")[1] ?? "") },
+          });
+          return cookie;
+        },
+      ],
+      [
+        "an expired session's cookie",
+        async () => {
+          // Minted two hours ago, so its one-hour lifetime is over.
+          vi.useFakeTimers({ toFake: ["Date"] });
+          try {
+            vi.setSystemTime(Date.now() - 2 * 3_600_000);
+            return await newSessionCookie("proj_expired");
+          } finally {
+            vi.useRealTimers();
+          }
+        },
+      ],
+    ];
+
+    const rows = ["GET", "DELETE"].flatMap((method) =>
+      cookies.map(([what, cookie]) => ({ method, what, cookie })),
+    );
+
+    test.each(rows)("$method with $what", async ({ method, cookie }) => {
+      const value = await cookie();
+      const res = await fetch(`${BASE}/sessions/me`, {
+        method,
+        headers: value ? { cookie: value } : {},
+      });
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({
+        code: "auth.unauthorized",
+        message: "Missing or invalid session token.",
+      });
+    });
+  });
+
   test("DELETE /sessions/me without a session cookie returns 401", async () => {
     const res = await fetch(`${BASE}/sessions/me`, { method: "DELETE" });
     expect(res.status).toBe(401);

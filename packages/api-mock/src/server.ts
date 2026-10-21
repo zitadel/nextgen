@@ -107,6 +107,15 @@ function lookupSession(req: express.Request): SessionLookup {
 }
 
 /**
+ * The Go server's answer to a session-only operation whose cookie names no
+ * live session: `auth.unauthorized` with `sessionUnauthorizedMessage`
+ * (`internal/api/security.go`).
+ */
+function noSessionBody() {
+  return errorBody("auth.unauthorized", "Missing or invalid session token.");
+}
+
+/**
  * Holds the request's session to its `project_id`, as the server does on every
  * `/sessions/me` route once the cookie has authenticated the request: a value
  * outside the project-id pattern (or not a single string) is a bad request, and
@@ -390,24 +399,32 @@ export function createMockApp(options: { issuer: string }): express.Express {
   });
 
   // GET /sessions/me — validate opaque session cookie and return session data.
-  // Mirrors the Go server's GetMySession handler.
+  // Mirrors the Go server's GetMySession handler: a missing cookie, one that
+  // names no live token (revoked, or never issued) and an expired one all get
+  // the same `401 auth.unauthorized` verdict (`invalidSessionCredential` and
+  // the nextgenSession security handler in internal/api), which the SDKs and
+  // widgets read as "no session".
   app.get("/sessions/me", (req: express.Request, res: express.Response) => {
-    const found = lookupSession(req);
-    switch (found.status) {
-      case "missing":
-        res.status(401).json(errorBody("unauthenticated", "no session cookie"));
-        return;
-      case "unknown":
-        res.status(401).json(errorBody("unauthenticated", "invalid or expired session"));
-        return;
-      case "expired":
-        res.status(401).json(errorBody("unauthenticated", "session expired"));
-        return;
-      case "active": {
-        if (refuseForProject(req, res, found.session)) return;
-        res.json(found.session);
-      }
+    // Both the session and the 401 are session state: neither may be stored.
+    res.setHeader("Cache-Control", "private, no-store");
+    // Mirrors the server, which validates a present project_id against the
+    // project-id pattern before it reads the session.
+    const projectParam = req.query.project_id;
+    if (
+      projectParam !== undefined &&
+      (typeof projectParam !== "string" || !/^[a-zA-Z0-9_-]+$/.test(projectParam))
+    ) {
+      res.status(400).json(errorBody("req.invalid", "project_id is not a valid project id."));
+      return;
     }
+    const found = lookupSession(req);
+    if (found.status !== "active") {
+      res.status(401).json(noSessionBody());
+      return;
+    }
+    // A read that names a project refuses a session of any other project.
+    if (refuseForProject(req, res, found.session)) return;
+    res.json(found.session);
   });
 
   // GET /sessions/me/csrf — the session's CSRF token (ADR 053 §5). Mirrors
@@ -420,7 +437,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
     // cookie before the handler runs, so its project check, like this one,
     // only ever sees a live session.
     if (found.status !== "active") {
-      res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
+      res.status(401).json(noSessionBody());
       return;
     }
     if (refuseForProject(req, res, found.session)) return;
@@ -428,13 +445,13 @@ export function createMockApp(options: { issuer: string }): express.Express {
   });
 
   // DELETE /sessions/me — revoke the current session (logout). Mirrors the
-  // Go server's revokeMySession handler and the SDK proxy's logout call.
+  // Go server's revokeMySession handler and the SDK proxy's logout call: a
+  // cookie that names no live, unexpired session is refused the way GET is,
+  // with `401 auth.unauthorized`.
   app.delete("/sessions/me", (req: express.Request, res: express.Response) => {
     const found = lookupSession(req);
-    // As on GET /sessions/me/csrf: the server's token gate answers these 401
-    // before the handler, whatever project the request names.
     if (found.status !== "active") {
-      res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
+      res.status(401).json(noSessionBody());
       return;
     }
     // ADR 053 §5: sign-out is a cookie-authenticated write, so it carries the

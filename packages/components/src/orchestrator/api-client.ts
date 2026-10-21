@@ -107,7 +107,10 @@ export async function getSession(
   }
   try {
     const session = await api.getMySession({ project_id: projectId }, apiRequestInit);
-    return session.project_id === projectId ? session : null;
+    // A body that is not a session at all (no `project_id`) is not another
+    // project's either: it goes back as it came, for the caller to reject.
+    const answered = (session as { project_id?: unknown } | null)?.project_id;
+    return typeof answered === "string" && answered !== projectId ? null : session;
   } catch (error) {
     if (apiErrorCode(error) === "sess.project_mismatch") {
       return null;
