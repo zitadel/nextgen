@@ -109,6 +109,29 @@ block, the generated Changesets changelogs,
 inputs. Publish the draft GitHub Release only when the product needs an
 announcement.
 
+The website changelog shows everything outside the generated facts block
+(`<!-- nextgen-release-facts:start -->` to `<!-- nextgen-release-facts:end -->`)
+as the release's notes, above its changes, and reads the changes and the
+Breaking filter only from that block
+([`releases.ts`](../../apps/website/app/changelog/releases.ts)).
+
+- Leave the generated facts block as it is.
+- Write Markdown only; the website drops HTML.
+- Link pull requests in full, `[#123](https://github.com/zitadel/nextgen/pull/123)`:
+  a bare `#123` links only on GitHub.
+- Refer to "the changes below", never to the generated facts or their tables,
+  which the website does not show.
+- Edit a draft's notes with `gh release edit`. An API `PATCH` without
+  `tag_name` resets the draft's tag to `untagged-…`, and
+  `scripts/release-github.mjs` finds the draft by `tag_name`.
+
+`--notes-file` replaces the whole body, so start from the draft's body:
+
+```sh
+gh release view v<version> --repo zitadel/nextgen --json body -q .body > notes.md
+gh release edit v<version> --repo zitadel/nextgen --notes-file notes.md
+```
+
 GitHub rejects release bodies over 125000 characters, so the generated facts
 block replaces its largest package changelog sections with pointers to the
 per-package `CHANGELOG.md` when the body would not fit. If the human-written
@@ -127,9 +150,8 @@ moon run release:publish -- --dry-run --recover-version 0.1.0-alpha.8
 ## Renumbering the 1.0.0-alpha releases
 
 Once, for [ADR 074](../adrs/074-preview-releases-on-0x.md). Run it from a
-checkout of `main`, with `gh` signed in as a maintainer, Docker logged in to
-`ghcr.io` with `write:packages`, and npm signed in as an owner of the
-`@zitadel` packages.
+checkout of `main`, with `gh` signed in as a maintainer and npm signed in as an
+owner of the `@zitadel` packages.
 
 1. Rename the tags and releases before you publish the `v0.1.0` draft: the
    website changelog sorts releases by version, and would list `0.1.0` under
@@ -148,21 +170,10 @@ checkout of `main`, with `gh` signed in as a maintainer, Docker logged in to
    done
    ```
 
-2. Add the new tag to each image and keep the old one: a CLI of that version
-   starts the image of its own version.
-
-   ```sh
-   for n in 20 21 22 23 24 25 28; do
-     docker buildx imagetools create \
-       --tag "ghcr.io/zitadel/nextgen:0.1.0-alpha.$n" \
-       "ghcr.io/zitadel/nextgen:1.0.0-alpha.$n"
-   done
-   ```
-
-3. Merge the `build: version packages` PR that releases `0.1.0` soon after
+2. Merge the `build: version packages` PR that releases `0.1.0` soon after
    the PR that adopted ADR 074: until `0.1.0` is on npm, the docs'
    `npx @zitadel/cli@latest` runs the placeholder build.
-4. Once `0.1.0` is on npm, deprecate the `1.0.0-alpha` versions and move
+3. Once `0.1.0` is on npm, deprecate the `1.0.0-alpha` versions and move
    `alpha` to `0.1.0`:
 
    ```sh
@@ -172,5 +183,5 @@ checkout of `main`, with `gh` signed in as a maintainer, Docker logged in to
    done
    ```
 
-5. Add the product notes to the `v0.1.0` draft release and publish it; it
-   becomes the repository's latest release.
+4. Add the [product notes](#product-notes) to the `v0.1.0` draft release and
+   publish it; it becomes the repository's latest release.

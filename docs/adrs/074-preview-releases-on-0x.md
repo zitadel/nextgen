@@ -7,8 +7,8 @@
 > placeholder build.
 > **Relates to:** [ADR 002](002-multi-package-release-strategy.md) (Changesets
 > owns versions; this settles its prerelease follow-up)
-> **Implementation:** ships with this ADR; the one-time tag, image and npm
-> steps are in the
+> **Implementation:** ships with this ADR; the one-time tag and npm steps are
+> in the
 > [release runbook](../runbooks/manual-release.md#renumbering-the-100-alpha-releases).
 
 ## Decision
@@ -38,9 +38,10 @@
 5. **The 1.0.0-alpha releases are renamed where they can be.**
    - The git tags and GitHub Releases `v1.0.0-alpha.20` to `.28` become
      `v0.1.0-alpha.N`, what they would have been without the major bump. Each
-     release names its npm version.
-   - The images keep their `1.0.0-alpha.N` tags and gain `0.1.0-alpha.N`: a
-     CLI of those versions starts the image of its own version.
+     release names its npm and image version.
+   - The images keep only their `1.0.0-alpha.N` tags: a CLI of those versions
+     starts the image of its own version, and nothing pulls a `0.1.0-alpha.N`
+     image.
    - npm keeps `1.0.0-alpha.N`, deprecated. npm cannot rename or reuse a
      version, its unpublish rules block ours (they depend on each other and
      have several maintainers), and apps scaffolded on those versions pin
