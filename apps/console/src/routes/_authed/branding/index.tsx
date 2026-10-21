@@ -253,11 +253,14 @@ function BrandingScreen() {
           302px is the design's 300 plus the 1px card border each side, so the
           content the rows align to is the 276 the design lays them out in. */}
       <div className="mt-3 grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_302px] lg:px-2">
-        <PreviewStage className="flex min-h-[29rem] items-center justify-center overflow-auto rounded-md border border-foreground/10 bg-card p-6 shadow-xs transition-colors duration-300 lg:min-h-[32rem]">
+        <PreviewStage className="flex min-h-[29rem] overflow-auto rounded-md border border-foreground/10 bg-card p-6 shadow-xs transition-colors duration-300 lg:min-h-[32rem]">
           {(onGround) => (
             // The widget is content-sized, so the preview constrains the width
             // rather than the element: that is what an embedding page does.
-            <div className={narrow ? "w-96" : "w-full max-w-lg"}>
+            // Centred by auto margins, not the stage's alignment: a step
+            // taller than the stage (an error banner) then starts at its top
+            // and scrolls, instead of spilling above where it cannot.
+            <div className={narrow ? "m-auto w-96" : "m-auto w-full max-w-lg"}>
               <LoginPreview
                 journey={activeJourney}
                 flowName={activeFlowName}
