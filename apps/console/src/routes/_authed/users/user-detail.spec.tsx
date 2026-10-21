@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
@@ -108,6 +108,16 @@ function stubSchema(properties: Record<string, unknown>, required: string[] = ["
       }),
     ),
   );
+}
+
+/**
+ * One native `input` event on a date field, as a browser fires it per edit.
+ * jsdom has no date widget, so `validity.badInput` (the field shows a partial
+ * date its `value` cannot express) is stubbed.
+ */
+function inputDate(input: HTMLElement, value: string, badInput: boolean) {
+  Object.defineProperty(input, "validity", { configurable: true, value: { badInput } });
+  fireEvent.input(input, { target: { value } });
 }
 
 /** Accepts every `PATCH /users/{id}` and records its body. */
@@ -354,6 +364,61 @@ describe("user detail", () => {
     await userEvent.clear(screen.getByLabelText("Company name"));
     await userEvent.click(save);
     await waitFor(() => expect(bodies).toEqual([{ attributes: { companyName: null } }]));
+  });
+
+  it("keeps a date out of the patch while its input reports it unreadable", async () => {
+    // A partly cleared date input reports `""` with `validity.badInput`, while
+    // the screen still shows part of the date. Read as emptied, saving any
+    // change would delete the stored date.
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", companyName: "Acme", founded: "2020-01-02" },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      companyName: { type: "string", title: "Company name" },
+      founded: { type: "string", format: "date", title: "Founded" },
+    });
+    await renderDetail();
+
+    const founded = await screen.findByLabelText("Founded");
+    const save = screen.getByRole("button", { name: "Save" });
+    inputDate(founded, "", true);
+    await userEvent.type(screen.getByLabelText("Company name"), " Inc");
+    expect(save).toBeDisabled();
+    expect(founded).toHaveAttribute("aria-invalid", "true");
+
+    // Readable again: the other change can be saved.
+    inputDate(founded, "2020-01-02", false);
+    expect(save).toBeEnabled();
+  });
+
+  it("deletes a date cleared in steps, though its value stayed empty", async () => {
+    // Clearing the rest of a partly cleared date fires `input` with the same
+    // `""`, so React reports no change; the date must still read as emptied.
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", founded: "2020-01-02" },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      founded: { type: "string", format: "date", title: "Founded" },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const founded = await screen.findByLabelText("Founded");
+    inputDate(founded, "", true);
+    inputDate(founded, "", false);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { founded: null } }]));
   });
 
   it("says a required field is required once it is emptied", async () => {

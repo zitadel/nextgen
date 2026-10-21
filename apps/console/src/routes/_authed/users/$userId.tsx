@@ -359,6 +359,9 @@ function ProfileCard({
     [fields, attributes],
   );
   const [values, setValues] = useState(stored);
+  // An input that cannot read what it shows (a partly cleared date reports
+  // `""` with `validity.badInput`); saving would delete the stored value.
+  const [unreadable, setUnreadable] = useState<Record<string, boolean>>({});
   const save = useSubmit(async () => {
     await api.patchUserByID(userId, { attributes: patchOf(fields, stored, values) });
     await onSaved();
@@ -367,6 +370,7 @@ function ProfileCard({
 
   useEffect(() => {
     setValues(stored);
+    setUnreadable({});
     clearError();
   }, [stored, clearError]);
 
@@ -429,6 +433,11 @@ function ProfileCard({
                 value={values[entry.key] ?? ""}
                 readOnly={readOnlyKeys.has(entry.key)}
                 missing={missing.includes(entry)}
+                // Marked, since it is the only reason on screen why Save is off.
+                unreadable={unreadable[entry.key] ?? false}
+                onBadInput={(badInput) =>
+                  setUnreadable((current) => ({ ...current, [entry.key]: badInput }))
+                }
                 onChange={(value) => setValues((current) => ({ ...current, [entry.key]: value }))}
               />
             ))}
@@ -443,7 +452,7 @@ function ProfileCard({
               variant="secondary"
               size="sm"
               className="gap-1 px-2.5 text-xs max-sm:w-full"
-              disabled={!dirty || missing.length > 0}
+              disabled={!dirty || missing.length > 0 || Object.values(unreadable).some(Boolean)}
               loading={save.pending}
             >
               Save
@@ -483,6 +492,8 @@ function ProfileField({
   value,
   readOnly,
   missing,
+  unreadable,
+  onBadInput,
   onChange,
 }: {
   entry: SchemaField;
@@ -490,6 +501,13 @@ function ProfileField({
   readOnly: boolean;
   /** A required value the draft has emptied. */
   missing: boolean;
+  unreadable: boolean;
+  /**
+   * Whether the input shows something its `value` cannot express. Read on
+   * every native `input` event: `onChange` skips one that leaves the value
+   * as it was, such as the last step of clearing a partial date.
+   */
+  onBadInput: (badInput: boolean) => void;
   onChange: (value: string) => void;
 }) {
   const id = useId();
@@ -532,11 +550,12 @@ function ProfileField({
             readOnly={readOnly}
             required={entry.required}
             placeholder={entry.placeholder}
-            aria-invalid={missing || undefined}
+            aria-invalid={missing || unreadable || undefined}
             // `aria-invalid` says the field is wrong; this says why.
             aria-describedby={missing ? errorId : undefined}
             className={INPUT_WIDTH}
             onChange={(event) => onChange(event.target.value)}
+            onInput={(event) => onBadInput(event.currentTarget.validity.badInput)}
           />
         )}
         {missing && <FieldError id={errorId}>This field is required.</FieldError>}
