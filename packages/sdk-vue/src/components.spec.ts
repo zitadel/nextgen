@@ -21,7 +21,15 @@ import {
   widgetTags,
 } from "@zitadel/sdk-core/types";
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
-import { createSSRApp, defineComponent, h, nextTick, shallowRef, type Ref } from "vue";
+import {
+  createSSRApp,
+  defineComponent,
+  h,
+  nextTick,
+  shallowRef,
+  withDirectives,
+  type Ref,
+} from "vue";
 import { renderToString } from "vue/server-renderer";
 
 import ZitadelLogin from "./components/ZitadelLogin";
@@ -47,6 +55,42 @@ function mountWithInstanceRef(
   const { container } = render(parent);
   return { captured, container };
 }
+
+// Raises one event on the widget element before it is attached to the document,
+// i.e. before the widget can start loading, and returns what the consumer got.
+function renderRaisingEarly(
+  child: typeof ZitadelLogout | typeof ZitadelSession,
+  eventName: string,
+  handlerProp: string,
+): unknown[] {
+  const received: unknown[] = [];
+  const detail = { probe: eventName };
+  const early = {
+    beforeMount: (el: Element) => {
+      el.dispatchEvent(new CustomEvent(eventName, { detail }));
+    },
+  };
+  const parent = defineComponent({
+    setup: () => () =>
+      withDirectives(h(child, { project, [handlerProp]: (d: unknown) => received.push(d) }), [
+        [early],
+      ]),
+  });
+  render(parent);
+  return received;
+}
+
+// The widget itself fails its first request (no synthetic event): the way it
+// raises `zitadel-session-error` on its own, always after an awaited fetch.
+const failEveryRequest = () =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("{}", { status: 500 })),
+  );
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 const handle = {
@@ -186,6 +230,15 @@ describe("ZitadelLogout", () => {
     },
   );
 
+  it.each([
+    ["zitadel-session-error", "onSessionError"],
+    ["zitadel-signout", "onSignout"],
+  ])("forwards %s raised the moment the element mounts", (eventName, handlerProp) => {
+    expect(renderRaisingEarly(ZitadelLogout, eventName, handlerProp)).toEqual([
+      { probe: eventName },
+    ]);
+  });
+
   it("exposes the rendered element via the instance ref", () => {
     const { captured, container } = mountWithInstanceRef(ZitadelLogout);
     const element = captured.value!.element;
@@ -241,6 +294,23 @@ describe("ZitadelSession", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it.each([
+    ["zitadel-session-error", "onSessionError"],
+    ["zitadel-signout", "onSignout"],
+  ])("forwards %s raised the moment the element mounts", (eventName, handlerProp) => {
+    expect(renderRaisingEarly(ZitadelSession, eventName, handlerProp)).toEqual([
+      { probe: eventName },
+    ]);
+  });
+
+  it("delivers the error the widget raises when its own first request fails", async () => {
+    failEveryRequest();
+    const spy = vi.fn();
+    render(ZitadelSession, { props: { project, onSessionError: spy } });
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ phase: "load", status: 500 }));
+  });
 
   it("exposes the rendered element via the instance ref", () => {
     const { captured, container } = mountWithInstanceRef(ZitadelSession);

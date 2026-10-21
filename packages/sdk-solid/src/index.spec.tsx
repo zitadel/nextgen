@@ -22,7 +22,7 @@ import {
   widgetNames,
   widgetTags,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, expectTypeOf, it, vi } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
   businessLocales,
@@ -35,6 +35,18 @@ import {
 } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
+
+// The widget itself fails its first request (no synthetic event): the way it
+// raises `zitadel-session-error` on its own, always after an awaited fetch.
+const failEveryRequest = () =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("{}", { status: 500 })),
+  );
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
   const element = root.querySelector(tag);
@@ -141,6 +153,25 @@ describe("ZitadelLogout", () => {
     },
   );
 
+  it.each([
+    ["zitadel-session-error", "onSessionError"],
+    ["zitadel-signout", "onSignout"],
+  ])("forwards %s raised the moment the element mounts", (eventName, handlerProp) => {
+    const spy = vi.fn();
+    const detail = { probe: eventName };
+    render(() => (
+      <ZitadelLogout
+        ref={(e) => {
+          e.dispatchEvent(new CustomEvent(eventName, { detail }));
+        }}
+        project={project}
+        {...{ [handlerProp]: spy }}
+      />
+    ));
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(detail);
+  });
+
   it("forwards the ref to the underlying element", () => {
     let captured: ZitadelLogoutElement | undefined;
     const { container } = render(() => (
@@ -196,6 +227,33 @@ describe("ZitadelSession", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it.each([
+    ["zitadel-session-error", "onSessionError"],
+    ["zitadel-signout", "onSignout"],
+  ])("forwards %s raised the moment the element mounts", (eventName, handlerProp) => {
+    const spy = vi.fn();
+    const detail = { probe: eventName };
+    render(() => (
+      <ZitadelSession
+        ref={(e) => {
+          e.dispatchEvent(new CustomEvent(eventName, { detail }));
+        }}
+        project={project}
+        {...{ [handlerProp]: spy }}
+      />
+    ));
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(detail);
+  });
+
+  it("delivers the error the widget raises when its own first request fails", async () => {
+    failEveryRequest();
+    const spy = vi.fn();
+    render(() => <ZitadelSession project={project} onSessionError={spy} />);
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ phase: "load", status: 500 }));
+  });
 
   it("forwards the ref to the underlying element", () => {
     let captured: ZitadelSessionElement | undefined;

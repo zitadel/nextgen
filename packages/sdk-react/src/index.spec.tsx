@@ -42,6 +42,18 @@ import {
 // rejection is ignored package-wide; these are light binding/event assertions.
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+// The widget itself fails its first request (no synthetic event): the only way
+// it raises `zitadel-session-error` on its own, always after an awaited fetch.
+const failEveryRequest = () =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("{}", { status: 500 })),
+  );
+
 function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
   const element = root.querySelector(tag);
   if (!element) throw new Error(`no <${tag}> was rendered`);
@@ -139,6 +151,14 @@ describe("ZitadelLogout", () => {
     },
   );
 
+  it("delivers the error the widget raises when its own first request fails", async () => {
+    failEveryRequest();
+    const spy = vi.fn();
+    render(<ZitadelLogout project={project} onSessionError={spy} />);
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ phase: "load", status: 500 }));
+  });
+
   it("forwards a ref to the underlying element", () => {
     const ref = React.createRef<ZitadelLogoutElement>();
     const { container } = render(<ZitadelLogout ref={ref} project={project} />);
@@ -185,6 +205,14 @@ describe("ZitadelSession", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it("delivers the error the widget raises when its own first request fails", async () => {
+    failEveryRequest();
+    const spy = vi.fn();
+    render(<ZitadelSession project={project} onSessionError={spy} />);
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ phase: "load", status: 500 }));
+  });
 
   it("forwards a ref to the underlying element", () => {
     const ref = React.createRef<ZitadelSessionElement>();

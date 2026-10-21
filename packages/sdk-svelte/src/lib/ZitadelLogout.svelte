@@ -39,30 +39,21 @@
       assignGiven(el, { theme });
     }
   });
-
-  $effect(() => {
-    const node = el;
-    if (!node) {
-      return;
-    }
-    const signout = (event: Event): void => {
-      if (event instanceof CustomEvent) onSignout?.(event.detail);
-    };
-    const sessionError = (event: Event): void => {
-      if (event instanceof CustomEvent) onSessionError?.(event.detail);
-    };
-    node.addEventListener('zitadel-signout', signout);
-    node.addEventListener('zitadel-session-error', sessionError);
-    return () => {
-      node.removeEventListener('zitadel-signout', signout);
-      node.removeEventListener('zitadel-session-error', sessionError);
-    };
-  });
+  // The listeners below are element attributes, bound when the element is created and
+  // before the widget can start loading; an `$effect` runs only after mount and would
+  // miss a failure the widget raises as it mounts. The handlers read the props when the
+  // event fires, so they stay current.
 </script>
 
 <zitadel-logout
   {...attributes}
   bind:this={el}
+  onzitadel-signout={(event: Event) => {
+    if (event instanceof CustomEvent) onSignout?.(event.detail);
+  }}
+  onzitadel-session-error={(event: Event) => {
+    if (event instanceof CustomEvent) onSessionError?.(event.detail);
+  }}
   project={onClient(project)}
   project-id={project?.projectId ?? projectId}
   proxy-path={proxyPathAttr(project?.proxyPath ?? proxyPath)}

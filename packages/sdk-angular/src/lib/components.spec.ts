@@ -4,7 +4,7 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
-import { Component, type Type } from "@angular/core";
+import { Component, input, type Type } from "@angular/core";
 import { bootstrapApplication, provideClientHydration } from "@angular/platform-browser";
 import { provideServerRendering, renderApplication } from "@angular/platform-server";
 import { render, waitFor } from "@testing-library/angular";
@@ -28,6 +28,38 @@ import { ZitadelSessionComponent } from "./zitadel-session.component";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
+// A consumer binds the outputs in its own template, so they are subscribed as
+// the component is created, before its view initialises; `received` records them.
+@Component({
+  selector: "consumer-of-logout",
+  standalone: true,
+  imports: [ZitadelLogoutComponent],
+  template: `<zitadel-auth-logout
+    [project]="project()"
+    (signout)="received.push($event)"
+    (sessionError)="received.push($event)"
+  />`,
+})
+class ConsumerOfLogout {
+  project = input<typeof project>();
+  received: unknown[] = [];
+}
+
+@Component({
+  selector: "consumer-of-session",
+  standalone: true,
+  imports: [ZitadelSessionComponent],
+  template: `<zitadel-auth-session
+    [project]="project()"
+    (signout)="received.push($event)"
+    (sessionError)="received.push($event)"
+  />`,
+})
+class ConsumerOfSession {
+  project = input<typeof project>();
+  received: unknown[] = [];
+}
+
 // `'zitadel-flow-step'` → `'flowStep'`: the camelCased `@Output()` name Angular
 // exposes for the event (the `zitadel-` prefix dropped, the rest camelCased).
 const outputName = (event: string): string =>
@@ -47,7 +79,31 @@ const outputOf = (instance: object, event: string): SubscribableOutput => {
   return output;
 };
 
+// The widget raises a failure while it connects, i.e. as soon as it is attached
+// and before the component's view has finished initialising. Lit calls
+// `createRenderRoot` synchronously from `connectedCallback`, which is the hook
+// used here (the registered `connectedCallback` itself cannot be wrapped once
+// the element is defined).
+function raiseOnConnect(tagName: string, eventName: string, detail: unknown): void {
+  const proto = customElements.get(tagName)!.prototype as { createRenderRoot(): unknown };
+  const original = proto.createRenderRoot;
+  vi.spyOn(proto, "createRenderRoot").mockImplementation(function (this: HTMLElement) {
+    const root = original.call(this);
+    this.dispatchEvent(new CustomEvent(eventName, { detail, bubbles: true, composed: true }));
+    return root;
+  });
+}
+
+// The widget itself fails its first request (no synthetic event): the way it
+// raises `zitadel-session-error` on its own, always after an awaited fetch.
+const failEveryRequest = () =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("{}", { status: 500 })),
+  );
+
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   document.body.innerHTML = "";
 });
@@ -159,6 +215,16 @@ describe("ZitadelLogout", () => {
     },
   );
 
+  it.each([["zitadel-session-error"], ["zitadel-signout"]])(
+    "forwards %s raised the moment the element mounts",
+    async (eventName) => {
+      const detail = { probe: eventName };
+      raiseOnConnect("zitadel-logout", eventName, detail);
+      const { fixture } = await render(ConsumerOfLogout, { inputs: { project } });
+      expect(fixture.componentInstance.received).toEqual([detail]);
+    },
+  );
+
   it("exposes the underlying element via the element getter", async () => {
     const { fixture, container } = await render(ZitadelLogoutComponent, {
       inputs: { project },
@@ -215,6 +281,25 @@ describe("ZitadelSession", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it.each([["zitadel-session-error"], ["zitadel-signout"]])(
+    "forwards %s raised the moment the element mounts",
+    async (eventName) => {
+      const detail = { probe: eventName };
+      raiseOnConnect("zitadel-session", eventName, detail);
+      const { fixture } = await render(ConsumerOfSession, { inputs: { project } });
+      expect(fixture.componentInstance.received).toEqual([detail]);
+    },
+  );
+
+  it("delivers the error the widget raises when its own first request fails", async () => {
+    failEveryRequest();
+    const { fixture } = await render(ConsumerOfSession, { inputs: { project } });
+    await vi.waitFor(() => expect(fixture.componentInstance.received).toHaveLength(1));
+    expect(fixture.componentInstance.received[0]).toEqual(
+      expect.objectContaining({ phase: "load", status: 500 }),
+    );
+  });
 
   it("exposes the underlying element via the element getter", async () => {
     const { fixture, container } = await render(ZitadelSessionComponent, {

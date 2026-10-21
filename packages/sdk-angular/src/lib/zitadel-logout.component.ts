@@ -1,10 +1,12 @@
-import type { ElementRef } from "@angular/core";
 import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components";
 import type { ZitadelSessionErrorDetail, ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
 import {
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
+  DestroyRef,
+  ElementRef,
+  inject,
   EventEmitter,
   Input,
   Output,
@@ -41,8 +43,6 @@ import "@zitadel/components";
     [attr.url]="project?.url ?? null"
     [attr.post-sign-out-url]="postSignOutUrl"
     [attr.theme]="theme ?? null"
-    (zitadel-signout)="onSignout($event)"
-    (zitadel-session-error)="onSessionError($event)"
   ></zitadel-logout>`,
 })
 export class ZitadelLogoutComponent {
@@ -55,6 +55,23 @@ export class ZitadelLogoutComponent {
   @Output() sessionError = new EventEmitter<ZitadelSessionErrorDetail>();
 
   @ViewChild("el") private elementRef?: ElementRef<ZitadelLogoutElement>;
+
+  constructor() {
+    // The widget can raise `zitadel-signout` / `zitadel-session-error` the
+    // moment it connects, before this view has finished initialising, and a
+    // template `(event)` binding is only registered after the element is
+    // attached. Listening on the host in the capture phase is set up when the
+    // component is created, so such an early event is delivered too.
+    const host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+    const onSignout = (event: Event): void => this.onSignout(event);
+    const onSessionError = (event: Event): void => this.onSessionError(event);
+    host.addEventListener("zitadel-signout", onSignout, true);
+    host.addEventListener("zitadel-session-error", onSessionError, true);
+    inject(DestroyRef).onDestroy(() => {
+      host.removeEventListener("zitadel-signout", onSignout, true);
+      host.removeEventListener("zitadel-session-error", onSessionError, true);
+    });
+  }
 
   /** The underlying `<zitadel-logout>` custom element, or `null` before view init. */
   get element(): ZitadelLogoutElement | null {

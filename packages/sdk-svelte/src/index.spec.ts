@@ -38,6 +38,34 @@ import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
 
+// The widget raises a failure while it connects, i.e. as soon as it is attached
+// and before Svelte has run any effect of the component. Lit calls
+// `createRenderRoot` synchronously from `connectedCallback`, which is the hook
+// used here (the registered `connectedCallback` itself cannot be wrapped once
+// the element is defined).
+function raiseOnConnect(tagName: string, eventName: string, detail: unknown): void {
+  const proto = customElements.get(tagName)!.prototype as { createRenderRoot(): unknown };
+  const original = proto.createRenderRoot;
+  vi.spyOn(proto, "createRenderRoot").mockImplementation(function (this: HTMLElement) {
+    const root = original.call(this);
+    this.dispatchEvent(new CustomEvent(eventName, { detail }));
+    return root;
+  });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+// The widget itself fails its first request (no synthetic event): the way it
+// raises `zitadel-session-error` on its own, always after an awaited fetch.
+const failEveryRequest = () =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("{}", { status: 500 })),
+  );
+
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
 function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
@@ -146,6 +174,18 @@ describe("ZitadelLogout", () => {
     },
   );
 
+  it.each([
+    ["zitadel-session-error", "onSessionError"],
+    ["zitadel-signout", "onSignout"],
+  ])("forwards %s raised the moment the element mounts", (eventName, handlerProp) => {
+    const spy = vi.fn();
+    const detail = { probe: eventName };
+    raiseOnConnect("zitadel-logout", eventName, detail);
+    render(ZitadelLogout, { props: { project, [handlerProp]: spy } });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(detail);
+  });
+
   it("exposes the underlying element via getElement()", () => {
     const { component, container } = render(ZitadelLogout, {
       props: { project },
@@ -196,6 +236,26 @@ describe("ZitadelSession", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it.each([
+    ["zitadel-session-error", "onSessionError"],
+    ["zitadel-signout", "onSignout"],
+  ])("forwards %s raised the moment the element mounts", (eventName, handlerProp) => {
+    const spy = vi.fn();
+    const detail = { probe: eventName };
+    raiseOnConnect("zitadel-session", eventName, detail);
+    render(ZitadelSession, { props: { project, [handlerProp]: spy } });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(detail);
+  });
+
+  it("delivers the error the widget raises when its own first request fails", async () => {
+    failEveryRequest();
+    const spy = vi.fn();
+    render(ZitadelSession, { props: { project, onSessionError: spy } });
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ phase: "load", status: 500 }));
+  });
 
   it("exposes the underlying element via getElement()", () => {
     const { component, container } = render(ZitadelSession, {

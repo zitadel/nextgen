@@ -89,24 +89,30 @@ declare module "solid-js" {
 }
 
 /**
- * The project coordinates as attributes, so they are in the server markup. The
- * `project` handle stays a property too (it carries the publishable key and is
- * what the element prefers once Solid hydrates); its fields win over the
- * discrete props, as they do inside the widget. An empty proxy path is written
- * as `/`: the widget treats an empty `proxy-path` attribute as unset and falls
- * back to its default, while `/` normalizes to the site root.
+ * The `proxy-path` attribute for a proxy path. An empty path is written as `/`:
+ * the widget treats an empty `proxy-path` attribute as unset and falls back to
+ * its default, while `/` normalizes to the site root. The project coordinates are
+ * written as plain attributes on each element, so they are in the server markup
+ * and the compiler attaches the listeners before it runs `ref`.
  */
-function projectAttributes(props: {
-  readonly project?: ZitadelProject;
-  readonly projectId?: string;
-  readonly proxyPath?: string;
-}) {
-  const proxyPath = props.project?.proxyPath ?? props.proxyPath;
-  return {
-    "project-id": props.project?.projectId ?? props.projectId,
-    "proxy-path": proxyPath === "" ? "/" : proxyPath,
-    url: props.project?.url,
-  };
+function proxyPathAttribute(proxyPath: string | undefined): string | undefined {
+  return proxyPath === "" ? "/" : proxyPath;
+}
+
+/** Hands the widget's `zitadel-signout` and `zitadel-session-error` events to the callbacks in `props`. */
+function forwardSessionEvents(
+  el: HTMLElement,
+  props: {
+    onSignout?: (detail: ZitadelSignoutDetail) => void;
+    onSessionError?: (detail: ZitadelSessionErrorDetail) => void;
+  },
+): void {
+  el.addEventListener("zitadel-signout", (event) => {
+    if (event instanceof CustomEvent) props.onSignout?.(event.detail);
+  });
+  el.addEventListener("zitadel-session-error", (event) => {
+    if (event instanceof CustomEvent) props.onSessionError?.(event.detail);
+  });
 }
 
 /** Props of `ZitadelLogin`: the widget's own plus the standard HTML attributes. */
@@ -156,7 +162,9 @@ export function ZitadelLogin(props: ZitadelLoginSolidProps): JSX.Element {
       prop:project={props.project}
       prop:locales={props.locales}
       prop:lang={props.lang}
-      {...projectAttributes(props)}
+      project-id={props.project?.projectId ?? props.projectId}
+      proxy-path={proxyPathAttribute(props.project?.proxyPath ?? props.proxyPath)}
+      url={props.project?.url}
       purpose={props.purpose ?? "login"}
       flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
@@ -192,13 +200,19 @@ export function ZitadelLogout(props: ZitadelLogoutSolidProps): JSX.Element {
     <Dynamic
       component={widgetTags.logout}
       {...attributes()}
-      ref={props.ref}
       prop:project={props.project}
-      {...projectAttributes(props)}
+      project-id={props.project?.projectId ?? props.projectId}
+      proxy-path={proxyPathAttribute(props.project?.proxyPath ?? props.proxyPath)}
+      url={props.project?.url}
       post-sign-out-url={props.postSignOutUrl}
       theme={props.theme}
-      on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
-      on:zitadel-session-error={(event) => props.onSessionError?.(event.detail)}
+      ref={(el: HTMLElement) => {
+        // Bound here, ahead of the consumer's own ref callback: the props `Dynamic` applies
+        // reach the element in no fixed order, and an event raised the moment it mounts
+        // must not be lost.
+        forwardSessionEvents(el, props);
+        if (typeof props.ref === "function") props.ref(el as never);
+      }}
     />
   );
 }
@@ -220,17 +234,23 @@ export function ZitadelSession(props: ZitadelSessionSolidProps): JSX.Element {
     <Dynamic
       component={widgetTags.session}
       {...attributes()}
-      ref={props.ref}
       prop:project={props.project}
-      {...projectAttributes(props)}
+      project-id={props.project?.projectId ?? props.projectId}
+      proxy-path={proxyPathAttribute(props.project?.proxyPath ?? props.proxyPath)}
+      url={props.project?.url}
       post-sign-out-url={props.postSignOutUrl}
       heading={props.heading}
       logout-label={props.logoutLabel}
       variant={props.variant}
       theme={props.theme}
       prop:suppressHeader={props.suppressHeader}
-      on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
-      on:zitadel-session-error={(event) => props.onSessionError?.(event.detail)}
+      ref={(el: HTMLElement) => {
+        // Bound here, ahead of the consumer's own ref callback: the props `Dynamic` applies
+        // reach the element in no fixed order, and an event raised the moment it mounts
+        // must not be lost.
+        forwardSessionEvents(el, props);
+        if (typeof props.ref === "function") props.ref(el as never);
+      }}
     />
   );
 }
