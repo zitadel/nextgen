@@ -20,7 +20,11 @@ func (h *Handler) RevokeRelease(ctx context.Context, params api.RevokeReleasePar
 	}
 
 	entity, err := h.releaseService.Revoke(ctx, string(params.ProjectID), string(params.ReleaseID))
-	if conflict, ok := releaseInUseResponse(err); ok {
+	if de, ok := errors.AsType[domain.Error](err); ok && de.Code == domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code {
+		conflict, err := releaseInUseConflict(de)
+		if err != nil {
+			return nil, err
+		}
 		return conflict, nil
 	}
 	if err != nil {
@@ -30,26 +34,24 @@ func (h *Handler) RevokeRelease(ctx context.Context, params api.RevokeReleasePar
 	return &release, nil
 }
 
-// releaseInUseResponse answers rel.in_use with the typed 409, whose
+// releaseInUseConflict answers rel.in_use with the typed 409, whose
 // details.origins names each origin still serving the release. Through
 // NewError the details would nest under details.details.
-func releaseInUseResponse(err error) (*api.RevokeReleaseConflict, bool) {
-	de, ok := errors.AsType[domain.Error](err)
-	if !ok || de.Code != domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code {
-		return nil, false
-	}
+func releaseInUseConflict(de domain.Error) (*api.RevokeReleaseConflict, error) {
 	details, _ := de.Details.(domain.ReleaseInUseDetails)
 	resp := api.RevokeReleaseConflict{Code: api.ErrorCode(de.Code), Message: de.Message}
 	resp.Details.Origins = make([]api.RevokeReleaseConflictDetailsOriginsItem, len(details.Origins))
 	for i, origin := range details.Origins {
-		// A stored origin is a validated scheme://host[:port], so it parses.
-		parsed, _ := url.Parse(origin.Origin)
+		parsed, err := url.Parse(origin.Origin)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("stored origin is not a URL")
+		}
 		resp.Details.Origins[i] = api.RevokeReleaseConflictDetailsOriginsItem{
 			Origin:       *parsed,
 			DeploymentID: api.DeploymentID(origin.DeploymentID),
 		}
 	}
-	return &resp, true
+	return &resp, nil
 }
 
 func (h *Handler) BuildRelease(ctx context.Context, req *api.BuildReleaseRequest, params api.BuildReleaseParams) (api.BuildReleaseRes, error) {

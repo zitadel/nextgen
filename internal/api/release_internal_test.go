@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 
@@ -137,16 +138,21 @@ func TestReleaseErrorResponseConflicts(t *testing.T) {
 // The 409 names every origin still serving the release, so the caller can
 // deploy elsewhere or roll back before revoking again.
 func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {
-	resp, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
+	resp, err := releaseInUseConflict(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
 		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
 	}}))
-	require.True(t, ok)
+	require.NoError(t, err)
 	raw, err := json.Marshal(resp)
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"code":"rel.in_use","message":"release: still served by an origin","details":{"origins":[{"origin":"https://app.acme.com","deployment_id":"dep_1"}]}}`, string(raw))
 
-	_, ok = releaseInUseResponse(domain.ErrReleaseNotFound())
-	assert.False(t, ok)
+	// A stored origin that no longer parses is a server fault, not a 409.
+	_, err = releaseInUseConflict(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
+		{Origin: "https://app.acme.com:bad", DeploymentID: "dep_1"},
+	}}))
+	de, ok := errors.AsType[domain.Error](err)
+	require.True(t, ok)
+	assert.Equal(t, domain.ErrInternal(nil).Code, de.Code)
 }
 
 func TestRequireBuildKindScopes(t *testing.T) {

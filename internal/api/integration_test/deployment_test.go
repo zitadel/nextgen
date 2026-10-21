@@ -443,10 +443,13 @@ func TestRevokeRelease(t *testing.T) {
 	})
 
 	t.Run("another project's release", func(t *testing.T) {
+		// Own token and project; the release is another project's, and the
+		// lookup is scoped to the project, so it reads as unknown.
 		theirs := newDeploymentFixture(t)
-		resp, err := theirs.client.RevokeRelease(t.Context(), api.RevokeReleaseParams{ProjectID: project, ReleaseID: fixture.release.ID})
-		require.NoError(t, err)
-		assertAuthzError(t, resp, domain.ErrReleaseProjectNotFound().Code)
+		status, code, _, ok := errorResponseParts(t, revoke(t, theirs.release.ID))
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, status)
+		assert.Equal(t, domain.ErrReleaseNotFound().Code, code)
 	})
 }
 

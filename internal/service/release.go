@@ -11,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/preview"
+	"github.com/zitadel/nextgen/internal/storage/deployment"
 	"github.com/zitadel/nextgen/internal/storage/release"
 )
 
@@ -244,6 +244,7 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 	ctx, end := startSpan(ctx, "ReleaseService.Revoke")
 	defer end(&err)
 
+	now := time.Now()
 	var revoked *domain.Release
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
@@ -258,7 +259,7 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 			revoked = entity
 			return nil
 		}
-		served, err := servedOrigins(ctx, stmts, projectID, id, time.Now())
+		served, err := servedOrigins(ctx, stmts, projectID, id, now)
 		if err != nil {
 			return err
 		}
@@ -287,49 +288,35 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 	return revoked, nil
 }
 
-// servedOrigins lists, sorted, the origins whose newest deployment pins the
-// release: the project's primary origins and the preview URLs live at now.
+// servedOrigins lists, sorted, the origins that serve the release at now,
+// each with the deployment that pins it. It is the live view the deployments
+// list reads, which keeps an origin removed from the project until a later
+// deployment replaces its row: adding the origin back would serve the release
+// again, so a revoke counts it.
 func servedOrigins(ctx context.Context, stmts AllStatements, projectID, releaseID string, now time.Time) ([]domain.ReleaseInUseOrigin, error) {
-	project, err := stmts.GetProjectByID(ctx, projectID)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to get project from database")
-	}
-	origins := domain.PrimaryOrigins(project.Origins)
-	var cursor []byte
+	var served []domain.ReleaseInUseOrigin
+	opts := deployment.LiveListOptions(projectID, &releaseID, liveDeploymentPageSize)
 	for {
-		opts := preview.LiveListOptions(projectID, now, livePreviewPageSize)
-		opts.Pagination.Cursor = cursor
-		page, err := stmts.ListPreviews(WithAuthzListUnrestricted(ctx), opts)
+		page, err := stmts.ListLiveDeployments(WithAuthzListUnrestricted(ctx), now, opts)
 		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to list previews")
+			return nil, domain.ErrInternal(err).WithMessage("failed to list the live deployments")
 		}
-		for _, p := range page.Items {
-			origins = append(origins, p.Origin)
+		for _, d := range page.Items {
+			for _, origin := range d.Origins() {
+				served = append(served, domain.ReleaseInUseOrigin{Origin: origin, DeploymentID: d.ID})
+			}
 		}
 		if len(page.NextCursor) == 0 {
 			break
 		}
-		cursor = page.NextCursor
-	}
-	if len(origins) == 0 {
-		return nil, nil
-	}
-	newest, err := stmts.GetNewestPerOrigin(ctx, projectID, origins)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to read the newest deployment per origin")
-	}
-	var served []domain.ReleaseInUseOrigin
-	for _, d := range newest {
-		if d.ReleaseID == releaseID {
-			served = append(served, domain.ReleaseInUseOrigin{Origin: d.Origin, DeploymentID: d.DeploymentID})
-		}
+		opts.Pagination.Cursor = page.NextCursor
 	}
 	slices.SortFunc(served, func(a, b domain.ReleaseInUseOrigin) int { return strings.Compare(a.Origin, b.Origin) })
 	return served, nil
 }
 
-// livePreviewPageSize pages the live previews a revoke checks.
-const livePreviewPageSize = 100
+// liveDeploymentPageSize pages the live deployments a revoke checks.
+const liveDeploymentPageSize = 100
 
 func (s *releaseService) List(ctx context.Context, input ListReleasesInput) (_ *ListReleasesOutput, err error) {
 	ctx, end := startSpan(ctx, "ReleaseService.List")

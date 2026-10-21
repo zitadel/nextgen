@@ -457,16 +457,12 @@ func TestReleaseServiceCreateResolvesBuiltinSchemaUnderAnotherBase(t *testing.T)
 func TestReleaseServiceRevoke(t *testing.T) {
 	revokedAt := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
 	unrevoked := &domain.Release{ProjectID: "proj_1", ID: "rel_1", ContentHash: "abc"}
-	primary := domain.Origin{Pattern: "https://app.acme.com", Kind: domain.OriginKindPrimary}
-	noPreviews := &database.ListResult[*domain.Preview]{}
+	nothingLive := &database.ListResult[*domain.Deployment]{}
 
 	t.Run("revokes a release nothing serves", func(t *testing.T) {
 		svc, statements := newMockedReleaseService(t)
 		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(unrevoked, nil)
-		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1", Origins: []domain.Origin{primary}}, nil)
-		statements.EXPECT().ListPreviews(gomock.Any(), gomock.Any()).Return(noPreviews, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{primary.Pattern}).
-			Return([]domain.OriginDeployment{{Origin: primary.Pattern, DeploymentID: "dep_2", ReleaseID: "rel_2"}}, nil)
+		statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).Return(nothingLive, nil)
 		revoked := *unrevoked
 		revoked.RevokedAt = &revokedAt
 		statements.EXPECT().RevokeRelease(gomock.Any(), "proj_1", "rel_1").Return(&revoked, nil)
@@ -490,15 +486,12 @@ func TestReleaseServiceRevoke(t *testing.T) {
 	t.Run("an origin still serving it", func(t *testing.T) {
 		svc, statements := newMockedReleaseService(t)
 		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(unrevoked, nil)
-		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1", Origins: []domain.Origin{primary}}, nil)
-		statements.EXPECT().ListPreviews(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.Preview]{
-			Items: []*domain.Preview{{ProjectID: "proj_1", Origin: "https://pr-1-acmeinc.vercel.app"}},
-		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{primary.Pattern, "https://pr-1-acmeinc.vercel.app"}).
-			Return([]domain.OriginDeployment{
-				{Origin: "https://pr-1-acmeinc.vercel.app", DeploymentID: "dep_3", ReleaseID: "rel_1"},
-				{Origin: primary.Pattern, DeploymentID: "dep_2", ReleaseID: "rel_2"},
-			}, nil)
+		// The live view narrows each deployment to the origins it still serves.
+		statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{
+				{ProjectID: "proj_1", ID: "dep_3", ReleaseID: "rel_1", Targets: []domain.DeploymentTarget{{Origin: "https://www.acme.com"}}},
+				{ProjectID: "proj_1", ID: "dep_2", ReleaseID: "rel_1", Targets: []domain.DeploymentTarget{{Origin: "https://pr-1-acmeinc.vercel.app"}}},
+			}}, nil)
 
 		_, err := svc.Revoke(t.Context(), "proj_1", "rel_1")
 		require.Error(t, err)
@@ -506,7 +499,8 @@ func TestReleaseServiceRevoke(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code, de.Code)
 		assert.Equal(t, domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
-			{Origin: "https://pr-1-acmeinc.vercel.app", DeploymentID: "dep_3"},
+			{Origin: "https://pr-1-acmeinc.vercel.app", DeploymentID: "dep_2"},
+			{Origin: "https://www.acme.com", DeploymentID: "dep_3"},
 		}}, de.Details)
 	})
 
