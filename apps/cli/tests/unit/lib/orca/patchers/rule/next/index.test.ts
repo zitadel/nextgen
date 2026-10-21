@@ -75,17 +75,24 @@ describe("NextPatcher.plan", () => {
     expect(plan.ops.some((op) => op.kind === "add-dep")).toBe(true);
   });
 
+  it("renders the widgets through the SDK's React wrappers, not the raw elements", () => {
+    const plan = new NextPatcher().plan(ctxFor("app"));
+    for (const path of ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"]) {
+      const page = writeContents(plan, path);
+      expect(page).toContain('"@zitadel/sdk-next/components"');
+      expect(page).not.toMatch(/<zitadel-(login|session)/);
+    }
+  });
+
   it("wires the business copy overlay for business-use-case projects", () => {
     const plan = new NextPatcher().plan({ ...ctxFor("app"), useCase: "business" });
     for (const path of ["app/login/page.tsx", "app/register/page.tsx"]) {
       const page = writeContents(plan, path);
-      // The overlay ships with the SDK: the page pulls it from the client
-      // entry it already imports and assigns it through the ref — a JSX
-      // locales prop would decay to an attribute on React 18 (sdk-next's
-      // floor) and silently keep the neutral copy.
-      expect(page).toContain("businessLocales, configureZitadel");
-      expect(page).toContain("element.locales = businessLocales");
-      expect(page).not.toContain("locales={businessLocales}");
+      // The overlay ships with the SDK and is passed as a locales prop to
+      // the wrapper, which sets it as a property on React 18 and 19.
+      expect(page).toContain("ZitadelLogin: Login, businessLocales, configureZitadel");
+      expect(page).toContain("locales={businessLocales}");
+      expect(page).not.toContain("element.locales");
     }
     // Consumer scaffolds keep the neutral built-ins, like minimal ones.
     const consumer = new NextPatcher().plan({ ...ctxFor("app"), useCase: "consumer" });
@@ -161,7 +168,7 @@ describe("NextPatcher.plan", () => {
     });
     const page = writeContents(plan, "app/login/page.tsx");
     expect(page).toContain('variant="widget"');
-    expect(page).toContain("element.locales = businessLocales");
+    expect(page).toContain("locales={businessLocales}");
   });
 
   it("treats absent posture as the page posture (legacy restores)", () => {

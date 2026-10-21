@@ -120,6 +120,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 <zitadel-auth-login [project]="project" theme="light" (flowComplete)="track($event)" />
 ```
 
+The `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` details carry a `waitUntil(promise)`; call it from your handler to make the widget wait for your async work before it navigates.
+
 ## Read these, don't guess
 
 This skill shows the *pattern*; it is not an API catalog and will drift. For

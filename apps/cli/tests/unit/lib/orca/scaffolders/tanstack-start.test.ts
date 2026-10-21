@@ -29,7 +29,7 @@ beforeEach(() => {
 });
 
 describe("TanStackStartScaffolder", () => {
-  it("runs create-start-app (full Start mode) then removes the starter routes/index.tsx", async () => {
+  it("runs @tanstack/cli create (full Start mode) then removes the starter routes/index.tsx", async () => {
     mockSpawn.mockReturnValue(spawnOk());
 
     await new TanStackStartScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "tanstack-start");
@@ -38,12 +38,16 @@ describe("TanStackStartScaffolder", () => {
     expect(command).toBe("npx");
     expect(args).toEqual([
       "-y",
-      "create-start-app@latest",
+      "@tanstack/cli@latest",
+      "create",
       ".",
       "--framework",
       "react",
+      "--deployment",
+      "nitro",
       "--no-examples",
       "--no-toolchain",
+      "--no-intent",
       "--no-git",
       "-y",
     ]);
@@ -56,8 +60,8 @@ describe("TanStackStartScaffolder", () => {
   describeNodeEngines({
     make: (node, platform) => new TanStackStartScaffolder(node, platform),
     framework: "tanstack-start",
-    label: "create-start-app",
-    spec: "create-start-app@latest",
+    label: "@tanstack/cli",
+    spec: "@tanstack/cli@latest",
     fallback: "^20.19.0 || >=22.12.0",
     enforcement: "warn",
     supported: ["24.15.0", "20.19.0", "22.12.0"],

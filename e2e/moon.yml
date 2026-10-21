@@ -307,7 +307,6 @@ tasks:
       - "oidc-mock:build"
       # sdk-next is omitted: cli:build already reaches it (no duplicate edges).
       - "sdk-nuxt:build"
-      - "sdk-react:build"
       - "sdk-vue:build"
       - "sdk-angular:build"
       - "sdk-solid:build"

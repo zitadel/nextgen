@@ -11,6 +11,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { OpenAPIPage } from "@/components/api-page";
+import { CliPage } from "@/components/cli-page";
 import { getMDXComponents } from "@/components/mdx";
 import { getPageImageUrl, getPageMarkdownUrl, gitConfig } from "@/lib/shared";
 import { openapiPageProps, source } from "@/lib/source";
@@ -24,8 +25,9 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
   const header = (
     <>
       <DocsTitle>{page.data.title}</DocsTitle>
-      {/* An API page's body shows its whole description, so its header is
-          the title, as in Fumadocs' OpenAPI recipe (lib/description.ts). */}
+      {/* An API or CLI reference page's body shows its whole description, so
+          its header is the title, as in Fumadocs' OpenAPI recipe
+          (lib/description.ts). */}
       {page.type === "docs" && (
         <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
       )}
@@ -33,7 +35,7 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         <ViewOptionsPopover
           markdownUrl={markdownUrl}
-          // An operation page has no file of its own.
+          // An operation's or a CLI command's page has no file of its own.
           githubUrl={
             page.type === "docs"
               ? `https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/apps/docs/content/docs/${page.path}`
@@ -50,6 +52,17 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
         {header}
         <DocsBody>
           <OpenAPIPage {...openapiPageProps(page)} />
+        </DocsBody>
+      </DocsPage>
+    );
+  }
+
+  if (page.type === "cli") {
+    return (
+      <DocsPage toc={page.data.toc}>
+        {header}
+        <DocsBody>
+          <CliPage markdown={page.data.markdown} />
         </DocsBody>
       </DocsPage>
     );

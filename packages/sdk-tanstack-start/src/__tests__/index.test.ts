@@ -31,7 +31,7 @@ describe("package manifest", () => {
 
   it("declares its supported peer ranges", () => {
     expect(manifest.peerDependencies).toEqual({
-      "@tanstack/react-start": ">=1",
+      "@tanstack/react-start": ">=1.168.10",
       react: ">=18",
       "react-dom": ">=18",
     });

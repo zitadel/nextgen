@@ -5,6 +5,7 @@
 
   import type { ZitadelLoginSvelteProps } from './types';
   import { assignGiven } from './given';
+  import { withDetail } from './events';
   import { onClient, proxyPathAttr } from './attributes';
 
   let {
@@ -65,19 +66,19 @@
       return;
     }
     const step = (event: Event): void => {
-      if (event instanceof CustomEvent) onFlowStep?.(event.detail);
+      withDetail(event, onFlowStep);
     };
     const input = (event: Event): void => {
-      if (event instanceof CustomEvent) onFlowInput?.(event.detail);
+      withDetail(event, onFlowInput);
     };
     const complete = (event: Event): void => {
-      if (event instanceof CustomEvent) onFlowComplete?.(event.detail);
+      withDetail(event, onFlowComplete);
     };
     const redirect = (event: Event): void => {
-      if (event instanceof CustomEvent) onFlowRedirect?.(event.detail);
+      withDetail(event, onFlowRedirect);
     };
     const error = (event: Event): void => {
-      if (event instanceof CustomEvent) onFlowError?.(event.detail);
+      withDetail(event, onFlowError);
     };
     node.addEventListener('zitadel-flow-step', step);
     node.addEventListener('zitadel-flow-input', input);

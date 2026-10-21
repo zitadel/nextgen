@@ -27,6 +27,7 @@ TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes]
 | `@zitadel/sdk-next/react`      | Client Components                | `useAuth()`, `AuthContextProvider`               |
 | `@zitadel/sdk-next/session`    | Client Components                | `getSession()`                                   |
 | `@zitadel/sdk-next/client`     | Client boundary                  | Web-component registration, `configureZitadel()` |
+| `@zitadel/sdk-next/components` | Client Components                | `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession` |
 
 The package root re-exports the server and client surfaces together for use
 in server modules. Do not import the root from a `"use client"` module: it
@@ -218,7 +219,7 @@ load without extra wiring; to react in place, listen for the widgets'
 
 ### 5. Login page
 
-The `<zitadel-login>` web component (from `@zitadel/components`) must be rendered client-side only. Split it into a server wrapper and a client widget:
+The `ZitadelLogin` component (the `@zitadel/sdk-react` wrapper, re-exported from `@zitadel/sdk-next/components`) must be rendered client-side only. Split it into a server wrapper and a client widget:
 
 ```tsx
 // app/login/page.tsx (server)
@@ -249,17 +250,19 @@ import dynamic from 'next/dynamic';
 
 const ZitadelLogin = dynamic(
   async () => {
-    // The /client entry registers the custom elements AND re-exports
+    // The /components entry registers the custom elements AND re-exports
     // configureZitadel, so an app that only declares @zitadel/sdk-next
     // resolves everything it needs (strict package managers would not
     // resolve @zitadel/api or @zitadel/components transitively).
-    const { configureZitadel } = await import('@zitadel/sdk-next/client');
-    configureZitadel({
+    const { ZitadelLogin: Login, configureZitadel } = await import(
+      '@zitadel/sdk-next/components'
+    );
+    const project = configureZitadel({
       projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID!,
       proxyPath: '/__nextgen',
     });
     return function ZitadelLoginElement() {
-      return <zitadel-login post-sign-in-url="/admin" />;
+      return <Login project={project} postSignInUrl="/admin" />;
     };
   },
   { ssr: false },
@@ -270,34 +273,24 @@ export function LoginWidget() {
 }
 ```
 
-There is no `api-base` attribute — the element reads the global handle from
-`configureZitadel()` (or you can assign the returned handle to the element's
-`project` property).
+There is no `api-base` prop — pass the handle returned by `configureZitadel()`
+as `project`.
 
 ## Widget events
 
-The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
+Each widget event reaches the callback in the last column, which receives the event's `detail` payload.
 
-| Widget event | Fires when | Detail | Widgets |
-| --- | --- | --- | --- |
-| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login |
-| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login |
-| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login |
-| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login |
-| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login |
-| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session |
+| Widget event | Fires when | Detail | Widgets | Callback |
+| --- | --- | --- | --- | --- |
+| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `onFlowStep` |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login | `onFlowInput` |
+| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login | `onFlowComplete` |
+| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login | `onFlowRedirect` |
+| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login | `onFlowError` |
+| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session | `onSignout` |
 
 ```tsx
-const ref = useRef<HTMLElementTagNameMap['zitadel-login']>(null);
-
-useEffect(() => {
-  const login = ref.current;
-  const onComplete = (event: Event) => track((event as CustomEvent).detail);
-  login?.addEventListener('zitadel-flow-complete', onComplete);
-  return () => login?.removeEventListener('zitadel-flow-complete', onComplete);
-}, []);
-
-return <zitadel-login ref={ref} post-sign-in-url="/admin" />;
+<ZitadelLogin project={project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
 
 ## Middleware options
