@@ -1,3 +1,4 @@
+import { renderPlaceholder } from "fumadocs-core/mdx-plugins/remark-llms.runtime";
 import type * as PageTree from "fumadocs-core/page-tree";
 import type { AdvancedIndex } from "fumadocs-core/search/server";
 import { getSlugs, llms, loader, update } from "fumadocs-core/source";
@@ -28,7 +29,9 @@ const docs = defineDocs({
     mdxOptions: (environment) =>
       applyMdxPreset({ rehypeCodeOptions: { themes: codeThemes } })(environment),
     postprocess: {
-      includeProcessedMarkdown: true,
+      // An API tag's page lists the tag's operations with <Operations />,
+      // which its Markdown renders as the page does (pageText).
+      includeProcessedMarkdown: { mdxAsPlaceholder: ["Operations"] },
     },
   },
   meta: {
@@ -44,12 +47,20 @@ const apiBaseDir = "reference/api";
 // in content/docs/reference/api. Fumadocs makes the operation's whole
 // description the page's description; the page's own is a line of plain text,
 // and `markdownDescription` keeps the whole (lib/description.ts).
+// The sidebar lists a tag's operations in the document's order. A tag's folder
+// takes its name from the tag's page, and the reference's own meta.json orders
+// the tags.
 const operationPages = update(
   await openapi.staticSource({
     baseDir: apiBaseDir,
     groupBy: "tag",
+    meta: true,
   }),
 )
+  .files((files) =>
+    files.filter((file) => file.type !== "meta" || file.path !== `${apiBaseDir}/meta.json`),
+  )
+  .meta((meta): typeof meta => ({ ...meta, data: { pages: meta.data.pages } }))
   .page((page) => {
     // The document is data: a description that is not a string is none.
     const description: unknown = page.data.description;
@@ -77,6 +88,10 @@ function apiOperations(): ApiOperation[] {
     if (file.type === "page" && nameOf(file.path) === "index") {
       sectionTitles.set(folderOf(file.path), file.data.title);
     }
+  }
+  // The reference's meta.json orders the sections, each section's own the
+  // operations in it.
+  for (const file of [...content.files, ...operationPages.files]) {
     if (file.type === "meta") listed.set(folderOf(file.path), file.data.pages ?? []);
   }
   // Where a folder's meta.json lists a page; one it does not list comes last.
@@ -155,7 +170,8 @@ ${await pageText(page, full)}`,
 }
 
 // A CLI reference page and the Errors page are Markdown already, with a
-// version for llms-full.txt; a content page's is its processed MDX.
+// version for llms-full.txt; a content page's is its processed MDX, with an
+// API tag's operations in place of <Operations />.
 async function pageText(page: Page, full: boolean) {
   switch (page.type) {
     case "openapi":
@@ -164,12 +180,13 @@ async function pageText(page: Page, full: boolean) {
     case "errors":
       return full ? page.data.llmsFullMarkdown : page.data.markdown;
     default:
-      return page.data.getText("processed");
+      return renderPlaceholder(await page.data.getText("processed"), {
+        Operations: () => operationTable(page, !full),
+      });
   }
 }
 
-// The pages, llms-full.txt, and MCP, whose get_page takes the page URL its
-// list_pages lists.
+// The pages and MCP, whose get_page takes the page URL its list_pages lists.
 export const docsLlms = sourceLlms(source);
 
 // llms-full.txt, which leaves the operations out, so its pages link none.
@@ -234,6 +251,50 @@ export function openapiPageProps(page: OpenAPIPage) {
       } as OpenAPIV3_2.Document,
     },
   };
+}
+
+// An API tag's page lists the operation and webhook pages beside it, in the
+// sidebar's order, as Markdown tables: the page renders them in place of
+// <Operations /> (components/operations.tsx), and so does its Markdown
+// (pageText). A row links its page unless `links` is false.
+export function operationTable(page: Page, links = true) {
+  const operations: string[] = [];
+  const webhooks: string[] = [];
+  for (const child of source.getPages()) {
+    if (child.type !== "openapi" || child.slugs.length !== page.slugs.length + 1) continue;
+    if (page.slugs.some((slug, i) => child.slugs[i] !== slug)) continue;
+
+    const { operations: items = [], webhooks: hooks = [] } = child.data.getOpenAPIPageProps();
+    const link = (text: string) => (links ? `[${text}](${child.url})` : text);
+    // The sidebar strikes a deprecated one through.
+    const deprecated = child.data._openapi.deprecated ? " Deprecated." : "";
+    for (const { method, path } of items) {
+      operations.push(
+        `| \`${method.toUpperCase()}\` | \`${path}\` | ${link(cell(child.data.title ?? ""))}${deprecated} |`,
+      );
+    }
+    for (const { name } of hooks) {
+      const description = firstSentence(child.data.markdownDescription ?? "");
+      webhooks.push(`| ${link(`\`${name}\``)} | ${cell(description)}${deprecated} |`);
+    }
+  }
+
+  return [
+    operations.length > 0 && ["| Method | Path | Summary |", "| --- | --- | --- |", ...operations],
+    webhooks.length > 0 && ["| Event type | Description |", "| --- | --- |", ...webhooks],
+  ]
+    .filter((table) => table !== false)
+    .map((table) => table.join("\n"))
+    .join("\n\n");
+}
+
+// A cell of plain text is one line, in which a `|` would end the cell and a
+// `*`, `[` or `<` start Markdown.
+function cell(text: string) {
+  return text
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[\\`*[\]<|]/g, "\\$&");
 }
 
 // An operation or webhook page has no Markdown of its own. Its text is its
