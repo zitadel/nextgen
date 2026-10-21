@@ -2310,10 +2310,11 @@ func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinition
 	}
 
 	// Skip handoff when no user was resolved (e.g. user_not_found →
-	// no-account). PrepareHandoff can't catch this today: attempts are
-	// started with empty RequiredChecks, so IsCompleted is vacuously
-	// true and a token would be minted. Remove once the policy engine
-	// populates RequiredChecks.
+	// no-account): render the terminal step without minting a token. Handoff
+	// itself now fails closed on an identifier-only attempt (IsCompleted
+	// requires a verified credential-class factor), but a no-account terminal
+	// has nothing to hand off and must return the step cleanly rather than
+	// surface ErrAuthAttemptNotCompleted.
 	if pc.state.CollectedData.UserID == "" {
 		return FlowStepResult{State: pc.state, Step: rendered}, nil
 	}
