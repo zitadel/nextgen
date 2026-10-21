@@ -2,6 +2,7 @@ import { Box } from "lucide-react";
 import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { FieldTitle } from "@/components/ui/field";
 import { MetaItem } from "@/components/ui/meta-item";
 import {
   Combobox,
@@ -28,7 +29,6 @@ export interface ProjectAccessRow {
 }
 
 const SECTION = "flex flex-col gap-2.5";
-const LABEL = "font-serif text-sm leading-5 text-foreground";
 // The section heading row uses a 10px gap, unlike the 8px on a Field label row.
 const LABEL_ROW = "flex items-center gap-2.5";
 const ROWS = "flex flex-col gap-2";
@@ -79,9 +79,9 @@ export function ProjectAccess({
   return (
     <fieldset className={`${SECTION} min-w-0`} aria-labelledby={labelId}>
       <div className={LABEL_ROW}>
-        <p id={labelId} className={LABEL}>
+        <FieldTitle id={labelId} className="text-foreground">
           Projects
-        </p>
+        </FieldTitle>
         <MetaItem>Optional</MetaItem>
       </div>
 

@@ -29,9 +29,10 @@ function FieldLegend({
       data-slot="field-legend"
       data-variant={variant}
       className={cn(
-        "mb-3 font-medium",
-        "data-[variant=legend]:text-base",
-        "data-[variant=label]:text-sm",
+        "mb-3",
+        "data-[variant=legend]:text-base data-[variant=legend]:font-medium",
+        // A legend used as a field label matches `Label` (Arimo 14/20, regular).
+        "data-[variant=label]:font-sans data-[variant=label]:text-sm data-[variant=label]:leading-5 data-[variant=label]:font-normal",
         className,
       )}
       {...props}
@@ -105,10 +106,9 @@ function FieldLabel({ className, ...props }: React.ComponentProps<typeof Label>)
     <Label
       data-slot="field-label"
       className={cn(
-        // The design draws a field label in the display face at 14/20 and normal
-        // weight. The registry default is the sans face at `leading-snug`, which
-        // is why call sites kept re-declaring their own label class.
-        "group/field-label peer/field-label flex w-fit gap-2 font-serif text-sm leading-5 font-normal group-data-[disabled=true]/field:opacity-50",
+        // Typography (Arimo 14/20, regular) comes from `Label`, the single source
+        // for every form field label. Don't re-declare it here or at call sites.
+        "group/field-label peer/field-label flex w-fit gap-2 group-data-[disabled=true]/field:opacity-50",
         "has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col has-[>[data-slot=field]]:rounded-md has-[>[data-slot=field]]:border [&>*]:data-[slot=field]:p-4",
         "has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/5 dark:has-data-[state=checked]:bg-primary/10",
         className,
@@ -123,7 +123,9 @@ function FieldTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="field-label"
       className={cn(
-        "flex w-fit items-center gap-2 text-sm leading-snug font-medium group-data-[disabled=true]/field:opacity-50",
+        // Same typography as `Label`, for field labels that aren't a <label>
+        // (e.g. a group named via `aria-labelledby`).
+        "flex w-fit items-center gap-2 font-sans text-sm leading-5 font-normal group-data-[disabled=true]/field:opacity-50",
         className,
       )}
       {...props}
