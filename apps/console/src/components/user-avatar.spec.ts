@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { avatarGradient } from "./user-avatar";
+import { avatarVars } from "./user-avatar";
 
-describe("avatarGradient", () => {
+const avatarGradient = (seed: string) => JSON.stringify(avatarVars(seed));
+
+describe("avatarVars", () => {
   it("gives a seed the same gradient every time", () => {
     expect(avatarGradient("user_1")).toBe(avatarGradient("user_1"));
   });

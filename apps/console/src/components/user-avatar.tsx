@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 import { cn } from "@/lib/utils";
 
 /**
@@ -23,23 +25,31 @@ function hash(seed: string): number {
 }
 
 /**
- * The gradient for a seed: two different design-system starts at an angle,
- * all three taken from the hash, so a person keeps theirs on every screen and
- * device and two people rarely share one.
+ * The colours for a seed, as the custom properties `.user-avatar` paints with
+ * (`styles.css`): two different design-system starts and an angle, all taken
+ * from the hash, so a person keeps theirs on every screen and device and two
+ * people rarely share one.
+ *
+ * Set on a hover host as well, they tint its hover wash with the same colours.
  */
-export function avatarGradient(seed: string): string {
+export function avatarVars(seed: string): CSSProperties {
   const h = hash(seed);
   const from = h % STARTS.length;
   // The second colour is drawn from the other four, so the two never match.
   const to = (from + 1 + ((h >>> 8) % (STARTS.length - 1))) % STARTS.length;
-  const angle = (h >>> 16) % 360;
-  return `linear-gradient(${angle}deg, var(${STARTS[from]}) 15%, var(${STARTS[to]}) 85%)`;
+  return {
+    "--avatar-from": `var(${STARTS[from]})`,
+    "--avatar-to": `var(${STARTS[to]})`,
+    "--avatar-base": `${(h >>> 16) % 360}deg`,
+  } as CSSProperties;
 }
 
 /**
  * A person's avatar: a gradient generated from their user id rather than a
  * picture. The id, not the email, seeds it, so it survives a changed email.
  * A picture can replace it once users can upload one.
+ *
+ * Inside an `.avatar-host` it turns half a revolution on hover.
  *
  * Decorative: the name always sits beside it, so it is hidden from assistive
  * technology.
@@ -48,8 +58,8 @@ export function UserAvatar({ seed, className }: { seed: string; className?: stri
   return (
     <span
       aria-hidden
-      className={cn("size-6 shrink-0 rounded-full", className)}
-      style={{ backgroundImage: avatarGradient(seed) }}
+      className={cn("user-avatar size-6 shrink-0 rounded-full", className)}
+      style={avatarVars(seed)}
     />
   );
 }

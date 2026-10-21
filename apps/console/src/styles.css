@@ -121,3 +121,72 @@ select:-webkit-autofill {
   -webkit-text-fill-color: var(--color-foreground);
   caret-color: var(--color-foreground);
 }
+
+/* The generated avatar (`components/user-avatar.tsx`): two design-system
+   gradient starts at an angle, all set per person as custom properties.
+   `--avatar-angle` is registered so it interpolates: on its host's hover the
+   gradient turns half a revolution instead of jumping. */
+@property --avatar-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.user-avatar {
+  --avatar-angle: var(--avatar-base);
+  background-image: linear-gradient(
+    var(--avatar-angle),
+    var(--avatar-from) 15%,
+    var(--avatar-to) 85%
+  );
+  transition:
+    --avatar-angle 600ms var(--zl-easing-standard),
+    box-shadow var(--zl-duration-base) var(--zl-easing-standard);
+}
+
+/* A hover host (the sidebar footer) carries the same colours: on hover or
+   while its menu is open, a wash of them sweeps in behind its content and
+   the avatar turns and takes a faint ring of its own first colour. */
+.avatar-host {
+  position: relative;
+  isolation: isolate;
+}
+
+.avatar-host::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in oklab, var(--avatar-from) 22%, transparent),
+    color-mix(in oklab, var(--avatar-to) 10%, transparent) 50%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  background-position: 100% 0;
+  opacity: 0;
+  transition:
+    opacity var(--zl-duration-slow) var(--zl-easing-standard),
+    background-position 600ms var(--zl-easing-standard);
+}
+
+.avatar-host:hover::before,
+.avatar-host[data-state="open"]::before {
+  opacity: 1;
+  background-position: 0 0;
+}
+
+.avatar-host:hover .user-avatar,
+.avatar-host[data-state="open"] .user-avatar {
+  --avatar-angle: calc(var(--avatar-base) + 180deg);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--avatar-from) 35%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-avatar,
+  .avatar-host::before {
+    transition: none;
+  }
+}

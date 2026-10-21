@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserAvatar } from "@/components/user-avatar";
+import { UserAvatar, avatarVars } from "@/components/user-avatar";
 import { useSessionCached } from "@/hooks/use-async";
 import { readAccountTeam } from "@/lib/account";
 import { type ThemePreference, useTheme } from "@/theme";
@@ -119,7 +119,9 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             size="lg"
             tooltip={name}
             aria-label={`Account: ${name}`}
-            className="h-auto min-h-12 py-2"
+            // The avatar's colours sweep across the row on hover (`styles.css`).
+            className="avatar-host h-auto min-h-12 py-2"
+            style={avatarVars(user?.userId ?? email)}
           >
             {/* 24px in the footer row, generated from the user id. */}
             <UserAvatar seed={user?.userId ?? email} />
