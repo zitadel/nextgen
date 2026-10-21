@@ -1031,6 +1031,94 @@
       ]
     },
     {
+      "id": "api",
+      "group": "Resource commands",
+      "description": "Call any operation of the Zitadel API, with this project's server and project secret.",
+      "args": [
+        {
+          "name": "operation",
+          "description": "An operationId (queryUsers) or a path (/users/query), then the path parameters. Omit it to choose one."
+        }
+      ],
+      "flags": [
+        {
+          "name": "method",
+          "char": "X",
+          "description": "The HTTP method, to choose among a path's operations.",
+          "type": "option"
+        },
+        {
+          "name": "field",
+          "char": "F",
+          "description": "A field: name=value, or name:=json for JSON, typed by the operation's schema. A query parameter's name sets it; any other name is a dot path into the body. Repeatable.",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "input",
+          "description": "Read the JSON body from a file, or from stdin with -. --field lays over it.",
+          "type": "option"
+        },
+        {
+          "name": "paginate",
+          "description": "Follow next_page_token to the last page, and answer with every page's items in one list.",
+          "type": "boolean"
+        }
+      ],
+      "examples": [
+        {
+          "command": "api queryUsers -F limit=5"
+        },
+        {
+          "command": "api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W"
+        },
+        {
+          "command": "api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json"
+        },
+        {
+          "command": "api listEvents -F category=auth --paginate --json"
+        },
+        {
+          "command": "api createTeam -F name=Support --dry-run"
+        },
+        {
+          "command": "api createTeam --input - < team.json"
+        }
+      ]
+    },
+    {
+      "id": "api ls",
+      "group": "Resource commands",
+      "description": "List the operations of the Zitadel API that `zitadel api` calls.",
+      "args": [
+        {
+          "name": "filter",
+          "description": "Only operations whose id, path, summary or tag contains this text."
+        }
+      ],
+      "flags": [
+        {
+          "name": "tag",
+          "description": "Only the operations of this part of the API (Users, Teams, …).",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "api ls"
+        },
+        {
+          "command": "api ls passkey"
+        },
+        {
+          "command": "api ls --tag Users --json"
+        },
+        {
+          "command": "api ls --json | jq -r '.data.operations[] | select(.command == null) | .id'"
+        }
+      ]
+    },
+    {
       "id": "events get",
       "group": "Resource commands",
       "description": "Get one event by id.",

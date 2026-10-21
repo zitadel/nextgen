@@ -161,6 +161,47 @@ test("every page negotiates Markdown through Accept", async ({ request }) => {
   expect(failures(results), "pages that do not negotiate Markdown").toEqual([]);
 });
 
+type Fragment = {
+  paths?: Record<string, Record<string, Operation>>;
+  components?: { parameters?: Record<string, Parameter> };
+};
+type Operation = {
+  operationId?: string;
+  security?: Record<string, unknown>[];
+  parameters?: (Parameter | { $ref: string })[];
+};
+type Parameter = { in?: string };
+
+/** The operation of an operation page, from the OpenAPI its Markdown ends with. */
+function operationOf(markdown: string): { operation: Operation; fragment: Fragment } | undefined {
+  const json = /as OpenAPI:\n\n```json\n([\s\S]*?)\n```/.exec(markdown)?.[1];
+  if (!json) return undefined;
+  const fragment = JSON.parse(json) as Fragment;
+  const operation = Object.values(Object.values(fragment.paths ?? {})[0] ?? {})[0];
+  return operation && { operation, fragment };
+}
+
+/**
+ * `api <operationId>` for an operation `zitadel api` calls: one a project
+ * secret or nothing authenticates, without a cookie parameter.
+ */
+function apiCommand(found: ReturnType<typeof operationOf>): string | undefined {
+  if (!found) return undefined;
+  const { operation, fragment } = found;
+  const security = operation.security ?? [];
+  const session =
+    security.length > 0 &&
+    !security.some((item) => Object.keys(item).length === 0 || "oauth2" in item);
+  const cookie = (operation.parameters ?? []).some((parameter) => {
+    const resolved =
+      "$ref" in parameter
+        ? fragment.components?.parameters?.[parameter.$ref.split("/").pop() ?? ""]
+        : parameter;
+    return resolved?.in === "cookie";
+  });
+  return session || cookie ? undefined : `api ${operation.operationId}`;
+}
+
 test("every API operation shows its call through @zitadel/api, its CLI command and cURL", async ({
   request,
 }) => {
@@ -180,8 +221,10 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
     operations++;
     if (!call.test(markdown)) return `${markdownUrl(url)}: no call through @zitadel/api`;
     // An operation the spec names a CLI command for (`x-zitadel-cli`, which
-    // its OpenAPI shows) is also run with that command (lib/cli-sample.ts).
-    const command = /"x-zitadel-cli": "([^"]+)"/.exec(markdown)?.[1];
+    // its OpenAPI shows) is also run with that command, and one the CLI can
+    // call without one with `zitadel api` (lib/cli-sample.ts).
+    const command =
+      /"x-zitadel-cli": "([^"]+)"/.exec(markdown)?.[1] ?? apiCommand(operationOf(markdown));
     if (command && !markdown.includes(`npx @zitadel/cli@alpha ${command}`)) {
       return `${markdownUrl(url)}: no \`${command}\` command`;
     }

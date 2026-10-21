@@ -227,8 +227,8 @@ function operationSamples(
   const request = defaultRequest(operation, pathItem, method);
   return {
     typescript: sdkSample(operation, path, pathItem, request),
-    command: cliCommand(operation),
-    cli: cliSample(operation, path, request),
+    command: cliCommand(operation, pathItem),
+    cli: cliSample(operation, path, pathItem, request),
     curl: curlSample(operation, path, request),
   };
 }
