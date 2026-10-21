@@ -148,6 +148,9 @@ type userService struct {
 	schemaStore domain.JSONSchemaStore
 	hashers     ProjectHasherResolver
 	refs        UserRefResolver
+	// builtinBases lets a filter on a built-in schema's `$id` match the users
+	// stored under any of its bases, the way schemaStore resolves one.
+	builtinBases domain.BuiltinSchemaBases
 }
 
 // NewUserService returns the interface rather than *userService, deliberately
@@ -161,12 +164,14 @@ func NewUserService(
 	schemaStore domain.JSONSchemaStore,
 	hashers ProjectHasherResolver,
 	refs UserRefResolver,
+	builtinBases domain.BuiltinSchemaBases,
 ) UserService {
 	return &userService{
-		v2Pool:      v2Pool,
-		schemaStore: schemaStore,
-		hashers:     hashers,
-		refs:        refs,
+		v2Pool:       v2Pool,
+		schemaStore:  schemaStore,
+		hashers:      hashers,
+		refs:         refs,
+		builtinBases: builtinBases,
 	}
 }
 
@@ -289,7 +294,7 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *L
 	filters := make([]database.Filter[domain.UserField], 0, len(columnFilters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID))
 	for _, f := range columnFilters {
-		filter, err := userFilter(f)
+		filter, err := userFilter(f, s.builtinBases)
 		if err != nil {
 			return nil, err
 		}
@@ -361,8 +366,10 @@ func splitUserFilters(filters []Filter) ([]Filter, UserQueryOptions, error) {
 // userFilter maps an API filter predicate to a storage filter. Operations the
 // v2 filter layer cannot express return [domain.ErrNotImplemented];
 // invalid field/operation/value combinations return [domain.ErrRequestInvalid].
-// [splitUserFilters] has already taken team_id out.
-func userFilter(f Filter) (database.Filter[domain.UserField], error) {
+// [splitUserFilters] has already taken team_id out. A `schema` equality names
+// a built-in schema's `$id` under any of its bases: users are stored under
+// the base their project holds the row at, whichever one the caller used.
+func userFilter(f Filter, builtinBases domain.BuiltinSchemaBases) (database.Filter[domain.UserField], error) {
 	switch f.Field {
 	case userFieldCreatedAt:
 		return createdAtFilter(f.Operation, database.Col(domain.UserFieldCreatedAt), f.Value)
@@ -376,6 +383,13 @@ func userFilter(f Filter) (database.Filter[domain.UserField], error) {
 		value, err := stringFilterValue(f)
 		if err != nil {
 			return nil, err
+		}
+		if equivalents := builtinBases.Equivalents(value); f.Operation == filterOpEquals && len(equivalents) > 1 {
+			spellings := make([]database.Filter[domain.UserField], 0, len(equivalents))
+			for _, url := range equivalents {
+				spellings = append(spellings, database.StringEqual(database.Col(domain.UserFieldSchemaURL), url))
+			}
+			return database.Or(spellings...), nil
 		}
 		return stringFilter(f.Operation, database.Col(domain.UserFieldSchemaURL), value)
 	case userFieldStatus:
@@ -740,10 +754,12 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 
 	o.schemaJSON = schemaEntity.Schema
 	o.CreateUser, err = domain.NewCreateUser(domain.CreateUserParams{
-		ProjectID:  o.ProjectID,
-		TeamID:     o.TeamID,
-		ID:         o.ID,
-		SchemaURL:  o.SchemaURL,
+		ProjectID: o.ProjectID,
+		TeamID:    o.TeamID,
+		ID:        o.ID,
+		// The row that was found, which can sit under another built-in base
+		// than the one the caller named (domain.BuiltinSchemaBases).
+		SchemaURL:  schemaEntity.URL,
 		Schema:     schemaEntity.Schema,
 		Attributes: o.Attributes,
 	})
@@ -884,7 +900,9 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
-	if targetSchemaURL != user.SchemaURL {
+	// Compare rows, not spellings: the store resolves a built-in schema named
+	// under another base to the row the user may already be stored under.
+	if targetSchema.URL != user.SchemaURL {
 		currentSchema, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, user.SchemaURL)
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to get the user's current schema from database")
@@ -897,7 +915,7 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 	o.schemaJSON = targetSchema.Schema
 	o.patch, err = domain.NewPatchUser(domain.PatchUserParams{
 		Current:              user,
-		SchemaURL:            targetSchemaURL,
+		SchemaURL:            targetSchema.URL,
 		Schema:               targetSchema.Schema,
 		AttributesPatch:      o.Attributes,
 		StoredRegistryScopes: storedScopes,

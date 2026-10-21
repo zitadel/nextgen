@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import "./zl-passkey.js";
 import type { ZlPasskey } from "./zl-passkey.js";
@@ -165,6 +165,26 @@ describe("<zl-passkey>", () => {
     expect(typeof result.proof.response.authenticatorData).toBe("string");
     expect(typeof result.proof.response.signature).toBe("string");
     expect(result.proof.authenticatorAttachment).toBe("platform");
+  });
+
+  it("keeps zl-passkey-result inside the widget", async () => {
+    // Arrange
+    const heardOnPage = vi.fn();
+    const host = document.body.appendChild(document.createElement("div"));
+    const root = host.attachShadow({ mode: "open" });
+    const element = create({ ceremony: "authenticate", options: { challenge: "AAAA" } });
+    window.addEventListener("zl-passkey-result", heardOnPage, true);
+    onTestFinished(() => {
+      window.removeEventListener("zl-passkey-result", heardOnPage, true);
+      host.remove();
+    });
+
+    // Act
+    root.append(element);
+    await nextEvent(element, "zl-passkey-result");
+
+    // Assert
+    expect(heardOnPage).not.toHaveBeenCalled();
   });
 
   it("decodes allowCredentials descriptors into ArrayBuffer ids", async () => {

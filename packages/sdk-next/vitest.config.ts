@@ -42,7 +42,9 @@ export default defineConfig({
     projects: [
       {
         cacheDir: ".vitest/jsdom",
-        resolve: { alias },
+        // The browser build of @lit/react binds element properties; its Node
+        // build only collects them for server rendering.
+        resolve: { alias, conditions: ["browser"] },
         test: {
           name: "jsdom",
           globals: true,
@@ -53,16 +55,6 @@ export default defineConfig({
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
       edgeProject({
-        // `/middleware` is the SDK's edge entry (see the README), and the JWT
-        // helpers it verifies sessions with: both must run in the edge VM. So
-        // must `/client` (its edge spec), which registers the elements in the
-        // browser.
-        include: [
-          "src/__tests__/middleware.test.ts",
-          "src/__tests__/lib/jwt.test.ts",
-          "src/__tests__/index.test.ts",
-          "src/__tests__/server.test.ts",
-        ],
         // Next's edge bundler adds both.
         conditions: ["react-server", "edge-light"],
         plugins: [clientReferences()],

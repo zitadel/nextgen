@@ -86,6 +86,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 <zitadel-auth-login [project]="project" theme="light" (flowComplete)="track($event)" />
 ```
 
+The `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` details carry a `waitUntil(promise)`; call it from your handler to make the widget wait for your async work before it navigates.
+
 ## Standard HTML attributes
 
 The Angular components are tags (`zitadel-auth-login`, `zitadel-auth-logout` and `zitadel-auth-session`), and a tag already carries the standard HTML attributes: put `class`, `style`, `id`, `data-*` or `aria-*` on it and Angular applies them to the tag, not to the widget inside it.

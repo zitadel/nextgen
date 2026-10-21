@@ -68,7 +68,7 @@ func TestResolveUserSchema(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveUserSchema(t.Context(), schemas, "proj", tt.ref)
+			got, err := resolveUserSchema(t.Context(), schemas, domain.BuiltinSchemaBases{}, "proj", tt.ref)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				return
@@ -77,6 +77,22 @@ func TestResolveUserSchema(t *testing.T) {
 			assert.Same(t, tt.want, got)
 		})
 	}
+}
+
+// A built-in schema's `$id` resolves under whichever base the project stores
+// it at, so a flow may name the default schema under a base it was not
+// seeded under.
+func TestResolveUserSchemaUnderAnotherBuiltinBase(t *testing.T) {
+	bases := domain.NewBuiltinSchemaBases("https://schemas.test/builtin/v1", "https://schemas.test/builtin/v0")
+	stored := &domain.JSONSchema{URL: "https://schemas.test/builtin/v1/default-human-user.json", ObjectType: new("human-user")}
+	schemas := fakeUserSchemas{stored}
+
+	got, err := resolveUserSchema(t.Context(), schemas, bases, "proj", "https://schemas.test/builtin/v0/default-human-user.json")
+	require.NoError(t, err)
+	assert.Same(t, stored, got)
+
+	_, err = resolveUserSchema(t.Context(), schemas, bases, "proj", "https://schemas.test/builtin/v0/other.json")
+	assert.ErrorIs(t, err, domain.ErrJSONSchemaNotFound())
 }
 
 func TestSameUserSchema(t *testing.T) {

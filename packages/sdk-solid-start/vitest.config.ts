@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { baseTest, edgeProject } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
 
 export default defineConfig({
   cacheDir: ".vitest",
@@ -15,18 +15,11 @@ export default defineConfig({
           globals: true,
           environment: "node",
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
+          exclude: [edgeSpecs],
         },
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
-      edgeProject({
-        // The `/server` entry is what runs on the edge, with the JWT helpers it
-        // verifies sessions with: both must run in the edge VM.
-        include: [
-          "src/__tests__/middleware.test.ts",
-          "src/__tests__/session-cookies.test.ts",
-          "src/__tests__/lib/jwt.test.ts",
-        ],
-      }),
+      edgeProject({}),
     ],
   },
 });

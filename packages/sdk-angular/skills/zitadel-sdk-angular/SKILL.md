@@ -5,8 +5,8 @@ description: >-
   @zitadel/sdk-angular — the client-side SPA components for login,
   registration, logout, and the signed-in session card. Use when adding or
   wiring Zitadel auth, a login or registration screen, or session handling into
-  an Angular app, and especially when the app already exists (the CLI cannot
-  patch an existing Angular app, so wire it in by hand with this skill).
+  an Angular app, and especially when the app already exists and the CLI's
+  setup stops on it (then wire it in by hand with this skill).
 ---
 
 # @zitadel/sdk-angular
@@ -18,12 +18,13 @@ Angular wrapper components for the Zitadel auth UI in a client-side SPA.
 You are adding Zitadel login, registration, logout, or session handling to an
 Angular app and wiring the auth UI in by hand.
 
-The `zitadel` CLI can scaffold a *fresh* Angular app
-(`npx @zitadel/cli@alpha setup --framework angular`) with this SDK already wired in, and it can
-patch some existing frameworks (e.g. Next.js). It **cannot** integrate into an
-**existing** Angular app — it only scaffolds Angular into an empty directory. So
-for an app that already exists, do **not** rely on the CLI; follow this skill to
-install the package and wire the components in manually.
+The `zitadel` CLI scaffolds a *fresh* Angular app
+(`npx @zitadel/cli@alpha setup --framework angular`) with this SDK already wired in. In an
+**existing** Angular app it writes the root component to `src/app/app.ts`, and
+stops with `E_CONFLICT` when the app has one there, or when `src/main.ts`
+bootstraps a root from another file (Angular 17–19's
+`src/app/app.component.ts`). When setup stops, follow this skill to install the
+package and wire the components in manually.
 
 ## Install
 
@@ -118,6 +119,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 ```html
 <zitadel-auth-login [project]="project" theme="light" (flowComplete)="track($event)" />
 ```
+
+The `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` details carry a `waitUntil(promise)`; call it from your handler to make the widget wait for your async work before it navigates.
 
 ## Read these, don't guess
 

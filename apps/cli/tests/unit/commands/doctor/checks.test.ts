@@ -34,7 +34,7 @@ const tempDirs: string[] = [];
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
   objectType: "human-user",
-  metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+  metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
   "x-auth-methods": { passkey: { enabled: true } },
   properties: { email: { type: "string" } },
 };
@@ -456,7 +456,7 @@ describe("DependencyCheck", () => {
     ],
     [
       "tanstack-start",
-      { react: "^19", "@tanstack/react-start": "^1" },
+      { react: "^19", "@tanstack/react-start": "^1.168.10" },
       "@zitadel/sdk-tanstack-start",
     ],
     [
