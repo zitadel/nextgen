@@ -161,6 +161,16 @@ function apiErrorCode(error: unknown): string {
     : "";
 }
 
+/**
+ * Orchestrator element `<zitadel-login>` — drives a login flow end to end and
+ * surfaces its progress through the public `zitadel-*` events.
+ *
+ * @fires {CustomEvent<ZitadelFlowStepDetail>} zitadel-flow-step - A new flow step was rendered.
+ * @fires {CustomEvent<ZitadelFlowInputDetail>} zitadel-flow-input - A field in the current step changed.
+ * @fires {CustomEvent<ZitadelFlowRedirectDetail>} zitadel-flow-redirect - The flow is navigating to an external target.
+ * @fires {CustomEvent<ZitadelFlowCompleteDetail>} zitadel-flow-complete - The flow reached a terminal step.
+ * @fires {CustomEvent<ZitadelFlowErrorDetail>} zitadel-flow-error - The flow failed; carries the error message.
+ */
 @customElement("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
