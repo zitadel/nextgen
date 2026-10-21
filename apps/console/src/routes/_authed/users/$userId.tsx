@@ -148,7 +148,7 @@ function UserDetail() {
           <Card className={DETAIL_CARD}>
             {/* The row wraps rather than truncate the id, and the box grows
                 past its 24px when the id breaks across lines. */}
-            <div className="flex flex-wrap items-center gap-2 px-6 pt-5 pb-6">
+            <div className="flex flex-wrap items-center gap-2 px-6 pt-5 pb-4">
               <span className="text-foreground font-serif text-base leading-5">User schema</span>
               {schema && schemaId && (
                 <Button
@@ -171,14 +171,15 @@ function UserDetail() {
                 </Button>
               )}
             </div>
+            <Separator className={PANEL_RULE} />
             {fields.length === 0 ? (
-              <p className="text-muted-foreground px-6 pb-5 text-sm">
+              <p className="text-muted-foreground px-6 pt-4 pb-5 text-sm">
                 {schema
                   ? "This schema defines no attributes that can be shown."
                   : "This user’s schema could not be read, so its attributes cannot be labelled."}
               </p>
             ) : (
-              <FieldGroup className="gap-4 px-6 pb-5">
+              <FieldGroup className="gap-4 px-6 pt-4 pb-5">
                 {fields.map((entry) => (
                   <ProfileField
                     key={entry.key}
