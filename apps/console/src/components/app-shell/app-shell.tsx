@@ -93,12 +93,6 @@ const BRAND_HEADER =
 /** The design's `Sidebar / Header Button`: 28px square around a 16px glyph. */
 const HEADER_BUTTON = "size-7! text-sidebar-foreground";
 
-/**
- * The back row is a full-width 32px row while extended and a 28px square in the
- * rail, so its collapsed size is a variant rather than a flat override.
- */
-const BACK_BUTTON = "group-data-[collapsible=icon]:size-7!";
-
 // The rule under the back row sits inside its 48px, so the bottom inset gives
 // up the pixel the rule takes.
 const SETTINGS_HEADER =
@@ -176,7 +170,7 @@ function SettingsHeader() {
           CSS deciding which one is real. */}
       <SidebarMenu className="group-data-[collapsible=icon]:items-center">
         <SidebarMenuItem>
-          <SidebarMenuButton asChild tooltip="Back to dashboard" className={BACK_BUTTON}>
+          <SidebarMenuButton asChild tooltip="Back to dashboard">
             <Link to="/">
               <ArrowLeft aria-hidden />
               <span>Back to dashboard</span>
@@ -247,8 +241,12 @@ function SettingsNav() {
   );
 }
 
-/** Both navs: a 2px gap between rows, widened to the rail's 4px when collapsed. */
-const NAV_MENU = "gap-0.5 group-data-[collapsible=icon]:gap-1";
+/**
+ * Both navs: a 2px gap between rows in both states. Rows keep their height on
+ * the rail too (the back row is the rail's 32px square, as every row is), so
+ * collapsing moves nothing vertically.
+ */
+const NAV_MENU = "gap-0.5";
 
 /** Portal nav: the flat list, with `User schemas` nested under `Users`. */
 function PortalNav() {
