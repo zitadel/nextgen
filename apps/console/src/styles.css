@@ -124,12 +124,23 @@ select:-webkit-autofill {
 
 /* The generated avatar (`components/user-avatar.tsx`): two design-system
    gradient starts at an angle, all set per person as custom properties.
-   `--avatar-angle` is registered so it interpolates: on its host's hover the
-   gradient turns half a revolution instead of jumping. */
+   `--avatar-angle` is registered so it interpolates: the gradient drifts one
+   slow revolution a minute, like something alive, and each person starts at
+   their own point in it (`--avatar-phase`), so a list of avatars never turns
+   in step. */
 @property --avatar-angle {
   syntax: "<angle>";
   inherits: false;
   initial-value: 0deg;
+}
+
+@keyframes avatar-drift {
+  from {
+    --avatar-angle: var(--avatar-base);
+  }
+  to {
+    --avatar-angle: calc(var(--avatar-base) + 360deg);
+  }
 }
 
 .user-avatar {
@@ -139,14 +150,12 @@ select:-webkit-autofill {
     var(--avatar-from) 15%,
     var(--avatar-to) 85%
   );
-  transition:
-    --avatar-angle 600ms var(--zl-easing-standard),
-    box-shadow var(--zl-duration-base) var(--zl-easing-standard);
+  animation: avatar-drift 60s linear infinite;
+  animation-delay: var(--avatar-phase);
 }
 
 /* A hover host (the sidebar footer) carries the same colours: on hover or
-   while its menu is open, a wash of them sweeps in behind its content and
-   the avatar turns and takes a faint ring of its own first colour. */
+   while its menu is open, a wash of them sweeps in behind its content. */
 .avatar-host {
   position: relative;
   isolation: isolate;
@@ -178,14 +187,11 @@ select:-webkit-autofill {
   background-position: 0 0;
 }
 
-.avatar-host:hover .user-avatar,
-.avatar-host[data-state="open"] .user-avatar {
-  --avatar-angle: calc(var(--avatar-base) + 180deg);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--avatar-from) 35%, transparent);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .user-avatar,
+  .user-avatar {
+    animation: none;
+  }
+
   .avatar-host::before {
     transition: none;
   }

@@ -26,8 +26,8 @@ function hash(seed: string): number {
 
 /**
  * The colours for a seed, as the custom properties `.user-avatar` paints with
- * (`styles.css`): two different design-system starts and an angle, all taken
- * from the hash, so a person keeps theirs on every screen and device and two
+ * (`styles.css`): two different design-system starts, an angle and where in
+ * its slow drift it starts, all taken from the hash, so a person keeps theirs on every screen and device and two
  * people rarely share one.
  *
  * Set on a hover host as well, they tint its hover wash with the same colours.
@@ -41,6 +41,8 @@ export function avatarVars(seed: string): CSSProperties {
     "--avatar-from": `var(${STARTS[from]})`,
     "--avatar-to": `var(${STARTS[to]})`,
     "--avatar-base": `${(h >>> 16) % 360}deg`,
+    // A negative delay starts the minute-long drift part-way through.
+    "--avatar-phase": `-${(h >>> 4) % 60}s`,
   } as CSSProperties;
 }
 
@@ -49,7 +51,8 @@ export function avatarVars(seed: string): CSSProperties {
  * picture. The id, not the email, seeds it, so it survives a changed email.
  * A picture can replace it once users can upload one.
  *
- * Inside an `.avatar-host` it turns half a revolution on hover.
+ * It drifts one slow revolution a minute, unless the person asked for reduced
+ * motion.
  *
  * Decorative: the name always sits beside it, so it is hidden from assistive
  * technology.
