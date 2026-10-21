@@ -40,3 +40,13 @@ func TestEnsureListOptions_preservesExplicitOrder(t *testing.T) {
 	assert.Equal(t, in.Pagination.OrderBy, got.Pagination.OrderBy)
 	assert.NotSame(t, in, got)
 }
+
+func TestByIDs(t *testing.T) {
+	t.Parallel()
+
+	filter := ByIDs("proj_1", []string{"fd_a", "fd_b"})
+	require.NotNil(t, filter)
+	assert.True(t, filter.Restricts(database.Col(domain.FlowDefinitionFieldProjectID)))
+	assert.True(t, filter.Restricts(database.Col(domain.FlowDefinitionFieldID)))
+	assert.False(t, filter.Restricts(database.Col(domain.FlowDefinitionFieldName)))
+}

@@ -209,6 +209,30 @@ func ValidationLocation(ve *types.ValidationError) string {
 	return "/" + strings.Join(*ve.Loc, "/")
 }
 
+func ValidationErrAttributeKey(ve *types.ValidationError, doc map[string]any) (key AttributeKey, complete bool) {
+	if ve.Loc == nil {
+		return "", true
+	}
+	var instance any = doc
+	for _, segment := range *ve.Loc {
+		keyword, name, _ := strings.Cut(segment, "/")
+		switch keyword {
+		case "properties", "patternProperties", "additionalProperties", "unevaluatedProperties", "required":
+			object, ok := instance.(map[string]any)
+			if !ok {
+				return key, false
+			}
+			key = key.AppendNode(name)
+			instance = object[name]
+		case "allOf", "dependentSchemas", "dependencies":
+			// Applied to the same instance.
+		default:
+			return key, false
+		}
+	}
+	return key, true
+}
+
 // compileMetaSchema compiles a meta-schema from a rendered JSON document.
 func compileMetaSchema(metaURL string, rendered map[string][]byte) (*jsonschema.Schema, error) {
 	cache := make(map[string]*jsonschema.Schema)

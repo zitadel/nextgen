@@ -246,3 +246,122 @@ func TestFlowStateMachine_Process_ConflictPasskeySignsInBoundUser(t *testing.T) 
 	assert.Equal(t, "handoff_01TEST", verified.HandoffToken)
 	assert.Equal(t, "user_alice", verified.State.CollectedData.UserID)
 }
+
+// ssoConflictWorld is ssoRenderWorld whose sign-in step routes a collision to
+// a conflict step shaped like the one `zitadel auth-method sso enable` writes:
+// a password, a passkey, and both providers.
+func ssoConflictWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+	t.Helper()
+	w, def, state := ssoRenderWorld(t)
+	def.Steps[0].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = domain.FlowStepTransition{Target: "sso-conflict"}
+	step := conflictStep()
+	step.SSOProviders = []string{"google", "github"}
+	step.Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = domain.FlowStepTransition{Target: "done"}
+	delete(step.Transitions, "sign_in")
+	step.Actions = step.Actions[:2]
+	def.Steps = append(def.Steps, step)
+	w.ssoProviders.EXPECT().
+		Resolve(gomock.Any(), testProjectID, "sso-conflict", []string{"google", "github"}).
+		Return([]domain.FlowSSOProvider{
+			{ID: "google", Name: "Google", ConnectionID: "idp-1"},
+			{ID: "github", Name: "GitHub", ConnectionID: "idp-2"},
+		}, nil).
+		AnyTimes()
+	return w, def, state
+}
+
+func conflictParked(verified bool) *domain.FlowSSOParkedIdentity {
+	return &domain.FlowSSOParkedIdentity{
+		CheckID:      "ch-1",
+		ConnectionID: "idp-1",
+		Subject:      "sub-1",
+		Claims:       map[string]any{"email": "alice@example.com"},
+		Verified:     map[string]bool{"email": verified},
+	}
+}
+
+func providerIDs(providers []domain.FlowSSOProvider) []string {
+	ids := make([]string, 0, len(providers))
+	for _, p := range providers {
+		ids = append(ids, p.ID)
+	}
+	return ids
+}
+
+func hasAction(step *domain.FlowStep, name string) bool {
+	for _, a := range step.Actions {
+		if a.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// After a provider's email collides, the conflict step names the account by
+// the address the provider verified, leaves out the provider that collided,
+// and offers a passkey only to an account that has one.
+func TestFlowStateMachine_Render_SSOConflictNamesVerifiedAccountAndDropsCollidingProvider(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoConflictWorld(t)
+	w.expectParked(conflictParked(true), nil)
+	w.expectOwner("email", "alice@example.com", "user-9")
+	w.expectBindCollision("user-9", nil)
+	w.ssoIdentities.EXPECT().UserHasPasskey(gomock.Any(), testProjectID, "user-9").Return(false, nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	require.Equal(t, "sso-conflict", result.Step.Name)
+	require.NotNil(t, result.Step.Identifier)
+	assert.Equal(t, "alice@example.com", result.Step.Identifier.Value)
+	assert.Equal(t, []string{"github"}, providerIDs(result.Step.SSOProviders), "the provider that collided is not offered again")
+	assert.False(t, hasAction(result.Step, domain.FlowActionPasskey), "an account without a passkey is not offered one")
+	assert.True(t, hasAction(result.Step, domain.FlowActionSubmit))
+	assert.Equal(t, "idp-1", result.State.CollectedData.SSOConflictConnectionID)
+}
+
+// An email the provider did not verify is not shown: the visitor has not
+// proved they hold it. The passkey stays for an account that has one.
+func TestFlowStateMachine_Render_SSOConflictDoesNotNameUnverifiedAccount(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoConflictWorld(t)
+	w.expectParked(conflictParked(false), nil)
+	w.expectOwner("email", "alice@example.com", "user-9")
+	w.expectBindCollision("user-9", nil)
+	w.ssoIdentities.EXPECT().UserHasPasskey(gomock.Any(), testProjectID, "user-9").Return(true, nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	require.Equal(t, "sso-conflict", result.Step.Name)
+	assert.Nil(t, result.Step.Identifier)
+	assert.Equal(t, []string{"github"}, providerIDs(result.Step.SSOProviders))
+	assert.True(t, hasAction(result.Step, domain.FlowActionPasskey))
+}
+
+// An address typed earlier on the flow that is not the one that collided
+// would name another account, so it is dropped.
+func TestFlowStateMachine_Render_SSOConflictDropsOtherTypedIdentifier(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoConflictWorld(t)
+	state.CollectedData.UserData = map[string]any{"email": "someone-else@example.com"}
+	w.expectParked(conflictParked(false), nil)
+	w.expectOwner("email", "alice@example.com", "user-9")
+	w.expectBindCollision("user-9", nil)
+	w.ssoIdentities.EXPECT().UserHasPasskey(gomock.Any(), testProjectID, "user-9").Return(true, nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	require.Equal(t, "sso-conflict", result.Step.Name)
+	assert.Nil(t, result.Step.Identifier)
+}
+
+// Releasing the bound user releases what the collision recorded with it.
+func TestFlowStateMachine_Process_SSOConflictClearedWithBoundUser(t *testing.T) {
+	t.Parallel()
+	w, def, state := conflictWorld(t)
+	state.CollectedData.SSOConflictConnectionID = "idp-1"
+	w.authAttemptService.EXPECT().Start(gomock.Any(), attemptFor(testProjectID, "sess-1")).Return("attempt-2", nil)
+
+	result, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{Action: "sign_in"})
+	require.NoError(t, err)
+	assert.Empty(t, result.State.CollectedData.SSOConflictConnectionID)
+}

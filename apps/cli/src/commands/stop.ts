@@ -78,7 +78,7 @@ export default class Stop extends BaseCommand {
   }
 
   private async stopAllManagedRuntimes(): Promise<JsonEnvelope> {
-    const sweep = await LocalServer.stopAll();
+    const sweep = await LocalServer.stopAll(this.localServers());
     if (!sweep.supported) {
       return this.emit({
         status: "ok",

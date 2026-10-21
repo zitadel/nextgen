@@ -42,7 +42,7 @@ func (r *FlowSSOProviderResolver) Resolve(ctx context.Context, projectID, stepNa
 		if err != nil {
 			return nil, domain.ErrInternal(err).WithMessage("failed to read identity provider connection document")
 		}
-		provider := domain.FlowSSOProvider{ID: connection.Slug, Name: doc.DisplayName}
+		provider := domain.FlowSSOProvider{ID: connection.Slug, Name: doc.DisplayName, ConnectionID: connection.ID}
 		if doc.Template != nil {
 			provider.Template = *doc.Template
 		}

@@ -42,15 +42,15 @@ Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 - [Quickstart](/docs/get-started/quickstart.md): from an empty folder to working local auth
 - [Agent setup](/docs/get-started/agents.md): the CLI's JSON contract and the browser proof
 - [Flows and schemas](/docs/concepts/flows-and-schemas.md): how login flows, user schemas and the generated UI relate
-- [Plan and apply](/docs/cli/plan-apply.md): edit the local configuration and sync it
-- [Add social sign-in](/docs/cli/social-sign-in.md): "Sign in with Google" or any OpenID Connect provider, with \`zitadel auth-method sso enable\`
-- [Customize the login design](/docs/cli/customize-design.md): a starter design, your branding, published as a revision
+- [Edit the login flow and schema](/docs/guides/plan-apply.md): edit the local configuration and sync it
+- [Add social sign-in](/docs/guides/social-sign-in.md): "Sign in with Google" or any OpenID Connect provider, with \`zitadel auth-method sso enable\`
+- [Customize the login design](/docs/guides/customize-design.md): a starter design, your branding, published as a revision
 - [Docs MCP server](/docs/api/mcp): the tools search, list_pages and get_page
 
 ## Optional
 
-- [Local runtime](/docs/concepts/local-runtime.md): how the CLI starts and stores local Zitadel state
-- [Repo configuration](/docs/concepts/repo-config.md): how the app's auth configuration stays reviewable
+- [Run Zitadel locally](/docs/guides/local-runtime.md): how the CLI starts and stores local Zitadel state
+- [Configuration as code](/docs/concepts/repo-config.md): how the app's auth configuration stays reviewable
 - [Source](https://github.com/zitadel/nextgen): the repository on GitHub
 - [Vision](https://github.com/zitadel/nextgen/blob/main/VISION.md): the four pillars and where each stands
 - [Zitadel v4](https://zitadel.com): the current release, for production

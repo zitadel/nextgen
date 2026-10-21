@@ -14,9 +14,13 @@ func (h Handler) CreateAuthAttempt(ctx context.Context, req *api.CreateAuthAttem
 	input := service.CreateAuthAttemptInput{
 		ProjectID: string(req.GetProjectID()),
 	}
-	if sessionID, ok := req.GetSessionID().Get(); ok {
-		input.SessionID = new(string(sessionID))
+	sessionID, err := h.provenSessionID(ctx, input.ProjectID,
+		string(req.GetSessionID().Or("")), string(req.GetSessionToken().Or("")),
+		domain.ErrAuthAttemptInvalidRequest)
+	if err != nil {
+		return nil, err
 	}
+	input.SessionID = sessionID
 	// TODO: handle challenge nonce in the future
 
 	attempt, err := h.authAttemptService.Create(ctx, input)

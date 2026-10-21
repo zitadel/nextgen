@@ -300,6 +300,8 @@ describe("server-render cases ↔ SDK specs", () => {
     SDK_SPECS["sdk-vue"].client,
     ANGULAR_SPEC,
     SDK_SPECS["sdk-svelte"].client,
+    SDK_SPECS["sdk-solid"].server,
+    SDK_SPECS["sdk-qwik"].server,
   ];
 
   const casesIn = (spec: string): string => {

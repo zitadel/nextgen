@@ -1,0 +1,8 @@
+title: DeploymentKind
+type: string
+description: |
+  `primary` for the project's primary origins, `preview` for preview URLs.
+enum:
+  - primary
+  - preview
+example: primary

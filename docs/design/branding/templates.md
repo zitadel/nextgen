@@ -41,11 +41,13 @@ Every render has access to the capability dictionaries from [`../flowengine/flow
 | `gates`         | Dictionary keyed by gate name                                | Flow payload            |
 | `sso_providers` | Array of providers                                           | Flow payload            |
 | `challenge`     | The pending challenge, or `null`                             | Flow payload            |
+| `identifier`    | The account the step signs in to (`step.identifier`, `{ value, autocomplete }`), or `null` | Flow payload            |
 | `errors`        | Array of errors, localised by the component                  | Flow payload            |
 | `identity`      | The known identity, or `null`                                | Component state         |
 | `messages`      | Always an empty array today                                  | Component               |
 | `branding`      | Branding projection (see [`schema.md`](schema.md)), with `logo_url` resolved for the active theme side | Inline on flow response |
 | `loading`       | `boolean`                                                    | Component state         |
+| `pending_action` | The action of the submit in flight, or `null`; only its control shows progress | Component state         |
 
 Templates iterate these bindings. They never mutate them.
 

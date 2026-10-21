@@ -2,6 +2,8 @@
 
 Integrates Zitadel auth into an Angular app.
 
+The detector requires `@angular/core` 17 or newer; older versions are refused.
+
 ## What it patches
 
 - `src/app/app.ts`, `src/app/app.html` — root component that renders the Zitadel widgets

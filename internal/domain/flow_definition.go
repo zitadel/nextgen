@@ -349,6 +349,10 @@ type FlowSSOProvider struct {
 	ID       string
 	Name     string
 	Template string
+	// ConnectionID is the connection's stable id. It is not rendered: the
+	// engine matches it against the connection an external identity came
+	// through.
+	ConnectionID string
 }
 
 // FlowStepTransition maps an action name to either a target step (regular) or a pivot purpose.

@@ -28,7 +28,7 @@ One Vercel deployment, six [services](https://vercel.com/docs/services):
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `storybook` | Storybook; `turbo run build` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
-| `website` | Next.js; `turbo run build --filter=@zitadel/components`, for the atoms its showcase renders, then `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the front page, and its assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
+| `website` | Next.js; `turbo run build --filter=@zitadel/components`, for the atoms its showcase renders, then `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there), and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
 | `schemas` | Static files: Node runs [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs), which needs no install, into `dist/cloud-schemas`. The service is rooted at `apps/cloud`, which holds no `package.json`, so Vercel detects no framework | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
 
 The console lives on the same origin, at `/console/` rather than a
@@ -96,10 +96,11 @@ document for editors and people under the same path on this project:
 
 Two variables in both Vercel environments: `CLOUD_DATABASE_URL`, the pooled
 URL (PgBouncer, port 6432) the server serves from with at most four
-connections per function instance, because Vercel starts one instance per
-concurrent request from cold; and `CLOUD_MIGRATOR_DATABASE_URL`, the direct
-URL (port 5432) the build migrates through, because migrations hold a
-session advisory lock.
+connections per function instance, because a burst starts new instances
+and each holds its own, while the four are shared by every request the
+instance has in flight ([Operating](#operating)); and
+`CLOUD_MIGRATOR_DATABASE_URL`, the direct URL (port 5432) the build
+migrates through, because migrations hold a session advisory lock.
 
 - **Production** is the PlanetScale database `production`. Both URLs name
   its `postgres` database.
@@ -191,6 +192,7 @@ Environment variables (add secrets with
 | `CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the share of console page loads that send Speed Insights, `0` to `1`; unset sends every one |
 | `DOCS_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the docs |
 | `WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the website |
+| `WEBSITE_GITHUB_TOKEN` | Production, Preview; sensitive | a fine-grained GitHub token with no permissions: the website's changelog reads the GitHub Releases with it, at 5,000 requests an hour instead of the 60 that each of Vercel's shared IP addresses gets without one |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive | production's `admin-user.b64`: the root admin document |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Preview; sensitive | preview's `admin-user.b64` |
 | `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
@@ -467,13 +469,28 @@ project and imports the root admin.
 - **Logs:** Vercel runtime logs of the `server` function (JSON). The
   launcher's first line names the database host and database it serves
   from. Add a log drain for retention.
-- **Cold starts:** a Go instance boots in about a second; a burst from cold
-  starts one instance per concurrent request.
+- **Cold starts:** a Go instance boots in one to two seconds.
+- **Concurrency:** an instance serves several requests at once on its one
+  vCPU, the Go service included, although Vercel's Fluid docs name only
+  Node.js and Python. A burst fills the warm instances first and starts
+  only a few new ones, not one per request: 40 parallel password checks
+  on a preview with at most 16 warm instances started 3, and the warm
+  instances' handler time rose from about 0.3 s to a median of 0.7 s.
+  To tell the two apart, compare a request's `handling request` log time
+  with the edge arrival in its Vercel request ID
+  (`<id>-<unix ms>-<hash>`): a gap of a second or more is a cold start,
+  a long handler time is sharing.
 - **Connections:** four per instance through PlanetScale's PgBouncer, which
   pools per database and role: on `preview` every preview database is a
   pool of its own, so the cluster's `max_connections` bounds how many
   previews can be busy at the same time. Raise it (Parameters tab, needs a
   restart) before raising the pool size.
+  - The four are shared by every request in flight on the instance: a
+    fifth that needs the database waits in the pgx pool for one to free
+    up, so a burst shows as handler time rather than errors.
+  - A bigger pool multiplies across instances against the same
+    `max_connections`, and handler time alone does not say whether
+    connection waits or the shared vCPU stretched it.
 - **Analytics:** the console reports page views and Web Vitals per route
   pattern (`/console/users/$userId`), the docs and the website per page,
   to the project's Analytics and Speed Insights tabs. Speed Insights samples

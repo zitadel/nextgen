@@ -1,14 +1,9 @@
 title: DeploymentReason
 type: string
 description: |
-  Why the deployment was created. Both are the same operation — a new
-  deployment making a release live on its targets — and the reason records
-  the caller's intent:
-
-  - `deploy` — a release goes live on the targets.
-  - `rollback` — a release the targets served earlier goes live again.
-    `POST /deployments/{deployment_id}/rollback` records it, and so may
-    `POST /deployments` when the caller picks the earlier release itself.
+  Why the deployment was created: `deploy`, or `rollback` when an earlier
+  release goes live again. The rollback operation always records `rollback`;
+  `POST /deployments` may too, and then `rollback_to` is null.
 enum:
   - deploy
   - rollback
