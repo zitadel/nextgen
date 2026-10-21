@@ -1,7 +1,10 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { Layers3, Link as LinkIcon, Plus } from "lucide-react";
+import { useState } from "react";
 
 import { DeploySheet } from "@/components/deploy-sheet";
+import { NoticeDialog } from "@/components/notice-dialog";
+import { RollbackSheet } from "@/components/rollback-sheet";
 
 import {
   LoadMore,
@@ -25,12 +28,17 @@ import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatRecent } from "@/lib/date";
-import { type Deployment, KIND_LABEL, listProjectDeployments } from "@/lib/deployment";
+import {
+  type Deployment,
+  KIND_LABEL,
+  listProjectDeployments,
+  releaseRevoked,
+} from "@/lib/deployment";
 import {
   projectScopeDeps,
   requireProjectScope,
@@ -45,7 +53,7 @@ import {
  *
  * **New deployment** on the title row opens the Deploy release drawer with
  * the release to pick; the row it records appears here once the drawer
- * closes. The row menu's **Redeploy** and **Rollback** are #1857's.
+ * closes. A primary row's menu redeploys its release or rolls back to it.
  */
 export const Route = createFileRoute("/_authed/deployments/")({
   // Order 6: Login flows sits at 5, with Branding nested under it; Project
@@ -67,6 +75,11 @@ function DeploymentsScreen() {
     "Could not load more deployments.",
   );
   const deployments = [...loaded.items, ...paging.extra];
+  // The newest primary deployment is the live one, and it is on the first
+  // page: a superseded row of its release has nothing to roll back to.
+  const liveReleaseId = deployments.find(
+    (deployment) => deployment.kind === "primary" && deployment.status === "live",
+  )?.release_id;
 
   return (
     <ResourcePage>
@@ -104,7 +117,12 @@ function DeploymentsScreen() {
               <ResourceEmptyRow colSpan={5}>This project has no deployments.</ResourceEmptyRow>
             ) : (
               deployments.map((deployment) => (
-                <DeploymentRowItem key={deployment.id} deployment={deployment} />
+                <DeploymentRowItem
+                  key={deployment.id}
+                  deployment={deployment}
+                  liveReleaseId={liveReleaseId}
+                  onChanged={() => router.invalidate()}
+                />
               ))
             )}
           </TableBody>
@@ -117,9 +135,32 @@ function DeploymentsScreen() {
 }
 
 /** One row of the directory. The whole row opens the release it deployed. */
-function DeploymentRowItem({ deployment }: { deployment: Deployment }) {
+function DeploymentRowItem({
+  deployment,
+  liveReleaseId,
+  onChanged,
+}: {
+  deployment: Deployment;
+  /** The release the primary origins serve now. */
+  liveReleaseId?: string;
+  onChanged: () => void | Promise<void>;
+}) {
   const navigate = useNavigate();
   const params = { releaseId: deployment.release_id };
+  const [redeployOpen, setRedeployOpen] = useState(false);
+  const [rollbackOpen, setRollbackOpen] = useState(false);
+  const [blockedOpen, setBlockedOpen] = useState(false);
+  // The drawer deploys to the primary origins; a preview row's redeploy
+  // waits on its Preview card. A revoked release cannot go live again.
+  const redeploy = deployment.kind === "primary" && !releaseRevoked(deployment);
+  // Previews are deployed to again rather than rolled back; a revoked release
+  // cannot go live again; and an earlier deployment of the live release would
+  // change nothing. None of those rows offers it. The live row does, to say
+  // why it cannot.
+  const rollback =
+    deployment.kind === "primary" &&
+    !releaseRevoked(deployment) &&
+    (deployment.status === "live" || deployment.release_id !== liveReleaseId);
 
   return (
     <ResourceRow onOpen={() => void navigate({ to: "/releases/$releaseId", params })}>
@@ -158,7 +199,43 @@ function DeploymentRowItem({ deployment }: { deployment: Deployment }) {
               View release
             </Link>
           </DropdownMenuItem>
+          {(redeploy || rollback) && <DropdownMenuSeparator />}
+          {redeploy && (
+            <DropdownMenuItem onSelect={() => setRedeployOpen(true)}>Redeploy</DropdownMenuItem>
+          )}
+          {/* The live row has nothing to go back to, and says so rather than
+              opening a drawer with the choice missing. */}
+          {rollback && (
+            <DropdownMenuItem
+              onSelect={() =>
+                deployment.status === "live" ? setBlockedOpen(true) : setRollbackOpen(true)
+              }
+            >
+              Rollback
+            </DropdownMenuItem>
+          )}
         </RowMenu>
+        {/* Outside the menu and opened by state, so the menu closes on select
+            instead of keeping the page `aria-hidden` under the drawer. */}
+        <DeploySheet
+          release={{ id: deployment.release_id }}
+          intent="redeploy"
+          open={redeployOpen}
+          onOpenChange={setRedeployOpen}
+          onDeployed={onChanged}
+        />
+        <RollbackSheet
+          deploymentId={deployment.id}
+          open={rollbackOpen}
+          onOpenChange={setRollbackOpen}
+          onRolledBack={onChanged}
+        />
+        <NoticeDialog
+          open={blockedOpen}
+          onOpenChange={setBlockedOpen}
+          title="Deployment cannot be rolled back"
+          description="Only superseded deployments can be rolled back."
+        />
       </TableCell>
     </ResourceRow>
   );

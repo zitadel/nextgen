@@ -292,3 +292,127 @@ describe("new deployment", () => {
     expect(screen.queryByText("Release deployed")).not.toBeInTheDocument();
   });
 });
+
+describe("rollback from a row", () => {
+  /** Opens the row's menu and picks `item`. */
+  async function pick(rowId: string, item: string) {
+    await userEvent.click(await screen.findByRole("button", { name: `Actions for ${rowId}` }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: item }));
+  }
+
+  it("rolls back to a superseded deployment, naming the live one", async () => {
+    const history = [
+      deployment("dep_live", { release_id: "rel_2" }),
+      deployment("dep_old", { status: "inactive" }),
+      // Of the live release: rolling back to it changes nothing, so it is no choice.
+      deployment("dep_same", { release_id: "rel_2", status: "inactive" }),
+    ];
+    let posted: { deploymentId: string; body: unknown } | undefined;
+    server.use(
+      http.get(DEPLOYMENTS_URL, ({ request }) => {
+        expect(new URL(request.url).searchParams.getAll("expand")).toEqual(["release"]);
+        return HttpResponse.json({ deployments: history });
+      }),
+      http.post(DEPLOYMENTS_URL.replace(/$/, "/:id/rollback"), async ({ request, params }) => {
+        posted = { deploymentId: String(params.id), body: await request.json() };
+        history.unshift(
+          deployment("dep_new", { metadata: { reason: "rollback", rollback_to: "dep_old" } }),
+        );
+        history[1] = deployment("dep_live", { release_id: "rel_2", status: "inactive" });
+        return HttpResponse.json(history[0], { status: 201 });
+      }),
+    );
+    await renderAt("/deployments");
+
+    // The live release's own earlier deployment offers no rollback.
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for dep_same" }));
+    expect(await screen.findByRole("menuitem", { name: "View release" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Rollback" })).not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+
+    await pick("dep_old", "Rollback");
+    const drawer = await screen.findByRole("dialog", { name: "Rollback deployment" });
+    const inDrawer = within(drawer);
+    expect(await inDrawer.findByRole("radio", { name: "dep_old" })).toBeChecked();
+    expect(inDrawer.queryByRole("radio", { name: "dep_same" })).not.toBeInTheDocument();
+    await userEvent.click(inDrawer.getByRole("button", { name: "Rollback deployment" }));
+
+    expect(await screen.findByText("Deployment rolled back")).toBeInTheDocument();
+    expect(posted).toEqual({
+      deploymentId: "dep_old",
+      body: { expected_deployment_id: "dep_live" },
+    });
+    // The list reads again: the rollback is the newest row.
+    const rows = await screen.findAllByRole("row");
+    expect(rows[1]).toHaveTextContent("rel_1");
+  });
+
+  it("says a live deployment cannot be rolled back", async () => {
+    serveDeployments([deployment("dep_live")]);
+    await renderAt("/deployments");
+
+    await pick("dep_live", "Rollback");
+    const dialog = await screen.findByRole("alertdialog", {
+      name: "Deployment cannot be rolled back",
+    });
+    expect(
+      within(dialog).getByText("Only superseded deployments can be rolled back."),
+    ).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("offers no rollback on a preview or on a revoked release", async () => {
+    serveDeployments([
+      deployment("dep_preview", { kind: "preview", status: "inactive" }),
+      deployment("dep_revoked", {
+        status: "inactive",
+        release: releaseSummary("rel_1", { revoked_at: "2026-10-01T00:00:00Z", pointers: [] }),
+      }),
+    ]);
+    await renderAt("/deployments");
+
+    for (const id of ["dep_preview", "dep_revoked"]) {
+      await userEvent.click(await screen.findByRole("button", { name: `Actions for ${id}` }));
+      expect(await screen.findByRole("menuitem", { name: "View release" })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "Rollback" })).not.toBeInTheDocument();
+      await userEvent.keyboard("{Escape}");
+    }
+  });
+});
+
+describe("redeploy from a row", () => {
+  it("redeploys the row's release to the primary origins", async () => {
+    serveDeployments([deployment("dep_old", { status: "inactive" })]);
+    serveProject([{ pattern: "https://app.acme.com", kind: "primary" }]);
+    let posted: unknown;
+    server.use(
+      http.post(DEPLOYMENTS_URL, async ({ request }) => {
+        posted = await request.json();
+        return HttpResponse.json(deployment("dep_new"), { status: 201 });
+      }),
+    );
+    await renderAt("/deployments");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for dep_old" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Redeploy" }));
+    const drawer = await screen.findByRole("dialog", { name: "Redeploy release" });
+    const inDrawer = within(drawer);
+    expect(inDrawer.getByRole("combobox", { name: "Release" })).toHaveTextContent("rel_1");
+    await inDrawer.findByRole("link", { name: "https://app.acme.com" });
+    await userEvent.type(inDrawer.getByLabelText("Message"), "Again");
+    await userEvent.click(inDrawer.getByRole("button", { name: "Redeploy release" }));
+
+    expect(await screen.findByText("Release redeployed")).toBeInTheDocument();
+    expect(posted).toEqual({ release_id: "rel_1", targets: ["primary"], message: "Again" });
+  });
+
+  it("offers no redeploy on a preview row", async () => {
+    serveDeployments([deployment("dep_preview", { kind: "preview" })]);
+    await renderAt("/deployments");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for dep_preview" }));
+    expect(await screen.findByRole("menuitem", { name: "View release" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Redeploy" })).not.toBeInTheDocument();
+  });
+});

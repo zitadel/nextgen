@@ -119,12 +119,17 @@ func (h *Handler) GetDeploymentVariables(ctx context.Context, params api.GetDepl
 }
 
 func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeploymentsParams) (api.ListDeploymentsRes, error) {
-	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment)
+	ctx, projectWide, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment)
 	if err != nil {
 		return nil, err
 	}
 	includeReleases := slices.Contains(params.Expand, api.DeploymentExpandRelease)
-	if includeReleases {
+	// A Console session mints no scopes, so the list check's project-wide
+	// decision stands in for release.read (#1300 §4, as the users list does
+	// for its expands): a session that reads the project reads its releases.
+	scopeCtx, _ := GetScopeContext(ctx)
+	sessionReads := projectWide && scopeCtx.PrincipalType == domain.AuthzPrincipalTypeUser
+	if includeReleases && !sessionReads {
 		if err := requireReleaseRead(ctx); err != nil {
 			return nil, err
 		}

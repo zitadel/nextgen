@@ -1,6 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Layers3 } from "lucide-react";
-import { Fragment, type ReactNode } from "react";
+import { BadgeCheck, Ellipsis, Layers3 } from "lucide-react";
+import { Fragment, type ReactNode, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { DeploySheet } from "@/components/deploy-sheet";
@@ -10,6 +10,8 @@ import { DocumentViewer } from "@/components/document-viewer";
 import { DETAIL_PANEL_PAGE } from "@/components/layout";
 import { ReleaseDeployments } from "@/components/release-deployments";
 import { ReleaseStatusBadge } from "@/components/release-status-badge";
+import { RevokeReleaseDialog } from "@/components/revoke-release-dialog";
+import { RollbackSheet } from "@/components/rollback-sheet";
 import {
   Accordion,
   AccordionContent,
@@ -18,9 +20,16 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/date";
-import { listReleaseDeployments } from "@/lib/deployment";
+import { type Deployment, listReleaseDeployments } from "@/lib/deployment";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import {
   type PointerGroup,
@@ -35,10 +44,9 @@ import {
  * Release detail: the header, the configuration the release pins, where it
  * went, and its metadata.
  *
- * **Deploy release** in the header opens the drawer with this release fixed,
- * while the release is not revoked. The design also draws a menu beside it
- * with **Redeploy**, **Rollback** and **Revoke release**; those are #1857's,
- * once the API serves the writes.
+ * The header's menu redeploys the release, rolls back to it or revokes it; a
+ * revoked release has no menu. A fresh deployment starts from the
+ * deployments directory.
  *
  * The pointers fail soft; the release and deployment reads are what the
  * route's error state reports.
@@ -88,13 +96,13 @@ function ReleaseDetail() {
               />
             </MetaCard>
             {/* A revoked release can never be served again, so there is nothing
-                to deploy it to. The new deployment lands in the card below. */}
+                to do with it. A new deployment lands in the card below. */}
             {releaseStatus(release) === "active" && (
-              <DeploySheet release={release} onDeployed={() => router.invalidate()}>
-                <Button size="sm" className="w-fit gap-1 px-2.5 text-xs">
-                  Deploy release
-                </Button>
-              </DeploySheet>
+              <ReleaseActions
+                release={release}
+                deployments={deployments}
+                onChanged={() => router.invalidate()}
+              />
             )}
           </div>
         </div>
@@ -121,22 +129,89 @@ function ReleaseDetail() {
 }
 
 /**
+ * The header's menu: **Redeploy** is the deploy drawer for this release with
+ * its own copy; **Rollback** opens the drawer with this release's newest
+ * superseded primary deployment chosen, when it has one; **Revoke release**
+ * asks first, and refuses at once while an origin serves it.
+ *
+ * Both open by state, outside the menu, so the menu closes on select.
+ */
+function ReleaseActions({
+  release,
+  deployments,
+  onChanged,
+}: {
+  release: Release;
+  deployments: Deployment[];
+  onChanged: () => void | Promise<void>;
+}) {
+  const [redeployOpen, setRedeployOpen] = useState(false);
+  const [rollbackOpen, setRollbackOpen] = useState(false);
+  const [revokeOpen, setRevokeOpen] = useState(false);
+  const superseded = deployments.find(
+    (deployment) => deployment.kind === "primary" && deployment.status !== "live",
+  );
+  const inUse = deployments.some((deployment) => deployment.status === "live");
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="icon-sm" aria-label={`Actions for ${release.id}`}>
+            <Ellipsis aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuItem onSelect={() => setRedeployOpen(true)}>Redeploy</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setRollbackOpen(true)}>Rollback</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onSelect={() => setRevokeOpen(true)}>
+            Revoke release
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DeploySheet
+        release={release}
+        intent="redeploy"
+        open={redeployOpen}
+        onOpenChange={setRedeployOpen}
+        onDeployed={onChanged}
+      />
+      <RollbackSheet
+        deploymentId={superseded?.id}
+        open={rollbackOpen}
+        onOpenChange={setRollbackOpen}
+        onRolledBack={onChanged}
+      />
+      <RevokeReleaseDialog
+        releaseId={release.id}
+        inUse={inUse}
+        open={revokeOpen}
+        onOpenChange={setRevokeOpen}
+        onRevoked={onChanged}
+      />
+    </>
+  );
+}
+
+/**
  * One kind's pointers: the heading in a 216px column at `lg`, with the list
  * flush against it, and stacked above the list below `lg`. Each pointer is an
  * accordion row that opens to its document.
  */
 function PointerGroupSection({ group }: { group: PointerGroup }) {
   return (
-    <section className="flex flex-col gap-4 py-1 lg:flex-row lg:items-start lg:gap-0">
+    <section className="flex flex-col gap-4 py-3 lg:flex-row lg:items-start lg:gap-0">
       <h2 className="text-sm leading-5 text-muted-foreground lg:w-54 lg:shrink-0">{group.label}</h2>
       <Accordion type="multiple" className="min-w-0 flex-1">
-        {/* 16px above and below the rule between rows, as the frame draws it;
-            the group's own rule follows the last row at the section gap. */}
+        {/* 12px above and below the rule between rows, a 48px row pitch as the
+            frame draws it; the group's own rule follows the last row at the
+            section gap. */}
         {group.pointers.map((pointer) => (
           <AccordionItem
             key={pointer.revisionId}
             value={pointer.revisionId}
-            className="py-4 first:pt-0 last:pb-0"
+            className="py-3 first:pt-0 last:pb-0"
           >
             {/* 24px: a 20px line with 2px above and below, so the row's text
                 sits level with the group's label. The shared trigger underlines
@@ -148,7 +223,8 @@ function PointerGroupSection({ group }: { group: PointerGroup }) {
               {/* The literal space is for the accessible name: a flex row drops it
                   visually, and without it the row reads "Customersch_1". */}
               <span className="flex min-w-0 flex-wrap items-center gap-2">
-                <span className="text-sm leading-5 font-medium text-foreground">
+                {/* The shared trigger is medium; the frame sets the name regular. */}
+                <span className="text-sm leading-5 font-normal text-foreground">
                   {pointer.name}
                 </span>{" "}
                 {/* A schema's revision id can be a URL the operator authored;
@@ -156,6 +232,7 @@ function PointerGroupSection({ group }: { group: PointerGroup }) {
                     overrides the pill's own `shrink-0`: a pill that will not
                     shrink pushes the chevron out of the card on a phone. */}
                 <Badge variant="secondary" className="min-w-0 max-w-full shrink">
+                  <BadgeCheck aria-hidden="true" />
                   <span className="truncate">{pointer.revisionId}</span>
                 </Badge>
               </span>

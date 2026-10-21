@@ -95,6 +95,8 @@ var operationRolesNextgenSession = map[string][]string{
 	QueryTeamsOperation:            []string{},
 	QueryUsersOperation:            []string{},
 	RevokeMySessionOperation:       []string{},
+	RevokeReleaseOperation:         []string{},
+	RollbackDeploymentOperation:    []string{},
 	UpdateTeamOperation:            []string{},
 }
 

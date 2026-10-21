@@ -26,6 +26,17 @@ export const KIND_LABEL: Record<Deployment["kind"], string> = {
 const PAGE_SIZE = 100;
 
 /**
+ * Each deployment carries its release, so a screen knows whether the release
+ * can still be deployed without a read per row.
+ */
+const EXPAND_RELEASE: ListDeploymentsParams["expand"] = ["release"];
+
+/** Whether the deployment's release is revoked; false when the release is not embedded. */
+export function releaseRevoked(deployment: Deployment): boolean {
+  return deployment.release?.revoked_at != null;
+}
+
+/**
  * Every deployment the filter matches, across pages. A release's own history
  * is a handful, so walking the pages is the honest read while
  * `GET /deployments` has no filter by release.
@@ -67,6 +78,7 @@ export async function listProjectDeployments(
 ): Promise<DeploymentPage> {
   const page = await api.listDeployments({
     project_id: projectId,
+    expand: EXPAND_RELEASE,
     limit: TABLE_PAGE_SIZE,
     page_token: pageToken,
   });
@@ -93,5 +105,51 @@ export function deployToPrimary(projectId: string, releaseId: string, message?: 
   return api.createDeployment(
     { release_id: releaseId, targets: [PRIMARY_TARGET], ...(message ? { message } : {}) },
     { project_id: projectId },
+  );
+}
+
+/**
+ * What the Rollback drawer offers: the primary deployment that is live, and
+ * the superseded primary deployments it can go back to, newest first. A
+ * deployment of the live release is left out, since rolling back to it
+ * changes nothing; so is one of a revoked release, which the server refuses.
+ * Previews are not rolled back; they are deployed to again.
+ */
+export interface RollbackTargets {
+  current?: Deployment;
+  options: Deployment[];
+}
+
+export async function listRollbackTargets(projectId: string): Promise<RollbackTargets> {
+  const history = await listAllDeployments({ project_id: projectId, expand: EXPAND_RELEASE });
+  const primary = history.filter((deployment) => deployment.kind === "primary");
+  const current = primary.find((deployment) => deployment.status === "live");
+  const options = primary.filter(
+    (deployment) =>
+      deployment.status !== "live" &&
+      deployment.release_id !== current?.release_id &&
+      !releaseRevoked(deployment),
+  );
+  return { current, options };
+}
+
+/**
+ * Makes the deployment's release live on the primary origins again, as a
+ * new deployment that names the one rolled back to. `expectedDeploymentId`
+ * is the deployment the operator saw as live: the server refuses when
+ * another has landed since, rather than rolling back over it.
+ */
+export function rollbackDeployment(
+  projectId: string,
+  deploymentId: string,
+  input: { message?: string; expectedDeploymentId?: string },
+) {
+  return api.rollbackDeployment(
+    deploymentId,
+    { project_id: projectId },
+    {
+      ...(input.message ? { message: input.message } : {}),
+      ...(input.expectedDeploymentId ? { expected_deployment_id: input.expectedDeploymentId } : {}),
+    },
   );
 }
