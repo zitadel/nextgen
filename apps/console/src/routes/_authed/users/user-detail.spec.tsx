@@ -120,6 +120,14 @@ function inputDate(input: HTMLElement, value: string, badInput: boolean) {
   fireEvent.input(input, { target: { value } });
 }
 
+/**
+ * Waits until a save and the reload after it are done (the fields unlock), so
+ * no request is left in flight for MSW to report in a later test.
+ */
+async function waitForSaveToSettle(label: string) {
+  await waitFor(() => expect(screen.getByLabelText(label)).toBeEnabled());
+}
+
 /** Accepts every `PATCH /users/{id}` and records its body. */
 function capturePatches(): unknown[] {
   const bodies: unknown[] = [];
@@ -568,6 +576,44 @@ describe("user detail", () => {
 
     expect(screen.getByLabelText("Company name")).toHaveValue("Acme Inc");
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
+  it("locks the fields while a save is in flight", async () => {
+    // A reload follows the save and resets the draft, so typing meanwhile
+    // would be lost.
+    stub();
+    stubSchema({
+      ...BUSINESS.properties,
+      verified: { type: "boolean", title: "Verified" },
+    });
+    let release: () => void = () => undefined;
+    let reached: () => void = () => undefined;
+    const handled = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    server.use(
+      http.patch(`${USERS_URL}/${USER_ID}`, async () => {
+        const held = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        reached();
+        await held;
+        return HttpResponse.json({ id: USER_ID });
+      }),
+    );
+    await renderDetail();
+
+    const company = await screen.findByLabelText("Company name");
+    await userEvent.type(company, " Inc");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(company).toBeDisabled());
+    expect(screen.getByRole("switch", { name: "Verified" })).toBeDisabled();
+    // The handler holds `release` only once the request reaches it.
+    await handled;
+    release();
+    await waitForSaveToSettle("Company name");
+    expect(screen.getByRole("switch", { name: "Verified" })).toBeEnabled();
   });
 
   it("shows the status and created date the server stamped", async () => {

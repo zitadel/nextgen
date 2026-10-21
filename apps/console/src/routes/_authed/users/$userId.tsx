@@ -443,6 +443,9 @@ function ProfileCard({
                 entry={entry}
                 value={values[entry.key] ?? ""}
                 readOnly={readOnlyKeys.has(entry.key)}
+                // The reload after a save resets the draft, so an edit made
+                // meanwhile would be lost.
+                disabled={save.pending}
                 missing={missing.includes(entry)}
                 // Marked, since it is the only reason on screen why Save is off.
                 unreadable={unreadable[entry.key] ?? false}
@@ -498,6 +501,7 @@ function ProfileField({
   entry,
   value,
   readOnly,
+  disabled,
   missing,
   unreadable,
   onBadInput,
@@ -506,6 +510,7 @@ function ProfileField({
   entry: SchemaField;
   value: string;
   readOnly: boolean;
+  disabled: boolean;
   /** A required value the draft has emptied. */
   missing: boolean;
   unreadable: boolean;
@@ -539,7 +544,7 @@ function ProfileField({
               checked={value === "true"}
               onCheckedChange={(checked) => onChange(String(checked))}
               required={entry.required}
-              disabled={readOnly}
+              disabled={disabled || readOnly}
             />
             {/* The switch reports its own state, so Yes/No is for the eye. A
                 locked value shows as stored instead, which the switch cannot
@@ -555,6 +560,7 @@ function ProfileField({
             {...inputAttributes(entry)}
             value={value}
             readOnly={readOnly}
+            disabled={disabled}
             required={entry.required}
             placeholder={entry.placeholder}
             aria-invalid={missing || unreadable || undefined}
