@@ -54,6 +54,8 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - A page's URL is its path under `content/docs/`. The API reference pages per
   operation and per webhook come from the OpenAPI document (`lib/source.ts`);
   `moon run docs:generate` bundles it into `.generated/openapi.mjs`.
+- An API tag's page is prose and `<Operations />`, its operations from that
+  document; give its folder no `meta.json`, so the sidebar keeps their order.
 - The CLI reference pages come from the CLI's `command-reference.json`
   (`lib/cli-reference.ts`), which the CLI's reference test writes: change the
   command, never the page ([`apps/cli/AGENTS.md`](../cli/AGENTS.md)).
