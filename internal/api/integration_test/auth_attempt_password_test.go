@@ -3,7 +3,6 @@
 package integration_test
 
 import (
-	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -81,10 +80,12 @@ func TestAuthAttemptIdentifierOnly_CannotHandoff(t *testing.T) {
 
 	handoffResp, err := client.CreateHandoff(t.Context(), api.CreateHandoffParams{AttemptID: attemptID})
 	require.NoError(t, err)
-	rejected, ok := handoffResp.(*api.CreateHandoffErrorResponseStatusCode)
+	// createHandoff declares 409 explicitly (rel.revoked), so ogen decodes every
+	// 409 — including att.not_completed — as ErrorDetails rather than the default
+	// CreateHandoffErrorResponseStatusCode wrapper.
+	rejected, ok := handoffResp.(*api.ErrorDetails)
 	require.True(t, ok, "expected handoff refused, got %s", helpers.MustMarshal(t, handoffResp))
-	require.Equal(t, http.StatusConflict, rejected.StatusCode, helpers.MustMarshal(t, rejected))
-	require.Equal(t, api.AttNotCompletedCreateHandoffErrorResponse, rejected.Response.Type, helpers.MustMarshal(t, rejected))
+	require.Equal(t, api.ErrorCode("att.not_completed"), rejected.Code, helpers.MustMarshal(t, rejected))
 }
 
 // A value held in a unique property the schema does not designate identifies
