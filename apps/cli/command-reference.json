@@ -555,11 +555,6 @@
           "type": "option"
         },
         {
-          "name": "origin",
-          "description": "Deploy to one primary origin instead of every primary origin.",
-          "type": "option"
-        },
-        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -574,9 +569,6 @@
       "examples": [
         {
           "command": "deploy -m 'add phone_number to human-user'"
-        },
-        {
-          "command": "deploy --origin https://app.acme.com"
         },
         {
           "command": "deploy --dry-run"
@@ -891,11 +883,6 @@
           "required": true
         },
         {
-          "name": "origin",
-          "description": "Deploy to one primary origin instead of every primary origin.",
-          "type": "option"
-        },
-        {
           "name": "message",
           "char": "m",
           "description": "A short summary of why this deploys.",
@@ -916,9 +903,6 @@
       "examples": [
         {
           "command": "deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
-        },
-        {
-          "command": "deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --origin https://app.acme.com"
         }
       ]
     },
@@ -1033,11 +1017,6 @@
       ],
       "flags": [
         {
-          "name": "origin",
-          "description": "Which origin's history the bare form reads.",
-          "type": "option"
-        },
-        {
           "name": "force",
           "char": "f",
           "description": "Roll back without the confirmation prompt. Required when non-interactive.",
@@ -1063,7 +1042,7 @@
           "command": "deployment rollback dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
         },
         {
-          "command": "deployment rollback --origin https://app.acme.com --force"
+          "command": "deployment rollback --force"
         }
       ]
     },

@@ -841,7 +841,7 @@ Build a release from .zitadel/ and deploy it to the project.
 USAGE
   $ zitadel deploy [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [-m <value>] [--origin <value>]
+    <value>] [-m <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -859,8 +859,6 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
                           process environment. Cannot be combined with --env.
-      --origin=<value>    Deploy to one primary origin instead of every primary
-                          origin.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -873,8 +871,6 @@ DESCRIPTION
 EXAMPLES
   $ zitadel deploy -m 'add phone_number to human-user'
 
-  $ zitadel deploy --origin https://app.acme.com
-
   $ zitadel deploy --dry-run
 ```
 
@@ -886,7 +882,7 @@ Deploy an existing release to the project's origins.
 USAGE
   $ zitadel deployment create --release <value> [--json] [-c <value>] [-s
     <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e
-    <value>] [--env-file <value>] [--origin <value>] [-m <value>]
+    <value>] [--env-file <value>] [-m <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -904,8 +900,6 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
                           process environment. Cannot be combined with --env.
-      --origin=<value>    Deploy to one primary origin instead of every primary
-                          origin.
       --release=<value>   (required) The release id to deploy.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
@@ -918,8 +912,6 @@ DESCRIPTION
 
 EXAMPLES
   $ zitadel deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-
-  $ zitadel deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --origin https://app.acme.com
 ```
 
 ## `zitadel deployment get DEPLOYMENT_ID`
@@ -1024,7 +1016,7 @@ Roll back to an earlier deployment.
 USAGE
   $ zitadel deployment rollback [DEPLOYMENT_ID] [--json] [-c <value>] [-s
     <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e
-    <value>] [--env-file <value>] [--origin <value>] [-f]
+    <value>] [--env-file <value>] [-f]
 
 ARGUMENTS
   [DEPLOYMENT_ID]  The deployment to re-apply. Omit to undo the last deploy.
@@ -1046,7 +1038,6 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
                           process environment. Cannot be combined with --env.
-      --origin=<value>    Which origin's history the bare form reads.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -1061,7 +1052,7 @@ EXAMPLES
 
   $ zitadel deployment rollback dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
 
-  $ zitadel deployment rollback --origin https://app.acme.com --force
+  $ zitadel deployment rollback --force
 ```
 
 ## `zitadel doctor`

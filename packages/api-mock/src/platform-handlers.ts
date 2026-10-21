@@ -1555,9 +1555,10 @@ export function setupPlatformHandlers() {
           continue;
         }
         if (primaries.includes(target)) {
-          resolved.add(target);
-          sawPrimary = true;
-          continue;
+          return HttpResponse.json(
+            errorBody("dep.invalid", "deployment: deploy primary origins with the primary keyword"),
+            { status: 400 },
+          );
         }
         if (matchesPreviewPattern(project, target)) {
           resolved.add(target);

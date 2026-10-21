@@ -25,7 +25,6 @@ export const diffStep: Step = {
 
     const deployments = await listLiveDeployments(ctx.client, ctx.projectId, {
       withRelease: true,
-      ...(ctx.origin === undefined ? {} : { origin: ctx.origin }),
     });
     // What the primary origins serve: a live preview deployment is never the
     // baseline, even when it is the newest one in the project.
@@ -35,11 +34,11 @@ export const diffStep: Step = {
       return;
     }
 
-    // Without `--origin` the deploy lands on every primary origin, and they
-    // need not serve the same release: the diff is against the newest one, so
-    // it is said aloud that another origin moves from something else.
+    // The deploy lands on every primary origin, and they need not serve the
+    // same release: the diff is against the newest one, so it is said aloud
+    // that another origin moves from something else.
     const releases = new Set(deployments.filter(servesPrimary).map((entry) => entry.release_id));
-    if (ctx.origin === undefined && releases.size > 1) {
+    if (releases.size > 1) {
       note(
         `The primary origins serve ${releases.size} different releases; the diff below is against the newest, ${sha.slice(0, 12)}.`,
       );

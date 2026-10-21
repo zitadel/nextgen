@@ -1912,6 +1912,25 @@ describe("api-mock releases and deployments", () => {
     expect(((await unknown.json()) as { code: string }).code).toBe("proj.origin_not_allowed");
   });
 
+  test("refuses a primary origin named one by one", async () => {
+    const project = await newProject("deploy-exact-primary");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const res = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://app.acme.com"],
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      code: "dep.invalid",
+      message: "deployment: deploy primary origins with the primary keyword",
+    });
+  });
+
   test("refuses a rollback whose expected deployment is no longer the newest", async () => {
     const project = await newProject("deploy-rollback-guard");
     await addPrimary(project.id, project.secret, "https://app.acme.com");
