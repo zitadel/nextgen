@@ -28,10 +28,10 @@ content:
         - $ref: '../../../components/schemas/errors/idp-scopes_missing_openid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
-        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/rel-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
-        - $ref: '../../../components/schemas/errors/unavailable.yaml'
         - $ref: '../../../components/schemas/errors/user-already_exists.yaml'
         - $ref: '../../../components/schemas/errors/user-conflict.yaml'
         - $ref: '../../../components/schemas/errors/user-invalid.yaml'
@@ -66,10 +66,10 @@ content:
           idp.scopes_missing_openid: '../../../components/schemas/errors/idp-scopes_missing_openid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
-          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          rel.not_found: '../../../components/schemas/errors/rel-not_found.yaml'
+          rel.revoked: '../../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
-          unavailable: '../../../components/schemas/errors/unavailable.yaml'
           user.already_exists: '../../../components/schemas/errors/user-already_exists.yaml'
           user.conflict: '../../../components/schemas/errors/user-conflict.yaml'
           user.invalid: '../../../components/schemas/errors/user-invalid.yaml'
@@ -198,11 +198,16 @@ content:
         value:
           code: tkn.invalid
           message: 'the token is not valid'
-      not_implemented:
-        summary: not_implemented
+      rel.not_found:
+        summary: rel.not_found
         value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
+          code: rel.not_found
+          message: 'release: not found'
+      rel.revoked:
+        summary: rel.revoked
+        value:
+          code: rel.revoked
+          message: 'the release this attempt runs on was revoked'
       req.invalid:
         summary: req.invalid
         value:
@@ -213,11 +218,6 @@ content:
         value:
           code: enc_key.unknown_alg
           message: 'unsupported encryption algorithm'
-      unavailable:
-        summary: unavailable
-        value:
-          code: unavailable
-          message: 'The service could not complete the request right now. Try again.'
       user.already_exists:
         summary: user.already_exists
         value:
