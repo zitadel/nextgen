@@ -158,15 +158,20 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 			Proof:       proof,
 		}
 	}
-	// The browser Origin header drives the WebAuthn relying-party params when a
-	// step issues or verifies a passkey challenge. Same-origin browser fetches may
-	// not include Origin; fall back to the effective request host injected by the
-	// WithRequestHostMiddleware (X-Forwarded-Host or r.Host).
+	// The browser Origin header (or the effective request host when a same-origin
+	// fetch omits it) is admitted on every submit — sealing pins which release
+	// serves the attempt, it does not skip the project allowlist. Origin also
+	// drives WebAuthn RP params and SSO return-target binding below.
 	originStr := ""
 	if origin, ok := params.Origin.Get(); ok {
 		originStr = origin.String()
 	} else if h, ok := requestOriginFromContext(ctx); ok {
 		originStr = h
+	}
+	if originStr != "" {
+		if err := h.admitOrigin(ctx, state.ProjectID, originStr); err != nil {
+			return nil, err
+		}
 	}
 	requestOrigin := ""
 	if originStr != "" {
@@ -174,14 +179,6 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		if err == nil {
 			if rp := passkeyRPFromOrigin(*originURL); rp != nil {
 				requestOrigin = originURL.Scheme + "://" + originURL.Host
-				// A sealed attempt already passed the gate at createFlow; Origin
-				// here only drives WebAuthn RP params. Unsealed cookies still
-				// check the project allowlist.
-				if state.DeploymentID == "" {
-					if err := h.admitOrigin(ctx, state.ProjectID, originStr); err != nil {
-						return nil, err
-					}
-				}
 				submitReq.PasskeyRP = rp
 			}
 		}
