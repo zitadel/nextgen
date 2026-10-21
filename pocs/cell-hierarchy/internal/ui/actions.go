@@ -92,6 +92,7 @@ func (a *App) doCreateWorkspace(ctx context.Context, id, name, cellLabel, teamID
 	_ = a.putWorkspace(Workspace{
 		ID: id, Name: name, Cell: cellLabel, CustomerTeamID: teamID,
 	})
+	a.rememberProjectHost(proj.ID, hostURL)
 	msg := fmt.Sprintf("created workspace/site %s on %s (team %s)", proj.ID, cellLabel, teamID)
 	a.endTrace(msg, nil)
 	return proj, msg, a.latestTimeline(), nil
@@ -233,6 +234,7 @@ func (a *App) doAddSite(ctx context.Context, fromProject, siteID, name, cellLabe
 		a.endTrace("created but attach failed: "+err.Error(), nil)
 		return cell.ProjectResponse{}, "", a.latestTimeline(), fmt.Errorf("created but attach failed: %w", err)
 	}
+	a.rememberProjectHost(proj.ID, hostURL)
 	msg := fmt.Sprintf("created site %s on %s (parent %s)", proj.ID, cellLabel, parent.ID)
 	a.endTrace(msg, nil)
 	return proj, msg, a.latestTimeline(), nil

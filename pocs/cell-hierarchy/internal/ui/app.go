@@ -43,6 +43,9 @@ type App struct {
 	workspaces    map[string]Workspace
 	workspaceFile string
 
+	hostMu      sync.Mutex
+	projectHost map[string]string // project id → cell base URL
+
 	signInMu sync.Mutex
 	signIn   *signInResult
 
@@ -1411,21 +1414,6 @@ func (a *App) cellURLByLabel(label string) (string, error) {
 		return "", fmt.Errorf("unknown cell %s", label)
 	}
 	return ref.URL, nil
-}
-
-func (a *App) findProject(ctx context.Context, id string) (string, cell.ProjectResponse, error) {
-	for _, c := range a.Cells {
-		projects, err := a.Peer.ListProjects(ctx, c.URL)
-		if err != nil {
-			continue
-		}
-		for _, p := range projects {
-			if p.ID == id {
-				return c.URL, p, nil
-			}
-		}
-	}
-	return "", cell.ProjectResponse{}, fmt.Errorf("project %s not found", id)
 }
 
 func (a *App) findByLabel(label string) (CellRef, bool) {

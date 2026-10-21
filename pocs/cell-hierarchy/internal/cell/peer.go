@@ -42,6 +42,11 @@ type PeerClient struct {
 	// ExtraDelay is a flat sleep before each request (legacy; prefer PairDelays).
 	ExtraDelay time.Duration
 
+	// ApplyPairDelays enables WAN simulation sleeps. Cell servers turn this on
+	// when they receive /v1/admin/delays. The UI PeerClient must keep this false
+	// so console→cell calls stay instant; only cell→cell hops simulate latency.
+	ApplyPairDelays bool
+
 	// PairDelays maps canonical "a|b" (sorted labels) → milliseconds.
 	// Protected by delayMu.
 	PairDelays map[string]int
@@ -112,8 +117,9 @@ func (c *PeerClient) LabelForURL(raw string) string {
 // DelayBetween returns sleep duration for a hop from→to.
 // Same-cell = 0. Listed pairs use the matrix. Both labels known but unlisted = 0.
 // Either side unlabeled = 50ms (unknown hop).
+// Returns 0 when ApplyPairDelays is false (UI / non-WAN clients).
 func (c *PeerClient) DelayBetween(fromURL, toURL string) time.Duration {
-	if c == nil {
+	if c == nil || !c.ApplyPairDelays {
 		return 0
 	}
 	fromLabel := c.LabelForURL(fromURL)

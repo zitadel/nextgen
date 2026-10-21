@@ -61,6 +61,7 @@ func TestPairwiseDelaySleepsBetweenCells(t *testing.T) {
 
 	peer := cell.NewPeerClient()
 	peer.SelfURL = "http://eu-1"
+	peer.ApplyPairDelays = true
 	peer.SetDelayConfig(
 		map[string]int{cell.PairKey("eu-1", "us-1"): 30},
 		map[string]string{

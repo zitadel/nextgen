@@ -24,11 +24,14 @@ func (a *App) seedDefaultDelays() {
 	a.delayMu.Lock()
 	defer a.delayMu.Unlock()
 	a.delayPairs = cell.DefaultPairDelays()
+	// Keep labels for timeline display only — do NOT enable ApplyPairDelays on the
+	// UI Peer. WAN sleeps belong on cell→cell hops after /v1/admin/delays broadcast.
 	labels := map[string]string{}
 	for _, c := range a.Cells {
 		labels[cell.NormalizeURL(c.URL)] = c.Label
 	}
 	a.Peer.SetDelayConfig(a.delayPairs, labels)
+	a.Peer.ApplyPairDelays = false
 }
 
 // broadcastDefaultDelaysSoon retries pushing the fixed matrix to every cell.
@@ -142,6 +145,7 @@ func (a *App) applyDelayConfig(pairs map[string]int) {
 	}
 	a.delayMu.Unlock()
 	a.Peer.SetDelayConfig(a.copyDelayPairs(), a.labelMap())
+	a.Peer.ApplyPairDelays = false
 }
 
 func (a *App) broadcastDelays(ctx context.Context) error {

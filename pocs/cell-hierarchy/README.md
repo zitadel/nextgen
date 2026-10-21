@@ -61,6 +61,12 @@ Cell membership tree (eu-1 joins platform as a **cell**) is separate from the **
 
 Cells `/` contacts **only the platform cell** (`GetMe` + `/v1/children`). Leaf cell detail lives under `/cells/{label}`. Project trees belong on Workspaces / site pages.
 
+## Latency notes
+
+- **UI → cell** calls are never artificially delayed. The console PeerClient keeps `ApplyPairDelays=false`.
+- **Cell → cell** hops (lookup walk up parents, float-up) use the pairwise WAN matrix after `/v1/admin/delays` broadcast.
+- Project APIs resolve the host via an in-memory `project → cell` cache (and workspace registry hints) so `GET /api/v1/projects/{id}` is one cell call, not a scan of every cell.
+
 ## Pairwise delays (fixed)
 
 | Pair | ms |

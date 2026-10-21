@@ -26,6 +26,7 @@ func (s *Server) handleAdminDelays(w http.ResponseWriter, r *http.Request) {
 		s.Peer = NewPeerClient()
 	}
 	s.Peer.SetDelayConfig(req.Pairs, req.Labels)
+	s.Peer.ApplyPairDelays = true
 	if meta, err := s.Store.GetMeta(); err == nil && meta.URL != "" {
 		s.Peer.SelfURL = NormalizeURL(meta.URL)
 	}
