@@ -174,11 +174,12 @@ describe("settings view", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
     expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
-    // The person heads the menu and is the way into Settings. The selection
-    // rides along, so `Back to dashboard` returns to the same project.
+    // The person heads the menu and opens their profile in account settings.
+    // The selection rides along, so `Back to dashboard` returns to the same
+    // project.
     expect(screen.getByRole("menuitem", { name: /^Test User/ })).toHaveAttribute(
       "href",
-      scopedPath("/settings", "proj_1"),
+      scopedPath("/settings/profile", "proj_1"),
     );
     // Settings' own pages are not repeated beside it.
     expect(screen.queryByRole("menuitem", { name: "Profile" })).not.toBeInTheDocument();

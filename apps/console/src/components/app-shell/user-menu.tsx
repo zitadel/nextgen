@@ -99,9 +99,9 @@ function ThemeRow() {
  * email leads, with the account beneath it — their team in the sign-in project
  * (`lib/account.ts`).
  *
- * The dropdown follows Vercel's: the person heads it and is the one way into
- * account settings, whose sidebar lists Overview (their teams, the account
- * among them) and Settings (their profile); then Theme and Log out.
+ * The dropdown follows Vercel's: the person heads it and opens their profile
+ * (Settings) in account settings, whose sidebar also lists Overview (their
+ * teams, the account among them); then Theme and Log out.
  * Nothing else repeats a Settings page. `Documentation` and `Feedback` are
  * parked: neither has a destination yet, and a row that does nothing reads as
  * broken.
@@ -146,7 +146,7 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
         >
           <div className="p-1">
             <DropdownMenuItem asChild className="flex-col items-start gap-1 py-2">
-              <Link to={SETTINGS_PATH}>
+              <Link to="/settings/profile">
                 <span className="max-w-full truncate text-sm font-medium">{name}</span>
                 {user?.display && (
                   <span className="max-w-full truncate text-xs leading-none text-muted-foreground">

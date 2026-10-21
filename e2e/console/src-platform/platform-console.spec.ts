@@ -112,12 +112,8 @@ test("a platform operator adds their name from the account menu", async ({ page,
 
   const account = page.getByRole("button", { name: `Account: ${operator.email}` });
   await account.click();
-  // The person heading the menu opens account settings; Settings is the profile.
+  // The person heading the menu opens their profile.
   await page.getByRole("menuitem", { name: operator.email }).click();
-  await page
-    .getByRole("navigation", { name: "Account settings" })
-    .getByRole("link", { name: "Settings" })
-    .click();
 
   await expect(page).toHaveURL(/\/settings\/profile/);
   await expect(page.getByLabel("Email", { exact: true })).toBeDisabled();
