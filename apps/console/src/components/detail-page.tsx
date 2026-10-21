@@ -83,18 +83,24 @@ export function DetailPanel({ children }: { children: ReactNode }) {
   return <Card className="gap-4 border-foreground/10 px-6 py-5 shadow-xs">{children}</Card>;
 }
 
-/** A panel's title lockup: the icon tile, an optional eyebrow, and the `h1`. */
+/**
+ * A panel's title lockup: the icon tile, an optional eyebrow, and the heading —
+ * the `h1` of a configuration screen, or an `h2` on a body card under a
+ * {@link DetailHeader}, which already owns the `h1`.
+ */
 export function PanelTitle({
   icon: Icon,
   eyebrow,
   title,
+  as: Heading = "h1",
 }: {
   icon: LucideIcon;
   eyebrow?: string;
   title: string;
+  as?: "h1" | "h2";
 }) {
   const heading = (
-    <h1 className="truncate font-serif text-lg leading-6 text-foreground">{title}</h1>
+    <Heading className="truncate font-serif text-lg leading-6 text-foreground">{title}</Heading>
   );
   return (
     <div className="flex min-w-0 items-center gap-3">

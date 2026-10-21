@@ -19,6 +19,7 @@ import { useRequiredProjectScope } from "@/lib/project-scope";
 import {
   attributeValue,
   fetchAllSchemas,
+  inputAttributes,
   type SchemaField,
   schemaDisplayName,
   schemaFieldSummary,
@@ -125,12 +126,15 @@ function AddUserForm({
 
   const create = useSubmit(async () => {
     if (!selected) return;
+    // Built from the field descriptors rather than the raw values so a
+    // property's declared type survives (`attributeValue`).
     const attributes: Record<string, unknown> = {};
     for (const entry of fields) {
       // Optional properties are omitted rather than sent empty: an empty
       // string fails format validation (`email`) instead of reading as absent.
       const value = values[entry.key]?.trim() ?? "";
-      if (value !== "") attributes[entry.key] = attributeValue(entry, value);
+      if (value === "") continue;
+      attributes[entry.key] = attributeValue(entry, value);
     }
     await api.createUser({ schema: selected.id, attributes }, { project_id: projectId });
     await onCreated();
@@ -232,7 +236,7 @@ function SchemaInput({
       <Input
         id={id}
         name={field.key}
-        type={field.inputType}
+        {...inputAttributes(field)}
         required={field.required}
         placeholder={field.placeholder}
         value={value}

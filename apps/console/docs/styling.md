@@ -195,7 +195,10 @@ Detail screens come in three compositions, and each has one shell:
   cards. Compose `Page` + `DetailHeader` from
   `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`. A
   body card with a titled section is a `DetailSection`; a single name field with
-  its Save button is a `RenameCard` (`src/components/rename-card.tsx`).
+  its Save button is a `RenameCard` (`src/components/rename-card.tsx`). A body
+  card the design titles by name rather than an eyebrow (Users: the profile,
+  under its schema's name) leads with `PanelTitle as="h2"`; the header owns the
+  `h1`.
 - **Configuration panel** (User schemas, Login flows): the whole screen is one
   `DetailPanel` headed by a `PanelTitle` (both in
   `src/components/detail-page.tsx`), inside `<Page inset="panel">`
