@@ -4,6 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { FIELD_LABEL_TYPOGRAPHY } from "@/components/typography";
 
 function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">) {
   return (
@@ -30,9 +31,7 @@ function FieldLegend({
       data-variant={variant}
       className={cn(
         "mb-3",
-        "data-[variant=legend]:text-base data-[variant=legend]:font-medium",
-        // A legend used as a field label matches `Label` (Arimo 14/20, regular).
-        "data-[variant=label]:font-sans data-[variant=label]:text-sm data-[variant=label]:leading-5 data-[variant=label]:font-normal",
+        variant === "label" ? FIELD_LABEL_TYPOGRAPHY : "text-base font-medium",
         className,
       )}
       {...props}
@@ -106,8 +105,7 @@ function FieldLabel({ className, ...props }: React.ComponentProps<typeof Label>)
     <Label
       data-slot="field-label"
       className={cn(
-        // Typography (Arimo 14/20, regular) comes from `Label`, the single source
-        // for every form field label. Don't re-declare it here or at call sites.
+        // Inherits shared form label typography from `Label`.
         "group/field-label peer/field-label flex w-fit gap-2 group-data-[disabled=true]/field:opacity-50",
         "has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col has-[>[data-slot=field]]:rounded-md has-[>[data-slot=field]]:border [&>*]:data-[slot=field]:p-4",
         "has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/5 dark:has-data-[state=checked]:bg-primary/10",
@@ -123,9 +121,9 @@ function FieldTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="field-label"
       className={cn(
-        // Same typography as `Label`, for field labels that aren't a <label>
-        // (e.g. a group named via `aria-labelledby`).
-        "flex w-fit items-center gap-2 font-sans text-sm leading-5 font-normal group-data-[disabled=true]/field:opacity-50",
+        // Non-label group titles share the form label typography.
+        "flex w-fit items-center gap-2 group-data-[disabled=true]/field:opacity-50",
+        FIELD_LABEL_TYPOGRAPHY,
         className,
       )}
       {...props}

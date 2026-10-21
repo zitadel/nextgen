@@ -60,7 +60,7 @@ function AddTeamForm({
       onClose={onClose}
     >
       <Field>
-        <FieldLabel className="text-foreground" htmlFor="team-name">
+        <FieldLabel htmlFor="team-name">
           Team name
         </FieldLabel>
         <Input

@@ -155,7 +155,7 @@ function DeleteUserForm({
           {/* The column's own 6px gap separates this from the description; the
               12px here is the field's internal label→input gap. */}
           <div className="flex flex-col gap-3">
-            <FieldLabel htmlFor={confirmId} className="text-foreground">
+            <FieldLabel htmlFor={confirmId}>
               Type {CONFIRM_WORD} to confirm
             </FieldLabel>
             <Input
