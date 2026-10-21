@@ -4,6 +4,7 @@ import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
 import { defineConfig } from "vitest/config";
 
 import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
+import { renderServerLogin } from "./src/__tests__/server-markup.ts";
 
 /**
  * Two projects in one config:
@@ -46,6 +47,8 @@ export default defineConfig({
             provider: playwright(),
             headless: true,
             instances: [{ browser: "chromium" }],
+            // Node-side helpers a browser spec calls through `commands`.
+            commands: { renderServerLogin },
           },
         },
       },

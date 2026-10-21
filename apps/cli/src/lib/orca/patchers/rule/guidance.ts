@@ -54,6 +54,7 @@ export function removeGuidanceSection(source: string): string {
 export function agentsGuidanceSection(ctx: PatchContext): string {
   const plan = publicCliCommand("plan", ctx.cliVersion);
   const apply = publicCliCommand("apply", ctx.cliVersion);
+  const movePort = movePortCommand(ctx);
   // WebAuthn ceremonies need an OS-level authenticator, so an agent driving
   // an automated browser stalls on the primary action of a passkey-first
   // flow unless told how to verify around it.
@@ -95,6 +96,7 @@ This app's login is managed by Zitadel. Local config is the source of truth; nev
 The golden path:
 
 1. Start the dev server and open ${ctx.issuer}/login — **exactly this origin, not 127.0.0.1**. Passkeys and the origin allowlist are bound to it. (Freshly scaffolded apps also redirect / there; pre-existing apps keep their homepage.)
+   - Port taken (\`EADDRINUSE\`) or another port wanted: run \`${movePort}\`. It moves the dev script or dev-server config, \`ZITADEL_ISSUER\` and the project's allowed origin together; changing only one of them breaks sign-in.
 2. Prove the loop in a real browser: register a user → sign out → sign in → /profile shows signed in.${passkeyVerifyNote}
 3. Customize by editing local config:
    - \`.zitadel/schemas/*.json\` — what a user is (fields, required, auth methods). See \`.zitadel/schemas/README.md\`.
@@ -125,9 +127,12 @@ Never edit \`.zitadel/state.json\` (sync bookkeeping) or \`.zitadel/secret\` (cr
 export function readmeGuidanceSection(ctx: PatchContext): string {
   const plan = publicCliCommand("plan", ctx.cliVersion);
   const apply = publicCliCommand("apply", ctx.cliVersion);
+  const movePort = movePortCommand(ctx);
   return `## Authentication (Zitadel)
 
 Login for this app is managed by [Zitadel](https://zitadel.com). Try it: start the dev server, open ${ctx.issuer}/login (use this exact origin — passkeys are bound to it), register a user, sign out, and sign in again.
+
+If the dev server's port is taken (\`EADDRINUSE\`), or you want another one, move the app with \`${movePort}\`: it updates the dev script, \`ZITADEL_ISSUER\` and the project's allowed origin together.
 
 The dev server keeps its terminal busy, so run the commands below from a second terminal in this directory.
 
@@ -137,6 +142,11 @@ To change what the login collects or how sign-in works, edit the files under \`.
 ${plan}
 ${apply}
 \`\`\``;
+}
+
+/** The command that moves the app to another dev port, `<port>` left to fill in. */
+function movePortCommand(ctx: PatchContext): string {
+  return publicCliCommand("setup --dev-port <port>", ctx.cliVersion);
 }
 
 /** Full-file header used when `AGENTS.md` does not exist yet. */

@@ -416,6 +416,54 @@ describe("users screen", () => {
     expect(screen.getByText("Blocked")).toBeInTheDocument();
   });
 
+  it("copies the whole id from the row, though the cell truncates it", async () => {
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_01M4ZB60GVT0ZE4DT13GZ6PQMB",
+              identifier: "kenji@acme.com",
+              identifier_property: "email",
+              attributes: { email: "kenji@acme.com" },
+            },
+          ],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    await renderUsers();
+
+    await user.click(await screen.findByRole("button", { name: "Copy the ID of kenji@acme.com" }));
+    expect(await navigator.clipboard.readText()).toBe("user_01M4ZB60GVT0ZE4DT13GZ6PQMB");
+  });
+
+  it("keeps the column order when the schema reads finish out of order", async () => {
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            { id: "user_1", schema: "sch_slow", attributes: { email: "a@x.com" } },
+            { id: "user_2", schema: "sch_fast", attributes: { handle: "b" } },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_slow`, async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return HttpResponse.json({ schema: { properties: { email: { type: "string" } } } });
+      }),
+      http.get(`${SCHEMAS_URL}/sch_fast`, () =>
+        HttpResponse.json({ schema: { properties: { handle: { type: "string" } } } }),
+      ),
+    );
+    await renderUsers();
+    await screen.findByRole("link", { name: "user_1" });
+
+    // The first user's schema leads, though its read finished last.
+    const headers = screen.getAllByRole("columnheader").map((cell) => cell.textContent);
+    expect(headers.indexOf("Email")).toBeLessThan(headers.indexOf("Handle"));
+  });
+
   it("renders the not-authorized state on a 401 with a live session (no redirect loop)", async () => {
     // A 401 data call while `GET /sessions/me` still answers with a session
     // means the server refused this request's session — the boundary must

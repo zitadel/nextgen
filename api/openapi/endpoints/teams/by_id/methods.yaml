@@ -32,11 +32,7 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: getTeam-error-response.yaml
 
 delete:
   operationId: deleteTeam
@@ -93,11 +89,7 @@ delete:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: deleteTeam-error-response.yaml
 
 patch:
   operationId: updateTeam
@@ -158,8 +150,4 @@ patch:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: updateTeam-error-response.yaml

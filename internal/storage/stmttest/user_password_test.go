@@ -224,6 +224,24 @@ func TestUserPasswordStatements_HistoryFollowsTheChangeTransaction(t *testing.T)
 		}))
 		assert.Equal(t, "hash-3", currentUserPasswordHash(t, d, projectID, userID))
 		assert.Equal(t, []string{"hash-2", "hash-1"}, userPasswordHistoryHashes(t, d, projectID, userID))
+
+		// Read inside the change's transaction, the history already starts
+		// with the password the change replaced: the set-password action
+		// reads it there to tell whether another change landed since its
+		// policy check.
+		var replaced []string
+		require.NoError(t, d.pool.Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+			if err := set(ctx, tx, "hash-4"); err != nil {
+				return err
+			}
+			history, err := tx.Statements().GetUserPasswordHistory(ctx, projectID, userID)
+			replaced = replaced[:0]
+			for _, pw := range history {
+				replaced = append(replaced, pw.EncodedHash)
+			}
+			return err
+		}))
+		assert.Equal(t, []string{"hash-3", "hash-2", "hash-1"}, replaced)
 	})
 }
 

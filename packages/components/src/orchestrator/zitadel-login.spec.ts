@@ -20,11 +20,22 @@ import {
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from "vitest";
 
 import "./zitadel-login.js";
 import type { ZlAlert } from "../atoms/zl-alert.js";
 import type { ZlField } from "../atoms/zl-field.js";
+import type { CreateFlow201, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 import { loginPreviewStatesFor, type ZitadelLogin } from "./zitadel-login.js";
 
 const API_BASE = "https://flow.test.invalid";
@@ -130,6 +141,122 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
   afterEach(() => {
     host.innerHTML = "";
+  });
+
+  describe("zitadel-flow-input", () => {
+    type FieldKind = CreateFlow201StepFieldsItem["type"];
+
+    const TYPED_VALUE = "s3cret";
+
+    /** Serves a first step that holds a single field `f` of the given kind and autocomplete. */
+    function serveStepWithField(kind: FieldKind, autocomplete?: string): void {
+      const step: CreateFlow201["step"] = {
+        name: "challenge",
+        texts: { title_key: "identifier.title" },
+        fields: [{ name: "f", type: kind, text_key: "identifier.field.email", autocomplete }],
+        actions: [{ name: "submit", kind: "submit", text_key: "submit.signin", primary: true }],
+        gates: {},
+      };
+      const body: CreateFlow201 = {
+        id: "flow_test",
+        session_id: "sess_test",
+        session_token: "st_test",
+        step,
+        branding: {},
+      };
+      server.use(
+        http.post("*/flow", () => HttpResponse.json(body, { status: 201 }), { once: true }),
+      );
+    }
+
+    const SECRET_FIELD_CASES: ReadonlyArray<{
+      kind: FieldKind;
+      autocomplete?: string;
+      description: string;
+    }> = [
+      {
+        kind: "password",
+        autocomplete: "current-password",
+        description: "a password field for the current password",
+      },
+      { kind: "password", description: "a password field without an autocomplete token" },
+      {
+        kind: "password",
+        autocomplete: "new-password",
+        description: "a password field for a new password",
+      },
+      { kind: "text", autocomplete: "one-time-code", description: "a one-time-code field" },
+      {
+        kind: "text",
+        autocomplete: "ONE-TIME-CODE",
+        description: "a one-time-code token in uppercase",
+      },
+      {
+        kind: "text",
+        autocomplete: "section-x one-time-code",
+        description: "a one-time-code token among several tokens",
+      },
+    ];
+
+    const PLAIN_FIELD_CASES: ReadonlyArray<{
+      kind: FieldKind;
+      autocomplete?: string;
+      description: string;
+    }> = [
+      { kind: "email", autocomplete: "username", description: "an email field for a username" },
+      { kind: "text", description: "a plain text field without an autocomplete token" },
+      { kind: "tel", autocomplete: "tel", description: "a telephone field" },
+      { kind: "number", description: "a number field" },
+    ];
+
+    it.each(SECRET_FIELD_CASES)(
+      "does not dispatch zitadel-flow-input for $description",
+      async ({ kind, autocomplete }) => {
+        // Arrange
+        const heardOnPage = vi.fn();
+        const host = document.body.appendChild(document.createElement("div"));
+        serveStepWithField(kind, autocomplete);
+        document.addEventListener("zitadel-flow-input", heardOnPage);
+        onTestFinished(() => {
+          document.removeEventListener("zitadel-flow-input", heardOnPage);
+          host.remove();
+        });
+        const element = await mount(host);
+        await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="f"]'));
+
+        // Act
+        type(element, "f", TYPED_VALUE);
+
+        // Assert
+        expect(heardOnPage).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(PLAIN_FIELD_CASES)(
+      "dispatches zitadel-flow-input with name and value for $description",
+      async ({ kind, autocomplete }) => {
+        // Arrange
+        const heardOnPage = vi.fn();
+        const host = document.body.appendChild(document.createElement("div"));
+        serveStepWithField(kind, autocomplete);
+        document.addEventListener("zitadel-flow-input", heardOnPage);
+        onTestFinished(() => {
+          document.removeEventListener("zitadel-flow-input", heardOnPage);
+          host.remove();
+        });
+        const element = await mount(host);
+        await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="f"]'));
+
+        // Act
+        type(element, "f", TYPED_VALUE);
+
+        // Assert
+        expect(heardOnPage).toHaveBeenCalledOnce();
+        expect(heardOnPage.mock.calls[0]?.[0]).toMatchObject({
+          detail: { name: "f", value: TYPED_VALUE },
+        });
+      },
+    );
   });
 
   it("starts a flow on mount and renders the first step", async () => {
@@ -372,6 +499,44 @@ describe("<zitadel-login> against the typed Flow API", () => {
     await waitFor(() => (completeEvents.length > 0 ? completeEvents : null));
     expect(completeEvents[0]?.detail).toEqual(expect.objectContaining({ behavior: "show" }));
     expect(completeEvents[0]?.detail.handoff_token).toBeTruthy();
+  });
+
+  it("waits for work a zitadel-flow-complete listener registers before navigating", async () => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = "/admin";
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+      const finish = new AbortController();
+      const completed = vi.fn();
+      element.addEventListener("zitadel-flow-complete", (event) => {
+        completed();
+        if (event instanceof CustomEvent) {
+          event.detail.waitUntil(
+            new Promise((resolve) => finish.signal.addEventListener("abort", resolve)),
+          );
+        }
+      });
+
+      await advanceMockLoginFlow(element);
+      await vi.waitFor(() => expect(completed).toHaveBeenCalledOnce());
+      await element.updateComplete;
+      expect(assign).not.toHaveBeenCalled();
+
+      finish.abort();
+      await vi.waitFor(() => expect(assign).toHaveBeenCalledWith("/admin"));
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: location });
+    }
   });
 
   it("does not paint the terminal step when it is about to navigate away", async () => {

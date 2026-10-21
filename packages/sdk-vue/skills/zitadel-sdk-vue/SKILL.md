@@ -115,6 +115,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin :project="project" theme="light" @flowComplete="track" />
 ```
 
+The `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` details carry a `waitUntil(promise)`; call it from your handler to make the widget wait for your async work before it navigates.
+
 ## Read these, don't guess
 
 The SDK and this skill version independently — discover the real surface before

@@ -5,7 +5,9 @@ export const links = {
   docs: "/docs",
   quickstart: "/docs/get-started/quickstart",
   llms: "/llms.txt",
+  changelog: "/changelog",
   github: "https://github.com/zitadel/nextgen",
   issues: "https://github.com/zitadel/nextgen/issues",
+  releases: "https://github.com/zitadel/nextgen/releases",
   zitadel: "https://zitadel.com",
 } as const;

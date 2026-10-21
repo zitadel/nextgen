@@ -354,6 +354,115 @@
   }
 }
 
+/* The changelog's Markdown (changelog/markdown.tsx): what GitHub's release
+   notes hold, in the page's type, with its links, code and emphasis in the
+   primary ink. A long command or URL breaks rather than widen a phone's
+   page; a code block scrolls. */
+@layer components {
+  .release-notes {
+    color: var(--color-text-secondary);
+    font-size: 0.9375rem;
+    line-height: 1.625rem;
+  }
+
+  .release-notes > * + *,
+  .release-notes li > * + * {
+    margin-top: 0.75rem;
+  }
+
+  .release-notes :where(ul, ol) {
+    padding-left: 1.25rem;
+  }
+
+  .release-notes ul {
+    list-style: disc;
+  }
+
+  .release-notes ol {
+    list-style: decimal;
+  }
+
+  .release-notes li + li {
+    margin-top: 0.375rem;
+  }
+
+  .release-notes li::marker {
+    color: var(--color-text-muted);
+  }
+
+  .release-notes :where(strong, h4, h5, h6) {
+    color: var(--color-text-primary);
+    font-weight: 600;
+  }
+
+  .release-notes a {
+    color: var(--color-text-primary);
+    text-decoration: underline;
+    text-decoration-color: var(--color-border-secondary);
+    text-underline-offset: 0.25em;
+    overflow-wrap: anywhere;
+    transition: text-decoration-color 200ms ease;
+  }
+
+  .release-notes a:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .release-notes code {
+    padding: 0.125em 0.3em;
+    border-radius: 0.25rem;
+    background-color: color-mix(in oklch, var(--color-tint) 7%, transparent);
+    color: var(--color-text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    overflow-wrap: anywhere;
+  }
+
+  .release-notes pre {
+    overflow-x: auto;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-window-border);
+    border-radius: 0.5rem;
+    background-color: var(--color-window);
+    font-size: 0.8125rem;
+    line-height: 1.5rem;
+  }
+
+  .release-notes pre code {
+    padding: 0;
+    background: none;
+    font-size: inherit;
+    overflow-wrap: normal;
+  }
+
+  .release-notes blockquote {
+    padding-left: 1rem;
+    border-left: 2px solid var(--color-border-secondary);
+  }
+
+  .release-notes img {
+    max-width: 100%;
+    border-radius: 0.5rem;
+  }
+
+  .release-notes table {
+    display: block;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .release-notes :where(th, td) {
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--color-border-primary);
+    text-align: left;
+  }
+
+  .release-notes hr {
+    border-color: var(--color-border-primary);
+  }
+}
+
 @keyframes finish-pop {
   40% {
     scale: 1.25;

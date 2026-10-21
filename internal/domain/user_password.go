@@ -27,7 +27,25 @@ func ErrUserPasswordEmpty() Error {
 }
 
 func ErrUserPasswordTooLong() Error {
-	return newError("user.password_too_long", "The password is too long. It can be at most 64 characters.", nil, nil)
+	return newError("user.password_too_long", "The password is too long for the project's password hashing method.", nil, nil)
+}
+
+// PasswordPolicyViolations is the client-facing detail of
+// [ErrUserPasswordPolicyViolation]: every failed rule keyed by name with the
+// value of the setting it is named after, e.g. {"min_length": 12}, the same
+// shape as a flow field's validation.
+type PasswordPolicyViolations struct {
+	Violations map[string]any `json:"violations"`
+}
+
+// ErrUserPasswordPolicyViolation rejects a password that breaks the project's
+// password policy or the server's length cap (ADR 066).
+func ErrUserPasswordPolicyViolation(violations map[string]any) Error {
+	var details any
+	if violations != nil {
+		details = PasswordPolicyViolations{Violations: violations}
+	}
+	return newError("user.password_policy_violation", "The password does not meet the password policy.", details, nil)
 }
 
 func NormalizePassword(password string) string {
@@ -39,8 +57,10 @@ func HashPassword(password string, hasher crypto.Hasher) (string, error) {
 	if normalized == "" {
 		return "", ErrUserPasswordEmpty()
 	}
+	// The password gate reports this as a max_length violation before a
+	// password gets here; the check stays as the backstop no path can skip.
 	if utf8.RuneCountInString(normalized) > MaxPasswordLength {
-		return "", ErrUserPasswordTooLong()
+		return "", ErrUserPasswordTooLong().WithMessage("The password is too long. It can be at most 64 characters.")
 	}
 	hash, err := hasher.Hash(normalized)
 	if errors.Is(err, crypto.ErrPasswordTooLong) {

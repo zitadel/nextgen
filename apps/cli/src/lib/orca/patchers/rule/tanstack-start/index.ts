@@ -30,11 +30,26 @@ export class TanStackStartPatcher extends AbstractRulePatcher {
     return framework === "tanstack-start";
   }
 
+  protected devPortOps(ctx: PatchContext): FileOp[] {
+    return [devScriptPortOp(ctx.issuer, { strictPort: true })];
+  }
+
   protected routeOps(ctx: PatchContext): FileOp[] {
     const src = (rel: string) => join(ctx.framework.appDir, rel);
     return [
+      // The auth boundary is written on every setup; a pre-existing start entry
+      // at this exact path (e.g. another auth provider's src/start.ts) is a
+      // genuine conflict the file-writer refuses (and --force replaces), the
+      // same way Next writes its request boundary.
       { kind: "write", path: src("start.ts"), contents: startTemplate() },
-      { kind: "write", path: src("routes/index.tsx"), contents: indexRouteTemplate() },
+      // The landing page is written only when setup created the skeleton
+      // itself — a pre-existing app keeps its own landing page (ADR 044),
+      // same as the Next/Nuxt homepage.
+      ...(ctx.scaffoldedFramework
+        ? ([
+            { kind: "write", path: src("routes/index.tsx"), contents: indexRouteTemplate() },
+          ] satisfies FileOp[])
+        : []),
       { kind: "write", path: src("routes/login.tsx"), contents: loginRouteTemplate(ctx) },
       { kind: "write", path: src("routes/register.tsx"), contents: registerRouteTemplate(ctx) },
       { kind: "write", path: src("routes/profile.tsx"), contents: profileRouteTemplate() },
@@ -71,6 +86,13 @@ export class TanStackStartPatcher extends AbstractRulePatcher {
     // infrastructure: without it /__nextgen/* 404s and protected routes open, so
     // doctor fails rather than warning about a missing page.
     return [join(view.framework.appDir, "start.ts")];
+  }
+
+  protected override conditionallyScaffoldedFiles(view: PatchView): ReadonlyArray<string> {
+    // Written only when setup created the app skeleton itself; on a
+    // pre-existing app the landing page stays user-owned (see routeOps), so
+    // the managed-files check must not expect it on a manifest-less app.
+    return [join(view.framework.appDir, "routes/index.tsx")];
   }
 
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {
