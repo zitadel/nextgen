@@ -37,11 +37,7 @@ post:
           schema:
             $ref: ../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
+      $ref: createBranding-error-response.yaml
 
 get:
   operationId: listBranding
@@ -69,8 +65,4 @@ get:
           schema:
             $ref: list-branding-response.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
+      $ref: listBranding-error-response.yaml
