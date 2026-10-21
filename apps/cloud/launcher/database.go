@@ -91,10 +91,10 @@ func parsePostgresURL(dsn string) (*url.URL, error) {
 }
 
 // checkServedThroughPooler fails a build whose serving URL reaches the same
-// endpoint as its migrator URL, which is the direct port: Vercel starts an
-// instance per concurrent request from cold, every instance holds its own
-// connections, and without the pooler a burst exhausts the cluster's
-// connection slots within seconds. Instances that find none fail to start.
+// endpoint as its migrator URL, which is the direct port: a burst starts new
+// instances, every instance holds its own connections, and without the
+// pooler a burst exhausts the cluster's connection slots within seconds.
+// Instances that find none fail to start.
 func checkServedThroughPooler(servingDSN, migratorDSN string) error {
 	serving, err := url.Parse(servingDSN)
 	if err != nil || servingDSN == "" {
