@@ -238,10 +238,10 @@ func TestCreateDeployment(t *testing.T) {
 	}
 
 	t.Run("a project with no primary origin", func(t *testing.T) {
-		bare := newReleaseFixture(t)
-		created := bare.create(t, &api.CreateReleaseRequest{Pointers: bare.pointers()})
+		withoutOrigins := newReleaseFixture(t)
+		created := withoutOrigins.create(t, &api.CreateReleaseRequest{Pointers: withoutOrigins.pointers()})
 		require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
-		resp := bare.createDeployment(t, &api.CreateDeploymentRequest{
+		resp := withoutOrigins.createDeployment(t, &api.CreateDeploymentRequest{
 			ReleaseID: api.NewOptReleaseID(created.(*api.CreateReleaseCreated).ID),
 			Targets:   api.DeploymentTargetsRequest{"primary"},
 		})
