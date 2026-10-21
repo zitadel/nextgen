@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { type CSSProperties, useEffect, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -26,8 +26,8 @@ function hash(seed: string): number {
 
 /**
  * The colours for a seed, as the custom properties `.user-avatar` paints with
- * (`styles.css`): two different design-system starts, an angle and where in
- * its slow drift it starts, all taken from the hash, so a person keeps theirs on every screen and device and two
+ * (`styles.css`): two different design-system starts, an angle and where on
+ * its path the light starts, all taken from the hash, so a person keeps theirs on every screen and device and two
  * people rarely share one.
  *
  * Set on a hover host as well, they tint its hover wash with the same colours.
@@ -41,25 +41,46 @@ export function avatarVars(seed: string): CSSProperties {
     "--avatar-from": `var(${STARTS[from]})`,
     "--avatar-to": `var(${STARTS[to]})`,
     "--avatar-base": `${(h >>> 16) % 360}deg`,
-    // A negative delay starts the 20-second drift part-way through.
-    "--avatar-phase": `-${(h >>> 4) % 20}s`,
+    // A negative delay starts the light part-way along its path.
+    "--avatar-phase": `-${(h >>> 4) % 77}s`,
   } as CSSProperties;
 }
+
+/** How much faster the light wanders while the avatar's host is hovered. */
+const FAST = 4;
 
 /**
  * A person's avatar: a gradient generated from their user id rather than a
  * picture. The id, not the email, seeds it, so it survives a changed email.
  * A picture can replace it once users can upload one.
  *
- * It drifts one slow revolution every 20 seconds, unless the person asked for reduced
- * motion.
+ * A soft light wanders behind the colours, unless the person asked for reduced
+ * motion. With `fast` it wanders `FAST` times quicker: the playback rate
+ * changes, not the duration, so the light speeds up from where it is instead
+ * of jumping.
  *
  * Decorative: the name always sits beside it, so it is hidden from assistive
  * technology.
  */
-export function UserAvatar({ seed, className }: { seed: string; className?: string }) {
+export function UserAvatar({
+  seed,
+  fast = false,
+  className,
+}: {
+  seed: string;
+  fast?: boolean;
+  className?: string;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    for (const animation of ref.current?.getAnimations?.() ?? []) {
+      animation.updatePlaybackRate(fast ? FAST : 1);
+    }
+  }, [fast]);
+
   return (
     <span
+      ref={ref}
       aria-hidden
       className={cn("user-avatar size-6 shrink-0 rounded-full", className)}
       style={avatarVars(seed)}

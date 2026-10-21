@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, type LucideIcon, Monitor, Moon, Sun } from "lucide-react";
+import { useState } from "react";
 
 import {
   DropdownMenu,
@@ -105,10 +106,13 @@ function ThemeRow() {
 export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
   const email = user?.identifier ?? user?.userId ?? "Signed in";
   const name = user?.display ?? email;
+  // The avatar's light speeds up while the row is hovered or its menu is open.
+  const [hovered, setHovered] = useState(false);
+  const [open, setOpen] = useState(false);
 
   return (
     <SidebarMenuItem>
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <SidebarMenuButton
             size="lg"
@@ -120,9 +124,11 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             // otherwise stretch it into a 32x48 pill.
             className="avatar-host h-auto min-h-12 py-2 group-data-[collapsible=icon]:min-h-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1!"
             style={avatarVars(user?.userId ?? email)}
+            onPointerEnter={() => setHovered(true)}
+            onPointerLeave={() => setHovered(false)}
           >
             {/* 24px in the footer row, generated from the user id. */}
-            <UserAvatar seed={user?.userId ?? email} />
+            <UserAvatar seed={user?.userId ?? email} fast={hovered || open} />
             {/* Hidden on the rail, so the avatar alone is what centres. */}
             <span className="flex min-w-0 flex-1 flex-col gap-1 group-data-[collapsible=icon]:hidden">
               <span className="truncate text-sm leading-none font-semibold">{name}</span>

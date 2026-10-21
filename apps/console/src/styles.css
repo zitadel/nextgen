@@ -123,35 +123,56 @@ select:-webkit-autofill {
 }
 
 /* The generated avatar (`components/user-avatar.tsx`): two design-system
-   gradient starts at an angle, all set per person as custom properties.
-   `--avatar-angle` is registered so it interpolates: the gradient drifts one
-   slow revolution every 20 seconds, like something alive, and each person starts at
-   their own point in it (`--avatar-phase`), so a list of avatars never turns
-   in step. */
-@property --avatar-angle {
-  syntax: "<angle>";
+   gradient starts at an angle, all set per person as custom properties, read
+   as tinted glass with a soft light wandering behind it. The light's position
+   is two registered properties so it interpolates, each on its own period
+   (7s across, 11s down), so its path never quite repeats; each person starts
+   at their own point (`--avatar-phase`), so a list of avatars never moves in
+   step. The component speeds the light up while its host is hovered. */
+@property --avatar-light-x {
+  syntax: "<percentage>";
   inherits: false;
-  initial-value: 0deg;
+  initial-value: 30%;
 }
 
-@keyframes avatar-drift {
+@property --avatar-light-y {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 30%;
+}
+
+@keyframes avatar-light-x {
   from {
-    --avatar-angle: var(--avatar-base);
+    --avatar-light-x: 18%;
   }
   to {
-    --avatar-angle: calc(var(--avatar-base) + 360deg);
+    --avatar-light-x: 82%;
+  }
+}
+
+@keyframes avatar-light-y {
+  from {
+    --avatar-light-y: 20%;
+  }
+  to {
+    --avatar-light-y: 80%;
   }
 }
 
 .user-avatar {
-  --avatar-angle: var(--avatar-base);
-  background-image: linear-gradient(
-    var(--avatar-angle),
-    var(--avatar-from) 15%,
-    var(--avatar-to) 85%
-  );
-  animation: avatar-drift 20s linear infinite;
-  animation-delay: var(--avatar-phase);
+  background-image:
+    radial-gradient(
+      circle at var(--avatar-light-x) var(--avatar-light-y),
+      color-mix(in oklab, white 70%, transparent) 0%,
+      color-mix(in oklab, white 25%, transparent) 22%,
+      transparent 58%
+    ),
+    linear-gradient(var(--avatar-base), var(--avatar-from) 15%, var(--avatar-to) 85%);
+  background-blend-mode: soft-light, normal;
+  animation:
+    avatar-light-x 7s ease-in-out infinite alternate,
+    avatar-light-y 11s ease-in-out infinite alternate;
+  animation-delay: var(--avatar-phase), var(--avatar-phase);
 }
 
 /* A hover host (the sidebar footer) carries the same colours: on hover or
