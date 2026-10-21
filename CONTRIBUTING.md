@@ -557,6 +557,12 @@ a `console-design-system-ui` classify-before-build guardrail or a
 `zitadel-pr-template` helper. They layer on these docs; nothing in the repo
 depends on them, so do not assume they are present.
 
+Committed developer skills live in `.agents/skills/`, which the cross-agent
+skills folder convention covers and `npx skills add` hides unless
+`INSTALL_INTERNAL_SKILLS=1` is set. Claude Code reads only `.claude/skills/`,
+so link each one you want:
+`mkdir -p .claude/skills && ln -s ../../.agents/skills/docs-review .claude/skills/`.
+
 ## Node.js and dependency versions
 
 `.nvmrc` names only the Node.js major, and every runtime in the repo uses that
