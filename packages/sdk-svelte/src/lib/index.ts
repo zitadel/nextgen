@@ -1,3 +1,7 @@
+// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
+// The edge build of the components package has no elements, so this does nothing there.
+import "@zitadel/components";
+
 export { default as ZitadelLogin } from "./ZitadelLogin.svelte";
 export { default as ZitadelLogout } from "./ZitadelLogout.svelte";
 export { default as ZitadelSession } from "./ZitadelSession.svelte";

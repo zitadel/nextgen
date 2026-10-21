@@ -30,6 +30,22 @@ func (t AuthCheckType) Class() AuthCheckType {
 	return t
 }
 
+// IsCredential reports whether a verified factor of this type proves the user
+// authenticated, as opposed to merely identifying who they claim to be. The
+// user (identifier) check proves only a claimed identity, and the SSO callback
+// is an intermediate state record, not a factor; password, passkey (including
+// enrollment, which shares the passkey class) and a linked SSO sign-in are
+// credentials. Attempt completion and handoff gate on a verified credential
+// factor, never on the identifier alone (see [AuthAttempt.IsCompleted]).
+func (t AuthCheckType) IsCredential() bool {
+	switch t.Class() {
+	case AuthCheckTypePassword, AuthCheckTypePasskey, AuthCheckTypeSSO:
+		return true
+	default:
+		return false
+	}
+}
+
 type AuthCheck interface {
 	Type() AuthCheckType
 	Payload() any

@@ -2,8 +2,9 @@
  * What each Figma collection *is*.
  *
  * Roles are declared, never inferred from shape: several collections carry
- * Light/Dark modes. A collection the sync has never seen stops
- * the sync until someone decides what it is, rather than being auto-routed
+ * Light/Dark modes. A collection the sync has never seen falls back to
+ * `registry-only` with a warning, and `sync-from-export.spec.ts` fails the sync
+ * PR until someone decides what it is, rather than it being auto-routed
  * somewhere by shape.
  *
  * Keys are the Figma collection name (`$metadata.collection`), falling back to

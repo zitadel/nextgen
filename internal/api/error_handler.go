@@ -100,10 +100,11 @@ func createFullErrDetailsDetailsMap(err error) any {
 }
 
 func errorResponse(err error) *api.ErrorDetailsStatusCode {
-	var e domain.Error
-	if !errors.As(err, &e) {
-		return internalErrorResponse(err)
+	if domain.IsServerFault(err) {
+		return serverFaultResponse(err)
 	}
+	var e domain.Error
+	errors.As(err, &e)
 	switch {
 	case e.Code == domain.ErrAuthUnauthorized(nil).Code:
 		return errorResponseWithStatusCode(http.StatusUnauthorized, e)
@@ -144,12 +145,26 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	case strings.HasPrefix(e.Code, domain.PrefixClaimChallenge.ErrorCodePrefix("")),
 		strings.HasPrefix(e.Code, domain.PrefixClaim.ErrorCodePrefix("")):
 		return claimErrorResponse(e)
-	case e.Code == domain.ErrNotImplemented().Code:
-		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
-	case e.Code == domain.ErrUnavailable().Code:
-		return errorResponseWithStatusCode(http.StatusServiceUnavailable, e)
 	case e.Code == domain.ErrRequestInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, e)
+	default:
+		return internalErrorResponse(err)
+	}
+}
+
+// serverFaultResponse answers a [domain.IsServerFault] error: 501 for a
+// feature that is not implemented, 503 for a transient failure worth retrying,
+// and 500 for everything else. Only the outermost domain error counts, the
+// one whose code the body carries: an internal error that wraps an
+// unavailable one is a 500.
+func serverFaultResponse(err error) *api.ErrorDetailsStatusCode {
+	var e domain.Error
+	errors.As(err, &e)
+	switch e.Code {
+	case domain.ErrNotImplemented().Code:
+		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
+	case domain.ErrUnavailable().Code:
+		return errorResponseWithStatusCode(http.StatusServiceUnavailable, err)
 	default:
 		return internalErrorResponse(err)
 	}
@@ -207,7 +222,7 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 		// ogen's validation rejected do go into details.
 		invalid := domain.ErrRequestInvalid()
 		if fields := validationFieldPaths(err); len(fields) > 0 {
-			invalid = invalid.WithDetails(map[string][]string{"fields": fields})
+			invalid = invalid.WithDetails(domain.InvalidFieldPathsDetails{Fields: fields})
 		}
 		details = domainErrorDetails(invalid)
 

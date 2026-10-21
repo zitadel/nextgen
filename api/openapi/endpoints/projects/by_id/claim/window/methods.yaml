@@ -11,17 +11,8 @@ get:
   tags:
     - Projects
   parameters:
-    - name: project_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../../../components/schemas/project-id.yaml
-    - name: challenge_id
-      in: query
-      required: true
-      description: The challenge from the claim URL.
-      schema:
-        $ref: ../../../../../components/schemas/challenge-id.yaml
+    - $ref: ../../../../../components/parameters/project-id-path.yaml
+    - $ref: ../../../../../components/parameters/challenge-id-query.yaml
   security: []
   responses:
     '200':
@@ -46,8 +37,4 @@ get:
           schema:
             $ref: ../../../../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../../components/error-details.yaml
+      $ref: getClaimWindow-error-response.yaml

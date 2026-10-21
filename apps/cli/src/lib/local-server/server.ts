@@ -17,7 +17,7 @@ import {
 import { HttpHealth, TcpPorts } from "./internal/probes";
 import { withStartLock } from "./internal/start-lock";
 import { RuntimeFileStore } from "./internal/store";
-import { discoverManagedRuntimeProcesses, type ManagedRuntimeProcess } from "./processes";
+import type { LocalServers, ManagedRuntimeProcess } from "./processes";
 import {
   type RuntimeBackend,
   type RuntimeMetadata,
@@ -211,8 +211,8 @@ export class LocalServer {
    * cannot find the server: the processes are found by their command lines, not
    * by any directory's record.
    */
-  static async stopAll(): Promise<SweepResult> {
-    const discovery = await discoverManagedRuntimeProcesses();
+  static async stopAll(servers: LocalServers): Promise<SweepResult> {
+    const discovery = await servers.current();
     if (!discovery.supported) {
       return { supported: false, error: discovery.error };
     }
@@ -448,7 +448,8 @@ export class LocalServer {
    * signalled and a pid that is no longer the server is left alone (see
    * `BinaryLauncher.stopRecord`). For a container, or with no record at all, the
    * container named for this directory is removed if there is one: a start that
-   * failed halfway can leave a container behind with no record of it.
+   * failed halfway can leave a container behind with no record of it. Where
+   * Docker is not installed there is none, and that is not an error.
    */
   private async halt(): Promise<StopReport> {
     const runtime = await readRuntimeMetadata(this.cwd);

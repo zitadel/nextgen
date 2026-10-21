@@ -1,0 +1,48 @@
+get:
+  operationId: listMyPasskeys
+  summary: List my passkeys
+  description: |
+    The signed-in user's own passkeys, newest first, paginated with a cursor.
+    Each passkey carries its id, its name and when it was registered, never the
+    credential itself.
+
+    With `project_id`, the passkeys are listed only when the session belongs to
+    that project.
+  tags:
+    - Users
+  security:
+    - nextgenSession: []
+  parameters:
+    - $ref: ../../../../components/parameters/limit.yaml
+    - $ref: ../../../../components/parameters/page-token.yaml
+    - $ref: ../../../../components/parameters/session-project-id.yaml
+  responses:
+    '200':
+      description: The user's passkeys.
+      headers:
+        Cache-Control:
+          $ref: ../../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../by_id/passkeys/list-user-passkeys-response.yaml
+    '400':
+      description: The page token or limit was not valid.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid session token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/auth-unauthorized.yaml
+    '403':
+      description: The session belongs to a different project than `project_id`.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/sess-project_mismatch.yaml
+    default:
+      $ref: listMyPasskeys-error-response.yaml

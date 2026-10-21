@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -70,6 +71,31 @@ func TestSchemaFieldResolver_Validate_MaxLength(t *testing.T) {
 	err := resolver.Validate(fields, map[string]any{"username": string(long)})
 	if !hasValidationRule(t, err, "username", domain.FlowFieldValidationRuleMaxLength) {
 		t.Fatalf("Validate err = %v, want max_length violation for username", err)
+	}
+}
+
+// Length rules count code points (JSON Schema), not UTF-8 bytes.
+func TestSchemaFieldResolver_Validate_MinLengthCountsCodePoints(t *testing.T) {
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
+	fields := resolveDefaultFields(t)
+
+	// 2 code points, 4 bytes: under minLength 3 despite 4 bytes.
+	err := resolver.Validate(fields, map[string]any{"username": "äö"})
+	if !hasValidationRule(t, err, "username", domain.FlowFieldValidationRuleMinLength) {
+		t.Fatalf("Validate err = %v, want min_length violation for username", err)
+	}
+}
+
+func TestSchemaFieldResolver_Validate_MaxLengthCountsCodePoints(t *testing.T) {
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
+	fields := resolveDefaultFields(t)
+
+	// 64 code points, 128 bytes: exactly at maxLength 64.
+	err := resolver.Validate(fields, map[string]any{"username": strings.Repeat("ä", 64)})
+	if err != nil {
+		t.Fatalf("Validate returned error: %v", err)
 	}
 }
 

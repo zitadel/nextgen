@@ -1,11 +1,12 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
+import { DEFAULT_SETUP_PRESET, DEFAULT_SETUP_USE_CASE } from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
@@ -14,7 +15,7 @@ vi.mock("../../../src/commands/setup/prompts", async (importOriginal) => ({
   askCustomSettings: vi.fn(),
 }));
 
-import { confirm } from "@clack/prompts";
+import { confirm, intro, isCancel, multiselect, select, text } from "@clack/prompts";
 
 import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
 import {
@@ -27,6 +28,7 @@ import { askCustomSettings } from "../../../src/commands/setup/prompts";
 import type { Asker } from "../../../src/lib/input";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
 import Setup from "../../../src/commands/setup";
+import { aFakeAppGeneratorPath } from "../../helpers/app-generator";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
@@ -63,6 +65,18 @@ async function recordStartedServer(dir: string, serverUrl: string): Promise<void
     cli_version: "0.0.0-test",
   });
 }
+
+/** An empty directory named as npm requires a package to be, which a new app's must be. */
+async function makeNewAppDirectory(): Promise<string> {
+  const parent = await mkdtemp(join(tmpdir(), "zitadel-setup-new-"));
+  tempDirs.push(parent);
+  const cwd = join(parent, "my-app");
+  await mkdir(cwd);
+  return cwd;
+}
+
+/** What a prompt answers when the person cancels it; the clack double's `isCancel` knows it. */
+const CANCELLED = Symbol("cancelled");
 
 /** A minimal detectable Next.js App Router project (no Zitadel files yet). */
 async function makeNextProject(): Promise<string> {
@@ -888,6 +902,37 @@ describe("setup command", () => {
     // its presence proves the non-default use case survived into the guidance.
     expect(res.stdout).toContain("--use-case business");
   });
+
+  describe("when the default resources of a new app cannot be uploaded", () => {
+    const failingUpload = async () => {
+      const cwd = await makeNewAppDirectory();
+      server.use(
+        http.post("*/schemas", () =>
+          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+        ),
+      );
+      const res = await runCliForTest(
+        [
+          ...["setup", "--cwd", cwd, "--json", "--server", "https://api.zitadel.cloud"],
+          ...["--framework", "next", "--non-interactive", "--skip-install"],
+        ],
+        { PATH: await aFakeAppGeneratorPath() },
+      );
+      return parseJson(res.stdout) as { hint?: string; next_commands?: string[] };
+    };
+
+    it("says the new app is gone again", async () => {
+      const json = await failingUpload();
+
+      expect(json.hint).toContain("so setup removed the new app again");
+    });
+
+    it("does not suggest --force, which the emptied directory does not need", async () => {
+      const json = await failingUpload();
+
+      expect(json.next_commands ?? []).toEqual([]);
+    });
+  });
 });
 
 describe("a retry after a failure before the wizard", () => {
@@ -1055,5 +1100,160 @@ describe("setup asked on a terminal", () => {
     await expect(settingUp(cwd)).rejects.toThrow();
 
     await expect(readFile(join(cwd, "zitadel.json"), "utf8")).rejects.toThrow();
+  });
+
+  describe("in a directory without an app", () => {
+    beforeEach(async () => {
+      vi.stubEnv("PATH", await aFakeAppGeneratorPath());
+      vi.mocked(isCancel).mockImplementation((value) => value === CANCELLED);
+      vi.mocked(text).mockClear();
+      vi.mocked(intro).mockClear();
+    });
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    /** Picks Next.js to scaffold, then answers every question after it. */
+    function answeringEveryQuestion(): void {
+      vi.mocked(select)
+        .mockResolvedValueOnce("next" as never)
+        .mockResolvedValueOnce(DEFAULT_SETUP_USE_CASE as never)
+        .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never);
+      vi.mocked(text).mockResolvedValueOnce("3000" as never);
+      vi.mocked(multiselect).mockResolvedValueOnce([] as never);
+    }
+
+    it("creates no app when a question after the framework is cancelled", async () => {
+      const cwd = await makeNewAppDirectory();
+      vi.mocked(select).mockResolvedValueOnce("next" as never);
+      vi.mocked(text).mockResolvedValueOnce(CANCELLED as never);
+
+      await expect(settingUp(cwd)).rejects.toThrow();
+
+      expect(text).toHaveBeenCalledWith(expect.objectContaining({ message: "Dev server port" }));
+      expect(await readdir(cwd)).toEqual([]);
+    });
+
+    it("creates the app once every question is answered", async () => {
+      const cwd = await makeNewAppDirectory();
+      answeringEveryQuestion();
+
+      await settingUp(cwd, "--skip-install");
+
+      expect(await readdir(cwd)).toEqual(expect.arrayContaining(["app", "zitadel.json"]));
+    });
+
+    it("asks every question under the heading the framework question opened", async () => {
+      const cwd = await makeNewAppDirectory();
+      answeringEveryQuestion();
+
+      await settingUp(cwd, "--skip-install");
+
+      expect(intro).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("setup --dev-port on an app already set up", () => {
+  /** A Next app with a `dev` script, through setup on the detected port, 3000. */
+  async function aSetUpNextApp(): Promise<string> {
+    const cwd = await makeNextProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", scripts: { dev: "next dev" }, dependencies: { next: "^15" } }),
+    );
+    const res = await setup(cwd, ["--non-interactive", "--skip-install"]);
+    expect(res.exitCode, res.stdout).toBe(0);
+    return cwd;
+  }
+
+  function moveTo(cwd: string, port: number) {
+    return setup(cwd, ["--non-interactive", "--dev-port", String(port)]);
+  }
+
+  /** The fields of `package.json`, `zitadel.json` and `.zitadel/secret` these tests read. */
+  type MovedFile = {
+    scripts?: { dev?: string };
+    environments?: unknown;
+    preview_origins?: unknown;
+    project_id?: string;
+  };
+
+  async function readJsonFile(cwd: string, path: string): Promise<MovedFile> {
+    return JSON.parse(await readFile(join(cwd, path), "utf8")) as MovedFile;
+  }
+
+  async function projectOrigins(cwd: string): Promise<unknown> {
+    const { project_id } = await readJsonFile(cwd, ".zitadel/secret");
+    const res = await fetch(`https://api.zitadel.cloud/projects/${project_id}`);
+    return ((await res.json()) as { origins: unknown }).origins;
+  }
+
+  it("moves the dev script, the issuer and the allowed origin to the new port", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const res = await moveTo(cwd, 3101);
+
+    expect(res.exitCode, res.stdout).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; data: Record<string, unknown> };
+    expect(json.status).toBe("ok");
+    expect(json.data).toMatchObject({
+      moved: true,
+      previous_issuer: "http://localhost:3000",
+      issuer: "http://localhost:3101",
+    });
+    expect((await readJsonFile(cwd, "package.json")).scripts?.dev).toBe("next dev --port 3101");
+    expect(await readFile(join(cwd, ".env.local"), "utf8")).toContain(
+      "ZITADEL_ISSUER=http://localhost:3101\n",
+    );
+    expect((await readJsonFile(cwd, "zitadel.json")).environments).toEqual({
+      development: { issuer: "http://localhost:3101" },
+    });
+    expect((await readJsonFile(cwd, ".zitadel/secret")).preview_origins).toEqual([
+      "http://localhost:3101",
+    ]);
+    expect(await readFile(join(cwd, "README.md"), "utf8")).toContain("http://localhost:3101/login");
+    expect(await projectOrigins(cwd)).toEqual([
+      { pattern: "http://localhost:3101", kind: "preview" },
+    ]);
+  });
+
+  it("changes nothing when the server refuses the new origin", async () => {
+    const cwd = await aSetUpNextApp();
+    const before = await readFile(join(cwd, "package.json"), "utf8");
+    const env = await readFile(join(cwd, ".env.local"), "utf8");
+    server.use(
+      http.post("*/projects/:project_id/origins", () =>
+        HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
+      ),
+    );
+
+    const res = await moveTo(cwd, 3101);
+
+    expect(res.exitCode).not.toBe(0);
+    expect(await readFile(join(cwd, "package.json"), "utf8")).toBe(before);
+    expect(await readFile(join(cwd, ".env.local"), "utf8")).toBe(env);
+  });
+
+  it("reports nothing moved for the port the app is already on", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const res = await moveTo(cwd, 3000);
+
+    expect(res.exitCode, res.stdout).toBe(0);
+    const json = parseJson(res.stdout) as { data: { moved: boolean; files_written: string[] } };
+    expect(json.data.moved).toBe(false);
+    expect(await projectOrigins(cwd)).toEqual([
+      { pattern: "http://localhost:3000", kind: "preview" },
+    ]);
+  });
+
+  it("refuses a port outside 1..65535", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const res = await moveTo(cwd, 70000);
+
+    const json = parseJson(res.stdout) as { code: string };
+    expect(json.code).toBe("E_VALIDATION");
   });
 });

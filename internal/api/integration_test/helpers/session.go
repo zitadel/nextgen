@@ -11,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureSessionService(t *testing.T) service.SessionService {
+func (h *Harness) EnsureSessionService(t testing.TB) service.SessionService {
 	t.Helper()
 	h.sessionService.mutex.Lock()
 	defer h.sessionService.mutex.Unlock()
@@ -31,11 +31,25 @@ func (h *Harness) EnsureSessionService(t *testing.T) service.SessionService {
 // expires_at while the state filter compares it against the service clock,
 // so a test that needs the session expired must wait until that is
 // observable rather than assume a tiny TTL has already elapsed.
-func (h *Harness) CreateSession(t *testing.T, projectID string, ttl time.Duration) *domain.Session {
+func (h *Harness) CreateSession(t testing.TB, projectID string, ttl time.Duration) *domain.Session {
 	t.Helper()
 	session := &domain.Session{ProjectID: projectID, TimeToLive: ttl}
 	require.NoError(t, h.EnsureServiceDB(t).Statements().CreateSession(t.Context(), session))
 	return session
+}
+
+// SessionToken returns the session_token a client holds for session, as
+// POST /sessions and the handoff exchange return it. A request that runs a
+// sign-in against an existing session must present it (step-up proof). Only a
+// session with a token record (CreateActiveSession's) gets a token that
+// introspection checks against that record.
+func (h *Harness) SessionToken(t testing.TB, session *domain.Session) string {
+	t.Helper()
+	crypter, err := h.EnsureKeyService(t).GetProjectCrypter(t.Context(), session.ProjectID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	token, err := session.Token(crypter)
+	require.NoError(t, err)
+	return token
 }
 
 // CreateActiveSession exchanges a handed-off attempt with a verified user
@@ -46,7 +60,7 @@ func (h *Harness) CreateSession(t *testing.T, projectID string, ttl time.Duratio
 // exchange past it. Only on that answer the helper seeds a fresh attempt, up
 // to three times; a handoff that is actually broken still fails the test.
 // TestClaimHappyPath and the session exchange tests exchange exactly once.
-func (h *Harness) CreateActiveSession(t *testing.T, projectID, userID string) *domain.Session {
+func (h *Harness) CreateActiveSession(t testing.TB, projectID, userID string) *domain.Session {
 	t.Helper()
 	stmts := h.EnsureServiceDB(t).Statements()
 
@@ -54,8 +68,11 @@ func (h *Harness) CreateActiveSession(t *testing.T, projectID, userID string) *d
 	for range 3 {
 		attempt := &domain.AuthAttempt{
 			ProjectID:      projectID,
-			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
-			Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser, domain.AuthCheckTypePassword},
+			// A completed attempt carries a verified credential-class factor
+			// alongside the identifier; the bare user factor never completes
+			// one (see domain.AuthAttempt.IsCompleted).
+			Checks: []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}, &domain.AuthFactorPassword{}},
 		}
 		require.NoError(t, stmts.CreateAuthAttempt(t.Context(), attempt))
 

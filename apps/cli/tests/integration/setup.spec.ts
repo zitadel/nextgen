@@ -2,10 +2,12 @@ import { realpath } from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
+import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
-import { anApp, type ScaffoldedApp } from "../helpers/project";
+import { aNewAppDirectory, anApp, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
+useLocalServers();
 
 const SOCIAL_CREDENTIALS = {
   clientId: "1234-abc.apps.googleusercontent.com",
@@ -108,6 +110,58 @@ describe("setup", () => {
 
         expect(result).toSucceed();
         expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
+      });
+
+      it("creates a new app in the directory start ran in", async () => {
+        const app = await aNewAppDirectory();
+        await app.startLocalServer();
+
+        const result = await app.setupNewApp();
+
+        expect(result).toSucceed();
+      });
+
+      it("previews a new app on a dry run", async () => {
+        const app = await aNewAppDirectory();
+
+        const result = await app.setupNewApp(["--dry-run"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("creates no app on a dry run", async () => {
+        const app = await aNewAppDirectory();
+        const before = await app.snapshot();
+
+        await app.setupNewApp(["--dry-run"]);
+
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+
+      it.each([
+        ["the platform is down", () => platform.isUnavailable()],
+        ["the schema upload fails", () => platform.rejectsSchemaUploads()],
+      ])("leaves the directory start ran in as it was when %s", async (_failure, fail) => {
+        const app = await aNewAppDirectory();
+        await app.startLocalServer();
+        const before = await app.snapshot();
+        fail();
+
+        await app.setupNewApp();
+
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+
+      it("sets a new app up as new when rerun after a failed run", async () => {
+        const app = await aNewAppDirectory();
+        platform.isUnavailable();
+        await app.setupNewApp();
+        platform.recovers();
+
+        const rerun = await app.setupNewApp();
+
+        const { data } = app.envelopeOf<{ files_written: string[] }>(rerun);
+        expect(data.files_written).toContain("app/page.tsx");
       });
 
       it("reports the configuration files it wrote", async () => {

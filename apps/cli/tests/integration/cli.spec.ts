@@ -127,7 +127,7 @@ describe("the cli", () => {
       it("ignores the server named in zitadel.json", async () => {
         const app = await anApp();
         await app.writeConfig({
-          $schema: "https://schemas.zitadel.com/v2/project.schema.json",
+          $schema: "./.zitadel/meta/project.json",
           project: "existing",
           server: "https://self.example",
         });

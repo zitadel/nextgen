@@ -28,9 +28,6 @@ wiring the middleware without the module.
 
 ```bash
 pnpm add @zitadel/sdk-nuxt@alpha
-# login/logout web components are a separate, non-transitive dependency under
-# strict package managers (pnpm, Yarn PnP) — declare it explicitly:
-pnpm add @zitadel/components@alpha
 ```
 
 Peer dependencies: `nuxt >=4`, `h3 >=1`.
@@ -53,19 +50,20 @@ export default defineNuxtConfig({
 The module registers the Nitro middleware and auth plugin and auto-imports the
 composables — no manual `server/middleware/auth.ts`. It reads `ZITADEL_URL`,
 `NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and the server-only `ZITADEL_PROJECT_SECRET`
-from the environment, or from `.env.local` when the environment has none (Nuxt
-itself loads only `.env`). A `nextgen.url` or
-`runtimeConfig.public.zitadelProjectId` in `nuxt.config.ts` wins over the
-variables.
+from the environment, or in `nuxt dev` from `.env.local` when the environment
+has none (Nuxt itself loads only `.env`). `url` and the project secret default to `ZITADEL_URL` and
+`ZITADEL_PROJECT_SECRET`; pass `nextgen.url` only to override. A built server
+reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from its own runtime environment (`NUXT_NEXTGEN_URL`
+and `NUXT_NEXTGEN_PROJECT_SECRET` take precedence) and never has them baked
+into `.output/`. A `nextgen.url` or `runtimeConfig.public.zitadelProjectId` in
+`nuxt.config.ts` wins over the variables. Sessions count only in the app's own
+project, the public project id unless `nextgen.projectId` names one: with none,
+nobody is signed in.
 
-Register the web components in a **client-only** plugin — importing
-`@zitadel/components` from a page `<script setup>` runs during SSR and breaks:
-
-```ts
-// plugins/zitadel-components.client.ts
-import '@zitadel/components';
-export default defineNuxtPlugin(() => {});
-```
+The module also loads the web components in the browser through a client-only
+plugin and provides the business copy overlay as
+`useNuxtApp().$zitadelBusinessLocales`. Do not install or import
+`@zitadel/components` in the app.
 
 Login and logout pages bind the project handle from `useZitadelProject()` inside
 `<ClientOnly>`; navigation after each flow is driven by the URL props (there is
@@ -105,7 +103,9 @@ built server takes each one from `NUXT_NEXTGEN_<OPTION>` (a list as JSON). Only
 an app without the module hand-rolls `server/middleware/auth.ts` with
 `createNextgenMiddleware(...)` from `@zitadel/sdk-nuxt/server`.
 
-## Widget events
+## Widget props and events
+
+The widgets are rendered as raw custom elements, so bind their props by the element's own names, in kebab-case in a template (`post-sign-in-url`, `project-id`). The `@zitadel/sdk-vue` skill lists each prop under its wrapper name in camelCase. The table below lists the events.
 
 The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
 
@@ -138,10 +138,9 @@ component attributes against the installed version rather than assuming.
   `runtimeConfig.public.zitadelProjectId`) the plugin silently skips
   `configureZitadel()`, so `useZitadelProject()` is `null` and
   `<zitadel-login>` never initializes.
-- **`@zitadel/components` is not transitive** under strict package managers —
-  add it to the app directly or imports fail to resolve.
-- **Never import components in page `<script setup>`** — it executes during SSR.
-  Use the `.client.ts` plugin and wrap the elements in `<ClientOnly>`.
+- **Do not depend on `@zitadel/components`.** The module loads the elements
+  itself; importing them in a page `<script setup>` would run during SSR, so
+  leave that to the module and wrap the elements in `<ClientOnly>`.
 - **Keep `proxyPath` at `/__nextgen` for external sign-in.** The module moves
   the server proxy and the widgets together, but a provider returns the browser
   to `/__nextgen/idp/{slug}/callback`, which is proxied only under the default

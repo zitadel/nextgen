@@ -56,7 +56,7 @@ export default class Apply extends EnvironmentCommand {
         data: {
           synced: true,
           // Platform resources this run touched (with resulting ids);
-          // `files_updated` stays the local write-backs only.
+          // `files_updated` lists the local rewrites only: re-pinned flows.
           changes: applied,
           files_updated: filesUpdated,
           unsupported_deletions: unsupported.length,

@@ -1,5 +1,6 @@
 get:
   operationId: getSession
+  x-zitadel-cli: sessions get
   summary: Get session state
   description: |
     Returns the current state of a session including its factors and all currently
@@ -45,6 +46,7 @@ get:
 
 delete:
   operationId: revokeSession
+  x-zitadel-cli: sessions revoke
   summary: Revoke session
   description: |
     Permanently deletes the session, terminating it immediately.

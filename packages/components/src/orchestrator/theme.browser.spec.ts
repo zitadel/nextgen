@@ -112,7 +112,6 @@ describe("<zitadel-login> theming (chromium)", () => {
   afterEach(() => {
     host.remove();
     stub?.restore();
-    document.getElementById("zl-default-font-link")?.remove();
   });
 
   async function mount(configure?: (el: ZitadelLogin) => void): Promise<ZitadelLogin> {

@@ -1,5 +1,7 @@
 import { createMDX } from "fumadocs-mdx/next";
 
+import moved from "./lib/moved.json" with { type: "json" };
+
 const withMDX = createMDX();
 
 // The share of page loads that send Speed Insights (app/layout.tsx), from 0
@@ -16,6 +18,9 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
 /** @type {import('next').NextConfig} */
 const config = {
   reactStrictMode: true,
+  // Keeps `next dev` from writing Next's agent rules into AGENTS.md when an
+  // AI coding agent runs it (apps/AGENTS.md).
+  agentRules: false,
   // Everything the docs serve lives under /docs, their scripts and styles
   // too: on the cloud's host every other path belongs to another service
   // (repo-root vercel.json), /_next/ to the website.
@@ -23,7 +28,16 @@ const config = {
   async redirects() {
     // The root serves nothing; locally (next dev, next start) it opens the
     // docs. On the cloud's host the root is the website's start page.
-    return [{ source: "/", destination: "/docs", permanent: false }];
+    return [
+      { source: "/", destination: "/docs", permanent: false },
+      // A page that moved, and its Markdown twin, such as the Qwik Router
+      // SDK's page from before the SDK took Qwik 2's name for its router
+      // (formerly Qwik City), or the CLI section's guides, now under Guides.
+      ...Object.entries(moved).flatMap(([source, destination]) => [
+        { source, destination, permanent: true },
+        { source: `${source}.md`, destination: `${destination}.md`, permanent: true },
+      ]),
+    ];
   },
 };
 

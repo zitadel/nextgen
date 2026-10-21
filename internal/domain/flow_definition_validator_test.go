@@ -133,7 +133,7 @@ var userSchemaRequiredProps = []byte(`{
 
 var tenantUserSchema = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "metaSchema": "https://nextgen.com/schemas/user-meta-schema.json",
+  "metaSchema": "https://example.test/schemas/user-meta-schema.json",
   "$id": "https://tenant.com/schemas/my-user.json",
   "kind": "user-schema",
   "type": "object",
@@ -157,7 +157,7 @@ var tenantUserSchema = []byte(`{
 
 var tenantUserSchemaNoProps = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "metaSchema": "https://nextgen.com/schemas/user-meta-schema.json",
+  "metaSchema": "https://example.test/schemas/user-meta-schema.json",
   "$id": "https://tenant.com/schemas/my-user.json",
   "kind": "user-schema",
   "type": "object",
@@ -1599,12 +1599,18 @@ func TestValidator_DeclaredBackKindRejected(t *testing.T) {
 // client would see two "back" buttons and route to the customer's kind.
 // "sso" is dispatched to the sso path on submission, so an authored action
 // of that name would validate and then fail every submission with
-// flow.invalid_action.
+// flow.invalid_action. The outcome names are routed by the engine alone;
+// a submission naming one is refused, so an action of that name could
+// never be taken.
 func TestValidator_ReservedActionNamesRejected(t *testing.T) {
 	schema := mustSchema(t, userSchemaIDAndPassword)
 	for name, reason := range map[string]string{
-		"back": "engine-injected back navigation",
-		"sso":  "sso submissions",
+		"back":                "engine-injected back navigation",
+		"sso":                 "sso submissions",
+		"user_not_found":      "flow outcomes",
+		"user_already_exists": "flow outcomes",
+		"sso_user_not_found":  "flow outcomes",
+		"sso_authenticated":   "flow outcomes",
 	} {
 		t.Run(name, func(t *testing.T) {
 			def := domain.FlowDefinition{

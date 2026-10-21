@@ -1,6 +1,12 @@
 post:
   operationId: createTeam
+  x-zitadel-cli: teams create
   summary: Create team
+  description: |
+    Creates a team in the project, with a name no other team in the project has.
+
+    A taken name is refused with `409 team.already_exists`. The new team has no
+    members yet.
   tags:
     - Teams
   security:
@@ -62,8 +68,4 @@ post:
           schema:
             $ref: ../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
+      $ref: createTeam-error-response.yaml
