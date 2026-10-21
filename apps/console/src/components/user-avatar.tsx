@@ -41,13 +41,13 @@ export function avatarVars(seed: string): CSSProperties {
     "--avatar-from": `var(${STARTS[from]})`,
     "--avatar-to": `var(${STARTS[to]})`,
     // A negative delay starts the roll part-way along its path. The four
-    // periods (9, 13, 23 and 31s) only line up again after hours.
-    "--avatar-phase": `-${(h >>> 4) % 600}s`,
+    // periods (18, 26, 46 and 62s) only line up again after hours.
+    "--avatar-phase": `-${(h >>> 4) % 1200}s`,
   } as CSSProperties;
 }
 
 /** How much faster the ball rolls while the avatar's host is hovered. */
-const FAST = 4;
+const FAST = 8;
 
 /**
  * A person's avatar: a gradient generated from their user id rather than a

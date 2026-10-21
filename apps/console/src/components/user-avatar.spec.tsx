@@ -37,7 +37,7 @@ describe("UserAvatar", () => {
     try {
       const { rerender } = render(<UserAvatar seed="user_1" />);
       rerender(<UserAvatar seed="user_1" fast />);
-      expect(updatePlaybackRate).toHaveBeenLastCalledWith(4);
+      expect(updatePlaybackRate).toHaveBeenLastCalledWith(8);
       rerender(<UserAvatar seed="user_1" />);
       expect(updatePlaybackRate).toHaveBeenLastCalledWith(1);
     } finally {

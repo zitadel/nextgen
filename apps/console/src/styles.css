@@ -218,10 +218,10 @@ select:-webkit-autofill {
     calc(var(--avatar-drift-x) + var(--avatar-sway-x))
     calc(var(--avatar-drift-y) + var(--avatar-sway-y));
   animation:
-    avatar-drift-x 23s linear infinite,
-    avatar-drift-y 31s linear infinite reverse,
-    avatar-sway-x 9s ease-in-out infinite alternate,
-    avatar-sway-y 13s ease-in-out infinite alternate;
+    avatar-drift-x 46s linear infinite,
+    avatar-drift-y 62s linear infinite reverse,
+    avatar-sway-x 18s ease-in-out infinite alternate,
+    avatar-sway-y 26s ease-in-out infinite alternate;
   animation-delay: var(--avatar-phase);
 }
 
