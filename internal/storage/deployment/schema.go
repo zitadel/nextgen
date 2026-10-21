@@ -56,8 +56,9 @@ func isPrimaryOrigin(tables Tables) string {
 		` WHERE po.project_id = t.project_id AND po.pattern = t.origin AND po.kind = 'primary')`
 }
 
-// liveValue marks where the Live filter's value goes, so the predicate is
-// written whole and cut around it.
+// liveValue holds the place of the Live filter's time. The filter needs the SQL
+// before and after that time, so the predicate is written whole with this marker
+// and cut in two at it. Any text works that never shows up in SQL; a NUL never does.
 const liveValue = "\x00"
 
 // NewSchema binds deployment list/filter/order fields for one dialect's table
