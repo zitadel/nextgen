@@ -425,6 +425,26 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	return &api.SetUserPasswordNoContent{}, nil
 }
 
+func (h *Handler) GetUserPasswordState(ctx context.Context, params api.GetUserPasswordStateParams) (api.GetUserPasswordStateRes, error) {
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
+	if err != nil {
+		return nil, err
+	}
+	setAt, err := h.userService.GetPasswordSetAt(ctx, service.GetPasswordInput{
+		ProjectID: projectID,
+		UserID:    string(params.UserID),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := &api.UserPasswordState{}
+	if setAt != nil {
+		res.SetAt = api.NewOptDateTime(*setAt)
+	}
+	return res, nil
+}
+
 // GetMyUser reads the user of the cookie's session, held to project_id when the
 // caller names one (requireSelf).
 func (h *Handler) GetMyUser(ctx context.Context, params api.GetMyUserParams) (api.GetMyUserRes, error) {
