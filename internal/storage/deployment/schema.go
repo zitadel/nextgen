@@ -28,11 +28,9 @@ type Tables struct {
 	ProjectOrigins string
 }
 
-// RowServes holds while row t serves its origin at the time bound to
-// placeholder. A primary row serves while its deployment is the project's
-// newest primary deployment and its origin is still a primary origin; a
-// preview row while it is the newest row to its URL, the URL is not a primary
-// origin, and its preview is live.
+// RowServes reports whether a deployment is live on one of its origins at the
+// given time. All primary origins run the newest primary deployment; a preview
+// URL runs its latest deployment until the preview expires.
 func RowServes(tables Tables, placeholder string) string {
 	return `(` + primaryRowServes(tables) + ` OR ` + previewRowServes(tables, placeholder) + `)`
 }
