@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -137,13 +136,20 @@ func TestReleaseErrorResponseConflicts(t *testing.T) {
 // The 409 names every origin still serving the release, so the caller can
 // deploy elsewhere or roll back before revoking again.
 func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {
-	resp, ok := releaseInUseConflict(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
+	resp, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
 		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
 	}}))
 	require.True(t, ok)
-	raw, err := json.Marshal(resp)
-	require.NoError(t, err)
-	assert.JSONEq(t, `{"code":"rel.in_use","message":"release: still served by an origin","details":{"origins":[{"origin":"https://app.acme.com","deployment_id":"dep_1"}]}}`, string(raw))
+	assert.Equal(t, api.ErrorCode(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code), resp.Code)
+	assert.Equal(t, []api.RevokeReleaseConflictDetailsOriginsItem{
+		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+	}, resp.Details.Origins)
+}
+
+// Without the origins the 409 cannot name them, so the generic envelope answers.
+func TestReleaseInUseResponseNeedsOrigins(t *testing.T) {
+	_, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).WithDetails(nil))
+	assert.False(t, ok)
 }
 
 func TestRequireBuildKindScopes(t *testing.T) {

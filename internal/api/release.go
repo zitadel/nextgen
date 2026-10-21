@@ -17,7 +17,7 @@ func (h *Handler) RevokeRelease(ctx context.Context, params api.RevokeReleasePar
 	}
 
 	entity, err := h.releaseService.Revoke(ctx, string(params.ProjectID), string(params.ReleaseID))
-	if conflict, ok := releaseInUseConflict(err); ok {
+	if conflict, ok := releaseInUseResponse(err); ok {
 		return conflict, nil
 	}
 	if err != nil {
@@ -27,23 +27,29 @@ func (h *Handler) RevokeRelease(ctx context.Context, params api.RevokeReleasePar
 	return &release, nil
 }
 
-// releaseInUseConflict answers rel.in_use with the typed 409. Through NewError
+// releaseInUseResponse answers rel.in_use with the typed 409. Through NewError
 // the details would nest under details.details.
-func releaseInUseConflict(err error) (*api.RevokeReleaseConflict, bool) {
+func releaseInUseResponse(err error) (*api.RevokeReleaseConflict, bool) {
 	de, ok := errors.AsType[domain.Error](err)
 	if !ok || de.Code != domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code {
 		return nil, false
 	}
-	details, _ := de.Details.(domain.ReleaseInUseDetails)
-	resp := api.RevokeReleaseConflict{Code: api.ErrorCode(de.Code), Message: de.Message}
-	resp.Details.Origins = make([]api.RevokeReleaseConflictDetailsOriginsItem, len(details.Origins))
+	details, ok := de.Details.(domain.ReleaseInUseDetails)
+	if !ok {
+		return nil, false
+	}
+	origins := make([]api.RevokeReleaseConflictDetailsOriginsItem, len(details.Origins))
 	for i, origin := range details.Origins {
-		resp.Details.Origins[i] = api.RevokeReleaseConflictDetailsOriginsItem{
+		origins[i] = api.RevokeReleaseConflictDetailsOriginsItem{
 			Origin:       api.Origin(origin.Origin),
 			DeploymentID: api.DeploymentID(origin.DeploymentID),
 		}
 	}
-	return &resp, true
+	return &api.RevokeReleaseConflict{
+		Code:    api.ErrorCode(de.Code),
+		Message: de.Message,
+		Details: api.RevokeReleaseConflictDetails{Origins: origins},
+	}, true
 }
 
 func (h *Handler) BuildRelease(ctx context.Context, req *api.BuildReleaseRequest, params api.BuildReleaseParams) (api.BuildReleaseRes, error) {

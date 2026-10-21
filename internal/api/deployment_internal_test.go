@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -81,9 +80,8 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 func TestDeploymentConflictRendersARevokedRelease(t *testing.T) {
 	resp, ok := deploymentConflictResponse(domain.ErrReleaseRevoked())
 	require.True(t, ok)
-	raw, err := json.Marshal(resp)
-	require.NoError(t, err)
-	assert.JSONEq(t, `{"code":"rel.revoked","message":"release: revoked"}`, string(raw))
+	assert.Equal(t, api.ReleaseRevokedConflictDeploymentConflict, resp.Type)
+	assert.Equal(t, domain.ErrReleaseRevoked().Code, resp.ReleaseRevokedConflict.Code)
 }
 
 // Any other error is left to NewError.
