@@ -197,7 +197,7 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
   expect(failures(results), "operations without their @zitadel/api call").toEqual([]);
 });
 
-test("every CLI command shows its usage, in tables whose rows keep their two cells", async ({
+test("every CLI command shows its usage, in tables whose rows keep their cells", async ({
   request,
 }) => {
   test.setTimeout(120_000);
@@ -217,8 +217,17 @@ test("every CLI command shows its usage, in tables whose rows keep their two cel
       const usage = `## Usage\n\n\`\`\`sh\nnpx @zitadel/cli@alpha ${words.split("/").join(" ")} `;
       if (!markdown.includes(usage)) return `${markdownUrl(url)}: no usage of its command`;
     }
-    const ragged = markdown.split("\n").find((line) => line.startsWith("| ") && cells(line) !== 2);
-    return ragged ? `${markdownUrl(url)}: a table row that is not two cells: ${ragged}` : null;
+    // A row has as many cells as its table's header, the row that opens it.
+    let header = 0;
+    const ragged = markdown.split("\n").find((line) => {
+      if (!line.startsWith("| ")) {
+        header = 0;
+        return false;
+      }
+      header ||= cells(line);
+      return cells(line) !== header;
+    });
+    return ragged ? `${markdownUrl(url)}: a table row unlike its header: ${ragged}` : null;
   });
   expect(commands).toBeGreaterThan(0);
   expect(failures(results), "CLI reference pages whose Markdown is wrong").toEqual([]);

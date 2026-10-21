@@ -5,7 +5,8 @@ import { Args, Flags } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { COMMANDS } from "../../../../src/index";
-import { BaseCommand } from "../../../../src/lib/oclif/base";
+import { EXIT_CODES } from "../../../../src/lib/errors";
+import { BaseCommand, FLAG_VARIABLES } from "../../../../src/lib/oclif/base";
 import { CommandGroups } from "../../../../src/lib/oclif/groups";
 import { cliReference } from "../../../../src/lib/oclif/reference";
 
@@ -99,6 +100,22 @@ describe("cliReference", () => {
       type: "boolean",
     });
     expect(reference.commands[0]?.flags.map((flag) => flag.name)).toEqual(["force"]);
+  });
+
+  it("lists the environment variables of the global flags in the flags' order", () => {
+    const reference = cliReference({ setup: aCommand() }, "zitadel");
+
+    const flags = Object.keys(BaseCommand.baseFlags);
+    const positions = reference.env.map(({ flag }) => flags.indexOf(flag));
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(reference.env).toEqual(expect.arrayContaining([...FLAG_VARIABLES]));
+    expect(reference.env).toHaveLength(FLAG_VARIABLES.length);
+  });
+
+  it("maps each error code to the exit code a failure with it returns", () => {
+    const reference = cliReference({ setup: aCommand() }, "zitadel");
+
+    expect(reference.exitCodes).toEqual(EXIT_CODES);
   });
 
   it("lists the flags a family adds to the base flags after the command's own", () => {

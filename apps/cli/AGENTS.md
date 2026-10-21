@@ -6,8 +6,8 @@
   envelope, invocation rules, claim, doctor repair). Update it with every
   change to the command surface.
 - `command-reference.json` is the docs site's CLI reference, generated from
-  `COMMANDS`: after a change to a command's help, rerun
-  `tests/unit/lib/oclif/reference.test.ts` with `--update`.
+  `COMMANDS`, `FLAG_VARIABLES` and `EXIT_CODES`: after a change to any of them,
+  rerun `tests/unit/lib/oclif/reference.test.ts` with `--update`.
 - Tests: [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving
   a test.
 - `start`, `stop`, `status`, `logs`, `reset`, `console`, `doctor` and how
@@ -32,6 +32,9 @@
   confirm" builds its own asker with `force: false`, as `setup` does.
 - The flag surface follows the [WebCLI spec](https://webcli.com/). Record a new
   global flag, or a deviation, in `SKILL.md`'s invocation rules.
+- Declare an environment variable that sets what a global flag sets as a
+  `FlagVariable` beside the code that reads it, read it by its `name`, and add
+  it to `FLAG_VARIABLES` (`src/lib/oclif/base.ts`).
 
 ## Telemetry
 
