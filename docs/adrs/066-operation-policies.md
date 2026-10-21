@@ -1,7 +1,7 @@
 # ADR 066: Operation Policies
 
 > **Status:** Draft
-> **Date:** 2026-08-28 (revised 2026-09-28)
+> **Date:** 2026-08-28 (revised 2026-09-28, 2026-10-16)
 > **Context:** [#383](https://github.com/zitadel/nextgen/issues/383) asks for the
 > settings-and-policies architecture; [#899](https://github.com/zitadel/nextgen/issues/899)
 > defines the product model; [#898](https://github.com/zitadel/nextgen/issues/898)
@@ -10,7 +10,7 @@
 > [ADR 035](035-configuration-environments.md),
 > [ADR 042](042-scaffolded-file-ownership-and-drift-detection.md),
 > [ADR 048](048-wide-events-internal-audit-primitive.md),
-> audience-scoped configuration (draft, [#1264](https://github.com/zitadel/nextgen/pull/1264))
+> audience-scoped configuration (proposed in [#1264](https://github.com/zitadel/nextgen/pull/1264), not decided)
 
 ## Context
 
@@ -61,15 +61,50 @@ Azure Policy's definition/assignment):
 - The instance is developer-authored and lives in the release. It carries the
   configuration values for the whole project.
 
-A policy is always evaluated before its operation runs. Every rule must hold
-for the operation to proceed.
+A policy is always evaluated before its operation runs. Every active rule must
+hold for the operation to proceed.
+
+Only what the developer configured is enforced. A template carries no
+defaults and no recommendations: a setting the instance omits switches off
+the rule that reads it, and a project without an instance has no policy for
+that operation. A setting is bounded only where the server has a technical
+limit. What the server enforces regardless of any policy (the maximum
+password length, for one) is a guard in the domain, not a policy.
+
+#### No server defaults
+
+Decided on 2026-10-15, revising #898's "defaults to 15 characters".
+
+- The product does not teach a project what is best for it. Requirements
+  legitimately differ between projects, so Zitadel enforces what a project
+  configures and does not grade it: no recommended values, no warnings below
+  a threshold, no product floor beyond what the server technically needs.
+- Nothing opinionated is hidden in the server. A value Zitadel chose on the
+  project's behalf would be enforced without appearing anywhere the project
+  can read or review.
+- Everything that is enforced is visible in the project's own
+  configuration: the instance file in `.zitadel/policies/`, versioned and
+  reviewed with the rest of the release.
+- Overrides stay simple. A later audience or hierarchy model resolves
+  between instances that exist, not between instances and a hidden default.
+
+Projects still start from a sensible policy. `zitadel setup` scaffolds a
+starter instance for `auth.factor.password.set` with `min_length: 15`, the
+NIST SP 800-63B minimum for a password used as a single factor
+([#1450](https://github.com/zitadel/nextgen/issues/1450)). #898's default
+therefore lives on as the starter's value, not as server behaviour. A project
+that skips the starter, or later removes the file or its `min_length`, has no
+length policy; the domain guards (non-empty, at most 64 code points) still
+apply. NIST alignment holds for projects that keep the starter.
 
 ### Terminology
 
-- Operation: a domain action that can carry a policy, such as `user.password.save`. Zitadel defines the list.
+- Operation: a domain action that can carry a policy, such as `auth.factor.password.set`. Zitadel defines the list.
 - Template: the Zitadel-defined half of a policy for one operation: config schema, context schema, rules.
 - Instance (or just policy): the developer-authored half, the config values. A revisioned resource in the release, one per operation per project.
-- Rule: one named CEL expression in a template that must evaluate to `true`.
+- Setting: one value an instance may set. Omitted means off.
+- Rule: one named CEL expression in a template that must evaluate to `true`. It reads exactly one setting, carries that setting's name, and is active only when the setting is set.
+- Config rule: one named CEL expression over settings alone, checked whenever an instance is bound (on publish, in release validation and when it is resolved for an operation), never per evaluation.
 - Decision: what evaluating an instance against a request context returns, `allow` or `deny` with the violated rules.
 
 ### Data model
@@ -79,35 +114,40 @@ for the operation to proceed.
 One template per operation, defined by Zitadel and versioned with the server.
 
 ```json
-// user.password.save — template
+// auth.factor.password.set — template
 {
-  "operation": "user.password.save",
+  "operation": "auth.factor.password.set",
   "config": {
-    "min_length":    { "type": "integer", "minimum": 8, "maximum": 64, "default": 15, "recommended_minimum": 15, "public": true },
-    "max_length":    { "type": "integer", "default": 64, "fixed": true, "public": true },
-    "history_depth": { "type": "integer", "minimum": 0, "maximum": 4,  "default": 0,  "public": true }
+    "min_length":    { "type": "integer", "minimum": 1, "maximum": 64 },
+    "max_length":    { "type": "integer", "minimum": 1, "maximum": 64 },
+    "history_depth": { "type": "integer", "minimum": 1, "maximum": 4 }
   },
+  "config_rules": [
+    { "name": "min_length_not_above_max_length", "expression": "config.min_length <= config.max_length" }
+  ],
   "context": {
-    "candidate":       { "length": "int", "in_blocklist": "bool" },
+    "candidate":       { "length": "int" },
     "history_matches": "list<bool>"
   },
   "rules": [
-    { "name": "min_length", "expression": "candidate.length >= config.min_length" },
-    { "name": "max_length", "expression": "candidate.length <= config.max_length" },
-    { "name": "history",    "expression": "config.history_depth == 0 || !history_matches.exists(m, m)" },
-    { "name": "blocklist",  "expression": "!candidate.in_blocklist" }
+    { "name": "min_length",    "expression": "candidate.length >= config.min_length" },
+    { "name": "max_length",    "expression": "candidate.length <= config.max_length" },
+    { "name": "history_depth", "expression": "!history_matches.slice(0, size(history_matches) < config.history_depth ? size(history_matches) : config.history_depth).exists(m, m)" }
   ]
 }
 ```
 
-`config` is a JSON Schema fragment per setting (type, bounds, default), the
-range a developer may move within; `fixed` pins a setting to its default and
-`public` allows the unauthenticated `constraints` projection to return it.
-`context` is the schema of the derived values the rules receive (the raw input
-stays out of it), and doubles as the CEL type environment. `rules` is an ordered list of
-named boolean expressions; a name is what a denial reports and what
-`constraints` lists. What each marker means and how a template is validated
-is in [Template](../design/policies/1-template.md).
+`config` declares each setting's type and, for an integer, the bounds the
+server can technically support; there are no defaults. `config_rules`
+constrain the settings among each other and run whenever an instance is
+bound, never per evaluation. `context` is the schema of the derived values the rules receive
+(the raw input stays out of it), and doubles as the CEL type environment.
+`rules` is a list of named boolean expressions. Each reads exactly one
+setting and carries its name, so the name is at once the rule, the setting,
+the key of a violation and the key of a constraint; `policy.New()` refuses
+a template that breaks this, and so does server startup once the gate wires
+the engine in. How a template is validated is in
+[Template](../design/policies/1-template.md).
 
 A template is not release content: templates ship with the server and evolve with it,
 as the flow engine's step vocabulary does for flow definitions. How a server
@@ -122,12 +162,12 @@ The envelope (`kind`, `operation`) is the same for every operation;
 discriminator that says which template that is.
 
 ```json
-// .zitadel/policies/user.password.save.json
+// .zitadel/policies/auth.factor.password.set.json
 {
   "kind": "policy",
-  "operation": "user.password.save",
+  "operation": "auth.factor.password.set",
   "config": {
-    "min_length": 15,
+    "min_length": 12,
     "history_depth": 4
   }
 }
@@ -136,23 +176,43 @@ discriminator that says which template that is.
 - An instance applies to its whole project: one instance per operation per
   project, and every request to that operation in the project is evaluated
   against it. Narrowing an instance to part of a project (a team, an app) is
-  the audience mechanism of the audience-scoped configuration draft
-  ([#1264](https://github.com/zitadel/nextgen/pull/1264)), which follows this
-  ADR and adds an `audience` envelope field; see [Applicability](#applicability).
-- `config` is validated against the template's config schema at write time.
-  A key the template does not declare is rejected.
-- A setting the instance omits takes the template's default, so evaluation
-  always sees a complete config; a project with no instance at all runs on the
-  template defaults. The example above therefore leaves `max_length` out (it
-  is fixed) and could leave `history_depth` out to keep the default of 0.
+  left to an audience mechanism such as the one proposed in
+  [#1264](https://github.com/zitadel/nextgen/pull/1264), which would add an
+  `audience` envelope field; see [Applicability](#applicability).
+- `config` is validated against the template at write time: a key the
+  template does not declare, a value of the wrong type or outside the
+  bounds, and a failed config rule are rejected.
+- A setting the instance omits is off, and so is the rule that reads it. The
+  example above therefore enforces a minimum length of 12, no reuse of the
+  last four passwords when users change their own password (history applies
+  only to self-service changes, see the [catalog](../design/policies/catalog.md)),
+  and no maximum beyond the domain's own cap. An empty
+  `config` switches the policy off; a missing or `null` one is rejected, so a
+  lost block cannot do it silently. A project with no instance has none.
 - The wire schema of the instance is a discriminated union on `operation`:
   one branch per catalogued operation, each with the `config` object that
-  operation's template declares (its settings, bounds and defaults, no others).
+  operation's template declares (its settings and bounds, no others).
   The union is what the OpenAPI component publishes, what the generated client
   types carry, and what the `policy.json` editor meta-schema is derived from,
-  so an editor completes `min_length` for `user.password.save` and rejects a
-  key that operation does not have. A test keeps every branch in parity with
-  its template.
+  so an editor completes `min_length` for `auth.factor.password.set` and rejects a
+  key that operation does not have. A test will keep every branch in parity
+  with its template once the wire schema exists (the resource PR).
+- A bound that mirrors a server limit is tied to the Go constant by a test:
+  the length bounds equal `domain.MaxPasswordLength` (64 code points), and
+  the history bound (four passwords, the current one included) may not
+  exceed what storage returns. Raising a limit later widens what instances
+  may set and breaks none.
+- A server upgrade may add settings, widen bounds and drop config rules,
+  never remove a setting, change its type, narrow a bound, or add or change a
+  config rule: a stored instance is bound against the current template
+  whenever it is resolved, so a template that rejects more would make every
+  evaluation of that operation fail. A test checks every template against a
+  record of the settings instances may hold and the config rules they were
+  checked against (`internal/policy/testdata/settings_compat.json`), and
+  requires the record to equal the templates, so every template change shows
+  up in its diff. A test cannot see history: a stricter template passes if
+  the record shrinks with it, which is why such a record diff needs a
+  migration of stored instances before it is merged.
 
 ### Policy catalog
 
@@ -162,8 +222,8 @@ cannot add an operation to it. Templates ship with the server; today's list:
 
 | Operation | Rules | Context (derived in Go) |
 |---|---|---|
-| `user.password.save` | `min_length`, `max_length`, `history`, `blocklist` (lands with #898's blocklist) | candidate length, blocklist hit, per-history-entry match |
-| `user.password.verify` (illustrative, not MVP) | `lockout` | recent failed attempts |
+| `auth.factor.password.set` | `min_length`, `max_length`, `history_depth` | candidate length, per-history-entry match |
+| `auth.check` (illustrative, not MVP) | failed-attempt limits | recent failed checks, factor |
 
 #### Where the catalog lives and how an operation is added
 
@@ -174,28 +234,35 @@ the index that names each operation's evaluation point,
 must agree; the index is what a reviewer reads, the files are what the
 server runs.
 
-Adding an operation is four things, and nothing else registers it:
+Adding an operation is five things, and nothing else registers it:
 
-1. a template file under `internal/policy/templates/`, compiled and checked
-   at startup by `policy.New()`;
-2. a row in the catalog index naming the template, the configurable and
-   fixed settings, the rules, and the evaluating function;
-3. a context builder in Go that derives the values the rules see for that
+1. a template file under `internal/policy/templates/`, named after its
+   operation and compiled and checked by `policy.New()` (at server start,
+   once the gate wires the engine in);
+2. its settings and config rules recorded in
+   `internal/policy/testdata/settings_compat.json`, so a later template
+   change that would reject stored instances shows up in review;
+3. a row in the catalog index naming the template, the settings, the rules,
+   the context builder and the gate;
+4. a context builder in Go that derives the values the rules see for that
    operation, keeping the raw input out;
-4. one gate call in the operation's shared write path, so no API, SDK or
+5. one gate call in the operation's shared write path, so no API, SDK or
    journey can reach the operation without it.
 
-For `user.password.save` the evaluating function is
-`service.PasswordPolicy.Check`, called from `service.SetPasswordUserAction.Apply`,
-the single function every password set goes through (admin API and
-registration flow alike). The context builder is
-`service.PasswordPolicy.buildContext`. Instances are resolved by
-`service.PolicyService.Resolve`: newest stored revision of the project's
-instance for the operation, template defaults when the project authored
-nothing. That is a stand-in: ADR 035 says an environment sees only what its
-active release pins, so resolution moves to the release's pinned policy
-revision once release-pinned reads exist (scope table in
-[`docs/design/policies/`](../design/policies/README.md)).
+For `auth.factor.password.set` the gate will sit in
+`service.SetPasswordUserAction.Prepare`, the single function every password
+set goes through (admin API, registration and SSO sign-up alike), before the
+password is hashed, so a rejected password costs neither a hash nor a
+transaction. History is only checked where the user sets their own password;
+the other paths have no history to compare with, or must not learn it.
+Instances will be resolved as the newest stored revision of the project's
+instance for the operation, and no instance means no active rule. That is a
+stand-in: ADR 035 says an environment sees only what its active release pins,
+so resolution moves to the release's pinned policy revision once
+release-pinned reads exist (scope table in
+[`docs/design/policies/`](../design/policies/README.md)). None of this is
+wired yet; the [catalog index](../design/policies/catalog.md) names the
+functions as they land.
 
 ### Policy evaluation trigger (relation to domain events)
 
@@ -203,24 +270,48 @@ A policy is evaluated before its operation, synchronously. Existing [wide events
 
 | Operation (policy evaluated before) | Wide event (emitted after) |
 |---|---|
-| `user.password.save` | `auth.factor.password.set` |
-| `user.create` | `user.created` |
+| `auth.factor.password.set` | `auth.factor.password.set` |
+| `user.create` | `user.created`, `user.create.failed` |
+| `auth.check` | `auth.check.succeeded`, `auth.check.failed` |
+| `auth.attempt.hand_off` | `auth.attempt.handed_off` |
+
+#### Naming an operation
+
+An operation is named after the action of the event it precedes: the
+event's area and resource, and its verb in the base form. Events name an
+action plus its outcome, either as a separate segment (`user.create.failed`,
+`auth.check.succeeded`) or in the verb's tense (`user.created`,
+`auth.attempt.handed_off`, `auth.factor.passkey.enrolled`); the operation
+drops the outcome and keeps the base verb (`user.create`, `auth.check`,
+`auth.attempt.hand_off`, `auth.factor.passkey.enroll`). Where base form and
+past participle coincide, the names are equal (`auth.factor.password.set`).
+An operation without an event, such as reading a team's resources, takes the
+same `area.resource.verb` grammar, and an event added later follows the
+operation's name.
+
+The name is public API: it is the instance file name
+(`.zitadel/policies/<operation>.json`), the `operation` discriminator on the
+wire, and a path segment of the `constraints` endpoint. An operation is as
+coarse as its event: `auth.check` covers every factor, and a rule that must
+differ per factor reads the factor from the context and carries a
+factor-specific setting.
 
 ### Policy evaluation
 
 Evaluation takes the resolved instance and the request context. The engine is
-stateless: it never fetches its own inputs. Every rule runs; there is no
-short-circuit, so a user sees every requirement they missed, not just the first.
+stateless: it never fetches its own inputs. Every active rule runs; there is
+no short-circuit, so a user sees every requirement they missed, not just the
+first.
 
 ```json
-// config — from the project's instance for this operation, defaults filled from the template
-{ "min_length": 15, "history_depth": 4 }
+// config — the project's instance for this operation, only what it sets
+{ "min_length": 12, "history_depth": 4 }
 ```
 
 ```json
 // context — derived by Go for this one evaluation
 {
-  "candidate":       { "length": 14, "in_blocklist": false },
+  "candidate":       { "length": 9 },
   "history_matches": [false, false, true, false]
 }
 ```
@@ -229,16 +320,22 @@ short-circuit, so a user sees every requirement they missed, not just the first.
 // decision
 {
   "allow": false,
-  "violations": [
-    { "rule": "min_length", "config": { "min_length": 15 } },
-    { "rule": "history",    "config": { "history_depth": 4 } }
-  ]
+  "violations": { "min_length": 12, "history_depth": 4 }
 }
 ```
 
-A violation names the rule and echoes the public settings the rule reads, which
-is what a client needs to render "at least 15 characters". Private settings are
-never echoed.
+`violations` maps each failed rule to the value of the setting it is named
+after, which is what a client needs to render "at least 12 characters". It is
+the same flat shape as the flow field's `validation` object
+(`{ "min_length": 12, "max_length": 32 }`), which already keys rules by name
+and treats an absent key as no rule. No derived value (the candidate's
+length, which kept password matched) is ever echoed.
+
+Every rule and its setting are disclosed, before the operation through
+`constraints` and after it in a denial. All rules today are requirements a
+caller fixes by changing the input. A rule that must stay hidden (a lockout
+threshold, a risk signal) brings a disclosure marker with it, required on
+every rule so a missing marker never means "disclose".
 
 #### Decisions
 
@@ -249,18 +346,32 @@ A third outcome, `require` (the operation is not yet permissible, these
 requirements are unmet, used to inject a step mid-flow), is not needed by any MVP
 operation. It returns as a per-rule field when the first assurance consumer lands.
 
+Rules stay boolean predicates. What can grow is what a failed rule causes
+(`deny` today; `require`, `warn` or `audit` later) and named outputs of other
+types next to the rules, such as a proof-of-work difficulty derived from
+failed attempts. Both are additions to the template format and the decision,
+not changes to how a rule is written.
+
 #### Evaluation errors
 
 A rule cannot fail at runtime in the ways a program can: expressions are
-type-checked against the context schema and cost-bounded before the server
-serves traffic, and CEL has no I/O, no recursion and no unbounded loops. What
+type-checked against the context schema and cost-bounded by `policy.New()`,
+which the server will run at startup, and CEL has no I/O, no recursion and no unbounded loops. What
 remains is Go failing to build the context (a storage error while loading
 password history), which is an ordinary service error: the operation fails,
 closed. There is no per-operation failure posture to declare. An operator who
-needs a misbehaving policy out of the way publishes a revision with the
-template defaults.
+needs a misbehaving policy out of the way publishes a revision with an empty
+`config`.
 
 ### End to end: a user enters their password during sign-up (via flow-engine)
+
+The intended flow once the gate and the flow field are wired, for an
+instance that sets `min_length: 12`. A new user has no password history, so
+history belongs to a self-service change, not to sign-up. The engine cannot
+tell the two apart yet: an instance that also sets `history_depth` puts it
+into the sign-up constraints too, and the sign-up context has to carry an
+empty `history_matches`. Modelling "self-service only" in the template is the
+gate's job ([#1448](https://github.com/zitadel/nextgen/issues/1448)).
 
 ```mermaid
 sequenceDiagram
@@ -272,28 +383,29 @@ sequenceDiagram
     participant DB as Storage
 
     F->>P: constraints(operation, instance)
-    P-->>F: {min_length: {limit 15}, history: {depth 4}, blocklist: {}}
+    P-->>F: {min_length: 12}
     F-->>C: render step carrying those constraints
     C->>F: submit password
     F->>F: re-check constraints<br>(normal payload validation<br>no full-policy evaluation)
     F->>S: SetPasswordUserAction
-    S->>S: build context<br>(blocklist, VerifyHash per history entry)
+    S->>S: build context<br>(code-point length of the NFC-normalized candidate)
     S->>P: evaluate(instance, context)
     P-->>S: decision
     alt deny
         S-->>C: invalid password + violated rules
     else allow
-        S->>DB: HashPassword, SetUserPassword
+        S->>S: HashPassword
+        S->>DB: SetUserPassword
         S->>DB: emit auth.factor.password.set
     end
 ```
 
-1. Render. Flow-engine fills `FlowFieldValidation` from the `constraints` projection (`service.PasswordPolicy.FieldValidation`). The client can perform frontend validation.
+1. Render. Flow-engine fills `FlowFieldValidation` from the `constraints` projection ([#1449](https://github.com/zitadel/nextgen/issues/1449)). The client can perform frontend validation.
 2. Submit. The client posts the new password as the reserved field `x-auth-methods#password`.
 3. Validation. Flow-engine backend payload validation re-checks constraints.
 4. Domain operation. The flow engine calls `SetPasswordUserAction`. This is the guarded operation.
 5. Prepare context. Per-operation Go code derives the context (see [Evaluation](../design/policies/2-evaluation.md)).
-6. Evaluate. Every rule runs over config plus context.
+6. Evaluate. Every active rule runs over config plus context.
 7. Return the error, or proceed with the operation.
 
 ### The rule language: CEL
@@ -305,8 +417,8 @@ that returns a decision to a list of named boolean rules settled it.
 Once a policy is a rule list, the invariants #899 asks for hold by structure
 instead of by convention:
 
-- Discoverability. The `constraints` projection is the rule list plus its
-  public settings. A rule cannot exist that the client is not told about.
+- Discoverability. The `constraints` projection is the active rules with
+  their settings. A rule cannot be enforced that the client is not told about.
 - No silent weakening. Rules live in the template, which the developer does
   not author. A future developer-authored template can only append rules.
 - `require` is a field on a rule.
@@ -341,36 +453,37 @@ reserved the `policy` resource kind, the `pol_` id prefix and the `policies`
 key in the release bundle; instances occupy them. The handle is the
 `operation`: it is what two revisions of the same instance share, so a
 release cannot pin two revisions for one operation, and an instance carries
-no `name`. When scoped instances land
-([#1264](https://github.com/zitadel/nextgen/pull/1264)) the handle grows the
-audience key next to the operation, still derived from the document, so a
+no `name`. When scoped instances land, with an audience model such as the
+one proposed in [#1264](https://github.com/zitadel/nextgen/pull/1264), the
+handle grows the audience key next to the operation, still derived from the document, so a
 project default and a team override of the same operation are two resources
 without a naming field to keep in step with the audience. The resource slice
 copies branding (create-only, versioned, project-owned), not the user schema
 (URL identity and `$ref` handling a policy does not need). Templates are not
 release content: they ship with the server, and a release records the catalog
-version it was validated against. Release validation checks every instance
-against its template (unknown operation, unknown setting, out-of-bounds value)
-and rejects two instances for the same operation.
+version it was validated against. Release validation runs the same check as
+publishing (`policy.Engine.ValidateInstance`: known operation and settings,
+types, bounds, config rules) and rejects two instances for the same
+operation.
 
 ### Applicability
 
 This ADR ships policies in project scope only: an instance applies to every
 request to its operation in the project, and a project without an instance
-gets the template defaults. That is what #898 asks for (one project-wide
-password policy) and the whole of what is implemented.
+has no policy for it. That is what #898 asks for (one project-wide password
+policy) and the whole of what is implemented.
 
-Scoping an instance to part of a project is a follow-up, decided in the
-audience-scoped configuration draft
-([#1264](https://github.com/zitadel/nextgen/pull/1264)). That draft gives
-release content a required `audience` (an explicit project default or a set
-of scope parameters such as `team_ids`), release-time validation, and
-most-specific-wins resolution; policies adopt it as-is when it lands, the
-`audience` field joining the envelope next to `kind` and `operation`. The
-model needs no change to take it: the engine evaluates one resolved instance,
-and the resolver is the only piece that grows a request hint. That a scoped
-instance must not weaken the project's policy is an open question decided
-with that draft ([Policy hierarchy](#policy-hierarchy)).
+Scoping an instance to part of a project is a follow-up. The audience-scoped
+configuration proposal ([#1264](https://github.com/zitadel/nextgen/pull/1264),
+closed without a decision) gave release content a required `audience` (an
+explicit project default or a set of scope parameters such as `team_ids`),
+release-time validation, and most-specific-wins resolution; whichever model
+is decided, policies take its envelope field next to `kind` and `operation`.
+The model needs no change to take it: the engine evaluates one resolved
+instance, and the resolver is the only piece that grows a request hint. That
+a scoped instance must not weaken the project's policy is decided with it
+([Policy hierarchy](#policy-hierarchy)); because settings are typed values,
+"not weaker" is a comparison per setting.
 
 ### Hooks and actions
 
@@ -403,7 +516,7 @@ In MVP the resolution root is always the Project, so no owner field is minted.
 For the MVP operations the answer is fixed per operation and documented here;
 it is not configurable:
 
-- `user.password.save`: a stricter policy applies the next time a password is
+- `auth.factor.password.set`: a stricter policy applies the next time a password is
   set. Existing passwords and sessions are untouched. This is the universal
   vendor behaviour (Okta, Auth0, Entra, Google, Keycloak). A later
   "validate at sign-in and force a change" switch would be an instance setting.
@@ -417,7 +530,7 @@ Duplication across operations. A control relevant at two operations is configure
 
 Long expressions in JSON. A rule list invites the temptation of one long expression. Mitigated by the caps (length, cost, `bool` result) and by the rule that a violation names one requirement.
 
-Expression language drift. cel-go gains features per release. Mitigated by the minimal environment: a rule uses the standard library and two extensions, and every template is compiled and checked when the server starts.
+Expression language drift. cel-go gains features per release. Mitigated by the minimal environment: a rule uses the standard library and two extensions, and every template is compiled and checked by `policy.New()`, which runs at server start once the gate is wired in.
 
 ## Design documents
 
@@ -425,8 +538,9 @@ The detail an implementer needs lives next to the code, under
 [`docs/design/policies/`](../design/policies/README.md), whose scope table says
 what the policy stack ships and what follows:
 
-- [Template](../design/policies/1-template.md): the settings markers, how an
-  instance is validated against a template, how the catalog is published.
+- [Template](../design/policies/1-template.md): settings, config rules and
+  the naming rule, how an instance is validated against a template, how the
+  catalog is published.
 - [Evaluation](../design/policies/2-evaluation.md): the context schema, the
   Go context builder, the limits every rule runs under.
 - [Constraints](../design/policies/3-constraints.md): the pre-auth projection,
@@ -448,12 +562,10 @@ Audit`, Gatekeeper `enforcementAction: deny | dryrun | warn`, Azure
 audit, read the decisions, switch to enforce) is the one thing a first-match
 resolution model cannot offer any other way. The shape is fixed now so the MVP
 does not foreclose it: an `enforcement` field on the instance, `enforce` by
-default, and an `audit` mode in which the template defaults stay enforced and
-only what the instance tightened beyond them is evaluated and recorded without
-blocking. Audit can therefore never weaken the baseline, which is what keeps
-#898's "secure defaults are not configurable by Projects" true. It needs the
-audited decision to land as a wide event (ADR 048), which is why it waits for
-the event type.
+default, and an `audit` mode in which the instance's rules are evaluated and
+recorded without blocking. The domain guards stay enforced either way, since
+they are not policy. It needs the audited decision to land as a wide event
+(ADR 048), which is why it waits for the event type.
 
 ### Developer-authored rules
 
@@ -463,21 +575,22 @@ rules. The shape is fixed now anyway so the MVP does not foreclose it: a
 developer-authored template is release content, names an operation on the
 catalogue, and may only append rules to the Zitadel template. It runs in the
 same evaluator, under the same limits, and its rules appear in `constraints`
-like any other. The data model then enforces Elina's product constraint from
-#898 (custom rules add or strengthen, never remove built-in protections); no
-review has to.
+like any other. The data model then guarantees that custom rules add to the
+Zitadel rules and never remove one; no review has to. Before that, the
+context schema has to become a public contract: today only Zitadel's own
+templates read it, so it can change with the server.
 
 ### Policy hierarchy
 
 #383 asks only that the architecture not foreclose it, and
 [Ownership](#ownership) pins the resolution root to the Project.
 
-Scoped instances (a team, an app) come with the audience-scoped
-configuration draft ([#1264](https://github.com/zitadel/nextgen/pull/1264)).
+Scoped instances (a team, an app) come with an audience model such as the
+one proposed in [#1264](https://github.com/zitadel/nextgen/pull/1264).
 Two questions stay open until then:
 
 - A scoped instance must not weaken the project's policy. How that is
-  checked, and against what, is decided together with #1264.
+  checked, and against what, is decided together with the audience model.
 - Tenant-authored configuration: a Team in a customer project is a runtime
   resource, so a Team-level override cannot live in the developer's release
   as it is. Whether Zitadel wants tenants to configure policies at all is a
@@ -513,8 +626,7 @@ than the link.
 
 ### Password specifics
 
-- [NIST SP 800-63B-4 password verifier requirements](https://pages.nist.gov/800-63-4/sp800-63b.html#passwordver): the source of #898's 15-character default, the at-least-64 maximum, the blocklist requirement, and the prohibition on composition rules.
-- [Auth0 flexible password policy](https://auth0.com/docs/authenticate/database-connections/flexible-password-policy): new database connections default to a 15-character minimum with no required character types, which is where #898's defaults land independently.
+- [NIST SP 800-63B-4 password verifier requirements](https://pages.nist.gov/800-63-4/sp800-63b.html#passwordver): the at-least-64 maximum the domain cap meets, code-point counting after NFC, and the prohibition on composition rules. Its 15-character single-factor minimum is a value a project configures, not a server default.
 
 ## Alternatives rejected
 
