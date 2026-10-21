@@ -10,7 +10,7 @@ import { parseJsonObject } from "./json";
  * the interactive setup prompt as the suggested value, so it is exported
  * rather than kept private.
  */
-export const DEFAULT_SERVER = "https://api.zitadel.cloud";
+export const DEFAULT_SERVER = "https://preview.zitadel.com";
 
 /**
  * The resolved target server plus the source it came from. `origin` is

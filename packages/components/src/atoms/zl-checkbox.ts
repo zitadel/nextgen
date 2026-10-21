@@ -144,11 +144,12 @@ export class ZlCheckbox extends FormAtom {
     const input = event.target as HTMLInputElement;
     this.checked = input.checked;
     this.syncFormState();
-    emit<ZlCheckboxChangeDetail>(this, "zl-change", {
-      name: this.name,
-      checked: this.checked,
-      value: this.value,
-    });
+    emit<ZlCheckboxChangeDetail>(
+      this,
+      "zl-change",
+      { name: this.name, checked: this.checked, value: this.value },
+      { composed: false },
+    );
     this.dispatchNativeChange();
   };
 

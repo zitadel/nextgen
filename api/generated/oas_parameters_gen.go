@@ -3754,6 +3754,102 @@ func decodeGetMyUserParams(args [0]string, argsEscaped bool, r *http.Request) (p
 	return params, nil
 }
 
+// GetMyUserSchemaParams is parameters of getMyUserSchema operation.
+type GetMyUserSchemaParams struct {
+	// The project the caller signs its users in to. The cookie's session is used
+	// only when it belongs to this project; a session of any other project answers
+	// `403` with `sess.project_mismatch`.
+	// A session belongs to one project, while a browser sends its cookie to every
+	// app on the same host. An app passes its own project, so that a session of
+	// another project never reads or acts as one of its users, and signing out of
+	// the app never ends it. The SDKs pass it when they read the session or sign
+	// out.
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in
+	// its own project, so keep its cookie.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
+}
+
+func unpackGetMyUserSchemaParams(packed middleware.Parameters) (params GetMyUserSchemaParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ProjectID = v.(OptProjectID)
+		}
+	}
+	return params
+}
+
+func decodeGetMyUserSchemaParams(args [0]string, argsEscaped bool, r *http.Request) (params GetMyUserSchemaParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal ProjectID
+				if err := func() error {
+					var paramsDotProjectIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotProjectIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID.SetTo(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.ProjectID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // GetProjectParams is parameters of getProject operation.
 type GetProjectParams struct {
 	// The unique identifier of the project.
@@ -7557,6 +7653,17 @@ type ListMyTeamsParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
+	// The project the caller signs its users in to. The cookie's session is used
+	// only when it belongs to this project; a session of any other project answers
+	// `403` with `sess.project_mismatch`.
+	// A session belongs to one project, while a browser sends its cookie to every
+	// app on the same host. An app passes its own project, so that a session of
+	// another project never reads or acts as one of its users, and signing out of
+	// the app never ends it. The SDKs pass it when they read the session or sign
+	// out.
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in
+	// its own project, so keep its cookie.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 func unpackListMyTeamsParams(packed middleware.Parameters) (params ListMyTeamsParams) {
@@ -7576,6 +7683,15 @@ func unpackListMyTeamsParams(packed middleware.Parameters) (params ListMyTeamsPa
 		}
 		if v, ok := packed[key]; ok {
 			params.PageToken = v.(OptPageToken)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ProjectID = v.(OptProjectID)
 		}
 	}
 	return params
@@ -7695,6 +7811,69 @@ func decodeListMyTeamsParams(args [0]string, argsEscaped bool, r *http.Request) 
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "page_token",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal ProjectID
+				if err := func() error {
+					var paramsDotProjectIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotProjectIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID.SetTo(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.ProjectID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
 			In:   "query",
 			Err:  err,
 		}

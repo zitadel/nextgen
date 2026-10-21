@@ -7,10 +7,7 @@ import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
 } from "../../lib/local-server/docker-guidance";
-import {
-  discoverManagedRuntimeProcesses,
-  type ManagedRuntimeProcess,
-} from "../../lib/local-server/processes";
+import type { LocalServers, ManagedRuntimeProcess } from "../../lib/local-server/processes";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   assertLocalStateWritable,
@@ -97,6 +94,7 @@ export default class Doctor extends BaseCommand {
       runtimeBackend,
       image,
       port,
+      this.localServers(),
     );
     const hasConfig = await hasZitadelConfig(cwd);
     const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
@@ -352,8 +350,9 @@ async function runLocalRuntimeChecks(
   runtimeBackend: RuntimeBackend,
   image: string,
   port: number,
+  servers: LocalServers,
 ): Promise<CheckOutcome[]> {
-  const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime);
+  const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime, servers);
   if (runtimeBackend === "binary") {
     return [
       await check("server-binary", "Server npm package is available", async () => {
@@ -475,8 +474,9 @@ class PortInUseCheckError extends Error {
 
 async function checkManagedRuntimeProcesses(
   runtime: RuntimeMetadata | undefined,
+  servers: LocalServers,
 ): Promise<CheckOutcome> {
-  const discovery = await discoverManagedRuntimeProcesses();
+  const discovery = await servers.current();
   if (!discovery.supported) {
     return {
       name: "managed-runtime-processes",

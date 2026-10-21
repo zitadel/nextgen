@@ -213,12 +213,18 @@ func (h *Handler) requireResourceAccess(ctx context.Context, resourceID string, 
 
 // requireResourceAccessInProject is requireResourceAccess for ids that are unique only
 // within a project (schemas): projectHint, when set, names the project to
-// resolve the id in instead of the credential's own.
+// resolve the id in instead of the credential's own. A schema id under one of
+// the built-in bases is looked up under every base the namespace knows,
+// because the index holds the row's own spelling only.
 func (h *Handler) requireResourceAccessInProject(ctx context.Context, projectHint, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
 	if h == nil || h.pool == nil {
 		return "", domain.ErrInternal(errors.New("authz statements not configured"))
 	}
-	return requireResourceAccess(ctx, h.pool.Statements(), projectHint, resourceID, res, op)
+	ids := []string{resourceID}
+	if res.kind == domain.ResourceKindSchema {
+		ids = h.builtinBases.Equivalents(resourceID)
+	}
+	return requireResourceAccessAmong(ctx, h.pool.Statements(), projectHint, ids, res, op)
 }
 
 // lookupResourceScope finds the project a path id lives in. A project-bound
@@ -269,7 +275,23 @@ func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, project
 }
 
 func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, projectHint, resourceID string, res resourceAccess, op accessOp) (string, error) {
-	scope, err := lookupResourceScope(ctx, stmts, projectHint, resourceID, res)
+	return requireResourceAccessAmong(ctx, stmts, projectHint, []string{resourceID}, res, op)
+}
+
+// requireResourceAccessAmong is requireResourceAccess for a resource that may
+// be indexed under any of several ids (a built-in schema's `$id` under each
+// of its bases): the first id with an index row is the resource; the first
+// id names it in a miss.
+func requireResourceAccessAmong(ctx context.Context, stmts resourceAccessStmts, projectHint string, ids []string, res resourceAccess, op accessOp) (string, error) {
+	resourceID := ids[0]
+	var scope *domain.ResourceScope
+	var err error
+	for _, id := range ids {
+		scope, err = lookupResourceScope(ctx, stmts, projectHint, id, res)
+		if err == nil || !errors.Is(err, new(database.NoRowFoundError)) {
+			break
+		}
+	}
 	if err != nil {
 		if errors.Is(err, new(database.NoRowFoundError)) {
 			if op == opDelete {

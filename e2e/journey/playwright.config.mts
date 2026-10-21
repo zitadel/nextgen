@@ -18,6 +18,14 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      testIgnore: /schema-revisions\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      // Leaves SSO on and a new schema revision, so it runs after the specs that need a fresh app.
+      name: "schema-revisions",
+      testMatch: /schema-revisions\.spec\.ts/,
+      dependencies: ["chromium"],
       use: { ...devices["Desktop Chrome"] },
     },
   ],

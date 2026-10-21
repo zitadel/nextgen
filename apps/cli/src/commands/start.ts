@@ -93,7 +93,7 @@ export default class Start extends BaseCommand {
     // NEXTGEN_* variables from .env.local and .env are read before any runtime
     // is stopped and reach the new runtime through its environment only; see
     // env-vars.ts.
-    const env = await loadProjectEnv(this.meta.cwd);
+    const env = await loadProjectEnv(this.meta.cwd, this.meta.env);
     // The developer exists on their own server from the first start: the
     // server imports the local admin, and the console signs them in by link.
     // The admin is a user of the platform project, so the two travel together:

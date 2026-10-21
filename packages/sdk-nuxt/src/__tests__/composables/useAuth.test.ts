@@ -52,7 +52,9 @@ describe("useAuth composable", () => {
 // What an app's page sees: Nuxt declares the auto-import as
 // `typeof import("<dist>/runtime/composables/useAuth").useAuth` and compiles
 // with `allowJs` and `skipLibCheck`. `sdk-nuxt:test` runs after the build.
-describe("useAuth as an app sees it", () => {
+// Each probe type-checks a program of its own, which on a loaded CI runner has
+// taken longer than Vitest's 5 s default.
+describe("useAuth as an app sees it", { timeout: 60_000 }, () => {
   function diagnostics(probe: string): string[] {
     const built = join(import.meta.dirname, "../../../dist/runtime/composables/useAuth");
     const dir = mkdtempSync(join(tmpdir(), "sdk-nuxt-use-auth-"));

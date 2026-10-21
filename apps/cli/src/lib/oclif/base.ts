@@ -9,9 +9,10 @@ import { toZitadelError, type ZitadelError } from "../errors";
 import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
 import { type Asker, input as askInput } from "../input";
 import { isObject } from "../json";
+import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
-import { resolveServer } from "../server";
+import { DEFAULT_SERVER, resolveServer } from "../server";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
 import { takeReportedWarnings } from "../warnings";
@@ -240,6 +241,14 @@ export abstract class BaseCommand extends Command {
    */
   protected createTelemetry(deps: TelemetryDeps): Telemetry {
     return Telemetry.create(deps);
+  }
+
+  /**
+   * Which local servers are running on the machine. Production asks `ps`; a
+   * test overrides this, like {@link createTelemetry}, to answer for the machine.
+   */
+  protected localServers(): LocalServers {
+    return new PsLocalServers();
   }
 
   private openTelemetry(flag: boolean | undefined): void {
@@ -638,7 +647,7 @@ function renderKnownSections(lines: string[], data: Record<string, unknown>): vo
 function sourceSuffix(opts: GlobalOptions): string {
   try {
     const url = new URL(opts.source);
-    if (url.host === "api.zitadel.cloud") {
+    if (url.host === new URL(DEFAULT_SERVER).host) {
       return "";
     }
     return `(server: ${url.host})`;

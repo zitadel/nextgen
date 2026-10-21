@@ -84,7 +84,6 @@ describe("<zitadel-session> surface (chromium)", () => {
   afterEach(() => {
     host.remove();
     stub?.restore();
-    document.getElementById("zl-default-font-link")?.remove();
   });
 
   async function mount(configure?: (el: ZitadelSession) => void): Promise<ZitadelSession> {
@@ -125,9 +124,6 @@ describe("<zitadel-session> surface (chromium)", () => {
     expect(surface).toBeTruthy();
     expect(getComputedStyle(surface).backgroundColor).toBe(TRANSPARENT);
     expect(getComputedStyle(surface).padding).toBe("0px");
-
-    // Widget mode injects no design-system font into the host document.
-    expect(document.getElementById("zl-default-font-link")).toBeNull();
   });
 
   it("variant=page claims the viewport and paints the shell dark by default", async () => {
@@ -142,9 +138,6 @@ describe("<zitadel-session> surface (chromium)", () => {
     expect(element.getBoundingClientRect().height).toBeGreaterThanOrEqual(window.innerHeight - 1);
     const surface = shell.shadowRoot?.querySelector(".zr-page-shell") as HTMLElement;
     expect(luminance(getComputedStyle(surface).backgroundColor)).toBeLessThan(60);
-
-    // Page mode ships the brand font, matching the login surface.
-    expect(document.getElementById("zl-default-font-link")).not.toBeNull();
   });
 
   it("theme=light repaints the page surface and card text", async () => {

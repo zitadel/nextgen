@@ -113,7 +113,7 @@ its metadata and data under `.zitadel/local/`; `stop` preserves that data and
 ### Zitadel Cloud
 
 ```sh
-npx @zitadel/cli@alpha setup --server https://api.zitadel.cloud
+npx @zitadel/cli@alpha setup --server https://preview.zitadel.com
 npm run dev
 ```
 

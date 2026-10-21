@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -31,8 +32,12 @@ func newMockedSchemaServiceWithPool(
 	pool := servicemocks.NewMockStatementPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
-	return service.NewSchemaService(service.NewPool(pool), nil, validator), statements, pool
+	return service.NewSchemaService(service.NewPool(pool), nil, validator, testSchemaBases), statements, pool
 }
+
+// testSchemaBases is the built-in schema namespace the schema service tests
+// run under; conflictSchemaBase sits outside it, so those ids resolve as written.
+var testSchemaBases = domain.NewBuiltinSchemaBases("https://schemas.test/builtin/v1", "https://schemas.test/builtin/v0")
 
 const conflictSchemaBase = "https://schemas.example.com/schemas"
 
@@ -301,4 +306,69 @@ func TestSchemaService_ListSchemas(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A built-in schema's `$id` resolves under whichever base the project stores
+// it at: the row comes back under its own URL.
+func TestSchemaService_GetSchemaUnderAnotherBuiltinBase(t *testing.T) {
+	t.Parallel()
+
+	const asked = "https://schemas.test/builtin/v0/default-human-user.json"
+	const stored = "https://schemas.test/builtin/v1/default-human-user.json"
+
+	svc, statements := newMockedSchemaService(t)
+	statements.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", asked).Return(nil, new(database.NoRowFoundError))
+	statements.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", stored).Return(&domain.JSONSchema{ProjectID: "proj_1", URL: stored}, nil)
+
+	got, err := svc.GetSchema(t.Context(), "proj_1", "", asked)
+	require.NoError(t, err)
+	assert.Equal(t, stored, got.URL)
+}
+
+// Nothing under the built-in namespace is ever fetched, so creating a schema
+// by such a URL answers from the project's rows: the row under that very URL,
+// a conflict naming the base it is stored at, or not found. The resolver is
+// nil here, so reaching it would fail the test.
+func TestSchemaService_CreateSchemaByUrlInBuiltinNamespace(t *testing.T) {
+	t.Parallel()
+
+	const asked = "https://schemas.test/builtin/v0/default-human-user.json"
+	const stored = "https://schemas.test/builtin/v1/default-human-user.json"
+
+	t.Run("the row under the requested URL is returned", func(t *testing.T) {
+		t.Parallel()
+		svc, statements := newMockedSchemaService(t)
+		statements.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", asked).Return(&domain.JSONSchema{ProjectID: "proj_1", URL: asked}, nil)
+
+		got, err := svc.CreateSchemaByUrl(t.Context(), service.CreateSchemaByURLInput{ProjectID: "proj_1", URL: mustURL(t, asked)})
+		require.NoError(t, err)
+		assert.Equal(t, asked, got.URL)
+	})
+	t.Run("a row under another base is a conflict that names it", func(t *testing.T) {
+		t.Parallel()
+		svc, statements := newMockedSchemaService(t)
+		statements.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", asked).Return(nil, new(database.NoRowFoundError))
+		statements.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", stored).Return(&domain.JSONSchema{ProjectID: "proj_1", URL: stored}, nil)
+
+		_, err := svc.CreateSchemaByUrl(t.Context(), service.CreateSchemaByURLInput{ProjectID: "proj_1", URL: mustURL(t, asked)})
+		require.ErrorIs(t, err, domain.ErrJSONSchemaAlreadyExists())
+		de, ok := errors.AsType[domain.Error](err)
+		require.True(t, ok)
+		assert.Contains(t, fmt.Sprint(de.Details), stored)
+	})
+	t.Run("no row under any base is not found", func(t *testing.T) {
+		t.Parallel()
+		svc, statements := newMockedSchemaService(t)
+		statements.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", gomock.Any()).Return(nil, new(database.NoRowFoundError)).Times(2)
+
+		_, err := svc.CreateSchemaByUrl(t.Context(), service.CreateSchemaByURLInput{ProjectID: "proj_1", URL: mustURL(t, asked)})
+		require.ErrorIs(t, err, domain.ErrJSONSchemaNotFound())
+	})
+}
+
+func mustURL(t *testing.T, raw string) url.URL {
+	t.Helper()
+	u, err := url.Parse(raw)
+	require.NoError(t, err)
+	return *u
 }

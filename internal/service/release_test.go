@@ -31,8 +31,12 @@ func newMockedReleaseService(t *testing.T) (service.ReleaseService, *servicemock
 		AnyTimes()
 	statementer.EXPECT().Statements().Return(statements).AnyTimes()
 	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	return service.NewReleaseService(service.NewPool(pool), nil, nil, nil, nil), statements
+	return service.NewReleaseService(service.NewPool(pool), nil, nil, nil, nil, testBuiltinBases), statements
 }
+
+// testBuiltinBases is the built-in schema namespace the release tests run
+// under: example.com rows are outside it, so pointers resolve as written.
+var testBuiltinBases = domain.NewBuiltinSchemaBases("https://schemas.test/builtin/v1", "https://schemas.test/builtin/v0")
 
 // loginFlow collects email, which human-user-v2.json dropped.
 func loginFlow() *domain.FlowDefinition {
@@ -406,4 +410,45 @@ func TestReleaseServiceGetUnknownIsNotFound(t *testing.T) {
 	domErr, ok := errors.AsType[domain.Error](err)
 	require.True(t, ok)
 	assert.Equal(t, domain.ErrReleaseNotFound().Code, domErr.Code)
+}
+
+// A schema pointer may name a built-in schema's `$id` under a base the
+// project was not seeded under: the release pins the row that was found,
+// under the base it is stored at.
+func TestReleaseServiceCreateResolvesBuiltinSchemaUnderAnotherBase(t *testing.T) {
+	const asked = "https://schemas.test/builtin/v0/default-human-user.json"
+	const stored = "https://schemas.test/builtin/v1/default-human-user.json"
+
+	svc, statements := newMockedReleaseService(t)
+	statements.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", asked).
+		Return(nil, new(database.NoRowFoundError))
+	statements.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", stored).
+		Return(&domain.JSONSchema{
+			ProjectID:  "proj_1",
+			URL:        stored,
+			ObjectType: new("human-user"),
+			Schema: []byte(`{"type": "object", "x-identifier": "email",
+				"x-auth-methods": {"password": {"enabled": true}},
+				"properties": {"email": {"type": "string", "format": "email", "x-unique": "team"}}}`),
+		}, nil)
+	statements.EXPECT().
+		GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).
+		Return(nil, new(database.NoRowFoundError))
+	statements.EXPECT().
+		CreateRelease(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, rel *domain.Release) error {
+			rel.ID = "rel_test02"
+			return nil
+		})
+
+	result, err := svc.Create(t.Context(), service.CreateReleaseInput{
+		ProjectID: "proj_1",
+		Pointers:  []service.CreateReleasePointer{{Kind: domain.ReleasePointerKindSchema, RevisionID: asked}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []domain.ReleasePointer{
+		{Kind: domain.ReleasePointerKindSchema, Handle: "human-user", RevisionID: stored},
+	}, result.Release.Pointers)
 }
