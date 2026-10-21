@@ -58,7 +58,8 @@ type resourceAccess struct {
 	// kind is the expected resource_scope_index.resource_kind for path-id ops.
 	// Empty means no kind check (project-scoped create/list only).
 	kind domain.ResourceKind
-	// readMiss / writeMiss are anti-oracle answers when Check finds no foothold;
+	// readMiss / writeMiss are anti-oracle answers when Check finds no foothold
+	// (for a by-id Check, none that covers the target);
 	// writeMiss also covers nonexistent projects on create/list.
 	readMiss  func() domain.Error
 	writeMiss func() domain.Error

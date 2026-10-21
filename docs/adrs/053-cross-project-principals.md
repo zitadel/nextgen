@@ -326,6 +326,16 @@ exception for project secrets does not extend to foreign human sessions.
 > pins both: every operation the Console calls answers a real foreign target
 > exactly as it answers a missing one.
 
+> **Implementation note (2026-10-21, #2112):** the foothold of a by-id check
+> covers the target, not the whole project: a grant scoped project-wide, to the
+> target's team or to the target itself, a membership in the target team or the
+> target's team, or the caller's own user record. Anything else answers like
+> an unknown id, so a principal granted on one team cannot confirm another
+> team or its users exist. Creates, project operations and lists keep the
+> project-wide foothold; they answer before any id is looked up, and the list
+> partial view depends on it. `TestConsoleSessionTeamScopedCannotProbeOtherTeams`
+> pins the case.
+
 ### 8. Audit events are written in the protected project
 
 Every allowed cross-project mutation and every security-relevant read produces
