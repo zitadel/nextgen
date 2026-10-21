@@ -59,6 +59,25 @@ func ErrOriginNotFound() Error {
 	return newError(PrefixOrigin.ErrorCodePrefix("not_found"), "origin: not found", nil, nil)
 }
 
+// ErrProjectOriginNotAllowed reports a request Origin that matches no origin
+// pattern of the project. Callers that include the refused origin in the
+// message use WithMessage so the login surface can show it.
+func ErrProjectOriginNotAllowed(details any) Error {
+	return newError(PrefixProject.ErrorCodePrefix("origin_not_allowed"), "the request origin is not an origin of this project", details, nil)
+}
+
+// ErrProjectPreviewNotLive reports an Origin that matches a preview pattern
+// but has no live preview row for that exact URL.
+func ErrProjectPreviewNotLive(details any) Error {
+	return newError(PrefixProject.ErrorCodePrefix("preview_not_live"), "no live preview for this origin; run zitadel preview on this branch", details, nil)
+}
+
+// ErrProjectMismatch reports a body project_id that disagrees with the
+// project the credential belongs to.
+func ErrProjectMismatch() Error {
+	return newError(PrefixProject.ErrorCodePrefix("mismatch"), "the project named in the request is not the one the credential belongs to", nil, nil)
+}
+
 // NormalizeOrigins returns a non-nil copy with trimmed patterns.
 func NormalizeOrigins(origins []Origin) []Origin {
 	if origins == nil {

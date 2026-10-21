@@ -103,7 +103,7 @@ func (f *identifierScopeFixture) submitIdentifier(t *testing.T, definition api.F
 	createResp, err := f.client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(f.project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	created := createResp.(*api.FlowResponseHeaders)

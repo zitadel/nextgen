@@ -12306,6 +12306,10 @@ func NewSchemaURLConfigurationBundleSchemasItem(v SchemaURL) ConfigurationBundle
 	return s
 }
 
+type CreateAuthAttemptConflict ErrorDetails
+
+func (*CreateAuthAttemptConflict) createAuthAttemptRes() {}
+
 // CreateAuthAttemptErrorResponse represents sum type.
 type CreateAuthAttemptErrorResponse struct {
 	Type                CreateAuthAttemptErrorResponseType // switch on this field
@@ -12541,6 +12545,10 @@ func (s *CreateAuthAttemptErrorResponseStatusCode) SetResponse(val CreateAuthAtt
 }
 
 func (*CreateAuthAttemptErrorResponseStatusCode) createAuthAttemptRes() {}
+
+type CreateAuthAttemptForbidden ErrorDetails
+
+func (*CreateAuthAttemptForbidden) createAuthAttemptRes() {}
 
 // Request to create a new authentication attempt.
 // Ref: #
@@ -13446,6 +13454,14 @@ func (s *CreateDeploymentRequest) SetExpectedDeploymentID(val OptDeploymentID) {
 	s.ExpectedDeploymentID = val
 }
 
+type CreateFlowBadRequest ErrorDetails
+
+func (*CreateFlowBadRequest) createFlowRes() {}
+
+type CreateFlowConflict ErrorDetails
+
+func (*CreateFlowConflict) createFlowRes() {}
+
 // CreateFlowDefinitionErrorResponse represents sum type.
 type CreateFlowDefinitionErrorResponse struct {
 	Type                     CreateFlowDefinitionErrorResponseType // switch on this field
@@ -14235,6 +14251,10 @@ func (s *CreateFlowErrorResponseStatusCode) SetResponse(val CreateFlowErrorRespo
 }
 
 func (*CreateFlowErrorResponseStatusCode) createFlowRes() {}
+
+type CreateFlowForbidden ErrorDetails
+
+func (*CreateFlowForbidden) createFlowRes() {}
 
 // Ref: #
 type CreateFlowRequest struct {
@@ -20911,12 +20931,14 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 
 func (*ErrorDetails) createBrandingRes()       {}
 func (*ErrorDetails) createFlowDefinitionRes() {}
-func (*ErrorDetails) createFlowRes()           {}
+func (*ErrorDetails) createHandoffRes()        {}
 func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
+func (*ErrorDetails) getAuthAttemptRes()       {}
 func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
+func (*ErrorDetails) issueChallengeRes()       {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
 func (*ErrorDetails) listMyIdentityLinksRes()  {}
 func (*ErrorDetails) listMyPasskeysRes()       {}
@@ -20924,6 +20946,7 @@ func (*ErrorDetails) listMyTeamsRes()          {}
 func (*ErrorDetails) revokeMySessionRes()      {}
 func (*ErrorDetails) rollbackDeploymentRes()   {}
 func (*ErrorDetails) submitFlowStepRes()       {}
+func (*ErrorDetails) verifyChallengeProofRes() {}
 
 // Additional error-specific context.
 type ErrorDetailsDetails map[string]jx.Raw
@@ -22302,6 +22325,10 @@ type ExchangeHandoffBadRequest ErrorDetails
 
 func (*ExchangeHandoffBadRequest) exchangeHandoffRes() {}
 
+type ExchangeHandoffConflict ErrorDetails
+
+func (*ExchangeHandoffConflict) exchangeHandoffRes() {}
+
 // ExchangeHandoffErrorResponse represents sum type.
 type ExchangeHandoffErrorResponse struct {
 	Type                    ExchangeHandoffErrorResponseType // switch on this field
@@ -22761,6 +22788,10 @@ func (s *ExchangeHandoffErrorResponseStatusCode) SetResponse(val ExchangeHandoff
 }
 
 func (*ExchangeHandoffErrorResponseStatusCode) exchangeHandoffRes() {}
+
+type ExchangeHandoffForbidden ErrorDetails
+
+func (*ExchangeHandoffForbidden) exchangeHandoffRes() {}
 
 type ExchangeHandoffUnauthorized ErrorDetails
 
