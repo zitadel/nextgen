@@ -58,14 +58,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      # The queue squashes a version PR onto the PRs queued ahead of it, and
-      # while it waits GitHub refuses release-publish's refresh of
-      # changeset-release/main. A changeset one of those PRs adds would land
-      # unrecorded in .changeset/pre.json, and release-publish's preflight
-      # would then refuse to publish the version. Running that preflight here
-      # drops the stale version PR from the queue instead; release-publish
-      # refreshes it once the PRs ahead land. Any other merge group skips.
-      - name: Check a queued version PR is current
+      # A version PR has to land on its own: release-publish finds the version
+      # commit from the diff of the push, which would also hold every PR the
+      # queue squashed it onto, and then refuses to publish. Running that
+      # detection here drops such a version PR from the queue instead; queue it
+      # again once the PRs ahead of it land. Any other merge group skips.
+      - name: Check a queued version PR lands alone
         if: ${{ github.event_name == 'merge_group' }}
         env:
           BASE_SHA: ${{ github.event.merge_group.base_sha }}
@@ -316,8 +314,8 @@ jobs:
         run: env -u CI -u GITHUB_ACTIONS moon run release:version
 
       # npm trusted publishing cannot create a package, so release publish
-      # stops a version that includes a public package npm has never seen, or
-      # one with only prereleases of the pre tag (scripts/release-dist-tags.mjs).
+      # stops a version that includes a public package npm has never seen
+      # (scripts/release-npm-preflight.mjs).
       # It used to find out only after the version commit was on main (run
       # 39324183811). Asking npm here fails the version PR and its merge group
       # instead, with the one-time commands that fix it.

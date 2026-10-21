@@ -335,8 +335,8 @@ export function validateChangesetStatusPackages(status) {
 
   for (const release of status.releases ?? []) {
     // A release no changeset asks for is one Changesets derives itself, such as
-    // a private workspace's prerelease version graduating when pre mode exits.
-    // A changeset that names a non-public package is reported above.
+    // the private website's patch when `@zitadel/components` moves. A changeset
+    // that names a non-public package is reported above.
     if (
       publicPackageNameSet.has(release.name) ||
       release.type === "none" ||

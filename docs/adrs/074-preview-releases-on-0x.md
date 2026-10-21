@@ -13,10 +13,11 @@
 
 ## Decision
 
-1. **Leave prerelease mode at `0.1.0`.** The public packages publish to npm's
-   `latest` tag as `0.x` versions, and the container's `:latest` moves only
-   with them. The READMEs say the product is a preview; the version string no
-   longer does. Docs, skills and hints run the CLI as
+1. **Leave prerelease mode at `0.1.0`.** `.changeset/pre.json` is deleted and
+   the public packages are set to `0.1.0-alpha.28`, so the next version PR
+   releases `0.1.0` to npm's `latest` tag, and the container's `:latest` moves
+   only with releases. The READMEs say the product is a preview; the version
+   string no longer does. Docs, skills and hints run the CLI as
    `npx @zitadel/cli@latest`.
 2. **A breaking change is a `minor` until 1.0.0.** Its changeset says what
    breaks and what to do in a paragraph that starts with `**Breaking:**`, as
@@ -25,9 +26,11 @@
    `scripts/check-changesets-status.mjs --pending` refuses a `major` changeset
    while the public packages are below 1.0.0, and CI runs it on every pull
    request.
-3. **1.0.0 is GA, cut on purpose.** The pull request that releases it sets the
-   version itself; a changeset cannot. From 1.0.0 the guard no longer applies,
-   and `major` means a new major.
+3. **1.0.0 is GA, cut the Changesets way.** The pull request that starts GA
+   deletes the guard and adds a `major` changeset, and Changesets releases
+   `1.0.0`. Release candidates, if wanted, run in prerelease mode
+   (`changeset pre enter rc`) on a release branch, for that phase only. From
+   then on `major` means a new major.
 4. **The CLI pins its own version on every release.** The packages `setup`
    adds, the commands the CLI suggests and the image its Docker runtime starts
    use the CLI's exact version, as they did on alpha versions. Other
@@ -43,10 +46,20 @@
      have several maintainers), and apps scaffolded on those versions pin
      them. `alpha` moves to `0.1.0`, so old `@alpha` commands keep working.
    - `CHANGELOG.md` keeps npm's `1.0.0-alpha.N` headings.
-6. **The released changesets are deleted before the exit.** On exit,
-   Changesets counts every file left in `.changeset/`: the ones the alpha
-   releases shipped would repeat in the `0.1.0` notes (about 370 server
-   entries), and the three released majors would make it `1.0.0`.
+6. **The released changesets go with `pre.json`.** Without the prerelease
+   state, Changesets counts every file left in `.changeset/` as pending: the
+   ones the alpha releases shipped would repeat in the `0.1.0` notes (about
+   370 server entries), and the three released majors would make it `1.0.0`.
+7. **Stock Changesets 3, without prerelease bookkeeping.** The repo moves to
+   `@changesets/cli` 3 and `@changesets/changelog-github` 1, which write the
+   same changelog lines. In v3 a peer dependent's bump is a `patch`, not a
+   `major`, so a `0.x` minor no longer pushes dependents to `1.0.0`. The
+   release code built for prerelease mode on `main` goes: the `pre.json`
+   bookkeeping, which outside it refuses every publish and recovery while a
+   changeset is pending, and the check for packages with only `alpha`
+   versions on npm. `scripts/release-npm-preflight.mjs` keeps the check for
+   packages npm has never seen, and CI still makes a version PR land on its
+   own.
 
 ## Context
 
@@ -74,6 +87,8 @@ Positive:
   change.
 - The tags, the releases and the website changelog, which sorts releases by
   version, read in order.
+- Releasing is stock Changesets: add a changeset, merge the version PR. The
+  one rule of our own is the `major` guard.
 
 Trade-offs:
 
@@ -89,6 +104,11 @@ Trade-offs:
 
 - **Exit at 1.0.0.** A new major every few weeks, or breaking changes in
   minors that break caret ranges.
+- **Exit with `changeset pre exit`.** Releases the same versions, but
+  Changesets 3 rewrites an exit-mode `pre.json` on every `changeset status`,
+  and the GitHub Changesets actions still read the old format.
+- **Stay on Changesets 2.** Keeps a peer dependent's `major` bump, which on
+  `0.x` turns a minor into `1.0.0`, and the prerelease bookkeeping.
 - **Stay in prerelease mode and point `latest` at the alpha.** Fixes bare
   `npx`, but keeps prerelease ranges, which dependency bots handle poorly, and
   `@alpha` in every doc.

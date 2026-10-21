@@ -57,8 +57,8 @@ gh run rerun <run-id> --repo zitadel/nextgen --failed
 ```
 
 Prefer that over `recover_version` when a preflight stopped the run:
-`recover_version` publishes `main`'s head, and refuses while `main` holds
-changesets the version commit did not record. Re-run before the next version
+`recover_version` publishes `main`'s head, which must still carry that
+version. Re-run before the next version
 PR lands. Publishing the older version after it would move npm's `latest` and
 the container's `:latest` back to it.
 
@@ -90,7 +90,6 @@ be a generated version commit" gate, but it still requires:
 
 - the checked-out `@zitadel/server` version to equal `recover_version`;
 - the workflow to run from `main`;
-- no unrecorded pending release changesets;
 - the normal artifact preflight and snapshot verification to pass.
 
 After the recovery run, verify the public surfaces and draft release shell:

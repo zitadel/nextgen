@@ -121,7 +121,8 @@ The public packages publish to npm's `latest` tag as `0.x`
   changelog lists such a change under Breaking. A `major` would release every
   public package as 1.0.0, so `node scripts/check-changesets-status.mjs --pending`
   refuses it; CI runs it on every PR.
-- 1.0.0 is cut by a PR that sets the version itself.
+- 1.0.0 is cut by a PR that deletes that check and adds a `major` changeset.
+  Release candidates, if any, run in prerelease mode on a release branch.
 
 ## Publishing
 
