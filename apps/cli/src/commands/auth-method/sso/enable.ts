@@ -21,6 +21,7 @@ import {
 } from "@zitadel/config/idp";
 
 import { createZitadelClient } from "../../../lib/api-client";
+import { loopbackReach } from "../../../lib/local-server/runtime";
 import { refuseBrokenFlows, refuseUneditable } from "../../../lib/auth-methods";
 import { isDevelopmentBuild } from "../../../lib/build-channel";
 import { ZitadelError } from "../../../lib/errors";
@@ -135,7 +136,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       resolveServer: true,
       preflight: (cwd) => readProject(cwd, flags),
     });
-    const { nonInteractive, dryRun, cliVersion } = this.meta;
+    const { nonInteractive, dryRun, cliVersion, source } = this.meta;
+    // A loopback issuer works only on a server that may fetch from this machine.
+    const loopback = loopbackIssuerWarning(selection, await loopbackReach(cwd, source));
+    if (loopback !== undefined) {
+      reportWarning(loopback);
+    }
     const provider = selectionName(selection);
     // What an agent can run once the missing credential is to hand. Only for a
     // catalog provider: a custom connection needs its settings repeated too.
@@ -579,10 +585,6 @@ async function readProject(
     ENABLE_FLAG_NAMES,
     customExample(ENABLE_FLAG_NAMES),
   );
-  const loopback = loopbackIssuerWarning(selection);
-  if (loopback !== undefined) {
-    reportWarning(loopback);
-  }
   const entry = providerOf(selection);
   const config = await readZitadelConfig(cwd);
   const secretFile = await readZitadelSecret(cwd);

@@ -241,15 +241,18 @@ type JSONSchemaResolver struct {
 	maxResolveDepth int
 	resolveTimeout  time.Duration
 	httpClient      *http.Client
-	// builtinPublicBase is the absolute URL prefix for product-built-in schemas (no trailing slash).
-	// When empty, builtin embedded schemas are disabled and resolution uses only the store / HTTP ingest.
-	builtinPublicBase string
+	// builtinBases is the namespace of product-built-in schemas: the configured
+	// public base and the other [KnownBuiltinSchemaBases]. When disabled, builtin
+	// embedded schemas are off and resolution uses only the store / HTTP ingest.
+	builtinBases BuiltinSchemaBases
 }
 
 // NewJSONSchemaResolver wires a resolver with an LRU cache, resolve limits,
 // an optional HTTP client for ingestion, and an optional builtinPublicBase URL.
-// When builtinPublicBase is non-nil, schema URLs under that prefix are loaded from embedded templates
+// When builtinPublicBase is non-nil, schema URLs under that prefix, or under one
+// of the other [KnownBuiltinSchemaBases], are loaded from embedded templates
 // instead of the database; they are not persisted via [JSONSchemaStore.CreateJSONSchema].
+// No URL under those bases is ever fetched over HTTP.
 // Persistence is supplied per [JSONSchemaResolver.Resolve] call via [JSONSchemaStore].
 // resolveTimeout bounds one whole [JSONSchemaResolver.Resolve] call including
 // every $ref fetch; 0 means [DefaultJSONSchemaResolveTimeout]. Response size
@@ -271,16 +274,16 @@ func NewJSONSchemaResolver(
 	if resolveTimeout == 0 {
 		resolveTimeout = DefaultJSONSchemaResolveTimeout
 	}
-	var base string
+	var bases BuiltinSchemaBases
 	if builtinPublicBase != nil {
-		base = strings.TrimSuffix(builtinPublicBase.String(), "/")
+		bases = BuiltinSchemaBasesFor(builtinPublicBase.String())
 	}
 	return &JSONSchemaResolver{
-		cache:             cache,
-		maxResolveDepth:   maxResolveDepth,
-		resolveTimeout:    resolveTimeout,
-		httpClient:        httpClient,
-		builtinPublicBase: base,
+		cache:           cache,
+		maxResolveDepth: maxResolveDepth,
+		resolveTimeout:  resolveTimeout,
+		httpClient:      httpClient,
+		builtinBases:    bases,
 	}
 }
 
@@ -379,29 +382,14 @@ func (r *JSONSchemaResolver) resolveRecursively(
 }
 
 func (r *JSONSchemaResolver) loadSchemaPayload(ctx context.Context, store JSONSchemaStore, projectID, schemaURL string) ([]byte, error) {
-	if r.builtinPublicBase != "" {
-		relPath, ok := builtinSchemaURLPathAfterBase(r.builtinPublicBase, schemaURL)
-		if ok {
-			if _, isBuiltin := builtinSchemas[relPath]; isBuiltin {
-				return loadBuiltinSchemaBytes(relPath, schemaURL)
-			}
+	if relPath, ok := r.builtinBases.RelPath(schemaURL); ok {
+		if _, isBuiltin := builtinSchemas[relPath]; isBuiltin {
+			// Rendered under the URL that was asked for, so a legacy base
+			// yields a document whose $id and $refs stay under that base.
+			return loadBuiltinSchemaBytes(relPath, schemaURL)
 		}
 	}
 	return r.getFromDatabase(ctx, store, projectID, schemaURL)
-}
-
-// builtinSchemaURLPathAfterBase reports whether schemaURL is under base and returns the path
-// after base (no leading slash), which matches the embed path under schema/ (for example
-// base https://iam.example.com/schema and schemaURL …/schema/user/v1/user.schema.json -> user/v1/user.schema.json).
-func builtinSchemaURLPathAfterBase(base, schemaURL string) (relPath string, underBase bool) {
-	if schemaURL == base {
-		return "", true
-	}
-	prefix := base + "/"
-	if !strings.HasPrefix(schemaURL, prefix) {
-		return "", false
-	}
-	return strings.TrimPrefix(schemaURL, prefix), true
 }
 
 func loadBuiltinSchemaBytes(relPath, canonicalSchemaURL string) ([]byte, error) {
@@ -500,7 +488,7 @@ func resolveRefs(node any, base *url.URL) (any, error) {
 }
 
 func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, store JSONSchemaStore, projectID, schemaURL string) ([]byte, error) {
-	dbSchema, err := store.GetJSONSchemaByID(ctx, projectID, schemaURL)
+	dbSchema, err := r.builtinBases.GetJSONSchema(ctx, store, projectID, schemaURL)
 	if err == nil {
 		return dbSchema.Schema, nil
 	}
@@ -509,6 +497,12 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, store JSONSche
 		return nil, err
 	}
 	if r.httpClient == nil {
+		return nil, fmt.Errorf("schema not found in database: %w", err)
+	}
+	// The built-in namespace names documents, it does not locate them: a
+	// project without the row has nothing to fetch, and a legacy base is not
+	// ours to fetch from.
+	if _, inNamespace := r.builtinBases.RelPath(schemaURL); inNamespace {
 		return nil, fmt.Errorf("schema not found in database: %w", err)
 	}
 

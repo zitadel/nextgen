@@ -2,9 +2,10 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
-    // contract.spec.ts imports @zitadel/components/events from its dist.
+    // contract.spec.ts imports @zitadel/components/events from its dist, and
+    // the edge specs import this package's built dist.
     "typecheck": {
-      "dependsOn": ["@zitadel/components#build"]
+      "dependsOn": ["@zitadel/components#build", "build"]
     },
     "build": {
       "dependsOn": ["@zitadel/api#build"]
@@ -17,7 +18,7 @@
     // and every SDK's manifest and docs and the demo apps' manifests and sources
     // to check that apps go through their SDK.
     "test": {
-      "dependsOn": ["@zitadel/components#build"],
+      "dependsOn": ["@zitadel/components#build", "build"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/packages/sdk-react/src/index.spec.tsx",

@@ -21,7 +21,12 @@ import {
 } from "../../../src/lib/local-server/runtime";
 import Reset from "../../../src/commands/reset";
 import { nextPort } from "../../helpers/ports";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
+import {
+  aMachineRunning,
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+} from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
@@ -283,20 +288,19 @@ describe("local runtime commands", () => {
   it("doctor warns about other host-wide managed runtime processes and suggests stop --all", async () => {
     const cwd = await tempProject("zitadel-doctor-orphan-");
     const fake = await fakeServerBinary();
-    const fakePs = await fakeProcessTable([
-      {
-        pid: 999_991,
-        ppid: 1,
-        command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
-      },
-      { pid: 999_992, ppid: 1, command: "/usr/local/bin/node /tmp/not-zitadel.js" },
-    ]);
+    const servers = aMachineRunning({
+      pid: 999_991,
+      ppid: 1,
+      command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+    });
     const port = nextPort();
 
-    const result = await runCliForTest(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
-      PATH: `${fakePs.binDir}:${process.env.PATH ?? ""}`,
-      ZITADEL_SERVER_BINARY: fake.binPath,
-    });
+    const result = await runCliForTest(
+      ["doctor", "--cwd", cwd, "--json", "--port", String(port)],
+      { ZITADEL_SERVER_BINARY: fake.binPath },
+      undefined,
+      servers,
+    );
 
     expect(result.exitCode).toBe(0);
     const envelope = parseJson(result.stdout) as {
@@ -388,10 +392,14 @@ describe("local runtime commands", () => {
     await expect(childEnv(serverUrl, "NEXTGEN_GOOGLE_SECRET")).resolves.toBe("canary-local");
     await expect(childEnv(serverUrl, "NEXTGEN_GITHUB_SECRET")).resolves.toBe("canary-github");
     await expect(childEnv(serverUrl, "UNDECLARED_SECRET")).resolves.toBeUndefined();
+    // The local defaults ride along: loopback is fetchable on a local server.
+    await expect(childEnv(serverUrl, "NEXTGEN_HTTPCLIENT_ALLOW_LIST")).resolves.toBe(
+      "localhost,127.0.0.0/8,::1/128",
+    );
 
     // Names only, in the envelope and on disk.
     expect(envelope.data.runtime.env).toEqual({
-      injected: ["NEXTGEN_GITHUB_SECRET", "NEXTGEN_GOOGLE_SECRET"],
+      injected: ["NEXTGEN_GITHUB_SECRET", "NEXTGEN_GOOGLE_SECRET", "NEXTGEN_HTTPCLIENT_ALLOW_LIST"],
     });
     expect(result.stdout).not.toContain("canary");
     expect(result.stderr).not.toContain("canary");
@@ -863,18 +871,18 @@ describe("local runtime commands", () => {
 
   it("stop --all reports only discovered CLI-managed runtime candidates", async () => {
     const cwd = await tempProject("zitadel-stop-all-");
-    const fakePs = await fakeProcessTable([
-      {
-        pid: 999_981,
-        ppid: 1,
-        command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
-      },
-      { pid: 999_982, ppid: 1, command: "/usr/local/bin/node /tmp/unrelated.js" },
-    ]);
-
-    const result = await runCliForTest(["stop", "--cwd", cwd, "--json", "--all"], {
-      PATH: `${fakePs.binDir}:${process.env.PATH ?? ""}`,
+    const servers = aMachineRunning({
+      pid: 999_981,
+      ppid: 1,
+      command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
     });
+
+    const result = await runCliForTest(
+      ["stop", "--cwd", cwd, "--json", "--all"],
+      {},
+      undefined,
+      servers,
+    );
 
     expect(result.exitCode).toBe(0);
     const envelope = parseJson(result.stdout) as {
@@ -1177,36 +1185,6 @@ process.exit(0);
   );
   await chmod(binPath, 0o755);
   return { binPath };
-}
-
-async function fakeProcessTable(
-  rows: Array<{ command: string; pid: number; ppid: number }>,
-): Promise<{ binDir: string }> {
-  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-ps-"));
-  tempDirs.push(binDir);
-  const psPath = join(binDir, "ps");
-  await writeFile(
-    psPath,
-    `#!/usr/bin/env node
-const rows = ${JSON.stringify(rows)};
-const args = process.argv.slice(2);
-if (args[0] === "axo") {
-  for (const row of rows) {
-    console.log(String(row.pid).padStart(6) + " " + String(row.ppid).padStart(6) + " " + row.command);
-  }
-  process.exit(0);
-}
-if (args[0] === "eww") {
-  const pid = Number(args[2]);
-  const row = rows.find((candidate) => candidate.pid === pid);
-  if (row) console.log(row.command);
-  process.exit(0);
-}
-process.exit(1);
-`,
-  );
-  await chmod(psPath, 0o755);
-  return { binDir };
 }
 
 /**

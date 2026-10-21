@@ -132,13 +132,11 @@ export interface ResourceSyncer {
    */
   validate(data: object, path?: string): void;
   /**
-   * Create the resource on the platform. `canonical` is the server's
-   * stored representation when the response (or a follow-up fetch)
-   * provides one; the sync loop writes it back to the local file so
-   * repo config matches live state byte-for-byte.
+   * Create the resource on the platform, answering with its id. What the
+   * server stored is not returned: the sync loop never writes it back, and
+   * the local file stays as written.
    */
-  create(data: object): Promise<{ id: string; canonical?: object }>;
-  /** Replace the resource. `canonical` as in {@link create}. */
+  create(data: object): Promise<{ id: string }>;
   /**
    * Apply the local body to the tracked resource.
    *
@@ -149,7 +147,7 @@ export interface ResourceSyncer {
    * id. Reporting it keeps state describing what the server did rather than
    * what the caller assumed. Omit it when the write cannot change identity.
    */
-  update(id: string, data: object): Promise<{ id?: string; canonical?: object }>;
+  update(id: string, data: object): Promise<{ id?: string }>;
   delete(id: string): Promise<void>;
   /**
    * `"unsupported"` when the platform cannot delete this resource yet. A file
@@ -173,21 +171,13 @@ export interface ResourceSyncer {
   /**
    * Reduce a body to its canonical comparison form: strip server-echoed
    * noise (empty `audience`) and spelled-out meta-schema defaults
-   * (`x-audit` et al) so hashing and diff rendering treat semantically
-   * identical bodies as identical — the server applies those defaults
-   * itself when it stores a schema. Comparison only: uploads send the file
-   * as written, and write-back writes the {@link normalizeWrite} form.
+   * (`x-audit`, a connection's `pkce_enabled` et al) so hashing and diff
+   * rendering treat semantically identical bodies as identical, and a field
+   * the file leaves out reads as the server's default rather than as a
+   * change — the server applies those defaults itself. Comparison only:
+   * uploads send the file as written.
    */
   normalize?(data: object): object;
-  /**
-   * Reduce a canonical server body to what belongs in the local file
-   * during write-back: strip pure transport noise (detail-envelope keys,
-   * the empty `audience` echo) and nothing else. Unlike {@link normalize},
-   * this must preserve every semantically meaningful field — defaulted or
-   * not — because its output becomes the bytes the next apply uploads.
-   * Absent means the canonical body is written verbatim.
-   */
-  normalizeWrite?(data: object): object;
 }
 
 /**

@@ -2,7 +2,7 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
-    // client.edge.test.ts imports this package's built dist.
+    // the edge tests import this package's built dist.
     "typecheck": {
       "dependsOn": ["build"]
     },

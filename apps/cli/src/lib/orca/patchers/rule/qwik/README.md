@@ -2,6 +2,8 @@
 
 Integrates Zitadel auth into a Vite + Qwik single-page app.
 
+The detector requires `@qwik.dev/core` at `2.0.0-beta.45` or newer; older versions are refused.
+
 ## What it patches
 
 - `src/app.tsx` — auth entry that renders the Zitadel login/logout widgets

@@ -86,6 +86,44 @@ export function runCapture(command, args = [], options = {}) {
   });
 }
 
+// Runs a command on pipes of its own and replays its output once it exits, for
+// commands that run side by side under one task. pnpm 12 is a native binary
+// that fails when a write to stdout would block, and a shared pipe turns
+// non-blocking for all its writers whenever a Node.js process among them
+// touches process.stdout, as every corepack start does (#1786). Settles only
+// once the replay is written: release.mjs exits right after a failure, which
+// would drop whatever the pipe had not taken yet.
+export async function runReplayed(command, args = [], options = {}) {
+  let result;
+  try {
+    result = await runCapture(command, args, options);
+  } catch (error) {
+    if (typeof error.stdout === "string") {
+      await replay(error);
+      // runCapture's message repeats the output that was just replayed.
+      error.message = error.message.split("\n")[0];
+    }
+    throw error;
+  }
+  await replay(result);
+  return result;
+}
+
+function replay({ stdout, stderr }) {
+  return Promise.all([writeAll(process.stdout, stdout), writeAll(process.stderr, stderr)]);
+}
+
+// The callback runs once the stream has handed the text to the OS.
+function writeAll(stream, text) {
+  return new Promise((resolve, reject) => {
+    if (!text) {
+      resolve();
+      return;
+    }
+    stream.write(text, (error) => (error ? reject(error) : resolve()));
+  });
+}
+
 export function formatCommand(command, args = []) {
   return [command, ...args].map(shellQuote).join(" ");
 }

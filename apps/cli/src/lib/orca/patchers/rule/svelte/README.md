@@ -2,6 +2,8 @@
 
 Integrates Zitadel auth into a Vite + Svelte single-page app.
 
+The detector requires `svelte` 5 or newer; older versions are refused.
+
 ## What it patches
 
 - `src/App.svelte` — auth entry that renders the Zitadel login/logout widgets

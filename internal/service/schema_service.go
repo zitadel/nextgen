@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -52,17 +53,22 @@ type SchemaService struct {
 	v2Pool          *DB
 	schemaResolver  *domain.JSONSchemaResolver
 	schemaValidator *domain.SchemaValidator
+	// builtinBases resolves a built-in schema's `$id` under whichever base the
+	// project stores it (domain.BuiltinSchemaBases).
+	builtinBases domain.BuiltinSchemaBases
 }
 
 func NewSchemaService(
 	v2Pool *DB,
 	schemaResolver *domain.JSONSchemaResolver,
 	schemaValidator *domain.SchemaValidator,
+	builtinBases domain.BuiltinSchemaBases,
 ) *SchemaService {
 	return &SchemaService{
 		v2Pool:          v2Pool,
 		schemaResolver:  schemaResolver,
 		schemaValidator: schemaValidator,
+		builtinBases:    builtinBases,
 	}
 }
 
@@ -186,6 +192,24 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 	defer end(&err)
 
 	strURI := input.URL.String()
+	// A URL in the built-in namespace names a document the project either
+	// already holds or never will: nothing under those bases is fetched, so
+	// there is nothing to create. Answer with the row that exists, under the
+	// base it is stored at, or say which it is.
+	if _, inNamespace := s.builtinBases.RelPath(strURI); inNamespace {
+		stored, err := s.builtinBases.GetJSONSchema(ctx, s.v2Pool.Statements(), input.ProjectID, strURI)
+		if err == nil {
+			if stored.URL == strURI {
+				return stored, nil
+			}
+			return nil, domain.ErrJSONSchemaAlreadyExists().WithDetails(fmt.Sprintf("the schema exists as %q", stored.URL))
+		}
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrJSONSchemaNotFound().WithDetails(fmt.Sprintf("no schema %q in this project; URLs under the built-in schema namespace are never fetched", strURI))
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")
+	}
+
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		return s.createSchemaByURL(ctx, tx.Statements(), input.ProjectID, strURI)
 	})
@@ -246,12 +270,15 @@ func (s *SchemaService) resolveOrCreateSchemaURL(
 	stmts AllStatements,
 	projectID, schemaURL string,
 ) (*domain.JSONSchema, error) {
-	existing, err := stmts.GetJSONSchemaByID(ctx, projectID, schemaURL)
+	existing, err := s.builtinBases.GetJSONSchema(ctx, stmts, projectID, schemaURL)
 	if err == nil {
 		return existing, nil
 	}
 	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
 		return nil, domain.ErrInternal(err).WithMessage("failed to look up schema by url")
+	}
+	if _, inNamespace := s.builtinBases.RelPath(schemaURL); inNamespace {
+		return nil, domain.ErrJSONSchemaNotFound().WithDetails(fmt.Sprintf("no schema %q in this project; URLs under the built-in schema namespace are never fetched", schemaURL))
 	}
 	if err := s.createSchemaByURL(ctx, stmts, projectID, schemaURL); err != nil {
 		return nil, err
@@ -320,7 +347,7 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 	ctx, end := startSpan(ctx, "SchemaService.GetSchema")
 	defer end(&err)
 
-	schema, err := s.v2Pool.Statements().GetJSONSchemaByID(ctx, projectID, schemaID)
+	schema, err := s.builtinBases.GetJSONSchema(ctx, s.v2Pool.Statements(), projectID, schemaID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrJSONSchemaNotFound()

@@ -52,7 +52,7 @@ func newPasswordHandlerFixture(t *testing.T) *passwordHandlerFixture {
 	svcPool := service.NewPool(v2Pool)
 	stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&database.ListResult[*domain.JSONSchema]{}, nil).AnyTimes()
-	userService := service.NewUserService(svcPool, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}, service.StatementsUserRefResolver{Pool: svcPool})
+	userService := service.NewUserService(svcPool, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{})
 	handler := service.NewFlowCreateUserHandler(service.FixedProjectHasherResolver{Hasher: hasher}, userService, schemaStore, v2Pool)
 
 	return &passwordHandlerFixture{
