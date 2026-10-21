@@ -1,4 +1,4 @@
-import { docsLlms, source } from "@/lib/source";
+import { docsLlmsFull, source } from "@/lib/source";
 
 export const revalidate = false;
 
@@ -7,7 +7,7 @@ export async function GET() {
   // reference they would make this file twenty times its size. llms.txt lists
   // them, and each has its own .md.
   const pages = source.getPages().filter((page) => page.type !== "openapi");
-  const rendered = await Promise.all(pages.map((page) => docsLlms.page(page)));
+  const rendered = await Promise.all(pages.map((page) => docsLlmsFull.page(page)));
 
   return new Response(rendered.join("\n\n"));
 }

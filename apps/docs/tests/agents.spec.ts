@@ -4,9 +4,10 @@ import { jsonRpcMessage } from "./support";
 
 /**
  * What agents use besides the pages: the search the site's own dialog calls,
- * the MCP server, the plain-text answers, the Open Graph image. They live
- * under /docs beside the pages, so an agent asking for Markdown or plain text
- * must reach them unchanged: proxy.ts leaves them out of its matcher (#1685).
+ * the MCP server, the plain-text answers, the OpenAPI document, the Open Graph
+ * image. They live under /docs beside the pages, so an agent asking for
+ * Markdown or plain text must reach them unchanged: proxy.ts leaves them out
+ * of its matcher (#1685).
  */
 
 test("search answers JSON hits under /docs", async ({ request }) => {
@@ -25,6 +26,7 @@ test("the routes that are not pages answer an agent that asks for text", async (
     ["/docs/api/search?query=passkey", "application/json"],
     ["/docs/llms.txt", "text/plain"],
     ["/docs/llms-full.txt", "text/plain"],
+    ["/docs/openapi.json", "application/json"],
   ];
   for (const accept of ["text/plain", "text/markdown"]) {
     for (const [route, type] of routes) {
@@ -33,6 +35,42 @@ test("the routes that are not pages answer an agent that asks for text", async (
       expect(response.headers()["content-type"], `${route} for ${accept}`).toContain(type);
     }
   }
+});
+
+test("the whole OpenAPI document is served as JSON, and llms.txt links it", async ({ request }) => {
+  const response = await request.get("/docs/openapi.json");
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toContain("application/json");
+  const document = (await response.json()) as {
+    openapi: string;
+    info: { title: string };
+    paths: Record<string, unknown>;
+  };
+  expect(document.openapi).toMatch(/^3\.1\./);
+  expect(document.info.title).not.toBe("");
+  expect(Object.keys(document.paths).length).toBeGreaterThan(0);
+  // Bundled (scripts/bundle-openapi.mjs): every reference points into the
+  // document itself, at something there.
+  const refs = [...JSON.stringify(document).matchAll(/"\$ref":"([^"]*)"/g)].map(
+    ([, ref = ""]) => ref,
+  );
+  expect(refs.length).toBeGreaterThan(0);
+  const target = (ref: string) =>
+    ref
+      .slice(2)
+      .split("/")
+      .map((key) => decodeURIComponent(key).replace(/~1/g, "/").replace(/~0/g, "~"))
+      .reduce<unknown>(
+        (node, key) => (node as Record<string, unknown> | undefined)?.[key],
+        document,
+      );
+  expect(
+    [...new Set(refs)].filter((ref) => !ref.startsWith("#/") || target(ref) === undefined),
+    "references that do not resolve inside the document",
+  ).toEqual([]);
+
+  const index = await (await request.get("/docs/llms.txt")).text();
+  expect(index).toContain("](/docs/openapi.json)");
 });
 
 test("a page advertises its Open Graph image, and the image renders", async ({ request }) => {
