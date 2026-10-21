@@ -20,6 +20,7 @@ import {
 } from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
@@ -62,6 +63,10 @@ interface UsersPage {
 
 /** The User and schema-driven cells clamp at 280px and truncate. */
 const CLAMP = "max-w-70";
+// The row's copy button rests hidden and shows on the row's hover or its own
+// focus, so a keyboard reaches it; where there is no hover it always shows.
+const ROW_COPY =
+  "shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100";
 
 function UsersScreen() {
   const projectId = useRequiredProjectScope();
@@ -152,7 +157,7 @@ function UsersScreen() {
               </ResourceEmptyRow>
             ) : (
               rows.map((user) => (
-                <ResourceRow key={user.id}>
+                <ResourceRow key={user.id} className="group">
                   {/* The User column renders the server-resolved identity
                       (display → identifier → id, ADR 058 §3a) and carries the
                       link to the detail screen — schema-driven columns cannot
@@ -194,13 +199,19 @@ function UsersScreen() {
                   {/* The ID takes whatever width the other columns leave
                       (`w-full max-w-0`) and truncates inside it, so the
                       default schema's table fits a 1024px window without
-                      scrolling. The tooltip and a copy of the text keep the
-                      whole id. */}
-                  <TableCell
-                    className={`${RESOURCE_CELL} text-foreground w-full max-w-0 min-w-40 truncate text-sm`}
-                    title={user.id}
-                  >
-                    {user.id}
+                      scrolling. The tooltip keeps the whole id, and the copy
+                      button copies it however much of it shows. */}
+                  <TableCell className={`${RESOURCE_CELL} w-full max-w-0 min-w-40`}>
+                    <span className="flex items-center gap-1">
+                      <span className="text-foreground min-w-0 truncate text-sm" title={user.id}>
+                        {user.id}
+                      </span>
+                      <CopyButton
+                        value={user.id}
+                        label={`Copy the ID of ${user.name}`}
+                        className={ROW_COPY}
+                      />
+                    </span>
                   </TableCell>
                   <TableCell className={RESOURCE_CELL}>
                     <RowActions

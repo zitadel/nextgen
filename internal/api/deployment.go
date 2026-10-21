@@ -77,7 +77,7 @@ func (h *Handler) RemovePreview(ctx context.Context, _ *api.RemovePreviewRequest
 
 // deploymentErrorResponse maps the deployment error codes onto statuses.
 // dep.conflict is the failed expected_deployment_id check: the 409 details
-// carry the actual newest deployment to the targets.
+// carry the deployment the write would replace.
 func deploymentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrDeploymentNotFound().Code:

@@ -306,9 +306,11 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 	}
 	actions = append(actions, &ssoLinkAction{subject: in.Subject, bind: bind})
 	if err := r.users.ApplyActions(ctx, actions...); err != nil {
-		// Audited like a create through the user API.
-		emitUserCreateFailedBestEffort(ctx, r.db, createUser, err)
-		if errors.Is(err, domain.ErrUserInvalid()) {
+		if unique, ok := errors.AsType[*database.UniqueError](err); ok {
+			// Audited like a create through the user API.
+			emitUserCreateFailedBestEffort(ctx, r.db.Statements(), in.ProjectID, unique)
+		}
+		if domain.IsUserInvalid(err) {
 			// The validator's messages quote the values, so only where they
 			// failed is logged.
 			var locations []string

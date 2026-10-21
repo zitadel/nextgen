@@ -64,6 +64,8 @@ const (
 	ListEventsOperation                    OperationName = "ListEvents"
 	ListFlowDefinitionsOperation           OperationName = "ListFlowDefinitions"
 	ListIdpRevisionsOperation              OperationName = "ListIdpRevisions"
+	ListMyIdentityLinksOperation           OperationName = "ListMyIdentityLinks"
+	ListMyPasskeysOperation                OperationName = "ListMyPasskeys"
 	ListMyProjectsOperation                OperationName = "ListMyProjects"
 	ListMyTeamsOperation                   OperationName = "ListMyTeams"
 	ListPreviewsOperation                  OperationName = "ListPreviews"

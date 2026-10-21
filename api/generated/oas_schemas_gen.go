@@ -6676,11 +6676,13 @@ func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
 	s.Details = val
 }
 
-func (*AuthUnauthorized) completeClaimRes()   {}
-func (*AuthUnauthorized) getMyUserSchemaRes() {}
-func (*AuthUnauthorized) listMyProjectsRes()  {}
-func (*AuthUnauthorized) listMyTeamsRes()     {}
-func (*AuthUnauthorized) revokeMySessionRes() {}
+func (*AuthUnauthorized) completeClaimRes()       {}
+func (*AuthUnauthorized) getMyUserSchemaRes()     {}
+func (*AuthUnauthorized) listMyIdentityLinksRes() {}
+func (*AuthUnauthorized) listMyPasskeysRes()      {}
+func (*AuthUnauthorized) listMyProjectsRes()      {}
+func (*AuthUnauthorized) listMyTeamsRes()         {}
+func (*AuthUnauthorized) revokeMySessionRes()     {}
 
 // Additional error-specific context.
 type AuthUnauthorizedDetails map[string]jx.Raw
@@ -11745,142 +11747,106 @@ func (s *CreateAuthAttemptRequest) SetSessionID(val OptNilSessionID) {
 	s.SessionID = val
 }
 
-// Merged schema.
+// The deployment cannot be made, told apart by `code`; `req.invalid` is a
+// request the schema rejects.
 // Ref: #
+// CreateDeploymentBadRequest represents sum type.
 type CreateDeploymentBadRequest struct {
-	Code ErrorCode `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Merged property.
-	Details OptCreateDeploymentBadRequestDetails `json:"details"`
+	Type                       CreateDeploymentBadRequestType // switch on this field
+	DepInvalid                 DepInvalid
+	DeploymentVariablesMissing DeploymentVariablesMissing
+	ReqInvalid                 ReqInvalid
 }
 
-// GetCode returns the value of Code.
-func (s *CreateDeploymentBadRequest) GetCode() ErrorCode {
-	return s.Code
+// CreateDeploymentBadRequestType is oneOf type of CreateDeploymentBadRequest.
+type CreateDeploymentBadRequestType string
+
+// Possible values for CreateDeploymentBadRequestType.
+const (
+	DepInvalidCreateDeploymentBadRequest                 CreateDeploymentBadRequestType = "dep.invalid"
+	DeploymentVariablesMissingCreateDeploymentBadRequest CreateDeploymentBadRequestType = "dep.variables_missing"
+	ReqInvalidCreateDeploymentBadRequest                 CreateDeploymentBadRequestType = "req.invalid"
+)
+
+// IsDepInvalid reports whether CreateDeploymentBadRequest is DepInvalid.
+func (s CreateDeploymentBadRequest) IsDepInvalid() bool {
+	return s.Type == DepInvalidCreateDeploymentBadRequest
 }
 
-// GetMessage returns the value of Message.
-func (s *CreateDeploymentBadRequest) GetMessage() string {
-	return s.Message
+// IsDeploymentVariablesMissing reports whether CreateDeploymentBadRequest is DeploymentVariablesMissing.
+func (s CreateDeploymentBadRequest) IsDeploymentVariablesMissing() bool {
+	return s.Type == DeploymentVariablesMissingCreateDeploymentBadRequest
 }
 
-// GetDetails returns the value of Details.
-func (s *CreateDeploymentBadRequest) GetDetails() OptCreateDeploymentBadRequestDetails {
-	return s.Details
+// IsReqInvalid reports whether CreateDeploymentBadRequest is ReqInvalid.
+func (s CreateDeploymentBadRequest) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateDeploymentBadRequest
 }
 
-// SetCode sets the value of Code.
-func (s *CreateDeploymentBadRequest) SetCode(val ErrorCode) {
-	s.Code = val
+// SetDepInvalid sets CreateDeploymentBadRequest to DepInvalid.
+func (s *CreateDeploymentBadRequest) SetDepInvalid(v DepInvalid) {
+	s.Type = DepInvalidCreateDeploymentBadRequest
+	s.DepInvalid = v
 }
 
-// SetMessage sets the value of Message.
-func (s *CreateDeploymentBadRequest) SetMessage(val string) {
-	s.Message = val
+// GetDepInvalid returns DepInvalid and true boolean if CreateDeploymentBadRequest is DepInvalid.
+func (s CreateDeploymentBadRequest) GetDepInvalid() (v DepInvalid, ok bool) {
+	if !s.IsDepInvalid() {
+		return v, false
+	}
+	return s.DepInvalid, true
 }
 
-// SetDetails sets the value of Details.
-func (s *CreateDeploymentBadRequest) SetDetails(val OptCreateDeploymentBadRequestDetails) {
-	s.Details = val
+// NewDepInvalidCreateDeploymentBadRequest returns new CreateDeploymentBadRequest from DepInvalid.
+func NewDepInvalidCreateDeploymentBadRequest(v DepInvalid) CreateDeploymentBadRequest {
+	var s CreateDeploymentBadRequest
+	s.SetDepInvalid(v)
+	return s
+}
+
+// SetDeploymentVariablesMissing sets CreateDeploymentBadRequest to DeploymentVariablesMissing.
+func (s *CreateDeploymentBadRequest) SetDeploymentVariablesMissing(v DeploymentVariablesMissing) {
+	s.Type = DeploymentVariablesMissingCreateDeploymentBadRequest
+	s.DeploymentVariablesMissing = v
+}
+
+// GetDeploymentVariablesMissing returns DeploymentVariablesMissing and true boolean if CreateDeploymentBadRequest is DeploymentVariablesMissing.
+func (s CreateDeploymentBadRequest) GetDeploymentVariablesMissing() (v DeploymentVariablesMissing, ok bool) {
+	if !s.IsDeploymentVariablesMissing() {
+		return v, false
+	}
+	return s.DeploymentVariablesMissing, true
+}
+
+// NewDeploymentVariablesMissingCreateDeploymentBadRequest returns new CreateDeploymentBadRequest from DeploymentVariablesMissing.
+func NewDeploymentVariablesMissingCreateDeploymentBadRequest(v DeploymentVariablesMissing) CreateDeploymentBadRequest {
+	var s CreateDeploymentBadRequest
+	s.SetDeploymentVariablesMissing(v)
+	return s
+}
+
+// SetReqInvalid sets CreateDeploymentBadRequest to ReqInvalid.
+func (s *CreateDeploymentBadRequest) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateDeploymentBadRequest
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateDeploymentBadRequest is ReqInvalid.
+func (s CreateDeploymentBadRequest) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateDeploymentBadRequest returns new CreateDeploymentBadRequest from ReqInvalid.
+func NewReqInvalidCreateDeploymentBadRequest(v ReqInvalid) CreateDeploymentBadRequest {
+	var s CreateDeploymentBadRequest
+	s.SetReqInvalid(v)
+	return s
 }
 
 func (*CreateDeploymentBadRequest) createDeploymentRes() {}
-
-// Merged schema.
-type CreateDeploymentBadRequestDetails struct {
-	// Whether the deployment targets primary origins or preview URLs:
-	// the kind whose variable values it would freeze.
-	Kind CreateDeploymentBadRequestDetailsKind `json:"kind"`
-	// Every variable the release references with no value stored for
-	// that kind, sorted.
-	Names           []string `json:"names"`
-	AdditionalProps CreateDeploymentBadRequestDetailsAdditional
-}
-
-// GetKind returns the value of Kind.
-func (s *CreateDeploymentBadRequestDetails) GetKind() CreateDeploymentBadRequestDetailsKind {
-	return s.Kind
-}
-
-// GetNames returns the value of Names.
-func (s *CreateDeploymentBadRequestDetails) GetNames() []string {
-	return s.Names
-}
-
-// GetAdditionalProps returns the value of AdditionalProps.
-func (s *CreateDeploymentBadRequestDetails) GetAdditionalProps() CreateDeploymentBadRequestDetailsAdditional {
-	return s.AdditionalProps
-}
-
-// SetKind sets the value of Kind.
-func (s *CreateDeploymentBadRequestDetails) SetKind(val CreateDeploymentBadRequestDetailsKind) {
-	s.Kind = val
-}
-
-// SetNames sets the value of Names.
-func (s *CreateDeploymentBadRequestDetails) SetNames(val []string) {
-	s.Names = val
-}
-
-// SetAdditionalProps sets the value of AdditionalProps.
-func (s *CreateDeploymentBadRequestDetails) SetAdditionalProps(val CreateDeploymentBadRequestDetailsAdditional) {
-	s.AdditionalProps = val
-}
-
-type CreateDeploymentBadRequestDetailsAdditional map[string]jx.Raw
-
-func (s *CreateDeploymentBadRequestDetailsAdditional) init() CreateDeploymentBadRequestDetailsAdditional {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Whether the deployment targets primary origins or preview URLs:
-// the kind whose variable values it would freeze.
-type CreateDeploymentBadRequestDetailsKind string
-
-const (
-	CreateDeploymentBadRequestDetailsKindPrimary CreateDeploymentBadRequestDetailsKind = "primary"
-	CreateDeploymentBadRequestDetailsKindPreview CreateDeploymentBadRequestDetailsKind = "preview"
-)
-
-// AllValues returns all CreateDeploymentBadRequestDetailsKind values.
-func (CreateDeploymentBadRequestDetailsKind) AllValues() []CreateDeploymentBadRequestDetailsKind {
-	return []CreateDeploymentBadRequestDetailsKind{
-		CreateDeploymentBadRequestDetailsKindPrimary,
-		CreateDeploymentBadRequestDetailsKindPreview,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s CreateDeploymentBadRequestDetailsKind) MarshalText() ([]byte, error) {
-	switch s {
-	case CreateDeploymentBadRequestDetailsKindPrimary:
-		return []byte(s), nil
-	case CreateDeploymentBadRequestDetailsKindPreview:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *CreateDeploymentBadRequestDetailsKind) UnmarshalText(data []byte) error {
-	switch CreateDeploymentBadRequestDetailsKind(data) {
-	case CreateDeploymentBadRequestDetailsKindPrimary:
-		*s = CreateDeploymentBadRequestDetailsKindPrimary
-		return nil
-	case CreateDeploymentBadRequestDetailsKindPreview:
-		*s = CreateDeploymentBadRequestDetailsKindPreview
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
 
 type CreateDeploymentCreated Deployment
 
@@ -12122,45 +12088,40 @@ func (s *CreateDeploymentErrorResponseStatusCode) SetResponse(val CreateDeployme
 
 func (*CreateDeploymentErrorResponseStatusCode) createDeploymentRes() {}
 
+type CreateDeploymentForbidden ErrorDetails
+
+func (*CreateDeploymentForbidden) createDeploymentRes() {}
+
+type CreateDeploymentNotFound ErrorDetails
+
+func (*CreateDeploymentNotFound) createDeploymentRes() {}
+
 type CreateDeploymentOK Deployment
 
 func (*CreateDeploymentOK) createDeploymentRes() {}
 
-// The release to make live and the targets to make it live on. The release
-// is named by exactly one of `release_id` or `content_hash`; a request with
-// both or neither answers `400` with `dep.invalid`.
-// `deployed_at` and `deployed_by` are derived server-side from the caller's
-// authentication context and are not accepted here.
+// The release to make live, named by exactly one of `release_id` or
+// `content_hash`, and the targets to make it live on.
 // Ref: #
 type CreateDeploymentRequest struct {
-	// The release to make live. Must exist in the project; deploying never
-	// assembles a release.
+	// The release to make live.
 	ReleaseID OptReleaseID `json:"release_id"`
 	// The content digest of the release to make live, in full with its
-	// `sha256:` prefix. A digest no release of the project carries answers
-	// `404` with `rel.not_found`; deploying never assembles a release.
+	// `sha256:` prefix.
 	ContentHash OptReleaseContentHash    `json:"content_hash"`
 	Targets     DeploymentTargetsRequest `json:"targets"`
-	// How long each preview URL in `targets` stays live, counted from this
-	// deployment. Every preview it writes gets the same expiry, renewing a
-	// preview that already exists. Omitted, the project's default applies; a
-	// value above the project's maximum answers `400` with `dep.invalid`.
-	// Only valid when the targets are preview URLs: with primary origins it
-	// answers `400` with `dep.invalid`.
+	// Preview URLs only: how long each preview stays live, counted from this
+	// deployment. Omitted, the project's default applies.
 	TTL OptPreviewTTL `json:"ttl"`
 	// Why this deployment happens. Omitted, the server records `deploy`.
 	Reason OptDeploymentReason `json:"reason"`
-	// A short free-form summary of why this deployment happened, analogous to
-	// a git commit message. Recorded on the deployment's metadata and shown
-	// when listing the history.
+	// A short free-form summary of why this deployment happened, recorded on
+	// its metadata.
 	Message OptString `json:"message"`
-	// An optimistic-concurrency guard: the deployment the caller believes is
-	// the newest one to any of its targets. When present, the deployment
-	// is only created if the newest deployment to any of the resolved
-	// targets is exactly this one; otherwise the request answers `409`
-	// with `dep.conflict`, carrying the actual newest deployment, and
-	// nothing changes.
-	// Not persisted; it guards the write, it is not part of the record.
+	// Deploy only if the deployment this write replaces — the project's
+	// newest primary deployment, or the newest deployment to any of the
+	// preview URLs — is this one. Otherwise the request fails with
+	// `409 dep.conflict` and nothing changes. Not stored.
 	ExpectedDeploymentID OptDeploymentID `json:"expected_deployment_id"`
 }
 
@@ -16598,7 +16559,7 @@ type CreateUserRequest struct {
 	// created using the `/schemas` endpoint. A default schema is provided.
 	Schema string `json:"schema"`
 	// The user's schema-defined content. Validated against `schema`; a
-	// property the schema does not permit is rejected with `user.invalid`.
+	// property the schema does not permit is rejected with `req.invalid`.
 	Attributes CreateUserRequestAttributes `json:"attributes"`
 }
 
@@ -16623,7 +16584,7 @@ func (s *CreateUserRequest) SetAttributes(val CreateUserRequestAttributes) {
 }
 
 // The user's schema-defined content. Validated against `schema`; a
-// property the schema does not permit is rejected with `user.invalid`.
+// property the schema does not permit is rejected with `req.invalid`.
 type CreateUserRequestAttributes map[string]jx.Raw
 
 func (s *CreateUserRequestAttributes) init() CreateUserRequestAttributes {
@@ -17423,6 +17384,59 @@ func (*DeleteVariableNoContent) deleteVariableRes() {}
 
 // Merged schema.
 // Ref: #
+type DepInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptDepInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *DepInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *DepInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *DepInvalid) GetDetails() OptDepInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *DepInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *DepInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *DepInvalid) SetDetails(val OptDepInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type DepInvalidDetails map[string]jx.Raw
+
+func (s *DepInvalidDetails) init() DepInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type DepNotFound struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -17527,15 +17541,12 @@ func (s *DepPermissionDeniedDetails) init() DepPermissionDeniedDetails {
 	return m
 }
 
-// An immutable record of a release being made live on a set of targets.
-// Deploying and rolling back both create a deployment. The record is what
-// ran where and when — the release, the targets and the timestamp — plus
-// metadata saying why and who. It is append-only: written once, in one
-// transaction for all of its targets, and never changed afterwards, so the
-// deployment log is the audit trail of what ran where.
-// A target serves the release of the newest deployment that targeted it.
-// An older deployment stays in the history after a newer one replaces it on
-// some or all of its targets.
+// An immutable record of a release made live on a set of targets. Deploying
+// and rolling back each append one, so the history is the audit trail.
+// All primary origins serve the project's newest primary deployment; one
+// added after it serves nothing until the next deployment to `primary`. A
+// preview URL serves the newest deployment to it while its preview is live.
+// Every field is fixed at creation except `status`, which is read as of now.
 // Ref: #
 type Deployment struct {
 	// The opaque, immutable resource id, assigned at creation.
@@ -17544,11 +17555,12 @@ type Deployment struct {
 	ProjectID ProjectID `json:"project_id"`
 	// The release this deployment made live. Always the release id, also
 	// when the request named the release by `content_hash`.
-	ReleaseID ReleaseID `json:"release_id"`
-	// The origins this deployment made the release live on, as resolved when
-	// it was created: `primary` appears here as the origins it expanded to.
-	// Sorted by origin.
+	ReleaseID ReleaseID      `json:"release_id"`
+	Kind      DeploymentKind `json:"kind"`
+	// The resolved origins, sorted. For `primary`, the project's primary
+	// origins at creation. The live view lists only the targets still served.
 	Targets []DeploymentTarget `json:"targets"`
+	Status  DeploymentStatus   `json:"status"`
 	// When the deployment was created.
 	DeployedAt time.Time          `json:"deployed_at"`
 	Metadata   DeploymentMetadata `json:"metadata"`
@@ -17573,9 +17585,19 @@ func (s *Deployment) GetReleaseID() ReleaseID {
 	return s.ReleaseID
 }
 
+// GetKind returns the value of Kind.
+func (s *Deployment) GetKind() DeploymentKind {
+	return s.Kind
+}
+
 // GetTargets returns the value of Targets.
 func (s *Deployment) GetTargets() []DeploymentTarget {
 	return s.Targets
+}
+
+// GetStatus returns the value of Status.
+func (s *Deployment) GetStatus() DeploymentStatus {
+	return s.Status
 }
 
 // GetDeployedAt returns the value of DeployedAt.
@@ -17608,9 +17630,19 @@ func (s *Deployment) SetReleaseID(val ReleaseID) {
 	s.ReleaseID = val
 }
 
+// SetKind sets the value of Kind.
+func (s *Deployment) SetKind(val DeploymentKind) {
+	s.Kind = val
+}
+
 // SetTargets sets the value of Targets.
 func (s *Deployment) SetTargets(val []DeploymentTarget) {
 	s.Targets = val
+}
+
+// SetStatus sets the value of Status.
+func (s *Deployment) SetStatus(val DeploymentStatus) {
+	s.Status = val
 }
 
 // SetDeployedAt sets the value of DeployedAt.
@@ -17630,10 +17662,8 @@ func (s *Deployment) SetRelease(val OptRelease) {
 
 func (*Deployment) getDeploymentByIdRes() {}
 
-// The deployment conflicts with the state of the project, told apart by
-// `code`: `dep.conflict` when `expected_deployment_id` did not match,
-// carrying the actual newest deployment, or `rel.revoked` when the release
-// is revoked.
+// The deployment conflicts with the project, told apart by `code`:
+// `dep.conflict` (guard mismatch) or `rel.revoked`.
 // Ref: #
 // DeploymentConflict represents sum type.
 type DeploymentConflict struct {
@@ -18289,8 +18319,7 @@ func (s *DeploymentExpand) UnmarshalText(data []byte) error {
 	}
 }
 
-// `expected_deployment_id` did not match: another deployment reached the
-// targets first.
+// `expected_deployment_id` is not the deployment this write replaces.
 // Ref: #
 type DeploymentGuardConflict struct {
 	Code string `json:"code"`
@@ -18330,9 +18359,8 @@ func (s *DeploymentGuardConflict) SetDetails(val DeploymentGuardConflictDetails)
 }
 
 type DeploymentGuardConflictDetails struct {
-	// The actual newest deployment to the targets, to inspect before
-	// retrying with its id as `expected_deployment_id`. Null when nothing
-	// has been deployed to any of the targets yet.
+	// The deployment this write replaces, null when there is none. Retry
+	// with its id as `expected_deployment_id`.
 	Deployment NilDeployment `json:"deployment"`
 }
 
@@ -18348,24 +18376,60 @@ func (s *DeploymentGuardConflictDetails) SetDeployment(val NilDeployment) {
 
 type DeploymentID string
 
-// Why the release went live and who made it happen. Set when the deployment
-// is created and never mutated afterwards — enrichment of the record, while
-// the release, targets and timestamp on the deployment itself say what ran
-// where and when.
+// `primary` for the project's primary origins, `preview` for preview URLs.
+// Ref: #
+type DeploymentKind string
+
+const (
+	DeploymentKindPrimary DeploymentKind = "primary"
+	DeploymentKindPreview DeploymentKind = "preview"
+)
+
+// AllValues returns all DeploymentKind values.
+func (DeploymentKind) AllValues() []DeploymentKind {
+	return []DeploymentKind{
+		DeploymentKindPrimary,
+		DeploymentKindPreview,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s DeploymentKind) MarshalText() ([]byte, error) {
+	switch s {
+	case DeploymentKindPrimary:
+		return []byte(s), nil
+	case DeploymentKindPreview:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *DeploymentKind) UnmarshalText(data []byte) error {
+	switch DeploymentKind(data) {
+	case DeploymentKindPrimary:
+		*s = DeploymentKindPrimary
+		return nil
+	case DeploymentKindPreview:
+		*s = DeploymentKindPreview
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Why the release went live and who made it happen.
 // Ref: #
 type DeploymentMetadata struct {
 	Reason DeploymentReason `json:"reason"`
 	// The caller-supplied summary of why this deployment happened, analogous
 	// to a git commit message.
 	Message OptNilString `json:"message"`
-	// The deployment `POST /deployments/{deployment_id}/rollback` re-applied,
-	// with its release and its targets. Null or absent for every other
-	// deployment, including one created by `POST /deployments` with
-	// `reason: rollback`.
+	// The deployment the rollback operation re-applied; null otherwise.
 	RollbackTo OptNilDeploymentID `json:"rollback_to"`
-	// The identity that created the deployment. Absent when the caller is a
-	// machine principal carrying no user identity, which is the common case
-	// for deployments made from CI.
+	// The identity that created the deployment. Null when the caller is a
+	// machine principal carrying no user identity, as from CI.
 	DeployedBy OptNilString `json:"deployed_by"`
 	// What kind of principal `deployed_by` names.
 	DeployedByType OptNilDeploymentMetadataDeployedByType `json:"deployed_by_type"`
@@ -18476,13 +18540,9 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Why the deployment was created. Both are the same operation — a new
-// deployment making a release live on its targets — and the reason records
-// the caller's intent:
-// - `deploy` — a release goes live on the targets.
-// - `rollback` — a release the targets served earlier goes live again.
-// `POST /deployments/{deployment_id}/rollback` records it, and so may
-// `POST /deployments` when the caller picks the earlier release itself.
+// Why the deployment was created: `deploy`, or `rollback` when an earlier
+// release goes live again. The rollback operation always records `rollback`;
+// `POST /deployments` may too, and then `rollback_to` is null.
 // Ref: #
 type DeploymentReason string
 
@@ -18525,16 +18585,58 @@ func (s *DeploymentReason) UnmarshalText(data []byte) error {
 	}
 }
 
+// Whether the deployment serves its release now.
+// - `live` — at least one of its targets serves it now.
+// - `inactive` — none does: a later deployment replaced it, or its previews
+// expired or were removed.
+// Ref: #
+type DeploymentStatus string
+
+const (
+	DeploymentStatusLive     DeploymentStatus = "live"
+	DeploymentStatusInactive DeploymentStatus = "inactive"
+)
+
+// AllValues returns all DeploymentStatus values.
+func (DeploymentStatus) AllValues() []DeploymentStatus {
+	return []DeploymentStatus{
+		DeploymentStatusLive,
+		DeploymentStatusInactive,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s DeploymentStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case DeploymentStatusLive:
+		return []byte(s), nil
+	case DeploymentStatusInactive:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *DeploymentStatus) UnmarshalText(data []byte) error {
+	switch DeploymentStatus(data) {
+	case DeploymentStatusLive:
+		*s = DeploymentStatusLive
+		return nil
+	case DeploymentStatusInactive:
+		*s = DeploymentStatusInactive
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // One origin a deployment made its release live on.
 // Ref: #
 type DeploymentTarget struct {
 	Origin Origin `json:"origin"`
-	// Present only on a target that is a preview URL: the expiry this
-	// deployment set for its preview. Fixed when the deployment is created,
-	// like the rest of the record: a later deployment to the URL renews the
-	// preview and records its own expiry, and removing the preview or
-	// letting it expire leaves this value as it was. Absent on a primary
-	// origin, which does not expire.
+	// Preview URLs only: the expiry this deployment set. A later deployment
+	// to the URL records its own.
 	ExpiresAt OptDateTime `json:"expires_at"`
 }
 
@@ -18559,6 +18661,73 @@ func (s *DeploymentTarget) SetExpiresAt(val OptDateTime) {
 }
 
 type DeploymentTargetsRequest []string
+
+// The release references variables the project holds no value for.
+// Ref: #
+type DeploymentVariablesMissing struct {
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string                            `json:"message"`
+	Details DeploymentVariablesMissingDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *DeploymentVariablesMissing) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *DeploymentVariablesMissing) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *DeploymentVariablesMissing) GetDetails() DeploymentVariablesMissingDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *DeploymentVariablesMissing) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *DeploymentVariablesMissing) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *DeploymentVariablesMissing) SetDetails(val DeploymentVariablesMissingDetails) {
+	s.Details = val
+}
+
+type DeploymentVariablesMissingDetails struct {
+	// The kind whose variable values the deployment would freeze.
+	Kind DeploymentKind `json:"kind"`
+	// Every variable the release references with no value stored for
+	// that kind, sorted.
+	Names []string `json:"names"`
+}
+
+// GetKind returns the value of Kind.
+func (s *DeploymentVariablesMissingDetails) GetKind() DeploymentKind {
+	return s.Kind
+}
+
+// GetNames returns the value of Names.
+func (s *DeploymentVariablesMissingDetails) GetNames() []string {
+	return s.Names
+}
+
+// SetKind sets the value of Kind.
+func (s *DeploymentVariablesMissingDetails) SetKind(val DeploymentKind) {
+	s.Kind = val
+}
+
+// SetNames sets the value of Names.
+func (s *DeploymentVariablesMissingDetails) SetNames(val []string) {
+	s.Names = val
+}
 
 // Empty payload for event types with no typed fields
 // (e.g. `project.deleted`, `user.deleted`, `session.expired`).
@@ -18881,8 +19050,11 @@ func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
+func (*ErrorDetails) listMyIdentityLinksRes()  {}
+func (*ErrorDetails) listMyPasskeysRes()       {}
 func (*ErrorDetails) listMyTeamsRes()          {}
 func (*ErrorDetails) revokeMySessionRes()      {}
+func (*ErrorDetails) rollbackDeploymentRes()   {}
 func (*ErrorDetails) submitFlowStepRes()       {}
 
 // Additional error-specific context.
@@ -35079,10 +35251,7 @@ func (s *ListDeploymentsErrorResponseStatusCode) SetResponse(val ListDeployments
 
 func (*ListDeploymentsErrorResponseStatusCode) listDeploymentsRes() {}
 
-// Deployments, newest first.
-// In the history (the default), each deployment carries every target it
-// made the release live on. In the live view (`live=true`), each deployment
-// carries only the targets it still serves.
+// One page of deployments, ordered as the operation describes.
 // Ref: #
 type ListDeploymentsResponse struct {
 	Deployments []Deployment `json:"deployments"`
@@ -35891,6 +36060,366 @@ func (*ListIdpRevisionsResponse) listIdpRevisionsRes() {}
 type ListIdpRevisionsUnauthorized ErrorDetails
 
 func (*ListIdpRevisionsUnauthorized) listIdpRevisionsRes() {}
+
+// ListMyIdentityLinksErrorResponse represents sum type.
+type ListMyIdentityLinksErrorResponse struct {
+	Type                ListMyIdentityLinksErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
+}
+
+// ListMyIdentityLinksErrorResponseType is oneOf type of ListMyIdentityLinksErrorResponse.
+type ListMyIdentityLinksErrorResponseType string
+
+// Possible values for ListMyIdentityLinksErrorResponseType.
+const (
+	AuthUnauthorizedListMyIdentityLinksErrorResponse    ListMyIdentityLinksErrorResponseType = "auth.unauthorized"
+	InternalListMyIdentityLinksErrorResponse            ListMyIdentityLinksErrorResponseType = "internal"
+	ReqInvalidListMyIdentityLinksErrorResponse          ListMyIdentityLinksErrorResponseType = "req.invalid"
+	SessProjectMismatchListMyIdentityLinksErrorResponse ListMyIdentityLinksErrorResponseType = "sess.project_mismatch"
+	UserNotFoundListMyIdentityLinksErrorResponse        ListMyIdentityLinksErrorResponseType = "user.not_found"
+)
+
+// IsAuthUnauthorized reports whether ListMyIdentityLinksErrorResponse is AuthUnauthorized.
+func (s ListMyIdentityLinksErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListMyIdentityLinksErrorResponse
+}
+
+// IsInternal reports whether ListMyIdentityLinksErrorResponse is Internal.
+func (s ListMyIdentityLinksErrorResponse) IsInternal() bool {
+	return s.Type == InternalListMyIdentityLinksErrorResponse
+}
+
+// IsReqInvalid reports whether ListMyIdentityLinksErrorResponse is ReqInvalid.
+func (s ListMyIdentityLinksErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListMyIdentityLinksErrorResponse
+}
+
+// IsSessProjectMismatch reports whether ListMyIdentityLinksErrorResponse is SessProjectMismatch.
+func (s ListMyIdentityLinksErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchListMyIdentityLinksErrorResponse
+}
+
+// IsUserNotFound reports whether ListMyIdentityLinksErrorResponse is UserNotFound.
+func (s ListMyIdentityLinksErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundListMyIdentityLinksErrorResponse
+}
+
+// SetAuthUnauthorized sets ListMyIdentityLinksErrorResponse to AuthUnauthorized.
+func (s *ListMyIdentityLinksErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListMyIdentityLinksErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListMyIdentityLinksErrorResponse is AuthUnauthorized.
+func (s ListMyIdentityLinksErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListMyIdentityLinksErrorResponse(v AuthUnauthorized) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListMyIdentityLinksErrorResponse to Internal.
+func (s *ListMyIdentityLinksErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListMyIdentityLinksErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListMyIdentityLinksErrorResponse is Internal.
+func (s ListMyIdentityLinksErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from Internal.
+func NewInternalListMyIdentityLinksErrorResponse(v Internal) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListMyIdentityLinksErrorResponse to ReqInvalid.
+func (s *ListMyIdentityLinksErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListMyIdentityLinksErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListMyIdentityLinksErrorResponse is ReqInvalid.
+func (s ListMyIdentityLinksErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from ReqInvalid.
+func NewReqInvalidListMyIdentityLinksErrorResponse(v ReqInvalid) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets ListMyIdentityLinksErrorResponse to SessProjectMismatch.
+func (s *ListMyIdentityLinksErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchListMyIdentityLinksErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if ListMyIdentityLinksErrorResponse is SessProjectMismatch.
+func (s ListMyIdentityLinksErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchListMyIdentityLinksErrorResponse(v SessProjectMismatch) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUserNotFound sets ListMyIdentityLinksErrorResponse to UserNotFound.
+func (s *ListMyIdentityLinksErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundListMyIdentityLinksErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if ListMyIdentityLinksErrorResponse is UserNotFound.
+func (s ListMyIdentityLinksErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from UserNotFound.
+func NewUserNotFoundListMyIdentityLinksErrorResponse(v UserNotFound) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// ListMyIdentityLinksErrorResponseStatusCode wraps ListMyIdentityLinksErrorResponse with StatusCode.
+type ListMyIdentityLinksErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListMyIdentityLinksErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListMyIdentityLinksErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyIdentityLinksErrorResponseStatusCode) GetResponse() ListMyIdentityLinksErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListMyIdentityLinksErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyIdentityLinksErrorResponseStatusCode) SetResponse(val ListMyIdentityLinksErrorResponse) {
+	s.Response = val
+}
+
+func (*ListMyIdentityLinksErrorResponseStatusCode) listMyIdentityLinksRes() {}
+
+// ListMyPasskeysErrorResponse represents sum type.
+type ListMyPasskeysErrorResponse struct {
+	Type                ListMyPasskeysErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
+}
+
+// ListMyPasskeysErrorResponseType is oneOf type of ListMyPasskeysErrorResponse.
+type ListMyPasskeysErrorResponseType string
+
+// Possible values for ListMyPasskeysErrorResponseType.
+const (
+	AuthUnauthorizedListMyPasskeysErrorResponse    ListMyPasskeysErrorResponseType = "auth.unauthorized"
+	InternalListMyPasskeysErrorResponse            ListMyPasskeysErrorResponseType = "internal"
+	ReqInvalidListMyPasskeysErrorResponse          ListMyPasskeysErrorResponseType = "req.invalid"
+	SessProjectMismatchListMyPasskeysErrorResponse ListMyPasskeysErrorResponseType = "sess.project_mismatch"
+	UserNotFoundListMyPasskeysErrorResponse        ListMyPasskeysErrorResponseType = "user.not_found"
+)
+
+// IsAuthUnauthorized reports whether ListMyPasskeysErrorResponse is AuthUnauthorized.
+func (s ListMyPasskeysErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListMyPasskeysErrorResponse
+}
+
+// IsInternal reports whether ListMyPasskeysErrorResponse is Internal.
+func (s ListMyPasskeysErrorResponse) IsInternal() bool {
+	return s.Type == InternalListMyPasskeysErrorResponse
+}
+
+// IsReqInvalid reports whether ListMyPasskeysErrorResponse is ReqInvalid.
+func (s ListMyPasskeysErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListMyPasskeysErrorResponse
+}
+
+// IsSessProjectMismatch reports whether ListMyPasskeysErrorResponse is SessProjectMismatch.
+func (s ListMyPasskeysErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchListMyPasskeysErrorResponse
+}
+
+// IsUserNotFound reports whether ListMyPasskeysErrorResponse is UserNotFound.
+func (s ListMyPasskeysErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundListMyPasskeysErrorResponse
+}
+
+// SetAuthUnauthorized sets ListMyPasskeysErrorResponse to AuthUnauthorized.
+func (s *ListMyPasskeysErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListMyPasskeysErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListMyPasskeysErrorResponse is AuthUnauthorized.
+func (s ListMyPasskeysErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListMyPasskeysErrorResponse(v AuthUnauthorized) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListMyPasskeysErrorResponse to Internal.
+func (s *ListMyPasskeysErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListMyPasskeysErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListMyPasskeysErrorResponse is Internal.
+func (s ListMyPasskeysErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from Internal.
+func NewInternalListMyPasskeysErrorResponse(v Internal) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListMyPasskeysErrorResponse to ReqInvalid.
+func (s *ListMyPasskeysErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListMyPasskeysErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListMyPasskeysErrorResponse is ReqInvalid.
+func (s ListMyPasskeysErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from ReqInvalid.
+func NewReqInvalidListMyPasskeysErrorResponse(v ReqInvalid) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets ListMyPasskeysErrorResponse to SessProjectMismatch.
+func (s *ListMyPasskeysErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchListMyPasskeysErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if ListMyPasskeysErrorResponse is SessProjectMismatch.
+func (s ListMyPasskeysErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchListMyPasskeysErrorResponse(v SessProjectMismatch) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUserNotFound sets ListMyPasskeysErrorResponse to UserNotFound.
+func (s *ListMyPasskeysErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundListMyPasskeysErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if ListMyPasskeysErrorResponse is UserNotFound.
+func (s ListMyPasskeysErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from UserNotFound.
+func NewUserNotFoundListMyPasskeysErrorResponse(v UserNotFound) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// ListMyPasskeysErrorResponseStatusCode wraps ListMyPasskeysErrorResponse with StatusCode.
+type ListMyPasskeysErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListMyPasskeysErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListMyPasskeysErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyPasskeysErrorResponseStatusCode) GetResponse() ListMyPasskeysErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListMyPasskeysErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyPasskeysErrorResponseStatusCode) SetResponse(val ListMyPasskeysErrorResponse) {
+	s.Response = val
+}
+
+func (*ListMyPasskeysErrorResponseStatusCode) listMyPasskeysRes() {}
 
 type ListMyProjectsBadRequest ErrorDetails
 
@@ -37253,6 +37782,34 @@ func (s *ListUserIdentityLinksResponse) SetNextPageToken(val OptNilPageToken) {
 
 func (*ListUserIdentityLinksResponse) listUserIdentityLinksRes() {}
 
+// ListUserIdentityLinksResponseHeaders wraps ListUserIdentityLinksResponse with response headers.
+type ListUserIdentityLinksResponseHeaders struct {
+	CacheControl OptString
+	Response     ListUserIdentityLinksResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *ListUserIdentityLinksResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *ListUserIdentityLinksResponseHeaders) GetResponse() ListUserIdentityLinksResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *ListUserIdentityLinksResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListUserIdentityLinksResponseHeaders) SetResponse(val ListUserIdentityLinksResponse) {
+	s.Response = val
+}
+
+func (*ListUserIdentityLinksResponseHeaders) listMyIdentityLinksRes() {}
+
 type ListUserIdentityLinksUnauthorized ErrorDetails
 
 func (*ListUserIdentityLinksUnauthorized) listUserIdentityLinksRes() {}
@@ -37483,6 +38040,34 @@ func (s *ListUserPasskeysResponse) SetNextPageToken(val OptNilPageToken) {
 }
 
 func (*ListUserPasskeysResponse) listUserPasskeysRes() {}
+
+// ListUserPasskeysResponseHeaders wraps ListUserPasskeysResponse with response headers.
+type ListUserPasskeysResponseHeaders struct {
+	CacheControl OptString
+	Response     ListUserPasskeysResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *ListUserPasskeysResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *ListUserPasskeysResponseHeaders) GetResponse() ListUserPasskeysResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *ListUserPasskeysResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListUserPasskeysResponseHeaders) SetResponse(val ListUserPasskeysResponse) {
+	s.Response = val
+}
+
+func (*ListUserPasskeysResponseHeaders) listMyPasskeysRes() {}
 
 type ListUserPasskeysResponsePasskeysItem struct {
 	// The unique identifier of the passkey.
@@ -40003,52 +40588,6 @@ func (o OptCompletedFactorPayload) Or(d CompletedFactorPayload) CompletedFactorP
 	return d
 }
 
-// NewOptCreateDeploymentBadRequestDetails returns new OptCreateDeploymentBadRequestDetails with value set to v.
-func NewOptCreateDeploymentBadRequestDetails(v CreateDeploymentBadRequestDetails) OptCreateDeploymentBadRequestDetails {
-	return OptCreateDeploymentBadRequestDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptCreateDeploymentBadRequestDetails is optional CreateDeploymentBadRequestDetails.
-type OptCreateDeploymentBadRequestDetails struct {
-	Value CreateDeploymentBadRequestDetails
-	Set   bool
-}
-
-// IsSet returns true if OptCreateDeploymentBadRequestDetails was set.
-func (o OptCreateDeploymentBadRequestDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptCreateDeploymentBadRequestDetails) Reset() {
-	var v CreateDeploymentBadRequestDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptCreateDeploymentBadRequestDetails) SetTo(v CreateDeploymentBadRequestDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptCreateDeploymentBadRequestDetails) Get() (v CreateDeploymentBadRequestDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptCreateDeploymentBadRequestDetails) Or(d CreateDeploymentBadRequestDetails) CreateDeploymentBadRequestDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptCreateSessionRequestUserAgent returns new OptCreateSessionRequestUserAgent with value set to v.
 func NewOptCreateSessionRequestUserAgent(v CreateSessionRequestUserAgent) OptCreateSessionRequestUserAgent {
 	return OptCreateSessionRequestUserAgent{
@@ -40135,6 +40674,52 @@ func (o OptDateTime) Get() (v time.Time, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptDepInvalidDetails returns new OptDepInvalidDetails with value set to v.
+func NewOptDepInvalidDetails(v DepInvalidDetails) OptDepInvalidDetails {
+	return OptDepInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDepInvalidDetails is optional DepInvalidDetails.
+type OptDepInvalidDetails struct {
+	Value DepInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptDepInvalidDetails was set.
+func (o OptDepInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDepInvalidDetails) Reset() {
+	var v DepInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDepInvalidDetails) SetTo(v DepInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDepInvalidDetails) Get() (v DepInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDepInvalidDetails) Or(d DepInvalidDetails) DepInvalidDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -56318,7 +56903,7 @@ func (*PatchUserByIDUnauthorized) patchUserByIDRes() {}
 // key stays untouched, an object merges recursively, `null` deletes the
 // attribute, and any other value replaces the stored one. The merged result
 // is validated as a whole against the user's schema, so a patch that deletes
-// or invalidates a required property is rejected with `user.invalid`.
+// or invalidates a required property is rejected with `req.invalid`.
 // `schema` moves the user to another registered schema — the ADR 009 §4
 // upgrade mechanism. The target must be a revision of the user's current
 // schema (the same `objectType`), newer or older; a schema of another
@@ -64530,10 +65115,6 @@ type RevokeSessionUnauthorized ErrorDetails
 
 func (*RevokeSessionUnauthorized) revokeSessionRes() {}
 
-type RollbackDeploymentBadRequest ErrorDetails
-
-func (*RollbackDeploymentBadRequest) rollbackDeploymentRes() {}
-
 type RollbackDeploymentCreated Deployment
 
 func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
@@ -64774,26 +65355,20 @@ func (s *RollbackDeploymentErrorResponseStatusCode) SetResponse(val RollbackDepl
 
 func (*RollbackDeploymentErrorResponseStatusCode) rollbackDeploymentRes() {}
 
-type RollbackDeploymentForbidden ErrorDetails
-
-func (*RollbackDeploymentForbidden) rollbackDeploymentRes() {}
-
 type RollbackDeploymentOK Deployment
 
 func (*RollbackDeploymentOK) rollbackDeploymentRes() {}
 
-// What to record alongside the rollback. The release and the targets come
-// from the deployment named in the path and cannot be changed here.
+// What to record alongside the rollback; the release, variable values and
+// targets are not chosen here.
 // Ref: #
 type RollbackDeploymentRequest struct {
 	// A short free-form summary of why the rollback happened. Recorded on
 	// the new deployment's metadata.
 	Message OptString `json:"message"`
-	// An optimistic-concurrency guard: the deployment the caller believes is
-	// the newest one to any of the targets. When present, the rollback only
-	// happens if it still is; otherwise the request answers `409` with
-	// `dep.conflict`, carrying the actual newest deployment, and nothing
-	// changes.
+	// Roll back only if the project's newest primary deployment is this one.
+	// Otherwise the request fails with `409 dep.conflict` and nothing
+	// changes. Not stored.
 	ExpectedDeploymentID OptDeploymentID `json:"expected_deployment_id"`
 }
 
@@ -66488,10 +67063,12 @@ func (s *SessProjectMismatch) SetDetails(val OptSessProjectMismatchDetails) {
 	s.Details = val
 }
 
-func (*SessProjectMismatch) getMyUserRes()       {}
-func (*SessProjectMismatch) getMyUserSchemaRes() {}
-func (*SessProjectMismatch) listMyProjectsRes()  {}
-func (*SessProjectMismatch) listMyTeamsRes()     {}
+func (*SessProjectMismatch) getMyUserRes()           {}
+func (*SessProjectMismatch) getMyUserSchemaRes()     {}
+func (*SessProjectMismatch) listMyIdentityLinksRes() {}
+func (*SessProjectMismatch) listMyPasskeysRes()      {}
+func (*SessProjectMismatch) listMyProjectsRes()      {}
+func (*SessProjectMismatch) listMyTeamsRes()         {}
 
 // Additional error-specific context.
 type SessProjectMismatchDetails map[string]jx.Raw

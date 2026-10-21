@@ -142,8 +142,8 @@ func TestMySessionHoldsTheSessionToTheNamedProject(t *testing.T) {
 // TestMyUserHoldsTheSessionToTheNamedProject drives the operations on the
 // cookie's user (/users/me) through the generated server the same way: with
 // project_id, a session of another project is refused with 403
-// sess.project_mismatch before the user, its schema, its teams or its projects
-// are looked up, and the refusal clears no cookie; a session of the named
+// sess.project_mismatch before the user, its schema, its teams, its sign-in
+// methods or its projects are looked up, and the refusal clears no cookie; a session of the named
 // project, or a request that names none, is served as before.
 func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
 	t.Parallel()
@@ -159,6 +159,8 @@ func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
 		{name: "projects", method: http.MethodGet, path: "/users/me/projects"},
 		{name: "schema", method: http.MethodGet, path: "/users/me/schema"},
 		{name: "teams", method: http.MethodGet, path: "/users/me/teams"},
+		{name: "passkeys", method: http.MethodGet, path: "/users/me/passkeys"},
+		{name: "identity links", method: http.MethodGet, path: "/users/me/identity_links"},
 	}
 	tests := []struct {
 		name    string
@@ -257,6 +259,16 @@ func (s *myUserService) GetMyUserSchema(_ context.Context, input service.GetMyUs
 func (s *myUserService) ListUserTeams(_ context.Context, input service.ListUserTeamsInput) (*service.ListUserTeamsOutput, error) {
 	s.serve(input.ProjectID, input.UserID)
 	return &service.ListUserTeamsOutput{}, nil
+}
+
+func (s *myUserService) ListPasskeys(_ context.Context, input service.ListPasskeysInput) ([]*domain.UserPasskey, string, error) {
+	s.serve(input.ProjectID, input.UserID)
+	return nil, "", nil
+}
+
+func (s *myUserService) ListIdentityLinks(_ context.Context, input service.ListIdentityLinksInput) ([]*domain.IDPIdentityLink, string, error) {
+	s.serve(input.ProjectID, input.UserID)
+	return nil, "", nil
 }
 
 func myUser(self domain.Self) *domain.User {
