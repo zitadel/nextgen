@@ -114,6 +114,9 @@ func checkServedThroughPooler(servingDSN, migratorDSN string) error {
 // ensureDatabase is ensurePreviewDatabase; tests replace it.
 var ensureDatabase = ensurePreviewDatabase
 
+// dropDatabase is dropPreviewDatabase; tests replace it.
+var dropDatabase = dropPreviewDatabase
+
 // ensurePreviewDatabase creates the preview's database unless it exists and
 // stamps it with the branch and the time of this deployment, so a cleanup can
 // later drop what no deployment touched for a while. The connecting role
@@ -166,6 +169,37 @@ func ensurePreviewDatabase(ctx context.Context, baseDSN, name, ref string, now t
 	if _, err := conn.Exec(ctx, "COMMENT ON DATABASE "+identifier+" IS "+quoteLiteral(string(stamp))); err != nil {
 		fmt.Fprintf(os.Stderr, "launcher: could not stamp preview database %s: %v\n", name, err)
 	}
+	return nil
+}
+
+// dropPreviewDatabase drops a preview database so the next ensurePreviewDatabase
+// call recreates it empty. Used when goose refuses to migrate because the
+// sticky preview still carries an older version set (for example after a
+// migration was renumbered on the branch). Production never calls this.
+func dropPreviewDatabase(ctx context.Context, baseDSN, name string) error {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	config, err := pgx.ParseConfig(baseDSN)
+	if err != nil {
+		return fmt.Errorf("parse %s: %w", migratorDatabaseURLVar, err)
+	}
+	for key := range config.RuntimeParams {
+		if strings.HasPrefix(key, "pool_") {
+			delete(config.RuntimeParams, key)
+		}
+	}
+	conn, err := pgx.ConnectConfig(ctx, config)
+	if err != nil {
+		return fmt.Errorf("connect to the preview cluster: %w", err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	identifier := pgx.Identifier{name}.Sanitize()
+	if _, err := conn.Exec(ctx, "DROP DATABASE IF EXISTS "+identifier+" WITH (FORCE)"); err != nil {
+		return fmt.Errorf("drop preview database %s: %w", name, err)
+	}
+	fmt.Fprintf(os.Stderr, "launcher: dropped preview database %s to remigrate from an empty schema\n", name)
 	return nil
 }
 

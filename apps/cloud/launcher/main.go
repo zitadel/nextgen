@@ -72,23 +72,78 @@ var servingParams = []struct{ key, value string }{
 var keyIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 func main() {
-	var args []string
-	var err error
 	if len(os.Args) > 1 && os.Args[1] == "migrate" {
-		args, err = prepareMigration(os.Args[2:])
-	} else {
-		args, err = prepareServer(os.Args[1:])
+		if err := runMigrate(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, "launcher:", err)
+			if errors.Is(err, errPrepareFailed) {
+				os.Exit(64)
+			}
+			os.Exit(1)
+		}
+		return
 	}
+	args, err := prepareServer(os.Args[1:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "launcher:", err)
 		os.Exit(64)
 	}
-	cmd := server.NewCommand()
-	cmd.SetArgs(args)
-	if err := cmd.Execute(); err != nil {
+	if err := executeServer(args); err != nil {
 		fmt.Fprintln(os.Stderr, "launcher:", err)
 		os.Exit(1)
 	}
+}
+
+// errPrepareFailed marks a prepareMigration/prepareServer failure (exit 64)
+// rather than a migrate/server execution failure (exit 1).
+var errPrepareFailed = errors.New("prepare failed")
+
+// executeServer runs the nextgen server command with args. Tests replace it.
+var executeServer = func(args []string) error {
+	cmd := server.NewCommand()
+	cmd.SetArgs(args)
+	return cmd.Execute()
+}
+
+// runMigrate prepares and runs deploy-time migrations. On a preview, when goose
+// refuses because the sticky branch database still has an older version set
+// (missing out-of-order migrations after a renumber), drop the preview database
+// once, recreate it, and remigrate from empty. Production is never dropped.
+func runMigrate(extra []string) error {
+	args, err := prepareMigration(extra)
+	if err != nil {
+		return fmt.Errorf("%w: %v", errPrepareFailed, err)
+	}
+	if err := executeServer(args); err == nil {
+		return nil
+	} else if os.Getenv("VERCEL_ENV") != "preview" || !isOutOfOrderMigration(err) {
+		return err
+	}
+
+	ref := gitRef()
+	name, nameErr := previewDatabaseName(ref)
+	if nameErr != nil {
+		return err
+	}
+	baseDSN := os.Getenv(migratorDatabaseURLVar)
+	fmt.Fprintf(os.Stderr, "launcher: preview migrate hit out-of-order migrations; recreating %s\n", name)
+	if dropErr := dropDatabase(context.Background(), baseDSN, name); dropErr != nil {
+		return fmt.Errorf("%v (also failed to drop preview database: %w)", err, dropErr)
+	}
+	args, err = prepareMigration(extra)
+	if err != nil {
+		return fmt.Errorf("%w: %v", errPrepareFailed, err)
+	}
+	return executeServer(args)
+}
+
+// isOutOfOrderMigration reports goose's refusal when filesystem migrations sit
+// below the database's max applied version but are not recorded as applied —
+// typical after a PR renumbers a migration on a sticky preview database.
+func isOutOfOrderMigration(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "missing (out-of-order) migration")
 }
 
 // productionBranch is the branch production deploys from: main, unless
