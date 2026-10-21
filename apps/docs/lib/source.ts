@@ -1,6 +1,6 @@
 import type * as PageTree from "fumadocs-core/page-tree";
 import type { AdvancedIndex } from "fumadocs-core/search/server";
-import { llms, loader, update } from "fumadocs-core/source";
+import { getSlugs, llms, loader, update } from "fumadocs-core/source";
 import { lucideIconsPlugin } from "fumadocs-core/source/lucide-icons";
 import { metaSchema, pageSchema } from "fumadocs-core/source/schema";
 import { applyMdxPreset } from "fumadocs-mdx/config";
@@ -66,8 +66,8 @@ const operationPages = update(
   .build();
 
 // The API's operations for its Errors page, in the order the sidebar lists
-// them, each with its section: the folder its page is in, titled by the
-// folder's own page.
+// them, each with its page and its section: the folder its page is in, titled
+// by the folder's own page.
 function apiOperations(): ApiOperation[] {
   const folderOf = (path: string) => path.slice(0, path.lastIndexOf("/"));
   const nameOf = (path: string) => path.slice(path.lastIndexOf("/") + 1).replace(/\.mdx?$/, "");
@@ -104,6 +104,7 @@ function apiOperations(): ApiOperation[] {
           summary: file.data.title ?? operation.operationId,
           method,
           path,
+          url: `${docsRoute}/${getSlugs(file.path).join("/")}`,
           section: {
             title: sectionTitles.get(folder) ?? folder,
             url: `${docsRoute}/${folder}`,
