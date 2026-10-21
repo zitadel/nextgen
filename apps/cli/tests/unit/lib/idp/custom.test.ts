@@ -261,6 +261,29 @@ describe("loopbackIssuerWarning", () => {
     );
 
     expect(loopbackIssuerWarning(selection)).toContain("NEXTGEN_HTTPCLIENT_ALLOW_LIST");
+    expect(loopbackIssuerWarning(selection, "unknown")).toContain("NEXTGEN_HTTPCLIENT_ALLOW_LIST");
+  });
+
+  it("is silent on a local server that may fetch from loopback", () => {
+    const selection = selectionFromFlags(
+      "custom",
+      { ...valid, issuer: "http://localhost:9100" },
+      flag,
+      "e.g.",
+    );
+
+    expect(loopbackIssuerWarning(selection, "allowed")).toBeUndefined();
+  });
+
+  it("points a container server at the process runtime", () => {
+    const selection = selectionFromFlags(
+      "custom",
+      { ...valid, issuer: "http://localhost:9100" },
+      flag,
+      "e.g.",
+    );
+
+    expect(loopbackIssuerWarning(selection, "container")).toContain("--runtime binary");
   });
 
   it("says nothing about an issuer elsewhere or about a catalog provider", () => {

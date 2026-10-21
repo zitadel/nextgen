@@ -139,12 +139,16 @@
         "scripts/ci-mode.mjs",
         "scripts/ci-mode.test.mjs",
         "scripts/dev-process.mjs",
+        "scripts/dev-process.test.mjs",
         "scripts/generate-meta-schemas.ts",
         "scripts/generate-meta-schemas.test.ts",
         "scripts/release-artifacts.mjs",
         "scripts/release-github.mjs",
         "scripts/release-github.test.mjs",
         "scripts/release-manifest.mjs",
+        "scripts/render-builtin-schemas.mjs",
+        "scripts/render-builtin-schemas.test.mjs",
+        "api/openapi/endpoints/schemas/*.json",
         "scripts/assert-file.mjs",
         "vitest.config.ts"
       ]
@@ -208,6 +212,12 @@
       "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
       "inputs": ["scripts/run-server.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
+    },
+    "//#cloud": {
+      "cache": false,
+      "persistent": true,
+      "inputs": ["scripts/run-cloud.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
+      "passThroughEnv": ["CLOUD_DEV_PORT", "CLOUD_DEV_DEBUG", "NEXTGEN_*", "GOFLAGS"]
     },
     "//#server-debug": {
       "cache": false,

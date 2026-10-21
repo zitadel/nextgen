@@ -2,20 +2,21 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import og from "./og.jpg";
 import "./globals.css";
+import { THEME_SCRIPT } from "./theme";
 
 // The website's faces: Arimo for text, APK Futural (a licensed webfont) for
 // headings, Azeret Mono for code, all from ./fonts so the build fetches
 // nothing (AGENTS.md). next/font serves them from /_next/, like every asset of
 // this app.
 //
-// Arimo is one variable file, every weight from 400 to 700, declared as the
-// two weights the page uses.
+// Arimo is one variable file, every weight from 400 to 700, declared as such:
+// the page sets text at 400 and 600, the login previews' card titles at
+// 500.
 const arimo = localFont({
-  src: [
-    { path: "./fonts/Arimo-latin.woff2", weight: "400" },
-    { path: "./fonts/Arimo-latin.woff2", weight: "600" },
-  ],
+  src: "./fonts/Arimo-latin.woff2",
+  weight: "400 700",
   variable: "--font-arimo",
   display: "swap",
 });
@@ -34,10 +35,25 @@ const apkFutural = localFont({
   display: "swap",
 });
 
+const title = "Zitadel preview — your login in one minute";
+const description =
+  "Open-source auth that lives in your repo: your user model, your flows, your look. For developers and the agents they work with.";
+
+// The share image, rendered from scripts/og.html (AGENTS.md), imported so it
+// loads from /_next/; on Vercel, Next makes its URL absolute with the
+// deployment's host.
 export const metadata: Metadata = {
-  title: "Zitadel — Coming soon",
-  description: "The next generation of Zitadel is coming soon.",
+  title,
+  description,
   icons: favicons(),
+  openGraph: {
+    type: "website",
+    siteName: "Zitadel",
+    title,
+    description,
+    images: [{ url: og.src, width: og.width, height: og.height, alt: "Zitadel" }],
+  },
+  twitter: { card: "summary_large_image", title, description, images: [og.src] },
 };
 
 // The website's favicons (packages/theme/assets/favicons in
@@ -75,7 +91,16 @@ const speedInsightsSampleRate = Number(process.env.WEBSITE_SPEED_INSIGHTS_SAMPLE
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${arimo.variable} ${apkFutural.variable} ${azeretMono.variable}`}>
+    // The theme script, inlined to run before the first paint, sets data-theme
+    // before React hydrates (theme.ts).
+    <html
+      lang="en"
+      className={`${arimo.variable} ${apkFutural.variable} ${azeretMono.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="bg-background text-foreground antialiased">
         {children}
         <Analytics />

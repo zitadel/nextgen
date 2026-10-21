@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import dns from "node:dns";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
-import type { IncomingHttpHeaders } from "node:http";
+import type { IncomingHttpHeaders, OutgoingHttpHeaders } from "node:http";
 import { createServer, type Server } from "node:https";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -36,6 +36,11 @@ export interface RemoteServer {
   readonly url: string;
   /** The requests that reached the server, oldest first. */
   readonly requests: ReadonlyArray<ReceivedRequest>;
+  /**
+   * Adds `headers` to every answer from now on, such as the `Set-Cookie` the
+   * server sends on a session exchange; `undefined` stops it.
+   */
+  answerWith(headers: OutgoingHttpHeaders | undefined): void;
 }
 
 /**
@@ -46,6 +51,7 @@ export interface RemoteServer {
  */
 export function useRemoteServer(): RemoteServer {
   const requests: ReceivedRequest[] = [];
+  let answerHeaders: OutgoingHttpHeaders = {};
   let url = "";
   let server: Server | undefined;
   let dir = "";
@@ -77,7 +83,10 @@ export function useRemoteServer(): RemoteServer {
           servername: (req.socket as tls.TLSSocket).servername || undefined,
         });
         const misdirected = req.headers.host !== new URL(url).host;
-        res.writeHead(misdirected ? 421 : 200, { "content-type": "text/plain" });
+        res.writeHead(misdirected ? 421 : 200, {
+          "content-type": "text/plain",
+          ...(misdirected ? {} : answerHeaders),
+        });
         res.end(misdirected ? "misdirected" : "ok");
       },
     );
@@ -98,6 +107,9 @@ export function useRemoteServer(): RemoteServer {
       return url;
     },
     requests,
+    answerWith(headers) {
+      answerHeaders = headers ?? {};
+    },
   };
 }
 

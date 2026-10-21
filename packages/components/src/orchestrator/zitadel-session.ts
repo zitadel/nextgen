@@ -1,5 +1,6 @@
 import { css, html, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement } from "lit/decorators.js";
+import { property } from "../internal/property.js";
 
 import { resolveApi } from "./resolve-api.js";
 import { SessionController } from "./session-controller.js";
@@ -107,9 +108,8 @@ export class ZitadelSession extends ZitadelSurface {
   /** Sign-out action label. */
   @property({ type: String, attribute: "logout-label" }) accessor logoutLabel = "Sign out";
 
-  private readonly session = new SessionController(
-    this,
-    () => resolveApi(this.project, this.projectAttrs, "<zitadel-session>").api,
+  private readonly session = new SessionController(this, () =>
+    resolveApi(this.project, this.projectAttrs, "<zitadel-session>"),
   );
 
   override willUpdate(): void {

@@ -2,6 +2,8 @@ id: "docs"
 language: "typescript"
 layer: "application"
 stack: "frontend"
+dependsOn:
+  - "api"
 
 workspace:
   inheritedTasks:
@@ -10,7 +12,9 @@ workspace:
       - "test"
 
 tasks:
-  # Bundles api/openapi into .generated/, which lib/openapi.ts imports. The
+  # Bundles api/openapi into .generated/, which lib/openapi.ts imports, with
+  # its error codes, which lib/error-reference.ts imports, and the CLI's
+  # command reference, which lib/cli-reference.ts imports. The
   # content needs no generation step: lib/source.ts defines its collection
   # with Fumadocs MDX's macro.
   generate:
@@ -20,13 +24,30 @@ tasks:
       - "/api/openapi/**/*.yaml"
       # The bundle applies the repo's Redocly config.
       - "/redocly.yaml"
+      # Written by the CLI's reference test from its command table.
+      - "/apps/cli/command-reference.json"
+      # Written by Changesets on every release: the release notes.
+      - "/apps/cli/CHANGELOG.md"
     outputs:
       - ".generated/openapi.mjs"
       - ".generated/openapi.d.mts"
+      - ".generated/errors.mjs"
+      - ".generated/errors.d.mts"
+      - ".generated/cli.mjs"
+      - ".generated/cli.d.mts"
 
   typecheck:
     deps:
       - "generate"
+      # The API reference's TypeScript samples compile against the client
+      # (scripts/sdk-samples.ts, tsconfig.samples.json), whose endpoints this
+      # generates from the same spec.
+      - "api:generate"
+    inputs:
+      # Declaring inputs drops the default project folder, so it is restated.
+      - "**/*"
+      # The client's runtime, which the samples call too.
+      - "/packages/api/src/**/*"
 
   build:
     command: "corepack pnpm exec next build"

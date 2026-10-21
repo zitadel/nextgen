@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/components",
-  "version": "1.0.0-alpha.25",
+  "version": "1.0.0-alpha.28",
   "description": "Lit-based atomic web components and the <zitadel-login> orchestrator for the Zitadel auth UI.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/components#readme",
   "bugs": {
@@ -24,6 +24,21 @@
   "exports": {
     "./package.json": "./package.json",
     ".": {
+      "workerd": {
+        "types": "./dist/server.d.mts",
+        "browser": "./dist/server.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "worker": {
+        "types": "./dist/server.d.mts",
+        "browser": "./dist/server.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "edge-light": {
+        "types": "./dist/server.d.mts",
+        "browser": "./dist/server.mjs",
+        "default": "./dist/index.mjs"
+      },
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
@@ -80,6 +95,7 @@
     "lucide": "catalog:"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@tsdown/css": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

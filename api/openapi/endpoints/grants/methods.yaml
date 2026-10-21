@@ -1,5 +1,6 @@
 post:
   operationId: createGrant
+  x-zitadel-cli: grants create
   summary: Create grant
   description: |
     Bind a user or team to `project.viewer`, `project.editor`, or

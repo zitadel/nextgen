@@ -36,6 +36,9 @@ import "@zitadel/components";
     [project]="project"
     [projectId]="projectId"
     [proxyPath]="proxyPath"
+    [attr.project-id]="project?.projectId ?? projectId ?? null"
+    [attr.proxy-path]="project?.proxyPath ?? proxyPath ?? null"
+    [attr.url]="project?.url ?? null"
     [attr.post-sign-out-url]="postSignOutUrl"
     [attr.theme]="theme ?? null"
     (zitadel-signout)="onSignout($event)"
@@ -57,6 +60,6 @@ export class ZitadelLogoutComponent {
   }
 
   onSignout(event: Event): void {
-    this.signout.emit((event as CustomEvent<ZitadelSignoutDetail>).detail);
+    if (event instanceof CustomEvent) this.signout.emit(event.detail);
   }
 }

@@ -19,11 +19,12 @@ import (
 // Like the resolution tests these run sequentially: each one creates a
 // project, a connection and users.
 
-// ssoConflictFlowDefinition is modelled on the flow `zitadel sso enable` writes
-// for a password schema (docs/design/idp/schemas/default-login.scaffold.json),
-// pruned to what these tests walk: every user_already_exists, from a provider
-// or a typed sign-up, routes to sso-conflict. It leaves out register-sso and
-// the sso_user_not_found routes, which a bound attempt never reaches.
+// ssoConflictFlowDefinition is modelled on the flow `zitadel auth-method sso
+// enable` writes for a password schema
+// (docs/design/idp/schemas/default-login.scaffold.json), pruned to what these
+// tests walk: every user_already_exists, from a provider or a typed sign-up,
+// routes to sso-conflict. It leaves out register-sso and the
+// sso_user_not_found routes, which a bound attempt never reaches.
 const ssoConflictFlowDefinition = `{
 	"name": "sso-conflict-login",
 	"status": "active",

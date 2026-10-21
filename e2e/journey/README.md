@@ -7,8 +7,9 @@ demo apps. Instead, it builds the current workspace packages, publishes packed
 tarballs to a temporary registry, creates empty app directories outside the
 repo, runs the customer local CLI flow through `npx`, starts the generated apps,
 and verifies that real users can register, log out, and log in again across
-all eight frameworks: Next, Nuxt, React, Vue, Angular, Solid, Svelte, and
-Qwik (`scripts/frameworks.mjs` is the authoritative list).
+every supported framework: the SPA families (React, Vue, Angular, Solid,
+Svelte, Qwik) and the meta-frameworks (Next, Nuxt, SvelteKit, TanStack Start,
+SolidStart, Qwik Router). `scripts/frameworks.mjs` is the authoritative list.
 
 ## Local runner
 
@@ -46,8 +47,9 @@ moon run e2e:journey -- --concurrency 2
 moon run e2e:journey -- --tarballs-dir dist/release/<version>/npm
 ```
 
-- `--framework <id>` runs one framework (`next`, `nuxt`, `react`, `vue`,
-  `angular`, `solid`, `svelte`, or `qwik`) instead of the full matrix.
+- `--framework <id>` runs one framework (any id in `frameworkIds` in
+  `scripts/frameworks.mjs`, e.g. `next`, `sveltekit`, `qwik-router`) instead of
+  the full matrix.
 - `--suite frameworks|testkit` selects the lane: `frameworks` (default) runs
   the scaffold journey matrix; `testkit` runs the `@zitadel/testing` consumer
   lane.
@@ -70,6 +72,10 @@ moon run e2e:journey -- --tarballs-dir dist/release/<version>/npm
   building one and implies `--runtime docker`.
 - `--tarballs-dir <path>` uses prebuilt release npm tarballs instead of running
   `moon run release:pack`.
+- Each framework lane starts the mock OIDC provider from
+  `tools/oidc-mock/dist/oidc-mock` (`moon run oidc-mock:build`). Without it the
+  specs that sign in through it skip, and `--ci` refuses to start. A docker
+  runtime starts no mock.
 - `--keep` keeps the temporary work directory after success.
 - `--work-dir <path>` uses an explicit work directory.
 
@@ -83,6 +89,7 @@ Useful environment overrides:
 - `JOURNEY_TARBALLS_REQUIRED=1` to refuse to pack without them. The
   `e2e:journey-local` lane sets it: the e2e lanes beside it read the dist
   folders a pack wipes and rebuilds.
+- `JOURNEY_OIDC_MOCK_PORT` for single-framework runs only
 - `JOURNEY_CI=1`, `JOURNEY_CONCURRENCY`, `JOURNEY_MATRIX`, `JOURNEY_RUNTIME`
   and `JOURNEY_WORK_DIR` for `--ci`, `--concurrency`, `--matrix`, `--runtime`
   and `--work-dir`. Arguments on the command line win. CI's turbo job sets
@@ -99,17 +106,21 @@ Every runner line starts with the time since the runner started
 (`[journey-local 1:12]`), so the log reads as a timeline even where a task
 runner prints a task's output only when it ends. Once the lanes have finished,
 passed or failed, the runner prints a table: a row per lane with when it began,
-the seconds each phase took (doctor, start, setup, the drift probe, the
-testkit's stop and install, app start, Playwright, teardown) and the phase a
-failed lane failed in, and a line with the shared steps before the lanes
-(Playwright browsers, the registry). In GitHub Actions the table also goes to
-the job summary. `scripts/timings.mjs` defines the phases; prepare-app records
-its CLI steps in `timings.json` in the lane's work dir, which the runner reads.
+the seconds each phase took (the mock OIDC provider's start, doctor, start,
+setup, the drift probe, the testkit's stop and install, app start, Playwright,
+teardown) and the phase a failed lane failed in, and a line with the shared
+steps before the lanes (Playwright browsers, the registry). In GitHub Actions
+the table also goes to the job summary. `scripts/timings.mjs` defines the
+phases; prepare-app records its CLI steps in `timings.json` in the lane's work
+dir, which the runner reads.
 
 ## CI gate
 
 The required PR CI job runs the framework matrix against the default binary
-runtime. It does not use public Zitadel packages or GHCR images; it publishes
+runtime. The matrix skips SvelteKit, TanStack Start, SolidStart and Qwik Router
+(`ciExcludedFrameworkIds` in `scripts/frameworks.mjs`): their scaffolders track
+upstream `create-*@latest` releases, so a red lane could come from outside the PR.
+They stay registered and run by hand with `--framework`. It does not use public Zitadel packages or GHCR images; it publishes
 the current workflow's package tarballs to Verdaccio and runs the same `npx`
 local setup flow against the generated app. The Docker fallback journey remains
 an opt-in local/manual check via

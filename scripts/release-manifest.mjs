@@ -120,6 +120,30 @@ export const PUBLIC_RELEASE_PACKAGES = [
     buildTarget: "sdk-qwik:build-release",
   },
   {
+    name: "@zitadel/sdk-sveltekit",
+    dir: "packages/sdk-sveltekit",
+    moonProject: "sdk-sveltekit",
+    buildTarget: "sdk-sveltekit:build-release",
+  },
+  {
+    name: "@zitadel/sdk-solid-start",
+    dir: "packages/sdk-solid-start",
+    moonProject: "sdk-solid-start",
+    buildTarget: "sdk-solid-start:build-release",
+  },
+  {
+    name: "@zitadel/sdk-qwik-router",
+    dir: "packages/sdk-qwik-router",
+    moonProject: "sdk-qwik-router",
+    buildTarget: "sdk-qwik-router:build-release",
+  },
+  {
+    name: "@zitadel/sdk-tanstack-start",
+    dir: "packages/sdk-tanstack-start",
+    moonProject: "sdk-tanstack-start",
+    buildTarget: "sdk-tanstack-start:build-release",
+  },
+  {
     name: "@zitadel/testing",
     dir: "packages/testing",
     moonProject: "testing",

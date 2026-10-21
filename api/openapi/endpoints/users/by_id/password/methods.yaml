@@ -49,14 +49,16 @@ get:
 put:
   operationId: setUserPassword
   summary: Set user password
+  description: |
+    Sets a user's password, hashed with the project's current password hashing
+    policy.
+
+    The new password replaces the current one, and setting it emits
+    `auth.factor.password.set`.
   tags:
     - Users
   parameters:
-    - name: user_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../../components/schemas/user-id.yaml
+    - $ref: ../../../../components/parameters/user-id.yaml
   security:
     - oauth2:
         - user.write

@@ -6,7 +6,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureBrandingService(t *testing.T) *service.BrandingService {
+func (h *Harness) EnsureBrandingService(t testing.TB) *service.BrandingService {
 	t.Helper()
 	h.brandingService.mutex.Lock()
 	defer h.brandingService.mutex.Unlock()
