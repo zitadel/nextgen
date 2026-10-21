@@ -22,13 +22,20 @@ export async function emit<T extends object = object>(
   detail?: T,
   options: { readonly composed?: boolean; readonly waitForListeners?: boolean } = {},
 ): Promise<void> {
-  const pending: Promise<unknown>[] = [];
+  const pending: unknown[] = [];
   host.dispatchEvent(
     new CustomEvent(type, {
       bubbles: true,
       composed: options.composed ?? true,
       detail: options.waitForListeners
-        ? { ...detail, waitUntil: (work: Promise<unknown>) => void pending.push(work) }
+        ? {
+            ...detail,
+            waitUntil: (work: unknown) => {
+              if (work) {
+                pending.push(work);
+              }
+            },
+          }
         : detail,
     }),
   );

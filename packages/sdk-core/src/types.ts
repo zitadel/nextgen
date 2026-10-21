@@ -35,17 +35,8 @@ export interface ZitadelFlowInputDetail {
  * or after a short timeout.
  */
 export interface ZitadelNavigationDetail {
-  readonly waitUntil: (work: Promise<unknown>) => void;
+  readonly waitUntil: (work: unknown) => void;
 }
-
-/**
- * Return type of an event's callback: the three navigating events accept an
- * async handler whose promise the wrapper registers on `waitUntil`, so the rest
- * return `void`.
- */
-type HandlerReturn<Detail> = Detail extends ZitadelNavigationDetail
-  ? void | Promise<unknown>
-  : void;
 
 /** Payload of the `zitadel-flow-complete` event. */
 export interface ZitadelFlowCompleteDetail extends ZitadelNavigationDetail {
@@ -293,21 +284,21 @@ export interface ZitadelSessionConfig {
 export type ZitadelLoginHandlers = {
   readonly [E in keyof ZitadelLoginEventMap as (typeof ZITADEL_LOGIN_EVENT_HANDLERS)[E]]?: (
     detail: ZitadelLoginEventMap[E],
-  ) => HandlerReturn<ZitadelLoginEventMap[E]>;
+  ) => ZitadelLoginEventMap[E] extends ZitadelNavigationDetail ? unknown : void;
 };
 
 /** Plain-callback handler for the `<zitadel-logout>` event (derived, as above). */
 export type ZitadelLogoutHandlers = {
   readonly [E in keyof ZitadelLogoutEventMap as (typeof ZITADEL_LOGOUT_EVENT_HANDLERS)[E]]?: (
     detail: ZitadelLogoutEventMap[E],
-  ) => HandlerReturn<ZitadelLogoutEventMap[E]>;
+  ) => ZitadelLogoutEventMap[E] extends ZitadelNavigationDetail ? unknown : void;
 };
 
 /** Plain-callback handlers for the `<zitadel-session>` events (derived, as above). */
 export type ZitadelSessionHandlers = {
   readonly [E in keyof ZitadelSessionEventMap as (typeof ZITADEL_SESSION_EVENT_HANDLERS)[E]]?: (
     detail: ZitadelSessionEventMap[E],
-  ) => HandlerReturn<ZitadelSessionEventMap[E]>;
+  ) => ZitadelSessionEventMap[E] extends ZitadelNavigationDetail ? unknown : void;
 };
 
 /** Full prop set for a `ZitadelLogin` wrapper (config + plain-callback handlers). */

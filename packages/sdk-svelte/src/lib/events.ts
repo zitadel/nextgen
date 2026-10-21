@@ -7,7 +7,7 @@
  */
 export function withDetail<Detail>(
   event: Event,
-  handler: ((detail: Detail) => void | Promise<unknown>) | undefined,
+  handler: ((detail: Detail) => unknown) | undefined,
 ): void {
   if (!(event instanceof CustomEvent) || !handler) {
     return;

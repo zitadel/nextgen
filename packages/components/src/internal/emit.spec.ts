@@ -59,6 +59,22 @@ describe("emit with waitForListeners", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("takes the fast path with no timer when a listener registers nothing thenable", async () => {
+    const host = document.createElement("div");
+    host.addEventListener("zitadel-test", (event) => {
+      if (event instanceof CustomEvent) {
+        event.detail.waitUntil(undefined);
+      }
+    });
+    const done = vi.fn();
+
+    void emit(host, "zitadel-test", {}, { waitForListeners: true }).then(done);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(done).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("stops waiting for a promise that never settles after the wait limit", async () => {
     const done = vi.fn();
 
