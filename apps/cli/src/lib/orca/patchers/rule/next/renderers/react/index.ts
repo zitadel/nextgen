@@ -19,8 +19,8 @@ import type { RendererSpec } from "../types";
  *
  * The wrappers set `project` and `locales` as DOM properties on React 18 and
  * 19 alike, where a raw `<zitadel-login>` would lose them on 19 hydration and
- * write `[object Object]` attributes on 18. The backend URL never reaches the browser: the client talks to the
- * same-origin `/__nextgen` proxy path, and the scaffolded Next request boundary
+ * write `[object Object]` attributes on 18. The backend URL never reaches the
+ * browser: the client talks to the same-origin `/__nextgen` proxy path, and the scaffolded Next request boundary
  * forwards it to `ZITADEL_URL` server-side. `NEXT_PUBLIC_ZITADEL_PROJECT_ID` is
  * public — the project id is not sensitive and the widget needs it to start a
  * flow.
