@@ -139,6 +139,54 @@ func (g *Graph) OracleFoothold(projectID, homeProjectID string, principalType do
 	return false
 }
 
+// OracleFootholdParams mirrors the foothold column of CheckAuthz: with a
+// target (ResourceID) only a path that could cover it counts (an assignment
+// scoped project-wide, to ResourceTeamID or to ResourceID, a membership in the
+// target team or the target's team, or the user's own record); without one it
+// is OracleFoothold.
+func (g *Graph) OracleFootholdParams(p domain.AuthzCheckParams) bool {
+	if p.ResourceID == "" {
+		return g.OracleFoothold(p.ProjectID, p.PrincipalHomeProjectID, p.PrincipalType, p.PrincipalID)
+	}
+	isUser := p.PrincipalType == domain.AuthzPrincipalTypeUser
+	if isUser && p.ResourceID == p.PrincipalID {
+		return true
+	}
+	home := p.HomeProjectID()
+	now := time.Now()
+	for _, a := range g.Assignments {
+		if a.ProjectID != p.ProjectID || !assignmentActive(a, now) || !assignmentCoversTarget(a, p) {
+			continue
+		}
+		if g.principalMatches(home, p.PrincipalType, p.PrincipalID, a) {
+			return true
+		}
+	}
+	if !isUser {
+		return false
+	}
+	for _, e := range g.Memberships {
+		if e.ProjectID == p.ProjectID && e.MemberType == domain.AuthzMemberTypeUser && e.MemberID == p.PrincipalID &&
+			e.SetType == domain.AuthzSetTypeTeam && (e.SetID == p.ResourceID || (p.ResourceTeamID != "" && e.SetID == p.ResourceTeamID)) {
+			return true
+		}
+	}
+	return false
+}
+
+func assignmentCoversTarget(a *domain.AuthzAssignment, p domain.AuthzCheckParams) bool {
+	switch a.ScopeKind {
+	case domain.AuthzScopeKindProject:
+		return true
+	case domain.AuthzScopeKindTeam:
+		return p.ResourceTeamID != "" && a.ScopeTeamID != nil && *a.ScopeTeamID == p.ResourceTeamID
+	case domain.AuthzScopeKindResource:
+		return a.ScopeResourceID != nil && *a.ScopeResourceID == p.ResourceID
+	default:
+		return false
+	}
+}
+
 func (g *Graph) closureAllowsScoped(projectID, home string, pType domain.AuthzPrincipalType, pID, objectType, relation string, scope domain.AuthzScopeKind, scopeID string, now time.Time) bool {
 	for _, a := range g.Assignments {
 		if a.ProjectID != projectID || !assignmentActive(a, now) || a.ScopeKind != scope {

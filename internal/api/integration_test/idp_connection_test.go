@@ -480,15 +480,17 @@ func TestQueryIdpsPartialGrant(t *testing.T) {
 	require.IsType(t, &api.ListIdpRevisionsResponse{}, revisions, helpers.MustMarshal(t, revisions))
 	assert.Equal(t, []string{granted.RevisionID}, revisionIDs(revisions.(*api.ListIdpRevisionsResponse).Revisions))
 
-	// Another connection of the same project is found, but the grant does not
-	// cover it.
-	denied := domain.ErrIDPConnectionPermissionDenied().Code
+	// Another connection of the same project is outside the grant's scope, so
+	// it answers like a connection that does not exist (#2112).
+	notFound := domain.ErrIDPConnectionNotFound().Code
 	hiddenGet := f.get(t, hidden.ID)
-	require.IsType(t, &api.GetIdpByIdForbidden{}, hiddenGet, helpers.MustMarshal(t, hiddenGet))
-	assertAuthzError(t, hiddenGet, denied)
+	require.IsType(t, &api.GetIdpByIdNotFound{}, hiddenGet, helpers.MustMarshal(t, hiddenGet))
+	assertAuthzError(t, hiddenGet, notFound)
 	hiddenRevisions := f.listRevisions(t, api.ListIdpRevisionsParams{ID: hidden.ID})
-	require.IsType(t, &api.ListIdpRevisionsForbidden{}, hiddenRevisions, helpers.MustMarshal(t, hiddenRevisions))
-	assertAuthzError(t, hiddenRevisions, denied)
+	require.IsType(t, &api.ListIdpRevisionsNotFound{}, hiddenRevisions, helpers.MustMarshal(t, hiddenRevisions))
+	assertAuthzError(t, hiddenRevisions, notFound)
+
+	denied := domain.ErrIDPConnectionPermissionDenied().Code
 
 	// A single revision has no index row, so its read checks the whole
 	// project, which a grant on one connection does not cover.
