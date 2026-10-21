@@ -174,6 +174,9 @@ describe("sendAll", () => {
 
     await expect(
       sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"])),
-    ).rejects.toThrow("The server repeated a page cursor");
+    ).rejects.toMatchObject({
+      message: "The server repeated a page cursor, so --paginate would never finish",
+      hint: "Fetch one page at a time with -F limit=<n> and -F page_token=<token>, and report the repeated cursor.",
+    });
   });
 });

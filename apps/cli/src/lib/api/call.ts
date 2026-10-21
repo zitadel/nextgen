@@ -101,7 +101,12 @@ export const sendAll = async (
       last = await send(server, token, pageOf(request, cursor));
       return last.body;
     },
-    { items: paging.items, all: true, nextPageToken: "next_page_token" },
+    {
+      items: paging.items,
+      all: true,
+      nextPageToken: "next_page_token",
+      flags: { all: "--paginate", onePage: "-F limit=<n> and -F page_token=<token>" },
+    },
   );
   return {
     status: last.status,
