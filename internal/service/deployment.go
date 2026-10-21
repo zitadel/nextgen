@@ -293,32 +293,19 @@ func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput
 	ctx, end := startSpan(ctx, "DeploymentService.List")
 	defer end(&err)
 
-	opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
-	opts.Pagination.Cursor = []byte(input.PageToken)
-	var result *database.ListResult[*domain.Deployment]
+	list := s.listHistory
 	if input.Live {
-		result, err = s.listLive(ctx, opts, input.Origin)
-	} else {
-		result, err = s.v2Pool.Statements().ListDeployments(ctx, opts)
+		list = s.listLive
 	}
+	result, live, err := list(ctx, input)
 	if err != nil {
-		if de, ok := errors.AsType[domain.Error](err); ok {
-			return nil, de
-		}
-		return nil, mapListError(err, "failed to list deployments")
+		return nil, err
 	}
 
 	output := &ListDeploymentsOutput{
 		Items:         result.Items,
+		Live:          live,
 		NextPageToken: string(result.NextCursor),
-	}
-	if input.Live {
-		output.Live = make(map[string]bool, len(result.Items))
-		for _, entity := range result.Items {
-			output.Live[entity.ID] = true
-		}
-	} else if output.Live, err = s.liveIDs(ctx, input.ProjectID, result.Items); err != nil {
-		return nil, err
 	}
 	if input.IncludeReleases {
 		releases, err := s.releasesFor(ctx, input.ProjectID, result.Items)
@@ -328,6 +315,44 @@ func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput
 		output.ReleasesByID = releases
 	}
 	return output, nil
+}
+
+// listHistory lists the project's deployments newest first, with the ids of
+// the listed ones that are live now.
+func (s *DeploymentService) listHistory(ctx context.Context, input ListDeploymentsInput) (*database.ListResult[*domain.Deployment], map[string]bool, error) {
+	result, err := s.v2Pool.Statements().ListDeployments(ctx, listOptions(input))
+	if err != nil {
+		return nil, nil, mapListError(err, "failed to list deployments")
+	}
+	live, err := s.liveIDs(ctx, input.ProjectID, result.Items)
+	return result, live, err
+}
+
+// listLive is the live view, newest first: the deployments some origin serves
+// now, each narrowed to the origins it serves, so all of them are live. With
+// an origin, it keeps the one deployment serving it; another that once named
+// it may serve others.
+func (s *DeploymentService) listLive(ctx context.Context, input ListDeploymentsInput) (*database.ListResult[*domain.Deployment], map[string]bool, error) {
+	result, err := s.v2Pool.Statements().ListLiveDeployments(ctx, time.Now(), listOptions(input))
+	if err != nil {
+		return nil, nil, mapListError(err, "failed to list live deployments")
+	}
+	if input.Origin != nil {
+		result = &database.ListResult[*domain.Deployment]{Items: slices.DeleteFunc(result.Items, func(entity *domain.Deployment) bool {
+			return !slices.Contains(entity.Origins(), *input.Origin)
+		})}
+	}
+	live := make(map[string]bool, len(result.Items))
+	for _, entity := range result.Items {
+		live[entity.ID] = true
+	}
+	return result, live, nil
+}
+
+func listOptions(input ListDeploymentsInput) *database.ListOptions[domain.DeploymentField] {
+	opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
+	opts.Pagination.Cursor = []byte(input.PageToken)
+	return opts
 }
 
 // releasesFor hydrates the releases a page of deployments points at, batched:
@@ -387,20 +412,6 @@ func (s *DeploymentService) liveIDs(ctx context.Context, projectID string, items
 		live[entity.ID] = true
 	}
 	return live, nil
-}
-
-// listLive is the live view, newest first: the deployments some origin serves
-// now, each narrowed to the origins it serves. With an origin, it keeps the
-// one deployment serving it; another that once named it may serve others.
-func (s *DeploymentService) listLive(ctx context.Context, opts *database.ListOptions[domain.DeploymentField], origin *string) (*database.ListResult[*domain.Deployment], error) {
-	result, err := s.v2Pool.Statements().ListLiveDeployments(ctx, time.Now(), opts)
-	if err != nil || origin == nil {
-		return result, err
-	}
-	served := slices.DeleteFunc(result.Items, func(entity *domain.Deployment) bool {
-		return !slices.Contains(entity.Origins(), *origin)
-	})
-	return &database.ListResult[*domain.Deployment]{Items: served}, nil
 }
 
 // newestPrimary is the project's newest primary deployment, nil when none.
