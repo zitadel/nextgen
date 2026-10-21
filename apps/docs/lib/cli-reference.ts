@@ -1,7 +1,4 @@
-import { getTableOfContents } from "fumadocs-core/content/toc";
-import { remarkGfm, type StructuredData, structure } from "fumadocs-core/mdx-plugins";
 import type { LoaderPlugin, MetaData, Source } from "fumadocs-core/source";
-import type { TOCItemType } from "fumadocs-core/toc";
 
 // The CLI's commands, from the reference its test keeps current
 // (apps/cli/command-reference.json), bundled by scripts/bundle-cli.mjs and
@@ -9,11 +6,11 @@ import type { TOCItemType } from "fumadocs-core/toc";
 import reference from "../.generated/cli.mjs";
 import { cli } from "./cli-sample.ts";
 import { shortDescription } from "./description.ts";
+import { type MarkdownPageData, markdownPageData, text } from "./markdown.ts";
 
 // The CLI reference: a page per command, under /docs/reference/cli, in the
 // groups and the order `zitadel --help` lists them, and an index with the
-// flags every command takes. A page is Markdown, the same text for the page
-// (components/cli-page.tsx), its Markdown twin and search.
+// flags every command takes. A page is Markdown (lib/markdown.ts).
 
 /** A flag as apps/cli/src/lib/oclif/reference.ts describes it. */
 export type CliFlag = {
@@ -64,14 +61,7 @@ export function cliCommandUrl(command: string) {
 
 // ---- Markdown ---------------------------------------------------------------
 
-// The help is plain text with code in backticks. Outside a code span, a `*`
-// and a `<` that would open an HTML tag stay what they are.
-function text(value: string) {
-  return value
-    .split(/(`[^`]*`)/)
-    .map((part, i) => (i % 2 === 1 ? part : part.replace(/\*|<(?=[A-Za-z/!?])/g, "\\$&")))
-    .join("");
-}
+// The help is plain text with code in backticks (text, lib/markdown.ts).
 
 // A table cell is one line, and a `|` in it, even in a code span, ends it.
 function cell(value: string) {
@@ -215,28 +205,8 @@ function indexMarkdown(cliReference: CliReference) {
 
 // ---- The source ---------------------------------------------------------------
 
-export type CliPageData = {
-  title: string;
-  description: string;
-  /** The page as Markdown, for the page itself, its Markdown twin and llms-full.txt. */
-  markdown: string;
-  toc: TOCItemType[];
-  structuredData: StructuredData;
-};
-
-function pageData(title: string, description: string, markdown: string): CliPageData {
-  return {
-    title,
-    description,
-    markdown,
-    toc: getTableOfContents(markdown),
-    // Search indexes the tables' cells, which the parser finds with GFM only.
-    structuredData: structure(markdown, [remarkGfm]),
-  };
-}
-
 /** The reference's pages, beside the content and the API reference in lib/source.ts. */
-export const cliSource: Source<{ pageData: CliPageData; metaData: MetaData }> = {
+export const cliSource: Source<{ pageData: MarkdownPageData; metaData: MetaData }> = {
   files: [
     {
       type: "meta",
@@ -254,12 +224,12 @@ export const cliSource: Source<{ pageData: CliPageData; metaData: MetaData }> = 
     {
       type: "page",
       path: `${baseDir}/index.mdx`,
-      data: pageData("CLI reference", indexDescription, indexMarkdown(reference)),
+      data: markdownPageData("CLI reference", indexDescription, indexMarkdown(reference)),
     },
     ...reference.commands.map((command) => ({
       type: "page" as const,
       path: `${baseDir}/${command.id.split(" ").join("/")}.mdx`,
-      data: pageData(
+      data: markdownPageData(
         `${reference.bin} ${command.id}`,
         shortDescription(text(command.description)),
         commandMarkdown(command),

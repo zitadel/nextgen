@@ -12,8 +12,9 @@ workspace:
       - "test"
 
 tasks:
-  # Bundles api/openapi into .generated/, which lib/openapi.ts imports, and
-  # the CLI's command reference, which lib/cli-reference.ts imports. The
+  # Bundles api/openapi into .generated/, which lib/openapi.ts imports, with
+  # its error codes, which lib/error-reference.ts imports, and the CLI's
+  # command reference, which lib/cli-reference.ts imports. The
   # content needs no generation step: lib/source.ts defines its collection
   # with Fumadocs MDX's macro.
   generate:
@@ -28,6 +29,8 @@ tasks:
     outputs:
       - ".generated/openapi.mjs"
       - ".generated/openapi.d.mts"
+      - ".generated/errors.mjs"
+      - ".generated/errors.d.mts"
       - ".generated/cli.mjs"
       - ".generated/cli.d.mts"
 

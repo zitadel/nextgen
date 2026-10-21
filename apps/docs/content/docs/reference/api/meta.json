@@ -1,6 +1,7 @@
 {
   "title": "API reference",
   "pages": [
+    "errors",
     "---Runtime auth---",
     "flows",
     "authentication-attempts",
