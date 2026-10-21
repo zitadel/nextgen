@@ -123,9 +123,9 @@ export function sanitizeResponse<T>(value: T): T {
  * The error envelope's `message` and `details` are printed as the failure, so
  * they are as attacker-influenceable as any response body. It stays an
  * `ApiError`, with the same status and URL, so `toZitadelError` classifies it
- * as before.
+ * as before. Exported for `zitadel api`, which sends its requests itself.
  */
-function sanitizeRejection(error: unknown): never {
+export function sanitizeRejection(error: unknown): never {
   if (!(error instanceof ApiError)) {
     throw error;
   }

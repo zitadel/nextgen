@@ -1,12 +1,13 @@
-import type { OperationObject } from "fumadocs-openapi";
+import type { OperationObject, PathItemObject } from "fumadocs-openapi";
 import type { RequestData } from "fumadocs-openapi/requests";
 
-import { pathParameterNames } from "./sdk-sample.ts";
+import { authentication, operationParameters, pathParameterNames } from "./sdk-sample.ts";
 
 // The API reference's CLI sample: the `zitadel` command that runs the
 // operation, which the spec names in the operation's `x-zitadel-cli`. The CLI's
 // api-coverage test keeps every name pointed at a command that calls the
-// operation. Like the TypeScript sample, the page builds it from the request
+// operation. An operation no command covers runs through `zitadel api`, by its
+// operationId. Like the TypeScript sample, the page builds it from the request
 // the reader is looking at, an operation's Markdown from its default request.
 //
 // The CLI acts on the project its directory was set up for, so `project_id`
@@ -19,19 +20,42 @@ export const cli = "npx @zitadel/cli@alpha";
 const context = "# Run where `zitadel setup` wrote .zitadel/secret.";
 
 /** The command the spec names for an operation, without the binary: `users create`. */
-export function cliCommand(operation: OperationObject): string | undefined {
+export function namedCliCommand(operation: OperationObject): string | undefined {
   const command: unknown = (operation as Record<string, unknown>)["x-zitadel-cli"];
   return typeof command === "string" ? command : undefined;
 }
 
-/** The sample's code, for an operation the spec names a command for. */
+/**
+ * The command that runs an operation, without the binary: the one the spec
+ * names (`users create`), else `api` for one `zitadel api` can call.
+ */
+export function cliCommand(
+  operation: OperationObject,
+  pathItem: PathItemObject,
+): string | undefined {
+  return namedCliCommand(operation) ?? (callable(operation, pathItem) ? "api" : undefined);
+}
+
+// What `zitadel api` calls: an operation a project secret or nothing
+// authenticates (lib/sdk-sample.ts), and no cookie only a browser carries,
+// as the CLI decides it (apps/cli/src/lib/api/operations.ts).
+function callable(operation: OperationObject, pathItem: PathItemObject): boolean {
+  return (
+    authentication(operation) !== "session" &&
+    !operationParameters(operation, pathItem).some((parameter) => parameter.in === "cookie")
+  );
+}
+
+/** The sample's code, for an operation the CLI runs. */
 export function cliSample(
   operation: OperationObject,
   path: string,
+  pathItem: PathItemObject,
   request: RequestData,
 ): string | undefined {
-  const command = cliCommand(operation);
+  const command = cliCommand(operation, pathItem);
   if (!command) return undefined;
+  if (command === "api") return apiSample(operation, path, request);
   const [topic, verb] = command.split(" ");
   const positionals = pathParameterNames(path).map((name) => word(request.path[name]?.value ?? ""));
 
@@ -44,6 +68,36 @@ export function cliSample(
     flags.push(`--data ${quote(JSON.stringify(request.body ?? {}, null, 2))}`);
   }
   return `${context}\n${line([`${cli} ${command}`, ...positionals], flags)}`;
+}
+
+// `zitadel api <operationId>`: the path parameters are its arguments, but a
+// trailing `project_id`, which the CLI fills in itself; each query parameter
+// and top-level body field is a `--field`, typed by the operation's schema, and
+// an object, a list or `null` is JSON after `:=`.
+function apiSample(operation: OperationObject, path: string, request: RequestData): string {
+  const names = pathParameterNames(path);
+  const positionals = names
+    .filter((name, index) => name !== "project_id" || index < names.length - 1)
+    .map((name) => word(request.path[name]?.value ?? ""));
+  const fields = [
+    ...Object.entries(request.query)
+      .filter(([name]) => name !== "project_id")
+      .flatMap(([name, { values }]) => values.map((value) => field(name, value))),
+    ...Object.entries(record(request.body)).map(([name, value]) => field(name, value)),
+  ];
+  // An operation that needs no credential runs anywhere, unless the CLI is
+  // to fill in its project.
+  const project =
+    authentication(operation) === "secret" ||
+    names.includes("project_id") ||
+    "project_id" in request.query;
+  const call = line([`${cli} api ${operation.operationId ?? ""}`, ...positionals], fields);
+  return project ? `${context}\n${call}` : call;
+}
+
+function field(name: string, value: unknown): string {
+  const scalar = ["string", "number", "boolean"].includes(typeof value);
+  return `-F ${word(scalar ? `${name}=${String(value)}` : `${name}:=${JSON.stringify(value)}`)}`;
 }
 
 // A list's query as the CLI spells it: each filter `field=operation:value`,

@@ -8,7 +8,7 @@ import type { TOCItemType } from "fumadocs-core/toc";
 // (apps/cli/CHANGELOG.md), bundled by scripts/bundle-cli.mjs and imported as a
 // module, so they ship inside the build.
 import reference, { releases } from "../.generated/cli.mjs";
-import { cli, cliCommand } from "./cli-sample.ts";
+import { cli, namedCliCommand } from "./cli-sample.ts";
 import { shortDescription } from "./description.ts";
 import type { openapi } from "./openapi.ts";
 import { gitConfig } from "./shared.ts";
@@ -116,7 +116,7 @@ export function commandOperations({ files }: Awaited<ReturnType<typeof openapi.s
     const slugs = getSlugs(file.path);
     for (const { method, path } of file.data.getOpenAPIPageProps().operations ?? []) {
       const operation = bundled.paths?.[path]?.[method];
-      const command = operation && cliCommand(operation);
+      const command = operation && namedCliCommand(operation);
       if (!operation || !command) continue;
       const endpoint = `${method.toUpperCase()} ${path}`;
       operations.set(command, {
@@ -401,6 +401,20 @@ function pageData(
   };
 }
 
+// A command other commands sit under (`api`, beside `api ls`) is a folder of
+// the tree as well as a page: its page is the folder's index, and the folder
+// lists the commands under it. Fumadocs would otherwise take the name for the
+// folder alone and leave the command's page out.
+const commandIds = new Set(reference.commands.map((command) => command.id));
+const parentOf = (id: string) => id.split(" ").slice(0, -1).join(" ");
+const isTopic = (id: string) => reference.commands.some((command) => parentOf(command.id) === id);
+
+/** A command's file under the reference, without its extension. */
+function pagePath(id: string) {
+  const path = id.split(" ").join("/");
+  return isTopic(id) ? `${path}/index` : path;
+}
+
 /**
  * The reference's pages, beside the content and the API reference in
  * lib/source.ts. A command's page links the operation it calls.
@@ -422,7 +436,9 @@ export const cliSource = (
         pages: [
           ...ownPages,
           ...reference.groups.flatMap((group) => {
-            const commands = reference.commands.filter((command) => command.group === group);
+            const commands = reference.commands.filter(
+              (command) => command.group === group && !commandIds.has(parentOf(command.id)),
+            );
             if (commands.length === 0) return [];
             return [
               `---${group}---`,
@@ -444,7 +460,7 @@ export const cliSource = (
     },
     ...reference.commands.map((command) => ({
       type: "page" as const,
-      path: `${baseDir}/${command.id.split(" ").join("/")}.mdx`,
+      path: `${baseDir}/${pagePath(command.id)}.mdx`,
       data: pageData(
         `${reference.bin} ${command.id}`,
         shortDescription(text(command.description)),
