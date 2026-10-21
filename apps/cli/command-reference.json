@@ -211,6 +211,23 @@
           "name": "sso-scopes",
           "description": "With --sso custom: the scopes to request, separated by spaces or commas. Must include openid. Default: openid profile email.",
           "type": "option"
+        },
+        {
+          "name": "sso-claim",
+          "description": "With --sso: fill a user-schema property from a provider claim, <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned as a number or boolean says so after a colon. Repeatable. Given, it replaces the wizard's claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "sso-verified-claim",
+          "description": "With --sso: how a mapped property is verified, <property>=<claim> for the boolean claim that must be true or <property>=true to trust the provider. Repeatable.",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "sso-claim-scope",
+          "description": "With --sso: extra scopes the mapped claims need, separated by spaces or commas.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -611,6 +628,23 @@
         {
           "name": "client-id",
           "description": "Client id of the application registered with the provider.",
+          "type": "option"
+        },
+        {
+          "name": "claim",
+          "description": "Fill a user-schema property from a provider claim: <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim the provider returns as a number or boolean says so after a colon (string is the default). Repeatable. Given, it replaces the interactive claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "verified-claim",
+          "description": "Say how a mapped property is verified: <property>=<claim> names the boolean claim that must be true, <property>=true trusts the provider. Repeatable.",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "claim-scope",
+          "description": "Extra scopes the mapped claims need before the provider returns them, separated by spaces or commas.",
           "type": "option"
         },
         {
