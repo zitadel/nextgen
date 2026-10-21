@@ -289,8 +289,8 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 	return revoked, nil
 }
 
-// servedOrigins lists, sorted, the origins serving the release at now and the
-// deployment pinning each, from the same live view the deployments list reads.
+// servedOrigins returns the origins still serving the release, each with the
+// deployment that serves it.
 func servedOrigins(ctx context.Context, stmts DeploymentStatements, projectID, releaseID string, now time.Time) ([]domain.ReleaseInUseOrigin, error) {
 	result, err := stmts.ListLiveDeployments(WithAuthzListUnrestricted(ctx), now, deployment.LiveListOptions(projectID, &releaseID, 0))
 	if err != nil {
