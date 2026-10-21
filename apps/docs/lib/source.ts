@@ -10,7 +10,7 @@ import type { RequestData } from "fumadocs-openapi/requests";
 import { pathnameFromRequest } from "fumadocs-openapi/requests/generators";
 import { curl } from "fumadocs-openapi/requests/generators/curl";
 
-import { cliCommandUrl, cliSidebarNames, cliSource } from "./cli-reference";
+import { cliCommandUrl, cliSidebarNames, cliSource, commandOperations } from "./cli-reference";
 import { codeThemes } from "./code-theme";
 import { cliCommand, cliSample } from "./cli-sample";
 import { defaultRequest, withRefValues } from "./default-request";
@@ -35,20 +35,21 @@ const docs = defineDocs({
   },
 });
 
+// A page per operation of the server's API, beside the reference's own pages
+// in content/docs/reference/api.
+const operationPages = await openapi.staticSource({
+  baseDir: "reference/api",
+  groupBy: "tag",
+});
+
 // See https://fumadocs.dev/docs/headless/source-api for more info
 export const source = loader(
   {
     docs: docs.toFumadocsSource(),
-    // A page per operation of the server's API, beside the reference's own
-    // pages in content/docs/reference/api. Fumadocs makes the operation's
-    // whole description the page's description; the page's own is a line of
-    // plain text, and `markdownDescription` keeps the whole (lib/description.ts).
-    openapi: update(
-      await openapi.staticSource({
-        baseDir: "reference/api",
-        groupBy: "tag",
-      }),
-    )
+    // Fumadocs makes the operation's whole description the page's
+    // description; the page's own is a line of plain text, and
+    // `markdownDescription` keeps the whole (lib/description.ts).
+    openapi: update(operationPages)
       .page((page) => {
         // The document is data: a description that is not a string is none.
         const description: unknown = page.data.description;
@@ -63,8 +64,9 @@ export const source = loader(
         };
       })
       .build(),
-    // A page per command of the CLI, under reference/cli (lib/cli-reference.ts).
-    cli: cliSource,
+    // A page per command of the CLI, under reference/cli, which links the
+    // operation the command calls (lib/cli-reference.ts).
+    cli: cliSource(commandOperations(operationPages)),
   },
   {
     baseUrl: docsRoute,
@@ -77,7 +79,7 @@ type OpenAPIPage = Extract<Page, { type: "openapi" }>;
 
 // llms.txt and MCP's list_pages have room for an operation's whole first
 // sentence (lib/description.ts); otherwise Fumadocs' own description.
-function sourceLlms(input: typeof source) {
+function sourceLlms(input: typeof source, { full = false } = {}) {
   return llms(input, {
     renderDescription: (node) => {
       const data =
@@ -88,18 +90,18 @@ function sourceLlms(input: typeof source) {
     },
     renderPage: async (page) => `# ${page.data.title} (${page.url})
 
-${await pageText(page)}`,
+${await pageText(page, full)}`,
   });
 }
 
-// A CLI reference page is Markdown already; a content page's is its processed
-// MDX.
-async function pageText(page: Page) {
+// A CLI reference page is Markdown already, with a version for llms-full.txt;
+// a content page's is its processed MDX.
+async function pageText(page: Page, full: boolean) {
   switch (page.type) {
     case "openapi":
       return operationText(page);
     case "cli":
-      return page.data.markdown;
+      return full ? page.data.llmsFullMarkdown : page.data.markdown;
     default:
       return page.data.getText("processed");
   }
@@ -108,6 +110,9 @@ async function pageText(page: Page) {
 // The pages, llms-full.txt, and MCP, whose get_page takes the page URL its
 // list_pages lists.
 export const docsLlms = sourceLlms(source);
+
+// llms-full.txt, which leaves the operations out, so its pages link none.
+export const docsLlmsFull = sourceLlms(source, { full: true });
 
 // /docs/llms.txt, which lists each page by its Markdown URL (lib/shared.ts),
 // so an agent fetches the Markdown without asking for it through `Accept`.
