@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/require"
