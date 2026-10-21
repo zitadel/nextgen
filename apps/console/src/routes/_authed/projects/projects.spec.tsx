@@ -88,6 +88,14 @@ describe("projects screen", () => {
     ).toBeInTheDocument();
   });
 
+  it("leaves the server out when it is the CLI's own default", async () => {
+    const { cliSetup } = await import("@/components/cli-hint");
+    expect(cliSetup("https://preview.zitadel.com")).toBe("npx @zitadel/cli@alpha setup");
+    expect(cliSetup("http://localhost:8080")).toBe(
+      "npx @zitadel/cli@alpha setup --server http://localhost:8080",
+    );
+  });
+
   it("lists a project somebody else granted access to", async () => {
     // The person owns nothing here: the row exists only because the query
     // answers with grants rather than with the console's own project.

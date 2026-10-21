@@ -13,13 +13,21 @@ const CLI = "npx @zitadel/cli@alpha";
 export const CLI_APPLY = `${CLI} apply`;
 
 /**
+ * The server the CLI targets when nothing names one: its hosted default
+ * (`DEFAULT_SERVER` in `apps/cli/src/lib/server.ts`). Keep the two in step.
+ */
+const CLI_DEFAULT_SERVER = "https://preview.zitadel.com";
+
+/**
  * `setup`: creates a project and connects the app in the current directory.
- * It names the server, which the CLI would otherwise take from its config or
- * its hosted default; a local server is recognised by its URL, so the project
- * is attached to the local admin's team as with `--server local`.
+ * It names the server unless that is the CLI's default: the CLI takes its
+ * server from `--server`, `ZITADEL_SERVER` or `zitadel.json` and otherwise
+ * the hosted default, and never finds a running local server by itself. A
+ * local server is recognised by its URL, so the project is attached to the
+ * local admin's team as with `--server local`.
  */
 export function cliSetup(server: string): string {
-  return `${CLI} setup --server ${server}`;
+  return server === CLI_DEFAULT_SERVER ? `${CLI} setup` : `${CLI} setup --server ${server}`;
 }
 
 /**

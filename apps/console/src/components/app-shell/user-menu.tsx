@@ -119,10 +119,12 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             tooltip={name}
             aria-label={`Account: ${name}`}
             // The avatar's colours sweep across the row on hover (`styles.css`).
-            // Collapsed to the rail, the row is the rail's 32px square with the
-            // 24px avatar centred 4px in on every side; `min-h-12` would
-            // otherwise stretch it into a 32x48 pill.
-            className="avatar-host h-auto min-h-12 py-2 group-data-[collapsible=icon]:min-h-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1!"
+            // The avatar holds still when the sidebar collapses: `pl-1` puts
+            // its centre on the nav icons' column (24px in) in both states, and
+            // on the rail the row is the rail's 32px square, 4px around the
+            // avatar, lifted 8px so the avatar keeps the height it had at the
+            // middle of the 48px row.
+            className="avatar-host h-auto min-h-12 py-2 pl-1 group-data-[collapsible=icon]:mb-2 group-data-[collapsible=icon]:min-h-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1!"
             style={avatarVars(user?.userId ?? email)}
             onPointerEnter={() => setHovered(true)}
             onPointerLeave={() => setHovered(false)}
