@@ -49,10 +49,16 @@ export type CliCommand = {
   examples: { command: string; description?: string }[];
 };
 
+/** An environment variable that sets what a global flag sets. */
+export type CliVariable = { name: string; flag: string; description: string; precedence: string };
+
 export type CliReference = {
   bin: string;
   groups: string[];
   globalFlags: CliFlag[];
+  env: CliVariable[];
+  /** The exit code of each error `code` an envelope can carry. */
+  exitCodes: Record<string, number>;
   commands: CliCommand[];
 };
 
@@ -121,11 +127,12 @@ function cell(value: string) {
   return text(value.replace(/\s+/g, " ").trim()).replaceAll("|", "\\|");
 }
 
-function table(head: [string, string], rows: [string, string][]) {
+// The first column is Markdown already, a name or a link; the others are text.
+function table(head: string[], rows: string[][]) {
   return [
-    `| ${head[0]} | ${head[1]} |`,
-    "| --- | --- |",
-    ...rows.map(([left, right]) => `| ${left} | ${cell(right)} |`),
+    `| ${head.join(" | ")} |`,
+    `|${" --- |".repeat(head.length)}`,
+    ...rows.map(([first, ...rest]) => `| ${[first, ...rest.map(cell)].join(" | ")} |`),
   ].join("\n");
 }
 
@@ -248,7 +255,35 @@ function commandMarkdown(
 
 const indexDescription = "Every zitadel command, with its flags and examples.";
 
-/** The reference's own page: how to run a command, the global flags, the commands. */
+// The variables that stand in for a global flag, with how each ranks against it.
+function variableTable(variables: CliVariable[]) {
+  return table(
+    ["Variable", "Flag", "Description", "Precedence"],
+    variables.map((variable) => [
+      code(variable.name),
+      code(`--${variable.flag}`),
+      variable.description,
+      variable.precedence,
+    ]),
+  );
+}
+
+// A row per exit code, lowest first, with the error codes that end in it.
+function exitCodeTable(exitCodes: Record<string, number>) {
+  const codes = [...new Set(Object.values(exitCodes))].sort((a, b) => a - b);
+  return table(
+    ["Exit code", "Error codes"],
+    codes.map((exit) => [
+      code(String(exit)),
+      list(Object.keys(exitCodes).filter((error) => exitCodes[error] === exit)),
+    ]),
+  );
+}
+
+/**
+ * The reference's own page: how to run a command, the global flags with the
+ * environment variables that stand in for them, the exit codes, the commands.
+ */
 function indexMarkdown(cliReference: CliReference) {
   const groups = cliReference.groups.flatMap((group) => {
     const rows = cliReference.commands
@@ -267,6 +302,12 @@ function indexMarkdown(cliReference: CliReference) {
     "## Global flags",
     "Every command takes these.",
     flagTable(cliReference.globalFlags),
+    "## Environment variables",
+    "These set what a global flag sets, for every command.",
+    variableTable(cliReference.env),
+    "## Exit codes",
+    "A command that succeeds, or skips because there is nothing to do, exits `0`. One that fails exits with the code of the error its envelope names in `code`.",
+    exitCodeTable(cliReference.exitCodes),
     ...groups,
     `\`${cli} --help\` also lists oclif's own commands, such as \`help\` and \`version\`, under Additional commands.`,
   ].join("\n\n");
