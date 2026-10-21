@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 
 import {
+  assertOidcMock,
   assertPrebuiltTarballs,
   journeyArgsFromEnv,
   parseLocalJourneyArgs,
@@ -11,7 +12,20 @@ test("local journey defaults to the full framework matrix", () => {
   assert.deepEqual(parseLocalJourneyArgs([]), {
     ci: false,
     concurrency: 5,
-    frameworkIds: ["next", "nuxt", "react", "vue", "angular", "solid", "svelte", "qwik"],
+    frameworkIds: [
+      "next",
+      "nuxt",
+      "react",
+      "vue",
+      "angular",
+      "solid",
+      "svelte",
+      "qwik",
+      "sveltekit",
+      "tanstack-start",
+      "solid-start",
+      "qwik-router",
+    ],
     image: "",
     keep: false,
     matrix: "full",
@@ -276,6 +290,15 @@ test("the e2e:all lane refuses to pack beside the other lanes", () => {
     "--ci",
   ]);
   assert.doesNotThrow(() => assertPrebuiltTarballs(handedOver, lane));
+});
+
+test("--ci refuses to run without the mock OIDC provider", () => {
+  const missing = "/does/not/exist/oidc-mock";
+  assert.throws(() => assertOidcMock({ ci: true }, missing), /oidc-mock:build/);
+  // Any existing file stands in for the built binary.
+  assert.doesNotThrow(() => assertOidcMock({ ci: true }, process.execPath));
+  // Run by hand, a missing binary only skips the mock.
+  assert.doesNotThrow(() => assertOidcMock({ ci: false }, missing));
 });
 
 test("local journey rejects invalid options", () => {

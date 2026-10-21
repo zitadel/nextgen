@@ -60,12 +60,14 @@ type FlowCreateAttemptInput struct {
 
 // FlowSubmitIdentifierInput names the submitted identifier field
 // (AttributeName, e.g. "email") and the user-entered value the
-// auth-attempt service resolves to a user.
+// auth-attempt service resolves to a user. UserSchemaURL is the schema the
+// flow is bound to: the lookup matches only users of its revisions.
 type FlowSubmitIdentifierInput struct {
 	ProjectID     string
 	AttemptID     string
 	AttributeName string
 	Value         string
+	UserSchemaURL string
 }
 
 type FlowSubmitPasswordInput struct {

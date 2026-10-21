@@ -388,9 +388,9 @@ function matches(step: Step, expected: Step): boolean {
 /**
  * A step without what the platform leaves out when it answers.
  *
- * `apply` writes the canonical definition back into the file, and the server
- * omits an action's `primary: false` (a default), an empty `fields` list, and
- * an empty `gates` map, so the step in the file is not byte for byte what this
+ * The server omits an action's `primary: false` (a default), an empty `fields`
+ * list, and an empty `gates` map, and a file that took the server's
+ * definition (as `apply` once wrote it back) is not byte for byte what this
  * generator wrote though it is the same step. Reading it as hand-edited would
  * skip the step on the next provider.
  */

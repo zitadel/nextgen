@@ -1,0 +1,24 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // The edge spec imports this package's built dist.
+    "typecheck": {
+      "dependsOn": ["build"]
+    },
+    "build": {
+      "dependsOn": ["@zitadel/sdk-core#build"]
+    },
+    "build-release": {
+      "dependsOn": ["@zitadel/sdk-core#build-release"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    // tsup's declaration pass resolves the workspace packages, which need
+    // api's generated client and the built dependencies.
+    "dev": {
+      "dependsOn": ["@zitadel/sdk-core#build"]
+    }
+  }
+}

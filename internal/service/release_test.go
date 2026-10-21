@@ -31,7 +31,31 @@ func newMockedReleaseService(t *testing.T) (service.ReleaseService, *servicemock
 		AnyTimes()
 	statementer.EXPECT().Statements().Return(statements).AnyTimes()
 	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	return service.NewReleaseService(service.NewPool(pool)), statements
+	return service.NewReleaseService(service.NewPool(pool), nil, nil, nil, nil, testBuiltinBases), statements
+}
+
+// testBuiltinBases is the built-in schema namespace the release tests run
+// under: example.com rows are outside it, so pointers resolve as written.
+var testBuiltinBases = domain.NewBuiltinSchemaBases("https://schemas.test/builtin/v1", "https://schemas.test/builtin/v0")
+
+// loginFlow collects email, which human-user-v2.json dropped.
+func loginFlow() *domain.FlowDefinition {
+	return &domain.FlowDefinition{
+		ProjectID:  "proj_1",
+		ID:         "flowdef_1",
+		Name:       "default-login",
+		UserSchema: "human-user",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:        "identify",
+				Fields:      []domain.Field{"email"},
+				Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+			},
+			{Name: "done", Complete: new(domain.FlowStepCompleteRedirect)},
+		},
+	}
 }
 
 // expectHandleReads stubs the per-kind revision reads that resolve a handle:
@@ -44,10 +68,26 @@ func expectHandleReads(statements *servicemocks.MockAllStatements) {
 			ProjectID:  "proj_1",
 			URL:        "https://example.com/human-user.json",
 			ObjectType: new("human-user"),
+			Schema: []byte(`{"type": "object", "x-identifier": "email",
+				"x-auth-methods": {"password": {"enabled": true}},
+				"properties": {"email": {"type": "string", "format": "email", "x-unique": "team"}}}`),
+		}, nil).AnyTimes()
+	statements.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.com/human-user-v2.json").
+		Return(&domain.JSONSchema{
+			ProjectID:  "proj_1",
+			URL:        "https://example.com/human-user-v2.json",
+			ObjectType: new("human-user"),
+			Schema: []byte(`{"type": "object",
+				"x-auth-methods": {"password": {"enabled": true}},
+				"properties": {"name": {"type": "string"}}}`),
 		}, nil).AnyTimes()
 	statements.EXPECT().
 		GetFlowDefinitionByID(gomock.Any(), "proj_1", "flowdef_1").
-		Return(&domain.FlowDefinition{ProjectID: "proj_1", ID: "flowdef_1", Name: "default-login"}, nil).AnyTimes()
+		Return(loginFlow(), nil).AnyTimes()
+	statements.EXPECT().
+		GetIDPConnectionRevision(gomock.Any(), "proj_1", "idprev_1").
+		Return(&domain.IDPConnection{ProjectID: "proj_1", ID: "idp_1", Slug: "google", RevisionID: "idprev_1"}, nil).AnyTimes()
 	statements.EXPECT().
 		GetBrandingByID(gomock.Any(), "proj_1", "brnd_1").
 		Return(&domain.Branding{ProjectID: "proj_1", ID: "brnd_1"}, nil).AnyTimes()
@@ -247,6 +287,91 @@ func TestReleaseServiceCreateRejectsSchemaWithoutObjectType(t *testing.T) {
 	assert.Equal(t, domain.ErrReleaseRevisionUnpinnable(nil).Code, domErr.Code)
 }
 
+func TestReleaseServiceCreateRejectsMissingUserSchema(t *testing.T) {
+	svc, statements := newMockedReleaseService(t)
+	expectHandleReads(statements)
+	statements.EXPECT().
+		GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).
+		Return(nil, new(database.NoRowFoundError))
+
+	_, err := svc.Create(t.Context(), service.CreateReleaseInput{
+		ProjectID: "proj_1",
+		Pointers: []service.CreateReleasePointer{
+			{Kind: domain.ReleasePointerKindFlowDefinition, RevisionID: "flowdef_1"},
+			{Kind: domain.ReleasePointerKindBranding, RevisionID: "brnd_1"},
+		},
+	})
+	assert.ErrorIs(t, err, domain.ErrReleaseUnresolvedReference())
+}
+
+// A set already released answers with that release; validation is skipped.
+func TestReleaseServiceCreateReturnsExistingWithoutValidating(t *testing.T) {
+	svc, statements := newMockedReleaseService(t)
+	expectHandleReads(statements)
+	existing := &domain.Release{ProjectID: "proj_1", ID: "rel_existing"}
+	statements.EXPECT().
+		GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).
+		Return(existing, nil)
+
+	result, err := svc.Create(t.Context(), service.CreateReleaseInput{
+		ProjectID: "proj_1",
+		Pointers:  []service.CreateReleasePointer{{Kind: domain.ReleasePointerKindFlowDefinition, RevisionID: "flowdef_1"}},
+	})
+	require.NoError(t, err)
+	assert.Same(t, existing, result.Release)
+	assert.False(t, result.Created)
+}
+
+func TestReleaseServiceCreateReferencesIDPConnection(t *testing.T) {
+	svc, statements := newMockedReleaseService(t)
+	expectHandleReads(statements)
+	statements.EXPECT().
+		GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).
+		Return(nil, new(database.NoRowFoundError))
+	statements.EXPECT().CreateRelease(gomock.Any(), gomock.Any()).Return(nil)
+
+	result, err := svc.Create(t.Context(), service.CreateReleaseInput{
+		ProjectID: "proj_1",
+		Pointers: []service.CreateReleasePointer{
+			{Kind: domain.ReleasePointerKindIDP, RevisionID: "idprev_1"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []domain.ReleasePointer{
+		{Kind: domain.ReleasePointerKindIDP, Handle: "google", RevisionID: "idprev_1"},
+	}, result.Release.Pointers)
+}
+
+func TestReleaseServiceCreateRejectsUnknownIDPRevision(t *testing.T) {
+	svc, statements := newMockedReleaseService(t)
+	statements.EXPECT().
+		GetIDPConnectionRevision(gomock.Any(), "proj_1", "idprev_gone").
+		Return(nil, new(database.NoRowFoundError))
+
+	_, err := svc.Create(t.Context(), service.CreateReleaseInput{
+		ProjectID: "proj_1",
+		Pointers:  []service.CreateReleasePointer{{Kind: domain.ReleasePointerKindIDP, RevisionID: "idprev_gone"}},
+	})
+	assert.ErrorIs(t, err, domain.ErrReleaseRevisionNotFound(nil))
+}
+
+func TestReleaseServiceCreateRejectsFlowNotFittingItsSchema(t *testing.T) {
+	svc, statements := newMockedReleaseService(t)
+	expectHandleReads(statements)
+	statements.EXPECT().
+		GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).
+		Return(nil, new(database.NoRowFoundError))
+
+	_, err := svc.Create(t.Context(), service.CreateReleaseInput{
+		ProjectID: "proj_1",
+		Pointers: []service.CreateReleasePointer{
+			{Kind: domain.ReleasePointerKindFlowDefinition, RevisionID: "flowdef_1"},
+			{Kind: domain.ReleasePointerKindSchema, RevisionID: "https://example.com/human-user-v2.json"},
+		},
+	})
+	assert.ErrorIs(t, err, domain.ErrReleaseInvalid(nil, nil))
+}
+
 // Two revisions of one resource cannot both be pinned: the release would
 // describe two states of the project at once. The handles collide only after
 // resolution, so this is caught with the revisions already read.
@@ -285,4 +410,45 @@ func TestReleaseServiceGetUnknownIsNotFound(t *testing.T) {
 	domErr, ok := errors.AsType[domain.Error](err)
 	require.True(t, ok)
 	assert.Equal(t, domain.ErrReleaseNotFound().Code, domErr.Code)
+}
+
+// A schema pointer may name a built-in schema's `$id` under a base the
+// project was not seeded under: the release pins the row that was found,
+// under the base it is stored at.
+func TestReleaseServiceCreateResolvesBuiltinSchemaUnderAnotherBase(t *testing.T) {
+	const asked = "https://schemas.test/builtin/v0/default-human-user.json"
+	const stored = "https://schemas.test/builtin/v1/default-human-user.json"
+
+	svc, statements := newMockedReleaseService(t)
+	statements.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", asked).
+		Return(nil, new(database.NoRowFoundError))
+	statements.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", stored).
+		Return(&domain.JSONSchema{
+			ProjectID:  "proj_1",
+			URL:        stored,
+			ObjectType: new("human-user"),
+			Schema: []byte(`{"type": "object", "x-identifier": "email",
+				"x-auth-methods": {"password": {"enabled": true}},
+				"properties": {"email": {"type": "string", "format": "email", "x-unique": "team"}}}`),
+		}, nil)
+	statements.EXPECT().
+		GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).
+		Return(nil, new(database.NoRowFoundError))
+	statements.EXPECT().
+		CreateRelease(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, rel *domain.Release) error {
+			rel.ID = "rel_test02"
+			return nil
+		})
+
+	result, err := svc.Create(t.Context(), service.CreateReleaseInput{
+		ProjectID: "proj_1",
+		Pointers:  []service.CreateReleasePointer{{Kind: domain.ReleasePointerKindSchema, RevisionID: asked}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []domain.ReleasePointer{
+		{Kind: domain.ReleasePointerKindSchema, Handle: "human-user", RevisionID: stored},
+	}, result.Release.Pointers)
 }

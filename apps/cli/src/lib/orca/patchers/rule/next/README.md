@@ -6,6 +6,8 @@ renderer id is declared in `renderers/registry.ts` but deliberately
 unavailable (`status: "not-implemented"`, reserved for a future
 `@zitadel/ui-lit`).
 
+The detector requires `next` 15.2.3 or newer; older versions are refused.
+
 ## What it patches
 
 - `<appDir>/login/page.tsx`, `<appDir>/register/page.tsx` — auth routes

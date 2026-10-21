@@ -186,10 +186,17 @@ export async function buildSyncPlan(
       // hash for the bodies it newly touches, which costs one no-op
       // revision on the next apply; keeping a copy of every past
       // normalizer to avoid that would outlast the state files it serves.
+      //
+      // A syncer that gained its first normalizer (connections, which read a
+      // left-out default as the server's) also accepts the hash of the
+      // un-normalized body, which is what its state entries hold. The file has
+      // to be byte-for-byte what was hashed for that to match, so it is the
+      // same file.
       const unchanged =
         entry.hash === hash ||
         entry.hash === hashResourceContent(content) ||
-        entry.hash === hashResourceContent(JSON.parse(stableStringify(content)) as object);
+        entry.hash === hashResourceContent(JSON.parse(stableStringify(content)) as object) ||
+        (syncer.normalize !== undefined && entry.hash === hashForState({}, content));
       // A re-pin is an upload of an otherwise unchanged file, so it needs a
       // syncer that can upload: an update for a mutable one, a new revision
       // for a revisioned one (flows).
@@ -286,9 +293,10 @@ export async function buildSyncPlan(
 /** Result of {@link runSyncLoop}: what changed on the platform and locally. */
 export type SyncLoopResult = {
   /**
-   * Project-relative paths of files updated from the server's canonical
-   * responses (write-back). Surfaced in human and `--json` output so a
-   * local rewrite is never silent.
+   * Project-relative paths of the flow files whose `user_schema` was re-pinned
+   * from a superseded schema revision id to the new one. Apply rewrites no
+   * other file: the rest stay as written. Surfaced in human and `--json`
+   * output so a local rewrite is never silent.
    */
   filesUpdated: string[];
   /**
@@ -305,10 +313,16 @@ export type SyncLoopResult = {
 /**
  * Execute every action returned by {@link buildSyncPlan} against the
  * platform. Updates the local state file (`.zitadel/state.json`) as
- * each action completes so an interrupted run can resume. After each
- * mutation, the server's canonical body is written back to the local
- * file (when it differs in normalized form), so repo config matches
- * live state by construction and the next `plan` is empty.
+ * each action completes so an interrupted run can resume, recording the
+ * hash of what was uploaded, so the next `plan` is empty.
+ *
+ * The files stay as written. The server's answer is not written back: it
+ * spells out defaults the author left to the server (a connection's
+ * `pkce_enabled`) and leaves out others (an action's `primary: false`), and
+ * `plan` reads both as no change through the syncer's `normalize`. The one
+ * rewrite is a flow's `user_schema` that pins a schema revision id this run
+ * (or an interrupted one) superseded: the file must carry the server-minted
+ * id of the new revision, or the next upload would pin the old one.
  *
  * The platform target (base URL + bearer auth) lives in the api
  * package's runtime registries; callers set them before invoking this.
@@ -357,37 +371,20 @@ export async function runSyncLoop(
     return { ...(content as Record<string, unknown>), user_schema: newId };
   };
 
-  const writeBack = async (
-    action: Extract<SyncAction, { kind: "create" | "revise" | "update" }>,
-    canonical: object | undefined,
-    fallbackHash: string,
-  ): Promise<string> => {
-    if (!canonical) {
-      return fallbackHash;
-    }
-    const { hash, changed } = await writeBackResource(cwd, action.path, action.syncer, canonical);
-    if (changed) {
-      filesUpdated.push(action.path);
-      consola.info(`Updated ${action.path} from the server's canonical response`);
-    }
-    return hash;
-  };
-
   for (const action of actions) {
     switch (action.kind) {
       case "create": {
-        let content = action.content;
         const newId = repinTarget(action.repin);
-        if (newId) {
-          // A flow created in the same run as (or after an interrupted)
-          // schema revise must adopt the new revision — POSTing the stale
-          // pin would fail validation, and its canonical echo would revert
-          // the re-pinned local file.
-          content = { ...(content as Record<string, unknown>), user_schema: newId };
-        }
-        const { id, canonical } = await action.syncer.create(content);
-        const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
-        const entry: ResourceEntry = { id, hash: await writeBack(action, canonical, fallbackHash) };
+        // A flow created in the same run as (or after an interrupted) schema
+        // revise must adopt the new revision — POSTing the stale pin would
+        // fail validation.
+        const content =
+          newId && action.repin
+            ? await adoptRepin(action.path, action.content, action.repin, newId)
+            : action.content;
+        const { id } = await action.syncer.create(content);
+        const hash = newId ? hashForState(action.syncer, content) : action.hash;
+        const entry: ResourceEntry = { id, hash };
         if (action.movedFrom === undefined) {
           await updateState(cwd, action.path, entry);
         } else {
@@ -418,14 +415,13 @@ export async function runSyncLoop(
           newId && action.repin
             ? await adoptRepin(action.path, action.content, action.repin, newId)
             : action.content;
-        const { id, canonical } = await action.syncer.create(content);
-        const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
+        const { id } = await action.syncer.create(content);
         // `previousId` lands in state before the flow files are rewritten:
         // if the process dies in between, the next plan recovers the re-pin
         // from state instead of publishing a duplicate revision.
         const entry: ResourceEntry = {
           id,
-          hash: await writeBack(action, canonical, fallbackHash),
+          hash: newId ? hashForState(action.syncer, content) : action.hash,
           previousId: action.previousId,
         };
         await updateState(cwd, action.path, entry);
@@ -454,8 +450,7 @@ export async function runSyncLoop(
           newId && action.repin
             ? await adoptRepin(action.path, action.content, action.repin, newId)
             : action.content;
-        const { id: landedOn, canonical } = await action.syncer.update(action.id, content);
-        const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
+        const { id: landedOn } = await action.syncer.update(action.id, content);
         // The id the write reported, not the one it was given: a write
         // addressed by document content can land on a different resource than
         // the tracked one, and state has to follow it or the next plan reads
@@ -463,7 +458,7 @@ export async function runSyncLoop(
         const trackedId = landedOn ?? action.id;
         await updateState(cwd, action.path, {
           id: trackedId,
-          hash: await writeBack(action, canonical, fallbackHash),
+          hash: newId ? hashForState(action.syncer, content) : action.hash,
         });
         consola.info(`Updated the ${action.syncer.kind} on Zitadel from ${action.path}`);
         applied.push({
@@ -567,45 +562,6 @@ async function repinFlowFile(
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/**
- * Reconcile a local file with the server's canonical body. What gets
- * written is the `normalizeWrite` form (strips pure transport noise like
- * the empty `audience` echo; for schemas the canonical body as returned,
- * with the `x-audit` defaults the server spells out on every property).
- * Equality is judged in the `normalize` comparison form, so the file is
- * rewritten only when it materially differs from live state;
- * hand-formatted files stay untouched otherwise.
- * Returns the state hash of the written form.
- */
-export async function writeBackResource(
-  cwd: string,
-  relPath: string,
-  syncer: Pick<ResourceSyncer, "normalize" | "normalizeWrite">,
-  canonical: object,
-): Promise<{ hash: string; changed: boolean }> {
-  let writeBody = syncer.normalizeWrite?.(canonical) ?? canonical;
-  const compare = (body: object) => stableStringify(syncer.normalize?.(body) ?? body);
-  const absPath = join(cwd, relPath);
-  let changed = true;
-  try {
-    const onDisk = JSON.parse(await readFile(absPath, "utf8")) as Record<string, unknown>;
-    changed = compare(writeBody) !== compare(onDisk);
-    // `$schema` is a local editor affordance (points at the dialect spec in
-    // .zitadel/meta/); the server never echoes it, so a rewrite would drop
-    // it. Carry the on-disk pointer over unless the canonical body has its
-    // own (user-schema documents do).
-    if (typeof onDisk.$schema === "string" && !("$schema" in writeBody)) {
-      writeBody = { ...writeBody, $schema: onDisk.$schema };
-    }
-  } catch (err) {
-    consola.debug(`read ${relPath} for write-back failed:`, err);
-  }
-  if (changed) {
-    await writeFile(absPath, `${stableStringify(writeBody)}\n`);
-  }
-  return { hash: hashForState(syncer, writeBody), changed };
 }
 
 /**

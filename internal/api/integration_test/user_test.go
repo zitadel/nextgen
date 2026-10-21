@@ -6,10 +6,12 @@ package integration_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -633,18 +635,11 @@ func TestPatchUser(t *testing.T) {
 		require.NoError(t, err)
 		return user
 	}
-	patchReq := func(t *testing.T, body map[string]any) *api.PatchUserRequest {
-		t.Helper()
-		req := &api.PatchUserRequest{}
-		require.NoError(t, req.UnmarshalJSON([]byte(helpers.MustMarshal(t, body))))
-		return req
-	}
-
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 		user := createUser(t, "testpatchuser.ok@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{
 				"email":    "testpatchuser.ok.patched@example.com",
 				"nickname": "Patched",
@@ -663,13 +658,13 @@ func TestPatchUser(t *testing.T) {
 		user := createUser(t, "testpatchuser.null@example.com")
 		params := api.PatchUserByIDParams{UserID: api.UserID(user.ID)}
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": "Ephemeral"},
 		}), params)
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 
-		resp, err = client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": nil},
 		}), params)
 		require.NoError(t, err)
@@ -682,7 +677,7 @@ func TestPatchUser(t *testing.T) {
 		t.Parallel()
 		user := createUser(t, "testpatchuser.invalid@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"email": 5},
 		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 		require.NoError(t, err)
@@ -693,11 +688,108 @@ func TestPatchUser(t *testing.T) {
 		t.Parallel()
 		user := createUser(t, "testpatchuser.unknownschema@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"schema": "https://example.com/schemas/does-not-exist",
 		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 		require.NoError(t, err)
 		assert.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	// Two revisions of one logical schema: v2 drops nickname and requires
+	// country. Both are closed, so a value the target does not declare must be
+	// removed by the patch.
+	revisionSchema := func(revision string, properties, required string) string {
+		return `{
+			"title": "PatchRevisionsSchema",
+			"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
+			"$id": "https://patch-revisions.example.com/schemas/` + revision + `.json",
+			"kind": "user-schema",
+			"objectType": "patch-revisions-user",
+			"type": "object",
+			"additionalProperties": false,
+			"x-identifier": "email",
+			"x-auth-methods": {"password": {"enabled": true}},
+			"required": ` + required + `,
+			"properties": {
+				"email": {"type": "string", "format": "email", "x-unique": "project"},
+				` + properties + `
+			}
+		}`
+	}
+	revisionV1 := harness.CreateUserSchema(t, project, revisionSchema("v1",
+		`"nickname": {"type": "string"}`, `["email"]`))
+	revisionV2 := harness.CreateUserSchema(t, project, revisionSchema("v2",
+		`"country": {"type": "string"}`, `["email", "country"]`))
+
+	createRevisionUser := func(t *testing.T, email string) *domain.User {
+		t.Helper()
+		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  project.ID,
+			SchemaURL:  revisionV1,
+			Attributes: map[string]any{"email": email, "nickname": "Nick"},
+		})
+		require.NoError(t, err)
+		return user
+	}
+	getUser := func(t *testing.T, userID string) *api.User {
+		t.Helper()
+		resp, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.User)
+	}
+	requireUserInvalid := func(t *testing.T, resp api.PatchUserByIDRes) {
+		t.Helper()
+		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), resp.(*api.PatchUserByIDBadRequest).Code)
+	}
+
+	t.Run("an older revision is validated like a newer one", func(t *testing.T) {
+		t.Parallel()
+		user := createRevisionUser(t, "testpatchuser.olderrevision@example.com")
+		params := api.PatchUserByIDParams{UserID: api.UserID(user.ID)}
+
+		// Forward: v2 requires country and does not declare nickname.
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"schema": revisionV2,
+		}), params)
+		require.NoError(t, err)
+		requireUserInvalid(t, resp)
+		unchanged := getUser(t, user.ID)
+		assert.Equal(t, revisionV1, unchanged.Schema)
+		assert.Equal(t, "Nick", userProp(t, *unchanged, "nickname"))
+
+		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"schema":     revisionV2,
+			"attributes": map[string]any{"country": "CH", "nickname": nil},
+		}), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, revisionV2, resp.(*api.User).Schema)
+
+		// Backward: v1 does not declare country, so the same validation
+		// refuses keeping it, and the user is left unchanged.
+		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"schema": revisionV1,
+		}), params)
+		require.NoError(t, err)
+		requireUserInvalid(t, resp)
+		unchanged = getUser(t, user.ID)
+		assert.Equal(t, revisionV2, unchanged.Schema)
+		assert.Equal(t, "CH", userProp(t, *unchanged, "country"))
+
+		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"schema":     revisionV1,
+			"attributes": map[string]any{"country": nil},
+		}), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		moved := resp.(*api.User)
+		assert.Equal(t, revisionV1, moved.Schema)
+		_, hasCountry := moved.Attributes["country"]
+		assert.False(t, hasCountry)
+		_, hasNickname := moved.Attributes["nickname"]
+		assert.False(t, hasNickname, "v1 declares nickname, but the value removed by the forward move stays removed")
 	})
 
 	t.Run("duplicate mail address", func(t *testing.T) {
@@ -705,7 +797,7 @@ func TestPatchUser(t *testing.T) {
 		createUser(t, "testpatchuser.taken@example.com")
 		userB := createUser(t, "testpatchuser.claimant@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"email": "testpatchuser.taken@example.com"},
 		}), api.PatchUserByIDParams{UserID: api.UserID(userB.ID)})
 		require.NoError(t, err)
@@ -715,7 +807,7 @@ func TestPatchUser(t *testing.T) {
 	t.Run("unknown user", func(t *testing.T) {
 		t.Parallel()
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": "Nobody"},
 		}), api.PatchUserByIDParams{UserID: api.UserID("user_does-not-exist")})
 		require.NoError(t, err)
@@ -741,6 +833,170 @@ func TestPatchUser(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
 	})
+}
+
+// patchUserRequest builds a PATCH /users/{user_id} body from a plain map, so a
+// test can send JSON null to delete an attribute.
+func patchUserRequest(t *testing.T, body map[string]any) *api.PatchUserRequest {
+	t.Helper()
+	req := &api.PatchUserRequest{}
+	require.NoError(t, req.UnmarshalJSON([]byte(helpers.MustMarshal(t, body))))
+	return req
+}
+
+// TestPatchUserFailedMigration pins the guarantee #1507 makes: a patch that
+// moves a user to another schema and fails changes neither the user's
+// attributes nor its schema reference. Three of the failures are decided in
+// Prepare, before the write transaction, so nothing is written for them; the
+// unknown schema reference is kept to match #1659 one to one, its 400 is also
+// covered by TestPatchUser. The unique collision is decided by the registry
+// insert inside the transaction, after the old rows were already deleted, so
+// it is the case that would leak a partial write.
+func TestPatchUserFailedMigration(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	// Every revision shares the object type and declares the same uniqueness
+	// rules, since #1507 rejects a migration that changes them. Each one
+	// changes a single rule of the first: a property it requires, an enum, or
+	// an optional property it adds.
+	revision := func(t *testing.T, required []string, properties string) string {
+		t.Helper()
+		return harness.CreateUserSchema(t, project, fmt.Sprintf(`{
+			"title": "MigrationUser",
+			"$schema": "https://json-schema.org/draft/2020-12/schema",
+			"metaSchema": "%s/user-schema.json",
+			"kind": "user-schema",
+			"objectType": "migration-user",
+			"type": "object",
+			"x-auth-methods": {"passkey": {"enabled": true}},
+			"required": %s,
+			"properties": {
+				"username": {"type": "string", "x-unique": "project"},
+				"nickname": {"type": "string"},
+				%s
+			}
+		}`, helpers.BuiltinSchemaBaseURL, helpers.MustMarshal(t, required), properties))
+	}
+	initialSchema := revision(t, []string{"username"}, `
+		"color": {"type": "string"}`)
+	requiresGivenName := revision(t, []string{"username", "givenName"}, `
+		"color": {"type": "string"},
+		"givenName": {"type": "string"}`)
+	restrictsColor := revision(t, []string{"username"}, `
+		"color": {"type": "string", "enum": ["red", "blue"]}`)
+	addsLanguage := revision(t, []string{"username"}, `
+		"color": {"type": "string"},
+		"preferredLanguage": {"type": "string"}`)
+
+	users := harness.EnsureUserService(t)
+	createUser := func(t *testing.T, attributes map[string]any) (*domain.User, error) {
+		t.Helper()
+		return users.CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  project.ID,
+			SchemaURL:  initialSchema,
+			Attributes: attributes,
+		})
+	}
+
+	// stored is what a failed migration must leave alone, read from storage
+	// rather than from the response.
+	type stored struct {
+		schemaURL  string
+		attributes map[string]any
+		updatedAt  time.Time
+	}
+	readStored := func(t *testing.T, userID string) stored {
+		t.Helper()
+		user, err := users.GetUserByID(t.Context(), service.GetUserInput{ProjectID: project.ID, UserID: userID})
+		require.NoError(t, err)
+		attributes, err := user.Attributes.ToMap()
+		require.NoError(t, err)
+		return stored{
+			schemaURL:  user.SchemaURL,
+			attributes: attributes,
+			updatedAt:  user.Metadata.UpdatedAt,
+		}
+	}
+
+	for _, tc := range []struct {
+		name         string
+		targetSchema string
+		// collide has another user claim a username first, and the patch
+		// takes it over in the same request as the move.
+		collide    bool
+		wantStatus any
+		wantCode   string
+	}{
+		{
+			name:         "a required attribute of the target revision is missing",
+			targetSchema: requiresGivenName,
+			wantStatus:   &api.PatchUserByIDBadRequest{},
+			wantCode:     domain.ErrUserInvalid().Code,
+		},
+		{
+			name:         "a value violates a tightened rule",
+			targetSchema: restrictsColor,
+			wantStatus:   &api.PatchUserByIDBadRequest{},
+			wantCode:     domain.ErrUserInvalid().Code,
+		},
+		{
+			name:         "a value collides with another user's unique attribute",
+			targetSchema: addsLanguage,
+			collide:      true,
+			wantStatus:   &api.PatchUserByIDConflict{},
+			wantCode:     domain.ErrUserAlreadyExists().Code,
+		},
+		{
+			name:         "the target schema reference does not exist",
+			targetSchema: "https://example.com/schemas/migration-user-does-not-exist",
+			wantStatus:   &api.PatchUserByIDBadRequest{},
+			wantCode:     domain.ErrUserInvalid().Code,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			suffix := helpers.RandString(8)
+			taken := "holder-" + suffix
+			if tc.collide {
+				_, err := createUser(t, map[string]any{"username": taken})
+				require.NoError(t, err)
+			}
+			username := "migrant-" + suffix
+			user, err := createUser(t, map[string]any{
+				"username": username,
+				"nickname": "nick-" + suffix,
+				"color":    "green",
+			})
+			require.NoError(t, err)
+			before := readStored(t, user.ID)
+
+			body := map[string]any{"schema": tc.targetSchema}
+			if tc.collide {
+				body["attributes"] = map[string]any{"username": taken, "preferredLanguage": "en"}
+			}
+			resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, body), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
+			require.NoError(t, err)
+			require.IsType(t, tc.wantStatus, resp, helpers.MustMarshal(t, resp))
+			assertAuthzError(t, resp, tc.wantCode)
+
+			after := readStored(t, user.ID)
+			assert.Equal(t, before.schemaURL, after.schemaURL, "schema reference")
+			assert.Equal(t, before.attributes, after.attributes, "attributes")
+			assert.True(t, before.updatedAt.Equal(after.updatedAt), "updated_at moved from %s to %s", before.updatedAt, after.updatedAt)
+
+			// The unique attribute registry must still hold the original
+			// username for this user, so a second user cannot take it.
+			_, err = createUser(t, map[string]any{"username": username})
+			assert.ErrorIs(t, err, domain.ErrUserAlreadyExists(), "the original username must still be claimed")
+		})
+	}
 }
 
 func TestPatchMyUser(t *testing.T) {
@@ -788,7 +1044,7 @@ func TestPatchMyUser(t *testing.T) {
 			"attributes": map[string]any{"nickname": "Myself"},
 		}))))
 
-		resp, err := client.PatchMyUser(t.Context(), patch)
+		resp, err := client.PatchMyUser(t.Context(), patch, api.PatchMyUserParams{})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 		assert.Equal(t, "Myself", userProp(t, *resp.(*api.User), "nickname"))
@@ -975,7 +1231,7 @@ func TestGetMyUser(t *testing.T) {
 		// GET USER USING TOKEN
 
 		client.SetSessionToken(sessionToken)
-		resp, err := client.GetMyUser(t.Context())
+		resp, err := client.GetMyUser(t.Context(), api.GetMyUserParams{})
 		assert.NoError(t, err)
 
 		assert.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
@@ -1009,6 +1265,111 @@ func TestGetMyUser(t *testing.T) {
 		assert.Equal(t, "auth.unauthorized", answer.Code)
 		assert.Equal(t, "Missing or invalid session token.", answer.Message)
 	})
+}
+
+// TestMyUser_HoldsTheSessionToTheNamedProject pins project-bound calls on the
+// session's user: with project_id, a live session of another project on the
+// same server is refused with 403 sess.project_mismatch by the user read, its
+// patch, its schema and the lists of its projects and teams alike, and the
+// refused patch changes nothing. Its own project is served as before.
+func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
+	t.Parallel()
+
+	projects := harness.EnsureProjectService(t)
+	project, err := projects.Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	// Nothing is read from it: it only has to be a project the session does not
+	// belong to.
+	otherProject, err := projects.Create(t.Context(), helpers.ProjectName(), nil, false)
+	require.NoError(t, err)
+
+	userService := harness.EnsureUserService(t)
+	user, err := userService.CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID:  project.ID,
+		SchemaURL:  test_data.UserSchemaURL,
+		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testmyuserproject@example.com"),
+	})
+	require.NoError(t, err)
+	const password = "fake-password"
+	require.NoError(t, userService.SetPassword(t.Context(), service.SetPasswordInput{
+		ProjectID: project.ID,
+		UserID:    user.ID,
+		Password:  password,
+	}))
+	session, err := helpers.CreateSessionUsingPassword(t,
+		harness.EnsureAuthAttemptService(t),
+		harness.EnsureSessionService(t),
+		project.ID,
+		user.StringAttribute("email"),
+		password,
+	)
+	require.NoError(t, err)
+	tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	sessionToken, err := session.Token(tokenCrypter)
+	require.NoError(t, err)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetSessionToken(sessionToken)
+
+	own := api.NewOptProjectID(api.ProjectID(project.ID))
+	other := api.NewOptProjectID(api.ProjectID(otherProject.ID))
+	nickname := func(value string) *api.PatchMyUserRequest {
+		patch := &api.PatchMyUserRequest{}
+		require.NoError(t, patch.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{
+			"attributes": map[string]any{"nickname": value},
+		}))))
+		return patch
+	}
+
+	read, err := client.GetMyUser(t.Context(), api.GetMyUserParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, read, helpers.MustMarshal(t, read))
+	assert.Equal(t, "sess.project_mismatch", read.(*api.SessProjectMismatch).Code)
+
+	patched, err := client.PatchMyUser(t.Context(), nickname("Intruder"), api.PatchMyUserParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.PatchMyUserForbidden{}, patched, helpers.MustMarshal(t, patched))
+	assert.Equal(t, api.ErrorCode("sess.project_mismatch"), patched.(*api.PatchMyUserForbidden).Code)
+
+	listed, err := client.ListMyProjects(t.Context(), api.ListMyProjectsParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, listed, helpers.MustMarshal(t, listed))
+	assert.Equal(t, "sess.project_mismatch", listed.(*api.SessProjectMismatch).Code)
+
+	schema, err := client.GetMyUserSchema(t.Context(), api.GetMyUserSchemaParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, schema, helpers.MustMarshal(t, schema))
+	assert.Equal(t, "sess.project_mismatch", schema.(*api.SessProjectMismatch).Code)
+
+	teams, err := client.ListMyTeams(t.Context(), api.ListMyTeamsParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, teams, helpers.MustMarshal(t, teams))
+	assert.Equal(t, "sess.project_mismatch", teams.(*api.SessProjectMismatch).Code)
+
+	read, err = client.GetMyUser(t.Context(), api.GetMyUserParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.User{}, read, helpers.MustMarshal(t, read))
+	assert.Equal(t, api.UserID(user.ID), read.(*api.User).ID)
+	assert.NotContains(t, read.(*api.User).Attributes, "nickname", "the refused patch changed nothing")
+
+	patched, err = client.PatchMyUser(t.Context(), nickname("Myself"), api.PatchMyUserParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.User{}, patched, helpers.MustMarshal(t, patched))
+	assert.Equal(t, "Myself", userProp(t, *patched.(*api.User), "nickname"))
+
+	listed, err = client.ListMyProjects(t.Context(), api.ListMyProjectsParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListMyProjectsResponseHeaders{}, listed, helpers.MustMarshal(t, listed))
+
+	schema, err = client.GetMyUserSchema(t.Context(), api.GetMyUserSchemaParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.SchemaHeaders{}, schema, helpers.MustMarshal(t, schema))
+	assert.Equal(t, read.(*api.User).Schema, schema.(*api.SchemaHeaders).Response.ID)
+
+	teams, err = client.ListMyTeams(t.Context(), api.ListMyTeamsParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListUserTeamsResponseHeaders{}, teams, helpers.MustMarshal(t, teams))
 }
 
 func TestListPasskeys(t *testing.T) {
@@ -1111,6 +1472,60 @@ func TestListPasskeys(t *testing.T) {
 		require.NoError(t, err)
 		assert.IsType(t, &api.ListUserPasskeysNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
+}
+
+// TestSelfAccessReads: a person reads their own schema and roster with only
+// their session, and anything short of a user-bound session gets the 401 the
+// contract declares.
+func TestSelfAccessReads(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	userID, teamID := harness.CreateUserOwnedByTeam(t, project.ID)
+	cookie := sessionCookieIn(t, project, userID)
+
+	t.Run("own schema, without a grant", func(t *testing.T) {
+		t.Parallel()
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		me := helpers.MustUnmarshal[api.User](t, []byte(body))
+
+		status, body = cookieRequest(t, cookie, http.MethodGet, "/users/me/schema", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, me.Schema, helpers.MustUnmarshal[api.Schema](t, []byte(body)).ID)
+	})
+
+	t.Run("own teams, without a grant", func(t *testing.T) {
+		t.Parallel()
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/teams", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		teams := helpers.MustUnmarshal[api.ListUserTeamsResponse](t, []byte(body)).Teams
+		require.Len(t, teams, 1)
+		assert.Equal(t, teamID, string(teams[0].ID))
+	})
+
+	session := harness.CreateSession(t, project.ID, time.Hour)
+	crypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	anonymous, err := session.Token(crypter)
+	require.NoError(t, err)
+
+	for _, path := range []string{"/users/me", "/users/me/schema", "/users/me/teams"} {
+		for name, cookie := range map[string]*http.Cookie{
+			"anonymous session": {Name: "__nextgen_session", Value: anonymous},
+			"no cookie":         nil,
+		} {
+			t.Run(path+" "+name, func(t *testing.T) {
+				t.Parallel()
+				status, body := cookieRequest(t, cookie, http.MethodGet, path, "", nil)
+				assert.Equal(t, http.StatusUnauthorized, status, body)
+				details := helpers.MustUnmarshal[api.ErrorDetails](t, []byte(body))
+				assert.Equal(t, api.ErrorCode("auth.unauthorized"), details.Code)
+				assert.Equal(t, "Missing or invalid session token.", details.Message)
+			})
+		}
+	}
 }
 
 func TestListUserIdentityLinks(t *testing.T) {

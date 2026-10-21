@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { ZitadelError } from "../../../../src/lib/errors";
 import {
   LOCAL_RUNTIME_FILE,
   defaultLocalServerImageForCliVersion,
@@ -12,8 +13,11 @@ import {
   ensureLocalState,
   localContainerName,
   localRuntimePaths,
+  loopbackReach,
+  readNearestRuntimeMetadata,
   readRuntimeMetadata,
   removeLocalData,
+  retargetMalformedRuntime,
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../../src/lib/local-server/runtime";
@@ -166,6 +170,107 @@ describe("findUpward", () => {
 
     await expect(findUpward(app, LOCAL_RUNTIME_FILE, home)).resolves.toBeUndefined();
     await expect(findUpward(app, LOCAL_RUNTIME_FILE, cwd)).resolves.toBe(cwd);
+  });
+});
+
+describe("readNearestRuntimeMetadata", () => {
+  async function malformedRecordAt(dir: string): Promise<void> {
+    await mkdir(join(dir, ".zitadel/local"), { recursive: true });
+    await writeFile(join(dir, LOCAL_RUNTIME_FILE), JSON.stringify({ backend: "nope" }));
+  }
+
+  it("recovers a malformed record in a parent where it is", async () => {
+    await malformedRecordAt(cwd);
+    const app = join(cwd, "my-app");
+    await mkdir(app);
+
+    await expect(readNearestRuntimeMetadata(app)).rejects.toMatchObject({
+      nextCommands: [`zitadel reset --force --cwd ${cwd}`, `zitadel start --cwd ${cwd}`],
+    });
+  });
+
+  it("recovers a malformed record in the working directory without naming it", async () => {
+    await malformedRecordAt(cwd);
+
+    await expect(readNearestRuntimeMetadata(cwd)).rejects.toMatchObject({
+      nextCommands: ["zitadel reset --force", "zitadel start"],
+    });
+  });
+});
+
+describe("loopbackReach", () => {
+  const ALLOW_LIST = { injected: ["NEXTGEN_HTTPCLIENT_ALLOW_LIST"] };
+
+  function binaryRuntime(env = ALLOW_LIST): RuntimeMetadata {
+    return {
+      ...runtimeFor(cwd),
+      backend: "binary",
+      pid: 4242,
+      command: "zitadel-server",
+      log_path: join(cwd, ".zitadel/local/server.log"),
+      server_package: "@zitadel/server",
+      server_version: "0.0.0-test",
+      env,
+    };
+  }
+
+  it("allows loopback on a process server that got the allow list, from a subdirectory too", async () => {
+    await writeRuntimeMetadata(cwd, binaryRuntime());
+    const app = join(cwd, "my-app");
+    await mkdir(app);
+
+    await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("allowed");
+    await expect(loopbackReach(app, "http://127.0.0.1:8081/")).resolves.toBe("allowed");
+  });
+
+  it("names a container server, whose localhost is the container", async () => {
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd));
+    await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("container");
+  });
+
+  it("knows nothing of a process server started with the allow list off", async () => {
+    await writeRuntimeMetadata(cwd, binaryRuntime({ injected: [] }));
+    await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("unknown");
+  });
+
+  it("knows nothing of a server the record does not name, or of no record", async () => {
+    await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("unknown");
+    await writeRuntimeMetadata(cwd, binaryRuntime());
+    await expect(loopbackReach(cwd, "http://localhost:9999")).resolves.toBe("unknown");
+    await expect(loopbackReach(cwd, "https://example.zitadel.cloud")).resolves.toBe("unknown");
+  });
+});
+
+describe("retargetMalformedRuntime", () => {
+  const malformed = new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {
+    details: { x: 1 },
+  });
+
+  it.each([
+    ["a Windows path with a space", "C:\\work\\my app"],
+    ["a Windows path with an apostrophe", "C:\\work\\it's"],
+    ["a POSIX path with a space", "/home/dev/my app"],
+  ])("hands over %s as arguments, not as commands", (_name, dir) => {
+    const retargeted = retargetMalformedRuntime(malformed, dir) as ZitadelError;
+
+    expect(retargeted.nextCommands).toBeUndefined();
+    expect(retargeted.details).toEqual({
+      x: 1,
+      suggested_args: [
+        ["reset", "--force", "--cwd", dir],
+        ["start", "--cwd", dir],
+      ],
+    });
+    expect(retargeted.hint).toContain("details.suggested_args");
+  });
+
+  it("writes the commands out for a path that needs no quoting", () => {
+    const retargeted = retargetMalformedRuntime(malformed, "/home/dev/app") as ZitadelError;
+
+    expect(retargeted.nextCommands).toEqual([
+      "zitadel reset --force --cwd /home/dev/app",
+      "zitadel start --cwd /home/dev/app",
+    ]);
   });
 });
 

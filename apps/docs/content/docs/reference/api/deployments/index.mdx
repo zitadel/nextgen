@@ -3,17 +3,11 @@ title: Deployments
 description: OpenAPI operations for deployments.
 ---
 
-import { Card, Cards } from "fumadocs-ui/components/card";
-
 A deployment will record which release goes live on which targets, and when.
 These operations are specified but answer `501 Not Implemented` today. Until
 they ship, the server serves the newest revision of each schema, branding, and
-identity provider connection, and picks flows as [Plan and
-apply](/docs/cli/plan-apply) describes.
+identity provider connection, and picks flows as
+[Edit the login flow and schema](/docs/guides/plan-apply#walkthrough-a-second-flow-selected-by-name)
+describes.
 
-<Cards>
-  <Card title="Create a deployment" href="/docs/reference/api/deployments/createDeployment" />
-  <Card title="List deployments" href="/docs/reference/api/deployments/listDeployments" />
-  <Card title="Get a deployment by id" href="/docs/reference/api/deployments/getDeploymentById" />
-  <Card title="Roll back to a deployment" href="/docs/reference/api/deployments/rollbackDeployment" />
-</Cards>
+<Operations />

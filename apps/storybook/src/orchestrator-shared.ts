@@ -61,9 +61,8 @@ export const mock = setupMockHandlers();
  * The providers the mock offers when `sso` is on, **derived from the component
  * library** instead of a hard-coded list: every brand mark `@zitadel/components`
  * ships (`SHIPPED_BRAND_ICON_NAMES`, e.g. `brand-google`) becomes a provider whose
- * button carries that logo. Add a glyph there and it appears here automatically —
- * no Google/GitHub to drift out of sync, and no dependency on `@zitadel/config`
- * (Storybook already depends on `@zitadel/components`, not on config).
+ * button carries that logo. Add a glyph there and it appears here automatically,
+ * with no hand-kept Google/GitHub list to drift out of sync.
  */
 const BRAND_PROVIDERS: MockSsoProvider[] = SHIPPED_BRAND_ICON_NAMES.map((brand) => {
   const template = brand.replace(/^brand-/, "");

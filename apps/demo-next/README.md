@@ -114,7 +114,7 @@ moon run storybook:dev
 # → http://localhost:6006
 ```
 
-After changing `@zitadel/components`, rebuild before refreshing:
+After changing the widget elements in `packages/components`, rebuild before refreshing:
 
 ```bash
 moon run components:build
@@ -133,10 +133,10 @@ The demo imports the package from `dist/`, not source.
 
 **Middleware** (`src/proxy.ts`) uses `nextgenMiddleware` from `@zitadel/sdk-next` to proxy `/__nextgen/*` requests to the auth backend, verify the session JWT on every request, and redirect unauthenticated users away from `/admin`.
 
-**Login page** renders the `<zitadel-login>` web component (from `@zitadel/components`) inside a client-only dynamic import to avoid SSR.
+**Login page** renders the `<zitadel-login>` web component, loaded through `@zitadel/sdk-next/client`, inside a client-only dynamic import to avoid SSR.
 
 **Admin page** calls `auth()` on the server to read the verified session and display the signed-in user's email, with the `<zitadel-logout>` component in the header.
 
-**Login widget** (`src/app/login/widget.tsx`) dynamically imports `@zitadel/components` with `ssr: false` so custom elements register only in the browser.
+**Login widget** (`src/app/login/widget.tsx`) dynamically imports `@zitadel/sdk-next/client` with `ssr: false` so custom elements register only in the browser. The app depends on `@zitadel/sdk-next` alone; the SDK owns the widget, API and design-token packages.
 
-**Fonts and branding** — the mock server ships a default `font_url` (Arimo via Google Fonts) on every flow response. `<zitadel-login>` injects it as a `<link rel="stylesheet">` in the host document `<head>` — **not** the shadow root, because browsers ignore `@font-face` declared inside a shadow tree; the shadow DOM's `font-family` then resolves against the document-level face. Root `layout.tsx` sets `body { margin: 0; font-family: sans-serif; }`. Headings use the same Arimo family rendered bold (`--zl-font-family-heading` leads with `"Arimo"`). Tenants override the face via `branding.font_url`.
+**Fonts and branding** — the mock server sets no font, and `<zitadel-login>` loads no typeface of its own, so the login renders in the `--zl-font-family-sans` stack (Arimo where installed, else the system font) and the page makes no request to a font CDN. Root `layout.tsx` sets `body { margin: 0; font-family: sans-serif; }`. To render a face, load it in the app (for example with `next/font`), or set branding `typography.font_url`: a `variant="page"` login links it in the document `<head>` — **not** the shadow root, because browsers ignore `@font-face` declared inside a shadow tree — and a widget leaves loading to the app.

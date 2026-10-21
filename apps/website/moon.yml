@@ -2,15 +2,13 @@ id: "website"
 language: "typescript"
 layer: "application"
 stack: "frontend"
-
-workspace:
-  inheritedTasks:
-    # One static page and no unit tests yet; `typecheck` and `build` check it.
-    exclude:
-      - "test"
+dependsOn:
+  # The showcase's login previews render the atoms of @zitadel/components.
+  - "components"
 
 tasks:
-  # lint is the inherited task unchanged, and so are the commands below.
+  # lint and test are the inherited tasks unchanged, and so are the commands
+  # below.
   typecheck:
     deps:
       # After the build, never beside it: `next typegen` and `next build`
@@ -23,6 +21,9 @@ tasks:
       - "build"
 
   build:
+    deps:
+      # Next resolves @zitadel/components to its dist/.
+      - "components:build"
     outputs:
       - ".next/**/*"
     options:
@@ -31,6 +32,8 @@ tasks:
 
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      - "components:build"
     options:
       persistent: true
       runInCI: false

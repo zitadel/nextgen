@@ -35,8 +35,11 @@ declare module "react" {
           "flow-name"?: string;
           "project-id"?: string;
           "proxy-path"?: string;
+          "publishable-key"?: string;
           url?: string;
           "post-sign-in-url"?: string;
+          forcePostSignInUrl?: ZitadelLogin["forcePostSignInUrl"];
+          "force-post-sign-in-url"?: boolean;
           "resume-flow-id"?: string;
           "preview-state"?: ZitadelLogin["previewState"];
           "preview-success-step"?: string;
@@ -52,6 +55,7 @@ declare module "react" {
           "suppress-header"?: boolean;
           "project-id"?: string;
           "proxy-path"?: string;
+          "publishable-key"?: string;
           url?: string;
           "post-sign-out-url"?: string;
           heading?: string;
@@ -63,6 +67,7 @@ declare module "react" {
           theme?: ZitadelLogout["theme"];
           "project-id"?: string;
           "proxy-path"?: string;
+          "publishable-key"?: string;
           url?: string;
           "post-sign-out-url"?: string;
         };

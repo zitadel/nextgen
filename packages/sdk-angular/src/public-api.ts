@@ -1,3 +1,7 @@
+// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
+// The edge build of the components package has no elements, so this does nothing there.
+import "@zitadel/components";
+
 export { ZitadelLoginComponent } from "./lib/zitadel-login.component";
 export { ZitadelLogoutComponent } from "./lib/zitadel-logout.component";
 export { ZitadelSessionComponent } from "./lib/zitadel-session.component";

@@ -1,6 +1,9 @@
 {
   "title": "API reference",
+  "root": true,
+  "pagesIndex": "index",
   "pages": [
+    "errors",
     "---Runtime auth---",
     "flows",
     "authentication-attempts",
@@ -20,6 +23,7 @@
     "users",
     "grants",
     "events",
+    "event-webhooks",
     "---System---",
     "system",
     "..."

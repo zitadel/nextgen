@@ -37,8 +37,7 @@ describe("orchestrator surface contract", () => {
   afterEach(() => {
     host.remove();
     consoleError.mockRestore();
-    // Page-variant mounts inject the document-level default-font link.
-    document.getElementById("zl-default-font-link")?.remove();
+    document.getElementById("zl-font-link")?.remove();
   });
 
   async function mount<T extends HTMLElement & { updateComplete: Promise<boolean> }>(
@@ -108,16 +107,14 @@ describe("orchestrator surface contract", () => {
     expect(shell?.hasAttribute("data-widget")).toBe(false);
   });
 
-  it("a widget surface leaves another surface's default font link alone", async () => {
-    // Page-variant session ships the brand font; mounting a widget next to it
-    // (which never wants the default font) must not strip that link.
+  it("an unbranded page surface links no font stylesheet", async () => {
+    // The package loads no face of its own: without a tenant `font_url` the
+    // token stack falls back to the system font, so no visitor's address
+    // reaches a font CDN by default (ADR 025, amended).
     await mount<ZitadelSession>("zitadel-session", (el) => {
       el.variant = "page";
     });
-    expect(document.getElementById("zl-default-font-link")).not.toBeNull();
-
-    await mount<ZitadelSession>("zitadel-session");
-    expect(document.getElementById("zl-default-font-link")).not.toBeNull();
+    expect(document.head.querySelector('link[rel="stylesheet"]')).toBeNull();
   });
 
   it("<zitadel-logout> resolves an explicit theme instead of pinning dark", async () => {

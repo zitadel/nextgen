@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	internalapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -207,4 +208,127 @@ func TestGetMySession_ExpiredSessionIsSignedOut(t *testing.T) {
 	require.NoError(t, json.NewDecoder(meResp.Body).Decode(&got))
 	require.Equal(t, "auth.unauthorized", got.Code)
 	require.Equal(t, "Missing or invalid session token.", got.Message)
+}
+
+// TestMySession_HoldsTheSessionToTheNamedProject pins the server side of
+// project-bound session calls: with project_id, a live session of another
+// project on the same server is refused with 403 sess.project_mismatch by the
+// read, the CSRF token read and sign-out alike, so an app never reads it as one
+// of its users and never ends it. The refused sign-out clears no cookie and
+// leaves the session live. Its own project reads it, gets its token and signs
+// it out as before.
+func TestMySession_HoldsTheSessionToTheNamedProject(t *testing.T) {
+	t.Parallel()
+
+	testServer := harness.EnsureTestServer(t)
+	projects := harness.EnsureProjectService(t)
+
+	project, err := projects.Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	otherProject, err := projects.Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	projectSecret, err := harness.EnsureTokenService(t).GenerateJWE(t.Context(), project.Token())
+	require.NoError(t, err)
+
+	attempt := &domain.AuthAttempt{ProjectID: project.ID}
+	stmts := harness.EnsureServiceDB(t)
+	require.NoError(t, stmts.Statements().CreateAuthAttempt(t.Context(), attempt))
+	const plainToken = "handoff_session_me_project_test"
+	sum := sha256.Sum256([]byte(plainToken))
+	attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
+	require.NoError(t, stmts.Statements().HandoffAuthAttempt(t.Context(), attempt))
+
+	exchangeBody, err := json.Marshal(map[string]string{"handoff_token": plainToken})
+	require.NoError(t, err)
+	exchangeReq, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		testServer.URL+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(exchangeBody))
+	require.NoError(t, err)
+	exchangeReq.Header.Set("Content-Type", "application/json")
+	exchangeReq.Header.Set("Authorization", "Bearer "+projectSecret)
+
+	exchangeResp, err := testServer.Client().Do(exchangeReq)
+	require.NoError(t, err)
+	defer func() { _ = exchangeResp.Body.Close() }()
+	if exchangeResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(exchangeResp.Body)
+		t.Fatalf("exchange returned %d: %s", exchangeResp.StatusCode, body)
+	}
+
+	var sessionCookie *http.Cookie
+	for _, cookie := range exchangeResp.Cookies() {
+		if cookie.Name == "__nextgen_session" {
+			sessionCookie = cookie
+		}
+	}
+	require.NotNil(t, sessionCookie, "exchange must set the __nextgen_session cookie")
+
+	call := func(method, path, projectID string) *http.Response {
+		t.Helper()
+		target := testServer.URL + path
+		if projectID != "" {
+			target += "?project_id=" + projectID
+		}
+		req, err := http.NewRequestWithContext(t.Context(), method, target, nil)
+		require.NoError(t, err)
+		req.AddCookie(sessionCookie)
+		if method == http.MethodDelete {
+			// Sign-out is a write: the project hold is checked once the
+			// session's CSRF token has passed (ADR 053 §5).
+			req.Header.Set(internalapi.CSRFHeader, internalapi.CSRFToken(sessionCookie.Value))
+		}
+		resp, err := testServer.Client().Do(req)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = resp.Body.Close() })
+		return resp
+	}
+	requireRefused := func(resp *http.Response) {
+		t.Helper()
+		require.Equal(t, http.StatusForbidden, resp.StatusCode)
+		var refusal struct {
+			Code string `json:"code"`
+		}
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&refusal))
+		require.Equal(t, "sess.project_mismatch", refusal.Code)
+		require.Empty(t, resp.Header.Values("Set-Cookie"), "the session of another project keeps its cookie")
+	}
+
+	refused := call(http.MethodGet, "/sessions/me", otherProject.ID)
+	require.Equal(t, "private, no-store", refused.Header.Get("Cache-Control"))
+	requireRefused(refused)
+
+	refusedToken := call(http.MethodGet, "/sessions/me/csrf", otherProject.ID)
+	require.Equal(t, "private, no-store", refusedToken.Header.Get("Cache-Control"))
+	requireRefused(refusedToken)
+
+	requireRefused(call(http.MethodDelete, "/sessions/me", otherProject.ID))
+
+	served := call(http.MethodGet, "/sessions/me", project.ID)
+	require.Equal(t, http.StatusOK, served.StatusCode, "a refused sign-out leaves the session live")
+	var session struct {
+		ProjectID string `json:"project_id"`
+	}
+	require.NoError(t, json.NewDecoder(served.Body).Decode(&session))
+	require.Equal(t, project.ID, session.ProjectID)
+
+	servedToken := call(http.MethodGet, "/sessions/me/csrf", project.ID)
+	require.Equal(t, http.StatusOK, servedToken.StatusCode)
+	var token struct {
+		CsrfToken string `json:"csrf_token"`
+	}
+	require.NoError(t, json.NewDecoder(servedToken.Body).Decode(&token))
+	require.NotEmpty(t, token.CsrfToken)
+
+	signedOut := call(http.MethodDelete, "/sessions/me", project.ID)
+	require.Equal(t, http.StatusNoContent, signedOut.StatusCode)
+	var cleared bool
+	for _, cookie := range signedOut.Cookies() {
+		if cookie.Name == "__nextgen_session" && cookie.MaxAge < 0 {
+			cleared = true
+		}
+	}
+	require.True(t, cleared, "signing out of its own project clears the cookie")
+
+	require.Equal(t, http.StatusUnauthorized, call(http.MethodGet, "/sessions/me", "").StatusCode,
+		"the session is gone once its own project signed it out")
 }
