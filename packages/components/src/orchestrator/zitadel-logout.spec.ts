@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -264,7 +264,7 @@ describe("<zitadel-logout>", () => {
     expect(requestLog[0]?.credentials).toBe("include");
     expect(requestLog[0]?.csrf).toBe(CSRF_TOKEN);
     expect(signoutEvents).toHaveLength(1);
-    expect(signoutEvents[0]?.detail).toEqual({
+    expect(signoutEvents[0]?.detail).toMatchObject({
       display: "Alice Liddell",
       identifier: "alice@acme.com",
     });
@@ -289,6 +289,37 @@ describe("<zitadel-logout>", () => {
     expect(requestLog).toHaveLength(1);
     expect(requestLog[0]?.method).toBe("DELETE");
     expect(window.location.href).toBe("https://app.test/done");
+  });
+
+  it("waits for work a zitadel-signout listener registers before navigating to post-sign-out-url", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, href: "" },
+      writable: true,
+    });
+    const element = mount();
+    element.postSignOutUrl = "https://app.test/done";
+    await flush(element);
+    const finish = new AbortController();
+    const signedOut = vi.fn();
+    element.addEventListener("zitadel-signout", (event) => {
+      signedOut();
+      if (event instanceof CustomEvent) {
+        event.detail.waitUntil(
+          new Promise((resolve) => finish.signal.addEventListener("abort", resolve)),
+        );
+      }
+    });
+
+    shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+    await element.updateComplete;
+    shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+    await vi.waitFor(() => expect(signedOut).toHaveBeenCalledOnce());
+    await element.updateComplete;
+    expect(window.location.href).toBe("");
+
+    finish.abort();
+    await vi.waitFor(() => expect(window.location.href).toBe("https://app.test/done"));
   });
 
   it("signs out using project-id / proxy-path attributes with no global config", async () => {

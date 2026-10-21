@@ -301,8 +301,11 @@ export const cliSource: Source<{ pageData: CliPageData; metaData: MetaData }> = 
       path: `${baseDir}/meta.json`,
       data: {
         title: "CLI reference",
-        // The index is the folder's own page, so it is not listed; the
-        // reference's own pages come before the commands' groups.
+        // A section the sidebar steps down into (components/sidebar.tsx), whose
+        // index is its own page, so it is not listed; the reference's own
+        // pages come before the commands' groups.
+        root: true,
+        pagesIndex: "index",
         pages: [
           ...ownPages,
           ...reference.groups.flatMap((group) => {
