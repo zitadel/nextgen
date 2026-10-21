@@ -309,7 +309,10 @@ is a full-page destination on another origin, so there is nothing a router
 could do with it. The event is a notification, not a hook — it is not
 cancelable, and a host listener cannot substitute its own navigation. Use it
 to record the hand-off (analytics, a spinner, saving scroll state) before the
-page goes away. The framework wrappers surface it as `onFlowRedirect`, except
+page goes away. The detail carries `waitUntil(promise)`: the widget waits for
+the promises its listeners pass, up to two seconds, before it navigates.
+`zitadel-flow-complete` and `zitadel-signout` carry it too, for the navigation
+that follows them. The framework wrappers surface it as `onFlowRedirect`, except
 Vue and Angular, which emit `flowRedirect`, and Qwik, which takes
 `onFlowRedirect$`.
 The orchestrator exposes `::part(form)` for tenant-side CSS hooks. Adopts

@@ -223,10 +223,16 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
     // An operation the spec names a CLI command for (`x-zitadel-cli`, which
     // its OpenAPI shows) is also run with that command, and one the CLI can
     // call without one with `zitadel api` (lib/cli-sample.ts).
-    const command =
-      /"x-zitadel-cli": "([^"]+)"/.exec(markdown)?.[1] ?? apiCommand(operationOf(markdown));
+    const named = /"x-zitadel-cli": "([^"]+)"/.exec(markdown)?.[1];
+    const command = named ?? apiCommand(operationOf(markdown));
     if (command && !markdown.includes(`npx @zitadel/cli@alpha ${command}`)) {
       return `${markdownUrl(url)}: no \`${command}\` command`;
+    }
+    if (named) {
+      // The command's page links back to the operation (lib/cli-reference.ts).
+      const commandPage = markdownUrl(`/docs/reference/cli/${named.split(" ").join("/")}`);
+      const back = await (await request.get(commandPage)).text();
+      if (!back.includes(`](${url})`)) return `${commandPage}: no link to ${url}`;
     }
     // And with cURL, as the page's last sample (lib/source.ts).
     if (!/```bash\ncurl -X [A-Z]+ 'http:\/\/localhost:8080\//.test(markdown)) {
