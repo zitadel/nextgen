@@ -345,10 +345,13 @@ describe("add user sheet", () => {
     // The accessible name must not absorb the marker.
     expect(screen.getByLabelText("Family name")).toBeInTheDocument();
   });
-  it("sends a numeric property as a JSON number, not a string", async () => {
-    // `schemaFields` maps `type: number|integer` to a number input, but an input
-    // always yields a string — JSON Schema validates the property against a JSON
-    // number, so `"42"` would be rejected.
+  it.each([
+    ["42", 42],
+    // `Number` would read hex as 16; the server says what is wrong instead.
+    ["0x10", "0x10"],
+  ])("sends a numeric property typed %s as %j", async (typed, sent) => {
+    // An input always yields a string, but JSON Schema validates the property
+    // against a JSON number, so `"42"` would be rejected.
     stubSchemas({
       sch_seats: {
         ...BUSINESS,
@@ -369,12 +372,10 @@ describe("add user sheet", () => {
     await openSheet();
 
     await userEvent.type(await screen.findByLabelText("Email"), "a@acme.com");
-    await userEvent.type(screen.getByLabelText("Seats"), "42");
+    await userEvent.type(screen.getByLabelText("Seats"), typed);
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
 
     await waitFor(() => expect(body).toBeDefined());
-    const attributes = body?.attributes as Record<string, unknown>;
-    expect(attributes.seats).toBe(42);
-    expect(typeof attributes.seats).toBe("number");
+    expect(body?.attributes).toMatchObject({ seats: sent });
   });
 });

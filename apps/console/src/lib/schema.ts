@@ -44,18 +44,23 @@ export interface SchemaField {
   key: string;
   label: string;
   required: boolean;
-  /** `<input type>` chosen from the property's JSON Schema `format`. */
-  inputType: "text" | "email" | "number" | "url" | "tel" | "date";
+  /**
+   * `<input type>` chosen from the property's JSON Schema `format`, or
+   * `boolean`, which no `<input type>` names: each form picks its own control.
+   */
+  inputType: "text" | "email" | "number" | "url" | "tel" | "date" | "boolean";
   placeholder?: string;
 }
 
 /**
- * The `<input>` attributes a field's type decides. A number input defaults to
- * `step=1`, which would refuse `1.5` for a `number` property before the form
- * submits; whether an `integer` takes a fraction is the server's to say.
+ * The `<input>` attributes a field's type decides. A number is typed as text:
+ * a number input reports text it cannot parse as empty, which a form would
+ * read as emptied, and iOS's decimal keypad has no minus key. A boolean is
+ * typed as text where a form has no switch for it.
  */
-export function inputAttributes(entry: SchemaField): { type: string; step?: string } {
-  return entry.inputType === "number" ? { type: "number", step: "any" } : { type: entry.inputType };
+export function inputAttributes(entry: SchemaField): { type: string } {
+  const text = entry.inputType === "number" || entry.inputType === "boolean";
+  return { type: text ? "text" : entry.inputType };
 }
 
 /**
@@ -63,13 +68,22 @@ export function inputAttributes(entry: SchemaField): { type: string; step?: stri
  * string, but JSON Schema validates a `number`/`integer` property against a
  * JSON number, and `"42"` would be rejected. A value that will not parse is
  * sent through untouched so the server explains why, rather than becoming
- * `NaN` — which `JSON.stringify` would silently turn into `null`.
+ * `NaN`, which `JSON.stringify` would silently turn into `null`. So is text
+ * `Number` would read differently than typed: hex, binary or octal (`0x10` is
+ * 16), and a whole number past 2^53, which it rounds. A boolean is `"true"` or
+ * `"false"`, as a switch writes it; other text is sent as typed.
  */
 export function attributeValue(entry: SchemaField, value: string): unknown {
-  if (entry.inputType !== "number") return value;
+  if (entry.inputType === "boolean" && (value === "true" || value === "false")) {
+    return value === "true";
+  }
+  if (entry.inputType !== "number" || !DECIMAL.test(value)) return value;
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : value;
+  if (!Number.isFinite(numeric)) return value;
+  return Number.isInteger(numeric) && !Number.isSafeInteger(numeric) ? value : numeric;
 }
+
+const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
 
 /**
  * Human-readable schema name for the picker.
@@ -376,6 +390,7 @@ function propertyInputType(property: Record<string, unknown>): SchemaField["inpu
       break;
   }
   const type = field(property, "type");
+  if (type === "boolean") return "boolean";
   return type === "number" || type === "integer" ? "number" : "text";
 }
 
