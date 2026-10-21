@@ -117009,6 +117009,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ProjOriginNotAllowedSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("proj.origin_not_allowed")
@@ -117094,6 +117110,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("enc_key.unknown_alg")
 		{
 			s := s.EncKeyUnknownAlg
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -117315,6 +117347,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "tkn.invalid":
 					s.Type = TknInvalidSubmitFlowStepErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedSubmitFlowStepErrorResponse
+					found = true
 				case "proj.origin_not_allowed":
 					s.Type = ProjOriginNotAllowedSubmitFlowStepErrorResponse
 					found = true
@@ -117332,6 +117367,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "enc_key.unknown_alg":
 					s.Type = EncKeyUnknownAlgSubmitFlowStepErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableSubmitFlowStepErrorResponse
 					found = true
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsSubmitFlowStepErrorResponse
@@ -117464,6 +117502,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.TknInvalid.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedSubmitFlowStepErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ProjOriginNotAllowedSubmitFlowStepErrorResponse:
 		if err := s.ProjOriginNotAllowed.Decode(d); err != nil {
 			return err
@@ -117486,6 +117528,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case EncKeyUnknownAlgSubmitFlowStepErrorResponse:
 		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableSubmitFlowStepErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserAlreadyExistsSubmitFlowStepErrorResponse:
