@@ -234,8 +234,6 @@ type ReleasePointerPayload struct {
 
 type ReleaseCreatedPayload = ReleasePayload
 
-// ReleaseRevokedPayload repeats the digest so the audit stream names the
-// release the way the CLI prints it.
 type ReleaseRevokedPayload struct {
 	ContentHash string `json:"content_hash"`
 }

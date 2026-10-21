@@ -12,8 +12,6 @@ import (
 )
 
 func (h *Handler) RevokeRelease(ctx context.Context, params api.RevokeReleaseParams) (api.RevokeReleaseRes, error) {
-	// Scoped to the project like the read, so a release of another project
-	// answers not found rather than confirming it exists.
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), releaseAccess, opWrite); err != nil {
 		return nil, err
 	}
@@ -29,9 +27,8 @@ func (h *Handler) RevokeRelease(ctx context.Context, params api.RevokeReleasePar
 	return &release, nil
 }
 
-// releaseInUseConflict answers rel.in_use with the typed 409, whose
-// details.origins names each origin still serving the release. Through
-// NewError the details would nest under details.details.
+// releaseInUseConflict answers rel.in_use with the typed 409. Through NewError
+// the details would nest under details.details.
 func releaseInUseConflict(err error) (*api.RevokeReleaseConflict, bool) {
 	de, ok := errors.AsType[domain.Error](err)
 	if !ok || de.Code != domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code {
