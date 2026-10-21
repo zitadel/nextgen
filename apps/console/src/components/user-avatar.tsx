@@ -26,8 +26,8 @@ function hash(seed: string): number {
 
 /**
  * The colours for a seed, as the custom properties `.user-avatar` paints with
- * (`styles.css`): two different design-system starts and where in its spin it
- * starts, all taken from the hash, so a person keeps theirs on every
+ * (`styles.css`): two different design-system starts and where along its roll
+ * it starts, all taken from the hash, so a person keeps theirs on every
  * screen and device and two people rarely share one.
  *
  * Set on a hover host as well, they tint its hover wash with the same colours.
@@ -40,12 +40,13 @@ export function avatarVars(seed: string): CSSProperties {
   return {
     "--avatar-from": `var(${STARTS[from]})`,
     "--avatar-to": `var(${STARTS[to]})`,
-    // A negative delay starts the 20-second spin part-way through.
-    "--avatar-phase": `-${(h >>> 4) % 20}s`,
+    // A negative delay starts the roll part-way along its path. The four
+    // periods (9, 13, 23 and 31s) only line up again after hours.
+    "--avatar-phase": `-${(h >>> 4) % 600}s`,
   } as CSSProperties;
 }
 
-/** How much faster the ball spins while the avatar's host is hovered. */
+/** How much faster the ball rolls while the avatar's host is hovered. */
 const FAST = 4;
 
 /**
@@ -53,8 +54,8 @@ const FAST = 4;
  * picture. The id, not the email, seeds it, so it survives a changed email.
  * A picture can replace it once users can upload one.
  *
- * It spins like a painted ball, unless the person asked for reduced motion.
- * With `fast` it spins `FAST` times quicker: the playback rate
+ * It rolls about like a painted ball, unless the person asked for reduced
+ * motion. With `fast` it rolls `FAST` times quicker: the playback rate
  * changes, not the duration, so the motion speeds up from where it is instead
  * of jumping.
  *
@@ -72,7 +73,8 @@ export function UserAvatar({
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
-    for (const animation of ref.current?.getAnimations?.() ?? []) {
+    // `subtree`: the roll runs on the `::before` paint, not the element.
+    for (const animation of ref.current?.getAnimations?.({ subtree: true }) ?? []) {
       animation.updatePlaybackRate(fast ? FAST : 1);
     }
   }, [fast]);

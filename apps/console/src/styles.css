@@ -123,37 +123,116 @@ select:-webkit-autofill {
 }
 
 /* The generated avatar (`components/user-avatar.tsx`): a ball painted with
-   the person's two design-system gradient starts, spinning around its own
-   axis. The paint is a seamless band (first colour, second, first again)
-   twice the ball's width that scrolls behind two fixed shading layers, a
-   darker rim and a broad soft light, so the colours travel across a curved
-   surface instead of a flat disc turning in place. One turn takes 20s; each
-   person starts at their own point (`--avatar-phase`), so a list of avatars
-   never turns in step. The component speeds it up while its host is
-   hovered. */
-@keyframes avatar-spin {
+   the person's two design-system gradient starts, rolling about at random.
+   The paint (`::before`) is a seamless two-axis pattern (blobs of the first
+   colour on the second, tiles twice the ball's size) that moves behind fixed
+   shading (`::after`: a darker rim and a broad soft light), so the colours
+   travel across a curved surface instead of a flat disc turning in place.
+
+   Each axis moves on its own: a steady drift plus a sway, all four on
+   different periods. The direction the ball rolls in therefore wanders, and
+   its speed rises and falls, like a ball pushed about on the floor rather
+   than spun on a finger. Each person starts at their own point
+   (`--avatar-phase`), so a list of avatars never moves in step. The
+   component speeds it up while its host is hovered. */
+@property --avatar-drift-x {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+@property --avatar-drift-y {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+@property --avatar-sway-x {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+@property --avatar-sway-y {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+/* With tiles twice the ball's size, 200% moves the pattern by one tile. */
+@keyframes avatar-drift-x {
+  to {
+    --avatar-drift-x: 200%;
+  }
+}
+
+@keyframes avatar-drift-y {
+  to {
+    --avatar-drift-y: 200%;
+  }
+}
+
+@keyframes avatar-sway-x {
   from {
-    background-position: 0 0, 0 0, 0% 0;
+    --avatar-sway-x: -60%;
   }
   to {
-    /* With the band twice the ball's width, 200% moves it by one full band. */
-    background-position: 0 0, 0 0, 200% 0;
+    --avatar-sway-x: 60%;
+  }
+}
+
+@keyframes avatar-sway-y {
+  from {
+    --avatar-sway-y: -60%;
+  }
+  to {
+    --avatar-sway-y: 60%;
   }
 }
 
 .user-avatar {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.user-avatar::before,
+.user-avatar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.user-avatar::before {
+  /* The second colour fills each tile from halfway out, so the tiles meet
+     seamlessly on every side. */
+  background-image: radial-gradient(
+    circle,
+    var(--avatar-from) 0%,
+    var(--avatar-to) 50%,
+    var(--avatar-to) 100%
+  );
+  background-size: 200% 200%;
+  background-position:
+    calc(var(--avatar-drift-x) + var(--avatar-sway-x))
+    calc(var(--avatar-drift-y) + var(--avatar-sway-y));
+  animation:
+    avatar-drift-x 23s linear infinite,
+    avatar-drift-y 31s linear infinite reverse,
+    avatar-sway-x 9s ease-in-out infinite alternate,
+    avatar-sway-y 13s ease-in-out infinite alternate;
+  animation-delay: var(--avatar-phase);
+}
+
+.user-avatar::after {
   background-image:
     radial-gradient(
       circle at 35% 30%,
       color-mix(in oklab, white 28%, transparent) 0%,
       transparent 60%
     ),
-    radial-gradient(circle, transparent 50%, color-mix(in oklab, black 45%, transparent) 100%),
-    linear-gradient(90deg, var(--avatar-from), var(--avatar-to), var(--avatar-from));
-  background-size: 100% 100%, 100% 100%, 200% 100%;
-  background-repeat: no-repeat, no-repeat, repeat-x;
-  animation: avatar-spin 20s linear infinite;
-  animation-delay: var(--avatar-phase);
+    radial-gradient(circle, transparent 50%, color-mix(in oklab, black 45%, transparent) 100%);
 }
 
 /* A hover host (the sidebar footer) carries the same colours: on hover or
@@ -190,7 +269,7 @@ select:-webkit-autofill {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .user-avatar {
+  .user-avatar::before {
     animation: none;
   }
 
