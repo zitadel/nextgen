@@ -8,13 +8,13 @@ export type Corners = "sharp" | "soft" | "round";
 export type Headings = "sans" | "serif" | "mono";
 
 export type BrandChoice = {
-  /** The brand colour, as a hex string. */
+  /** The brand color, as a hex string. */
   color: string;
   corners: Corners;
   headings: Headings;
 };
 
-/** The colours to pick from, Zitadel's own orange first; any other comes from the picker. */
+/** The colors to pick from, Zitadel's own orange first; any other comes from the picker. */
 export const COLORS = [
   { name: "Zitadel orange", value: "#f25543" },
   { name: "Blue", value: "#2563eb" },
@@ -63,8 +63,8 @@ const channel = (value: number) => {
   return share <= 0.03928 ? share / 12.92 : ((share + 0.055) / 1.055) ** 2.4;
 };
 
-/** White on a dark brand colour, near-black on a light one (WCAG relative luminance). */
-export function foregroundFor(hex: string): string {
+/** White on a dark brand color, near-black on a light one (WCAG relative luminance). */
+function foregroundFor(hex: string): string {
   const value = Number.parseInt(hex.slice(1), 16);
   const luminance =
     0.2126 * channel((value >> 16) & 255) +
@@ -143,4 +143,17 @@ export function baseProperties(tokens: TokenTree, cssVars: TokenTree): Record<st
   properties["--zl-font-family-sans"] = arimo;
   properties["--zl-font-family-heading"] = arimo;
   return properties;
+}
+
+/**
+ * The --zl-* properties the light side changes, from the package's generated
+ * stylesheet: its token objects hold the dark side only. Laid over the base
+ * layer, they paint the login as `<zitadel-login theme="light">` would.
+ */
+export function lightProperties(tokensCss: string, selector: string): Record<string, string> {
+  const start = tokensCss.indexOf(`${selector} {`);
+  const block = start < 0 ? "" : tokensCss.slice(start, tokensCss.indexOf("}", start));
+  return Object.fromEntries(
+    [...block.matchAll(/(--zl-[\w-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value]),
+  );
 }

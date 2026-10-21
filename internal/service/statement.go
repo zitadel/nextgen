@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/authz/compiler"
@@ -424,6 +425,15 @@ type AuthAttemptStatements interface {
 	MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error
 }
 
+// UniqueAttributeClaim is a value of a unique attribute as the
+// unique-attributes registry stores it: under a team scope ("" for
+// project-wide), by key and value hash.
+type UniqueAttributeClaim struct {
+	TeamID    string
+	Key       domain.AttributeKey
+	ValueHash [sha256.Size]byte
+}
+
 // UserQueryOptions carries EAV match/hydrate options for GetUser / ListUsers.
 // Column predicates stay in Filter / ListOptions.
 type UserQueryOptions struct {
@@ -483,6 +493,10 @@ type UserStatements interface {
 	// attribute key, so a patch keeps the scope an existing claim was created
 	// under. An unknown user reads as an empty map, not an error.
 	GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error)
+	// GetTakenUniqueAttributeKeys returns the keys of the claims whose value a
+	// user other than userID holds in the unique-attributes registry, in no
+	// particular order.
+	GetTakenUniqueAttributeKeys(ctx context.Context, projectID, userID string, claims []UniqueAttributeClaim) ([]domain.AttributeKey, error)
 	GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts UserQueryOptions) (*domain.User, error)
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error

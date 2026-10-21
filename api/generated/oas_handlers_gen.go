@@ -1277,48 +1277,31 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 
 // handleCreateDeploymentRequest handles createDeployment operation.
 //
-// Makes a release live on a set of targets by recording a deployment. The
-// two happen atomically: when the call returns, every target serves the
-// named release and the record exists; on any failure every target keeps
-// serving what it served and no record is written.
-// The release is named by exactly one of `release_id` or `content_hash`
-// (both or neither answers `400` with `dep.invalid`), and must already
-// exist in the project: deploying never assembles a release. An
-// unknown release id or digest answers `404` with `rel.not_found`, and a
-// revoked release answers `409` with `rel.revoked`.
-// `targets` lists `primary`, which expands to every primary origin of the
-// project, and exact origins. An origin that is neither a primary origin
-// of the project nor matches one of its preview patterns answers `403`
-// with `proj.origin_not_allowed`, and `primary` on a project with no
-// primary origin answers `400` with `dep.invalid`. The deployment records
-// the resolved origins, sorted, never the keyword.
-// A deployment to preview URLs creates the preview for each of them, or
-// renews it when it exists, in the same transaction, with the expiry set
-// from `ttl`; each target in the response carries that expiry. It always
-// writes a new deployment, answering `201`, even when the URLs already
-// serve the release: that record is the renewal. Primary origins and
-// preview URLs cannot be mixed in one deployment: that answers `400` with
-// `dep.invalid`.
-// A deployment freezes the variable values the project stores for its
-// kind: primary origins use the primary values, preview URLs the preview
-// values, with no fallback from one to the other. A release that
-// references a variable with no value for that kind answers `400` with
-// `dep.variables_missing`, naming the kind and every missing variable, and
-// nothing is written.
-// A deployment to primary origins is idempotent on what is served: when
-// every resolved target already serves the release with the same frozen
-// variable values, nothing changes and the call answers `200` with the
-// newest deployment to those targets, so a re-run of `zitadel deploy` on
-// unchanged content is a no-op end to end. The same release with a
-// changed variable value is a new deployment.
-// Anything else writes a new record covering all of the resolved targets,
-// including the same release returning after something else was served in
-// between: the log is append-only, and each record is one act of making a
-// release live.
-// `expected_deployment_id` guards against racing another deploy: when
-// present, the write only happens if the newest deployment to any of the
-// resolved targets still is the one named, and a mismatch answers `409`
-// with `dep.conflict`, carrying the actual newest deployment.
+// Makes a release live on its targets by recording a deployment,
+// atomically: on success every target serves the release and the record
+// exists; on failure nothing changes and no record is written.
+// Name the release by exactly one of `release_id` or `content_hash`; it
+// must already exist in the project. `targets` is `primary` or preview
+// URLs. The deployment freezes the project's variable values for its kind,
+// with no fallback between primary and preview values.
+// A deployment to `primary` changes nothing when the project's newest
+// primary deployment has the same release and frozen values and covers
+// exactly the current primary origins: the call answers `200` with that
+// deployment. Any other request writes a new deployment and answers `201`;
+// for preview URLs that record renews their previews.
+// Failures:
+// - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
+// a primary origin named exactly; `primary` mixed with preview URLs;
+// `primary` on a project with no primary origin; `ttl` with `primary`;
+// `ttl` above the project's maximum.
+// - `400 dep.variables_missing`: a referenced variable has no value for
+// the kind; `details` names the kind and every missing variable.
+// - `403 proj.origin_not_allowed`: a preview URL matches no preview
+// pattern.
+// - `404 rel.not_found`: the release id or digest names no release here.
+// - `409 dep.conflict`: `expected_deployment_id` is not the deployment
+// this write replaces; `details.deployment` is that deployment.
+// - `409 rel.revoked`: the release is revoked.
 //
 // POST /deployments
 func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -7762,6 +7745,8 @@ func (s *Server) handleGetMySessionRequest(args [0]string, argsEscaped bool, w h
 // HttpOnly cookie is still the credential, and a cross-site page cannot
 // read this response. It stays the same for the life of the session, so a
 // client fetches it once per session.
+// With `project_id`, the token is returned only when the session belongs to
+// that project.
 //
 // GET /sessions/me/csrf
 func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -7879,6 +7864,16 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 			return
 		}
 	}
+	params, err := decodeGetMySessionCsrfTokenParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 
@@ -7891,13 +7886,18 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 			OperationID:      "getMySessionCsrfToken",
 			Body:             nil,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = struct{}
+			Params   = GetMySessionCsrfTokenParams
 			Response = GetMySessionCsrfTokenRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -7907,14 +7907,14 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 		](
 			m,
 			mreq,
-			nil,
+			unpackGetMySessionCsrfTokenParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetMySessionCsrfToken(ctx)
+				response, err = s.h.GetMySessionCsrfToken(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetMySessionCsrfToken(ctx)
+		response, err = s.h.GetMySessionCsrfToken(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -7936,6 +7936,8 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 // Returns the user signed in to the session that authenticates the request.
 // The project and the user both come from the session cookie, so a caller only
 // ever reads their own user.
+// With `project_id`, the user is returned only when the session belongs to
+// that project.
 //
 // GET /users/me
 func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -8053,6 +8055,16 @@ func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http
 			return
 		}
 	}
+	params, err := decodeGetMyUserParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 
@@ -8065,13 +8077,18 @@ func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http
 			OperationID:      "getMyUser",
 			Body:             nil,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = struct{}
+			Params   = GetMyUserParams
 			Response = GetMyUserRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -8081,14 +8098,14 @@ func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http
 		](
 			m,
 			mreq,
-			nil,
+			unpackGetMyUserParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetMyUser(ctx)
+				response, err = s.h.GetMyUser(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetMyUser(ctx)
+		response, err = s.h.GetMyUser(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -8108,6 +8125,8 @@ func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http
 // handleGetMyUserSchemaRequest handles getMyUserSchema operation.
 //
 // The schema the signed-in user's own record is validated against.
+// With `project_id`, the schema is returned only when the session belongs to
+// that project.
 //
 // GET /users/me/schema
 func (s *Server) handleGetMyUserSchemaRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -8225,6 +8244,16 @@ func (s *Server) handleGetMyUserSchemaRequest(args [0]string, argsEscaped bool, 
 			return
 		}
 	}
+	params, err := decodeGetMyUserSchemaParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 
@@ -8237,13 +8266,18 @@ func (s *Server) handleGetMyUserSchemaRequest(args [0]string, argsEscaped bool, 
 			OperationID:      "getMyUserSchema",
 			Body:             nil,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = struct{}
+			Params   = GetMyUserSchemaParams
 			Response = GetMyUserSchemaRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -8253,14 +8287,14 @@ func (s *Server) handleGetMyUserSchemaRequest(args [0]string, argsEscaped bool, 
 		](
 			m,
 			mreq,
-			nil,
+			unpackGetMyUserSchemaParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetMyUserSchema(ctx)
+				response, err = s.h.GetMyUserSchema(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetMyUserSchema(ctx)
+		response, err = s.h.GetMyUserSchema(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -9634,6 +9668,213 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 	}
 }
 
+// handleGetUserPasswordStateRequest handles getUserPasswordState operation.
+//
+// Reports when the user's current password was set, and leaves `set_at` out
+// when the user has none. The password and its hash are never returned;
+// setting one is `PUT` on the same path.
+//
+// GET /users/{user_id}/password
+func (s *Server) handleGetUserPasswordStateRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getUserPasswordState"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/users/{user_id}/password"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetUserPasswordStateOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: GetUserPasswordStateOperation,
+			ID:   "getUserPasswordState",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, GetUserPasswordStateOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, GetUserPasswordStateOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeGetUserPasswordStateParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response GetUserPasswordStateRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    GetUserPasswordStateOperation,
+			OperationSummary: "Get user password state",
+			OperationID:      "getUserPasswordState",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "user_id",
+					In:   "path",
+				}: params.UserID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = GetUserPasswordStateParams
+			Response = GetUserPasswordStateRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackGetUserPasswordStateParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.GetUserPasswordState(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.GetUserPasswordState(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeGetUserPasswordStateResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleGetVariableRequest handles getVariable operation.
 //
 // Reads one variable by name, with its value per kind. A name with no
@@ -10633,23 +10874,18 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 
 // handleListDeploymentsRequest handles listDeployments operation.
 //
-// Lists deployments newest first: what ran where, and when.
-// By default the list is the history: every deployment of the project, each
-// with every target it made the release live on. With `origin`, it is the
-// history of that origin alone, and its first row is the deployment the
-// origin serves.
-// With `live=true`, the list is what is served now: the newest deployment
-// to each target, each carrying only the targets it still serves. A
-// preview URL is served only while its preview is live, and its
-// `expires_at` is the expiry its newest deployment set, which is the
-// preview's current one. A deployment every target of which has since
-// been replaced, or whose previews have all expired or been removed, does
-// not appear. Combined with `origin`, the live view is the one deployment
-// that origin serves, or empty.
-// `expand: ["release"]` embeds the release each deployment made live, so a
-// history renders with each entry's content without resolving `release_id`
-// one by one. Expanding requires `release.read` and does not affect the
-// ordering or the page tokens.
+// Lists what ran where, and when.
+// By default the list is the history, newest first: every deployment of
+// the project with every target it made the release live on. With
+// `origin`, the history of that origin alone.
+// With `live=true`, the list is what is served now: the project's newest
+// primary deployment, narrowed to origins that are still primary, then the
+// newest deployment to each live preview URL, newest first, narrowed to
+// the URLs it still serves. Combined with `origin`, it is the one
+// deployment that origin serves, or empty.
+// `expand: ["release"]` embeds the release each deployment made live; it
+// requires `release.read` and does not change the ordering or the page
+// tokens.
 //
 // GET /deployments
 func (s *Server) handleListDeploymentsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -11553,6 +11789,9 @@ func (s *Server) handleListIdpRevisionsRequest(args [1]string, argsEscaped bool,
 // This is not the same question as `queryProjects`, which answers with the one
 // project the calling credential is bound to. Here the session is the caller
 // and the grants are the answer, so the list spans projects.
+// With `project_id`, the projects are listed only when the session belongs to
+// that project. It names the project the session was signed in to, not one to
+// list.
 //
 // GET /users/me/projects
 func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -11701,6 +11940,10 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 					Name: "page_token",
 					In:   "query",
 				}: params.PageToken,
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
 			},
 			Raw: r,
 		}
@@ -11744,6 +11987,8 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 // handleListMyTeamsRequest handles listMyTeams operation.
 //
 // The signed-in user's own team roster, ordered by team name.
+// With `project_id`, the teams are listed only when the session belongs to
+// that project.
 //
 // GET /users/me/teams
 func (s *Server) handleListMyTeamsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -11892,6 +12137,10 @@ func (s *Server) handleListMyTeamsRequest(args [0]string, argsEscaped bool, w ht
 					Name: "page_token",
 					In:   "query",
 				}: params.PageToken,
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
 			},
 			Raw: r,
 		}
@@ -13215,6 +13464,8 @@ func (s *Server) handleListUserTeamsRequest(args [1]string, argsEscaped bool, w 
 // Partially updates the caller's own schema-defined attributes. The merged
 // result is validated against the user's schema before commit. Concurrent
 // writes are last-write-wins.
+// With `project_id`, the user is updated only when the session belongs to
+// that project.
 //
 // PATCH /users/me
 func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -13332,6 +13583,16 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 			return
 		}
 	}
+	params, err := decodePatchMyUserParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 	request, rawBody, close, err := s.decodePatchMyUserRequest(r)
@@ -13359,13 +13620,18 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 			OperationID:      "patchMyUser",
 			Body:             request,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = *PatchMyUserRequest
-			Params   = struct{}
+			Params   = PatchMyUserParams
 			Response = PatchMyUserRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -13375,14 +13641,14 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 		](
 			m,
 			mreq,
-			nil,
+			unpackPatchMyUserParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.PatchMyUser(ctx, request)
+				response, err = s.h.PatchMyUser(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.PatchMyUser(ctx, request)
+		response, err = s.h.PatchMyUser(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -13718,11 +13984,29 @@ func (s *Server) handlePatchUserByIDRequest(args [1]string, argsEscaped bool, w 
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, PatchUserByIDOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -15536,9 +15820,12 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 //
 // Logs out by permanently deleting the session.
 // The `__nextgen_session` cookie issued at creation (or superseded by a handoff
-// exchange) is required. Idempotent: if the session is already gone this still
-// returns 204. Any tokens derived from the session are invalidated, and the
-// cookie itself is cleared in the response.
+// exchange) is required, with the session's token from `GET /sessions/me/csrf`
+// in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
+// this still returns 204. Any tokens derived from the session are invalidated,
+// and the cookie itself is cleared in the response.
+// With `project_id`, only a session of that project is deleted. A session of
+// another project is left alone, and so is its cookie.
 //
 // DELETE /sessions/me
 func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -15656,6 +15943,16 @@ func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, 
 			return
 		}
 	}
+	params, err := decodeRevokeMySessionParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 
@@ -15668,13 +15965,18 @@ func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, 
 			OperationID:      "revokeMySession",
 			Body:             nil,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = struct{}
+			Params   = RevokeMySessionParams
 			Response = RevokeMySessionRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -15684,14 +15986,14 @@ func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, 
 		](
 			m,
 			mreq,
-			nil,
+			unpackRevokeMySessionParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.RevokeMySession(ctx)
+				response, err = s.h.RevokeMySession(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.RevokeMySession(ctx)
+		response, err = s.h.RevokeMySession(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -16109,29 +16411,19 @@ func (s *Server) handleRevokeSessionRequest(args [1]string, argsEscaped bool, w 
 
 // handleRollbackDeploymentRequest handles rollbackDeployment operation.
 //
-// Re-deploys the deployment named in the path: a new deployment with the
-// same `release_id` and the same `targets`, `reason: rollback`, and
-// `rollback_to` in its metadata naming the deployment it re-applied. The
-// variable values that deployment resolved are re-applied with it, so the
-// targets serve exactly what they served then. The history is append-only,
-// so the deployments in between stay in it.
-// Only a deployment to primary origins can be rolled back. One whose
-// targets were preview URLs answers `400` with `dep.invalid`; deploy to
-// the preview again instead. Every target must still be a primary origin
-// of the project, as `POST /deployments` requires of an exact origin:
-// when one is not, the request answers `403` with
-// `proj.origin_not_allowed` naming it, and nothing changes. There is no
-// narrowing to some of the targets: to roll back one origin, deploy the
-// earlier release to it with `POST /deployments`.
-// When every target already serves the deployment's release, nothing
-// changes and the call answers `200` with the newest deployment to the
-// targets.
-// The release must not be revoked: a revoked one answers `409` with
-// `rel.revoked`. An unknown deployment id, or one of another project,
-// answers `404` with `dep.not_found`.
-// A rollback never answers `dep.variables_missing`: the release and the
-// frozen values it re-applies passed that check together when the named
-// deployment was made.
+// Re-deploys the release of the deployment named in the path to `primary`,
+// with the variable values it froze: a new deployment with `reason:
+// rollback` and `rollback_to` naming it. Like any deployment to `primary`,
+// it covers every current primary origin. Idempotent like a deployment to
+// `primary`: when nothing would change it answers `200` with the newest
+// primary deployment.
+// Failures:
+// - `400 dep.invalid`: the deployment went to preview URLs (deploy to the
+// preview again instead), or the project has no primary origin.
+// - `404 dep.not_found`: no deployment of the project has that id.
+// - `409 dep.conflict`: `expected_deployment_id` is not the project's
+// newest primary deployment; `details.deployment` is that deployment.
+// - `409 rel.revoked`: the release is revoked.
 //
 // POST /deployments/{deployment_id}/rollback
 func (s *Server) handleRollbackDeploymentRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

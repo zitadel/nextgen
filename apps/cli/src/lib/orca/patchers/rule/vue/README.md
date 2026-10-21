@@ -2,6 +2,8 @@
 
 Integrates Zitadel auth into a Vite + Vue single-page app.
 
+The detector requires `vue` 3.2 or newer; older versions are refused.
+
 ## What it patches
 
 - `src/App.vue` — auth entry that renders the Zitadel login/logout widgets

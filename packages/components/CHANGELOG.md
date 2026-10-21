@@ -1,5 +1,93 @@
 # @zitadel/components
 
+## 1.0.0-alpha.28
+
+### Minor Changes
+
+- [#2114](https://github.com/zitadel/nextgen/pull/2114) [`4efca9c`](https://github.com/zitadel/nextgen/commit/4efca9c361ecf7d7806d6147ca3e2e6a31241e23) Thanks [@peintnermax](https://github.com/peintnermax)! - `@zitadel/components/tokens` also re-exports `tokensCss` and `THEME_SELECTORS`
+  from `@zitadel/design-tokens`, so a consumer can read the light side's values,
+  which the `tokens` object does not hold.
+
+- [#2110](https://github.com/zitadel/nextgen/pull/2110) [`5bf2573`](https://github.com/zitadel/nextgen/commit/5bf257321b290dc54befe3a32b4c39027bd25a2b) Thanks [@livio-a](https://github.com/livio-a)! - Signing out with the session cookie (`DELETE /sessions/me`) now needs the
+  session's CSRF token in `X-Zitadel-CSRF`, like every other write the cookie
+  authenticates; without it the server answers `403 auth.csrf_invalid` and the
+  session stays signed in. `<zitadel-session>` and `<zitadel-logout>` read the
+  token from `GET /sessions/me/csrf` and send it.
+
+  **Breaking:** an app on an older `@zitadel/components` cannot sign out against
+  this server. Update `@zitadel/components` (or the SDK that bundles it) together
+  with the server. Code that calls `revokeMySession()` itself must first read the
+  token with `getMySessionCsrfToken()` and send it in the `X-Zitadel-CSRF` header,
+  or set it once with `setApiCsrfToken()`.
+
+### Patch Changes
+
+- [#2099](https://github.com/zitadel/nextgen/pull/2099) [`20e5433`](https://github.com/zitadel/nextgen/commit/20e5433792cb70a515ad3e22730d8b1ae6dbee74) Thanks [@mridang](https://github.com/mridang)! - Importing `@zitadel/components` no longer throws `HTMLElement is not defined` on edge runtimes. When `browser` is active together with `workerd`, `worker` or `edge-light`, the package root now resolves to an entry that never loads Lit and keeps the locales (`businessLocales` included), tokens, branding helpers, the attribution markup and the flow API client. The elements are not in that entry, so import them only in code that runs in a browser.
+
+- [#2150](https://github.com/zitadel/nextgen/pull/2150) [`437c7f1`](https://github.com/zitadel/nextgen/commit/437c7f127395ac45c8b014948c627516c1f9b4af) Thanks [@fforootd](https://github.com/fforootd)! - `<zitadel-login>` and `<zitadel-session>` no longer load Arimo from Google Fonts
+  by default, so an unbranded sign-in page sends no visitor data to a font CDN.
+  Without a branding `typography.font_url` the login renders in Arimo where the
+  browser already has it and in the system font otherwise; set `font_url` (on a
+  `variant="page"` login) or load a face in your app to choose one. The server's
+  hosted login page now serves Arimo from its own origin.
+
+- [#2080](https://github.com/zitadel/nextgen/pull/2080) [`628e101`](https://github.com/zitadel/nextgen/commit/628e101e5c254ab8bdaca830fc6e4acbd084b41e) Thanks [@fforootd](https://github.com/fforootd)! - `DELETE /sessions/me` and `GET /sessions/me/csrf` take the same optional
+  `project_id` as `GET /sessions/me`, and answer a session of another project
+  with `403 sess.project_mismatch`. A refused sign-out leaves that session signed
+  in and keeps its cookie. `<zitadel-session>`, `<zitadel-logout>` and the console
+  send their project when they sign out, and the console also when it reads its
+  CSRF token. Signing out with `<zitadel-session>` or `<zitadel-logout>` after the
+  session already ended, in another tab or by expiring, now completes instead of
+  showing an error.
+
+  In `@zitadel/api`, `revokeMySession()` and `getMySessionCsrfToken()` now take
+  their query parameters first: call `revokeMySession(undefined, init)` and
+  `getMySessionCsrfToken(undefined, init)` where you passed `init` alone.
+
+- [#2076](https://github.com/zitadel/nextgen/pull/2076) [`12b3226`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now count a session as signed in only when it belongs to the
+  app's own project. A session of another project on the same server, such as a
+  second app on the same host or the console of a local `zitadel start`, reads
+  as signed out in `protectedRoutes`, `auth()` and `getAuth()`, and its cookie is
+  left in place for the app it belongs to.
+
+  The project comes from the new `projectId` middleware option, else
+  `ZITADEL_PROJECT_ID`, else the framework's public project id variable
+  (`NEXT_PUBLIC_`, `VITE_` or `PUBLIC_ZITADEL_PROJECT_ID`). `zitadel setup`
+  already writes these to `.env.local`. A deployment that sets none of them must
+  set `ZITADEL_PROJECT_ID`, or nobody is signed in. With `@zitadel/sdk-nuxt`, the
+  public project id (`NUXT_PUBLIC_ZITADEL_PROJECT_ID`) decides unless
+  `nextgen.projectId` names one, so a built server follows it at runtime. A JWT
+  session token must name the project in its `aud` claim. `auth()` in
+  `@zitadel/sdk-next` also takes the project of `configureZitadel()`; with
+  `createProxy(config)`, pass the same project to `auth()` when it lives only in
+  that handle.
+
+  `GET /sessions/me` takes an optional `project_id` and answers a session of
+  another project with `403 sess.project_mismatch`. The SDKs send it, and so do
+  `getSession()` in `@zitadel/sdk-next`, `<zitadel-session>`, `<zitadel-logout>`
+  and the console. `getSession()` takes the project from its `projectId` option,
+  `configureZitadel()` or `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, and without one reads
+  as signed out. Signing out with `<zitadel-logout>` or `<zitadel-session>` no
+  longer ends another project's session. The `AGENTS.md` guidance that
+  `zitadel setup` writes now tells agents to read the session this way.
+
+  A Bearer token that is not this app's no longer decides what happens to the
+  session cookie that came with it: the cookie is judged, and cleared only when
+  the backend refuses it, on its own.
+
+  In `@zitadel/api`, `getMySession()` now takes its query parameters first: call
+  `getMySession(undefined, init)` where you called `getMySession(init)`. In
+  `@zitadel/sdk-core`, `checkOpaqueSessionToken()` and
+  `validateOpaqueSessionToken()` take the project id as a fourth argument, and
+  `resolveSession()` is the one implementation of these rules behind every server
+  SDK's middleware.
+
+  The `@zitadel/sdk-next` middleware also no longer lets a session that has not
+  finished signing in through `protectedRoutes`.
+
+- Updated dependencies [[`d04f94b`](https://github.com/zitadel/nextgen/commit/d04f94b50061418b1dba90f3f8b8ddfa0dee9adf), [`21ac783`](https://github.com/zitadel/nextgen/commit/21ac783d40f0480d93aaea550eb938e8f98a96dd), [`b53ef49`](https://github.com/zitadel/nextgen/commit/b53ef494bce234fc3f1e54c6cb4bd0cf288423c5)]:
+  - @zitadel/config@1.0.0-alpha.28
+
 ## 1.0.0-alpha.27
 
 ### Patch Changes

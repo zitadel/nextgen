@@ -70,6 +70,10 @@ and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM.
   `aria-hidden`, out of the tab order, its state in `data-*` hooks.
   `<zl-select>` is the reference.
 
+## Secrets and events
+
+The widget never broadcasts a password or one-time-code value through its own events: `zitadel-flow-input` is not dispatched for a field whose type is `password` or whose autocomplete is `current-password`, `new-password` or `one-time-code`, and the internal `zl-input`, `zl-change` and `zl-passkey-result` events are emitted `{ composed: false }` so they stay inside the widget. It does not, and cannot, hide the input from other scripts on the same page.
+
 ## Tests
 
 - `pnpm test` runs the projects of `vitest.config.ts`: `unit` (jsdom),

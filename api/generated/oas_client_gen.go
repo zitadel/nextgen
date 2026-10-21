@@ -111,48 +111,31 @@ type Invoker interface {
 	CreateBranding(ctx context.Context, request *Branding, params CreateBrandingParams) (CreateBrandingRes, error)
 	// CreateDeployment invokes createDeployment operation.
 	//
-	// Makes a release live on a set of targets by recording a deployment. The
-	// two happen atomically: when the call returns, every target serves the
-	// named release and the record exists; on any failure every target keeps
-	// serving what it served and no record is written.
-	// The release is named by exactly one of `release_id` or `content_hash`
-	// (both or neither answers `400` with `dep.invalid`), and must already
-	// exist in the project: deploying never assembles a release. An
-	// unknown release id or digest answers `404` with `rel.not_found`, and a
-	// revoked release answers `409` with `rel.revoked`.
-	// `targets` lists `primary`, which expands to every primary origin of the
-	// project, and exact origins. An origin that is neither a primary origin
-	// of the project nor matches one of its preview patterns answers `403`
-	// with `proj.origin_not_allowed`, and `primary` on a project with no
-	// primary origin answers `400` with `dep.invalid`. The deployment records
-	// the resolved origins, sorted, never the keyword.
-	// A deployment to preview URLs creates the preview for each of them, or
-	// renews it when it exists, in the same transaction, with the expiry set
-	// from `ttl`; each target in the response carries that expiry. It always
-	// writes a new deployment, answering `201`, even when the URLs already
-	// serve the release: that record is the renewal. Primary origins and
-	// preview URLs cannot be mixed in one deployment: that answers `400` with
-	// `dep.invalid`.
-	// A deployment freezes the variable values the project stores for its
-	// kind: primary origins use the primary values, preview URLs the preview
-	// values, with no fallback from one to the other. A release that
-	// references a variable with no value for that kind answers `400` with
-	// `dep.variables_missing`, naming the kind and every missing variable, and
-	// nothing is written.
-	// A deployment to primary origins is idempotent on what is served: when
-	// every resolved target already serves the release with the same frozen
-	// variable values, nothing changes and the call answers `200` with the
-	// newest deployment to those targets, so a re-run of `zitadel deploy` on
-	// unchanged content is a no-op end to end. The same release with a
-	// changed variable value is a new deployment.
-	// Anything else writes a new record covering all of the resolved targets,
-	// including the same release returning after something else was served in
-	// between: the log is append-only, and each record is one act of making a
-	// release live.
-	// `expected_deployment_id` guards against racing another deploy: when
-	// present, the write only happens if the newest deployment to any of the
-	// resolved targets still is the one named, and a mismatch answers `409`
-	// with `dep.conflict`, carrying the actual newest deployment.
+	// Makes a release live on its targets by recording a deployment,
+	// atomically: on success every target serves the release and the record
+	// exists; on failure nothing changes and no record is written.
+	// Name the release by exactly one of `release_id` or `content_hash`; it
+	// must already exist in the project. `targets` is `primary` or preview
+	// URLs. The deployment freezes the project's variable values for its kind,
+	// with no fallback between primary and preview values.
+	// A deployment to `primary` changes nothing when the project's newest
+	// primary deployment has the same release and frozen values and covers
+	// exactly the current primary origins: the call answers `200` with that
+	// deployment. Any other request writes a new deployment and answers `201`;
+	// for preview URLs that record renews their previews.
+	// Failures:
+	// - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
+	// a primary origin named exactly; `primary` mixed with preview URLs;
+	// `primary` on a project with no primary origin; `ttl` with `primary`;
+	// `ttl` above the project's maximum.
+	// - `400 dep.variables_missing`: a referenced variable has no value for
+	// the kind; `details` names the kind and every missing variable.
+	// - `403 proj.origin_not_allowed`: a preview URL matches no preview
+	// pattern.
+	// - `404 rel.not_found`: the release id or digest names no release here.
+	// - `409 dep.conflict`: `expected_deployment_id` is not the deployment
+	// this write replaces; `details.deployment` is that deployment.
+	// - `409 rel.revoked`: the release is revoked.
 	//
 	// POST /deployments
 	CreateDeployment(ctx context.Context, request *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error)
@@ -556,23 +539,29 @@ type Invoker interface {
 	// HttpOnly cookie is still the credential, and a cross-site page cannot
 	// read this response. It stays the same for the life of the session, so a
 	// client fetches it once per session.
+	// With `project_id`, the token is returned only when the session belongs to
+	// that project.
 	//
 	// GET /sessions/me/csrf
-	GetMySessionCsrfToken(ctx context.Context) (GetMySessionCsrfTokenRes, error)
+	GetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (GetMySessionCsrfTokenRes, error)
 	// GetMyUser invokes getMyUser operation.
 	//
 	// Returns the user signed in to the session that authenticates the request.
 	// The project and the user both come from the session cookie, so a caller only
 	// ever reads their own user.
+	// With `project_id`, the user is returned only when the session belongs to
+	// that project.
 	//
 	// GET /users/me
-	GetMyUser(ctx context.Context) (GetMyUserRes, error)
+	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)
 	// GetMyUserSchema invokes getMyUserSchema operation.
 	//
 	// The schema the signed-in user's own record is validated against.
+	// With `project_id`, the schema is returned only when the session belongs to
+	// that project.
 	//
 	// GET /users/me/schema
-	GetMyUserSchema(ctx context.Context) (GetMyUserSchemaRes, error)
+	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
 	// GetProject invokes getProject operation.
 	//
 	// Returns the current state of a project.
@@ -638,6 +627,14 @@ type Invoker interface {
 	//
 	// GET /users/{user_id}
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
+	// GetUserPasswordState invokes getUserPasswordState operation.
+	//
+	// Reports when the user's current password was set, and leaves `set_at` out
+	// when the user has none. The password and its hash are never returned;
+	// setting one is `PUT` on the same path.
+	//
+	// GET /users/{user_id}/password
+	GetUserPasswordState(ctx context.Context, params GetUserPasswordStateParams) (GetUserPasswordStateRes, error)
 	// GetVariable invokes getVariable operation.
 	//
 	// Reads one variable by name, with its value per kind. A name with no
@@ -687,23 +684,18 @@ type Invoker interface {
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
 	// ListDeployments invokes listDeployments operation.
 	//
-	// Lists deployments newest first: what ran where, and when.
-	// By default the list is the history: every deployment of the project, each
-	// with every target it made the release live on. With `origin`, it is the
-	// history of that origin alone, and its first row is the deployment the
-	// origin serves.
-	// With `live=true`, the list is what is served now: the newest deployment
-	// to each target, each carrying only the targets it still serves. A
-	// preview URL is served only while its preview is live, and its
-	// `expires_at` is the expiry its newest deployment set, which is the
-	// preview's current one. A deployment every target of which has since
-	// been replaced, or whose previews have all expired or been removed, does
-	// not appear. Combined with `origin`, the live view is the one deployment
-	// that origin serves, or empty.
-	// `expand: ["release"]` embeds the release each deployment made live, so a
-	// history renders with each entry's content without resolving `release_id`
-	// one by one. Expanding requires `release.read` and does not affect the
-	// ordering or the page tokens.
+	// Lists what ran where, and when.
+	// By default the list is the history, newest first: every deployment of
+	// the project with every target it made the release live on. With
+	// `origin`, the history of that origin alone.
+	// With `live=true`, the list is what is served now: the project's newest
+	// primary deployment, narrowed to origins that are still primary, then the
+	// newest deployment to each live preview URL, newest first, narrowed to
+	// the URLs it still serves. Combined with `origin`, it is the one
+	// deployment that origin serves, or empty.
+	// `expand: ["release"]` embeds the release each deployment made live; it
+	// requires `release.read` and does not change the ordering or the page
+	// tokens.
 	//
 	// GET /deployments
 	ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error)
@@ -745,12 +737,17 @@ type Invoker interface {
 	// This is not the same question as `queryProjects`, which answers with the one
 	// project the calling credential is bound to. Here the session is the caller
 	// and the grants are the answer, so the list spans projects.
+	// With `project_id`, the projects are listed only when the session belongs to
+	// that project. It names the project the session was signed in to, not one to
+	// list.
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
 	// ListMyTeams invokes listMyTeams operation.
 	//
 	// The signed-in user's own team roster, ordered by team name.
+	// With `project_id`, the teams are listed only when the session belongs to
+	// that project.
 	//
 	// GET /users/me/teams
 	ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error)
@@ -815,9 +812,11 @@ type Invoker interface {
 	// Partially updates the caller's own schema-defined attributes. The merged
 	// result is validated against the user's schema before commit. Concurrent
 	// writes are last-write-wins.
+	// With `project_id`, the user is updated only when the session belongs to
+	// that project.
 	//
 	// PATCH /users/me
-	PatchMyUser(ctx context.Context, request *PatchMyUserRequest) (PatchMyUserRes, error)
+	PatchMyUser(ctx context.Context, request *PatchMyUserRequest, params PatchMyUserParams) (PatchMyUserRes, error)
 	// PatchProject invokes patchProject operation.
 	//
 	// Updates the state of a project.
@@ -920,12 +919,15 @@ type Invoker interface {
 	//
 	// Logs out by permanently deleting the session.
 	// The `__nextgen_session` cookie issued at creation (or superseded by a handoff
-	// exchange) is required. Idempotent: if the session is already gone this still
-	// returns 204. Any tokens derived from the session are invalidated, and the
-	// cookie itself is cleared in the response.
+	// exchange) is required, with the session's token from `GET /sessions/me/csrf`
+	// in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
+	// this still returns 204. Any tokens derived from the session are invalidated,
+	// and the cookie itself is cleared in the response.
+	// With `project_id`, only a session of that project is deleted. A session of
+	// another project is left alone, and so is its cookie.
 	//
 	// DELETE /sessions/me
-	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
+	RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error)
 	// RevokeRelease invokes revokeRelease operation.
 	//
 	// Marks the release revoked, so that its content is never served again.
@@ -961,29 +963,19 @@ type Invoker interface {
 	RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error)
 	// RollbackDeployment invokes rollbackDeployment operation.
 	//
-	// Re-deploys the deployment named in the path: a new deployment with the
-	// same `release_id` and the same `targets`, `reason: rollback`, and
-	// `rollback_to` in its metadata naming the deployment it re-applied. The
-	// variable values that deployment resolved are re-applied with it, so the
-	// targets serve exactly what they served then. The history is append-only,
-	// so the deployments in between stay in it.
-	// Only a deployment to primary origins can be rolled back. One whose
-	// targets were preview URLs answers `400` with `dep.invalid`; deploy to
-	// the preview again instead. Every target must still be a primary origin
-	// of the project, as `POST /deployments` requires of an exact origin:
-	// when one is not, the request answers `403` with
-	// `proj.origin_not_allowed` naming it, and nothing changes. There is no
-	// narrowing to some of the targets: to roll back one origin, deploy the
-	// earlier release to it with `POST /deployments`.
-	// When every target already serves the deployment's release, nothing
-	// changes and the call answers `200` with the newest deployment to the
-	// targets.
-	// The release must not be revoked: a revoked one answers `409` with
-	// `rel.revoked`. An unknown deployment id, or one of another project,
-	// answers `404` with `dep.not_found`.
-	// A rollback never answers `dep.variables_missing`: the release and the
-	// frozen values it re-applies passed that check together when the named
-	// deployment was made.
+	// Re-deploys the release of the deployment named in the path to `primary`,
+	// with the variable values it froze: a new deployment with `reason:
+	// rollback` and `rollback_to` naming it. Like any deployment to `primary`,
+	// it covers every current primary origin. Idempotent like a deployment to
+	// `primary`: when nothing would change it answers `200` with the newest
+	// primary deployment.
+	// Failures:
+	// - `400 dep.invalid`: the deployment went to preview URLs (deploy to the
+	// preview again instead), or the project has no primary origin.
+	// - `404 dep.not_found`: no deployment of the project has that id.
+	// - `409 dep.conflict`: `expected_deployment_id` is not the project's
+	// newest primary deployment; `details.deployment` is that deployment.
+	// - `409 rel.revoked`: the release is revoked.
 	//
 	// POST /deployments/{deployment_id}/rollback
 	RollbackDeployment(ctx context.Context, request OptRollbackDeploymentRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
@@ -1990,48 +1982,31 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 
 // CreateDeployment invokes createDeployment operation.
 //
-// Makes a release live on a set of targets by recording a deployment. The
-// two happen atomically: when the call returns, every target serves the
-// named release and the record exists; on any failure every target keeps
-// serving what it served and no record is written.
-// The release is named by exactly one of `release_id` or `content_hash`
-// (both or neither answers `400` with `dep.invalid`), and must already
-// exist in the project: deploying never assembles a release. An
-// unknown release id or digest answers `404` with `rel.not_found`, and a
-// revoked release answers `409` with `rel.revoked`.
-// `targets` lists `primary`, which expands to every primary origin of the
-// project, and exact origins. An origin that is neither a primary origin
-// of the project nor matches one of its preview patterns answers `403`
-// with `proj.origin_not_allowed`, and `primary` on a project with no
-// primary origin answers `400` with `dep.invalid`. The deployment records
-// the resolved origins, sorted, never the keyword.
-// A deployment to preview URLs creates the preview for each of them, or
-// renews it when it exists, in the same transaction, with the expiry set
-// from `ttl`; each target in the response carries that expiry. It always
-// writes a new deployment, answering `201`, even when the URLs already
-// serve the release: that record is the renewal. Primary origins and
-// preview URLs cannot be mixed in one deployment: that answers `400` with
-// `dep.invalid`.
-// A deployment freezes the variable values the project stores for its
-// kind: primary origins use the primary values, preview URLs the preview
-// values, with no fallback from one to the other. A release that
-// references a variable with no value for that kind answers `400` with
-// `dep.variables_missing`, naming the kind and every missing variable, and
-// nothing is written.
-// A deployment to primary origins is idempotent on what is served: when
-// every resolved target already serves the release with the same frozen
-// variable values, nothing changes and the call answers `200` with the
-// newest deployment to those targets, so a re-run of `zitadel deploy` on
-// unchanged content is a no-op end to end. The same release with a
-// changed variable value is a new deployment.
-// Anything else writes a new record covering all of the resolved targets,
-// including the same release returning after something else was served in
-// between: the log is append-only, and each record is one act of making a
-// release live.
-// `expected_deployment_id` guards against racing another deploy: when
-// present, the write only happens if the newest deployment to any of the
-// resolved targets still is the one named, and a mismatch answers `409`
-// with `dep.conflict`, carrying the actual newest deployment.
+// Makes a release live on its targets by recording a deployment,
+// atomically: on success every target serves the release and the record
+// exists; on failure nothing changes and no record is written.
+// Name the release by exactly one of `release_id` or `content_hash`; it
+// must already exist in the project. `targets` is `primary` or preview
+// URLs. The deployment freezes the project's variable values for its kind,
+// with no fallback between primary and preview values.
+// A deployment to `primary` changes nothing when the project's newest
+// primary deployment has the same release and frozen values and covers
+// exactly the current primary origins: the call answers `200` with that
+// deployment. Any other request writes a new deployment and answers `201`;
+// for preview URLs that record renews their previews.
+// Failures:
+// - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
+// a primary origin named exactly; `primary` mixed with preview URLs;
+// `primary` on a project with no primary origin; `ttl` with `primary`;
+// `ttl` above the project's maximum.
+// - `400 dep.variables_missing`: a referenced variable has no value for
+// the kind; `details` names the kind and every missing variable.
+// - `403 proj.origin_not_allowed`: a preview URL matches no preview
+// pattern.
+// - `404 rel.not_found`: the release id or digest names no release here.
+// - `409 dep.conflict`: `expected_deployment_id` is not the deployment
+// this write replaces; `details.deployment` is that deployment.
+// - `409 rel.revoked`: the release is revoked.
 //
 // POST /deployments
 func (c *Client) CreateDeployment(ctx context.Context, request *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error) {
@@ -6728,14 +6703,16 @@ func (c *Client) sendGetMySession(ctx context.Context, params GetMySessionParams
 // HttpOnly cookie is still the credential, and a cross-site page cannot
 // read this response. It stays the same for the life of the session, so a
 // client fetches it once per session.
+// With `project_id`, the token is returned only when the session belongs to
+// that project.
 //
 // GET /sessions/me/csrf
-func (c *Client) GetMySessionCsrfToken(ctx context.Context) (GetMySessionCsrfTokenRes, error) {
-	res, err := c.sendGetMySessionCsrfToken(ctx)
+func (c *Client) GetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (GetMySessionCsrfTokenRes, error) {
+	res, err := c.sendGetMySessionCsrfToken(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetMySessionCsrfToken(ctx context.Context) (res GetMySessionCsrfTokenRes, err error) {
+func (c *Client) sendGetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (res GetMySessionCsrfTokenRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMySessionCsrfToken"),
 		semconv.HTTPRequestMethodKey.String("GET"),
@@ -6775,6 +6752,30 @@ func (c *Client) sendGetMySessionCsrfToken(ctx context.Context) (res GetMySessio
 	var pathParts [1]string
 	pathParts[0] = "/sessions/me/csrf"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
@@ -6837,14 +6838,16 @@ func (c *Client) sendGetMySessionCsrfToken(ctx context.Context) (res GetMySessio
 // Returns the user signed in to the session that authenticates the request.
 // The project and the user both come from the session cookie, so a caller only
 // ever reads their own user.
+// With `project_id`, the user is returned only when the session belongs to
+// that project.
 //
 // GET /users/me
-func (c *Client) GetMyUser(ctx context.Context) (GetMyUserRes, error) {
-	res, err := c.sendGetMyUser(ctx)
+func (c *Client) GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error) {
+	res, err := c.sendGetMyUser(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetMyUser(ctx context.Context) (res GetMyUserRes, err error) {
+func (c *Client) sendGetMyUser(ctx context.Context, params GetMyUserParams) (res GetMyUserRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMyUser"),
 		semconv.HTTPRequestMethodKey.String("GET"),
@@ -6884,6 +6887,30 @@ func (c *Client) sendGetMyUser(ctx context.Context) (res GetMyUserRes, err error
 	var pathParts [1]string
 	pathParts[0] = "/users/me"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
@@ -6944,14 +6971,16 @@ func (c *Client) sendGetMyUser(ctx context.Context) (res GetMyUserRes, err error
 // GetMyUserSchema invokes getMyUserSchema operation.
 //
 // The schema the signed-in user's own record is validated against.
+// With `project_id`, the schema is returned only when the session belongs to
+// that project.
 //
 // GET /users/me/schema
-func (c *Client) GetMyUserSchema(ctx context.Context) (GetMyUserSchemaRes, error) {
-	res, err := c.sendGetMyUserSchema(ctx)
+func (c *Client) GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error) {
+	res, err := c.sendGetMyUserSchema(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetMyUserSchema(ctx context.Context) (res GetMyUserSchemaRes, err error) {
+func (c *Client) sendGetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (res GetMyUserSchemaRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMyUserSchema"),
 		semconv.HTTPRequestMethodKey.String("GET"),
@@ -6991,6 +7020,30 @@ func (c *Client) sendGetMyUserSchema(ctx context.Context) (res GetMyUserSchemaRe
 	var pathParts [1]string
 	pathParts[0] = "/users/me/schema"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
@@ -8047,6 +8100,149 @@ func (c *Client) sendGetUserByID(ctx context.Context, params GetUserByIDParams) 
 	return result, nil
 }
 
+// GetUserPasswordState invokes getUserPasswordState operation.
+//
+// Reports when the user's current password was set, and leaves `set_at` out
+// when the user has none. The password and its hash are never returned;
+// setting one is `PUT` on the same path.
+//
+// GET /users/{user_id}/password
+func (c *Client) GetUserPasswordState(ctx context.Context, params GetUserPasswordStateParams) (GetUserPasswordStateRes, error) {
+	res, err := c.sendGetUserPasswordState(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetUserPasswordState(ctx context.Context, params GetUserPasswordStateParams) (res GetUserPasswordStateRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getUserPasswordState"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/users/{user_id}/password"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetUserPasswordStateOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/users/"
+	{
+		// Encode "user_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "user_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.UserID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/password"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetUserPasswordStateOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetUserPasswordStateOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetUserPasswordStateResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // GetVariable invokes getVariable operation.
 //
 // Reads one variable by name, with its value per kind. A name with no
@@ -8787,23 +8983,18 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 
 // ListDeployments invokes listDeployments operation.
 //
-// Lists deployments newest first: what ran where, and when.
-// By default the list is the history: every deployment of the project, each
-// with every target it made the release live on. With `origin`, it is the
-// history of that origin alone, and its first row is the deployment the
-// origin serves.
-// With `live=true`, the list is what is served now: the newest deployment
-// to each target, each carrying only the targets it still serves. A
-// preview URL is served only while its preview is live, and its
-// `expires_at` is the expiry its newest deployment set, which is the
-// preview's current one. A deployment every target of which has since
-// been replaced, or whose previews have all expired or been removed, does
-// not appear. Combined with `origin`, the live view is the one deployment
-// that origin serves, or empty.
-// `expand: ["release"]` embeds the release each deployment made live, so a
-// history renders with each entry's content without resolving `release_id`
-// one by one. Expanding requires `release.read` and does not affect the
-// ordering or the page tokens.
+// Lists what ran where, and when.
+// By default the list is the history, newest first: every deployment of
+// the project with every target it made the release live on. With
+// `origin`, the history of that origin alone.
+// With `live=true`, the list is what is served now: the project's newest
+// primary deployment, narrowed to origins that are still primary, then the
+// newest deployment to each live preview URL, newest first, narrowed to
+// the URLs it still serves. Combined with `origin`, it is the one
+// deployment that origin serves, or empty.
+// `expand: ["release"]` embeds the release each deployment made live; it
+// requires `release.read` and does not change the ordering or the page
+// tokens.
 //
 // GET /deployments
 func (c *Client) ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error) {
@@ -9920,6 +10111,9 @@ func (c *Client) sendListIdpRevisions(ctx context.Context, params ListIdpRevisio
 // This is not the same question as `queryProjects`, which answers with the one
 // project the calling credential is bound to. Here the session is the caller
 // and the grants are the answer, so the list spans projects.
+// With `project_id`, the projects are listed only when the session belongs to
+// that project. It names the project the session was signed in to, not one to
+// list.
 //
 // GET /users/me/projects
 func (c *Client) ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error) {
@@ -10010,6 +10204,26 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 			return res, errors.Wrap(err, "encode query")
 		}
 	}
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
 	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
@@ -10071,6 +10285,8 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 // ListMyTeams invokes listMyTeams operation.
 //
 // The signed-in user's own team roster, ordered by team name.
+// With `project_id`, the teams are listed only when the session belongs to
+// that project.
 //
 // GET /users/me/teams
 func (c *Client) ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error) {
@@ -10151,6 +10367,26 @@ func (c *Client) sendListMyTeams(ctx context.Context, params ListMyTeamsParams) 
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
 				if unwrapped := string(val); true {
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}
@@ -11391,14 +11627,16 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 // Partially updates the caller's own schema-defined attributes. The merged
 // result is validated against the user's schema before commit. Concurrent
 // writes are last-write-wins.
+// With `project_id`, the user is updated only when the session belongs to
+// that project.
 //
 // PATCH /users/me
-func (c *Client) PatchMyUser(ctx context.Context, request *PatchMyUserRequest) (PatchMyUserRes, error) {
-	res, err := c.sendPatchMyUser(ctx, request)
+func (c *Client) PatchMyUser(ctx context.Context, request *PatchMyUserRequest, params PatchMyUserParams) (PatchMyUserRes, error) {
+	res, err := c.sendPatchMyUser(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendPatchMyUser(ctx context.Context, request *PatchMyUserRequest) (res PatchMyUserRes, err error) {
+func (c *Client) sendPatchMyUser(ctx context.Context, request *PatchMyUserRequest, params PatchMyUserParams) (res PatchMyUserRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -11447,6 +11685,30 @@ func (c *Client) sendPatchMyUser(ctx context.Context, request *PatchMyUserReques
 	var pathParts [1]string
 	pathParts[0] = "/users/me"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "PATCH", u)
@@ -11766,11 +12028,23 @@ func (c *Client) sendPatchUserByID(ctx context.Context, request *PatchUserReques
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, PatchUserByIDOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -12984,17 +13258,20 @@ func (c *Client) sendRemovePreview(ctx context.Context, request *RemovePreviewRe
 //
 // Logs out by permanently deleting the session.
 // The `__nextgen_session` cookie issued at creation (or superseded by a handoff
-// exchange) is required. Idempotent: if the session is already gone this still
-// returns 204. Any tokens derived from the session are invalidated, and the
-// cookie itself is cleared in the response.
+// exchange) is required, with the session's token from `GET /sessions/me/csrf`
+// in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
+// this still returns 204. Any tokens derived from the session are invalidated,
+// and the cookie itself is cleared in the response.
+// With `project_id`, only a session of that project is deleted. A session of
+// another project is left alone, and so is its cookie.
 //
 // DELETE /sessions/me
-func (c *Client) RevokeMySession(ctx context.Context) (RevokeMySessionRes, error) {
-	res, err := c.sendRevokeMySession(ctx)
+func (c *Client) RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error) {
+	res, err := c.sendRevokeMySession(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendRevokeMySession(ctx context.Context) (res RevokeMySessionRes, err error) {
+func (c *Client) sendRevokeMySession(ctx context.Context, params RevokeMySessionParams) (res RevokeMySessionRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("revokeMySession"),
 		semconv.HTTPRequestMethodKey.String("DELETE"),
@@ -13034,6 +13311,30 @@ func (c *Client) sendRevokeMySession(ctx context.Context) (res RevokeMySessionRe
 	var pathParts [1]string
 	pathParts[0] = "/sessions/me"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "DELETE", u)
@@ -13392,29 +13693,19 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 
 // RollbackDeployment invokes rollbackDeployment operation.
 //
-// Re-deploys the deployment named in the path: a new deployment with the
-// same `release_id` and the same `targets`, `reason: rollback`, and
-// `rollback_to` in its metadata naming the deployment it re-applied. The
-// variable values that deployment resolved are re-applied with it, so the
-// targets serve exactly what they served then. The history is append-only,
-// so the deployments in between stay in it.
-// Only a deployment to primary origins can be rolled back. One whose
-// targets were preview URLs answers `400` with `dep.invalid`; deploy to
-// the preview again instead. Every target must still be a primary origin
-// of the project, as `POST /deployments` requires of an exact origin:
-// when one is not, the request answers `403` with
-// `proj.origin_not_allowed` naming it, and nothing changes. There is no
-// narrowing to some of the targets: to roll back one origin, deploy the
-// earlier release to it with `POST /deployments`.
-// When every target already serves the deployment's release, nothing
-// changes and the call answers `200` with the newest deployment to the
-// targets.
-// The release must not be revoked: a revoked one answers `409` with
-// `rel.revoked`. An unknown deployment id, or one of another project,
-// answers `404` with `dep.not_found`.
-// A rollback never answers `dep.variables_missing`: the release and the
-// frozen values it re-applies passed that check together when the named
-// deployment was made.
+// Re-deploys the release of the deployment named in the path to `primary`,
+// with the variable values it froze: a new deployment with `reason:
+// rollback` and `rollback_to` naming it. Like any deployment to `primary`,
+// it covers every current primary origin. Idempotent like a deployment to
+// `primary`: when nothing would change it answers `200` with the newest
+// primary deployment.
+// Failures:
+// - `400 dep.invalid`: the deployment went to preview URLs (deploy to the
+// preview again instead), or the project has no primary origin.
+// - `404 dep.not_found`: no deployment of the project has that id.
+// - `409 dep.conflict`: `expected_deployment_id` is not the project's
+// newest primary deployment; `details.deployment` is that deployment.
+// - `409 rel.revoked`: the release is revoked.
 //
 // POST /deployments/{deployment_id}/rollback
 func (c *Client) RollbackDeployment(ctx context.Context, request OptRollbackDeploymentRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error) {

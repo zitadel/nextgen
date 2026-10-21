@@ -9,10 +9,12 @@ import { toZitadelError, type ZitadelError } from "../errors";
 import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
 import { type Asker, input as askInput } from "../input";
 import { isObject } from "../json";
+import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
-import { resolveServer } from "../server";
+import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "../server";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
+import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
 import { takeReportedWarnings } from "../warnings";
 import {
@@ -28,10 +30,41 @@ import type {
   CommandResult,
   ErrorEnvelope,
   EnvelopeMeta,
+  FlagVariable,
   GlobalOptions,
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
+
+/**
+ * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
+ * and the colour libraries read. The libraries agree that off wins.
+ */
+const NO_COLOR: FlagVariable = {
+  name: "NO_COLOR",
+  flag: "color",
+  description: "A non-empty value turns color off, as `--no-color` does (https://no-color.org).",
+  precedence: "Turns color off even with `--color` or `FORCE_COLOR`.",
+};
+const FORCE_COLOR: FlagVariable = {
+  name: "FORCE_COLOR",
+  flag: "color",
+  description: "Turns color on where it would be off, such as in a pipe, as `--color` does.",
+  precedence: "`--no-color` and `NO_COLOR` win over it.",
+};
+
+/**
+ * The environment variables that set what a global flag sets, each declared
+ * beside the code that reads it. The CLI reference lists them beside the
+ * flags (`./reference.ts`).
+ */
+export const FLAG_VARIABLES: readonly FlagVariable[] = [
+  SERVER_VARIABLE,
+  NO_COLOR,
+  FORCE_COLOR,
+  DO_NOT_TRACK,
+  ZITADEL_TELEMETRY,
+];
 
 /**
  * Base class for every oclif command. Owns the global flags, builds the
@@ -191,7 +224,7 @@ export abstract class BaseCommand extends Command {
     // process as `NO_COLOR` via `bin/run.js`, and `--no-color` also unsets the
     // parsed `color` flag. The flag's value is the source of truth here so that
     // a programmatic `run()` (tests) honours it without the entry-point shim.
-    const useColor = flags.color !== false && !process.env.NO_COLOR;
+    const useColor = flags.color !== false && !process.env[NO_COLOR.name];
     // Drop the right-aligned timestamp the FancyReporter adds by default.
     // Timestamps add no value in a one-off CLI run, wrap awkwardly on long
     // lines (e.g. created-schema URL), and clutter the visual rhythm of the
@@ -240,6 +273,14 @@ export abstract class BaseCommand extends Command {
    */
   protected createTelemetry(deps: TelemetryDeps): Telemetry {
     return Telemetry.create(deps);
+  }
+
+  /**
+   * Which local servers are running on the machine. Production asks `ps`; a
+   * test overrides this, like {@link createTelemetry}, to answer for the machine.
+   */
+  protected localServers(): LocalServers {
+    return new PsLocalServers();
   }
 
   private openTelemetry(flag: boolean | undefined): void {
@@ -638,7 +679,7 @@ function renderKnownSections(lines: string[], data: Record<string, unknown>): vo
 function sourceSuffix(opts: GlobalOptions): string {
   try {
     const url = new URL(opts.source);
-    if (url.host === "api.zitadel.cloud") {
+    if (url.host === new URL(DEFAULT_SERVER).host) {
       return "";
     }
     return `(server: ${url.host})`;

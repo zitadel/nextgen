@@ -139,9 +139,37 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, got, helpers.MustMarshal(t, got))
 
+		password, err := session.GetUserPasswordState(t.Context(), api.GetUserPasswordStateParams{UserID: user.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.UserPasswordState{}, password, helpers.MustMarshal(t, password))
+
+		patched, err := session.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"attributes": map[string]any{"nickname": "Patched"},
+		}), api.PatchUserByIDParams{UserID: user.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, patched, helpers.MustMarshal(t, patched))
+		assert.Equal(t, "Patched", userProp(t, *patched.(*api.User), "nickname"))
+
 		deleted, err := session.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: user.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.DeleteUserByIDNoContent{}, deleted, helpers.MustMarshal(t, deleted))
+	})
+
+	// Editor is the least PATCH asks for; the admin grant above would also
+	// pass a check that wrongly asked for admin.
+	t.Run("an editor patches a user", func(t *testing.T) {
+		t.Parallel()
+		edited, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		harness.SeedProjectEditor(t, edited.ID, claimerID)
+		targetID, _ := harness.CreateUserOwnedByTeam(t, edited.ID)
+
+		resp, err := session.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"attributes": map[string]any{"nickname": "Patched"},
+		}), api.PatchUserByIDParams{UserID: api.UserID(targetID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, "Patched", userProp(t, *resp.(*api.User), "nickname"))
 	})
 }
 
@@ -206,6 +234,11 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.ListUserPasskeysNotFound{}, passkeys, helpers.MustMarshal(t, passkeys))
 
+		password, err := session.GetUserPasswordState(t.Context(), api.GetUserPasswordStateParams{UserID: api.UserID(foreignUserID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetUserPasswordStateNotFound{}, password, helpers.MustMarshal(t, password))
+		assert.Equal(t, api.ErrorCode("user.not_found"), password.(*api.GetUserPasswordStateNotFound).Code)
+
 		links, err := session.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: api.UserID(foreignUserID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.ListUserIdentityLinksNotFound{}, links, helpers.MustMarshal(t, links))
@@ -224,6 +257,32 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.DeleteUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
 		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.DeleteUserByIDNotFound).Code)
+	})
+
+	t.Run("cannot patch another project's user", func(t *testing.T) {
+		// Its own target: the delete above must not decide this answer.
+		targetID, _ := harness.CreateUserOwnedByTeam(t, other.ID)
+		resp, err := session.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"attributes": map[string]any{"nickname": "Patched"},
+		}), api.PatchUserByIDParams{UserID: api.UserID(targetID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.PatchUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.PatchUserByIDNotFound).Code)
+	})
+
+	// A viewer finds the user, so the refusal is the write check, not not-found.
+	t.Run("a viewer cannot patch a user", func(t *testing.T) {
+		viewed, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		harness.SeedProjectViewer(t, viewed.ID, strangerID)
+		targetID, _ := harness.CreateUserOwnedByTeam(t, viewed.ID)
+
+		resp, err := session.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"attributes": map[string]any{"nickname": "Patched"},
+		}), api.PatchUserByIDParams{UserID: api.UserID(targetID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.PatchUserByIDForbidden{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.permission_denied"), resp.(*api.PatchUserByIDForbidden).Code)
 	})
 
 	t.Run("cannot update another project's team", func(t *testing.T) {
@@ -772,7 +831,7 @@ func TestConsoleSessionRevokedStopsAuthorizing(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, queryUsers(), "the live session authorizes")
 
-	revoked, err := session.RevokeMySession(t.Context())
+	revoked, err := session.RevokeMySession(t.Context(), api.RevokeMySessionParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.RevokeMySessionNoContent{}, revoked, helpers.MustMarshal(t, revoked))
 

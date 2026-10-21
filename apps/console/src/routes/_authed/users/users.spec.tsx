@@ -74,9 +74,8 @@ describe("users screen", () => {
     );
     await renderUsers(scopedPath("/users", "proj_other"));
 
-    // The address renders twice in the row (User and identifier columns).
     const table = within(await screen.findByRole("table"));
-    expect(table.getAllByText("maya@acme.com").length).toBeGreaterThan(0);
+    expect(table.getByText("maya@acme.com")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Load more" }));
     await waitFor(() => expect(projects).toEqual(["proj_other", "proj_other"]));
   });
@@ -153,15 +152,96 @@ describe("users screen", () => {
     await renderUsers();
     expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
     // The User column leads with the resolved display and carries the link;
-    // the identifier has its own column (asserted below). Schema-driven
-    // attribute columns follow (decisions log D4).
+    // the designated identifier sits under it, its tooltip naming the property.
+    // Schema-driven attribute columns follow (decisions log D4).
     expect(await screen.findByRole("link", { name: "Maya Patel" })).toBeInTheDocument();
-    // The designated identifier is its own platform-derived column (like
-    // Status and ID), role-named so mixed-schema lists read down one column.
-    expect(screen.getByRole("columnheader", { name: "Identifier" })).toBeInTheDocument();
-    expect(screen.getAllByText("maya.patel@acme.com").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Maya")).toBeInTheDocument();
-    expect(screen.getByText("Patel")).toBeInTheDocument();
+    const table = within(screen.getByRole("table"));
+    expect(table.getByText("maya.patel@acme.com")).toHaveAttribute("title", "email");
+    expect(table.getByText("Maya")).toBeInTheDocument();
+    expect(table.getByText("Patel")).toBeInTheDocument();
+    // The email column would only repeat the line under the name.
+    expect(table.queryByRole("columnheader", { name: "Identifier" })).not.toBeInTheDocument();
+    expect(table.queryByRole("columnheader", { name: /email/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the email once under the default schema", async () => {
+    // The default schema designates `email` as the identifier and nothing as
+    // the display, so the identity, the identifier and the `email` attribute
+    // are one value. It reads once, as the link.
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              schema: "sch_default",
+              identifier: "maya@acme.com",
+              identifier_property: "email",
+              attributes: { email: "maya@acme.com" },
+              metadata: { status: "active" },
+            },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_default`, () =>
+        HttpResponse.json({
+          id: "sch_default",
+          schema: {
+            "x-identifier": "email",
+            required: ["email"],
+            properties: { email: { type: "string", format: "email" } },
+          },
+        }),
+      ),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByRole("link", { name: "maya@acme.com" })).toBeInTheDocument();
+    expect(table.getAllByText("maya@acme.com")).toHaveLength(1);
+    expect(table.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
+      "User",
+      "Status",
+      "Team",
+      "ID",
+      "",
+    ]);
+    // The ID is the column that truncates to fit; the tooltip keeps it whole.
+    expect(table.getByText("user_1")).toHaveAttribute("title", "user_1");
+  });
+
+  it("keeps an attribute column some row needs, even where it repeats another row's identity", async () => {
+    // A mixed list: one schema identifies by email, another by username, so
+    // the second row's email is said nowhere else. The column stays whole
+    // rather than leaving the first row's cell blank as if it had no email.
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              identifier: "maya@acme.com",
+              identifier_property: "email",
+              attributes: { email: "maya@acme.com" },
+            },
+            {
+              id: "user_2",
+              identifier: "kenji",
+              identifier_property: "username",
+              attributes: { email: "kenji@acme.com", username: "kenji" },
+            },
+          ],
+        }),
+      ),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByRole("columnheader", { name: "email" })).toBeInTheDocument();
+    expect(table.getByText("kenji@acme.com")).toBeInTheDocument();
+    // `username` only ever repeats the identity, so it is dropped.
+    expect(table.queryByRole("columnheader", { name: "username" })).not.toBeInTheDocument();
+    expect(table.getAllByText("kenji")).toHaveLength(1);
   });
 
   it("builds the columns from the schema the users reference", async () => {
@@ -334,6 +414,54 @@ describe("users screen", () => {
     // could count on for every user (#553); nothing is invented for records
     // without one.
     expect(screen.getByText("Blocked")).toBeInTheDocument();
+  });
+
+  it("copies the whole id from the row, though the cell truncates it", async () => {
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_01M4ZB60GVT0ZE4DT13GZ6PQMB",
+              identifier: "kenji@acme.com",
+              identifier_property: "email",
+              attributes: { email: "kenji@acme.com" },
+            },
+          ],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    await renderUsers();
+
+    await user.click(await screen.findByRole("button", { name: "Copy the ID of kenji@acme.com" }));
+    expect(await navigator.clipboard.readText()).toBe("user_01M4ZB60GVT0ZE4DT13GZ6PQMB");
+  });
+
+  it("keeps the column order when the schema reads finish out of order", async () => {
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            { id: "user_1", schema: "sch_slow", attributes: { email: "a@x.com" } },
+            { id: "user_2", schema: "sch_fast", attributes: { handle: "b" } },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_slow`, async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return HttpResponse.json({ schema: { properties: { email: { type: "string" } } } });
+      }),
+      http.get(`${SCHEMAS_URL}/sch_fast`, () =>
+        HttpResponse.json({ schema: { properties: { handle: { type: "string" } } } }),
+      ),
+    );
+    await renderUsers();
+    await screen.findByRole("link", { name: "user_1" });
+
+    // The first user's schema leads, though its read finished last.
+    const headers = screen.getAllByRole("columnheader").map((cell) => cell.textContent);
+    expect(headers.indexOf("Email")).toBeLessThan(headers.indexOf("Handle"));
   });
 
   it("renders the not-authorized state on a 401 with a live session (no redirect loop)", async () => {

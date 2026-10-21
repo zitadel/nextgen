@@ -11745,142 +11745,106 @@ func (s *CreateAuthAttemptRequest) SetSessionID(val OptNilSessionID) {
 	s.SessionID = val
 }
 
-// Merged schema.
+// The deployment cannot be made, told apart by `code`; `req.invalid` is a
+// request the schema rejects.
 // Ref: #
+// CreateDeploymentBadRequest represents sum type.
 type CreateDeploymentBadRequest struct {
-	Code ErrorCode `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Merged property.
-	Details OptCreateDeploymentBadRequestDetails `json:"details"`
+	Type                       CreateDeploymentBadRequestType // switch on this field
+	DepInvalid                 DepInvalid
+	DeploymentVariablesMissing DeploymentVariablesMissing
+	ReqInvalid                 ReqInvalid
 }
 
-// GetCode returns the value of Code.
-func (s *CreateDeploymentBadRequest) GetCode() ErrorCode {
-	return s.Code
+// CreateDeploymentBadRequestType is oneOf type of CreateDeploymentBadRequest.
+type CreateDeploymentBadRequestType string
+
+// Possible values for CreateDeploymentBadRequestType.
+const (
+	DepInvalidCreateDeploymentBadRequest                 CreateDeploymentBadRequestType = "dep.invalid"
+	DeploymentVariablesMissingCreateDeploymentBadRequest CreateDeploymentBadRequestType = "dep.variables_missing"
+	ReqInvalidCreateDeploymentBadRequest                 CreateDeploymentBadRequestType = "req.invalid"
+)
+
+// IsDepInvalid reports whether CreateDeploymentBadRequest is DepInvalid.
+func (s CreateDeploymentBadRequest) IsDepInvalid() bool {
+	return s.Type == DepInvalidCreateDeploymentBadRequest
 }
 
-// GetMessage returns the value of Message.
-func (s *CreateDeploymentBadRequest) GetMessage() string {
-	return s.Message
+// IsDeploymentVariablesMissing reports whether CreateDeploymentBadRequest is DeploymentVariablesMissing.
+func (s CreateDeploymentBadRequest) IsDeploymentVariablesMissing() bool {
+	return s.Type == DeploymentVariablesMissingCreateDeploymentBadRequest
 }
 
-// GetDetails returns the value of Details.
-func (s *CreateDeploymentBadRequest) GetDetails() OptCreateDeploymentBadRequestDetails {
-	return s.Details
+// IsReqInvalid reports whether CreateDeploymentBadRequest is ReqInvalid.
+func (s CreateDeploymentBadRequest) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateDeploymentBadRequest
 }
 
-// SetCode sets the value of Code.
-func (s *CreateDeploymentBadRequest) SetCode(val ErrorCode) {
-	s.Code = val
+// SetDepInvalid sets CreateDeploymentBadRequest to DepInvalid.
+func (s *CreateDeploymentBadRequest) SetDepInvalid(v DepInvalid) {
+	s.Type = DepInvalidCreateDeploymentBadRequest
+	s.DepInvalid = v
 }
 
-// SetMessage sets the value of Message.
-func (s *CreateDeploymentBadRequest) SetMessage(val string) {
-	s.Message = val
+// GetDepInvalid returns DepInvalid and true boolean if CreateDeploymentBadRequest is DepInvalid.
+func (s CreateDeploymentBadRequest) GetDepInvalid() (v DepInvalid, ok bool) {
+	if !s.IsDepInvalid() {
+		return v, false
+	}
+	return s.DepInvalid, true
 }
 
-// SetDetails sets the value of Details.
-func (s *CreateDeploymentBadRequest) SetDetails(val OptCreateDeploymentBadRequestDetails) {
-	s.Details = val
+// NewDepInvalidCreateDeploymentBadRequest returns new CreateDeploymentBadRequest from DepInvalid.
+func NewDepInvalidCreateDeploymentBadRequest(v DepInvalid) CreateDeploymentBadRequest {
+	var s CreateDeploymentBadRequest
+	s.SetDepInvalid(v)
+	return s
+}
+
+// SetDeploymentVariablesMissing sets CreateDeploymentBadRequest to DeploymentVariablesMissing.
+func (s *CreateDeploymentBadRequest) SetDeploymentVariablesMissing(v DeploymentVariablesMissing) {
+	s.Type = DeploymentVariablesMissingCreateDeploymentBadRequest
+	s.DeploymentVariablesMissing = v
+}
+
+// GetDeploymentVariablesMissing returns DeploymentVariablesMissing and true boolean if CreateDeploymentBadRequest is DeploymentVariablesMissing.
+func (s CreateDeploymentBadRequest) GetDeploymentVariablesMissing() (v DeploymentVariablesMissing, ok bool) {
+	if !s.IsDeploymentVariablesMissing() {
+		return v, false
+	}
+	return s.DeploymentVariablesMissing, true
+}
+
+// NewDeploymentVariablesMissingCreateDeploymentBadRequest returns new CreateDeploymentBadRequest from DeploymentVariablesMissing.
+func NewDeploymentVariablesMissingCreateDeploymentBadRequest(v DeploymentVariablesMissing) CreateDeploymentBadRequest {
+	var s CreateDeploymentBadRequest
+	s.SetDeploymentVariablesMissing(v)
+	return s
+}
+
+// SetReqInvalid sets CreateDeploymentBadRequest to ReqInvalid.
+func (s *CreateDeploymentBadRequest) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateDeploymentBadRequest
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateDeploymentBadRequest is ReqInvalid.
+func (s CreateDeploymentBadRequest) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateDeploymentBadRequest returns new CreateDeploymentBadRequest from ReqInvalid.
+func NewReqInvalidCreateDeploymentBadRequest(v ReqInvalid) CreateDeploymentBadRequest {
+	var s CreateDeploymentBadRequest
+	s.SetReqInvalid(v)
+	return s
 }
 
 func (*CreateDeploymentBadRequest) createDeploymentRes() {}
-
-// Merged schema.
-type CreateDeploymentBadRequestDetails struct {
-	// Whether the deployment targets primary origins or preview URLs:
-	// the kind whose variable values it would freeze.
-	Kind CreateDeploymentBadRequestDetailsKind `json:"kind"`
-	// Every variable the release references with no value stored for
-	// that kind, sorted.
-	Names           []string `json:"names"`
-	AdditionalProps CreateDeploymentBadRequestDetailsAdditional
-}
-
-// GetKind returns the value of Kind.
-func (s *CreateDeploymentBadRequestDetails) GetKind() CreateDeploymentBadRequestDetailsKind {
-	return s.Kind
-}
-
-// GetNames returns the value of Names.
-func (s *CreateDeploymentBadRequestDetails) GetNames() []string {
-	return s.Names
-}
-
-// GetAdditionalProps returns the value of AdditionalProps.
-func (s *CreateDeploymentBadRequestDetails) GetAdditionalProps() CreateDeploymentBadRequestDetailsAdditional {
-	return s.AdditionalProps
-}
-
-// SetKind sets the value of Kind.
-func (s *CreateDeploymentBadRequestDetails) SetKind(val CreateDeploymentBadRequestDetailsKind) {
-	s.Kind = val
-}
-
-// SetNames sets the value of Names.
-func (s *CreateDeploymentBadRequestDetails) SetNames(val []string) {
-	s.Names = val
-}
-
-// SetAdditionalProps sets the value of AdditionalProps.
-func (s *CreateDeploymentBadRequestDetails) SetAdditionalProps(val CreateDeploymentBadRequestDetailsAdditional) {
-	s.AdditionalProps = val
-}
-
-type CreateDeploymentBadRequestDetailsAdditional map[string]jx.Raw
-
-func (s *CreateDeploymentBadRequestDetailsAdditional) init() CreateDeploymentBadRequestDetailsAdditional {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Whether the deployment targets primary origins or preview URLs:
-// the kind whose variable values it would freeze.
-type CreateDeploymentBadRequestDetailsKind string
-
-const (
-	CreateDeploymentBadRequestDetailsKindPrimary CreateDeploymentBadRequestDetailsKind = "primary"
-	CreateDeploymentBadRequestDetailsKindPreview CreateDeploymentBadRequestDetailsKind = "preview"
-)
-
-// AllValues returns all CreateDeploymentBadRequestDetailsKind values.
-func (CreateDeploymentBadRequestDetailsKind) AllValues() []CreateDeploymentBadRequestDetailsKind {
-	return []CreateDeploymentBadRequestDetailsKind{
-		CreateDeploymentBadRequestDetailsKindPrimary,
-		CreateDeploymentBadRequestDetailsKindPreview,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s CreateDeploymentBadRequestDetailsKind) MarshalText() ([]byte, error) {
-	switch s {
-	case CreateDeploymentBadRequestDetailsKindPrimary:
-		return []byte(s), nil
-	case CreateDeploymentBadRequestDetailsKindPreview:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *CreateDeploymentBadRequestDetailsKind) UnmarshalText(data []byte) error {
-	switch CreateDeploymentBadRequestDetailsKind(data) {
-	case CreateDeploymentBadRequestDetailsKindPrimary:
-		*s = CreateDeploymentBadRequestDetailsKindPrimary
-		return nil
-	case CreateDeploymentBadRequestDetailsKindPreview:
-		*s = CreateDeploymentBadRequestDetailsKindPreview
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
 
 type CreateDeploymentCreated Deployment
 
@@ -12122,45 +12086,40 @@ func (s *CreateDeploymentErrorResponseStatusCode) SetResponse(val CreateDeployme
 
 func (*CreateDeploymentErrorResponseStatusCode) createDeploymentRes() {}
 
+type CreateDeploymentForbidden ErrorDetails
+
+func (*CreateDeploymentForbidden) createDeploymentRes() {}
+
+type CreateDeploymentNotFound ErrorDetails
+
+func (*CreateDeploymentNotFound) createDeploymentRes() {}
+
 type CreateDeploymentOK Deployment
 
 func (*CreateDeploymentOK) createDeploymentRes() {}
 
-// The release to make live and the targets to make it live on. The release
-// is named by exactly one of `release_id` or `content_hash`; a request with
-// both or neither answers `400` with `dep.invalid`.
-// `deployed_at` and `deployed_by` are derived server-side from the caller's
-// authentication context and are not accepted here.
+// The release to make live, named by exactly one of `release_id` or
+// `content_hash`, and the targets to make it live on.
 // Ref: #
 type CreateDeploymentRequest struct {
-	// The release to make live. Must exist in the project; deploying never
-	// assembles a release.
+	// The release to make live.
 	ReleaseID OptReleaseID `json:"release_id"`
 	// The content digest of the release to make live, in full with its
-	// `sha256:` prefix. A digest no release of the project carries answers
-	// `404` with `rel.not_found`; deploying never assembles a release.
+	// `sha256:` prefix.
 	ContentHash OptReleaseContentHash    `json:"content_hash"`
 	Targets     DeploymentTargetsRequest `json:"targets"`
-	// How long each preview URL in `targets` stays live, counted from this
-	// deployment. Every preview it writes gets the same expiry, renewing a
-	// preview that already exists. Omitted, the project's default applies; a
-	// value above the project's maximum answers `400` with `dep.invalid`.
-	// Only valid when the targets are preview URLs: with primary origins it
-	// answers `400` with `dep.invalid`.
+	// Preview URLs only: how long each preview stays live, counted from this
+	// deployment. Omitted, the project's default applies.
 	TTL OptPreviewTTL `json:"ttl"`
 	// Why this deployment happens. Omitted, the server records `deploy`.
 	Reason OptDeploymentReason `json:"reason"`
-	// A short free-form summary of why this deployment happened, analogous to
-	// a git commit message. Recorded on the deployment's metadata and shown
-	// when listing the history.
+	// A short free-form summary of why this deployment happened, recorded on
+	// its metadata.
 	Message OptString `json:"message"`
-	// An optimistic-concurrency guard: the deployment the caller believes is
-	// the newest one to any of its targets. When present, the deployment
-	// is only created if the newest deployment to any of the resolved
-	// targets is exactly this one; otherwise the request answers `409`
-	// with `dep.conflict`, carrying the actual newest deployment, and
-	// nothing changes.
-	// Not persisted; it guards the write, it is not part of the record.
+	// Deploy only if the deployment this write replaces — the project's
+	// newest primary deployment, or the newest deployment to any of the
+	// preview URLs — is this one. Otherwise the request fails with
+	// `409 dep.conflict` and nothing changes. Not stored.
 	ExpectedDeploymentID OptDeploymentID `json:"expected_deployment_id"`
 }
 
@@ -16598,7 +16557,7 @@ type CreateUserRequest struct {
 	// created using the `/schemas` endpoint. A default schema is provided.
 	Schema string `json:"schema"`
 	// The user's schema-defined content. Validated against `schema`; a
-	// property the schema does not permit is rejected with `user.invalid`.
+	// property the schema does not permit is rejected with `req.invalid`.
 	Attributes CreateUserRequestAttributes `json:"attributes"`
 }
 
@@ -16623,7 +16582,7 @@ func (s *CreateUserRequest) SetAttributes(val CreateUserRequestAttributes) {
 }
 
 // The user's schema-defined content. Validated against `schema`; a
-// property the schema does not permit is rejected with `user.invalid`.
+// property the schema does not permit is rejected with `req.invalid`.
 type CreateUserRequestAttributes map[string]jx.Raw
 
 func (s *CreateUserRequestAttributes) init() CreateUserRequestAttributes {
@@ -17423,6 +17382,59 @@ func (*DeleteVariableNoContent) deleteVariableRes() {}
 
 // Merged schema.
 // Ref: #
+type DepInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptDepInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *DepInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *DepInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *DepInvalid) GetDetails() OptDepInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *DepInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *DepInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *DepInvalid) SetDetails(val OptDepInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type DepInvalidDetails map[string]jx.Raw
+
+func (s *DepInvalidDetails) init() DepInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type DepNotFound struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -17527,15 +17539,12 @@ func (s *DepPermissionDeniedDetails) init() DepPermissionDeniedDetails {
 	return m
 }
 
-// An immutable record of a release being made live on a set of targets.
-// Deploying and rolling back both create a deployment. The record is what
-// ran where and when — the release, the targets and the timestamp — plus
-// metadata saying why and who. It is append-only: written once, in one
-// transaction for all of its targets, and never changed afterwards, so the
-// deployment log is the audit trail of what ran where.
-// A target serves the release of the newest deployment that targeted it.
-// An older deployment stays in the history after a newer one replaces it on
-// some or all of its targets.
+// An immutable record of a release made live on a set of targets. Deploying
+// and rolling back each append one, so the history is the audit trail.
+// All primary origins serve the project's newest primary deployment; one
+// added after it serves nothing until the next deployment to `primary`. A
+// preview URL serves the newest deployment to it while its preview is live.
+// Every field is fixed at creation except `status`, which is read as of now.
 // Ref: #
 type Deployment struct {
 	// The opaque, immutable resource id, assigned at creation.
@@ -17544,11 +17553,12 @@ type Deployment struct {
 	ProjectID ProjectID `json:"project_id"`
 	// The release this deployment made live. Always the release id, also
 	// when the request named the release by `content_hash`.
-	ReleaseID ReleaseID `json:"release_id"`
-	// The origins this deployment made the release live on, as resolved when
-	// it was created: `primary` appears here as the origins it expanded to.
-	// Sorted by origin.
+	ReleaseID ReleaseID      `json:"release_id"`
+	Kind      DeploymentKind `json:"kind"`
+	// The resolved origins, sorted. For `primary`, the project's primary
+	// origins at creation. The live view lists only the targets still served.
 	Targets []DeploymentTarget `json:"targets"`
+	Status  DeploymentStatus   `json:"status"`
 	// When the deployment was created.
 	DeployedAt time.Time          `json:"deployed_at"`
 	Metadata   DeploymentMetadata `json:"metadata"`
@@ -17573,9 +17583,19 @@ func (s *Deployment) GetReleaseID() ReleaseID {
 	return s.ReleaseID
 }
 
+// GetKind returns the value of Kind.
+func (s *Deployment) GetKind() DeploymentKind {
+	return s.Kind
+}
+
 // GetTargets returns the value of Targets.
 func (s *Deployment) GetTargets() []DeploymentTarget {
 	return s.Targets
+}
+
+// GetStatus returns the value of Status.
+func (s *Deployment) GetStatus() DeploymentStatus {
+	return s.Status
 }
 
 // GetDeployedAt returns the value of DeployedAt.
@@ -17608,9 +17628,19 @@ func (s *Deployment) SetReleaseID(val ReleaseID) {
 	s.ReleaseID = val
 }
 
+// SetKind sets the value of Kind.
+func (s *Deployment) SetKind(val DeploymentKind) {
+	s.Kind = val
+}
+
 // SetTargets sets the value of Targets.
 func (s *Deployment) SetTargets(val []DeploymentTarget) {
 	s.Targets = val
+}
+
+// SetStatus sets the value of Status.
+func (s *Deployment) SetStatus(val DeploymentStatus) {
+	s.Status = val
 }
 
 // SetDeployedAt sets the value of DeployedAt.
@@ -17630,10 +17660,8 @@ func (s *Deployment) SetRelease(val OptRelease) {
 
 func (*Deployment) getDeploymentByIdRes() {}
 
-// The deployment conflicts with the state of the project, told apart by
-// `code`: `dep.conflict` when `expected_deployment_id` did not match,
-// carrying the actual newest deployment, or `rel.revoked` when the release
-// is revoked.
+// The deployment conflicts with the project, told apart by `code`:
+// `dep.conflict` (guard mismatch) or `rel.revoked`.
 // Ref: #
 // DeploymentConflict represents sum type.
 type DeploymentConflict struct {
@@ -18289,8 +18317,7 @@ func (s *DeploymentExpand) UnmarshalText(data []byte) error {
 	}
 }
 
-// `expected_deployment_id` did not match: another deployment reached the
-// targets first.
+// `expected_deployment_id` is not the deployment this write replaces.
 // Ref: #
 type DeploymentGuardConflict struct {
 	Code string `json:"code"`
@@ -18330,9 +18357,8 @@ func (s *DeploymentGuardConflict) SetDetails(val DeploymentGuardConflictDetails)
 }
 
 type DeploymentGuardConflictDetails struct {
-	// The actual newest deployment to the targets, to inspect before
-	// retrying with its id as `expected_deployment_id`. Null when nothing
-	// has been deployed to any of the targets yet.
+	// The deployment this write replaces, null when there is none. Retry
+	// with its id as `expected_deployment_id`.
 	Deployment NilDeployment `json:"deployment"`
 }
 
@@ -18348,24 +18374,60 @@ func (s *DeploymentGuardConflictDetails) SetDeployment(val NilDeployment) {
 
 type DeploymentID string
 
-// Why the release went live and who made it happen. Set when the deployment
-// is created and never mutated afterwards — enrichment of the record, while
-// the release, targets and timestamp on the deployment itself say what ran
-// where and when.
+// `primary` for the project's primary origins, `preview` for preview URLs.
+// Ref: #
+type DeploymentKind string
+
+const (
+	DeploymentKindPrimary DeploymentKind = "primary"
+	DeploymentKindPreview DeploymentKind = "preview"
+)
+
+// AllValues returns all DeploymentKind values.
+func (DeploymentKind) AllValues() []DeploymentKind {
+	return []DeploymentKind{
+		DeploymentKindPrimary,
+		DeploymentKindPreview,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s DeploymentKind) MarshalText() ([]byte, error) {
+	switch s {
+	case DeploymentKindPrimary:
+		return []byte(s), nil
+	case DeploymentKindPreview:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *DeploymentKind) UnmarshalText(data []byte) error {
+	switch DeploymentKind(data) {
+	case DeploymentKindPrimary:
+		*s = DeploymentKindPrimary
+		return nil
+	case DeploymentKindPreview:
+		*s = DeploymentKindPreview
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Why the release went live and who made it happen.
 // Ref: #
 type DeploymentMetadata struct {
 	Reason DeploymentReason `json:"reason"`
 	// The caller-supplied summary of why this deployment happened, analogous
 	// to a git commit message.
 	Message OptNilString `json:"message"`
-	// The deployment `POST /deployments/{deployment_id}/rollback` re-applied,
-	// with its release and its targets. Null or absent for every other
-	// deployment, including one created by `POST /deployments` with
-	// `reason: rollback`.
+	// The deployment the rollback operation re-applied; null otherwise.
 	RollbackTo OptNilDeploymentID `json:"rollback_to"`
-	// The identity that created the deployment. Absent when the caller is a
-	// machine principal carrying no user identity, which is the common case
-	// for deployments made from CI.
+	// The identity that created the deployment. Null when the caller is a
+	// machine principal carrying no user identity, as from CI.
 	DeployedBy OptNilString `json:"deployed_by"`
 	// What kind of principal `deployed_by` names.
 	DeployedByType OptNilDeploymentMetadataDeployedByType `json:"deployed_by_type"`
@@ -18476,13 +18538,9 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Why the deployment was created. Both are the same operation — a new
-// deployment making a release live on its targets — and the reason records
-// the caller's intent:
-// - `deploy` — a release goes live on the targets.
-// - `rollback` — a release the targets served earlier goes live again.
-// `POST /deployments/{deployment_id}/rollback` records it, and so may
-// `POST /deployments` when the caller picks the earlier release itself.
+// Why the deployment was created: `deploy`, or `rollback` when an earlier
+// release goes live again. The rollback operation always records `rollback`;
+// `POST /deployments` may too, and then `rollback_to` is null.
 // Ref: #
 type DeploymentReason string
 
@@ -18525,16 +18583,58 @@ func (s *DeploymentReason) UnmarshalText(data []byte) error {
 	}
 }
 
+// Whether the deployment serves its release now.
+// - `live` — at least one of its targets serves it now.
+// - `inactive` — none does: a later deployment replaced it, or its previews
+// expired or were removed.
+// Ref: #
+type DeploymentStatus string
+
+const (
+	DeploymentStatusLive     DeploymentStatus = "live"
+	DeploymentStatusInactive DeploymentStatus = "inactive"
+)
+
+// AllValues returns all DeploymentStatus values.
+func (DeploymentStatus) AllValues() []DeploymentStatus {
+	return []DeploymentStatus{
+		DeploymentStatusLive,
+		DeploymentStatusInactive,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s DeploymentStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case DeploymentStatusLive:
+		return []byte(s), nil
+	case DeploymentStatusInactive:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *DeploymentStatus) UnmarshalText(data []byte) error {
+	switch DeploymentStatus(data) {
+	case DeploymentStatusLive:
+		*s = DeploymentStatusLive
+		return nil
+	case DeploymentStatusInactive:
+		*s = DeploymentStatusInactive
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // One origin a deployment made its release live on.
 // Ref: #
 type DeploymentTarget struct {
 	Origin Origin `json:"origin"`
-	// Present only on a target that is a preview URL: the expiry this
-	// deployment set for its preview. Fixed when the deployment is created,
-	// like the rest of the record: a later deployment to the URL renews the
-	// preview and records its own expiry, and removing the preview or
-	// letting it expire leaves this value as it was. Absent on a primary
-	// origin, which does not expire.
+	// Preview URLs only: the expiry this deployment set. A later deployment
+	// to the URL records its own.
 	ExpiresAt OptDateTime `json:"expires_at"`
 }
 
@@ -18559,6 +18659,73 @@ func (s *DeploymentTarget) SetExpiresAt(val OptDateTime) {
 }
 
 type DeploymentTargetsRequest []string
+
+// The release references variables the project holds no value for.
+// Ref: #
+type DeploymentVariablesMissing struct {
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string                            `json:"message"`
+	Details DeploymentVariablesMissingDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *DeploymentVariablesMissing) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *DeploymentVariablesMissing) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *DeploymentVariablesMissing) GetDetails() DeploymentVariablesMissingDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *DeploymentVariablesMissing) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *DeploymentVariablesMissing) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *DeploymentVariablesMissing) SetDetails(val DeploymentVariablesMissingDetails) {
+	s.Details = val
+}
+
+type DeploymentVariablesMissingDetails struct {
+	// The kind whose variable values the deployment would freeze.
+	Kind DeploymentKind `json:"kind"`
+	// Every variable the release references with no value stored for
+	// that kind, sorted.
+	Names []string `json:"names"`
+}
+
+// GetKind returns the value of Kind.
+func (s *DeploymentVariablesMissingDetails) GetKind() DeploymentKind {
+	return s.Kind
+}
+
+// GetNames returns the value of Names.
+func (s *DeploymentVariablesMissingDetails) GetNames() []string {
+	return s.Names
+}
+
+// SetKind sets the value of Kind.
+func (s *DeploymentVariablesMissingDetails) SetKind(val DeploymentKind) {
+	s.Kind = val
+}
+
+// SetNames sets the value of Names.
+func (s *DeploymentVariablesMissingDetails) SetNames(val []string) {
+	s.Names = val
+}
 
 // Empty payload for event types with no typed fields
 // (e.g. `project.deleted`, `user.deleted`, `session.expired`).
@@ -18882,6 +19049,8 @@ func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
 func (*ErrorDetails) listMyTeamsRes()          {}
+func (*ErrorDetails) revokeMySessionRes()      {}
+func (*ErrorDetails) rollbackDeploymentRes()   {}
 func (*ErrorDetails) submitFlowStepRes()       {}
 
 // Additional error-specific context.
@@ -28725,6 +28894,186 @@ func (s GetLiveOK) Read(p []byte) (n int, err error) {
 
 func (*GetLiveOK) getLiveRes() {}
 
+// GetMySessionCsrfTokenErrorResponse represents sum type.
+type GetMySessionCsrfTokenErrorResponse struct {
+	Type                GetMySessionCsrfTokenErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessNotFound        SessNotFound
+	SessProjectMismatch SessProjectMismatch
+}
+
+// GetMySessionCsrfTokenErrorResponseType is oneOf type of GetMySessionCsrfTokenErrorResponse.
+type GetMySessionCsrfTokenErrorResponseType string
+
+// Possible values for GetMySessionCsrfTokenErrorResponseType.
+const (
+	AuthUnauthorizedGetMySessionCsrfTokenErrorResponse    GetMySessionCsrfTokenErrorResponseType = "auth.unauthorized"
+	InternalGetMySessionCsrfTokenErrorResponse            GetMySessionCsrfTokenErrorResponseType = "internal"
+	ReqInvalidGetMySessionCsrfTokenErrorResponse          GetMySessionCsrfTokenErrorResponseType = "req.invalid"
+	SessNotFoundGetMySessionCsrfTokenErrorResponse        GetMySessionCsrfTokenErrorResponseType = "sess.not_found"
+	SessProjectMismatchGetMySessionCsrfTokenErrorResponse GetMySessionCsrfTokenErrorResponseType = "sess.project_mismatch"
+)
+
+// IsAuthUnauthorized reports whether GetMySessionCsrfTokenErrorResponse is AuthUnauthorized.
+func (s GetMySessionCsrfTokenErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetMySessionCsrfTokenErrorResponse
+}
+
+// IsInternal reports whether GetMySessionCsrfTokenErrorResponse is Internal.
+func (s GetMySessionCsrfTokenErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetMySessionCsrfTokenErrorResponse
+}
+
+// IsReqInvalid reports whether GetMySessionCsrfTokenErrorResponse is ReqInvalid.
+func (s GetMySessionCsrfTokenErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetMySessionCsrfTokenErrorResponse
+}
+
+// IsSessNotFound reports whether GetMySessionCsrfTokenErrorResponse is SessNotFound.
+func (s GetMySessionCsrfTokenErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundGetMySessionCsrfTokenErrorResponse
+}
+
+// IsSessProjectMismatch reports whether GetMySessionCsrfTokenErrorResponse is SessProjectMismatch.
+func (s GetMySessionCsrfTokenErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchGetMySessionCsrfTokenErrorResponse
+}
+
+// SetAuthUnauthorized sets GetMySessionCsrfTokenErrorResponse to AuthUnauthorized.
+func (s *GetMySessionCsrfTokenErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetMySessionCsrfTokenErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetMySessionCsrfTokenErrorResponse is AuthUnauthorized.
+func (s GetMySessionCsrfTokenErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetMySessionCsrfTokenErrorResponse(v AuthUnauthorized) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetMySessionCsrfTokenErrorResponse to Internal.
+func (s *GetMySessionCsrfTokenErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetMySessionCsrfTokenErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetMySessionCsrfTokenErrorResponse is Internal.
+func (s GetMySessionCsrfTokenErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from Internal.
+func NewInternalGetMySessionCsrfTokenErrorResponse(v Internal) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetMySessionCsrfTokenErrorResponse to ReqInvalid.
+func (s *GetMySessionCsrfTokenErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetMySessionCsrfTokenErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetMySessionCsrfTokenErrorResponse is ReqInvalid.
+func (s GetMySessionCsrfTokenErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from ReqInvalid.
+func NewReqInvalidGetMySessionCsrfTokenErrorResponse(v ReqInvalid) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessNotFound sets GetMySessionCsrfTokenErrorResponse to SessNotFound.
+func (s *GetMySessionCsrfTokenErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundGetMySessionCsrfTokenErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if GetMySessionCsrfTokenErrorResponse is SessNotFound.
+func (s GetMySessionCsrfTokenErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from SessNotFound.
+func NewSessNotFoundGetMySessionCsrfTokenErrorResponse(v SessNotFound) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetSessNotFound(v)
+	return s
+}
+
+// SetSessProjectMismatch sets GetMySessionCsrfTokenErrorResponse to SessProjectMismatch.
+func (s *GetMySessionCsrfTokenErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchGetMySessionCsrfTokenErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if GetMySessionCsrfTokenErrorResponse is SessProjectMismatch.
+func (s GetMySessionCsrfTokenErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchGetMySessionCsrfTokenErrorResponse(v SessProjectMismatch) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// GetMySessionCsrfTokenErrorResponseStatusCode wraps GetMySessionCsrfTokenErrorResponse with StatusCode.
+type GetMySessionCsrfTokenErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetMySessionCsrfTokenErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetMySessionCsrfTokenErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetMySessionCsrfTokenErrorResponseStatusCode) GetResponse() GetMySessionCsrfTokenErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetMySessionCsrfTokenErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetMySessionCsrfTokenErrorResponseStatusCode) SetResponse(val GetMySessionCsrfTokenErrorResponse) {
+	s.Response = val
+}
+
+func (*GetMySessionCsrfTokenErrorResponseStatusCode) getMySessionCsrfTokenRes() {}
+
 // GetMySessionErrorResponse represents sum type.
 type GetMySessionErrorResponse struct {
 	Type                GetMySessionErrorResponseType // switch on this field
@@ -28907,11 +29256,12 @@ func (*GetMySessionErrorResponseStatusCode) getMySessionRes() {}
 
 // GetMyUserErrorResponse represents sum type.
 type GetMyUserErrorResponse struct {
-	Type             GetMyUserErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
-	UserNotFound     UserNotFound
+	Type                GetMyUserErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
 }
 
 // GetMyUserErrorResponseType is oneOf type of GetMyUserErrorResponse.
@@ -28919,10 +29269,11 @@ type GetMyUserErrorResponseType string
 
 // Possible values for GetMyUserErrorResponseType.
 const (
-	AuthUnauthorizedGetMyUserErrorResponse GetMyUserErrorResponseType = "auth.unauthorized"
-	InternalGetMyUserErrorResponse         GetMyUserErrorResponseType = "internal"
-	ReqInvalidGetMyUserErrorResponse       GetMyUserErrorResponseType = "req.invalid"
-	UserNotFoundGetMyUserErrorResponse     GetMyUserErrorResponseType = "user.not_found"
+	AuthUnauthorizedGetMyUserErrorResponse    GetMyUserErrorResponseType = "auth.unauthorized"
+	InternalGetMyUserErrorResponse            GetMyUserErrorResponseType = "internal"
+	ReqInvalidGetMyUserErrorResponse          GetMyUserErrorResponseType = "req.invalid"
+	SessProjectMismatchGetMyUserErrorResponse GetMyUserErrorResponseType = "sess.project_mismatch"
+	UserNotFoundGetMyUserErrorResponse        GetMyUserErrorResponseType = "user.not_found"
 )
 
 // IsAuthUnauthorized reports whether GetMyUserErrorResponse is AuthUnauthorized.
@@ -28936,6 +29287,11 @@ func (s GetMyUserErrorResponse) IsInternal() bool { return s.Type == InternalGet
 // IsReqInvalid reports whether GetMyUserErrorResponse is ReqInvalid.
 func (s GetMyUserErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetMyUserErrorResponse
+}
+
+// IsSessProjectMismatch reports whether GetMyUserErrorResponse is SessProjectMismatch.
+func (s GetMyUserErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchGetMyUserErrorResponse
 }
 
 // IsUserNotFound reports whether GetMyUserErrorResponse is UserNotFound.
@@ -29006,6 +29362,27 @@ func NewReqInvalidGetMyUserErrorResponse(v ReqInvalid) GetMyUserErrorResponse {
 	return s
 }
 
+// SetSessProjectMismatch sets GetMyUserErrorResponse to SessProjectMismatch.
+func (s *GetMyUserErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchGetMyUserErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if GetMyUserErrorResponse is SessProjectMismatch.
+func (s GetMyUserErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchGetMyUserErrorResponse returns new GetMyUserErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchGetMyUserErrorResponse(v SessProjectMismatch) GetMyUserErrorResponse {
+	var s GetMyUserErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
 // SetUserNotFound sets GetMyUserErrorResponse to UserNotFound.
 func (s *GetMyUserErrorResponse) SetUserNotFound(v UserNotFound) {
 	s.Type = UserNotFoundGetMyUserErrorResponse
@@ -29057,11 +29434,12 @@ func (*GetMyUserErrorResponseStatusCode) getMyUserRes() {}
 
 // GetMyUserSchemaErrorResponse represents sum type.
 type GetMyUserSchemaErrorResponse struct {
-	Type             GetMyUserSchemaErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
-	UserNotFound     UserNotFound
+	Type                GetMyUserSchemaErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
 }
 
 // GetMyUserSchemaErrorResponseType is oneOf type of GetMyUserSchemaErrorResponse.
@@ -29069,10 +29447,11 @@ type GetMyUserSchemaErrorResponseType string
 
 // Possible values for GetMyUserSchemaErrorResponseType.
 const (
-	AuthUnauthorizedGetMyUserSchemaErrorResponse GetMyUserSchemaErrorResponseType = "auth.unauthorized"
-	InternalGetMyUserSchemaErrorResponse         GetMyUserSchemaErrorResponseType = "internal"
-	ReqInvalidGetMyUserSchemaErrorResponse       GetMyUserSchemaErrorResponseType = "req.invalid"
-	UserNotFoundGetMyUserSchemaErrorResponse     GetMyUserSchemaErrorResponseType = "user.not_found"
+	AuthUnauthorizedGetMyUserSchemaErrorResponse    GetMyUserSchemaErrorResponseType = "auth.unauthorized"
+	InternalGetMyUserSchemaErrorResponse            GetMyUserSchemaErrorResponseType = "internal"
+	ReqInvalidGetMyUserSchemaErrorResponse          GetMyUserSchemaErrorResponseType = "req.invalid"
+	SessProjectMismatchGetMyUserSchemaErrorResponse GetMyUserSchemaErrorResponseType = "sess.project_mismatch"
+	UserNotFoundGetMyUserSchemaErrorResponse        GetMyUserSchemaErrorResponseType = "user.not_found"
 )
 
 // IsAuthUnauthorized reports whether GetMyUserSchemaErrorResponse is AuthUnauthorized.
@@ -29088,6 +29467,11 @@ func (s GetMyUserSchemaErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether GetMyUserSchemaErrorResponse is ReqInvalid.
 func (s GetMyUserSchemaErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetMyUserSchemaErrorResponse
+}
+
+// IsSessProjectMismatch reports whether GetMyUserSchemaErrorResponse is SessProjectMismatch.
+func (s GetMyUserSchemaErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchGetMyUserSchemaErrorResponse
 }
 
 // IsUserNotFound reports whether GetMyUserSchemaErrorResponse is UserNotFound.
@@ -29155,6 +29539,27 @@ func (s GetMyUserSchemaErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetMyUserSchemaErrorResponse(v ReqInvalid) GetMyUserSchemaErrorResponse {
 	var s GetMyUserSchemaErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets GetMyUserSchemaErrorResponse to SessProjectMismatch.
+func (s *GetMyUserSchemaErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchGetMyUserSchemaErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if GetMyUserSchemaErrorResponse is SessProjectMismatch.
+func (s GetMyUserSchemaErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchGetMyUserSchemaErrorResponse returns new GetMyUserSchemaErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchGetMyUserSchemaErrorResponse(v SessProjectMismatch) GetMyUserSchemaErrorResponse {
+	var s GetMyUserSchemaErrorResponse
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
@@ -30210,6 +30615,202 @@ func (*GetUserByIDNotFound) getUserByIDRes() {}
 type GetUserByIDUnauthorized ErrorDetails
 
 func (*GetUserByIDUnauthorized) getUserByIDRes() {}
+
+// GetUserPasswordStateErrorResponse represents sum type.
+type GetUserPasswordStateErrorResponse struct {
+	Type                 GetUserPasswordStateErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+	UserNotFound         UserNotFound
+	UserPermissionDenied UserPermissionDenied
+}
+
+// GetUserPasswordStateErrorResponseType is oneOf type of GetUserPasswordStateErrorResponse.
+type GetUserPasswordStateErrorResponseType string
+
+// Possible values for GetUserPasswordStateErrorResponseType.
+const (
+	AuthUnauthorizedGetUserPasswordStateErrorResponse     GetUserPasswordStateErrorResponseType = "auth.unauthorized"
+	InternalGetUserPasswordStateErrorResponse             GetUserPasswordStateErrorResponseType = "internal"
+	ReqInvalidGetUserPasswordStateErrorResponse           GetUserPasswordStateErrorResponseType = "req.invalid"
+	UserNotFoundGetUserPasswordStateErrorResponse         GetUserPasswordStateErrorResponseType = "user.not_found"
+	UserPermissionDeniedGetUserPasswordStateErrorResponse GetUserPasswordStateErrorResponseType = "user.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether GetUserPasswordStateErrorResponse is AuthUnauthorized.
+func (s GetUserPasswordStateErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetUserPasswordStateErrorResponse
+}
+
+// IsInternal reports whether GetUserPasswordStateErrorResponse is Internal.
+func (s GetUserPasswordStateErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetUserPasswordStateErrorResponse
+}
+
+// IsReqInvalid reports whether GetUserPasswordStateErrorResponse is ReqInvalid.
+func (s GetUserPasswordStateErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetUserPasswordStateErrorResponse
+}
+
+// IsUserNotFound reports whether GetUserPasswordStateErrorResponse is UserNotFound.
+func (s GetUserPasswordStateErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundGetUserPasswordStateErrorResponse
+}
+
+// IsUserPermissionDenied reports whether GetUserPasswordStateErrorResponse is UserPermissionDenied.
+func (s GetUserPasswordStateErrorResponse) IsUserPermissionDenied() bool {
+	return s.Type == UserPermissionDeniedGetUserPasswordStateErrorResponse
+}
+
+// SetAuthUnauthorized sets GetUserPasswordStateErrorResponse to AuthUnauthorized.
+func (s *GetUserPasswordStateErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetUserPasswordStateErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetUserPasswordStateErrorResponse is AuthUnauthorized.
+func (s GetUserPasswordStateErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetUserPasswordStateErrorResponse returns new GetUserPasswordStateErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetUserPasswordStateErrorResponse(v AuthUnauthorized) GetUserPasswordStateErrorResponse {
+	var s GetUserPasswordStateErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetUserPasswordStateErrorResponse to Internal.
+func (s *GetUserPasswordStateErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetUserPasswordStateErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetUserPasswordStateErrorResponse is Internal.
+func (s GetUserPasswordStateErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetUserPasswordStateErrorResponse returns new GetUserPasswordStateErrorResponse from Internal.
+func NewInternalGetUserPasswordStateErrorResponse(v Internal) GetUserPasswordStateErrorResponse {
+	var s GetUserPasswordStateErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetUserPasswordStateErrorResponse to ReqInvalid.
+func (s *GetUserPasswordStateErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetUserPasswordStateErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetUserPasswordStateErrorResponse is ReqInvalid.
+func (s GetUserPasswordStateErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetUserPasswordStateErrorResponse returns new GetUserPasswordStateErrorResponse from ReqInvalid.
+func NewReqInvalidGetUserPasswordStateErrorResponse(v ReqInvalid) GetUserPasswordStateErrorResponse {
+	var s GetUserPasswordStateErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets GetUserPasswordStateErrorResponse to UserNotFound.
+func (s *GetUserPasswordStateErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundGetUserPasswordStateErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if GetUserPasswordStateErrorResponse is UserNotFound.
+func (s GetUserPasswordStateErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundGetUserPasswordStateErrorResponse returns new GetUserPasswordStateErrorResponse from UserNotFound.
+func NewUserNotFoundGetUserPasswordStateErrorResponse(v UserNotFound) GetUserPasswordStateErrorResponse {
+	var s GetUserPasswordStateErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPermissionDenied sets GetUserPasswordStateErrorResponse to UserPermissionDenied.
+func (s *GetUserPasswordStateErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
+	s.Type = UserPermissionDeniedGetUserPasswordStateErrorResponse
+	s.UserPermissionDenied = v
+}
+
+// GetUserPermissionDenied returns UserPermissionDenied and true boolean if GetUserPasswordStateErrorResponse is UserPermissionDenied.
+func (s GetUserPasswordStateErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
+	if !s.IsUserPermissionDenied() {
+		return v, false
+	}
+	return s.UserPermissionDenied, true
+}
+
+// NewUserPermissionDeniedGetUserPasswordStateErrorResponse returns new GetUserPasswordStateErrorResponse from UserPermissionDenied.
+func NewUserPermissionDeniedGetUserPasswordStateErrorResponse(v UserPermissionDenied) GetUserPasswordStateErrorResponse {
+	var s GetUserPasswordStateErrorResponse
+	s.SetUserPermissionDenied(v)
+	return s
+}
+
+// GetUserPasswordStateErrorResponseStatusCode wraps GetUserPasswordStateErrorResponse with StatusCode.
+type GetUserPasswordStateErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetUserPasswordStateErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetUserPasswordStateErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetUserPasswordStateErrorResponseStatusCode) GetResponse() GetUserPasswordStateErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetUserPasswordStateErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetUserPasswordStateErrorResponseStatusCode) SetResponse(val GetUserPasswordStateErrorResponse) {
+	s.Response = val
+}
+
+func (*GetUserPasswordStateErrorResponseStatusCode) getUserPasswordStateRes() {}
+
+type GetUserPasswordStateForbidden ErrorDetails
+
+func (*GetUserPasswordStateForbidden) getUserPasswordStateRes() {}
+
+type GetUserPasswordStateInternalServerError ErrorDetails
+
+func (*GetUserPasswordStateInternalServerError) getUserPasswordStateRes() {}
+
+type GetUserPasswordStateNotFound ErrorDetails
+
+func (*GetUserPasswordStateNotFound) getUserPasswordStateRes() {}
+
+type GetUserPasswordStateUnauthorized ErrorDetails
+
+func (*GetUserPasswordStateUnauthorized) getUserPasswordStateRes() {}
 
 // GetVariableErrorResponse represents sum type.
 type GetVariableErrorResponse struct {
@@ -34842,10 +35443,7 @@ func (s *ListDeploymentsErrorResponseStatusCode) SetResponse(val ListDeployments
 
 func (*ListDeploymentsErrorResponseStatusCode) listDeploymentsRes() {}
 
-// Deployments, newest first.
-// In the history (the default), each deployment carries every target it
-// made the release live on. In the live view (`live=true`), each deployment
-// carries only the targets it still serves.
+// One page of deployments, ordered as the operation describes.
 // Ref: #
 type ListDeploymentsResponse struct {
 	Deployments []Deployment `json:"deployments"`
@@ -35661,10 +36259,11 @@ func (*ListMyProjectsBadRequest) listMyProjectsRes() {}
 
 // ListMyProjectsErrorResponse represents sum type.
 type ListMyProjectsErrorResponse struct {
-	Type             ListMyProjectsErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
+	Type                ListMyProjectsErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
 }
 
 // ListMyProjectsErrorResponseType is oneOf type of ListMyProjectsErrorResponse.
@@ -35672,9 +36271,10 @@ type ListMyProjectsErrorResponseType string
 
 // Possible values for ListMyProjectsErrorResponseType.
 const (
-	AuthUnauthorizedListMyProjectsErrorResponse ListMyProjectsErrorResponseType = "auth.unauthorized"
-	InternalListMyProjectsErrorResponse         ListMyProjectsErrorResponseType = "internal"
-	ReqInvalidListMyProjectsErrorResponse       ListMyProjectsErrorResponseType = "req.invalid"
+	AuthUnauthorizedListMyProjectsErrorResponse    ListMyProjectsErrorResponseType = "auth.unauthorized"
+	InternalListMyProjectsErrorResponse            ListMyProjectsErrorResponseType = "internal"
+	ReqInvalidListMyProjectsErrorResponse          ListMyProjectsErrorResponseType = "req.invalid"
+	SessProjectMismatchListMyProjectsErrorResponse ListMyProjectsErrorResponseType = "sess.project_mismatch"
 )
 
 // IsAuthUnauthorized reports whether ListMyProjectsErrorResponse is AuthUnauthorized.
@@ -35690,6 +36290,11 @@ func (s ListMyProjectsErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether ListMyProjectsErrorResponse is ReqInvalid.
 func (s ListMyProjectsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListMyProjectsErrorResponse
+}
+
+// IsSessProjectMismatch reports whether ListMyProjectsErrorResponse is SessProjectMismatch.
+func (s ListMyProjectsErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchListMyProjectsErrorResponse
 }
 
 // SetAuthUnauthorized sets ListMyProjectsErrorResponse to AuthUnauthorized.
@@ -35752,6 +36357,27 @@ func (s ListMyProjectsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListMyProjectsErrorResponse(v ReqInvalid) ListMyProjectsErrorResponse {
 	var s ListMyProjectsErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets ListMyProjectsErrorResponse to SessProjectMismatch.
+func (s *ListMyProjectsErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchListMyProjectsErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if ListMyProjectsErrorResponse is SessProjectMismatch.
+func (s ListMyProjectsErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchListMyProjectsErrorResponse(v SessProjectMismatch) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
@@ -35847,11 +36473,12 @@ func (*ListMyProjectsResponseHeaders) listMyProjectsRes() {}
 
 // ListMyTeamsErrorResponse represents sum type.
 type ListMyTeamsErrorResponse struct {
-	Type             ListMyTeamsErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
-	UserNotFound     UserNotFound
+	Type                ListMyTeamsErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
 }
 
 // ListMyTeamsErrorResponseType is oneOf type of ListMyTeamsErrorResponse.
@@ -35859,10 +36486,11 @@ type ListMyTeamsErrorResponseType string
 
 // Possible values for ListMyTeamsErrorResponseType.
 const (
-	AuthUnauthorizedListMyTeamsErrorResponse ListMyTeamsErrorResponseType = "auth.unauthorized"
-	InternalListMyTeamsErrorResponse         ListMyTeamsErrorResponseType = "internal"
-	ReqInvalidListMyTeamsErrorResponse       ListMyTeamsErrorResponseType = "req.invalid"
-	UserNotFoundListMyTeamsErrorResponse     ListMyTeamsErrorResponseType = "user.not_found"
+	AuthUnauthorizedListMyTeamsErrorResponse    ListMyTeamsErrorResponseType = "auth.unauthorized"
+	InternalListMyTeamsErrorResponse            ListMyTeamsErrorResponseType = "internal"
+	ReqInvalidListMyTeamsErrorResponse          ListMyTeamsErrorResponseType = "req.invalid"
+	SessProjectMismatchListMyTeamsErrorResponse ListMyTeamsErrorResponseType = "sess.project_mismatch"
+	UserNotFoundListMyTeamsErrorResponse        ListMyTeamsErrorResponseType = "user.not_found"
 )
 
 // IsAuthUnauthorized reports whether ListMyTeamsErrorResponse is AuthUnauthorized.
@@ -35878,6 +36506,11 @@ func (s ListMyTeamsErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether ListMyTeamsErrorResponse is ReqInvalid.
 func (s ListMyTeamsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListMyTeamsErrorResponse
+}
+
+// IsSessProjectMismatch reports whether ListMyTeamsErrorResponse is SessProjectMismatch.
+func (s ListMyTeamsErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchListMyTeamsErrorResponse
 }
 
 // IsUserNotFound reports whether ListMyTeamsErrorResponse is UserNotFound.
@@ -35945,6 +36578,27 @@ func (s ListMyTeamsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListMyTeamsErrorResponse(v ReqInvalid) ListMyTeamsErrorResponse {
 	var s ListMyTeamsErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets ListMyTeamsErrorResponse to SessProjectMismatch.
+func (s *ListMyTeamsErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchListMyTeamsErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if ListMyTeamsErrorResponse is SessProjectMismatch.
+func (s ListMyTeamsErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchListMyTeamsErrorResponse returns new ListMyTeamsErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchListMyTeamsErrorResponse(v SessProjectMismatch) ListMyTeamsErrorResponse {
+	var s ListMyTeamsErrorResponse
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
@@ -39710,52 +40364,6 @@ func (o OptCompletedFactorPayload) Or(d CompletedFactorPayload) CompletedFactorP
 	return d
 }
 
-// NewOptCreateDeploymentBadRequestDetails returns new OptCreateDeploymentBadRequestDetails with value set to v.
-func NewOptCreateDeploymentBadRequestDetails(v CreateDeploymentBadRequestDetails) OptCreateDeploymentBadRequestDetails {
-	return OptCreateDeploymentBadRequestDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptCreateDeploymentBadRequestDetails is optional CreateDeploymentBadRequestDetails.
-type OptCreateDeploymentBadRequestDetails struct {
-	Value CreateDeploymentBadRequestDetails
-	Set   bool
-}
-
-// IsSet returns true if OptCreateDeploymentBadRequestDetails was set.
-func (o OptCreateDeploymentBadRequestDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptCreateDeploymentBadRequestDetails) Reset() {
-	var v CreateDeploymentBadRequestDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptCreateDeploymentBadRequestDetails) SetTo(v CreateDeploymentBadRequestDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptCreateDeploymentBadRequestDetails) Get() (v CreateDeploymentBadRequestDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptCreateDeploymentBadRequestDetails) Or(d CreateDeploymentBadRequestDetails) CreateDeploymentBadRequestDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptCreateSessionRequestUserAgent returns new OptCreateSessionRequestUserAgent with value set to v.
 func NewOptCreateSessionRequestUserAgent(v CreateSessionRequestUserAgent) OptCreateSessionRequestUserAgent {
 	return OptCreateSessionRequestUserAgent{
@@ -39842,6 +40450,52 @@ func (o OptDateTime) Get() (v time.Time, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptDepInvalidDetails returns new OptDepInvalidDetails with value set to v.
+func NewOptDepInvalidDetails(v DepInvalidDetails) OptDepInvalidDetails {
+	return OptDepInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDepInvalidDetails is optional DepInvalidDetails.
+type OptDepInvalidDetails struct {
+	Value DepInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptDepInvalidDetails was set.
+func (o OptDepInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDepInvalidDetails) Reset() {
+	var v DepInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDepInvalidDetails) SetTo(v DepInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDepInvalidDetails) Get() (v DepInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDepInvalidDetails) Or(d DepInvalidDetails) DepInvalidDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -54954,16 +55608,17 @@ func (*PatchMyUserConflict) patchMyUserRes() {}
 
 // PatchMyUserErrorResponse represents sum type.
 type PatchMyUserErrorResponse struct {
-	Type              PatchMyUserErrorResponseType // switch on this field
-	AuthCsrfInvalid   AuthCsrfInvalid
-	AuthUnauthorized  AuthUnauthorized
-	EvtInvalid        EvtInvalid
-	Internal          Internal
-	ReqInvalid        ReqInvalid
-	UserAlreadyExists UserAlreadyExists
-	UserConflict      UserConflict
-	UserInvalid       UserInvalid
-	UserNotFound      UserNotFound
+	Type                PatchMyUserErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserAlreadyExists   UserAlreadyExists
+	UserConflict        UserConflict
+	UserInvalid         UserInvalid
+	UserNotFound        UserNotFound
 }
 
 // PatchMyUserErrorResponseType is oneOf type of PatchMyUserErrorResponse.
@@ -54971,15 +55626,16 @@ type PatchMyUserErrorResponseType string
 
 // Possible values for PatchMyUserErrorResponseType.
 const (
-	AuthCsrfInvalidPatchMyUserErrorResponse   PatchMyUserErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "auth.unauthorized"
-	EvtInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "evt.invalid"
-	InternalPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "internal"
-	ReqInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "req.invalid"
-	UserAlreadyExistsPatchMyUserErrorResponse PatchMyUserErrorResponseType = "user.already_exists"
-	UserConflictPatchMyUserErrorResponse      PatchMyUserErrorResponseType = "user.conflict"
-	UserInvalidPatchMyUserErrorResponse       PatchMyUserErrorResponseType = "user.invalid"
-	UserNotFoundPatchMyUserErrorResponse      PatchMyUserErrorResponseType = "user.not_found"
+	AuthCsrfInvalidPatchMyUserErrorResponse     PatchMyUserErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedPatchMyUserErrorResponse    PatchMyUserErrorResponseType = "auth.unauthorized"
+	EvtInvalidPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "evt.invalid"
+	InternalPatchMyUserErrorResponse            PatchMyUserErrorResponseType = "internal"
+	ReqInvalidPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "req.invalid"
+	SessProjectMismatchPatchMyUserErrorResponse PatchMyUserErrorResponseType = "sess.project_mismatch"
+	UserAlreadyExistsPatchMyUserErrorResponse   PatchMyUserErrorResponseType = "user.already_exists"
+	UserConflictPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "user.conflict"
+	UserInvalidPatchMyUserErrorResponse         PatchMyUserErrorResponseType = "user.invalid"
+	UserNotFoundPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "user.not_found"
 )
 
 // IsAuthCsrfInvalid reports whether PatchMyUserErrorResponse is AuthCsrfInvalid.
@@ -55005,6 +55661,11 @@ func (s PatchMyUserErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether PatchMyUserErrorResponse is ReqInvalid.
 func (s PatchMyUserErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidPatchMyUserErrorResponse
+}
+
+// IsSessProjectMismatch reports whether PatchMyUserErrorResponse is SessProjectMismatch.
+func (s PatchMyUserErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchPatchMyUserErrorResponse
 }
 
 // IsUserAlreadyExists reports whether PatchMyUserErrorResponse is UserAlreadyExists.
@@ -55132,6 +55793,27 @@ func NewReqInvalidPatchMyUserErrorResponse(v ReqInvalid) PatchMyUserErrorRespons
 	return s
 }
 
+// SetSessProjectMismatch sets PatchMyUserErrorResponse to SessProjectMismatch.
+func (s *PatchMyUserErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchPatchMyUserErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if PatchMyUserErrorResponse is SessProjectMismatch.
+func (s PatchMyUserErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchPatchMyUserErrorResponse(v SessProjectMismatch) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
 // SetUserAlreadyExists sets PatchMyUserErrorResponse to UserAlreadyExists.
 func (s *PatchMyUserErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
 	s.Type = UserAlreadyExistsPatchMyUserErrorResponse
@@ -55243,6 +55925,10 @@ func (s *PatchMyUserErrorResponseStatusCode) SetResponse(val PatchMyUserErrorRes
 }
 
 func (*PatchMyUserErrorResponseStatusCode) patchMyUserRes() {}
+
+type PatchMyUserForbidden ErrorDetails
+
+func (*PatchMyUserForbidden) patchMyUserRes() {}
 
 // A partial update of the caller's own attributes, merged into the current
 // state: an omitted key stays untouched, an object merges recursively,
@@ -55657,6 +56343,7 @@ func (*PatchUserByIDConflict) patchUserByIDRes() {}
 // PatchUserByIDErrorResponse represents sum type.
 type PatchUserByIDErrorResponse struct {
 	Type                 PatchUserByIDErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
@@ -55673,6 +56360,7 @@ type PatchUserByIDErrorResponseType string
 
 // Possible values for PatchUserByIDErrorResponseType.
 const (
+	AuthCsrfInvalidPatchUserByIDErrorResponse      PatchUserByIDErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedPatchUserByIDErrorResponse     PatchUserByIDErrorResponseType = "auth.unauthorized"
 	EvtInvalidPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "evt.invalid"
 	InternalPatchUserByIDErrorResponse             PatchUserByIDErrorResponseType = "internal"
@@ -55683,6 +56371,11 @@ const (
 	UserNotFoundPatchUserByIDErrorResponse         PatchUserByIDErrorResponseType = "user.not_found"
 	UserPermissionDeniedPatchUserByIDErrorResponse PatchUserByIDErrorResponseType = "user.permission_denied"
 )
+
+// IsAuthCsrfInvalid reports whether PatchUserByIDErrorResponse is AuthCsrfInvalid.
+func (s PatchUserByIDErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidPatchUserByIDErrorResponse
+}
 
 // IsAuthUnauthorized reports whether PatchUserByIDErrorResponse is AuthUnauthorized.
 func (s PatchUserByIDErrorResponse) IsAuthUnauthorized() bool {
@@ -55727,6 +56420,27 @@ func (s PatchUserByIDErrorResponse) IsUserNotFound() bool {
 // IsUserPermissionDenied reports whether PatchUserByIDErrorResponse is UserPermissionDenied.
 func (s PatchUserByIDErrorResponse) IsUserPermissionDenied() bool {
 	return s.Type == UserPermissionDeniedPatchUserByIDErrorResponse
+}
+
+// SetAuthCsrfInvalid sets PatchUserByIDErrorResponse to AuthCsrfInvalid.
+func (s *PatchUserByIDErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidPatchUserByIDErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if PatchUserByIDErrorResponse is AuthCsrfInvalid.
+func (s PatchUserByIDErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidPatchUserByIDErrorResponse(v AuthCsrfInvalid) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets PatchUserByIDErrorResponse to AuthUnauthorized.
@@ -55965,7 +56679,7 @@ func (*PatchUserByIDUnauthorized) patchUserByIDRes() {}
 // key stays untouched, an object merges recursively, `null` deletes the
 // attribute, and any other value replaces the stored one. The merged result
 // is validated as a whole against the user's schema, so a patch that deletes
-// or invalidates a required property is rejected with `user.invalid`.
+// or invalidates a required property is rejected with `req.invalid`.
 // `schema` moves the user to another registered schema — the ADR 009 §4
 // upgrade mechanism. The target must be a revision of the user's current
 // schema (the same `objectType`), newer or older; a schema of another
@@ -63470,13 +64184,14 @@ func (*RequestApiDef) requestApiRes() {}
 
 // RevokeMySessionErrorResponse represents sum type.
 type RevokeMySessionErrorResponse struct {
-	Type             RevokeMySessionErrorResponseType // switch on this field
-	AuthCsrfInvalid  AuthCsrfInvalid
-	AuthUnauthorized AuthUnauthorized
-	EvtInvalid       EvtInvalid
-	Internal         Internal
-	ReqInvalid       ReqInvalid
-	SessNotFound     SessNotFound
+	Type                RevokeMySessionErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessNotFound        SessNotFound
+	SessProjectMismatch SessProjectMismatch
 }
 
 // RevokeMySessionErrorResponseType is oneOf type of RevokeMySessionErrorResponse.
@@ -63484,12 +64199,13 @@ type RevokeMySessionErrorResponseType string
 
 // Possible values for RevokeMySessionErrorResponseType.
 const (
-	AuthCsrfInvalidRevokeMySessionErrorResponse  RevokeMySessionErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedRevokeMySessionErrorResponse RevokeMySessionErrorResponseType = "auth.unauthorized"
-	EvtInvalidRevokeMySessionErrorResponse       RevokeMySessionErrorResponseType = "evt.invalid"
-	InternalRevokeMySessionErrorResponse         RevokeMySessionErrorResponseType = "internal"
-	ReqInvalidRevokeMySessionErrorResponse       RevokeMySessionErrorResponseType = "req.invalid"
-	SessNotFoundRevokeMySessionErrorResponse     RevokeMySessionErrorResponseType = "sess.not_found"
+	AuthCsrfInvalidRevokeMySessionErrorResponse     RevokeMySessionErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedRevokeMySessionErrorResponse    RevokeMySessionErrorResponseType = "auth.unauthorized"
+	EvtInvalidRevokeMySessionErrorResponse          RevokeMySessionErrorResponseType = "evt.invalid"
+	InternalRevokeMySessionErrorResponse            RevokeMySessionErrorResponseType = "internal"
+	ReqInvalidRevokeMySessionErrorResponse          RevokeMySessionErrorResponseType = "req.invalid"
+	SessNotFoundRevokeMySessionErrorResponse        RevokeMySessionErrorResponseType = "sess.not_found"
+	SessProjectMismatchRevokeMySessionErrorResponse RevokeMySessionErrorResponseType = "sess.project_mismatch"
 )
 
 // IsAuthCsrfInvalid reports whether RevokeMySessionErrorResponse is AuthCsrfInvalid.
@@ -63520,6 +64236,11 @@ func (s RevokeMySessionErrorResponse) IsReqInvalid() bool {
 // IsSessNotFound reports whether RevokeMySessionErrorResponse is SessNotFound.
 func (s RevokeMySessionErrorResponse) IsSessNotFound() bool {
 	return s.Type == SessNotFoundRevokeMySessionErrorResponse
+}
+
+// IsSessProjectMismatch reports whether RevokeMySessionErrorResponse is SessProjectMismatch.
+func (s RevokeMySessionErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchRevokeMySessionErrorResponse
 }
 
 // SetAuthCsrfInvalid sets RevokeMySessionErrorResponse to AuthCsrfInvalid.
@@ -63645,6 +64366,27 @@ func (s RevokeMySessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool
 func NewSessNotFoundRevokeMySessionErrorResponse(v SessNotFound) RevokeMySessionErrorResponse {
 	var s RevokeMySessionErrorResponse
 	s.SetSessNotFound(v)
+	return s
+}
+
+// SetSessProjectMismatch sets RevokeMySessionErrorResponse to SessProjectMismatch.
+func (s *RevokeMySessionErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchRevokeMySessionErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if RevokeMySessionErrorResponse is SessProjectMismatch.
+func (s RevokeMySessionErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchRevokeMySessionErrorResponse returns new RevokeMySessionErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchRevokeMySessionErrorResponse(v SessProjectMismatch) RevokeMySessionErrorResponse {
+	var s RevokeMySessionErrorResponse
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
@@ -64149,10 +64891,6 @@ type RevokeSessionUnauthorized ErrorDetails
 
 func (*RevokeSessionUnauthorized) revokeSessionRes() {}
 
-type RollbackDeploymentBadRequest ErrorDetails
-
-func (*RollbackDeploymentBadRequest) rollbackDeploymentRes() {}
-
 type RollbackDeploymentCreated Deployment
 
 func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
@@ -64393,26 +65131,20 @@ func (s *RollbackDeploymentErrorResponseStatusCode) SetResponse(val RollbackDepl
 
 func (*RollbackDeploymentErrorResponseStatusCode) rollbackDeploymentRes() {}
 
-type RollbackDeploymentForbidden ErrorDetails
-
-func (*RollbackDeploymentForbidden) rollbackDeploymentRes() {}
-
 type RollbackDeploymentOK Deployment
 
 func (*RollbackDeploymentOK) rollbackDeploymentRes() {}
 
-// What to record alongside the rollback. The release and the targets come
-// from the deployment named in the path and cannot be changed here.
+// What to record alongside the rollback; the release, variable values and
+// targets are not chosen here.
 // Ref: #
 type RollbackDeploymentRequest struct {
 	// A short free-form summary of why the rollback happened. Recorded on
 	// the new deployment's metadata.
 	Message OptString `json:"message"`
-	// An optimistic-concurrency guard: the deployment the caller believes is
-	// the newest one to any of the targets. When present, the rollback only
-	// happens if it still is; otherwise the request answers `409` with
-	// `dep.conflict`, carrying the actual newest deployment, and nothing
-	// changes.
+	// Roll back only if the project's newest primary deployment is this one.
+	// Otherwise the request fails with `409 dep.conflict` and nothing
+	// changes. Not stored.
 	ExpectedDeploymentID OptDeploymentID `json:"expected_deployment_id"`
 }
 
@@ -66107,6 +66839,11 @@ func (s *SessProjectMismatch) SetDetails(val OptSessProjectMismatchDetails) {
 	s.Details = val
 }
 
+func (*SessProjectMismatch) getMyUserRes()       {}
+func (*SessProjectMismatch) getMyUserSchemaRes() {}
+func (*SessProjectMismatch) listMyProjectsRes()  {}
+func (*SessProjectMismatch) listMyTeamsRes()     {}
+
 // Additional error-specific context.
 type SessProjectMismatchDetails map[string]jx.Raw
 
@@ -66145,7 +66882,8 @@ func (s *SessProjectMismatchHeaders) SetResponse(val SessProjectMismatch) {
 	s.Response = val
 }
 
-func (*SessProjectMismatchHeaders) getMySessionRes() {}
+func (*SessProjectMismatchHeaders) getMySessionCsrfTokenRes() {}
+func (*SessProjectMismatchHeaders) getMySessionRes()          {}
 
 // Merged schema.
 // Ref: #
@@ -73898,6 +74636,26 @@ func (s *UserPasswordEmptyDetails) init() UserPasswordEmptyDetails {
 	}
 	return m
 }
+
+// Whether the user has a password, and since when. Never the password or its
+// hash.
+// Ref: #
+type UserPasswordState struct {
+	// When the current password was set. Absent when the user has no password.
+	SetAt OptDateTime `json:"set_at"`
+}
+
+// GetSetAt returns the value of SetAt.
+func (s *UserPasswordState) GetSetAt() OptDateTime {
+	return s.SetAt
+}
+
+// SetSetAt sets the value of SetAt.
+func (s *UserPasswordState) SetSetAt(val OptDateTime) {
+	s.SetAt = val
+}
+
+func (*UserPasswordState) getUserPasswordStateRes() {}
 
 // Merged schema.
 // Ref: #

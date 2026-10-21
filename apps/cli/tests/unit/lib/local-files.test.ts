@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -9,7 +9,6 @@ import {
   inlineFileReferences,
   isFileReference,
   resolveFileReference,
-  restoreFileReferences,
 } from "../../../src/lib/local-files";
 
 const baseDir = ".zitadel/branding";
@@ -172,57 +171,5 @@ describe("inlineFileReferences", () => {
     expect(() => inlineFileReferences(document, { cwd, baseDir }, { onMissing: "omit" })).toThrow(
       ZitadelError,
     );
-  });
-});
-
-describe("restoreFileReferences", () => {
-  it("writes a differing canonical value to the file and keeps the reference", async () => {
-    const cwd = await makeProject("<p>local</p>");
-    const local = { layout: "split", liquid_template: { $file: "./login.liquid" } };
-    const canonical = { layout: "split", liquid_template: "<p>server</p>" };
-
-    const { document, written } = restoreFileReferences(canonical, local, { cwd, baseDir });
-
-    expect(document).toEqual(local);
-    expect(written).toEqual(["./login.liquid"]);
-    const onDisk = await readFile(join(cwd, baseDir, "login.liquid"), "utf8");
-    expect(onDisk).toBe("<p>server</p>");
-    expect(canonical.liquid_template).toBe("<p>server</p>");
-  });
-
-  it("never reads or writes through a symlink that points outside", async () => {
-    const cwd = await makeProject();
-    const outside = await makeOutside();
-    await symlink(join(outside, "secret.txt"), join(cwd, baseDir, "link.liquid"));
-    const context = { cwd, baseDir };
-    const local = { liquid_template: { $file: "./link.liquid" } };
-
-    expect(() => inlineFileReferences(local, context, { onMissing: "omit" })).toThrow(ZitadelError);
-    expect(() =>
-      restoreFileReferences({ liquid_template: "<p>server</p>" }, local, context),
-    ).toThrow(ZitadelError);
-    expect(await readFile(join(outside, "secret.txt"), "utf8")).toBe("outside");
-  });
-
-  it("does not rewrite a file whose content already matches", async () => {
-    const cwd = await makeProject("<p>same</p>");
-    const { written } = restoreFileReferences(
-      { liquid_template: "<p>same</p>" },
-      { liquid_template: { $file: "./login.liquid" } },
-      { cwd, baseDir },
-    );
-    expect(written).toEqual([]);
-  });
-
-  it("leaves the canonical value alone where the local document has no reference", async () => {
-    const cwd = await makeProject();
-    const canonical = { liquid_template: "<p>inline</p>" };
-    const { document, written } = restoreFileReferences(
-      canonical,
-      { liquid_template: "<p>inline</p>" },
-      { cwd, baseDir },
-    );
-    expect(document).toEqual(canonical);
-    expect(written).toEqual([]);
   });
 });

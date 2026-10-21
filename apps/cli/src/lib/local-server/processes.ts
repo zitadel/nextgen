@@ -21,6 +21,22 @@ type ProcessRow = Readonly<{
   ppid?: number;
 }>;
 
+/**
+ * Which CLI-managed local Zitadel servers are running on the machine, whichever
+ * directory started them. Everything that asks goes through this, so a test can
+ * answer for the machine instead of reading it.
+ */
+export interface LocalServers {
+  current(): Promise<ManagedRuntimeDiscovery>;
+}
+
+/** The real answer: the machine's processes, read with `ps`. */
+export class PsLocalServers implements LocalServers {
+  current(): Promise<ManagedRuntimeDiscovery> {
+    return discoverManagedRuntimeProcesses();
+  }
+}
+
 export async function discoverManagedRuntimeProcesses(opts?: {
   readonly timeoutMs?: number;
 }): Promise<ManagedRuntimeDiscovery> {

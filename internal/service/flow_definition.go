@@ -40,12 +40,16 @@ type flowDefinitionService struct {
 	v2Pool                 *DB
 	builtinSchemaProvider  BuiltinSchemaProvider
 	validateFlowDefinition flowDefinitionValidatorFunc
+	// builtinBases resolves a `user_schema` given as a built-in schema's `$id`
+	// under whichever base the project stores it.
+	builtinBases domain.BuiltinSchemaBases
 }
 
 func NewFlowDefinitionService(
 	v2Pool *DB,
 	schemaProvider BuiltinSchemaProvider,
 	flowDefinitionValidatorFn flowDefinitionValidatorFunc,
+	builtinBases domain.BuiltinSchemaBases,
 ) *flowDefinitionService {
 	if flowDefinitionValidatorFn == nil {
 		flowDefinitionValidatorFn = domain.ValidateFlowDefinition
@@ -54,6 +58,7 @@ func NewFlowDefinitionService(
 		v2Pool:                 v2Pool,
 		builtinSchemaProvider:  schemaProvider,
 		validateFlowDefinition: flowDefinitionValidatorFn,
+		builtinBases:           builtinBases,
 	}
 }
 
@@ -62,7 +67,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	defer end(&err)
 
 	stmts := fd.v2Pool.Statements()
-	userSchema, err := resolveUserSchema(ctx, stmts, req.ProjectID, req.UserSchema)
+	userSchema, err := resolveUserSchema(ctx, stmts, fd.builtinBases, req.ProjectID, req.UserSchema)
 	if err != nil {
 		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
 			return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q not found", req.UserSchema), err)

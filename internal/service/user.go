@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"slices"
+	"time"
 
 	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/audit"
@@ -87,6 +90,11 @@ type ListPasskeysInput struct {
 	Limit     int
 }
 
+type GetPasswordInput struct {
+	ProjectID string
+	UserID    string
+}
+
 type ListIdentityLinksInput struct {
 	ProjectID string
 	UserID    string
@@ -134,6 +142,9 @@ type UserService interface {
 	GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error)
 	PatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error)
 	SetPassword(ctx context.Context, input SetPasswordInput) (err error)
+	// GetPasswordSetAt reports when the user's current password was set, or
+	// nil when the user has none.
+	GetPasswordSetAt(ctx context.Context, input GetPasswordInput) (*time.Time, error)
 	GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error)
 	GetMyUserSchema(ctx context.Context, input GetMyUserInput) (*domain.JSONSchema, error)
 	PatchMyUser(ctx context.Context, input PatchMyUserInput) (*domain.User, error)
@@ -146,6 +157,9 @@ type userService struct {
 	schemaStore domain.JSONSchemaStore
 	hashers     ProjectHasherResolver
 	refs        UserRefResolver
+	// builtinBases lets a filter on a built-in schema's `$id` match the users
+	// stored under any of its bases, the way schemaStore resolves one.
+	builtinBases domain.BuiltinSchemaBases
 }
 
 // NewUserService returns the interface rather than *userService, deliberately
@@ -159,12 +173,14 @@ func NewUserService(
 	schemaStore domain.JSONSchemaStore,
 	hashers ProjectHasherResolver,
 	refs UserRefResolver,
+	builtinBases domain.BuiltinSchemaBases,
 ) UserService {
 	return &userService{
-		v2Pool:      v2Pool,
-		schemaStore: schemaStore,
-		hashers:     hashers,
-		refs:        refs,
+		v2Pool:       v2Pool,
+		schemaStore:  schemaStore,
+		hashers:      hashers,
+		refs:         refs,
+		builtinBases: builtinBases,
 	}
 }
 
@@ -196,18 +212,11 @@ func (s *userService) ApplyActions(ctx context.Context, actions ...UserAction) (
 	return nil
 }
 
-func emitUserCreateFailedBestEffort(ctx context.Context, pool StatementPool, action *CreateUserAction, applyErr error) {
-	var unique *database.UniqueError
-	if !errors.As(applyErr, &unique) {
-		return
-	}
-	if action == nil || action.CreateUser == nil {
-		return
-	}
-	_ = audit.Emit(ctx, pool.Statements(), audit.EmitSpec{
+func emitUserCreateFailedBestEffort(ctx context.Context, stmts AllStatements, projectID string, unique *database.UniqueError) {
+	_ = audit.Emit(ctx, stmts, audit.EmitSpec{
 		Type:       domain.EventTypeUserCreateFailed,
 		Category:   domain.EventCategoryEntity,
-		ProjectID:  action.ProjectID,
+		ProjectID:  projectID,
 		EntityType: "user",
 		Payload:    domain.UserCreateFailedPayload{KeyName: unique.Constraint()},
 	})
@@ -219,8 +228,18 @@ func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 
 	action := NewCreateUserAction(input, s.schemaStore)
 	if err := s.ApplyActions(ctx, action); err != nil {
-		emitUserCreateFailedBestEffort(ctx, s.v2Pool, action, err)
-		return nil, err
+		unique, ok := errors.AsType[*database.UniqueError](err)
+		if !ok {
+			return nil, err
+		}
+		user := action.CreateUser
+		emitUserCreateFailedBestEffort(ctx, s.v2Pool.Statements(), user.ProjectID, unique)
+		conflictingKeys, lookupErr := listConflictingUniqueAttributes(ctx, s.v2Pool.Statements(),
+			user.ProjectID, user.ID, user.Attributes, user.Attributes.RegistryTeamScopes(nil, user.AttributeTeamScope()))
+		if lookupErr != nil || len(conflictingKeys) == 0 {
+			return nil, err
+		}
+		return nil, domain.ErrUserAlreadyExists().WithParent(unique).WithDetails(domain.UserAttributesDetails{Keys: conflictingKeys})
 	}
 
 	// The insert does not report the row's timestamps or status.
@@ -284,7 +303,7 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *L
 	filters := make([]database.Filter[domain.UserField], 0, len(columnFilters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID))
 	for _, f := range columnFilters {
-		filter, err := userFilter(f)
+		filter, err := userFilter(f, s.builtinBases)
 		if err != nil {
 			return nil, err
 		}
@@ -356,8 +375,10 @@ func splitUserFilters(filters []Filter) ([]Filter, UserQueryOptions, error) {
 // userFilter maps an API filter predicate to a storage filter. Operations the
 // v2 filter layer cannot express return [domain.ErrNotImplemented];
 // invalid field/operation/value combinations return [domain.ErrRequestInvalid].
-// [splitUserFilters] has already taken team_id out.
-func userFilter(f Filter) (database.Filter[domain.UserField], error) {
+// [splitUserFilters] has already taken team_id out. A `schema` equality names
+// a built-in schema's `$id` under any of its bases: users are stored under
+// the base their project holds the row at, whichever one the caller used.
+func userFilter(f Filter, builtinBases domain.BuiltinSchemaBases) (database.Filter[domain.UserField], error) {
 	switch f.Field {
 	case userFieldCreatedAt:
 		return createdAtFilter(f.Operation, database.Col(domain.UserFieldCreatedAt), f.Value)
@@ -371,6 +392,13 @@ func userFilter(f Filter) (database.Filter[domain.UserField], error) {
 		value, err := stringFilterValue(f)
 		if err != nil {
 			return nil, err
+		}
+		if equivalents := builtinBases.Equivalents(value); f.Operation == filterOpEquals && len(equivalents) > 1 {
+			spellings := make([]database.Filter[domain.UserField], 0, len(equivalents))
+			for _, url := range equivalents {
+				spellings = append(spellings, database.StringEqual(database.Col(domain.UserFieldSchemaURL), url))
+			}
+			return database.Or(spellings...), nil
 		}
 		return stringFilter(f.Operation, database.Col(domain.UserFieldSchemaURL), value)
 	case userFieldStatus:
@@ -613,7 +641,17 @@ func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (_ *d
 		if action.stale && attempt < maxPatchAttempts {
 			continue
 		}
-		return nil, err
+		unique, ok := errors.AsType[*database.UniqueError](err)
+		if !ok {
+			return nil, err
+		}
+		patch := action.patch
+		conflictingKeys, lookupErr := listConflictingUniqueAttributes(ctx, s.v2Pool.Statements(),
+			patch.ProjectID, patch.UserID, patch.Attributes, patch.RegistryTeamScopes)
+		if lookupErr != nil || len(conflictingKeys) == 0 {
+			return nil, err
+		}
+		return nil, domain.ErrUserAlreadyExists().WithParent(unique).WithDetails(domain.UserAttributesDetails{Keys: conflictingKeys})
 	}
 
 	// The patch statement does not report the row's new updated_at, so the
@@ -638,6 +676,24 @@ func (s *userService) SetPassword(ctx context.Context, input SetPasswordInput) (
 
 	action := NewSetUserPasswordAction(input, s.hashers)
 	return s.ApplyActions(ctx, action)
+}
+
+func (s *userService) GetPasswordSetAt(ctx context.Context, input GetPasswordInput) (_ *time.Time, err error) {
+	ctx, end := startSpan(ctx, "UserService.GetPasswordSetAt")
+	defer end(&err)
+
+	password, err := s.v2Pool.Statements().GetUserPassword(ctx, database.And(
+		database.Equal(database.Col(domain.UserPasswordFieldProjectID), input.ProjectID),
+		database.Equal(database.Col(domain.UserPasswordFieldUserID), input.UserID),
+	))
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		// No password is an answer only for a user that exists.
+		return nil, s.requireUser(ctx, input.ProjectID, input.UserID)
+	}
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to get user password from database")
+	}
+	return &password.CreatedAt, nil
 }
 
 func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (_ *domain.User, err error) {
@@ -725,10 +781,12 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 
 	o.schemaJSON = schemaEntity.Schema
 	o.CreateUser, err = domain.NewCreateUser(domain.CreateUserParams{
-		ProjectID:  o.ProjectID,
-		TeamID:     o.TeamID,
-		ID:         o.ID,
-		SchemaURL:  o.SchemaURL,
+		ProjectID: o.ProjectID,
+		TeamID:    o.TeamID,
+		ID:        o.ID,
+		// The row that was found, which can sit under another built-in base
+		// than the one the caller named (domain.BuiltinSchemaBases).
+		SchemaURL:  schemaEntity.URL,
 		Schema:     schemaEntity.Schema,
 		Attributes: o.Attributes,
 	})
@@ -767,6 +825,34 @@ func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.Cre
 		return domain.ErrInternal(err).WithMessage("failed to create user in the database")
 	}
 	return nil
+}
+
+// listConflictingUniqueAttributes names the unique attributes of attrs whose
+// value a user other than userID holds, claimed under the team scope scopes
+// gives each. It runs after the write that lost on a unique value rolled back,
+// so it reads outside that transaction. A failed lookup is logged and
+// returned.
+func listConflictingUniqueAttributes(ctx context.Context, stmts UserStatements, projectID, userID string, attrs domain.CreateAttributes, scopes []string) ([]domain.AttributeKey, error) {
+	var claims []UniqueAttributeClaim
+	for i, attr := range attrs {
+		if attr.UniqueScope == domain.AttributeUniquenessUnspecified {
+			continue
+		}
+		claims = append(claims, UniqueAttributeClaim{TeamID: scopes[i], Key: attr.Key, ValueHash: attr.ValueHash})
+	}
+	if len(claims) == 0 {
+		return nil, nil
+	}
+	keys, err := stmts.GetTakenUniqueAttributeKeys(ctx, projectID, userID, claims)
+	if err != nil {
+		getLoggingContext(ctx, "user").WarnContext(ctx, "looking up the taken unique attributes failed",
+			slog.String("project_id", projectID),
+			slog.Any("error", err),
+		)
+		return nil, err
+	}
+	slices.Sort(keys)
+	return keys, nil
 }
 
 // ---- Patch User ACTION -------------------------------------------------------------
@@ -841,7 +927,9 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
-	if targetSchemaURL != user.SchemaURL {
+	// Compare rows, not spellings: the store resolves a built-in schema named
+	// under another base to the row the user may already be stored under.
+	if targetSchema.URL != user.SchemaURL {
 		currentSchema, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, user.SchemaURL)
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to get the user's current schema from database")
@@ -854,7 +942,7 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 	o.schemaJSON = targetSchema.Schema
 	o.patch, err = domain.NewPatchUser(domain.PatchUserParams{
 		Current:              user,
-		SchemaURL:            targetSchemaURL,
+		SchemaURL:            targetSchema.URL,
 		Schema:               targetSchema.Schema,
 		AttributesPatch:      o.Attributes,
 		StoredRegistryScopes: storedScopes,

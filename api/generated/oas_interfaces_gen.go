@@ -269,6 +269,10 @@ type GetUserByIDRes interface {
 	getUserByIDRes()
 }
 
+type GetUserPasswordStateRes interface {
+	getUserPasswordStateRes()
+}
+
 type GetVariableRes interface {
 	getVariableRes()
 }

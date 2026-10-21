@@ -1,5 +1,133 @@
 # @zitadel/server
 
+## 1.0.0-alpha.28
+
+### Minor Changes
+
+- [#1802](https://github.com/zitadel/nextgen/pull/1802) [`0f4b901`](https://github.com/zitadel/nextgen/commit/0f4b901f60f2ed20bff71e321564d3b1fc187eab) Thanks [@peintnermax](https://github.com/peintnermax)! - Add `GET /users/me/schema` and `GET /users/me/teams`: the signed-in user's own schema and team roster, readable with the session alone. Every `/users/me` endpoint now answers a refused session with `401 auth.unauthorized`. The `@zitadel/api` client gains `getMyUserSchema()` and `listMyTeams()`.
+
+- [#1858](https://github.com/zitadel/nextgen/pull/1858) [`83ffa22`](https://github.com/zitadel/nextgen/commit/83ffa22d6d8945e8234ced513083b3f17d85a5f0) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Build a release from a `.zitadel/` configuration bundle in one request (`POST /releases/build`): every resource failure is reported at once under `400 rel.invalid`, matching content reuses any prior revision (so rebuilding older content returns the existing release without allocating), and a missing handle answers `rel.unresolved_reference`.
+
+- [#1890](https://github.com/zitadel/nextgen/pull/1890) [`aa3454d`](https://github.com/zitadel/nextgen/commit/aa3454dba80ba69124053a975e3d53c7b6a99a2e) Thanks [@peintnermax](https://github.com/peintnermax)! - A platform user can rename the personal team created for them at sign-up: it is created with an `editor` grant scoped to that team.
+
+- [#1801](https://github.com/zitadel/nextgen/pull/1801) [`7c7bd5d`](https://github.com/zitadel/nextgen/commit/7c7bd5d731c90e3624b2b8fbfe62f6f719492adc) Thanks [@peintnermax](https://github.com/peintnermax)! - Seed the platform project with a user schema that adds an optional `name`, designated as `x-display`, so the people operating Zitadel — the cloud's admin and the local `zitadel start` admin — can name themselves. Customer projects keep the default schema unchanged, and registration still asks for an email only. A platform project that already exists keeps its schema until it is reseeded.
+
+- [#2080](https://github.com/zitadel/nextgen/pull/2080) [`628e101`](https://github.com/zitadel/nextgen/commit/628e101e5c254ab8bdaca830fc6e4acbd084b41e) Thanks [@fforootd](https://github.com/fforootd)! - `DELETE /sessions/me` and `GET /sessions/me/csrf` take the same optional
+  `project_id` as `GET /sessions/me`, and answer a session of another project
+  with `403 sess.project_mismatch`. A refused sign-out leaves that session signed
+  in and keeps its cookie. `<zitadel-session>`, `<zitadel-logout>` and the console
+  send their project when they sign out, and the console also when it reads its
+  CSRF token. Signing out with `<zitadel-session>` or `<zitadel-logout>` after the
+  session already ended, in another tab or by expiring, now completes instead of
+  showing an error.
+
+  In `@zitadel/api`, `revokeMySession()` and `getMySessionCsrfToken()` now take
+  their query parameters first: call `revokeMySession(undefined, init)` and
+  `getMySessionCsrfToken(undefined, init)` where you passed `init` alone.
+
+- [#2140](https://github.com/zitadel/nextgen/pull/2140) [`767f391`](https://github.com/zitadel/nextgen/commit/767f391de04c1209c7b3d114c8b3ff87bda13667) Thanks [@IAM-marco](https://github.com/IAM-marco)! - `PATCH /users/{user_id}` now accepts the Console session cookie as the signed-in user, like reading and deleting a user.
+
+- [#1888](https://github.com/zitadel/nextgen/pull/1888) [`43b52f6`](https://github.com/zitadel/nextgen/commit/43b52f627ce1fb09765f5726102342fb031c5a5e) Thanks [@peintnermax](https://github.com/peintnermax)! - `GET /users/{id}/teams` accepts the Console session cookie, gated like the membership expansion on `POST /users/query`.
+
+- [#2076](https://github.com/zitadel/nextgen/pull/2076) [`12b3226`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now count a session as signed in only when it belongs to the
+  app's own project. A session of another project on the same server, such as a
+  second app on the same host or the console of a local `zitadel start`, reads
+  as signed out in `protectedRoutes`, `auth()` and `getAuth()`, and its cookie is
+  left in place for the app it belongs to.
+
+  The project comes from the new `projectId` middleware option, else
+  `ZITADEL_PROJECT_ID`, else the framework's public project id variable
+  (`NEXT_PUBLIC_`, `VITE_` or `PUBLIC_ZITADEL_PROJECT_ID`). `zitadel setup`
+  already writes these to `.env.local`. A deployment that sets none of them must
+  set `ZITADEL_PROJECT_ID`, or nobody is signed in. With `@zitadel/sdk-nuxt`, the
+  public project id (`NUXT_PUBLIC_ZITADEL_PROJECT_ID`) decides unless
+  `nextgen.projectId` names one, so a built server follows it at runtime. A JWT
+  session token must name the project in its `aud` claim. `auth()` in
+  `@zitadel/sdk-next` also takes the project of `configureZitadel()`; with
+  `createProxy(config)`, pass the same project to `auth()` when it lives only in
+  that handle.
+
+  `GET /sessions/me` takes an optional `project_id` and answers a session of
+  another project with `403 sess.project_mismatch`. The SDKs send it, and so do
+  `getSession()` in `@zitadel/sdk-next`, `<zitadel-session>`, `<zitadel-logout>`
+  and the console. `getSession()` takes the project from its `projectId` option,
+  `configureZitadel()` or `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, and without one reads
+  as signed out. Signing out with `<zitadel-logout>` or `<zitadel-session>` no
+  longer ends another project's session. The `AGENTS.md` guidance that
+  `zitadel setup` writes now tells agents to read the session this way.
+
+  A Bearer token that is not this app's no longer decides what happens to the
+  session cookie that came with it: the cookie is judged, and cleared only when
+  the backend refuses it, on its own.
+
+  In `@zitadel/api`, `getMySession()` now takes its query parameters first: call
+  `getMySession(undefined, init)` where you called `getMySession(init)`. In
+  `@zitadel/sdk-core`, `checkOpaqueSessionToken()` and
+  `validateOpaqueSessionToken()` take the project id as a fourth argument, and
+  `resolveSession()` is the one implementation of these rules behind every server
+  SDK's middleware.
+
+  The `@zitadel/sdk-next` middleware also no longer lets a session that has not
+  finished signing in through `protectedRoutes`.
+
+- [#2110](https://github.com/zitadel/nextgen/pull/2110) [`5bf2573`](https://github.com/zitadel/nextgen/commit/5bf257321b290dc54befe3a32b4c39027bd25a2b) Thanks [@livio-a](https://github.com/livio-a)! - Signing out with the session cookie (`DELETE /sessions/me`) now needs the
+  session's CSRF token in `X-Zitadel-CSRF`, like every other write the cookie
+  authenticates; without it the server answers `403 auth.csrf_invalid` and the
+  session stays signed in. `<zitadel-session>` and `<zitadel-logout>` read the
+  token from `GET /sessions/me/csrf` and send it.
+
+  **Breaking:** an app on an older `@zitadel/components` cannot sign out against
+  this server. Update `@zitadel/components` (or the SDK that bundles it) together
+  with the server. Code that calls `revokeMySession()` itself must first read the
+  token with `getMySessionCsrfToken()` and send it in the `X-Zitadel-CSRF` header,
+  or set it once with `setApiCsrfToken()`.
+
+- [#2098](https://github.com/zitadel/nextgen/pull/2098) [`f65cebe`](https://github.com/zitadel/nextgen/commit/f65cebe8142daaab33882a8ae22822a75bd94e6f) Thanks [@fforootd](https://github.com/fforootd)! - `GET /users/me`, `PATCH /users/me` and `GET /users/me/projects` take the same
+  optional `project_id` as `GET /sessions/me`, and answer a session of another
+  project with `403 sess.project_mismatch` without reading or changing the user.
+  The console sends its project on these calls: when the cookie holds an app's
+  session instead, as on `localhost` after an app on another port signs in, the
+  console asks you to sign in again rather than showing that app's user or
+  projects.
+
+  In `@zitadel/api`, `getMyUser()` and `patchMyUser()` now take their query
+  parameters before the request options: call `getMyUser(undefined, init)` and
+  `patchMyUser(body, undefined, init)` where you passed `init` directly.
+
+- [#2134](https://github.com/zitadel/nextgen/pull/2134) [`e90dade`](https://github.com/zitadel/nextgen/commit/e90dade940d52ce4827ed63d0171d0de68cf2959) Thanks [@fforootd](https://github.com/fforootd)! - `GET /users/me/schema` and `GET /users/me/teams` take the same optional
+  `project_id` as `GET /users/me`, and answer a session of another project with
+  `403 sess.project_mismatch` without reading that user's schema or teams.
+
+  In `@zitadel/api`, `getMyUserSchema()` now takes its query parameters before the
+  request options: call `getMyUserSchema(undefined, init)` where you passed `init`
+  directly.
+
+### Patch Changes
+
+- [#2056](https://github.com/zitadel/nextgen/pull/2056) [`d04f94b`](https://github.com/zitadel/nextgen/commit/d04f94b50061418b1dba90f3f8b8ddfa0dee9adf) Thanks [@fforootd](https://github.com/fforootd)! - Built-in schemas are now named under `https://zitadel.com/schemas/v1`, for example `https://zitadel.com/schemas/v1/user-schema.json`, instead of `https://nextgen.com/api/schemas`, a domain Zitadel does not own. The base is an identifier, not an address: the server never fetches a URL in either namespace. Existing projects need no change: a built-in schema's id resolves under either base everywhere the API reads one, including `GET /schemas/{id}`, a flow definition's `user_schema`, a release's schema pointer, the users list's `schema` filter, and bootstrap user documents. A server still configured with the previous base accepts the new ids too. Projects created by `zitadel setup` from now on reference the new URLs, so pair this CLI with a server from this release or later.
+
+- [#2137](https://github.com/zitadel/nextgen/pull/2137) [`2981820`](https://github.com/zitadel/nextgen/commit/2981820879b27d300c0c39b792c891df1ff9f341) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Reloading or opening a console or login UI link whose last path segment holds a dot, such as a schema whose id is its `$id` URL, now loads the page instead of answering 404, and so does any other missing path under the console or login UI. Missing files under `assets/` still answer 404.
+
+- [#2152](https://github.com/zitadel/nextgen/pull/2152) [`61fad70`](https://github.com/zitadel/nextgen/commit/61fad700031c3d7331a1f0bd0dcda188e513254d) Thanks [@fforootd](https://github.com/fforootd)! - The console now opens on Users instead of an empty Teams page, after
+  `zitadel console`, sign-in and "Open the console" after a claim, so the people
+  who signed up through your app are the first thing you see. The Users table
+  shows each value once: a user's email no longer repeats across the User,
+  Identifier and Email columns under the default user schema, the identifier sits
+  under a display name when the schema has one, and the table fits a 1024px
+  window without scrolling sideways (a long user ID is shortened, with the full
+  ID in its tooltip).
+
+- [#1853](https://github.com/zitadel/nextgen/pull/1853) [`bd5b5f6`](https://github.com/zitadel/nextgen/commit/bd5b5f67c5adf50067716c012183efa73b175cc3) Thanks [@peintnermax](https://github.com/peintnermax)! - Login and registration fields now measure `minLength` and `maxLength` in characters, as the user schema does, rather than in bytes. A value with accented letters or emoji could previously pass a minimum length while being too short, and a name at its maximum length was rejected before reaching it.
+
+- [#2150](https://github.com/zitadel/nextgen/pull/2150) [`437c7f1`](https://github.com/zitadel/nextgen/commit/437c7f127395ac45c8b014948c627516c1f9b4af) Thanks [@fforootd](https://github.com/fforootd)! - `<zitadel-login>` and `<zitadel-session>` no longer load Arimo from Google Fonts
+  by default, so an unbranded sign-in page sends no visitor data to a font CDN.
+  Without a branding `typography.font_url` the login renders in Arimo where the
+  browser already has it and in the system font otherwise; set `font_url` (on a
+  `variant="page"` login) or load a face in your app to choose one. The server's
+  hosted login page now serves Arimo from its own origin.
+
+- [#2036](https://github.com/zitadel/nextgen/pull/2036) [`f2b8ff4`](https://github.com/zitadel/nextgen/commit/f2b8ff40807523e42cc0fc8318f4aceb11e4021e) Thanks [@wim07101993](https://github.com/wim07101993)! - `PATCH /users/{user_id}` now moves a user only to another revision of its own schema, one with the same `objectType`, older or newer. A `schema` with a different `objectType` is rejected with `user.invalid`, and `details` names the user's current schema and the requested one with their `objectType`s. Before, any registered schema was accepted. Moving back to an older revision is validated like moving forward: send the attribute changes it needs, such as `null` for an attribute it does not declare. Values removed by an earlier move are not restored.
+
 ## 1.0.0-alpha.27
 
 ### Patch Changes

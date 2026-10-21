@@ -151,7 +151,8 @@ func TestDeploymentsCheckAccessBeforeNotImplemented(t *testing.T) {
 			},
 			api.CreateDeploymentParams{ProjectID: project})
 		require.NoError(t, err)
-		expectError(t, resp, http.StatusNotFound, domain.ErrEnvironmentProjectNotFound().Code)
+		// A declared 404 decodes into a typed body, which carries no status.
+		assertAuthzError(t, resp, domain.ErrEnvironmentProjectNotFound().Code)
 	})
 
 	t.Run("get in another project", func(t *testing.T) {

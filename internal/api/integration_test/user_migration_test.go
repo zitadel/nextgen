@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/descope/virtualwebauthn"
@@ -99,16 +100,22 @@ func TestPatchUserMigration(t *testing.T) {
 	}
 
 	// assertRefused checks that the target schema refused the result, as
-	// opposed to any other 400, and that the user is exactly as stored.
+	// opposed to any other 400, and that the user is exactly as stored. A
+	// schema refusal answers req.invalid like request validation, naming only
+	// fields under attributes.
 	assertRefused := func(t *testing.T, resp api.PatchUserByIDRes, userID api.UserID, wantSchema string, wantAttributes map[string]any) {
 		t.Helper()
-		// The response type is what pins the 400: errorResponseParts reports a
-		// declared status as 0.
 		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
-		_, code, message, ok := errorResponseParts(t, resp)
-		require.True(t, ok, helpers.MustMarshal(t, resp))
-		assert.Equal(t, domain.ErrUserInvalid().Code, code)
-		assert.Contains(t, message, "not valid according to schema")
+		invalid := resp.(*api.PatchUserByIDBadRequest)
+		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), invalid.Code)
+		var details struct {
+			Fields []string `json:"fields"`
+		}
+		require.NoError(t, json.Unmarshal(invalid.Details.Value["details"], &details), helpers.MustMarshal(t, resp))
+		require.NotEmpty(t, details.Fields, helpers.MustMarshal(t, resp))
+		for _, field := range details.Fields {
+			assert.True(t, strings.HasPrefix(field, "attributes"), "field %q is not an attribute", field)
+		}
 
 		got, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: userID})
 		require.NoError(t, err)

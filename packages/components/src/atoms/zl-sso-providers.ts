@@ -57,6 +57,8 @@ const NAME_PLACEHOLDER = "{name}";
  * element is replaced, not updated — and the template passes `disabled` while
  * the step is submitting. Any "pending" flag kept here would be thrown away
  * on that same frame, so the disabled attribute is the whole mechanism.
+ *
+ * @fires {CustomEvent<ZlSsoSelectDetail>} zl-sso-select - An identity provider was chosen; carries the provider identifier.
  */
 @customElement("zl-sso-providers")
 export class ZlSsoProviders extends LitElement {

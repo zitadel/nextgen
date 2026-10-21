@@ -30,9 +30,9 @@ export default defineConfig({
           name: "jsdom",
           globals: true,
           environment: "jsdom",
+          setupFiles: ["src/test-setup.ts"],
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
           exclude: [edgeSpecs],
-          setupFiles: ["src/test-setup.ts"],
         },
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
