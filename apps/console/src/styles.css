@@ -125,7 +125,7 @@ select:-webkit-autofill {
 /* The generated avatar (`components/user-avatar.tsx`): two design-system
    gradient starts at an angle, all set per person as custom properties.
    `--avatar-angle` is registered so it interpolates: the gradient drifts one
-   slow revolution a minute, like something alive, and each person starts at
+   slow revolution every 20 seconds, like something alive, and each person starts at
    their own point in it (`--avatar-phase`), so a list of avatars never turns
    in step. */
 @property --avatar-angle {
@@ -150,7 +150,7 @@ select:-webkit-autofill {
     var(--avatar-from) 15%,
     var(--avatar-to) 85%
   );
-  animation: avatar-drift 60s linear infinite;
+  animation: avatar-drift 20s linear infinite;
   animation-delay: var(--avatar-phase);
 }
 

@@ -41,8 +41,8 @@ export function avatarVars(seed: string): CSSProperties {
     "--avatar-from": `var(${STARTS[from]})`,
     "--avatar-to": `var(${STARTS[to]})`,
     "--avatar-base": `${(h >>> 16) % 360}deg`,
-    // A negative delay starts the minute-long drift part-way through.
-    "--avatar-phase": `-${(h >>> 4) % 60}s`,
+    // A negative delay starts the 20-second drift part-way through.
+    "--avatar-phase": `-${(h >>> 4) % 20}s`,
   } as CSSProperties;
 }
 
@@ -51,7 +51,7 @@ export function avatarVars(seed: string): CSSProperties {
  * picture. The id, not the email, seeds it, so it survives a changed email.
  * A picture can replace it once users can upload one.
  *
- * It drifts one slow revolution a minute, unless the person asked for reduced
+ * It drifts one slow revolution every 20 seconds, unless the person asked for reduced
  * motion.
  *
  * Decorative: the name always sits beside it, so it is hidden from assistive
