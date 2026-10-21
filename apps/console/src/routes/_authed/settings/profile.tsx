@@ -1,14 +1,13 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Settings } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 
 import { DETAIL_CARD, DETAIL_TITLE } from "@/components/detail-page";
 import { FormError } from "@/components/form-error";
 import { Page, SettingsColumn } from "@/components/layout";
-import { SettingsCard } from "@/components/settings-card";
+import { SettingsCard, SettingsSection } from "@/components/settings-card";
 import { IdentityLinks, Passkeys } from "@/components/sign-in-methods";
-import { RESOURCE_TABLE_TOP } from "@/components/resource-list";
-import { EYEBROW, PAGE_TITLE_ROW } from "@/components/typography";
+import { PAGE_TITLE_ROW } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -20,7 +19,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { UserAvatar } from "@/components/user-avatar";
+import { UserAvatar, avatarSeed } from "@/components/user-avatar";
 
 import { api } from "@/api/zitadel";
 import { consoleSessionProject, invalidateSessionCache } from "@/auth/session";
@@ -33,8 +32,9 @@ import { readOwnUserSchema } from "@/lib/user-schema";
 import { userAttributes } from "@/lib/user";
 
 /**
- * Account settings → Settings: the person's own profile, generated from the person's own user schema as Add user
- * is (`schemaFields`): a row per property, nothing named in code. The schema's
+ * Account settings → Settings: the person's own profile, generated from their
+ * own user schema as Add user is (`schemaFields`): a row per property, nothing
+ * named in code. The schema's
  * `x-identifier` is read-only (D16); the rest saves through `PATCH /users/me`.
  * Without a readable schema, the record's own identifier shows alone.
  *
@@ -75,9 +75,6 @@ export const Route = createFileRoute("/_authed/settings/profile")({
 // variant that out-specifies a plain utility, hence the important suffix.
 const LABEL_HALF = "@md/field-group:min-w-px @md/field-group:flex-[1_0_0]!";
 const ROW = "@md/field-group:items-center!";
-// A section under the profile card sits as far below it as the first sits
-// below the title.
-const SECTION_TOP = "mt-8";
 // A sign-in method's heading inside the card, on the rows' 24px inset.
 const METHOD_HEAD = "px-6 pt-5 text-sm font-medium text-foreground";
 
@@ -94,37 +91,100 @@ function identifierFallback(user: Record<string, unknown>): SchemaField[] {
 
 function ProfileScreen() {
   const { user, schema, passkeys, identityLinks, idps } = Route.useLoaderData();
-  const router = useRouter();
-  const attributes = userAttributes(user as Record<string, unknown>);
+  const record = user as Record<string, unknown>;
+  const attributes = userAttributes(record);
   // The read-only row is whatever the schema designates as the identifier, or,
   // unread, what the record says it was identified by — never a fixed name.
-  const identifier = schema
-    ? field(schema, "x-identifier")
-    : field(user as Record<string, unknown>, "identifier_property");
+  const identifier = schema ? field(schema, "x-identifier") : field(record, "identifier_property");
 
   // The identifier first — it is who the person is — then the rest in the
   // schema's own (alphabetical) order.
-  const all = schema ? schemaFields(schema) : identifierFallback(user as Record<string, unknown>);
+  const all = schema ? schemaFields(schema) : identifierFallback(record);
   // Editable: anything but the identifier that a text input can round-trip.
   // Another type (a boolean) shows its value read-only rather than as text it
-  // could never be saved back from.
+  // could never be saved back from. Without a schema there are no types, so
+  // nothing is editable.
   const types = (schema?.properties ?? {}) as Record<string, { type?: unknown }>;
   const isEditable = (entry: SchemaField) =>
     entry.key !== identifier && EDITABLE_TYPES.has(String(types[entry.key]?.type));
   const fixed = all.filter((entry) => !isEditable(entry));
-  const editable = schema ? all.filter(isEditable) : [];
+  const editable = all.filter(isEditable);
 
   const saved = (entry: SchemaField) =>
     (displayValue(attributes, entry.key) ?? "") ||
     // Unread schema: the record's resolved identifier stands in for the attribute.
-    (!schema && entry.key === identifier
-      ? (field(user as Record<string, unknown>, "identifier") ?? "")
-      : "");
-  const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(editable.map((entry) => [entry.key, saved(entry)])),
+    (!schema && entry.key === identifier ? (field(record, "identifier") ?? "") : "");
+  const savedValues = Object.fromEntries(editable.map((entry) => [entry.key, saved(entry)]));
+
+  return (
+    <Page>
+      <SettingsColumn>
+        {/* No header gutter: the settings design aligns the title with the card,
+            where a resource detail insets its title lockup by 8px. */}
+        <div className={PAGE_TITLE_ROW}>
+          <h1 className={DETAIL_TITLE}>Settings</h1>
+        </div>
+        {/* Says whose settings these are: the nav label alone does not. */}
+        <SettingsSection
+          title="Your profile"
+          description="How you appear in the console. What you sign in with cannot be changed here."
+        >
+          <SettingsCard>
+            <Field orientation="responsive" className={ROW}>
+              <FieldContent className={LABEL_HALF}>
+                <FieldTitle>Avatar</FieldTitle>
+                <FieldDescription>Generated for you.</FieldDescription>
+              </FieldContent>
+              <FieldContent className="items-start @md/field-group:items-end">
+                <UserAvatar
+                  seed={avatarSeed({ userId: field(record, "id") })}
+                  className="size-10"
+                />
+              </FieldContent>
+            </Field>
+            {fixed.map((entry) => (
+              <ProfileRow key={entry.key} field={entry} value={saved(entry)} readOnly />
+            ))}
+            {/* Keyed by the saved values: a save re-runs the loader, and the
+                form starts again from what was saved. */}
+            {editable.length > 0 && (
+              <ProfileForm
+                key={JSON.stringify(savedValues)}
+                fields={editable}
+                saved={savedValues}
+              />
+            )}
+          </SettingsCard>
+        </SettingsSection>
+
+        <SettingsSection
+          title="Sign-in methods"
+          description="The passkeys you registered, and the identity provider accounts linked to you when you signed in with them."
+        >
+          <Card className={DETAIL_CARD}>
+            <h3 className={METHOD_HEAD}>Passkeys</h3>
+            <Passkeys passkeys={passkeys} empty="You have not added a passkey." />
+            <Separator />
+            <h3 className={METHOD_HEAD}>Linked accounts</h3>
+            <IdentityLinks
+              links={identityLinks}
+              idps={idps}
+              empty="No identity provider account is linked to you."
+              linkIdps={false}
+            />
+          </Card>
+        </SettingsSection>
+      </SettingsColumn>
+    </Page>
   );
-  const changed = editable.filter((entry) => (values[entry.key] ?? "").trim() !== saved(entry));
-  const missingRequired = editable.some(
+}
+
+/** The editable rows and Save, starting from the saved values. */
+function ProfileForm({ fields, saved }: { fields: SchemaField[]; saved: Record<string, string> }) {
+  const router = useRouter();
+  const [values, setValues] = useState(saved);
+  const changed = fields.filter((entry) => (values[entry.key] ?? "").trim() !== saved[entry.key]);
+  const missingRequired = fields.some(
     (entry) => entry.required && (values[entry.key] ?? "").trim() === "",
   );
 
@@ -142,97 +202,35 @@ function ProfileScreen() {
     invalidateSessionCache();
     await router.invalidate();
   }, "Could not save your profile.");
-  const { clearError } = save;
-
-  // A save re-runs the loader; the form follows the saved record.
-  const savedKey = editable.map((entry) => `${entry.key}=${saved(entry)}`).join("&");
-  useEffect(() => {
-    setValues(Object.fromEntries(editable.map((entry) => [entry.key, saved(entry)])));
-    clearError();
-  }, [savedKey, clearError]);
 
   return (
-    <Page>
-      <SettingsColumn>
-        {/* No header gutter: the settings design aligns the title with the card,
-            where a resource detail insets its title lockup by 8px. */}
-        <div className={PAGE_TITLE_ROW}>
-          <h1 className={DETAIL_TITLE}>Settings</h1>
+    <>
+      {fields.map((entry) => (
+        <ProfileRow
+          key={entry.key}
+          field={entry}
+          value={values[entry.key] ?? ""}
+          onChange={(value) => setValues((current) => ({ ...current, [entry.key]: value }))}
+          onEnter={() => {
+            if (changed.length > 0 && !missingRequired) void save.run();
+          }}
+        />
+      ))}
+      <div className="flex flex-col gap-2">
+        <FormError message={save.error} />
+        <div className="flex justify-end">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void save.run()}
+            disabled={changed.length === 0 || missingRequired}
+            loading={save.pending}
+          >
+            Save
+          </Button>
         </div>
-        {/* Says whose settings these are: the nav label alone does not. */}
-        <div className={RESOURCE_TABLE_TOP}>
-          <h2 className={EYEBROW}>Your profile</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            How you appear in the account menu and to the teams you are on. What you sign in with
-            cannot be changed here.
-          </p>
-        </div>
-        <SettingsCard className="mt-4">
-          <Field orientation="responsive" className={ROW}>
-            <FieldContent className={LABEL_HALF}>
-              <FieldTitle>Avatar</FieldTitle>
-              <FieldDescription>Generated from your account.</FieldDescription>
-            </FieldContent>
-            <FieldContent className="items-start @md/field-group:items-end">
-              <UserAvatar
-                seed={field(user as Record<string, unknown>, "id") ?? ""}
-                className="size-10"
-              />
-            </FieldContent>
-          </Field>
-          {fixed.map((entry) => (
-            <ProfileRow key={entry.key} field={entry} value={saved(entry)} readOnly />
-          ))}
-          {editable.map((entry) => (
-            <ProfileRow
-              key={entry.key}
-              field={entry}
-              value={values[entry.key] ?? ""}
-              onChange={(value) => setValues((current) => ({ ...current, [entry.key]: value }))}
-              onEnter={() => {
-                if (changed.length > 0 && !missingRequired) void save.run();
-              }}
-            />
-          ))}
-          {editable.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <FormError message={save.error} />
-              <div className="flex justify-end">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => void save.run()}
-                  disabled={changed.length === 0 || missingRequired}
-                  loading={save.pending}
-                >
-                  Save
-                </Button>
-              </div>
-            </div>
-          )}
-        </SettingsCard>
-
-        <div className={SECTION_TOP}>
-          <h2 className={EYEBROW}>Sign-in methods</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            The passkeys you registered, and the identity provider accounts linked to you when you
-            signed in with them.
-          </p>
-        </div>
-        <Card className={`${DETAIL_CARD} mt-4`}>
-          <h3 className={METHOD_HEAD}>Passkeys</h3>
-          <Passkeys passkeys={passkeys} empty="You have not added a passkey." />
-          <Separator />
-          <h3 className={METHOD_HEAD}>Linked accounts</h3>
-          <IdentityLinks
-            links={identityLinks}
-            idps={idps}
-            empty="No identity provider account is linked to you."
-            linkIdps={false}
-          />
-        </Card>
-      </SettingsColumn>
-    </Page>
+      </div>
+    </>
   );
 }
 

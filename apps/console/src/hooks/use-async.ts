@@ -1,7 +1,5 @@
 import { type DependencyList, useEffect, useState } from "react";
 
-import type { SessionCached } from "@/lib/session-cache";
-
 /**
  * A read's answer for a component: `undefined` until the first answer,
  * `fallback` if it fails, and never an answer that arrives after `deps` moved
@@ -11,7 +9,7 @@ import type { SessionCached } from "@/lib/session-cache";
  * skips the read and answers `fallback`.
  *
  * For the chrome reads that must not block a screen or raise a boundary — the
- * switchers, the account footer, search — where a failure degrades to an
+ * switchers and search — where a failure degrades to an
  * empty or absent value instead.
  */
 export function useAsync<T, F>(
@@ -39,15 +37,4 @@ export function useAsync<T, F>(
     };
   }, deps);
   return value;
-}
-
-/** {@link useAsync} over a {@link SessionCached} read, re-read whenever it is cleared. */
-export function useSessionCached<T, F>(
-  read: SessionCached<T>,
-  fallback: F,
-  enabled = true,
-): T | F | undefined {
-  const [version, setVersion] = useState(0);
-  useEffect(() => read.subscribe(() => setVersion((current) => current + 1)), [read]);
-  return useAsync(enabled ? read : null, fallback, [read, enabled, version]);
 }

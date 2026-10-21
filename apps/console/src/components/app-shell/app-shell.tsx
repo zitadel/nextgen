@@ -1,5 +1,4 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
-// `BookOpen` / `Search` return with the parked footer items below.
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -22,9 +21,8 @@ import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./icons";
 import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
 import { useNavItems } from "./use-nav-items";
+import type { NavView } from "@/nav";
 import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
-
-export type { ShellUser };
 
 /**
  * Console shell built on shadcn's `Sidebar` block. `collapsible="icon"` gives
@@ -113,18 +111,19 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
       <BrandHeader />
       {inSettings && <SettingsHeader />}
 
-      <SidebarContent>{inSettings ? <SettingsNav /> : <PortalNav />}</SidebarContent>
+      <SidebarContent>
+        {inSettings ? (
+          <NavList view="settings" label="Account settings" />
+        ) : (
+          <NavList view="portal" label="Primary" />
+        )}
+      </SidebarContent>
 
       <SidebarFooter>
         <SidebarMenu>
-          {/* Search and Documentation are parked: both rendered as ordinary
-              enabled buttons with no handler, so clicking them did nothing at
-              all — the worst of the three states, since they looked live.
-
-              Search needs a cross-resource query endpoint; ADR 031's
-              `POST /{resource}/query` exists only for projects today, so there
-              is nothing to search across. Documentation needs a published URL
-              for the docs site to point at. */}
+          {/* Documentation is parked: it needs a published URL for the docs
+              site to point at, and a row that does nothing reads as broken.
+              Search lives in the top bar. */}
           <UserMenuItem user={user} onSignOut={onSignOut} />
         </SidebarMenu>
       </SidebarFooter>
@@ -180,90 +179,50 @@ function SettingsHeader() {
 }
 
 /**
- * Settings nav: one flat list, as Vercel's account view draws it. Settings
- * (the person's profile) is its only row while accounts are not surfaced
- * (Console ADR 0005 §3).
+ * Both sidebars' nav: one flat list of the view's routes (`staticData.nav`,
+ * Console ADR 0001). Portal is the project's screens; Settings holds the
+ * person's profile alone while accounts are not surfaced (Console ADR 0005
+ * §3). A row stays marked on the screens beneath it, so a resource's detail
+ * keeps its list marked. Design-only entries (`DESIGN_ONLY_NAV`, empty today)
+ * render disabled.
  *
- * Rows attach the same way Portal's do, through `staticData.nav` on the route,
- * and declare `view: "settings"` so they leave the primary list alone. Each
- * marks only its own page.
+ * Rows keep their height and a 2px gap in both sidebar states, so collapsing
+ * moves nothing vertically.
  */
-function SettingsNav() {
-  const items = useNavItems("settings");
+function NavList({ view, label }: { view: NavView; label: string }) {
+  const items = useNavItems(view);
   const matchRoute = useMatchRoute();
 
   return (
-    <SidebarGroup role="navigation" aria-label="Account settings" className="pt-4 pb-0">
-      <SidebarMenu className={NAV_MENU}>
-        {items.map((item) => {
-          const Icon = item.nav.icon;
-          const label = item.nav.label;
-          // Every settings row is a built route: `useNavItems` merges the
-          // design-only entries into the portal list only.
-          if (!item.to) return null;
-          return (
-            <SidebarMenuItem key={label}>
-              <SidebarMenuButton asChild isActive={!!matchRoute({ to: item.to })} tooltip={label}>
-                <Link to={item.to} activeOptions={{ exact: true }} title={label}>
+    <SidebarGroup role="navigation" aria-label={label} className="pt-4 pb-0">
+      <SidebarMenu className="gap-0.5">
+        {items.map(({ to, nav: { icon: Icon, label: name } }) => (
+          <SidebarMenuItem key={name}>
+            {to ? (
+              <SidebarMenuButton
+                asChild
+                isActive={!!matchRoute({ to, fuzzy: to !== "/" })}
+                tooltip={name}
+              >
+                <Link to={to} title={name}>
                   <Icon aria-hidden />
-                  <span>{label}</span>
+                  <span>{name}</span>
                 </Link>
               </SidebarMenuButton>
-            </SidebarMenuItem>
-          );
-        })}
-      </SidebarMenu>
-    </SidebarGroup>
-  );
-}
-
-/**
- * Both navs: a 2px gap between rows in both states. Rows keep their height on
- * the rail too (the back row is the rail's 32px square, as every row is), so
- * collapsing moves nothing vertically.
- */
-const NAV_MENU = "gap-0.5";
-
-/** Portal nav: one flat list. */
-function PortalNav() {
-  const items = useNavItems();
-  const matchRoute = useMatchRoute();
-
-  return (
-    <SidebarGroup role="navigation" aria-label="Primary" className="pt-4 pb-0">
-      <SidebarMenu className={NAV_MENU}>
-        {items.map((item) => {
-          const Icon = item.nav.icon;
-          const label = item.nav.label;
-          if (!item.to) {
-            return (
-              <SidebarMenuItem key={label}>
-                <SidebarMenuButton
-                  tooltip={label}
-                  className="cursor-default"
-                  aria-disabled="true"
-                  title={`${label} — not available yet`}
-                  onClick={(event) => event.preventDefault()}
-                >
-                  <Icon aria-hidden />
-                  <span>{label}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            );
-          }
-          // Fuzzy, so a resource's detail screen keeps its list's row marked.
-          const active = !!matchRoute({ to: item.to, fuzzy: item.to !== "/" });
-          return (
-            <SidebarMenuItem key={label}>
-              <SidebarMenuButton asChild isActive={active} tooltip={label}>
-                <Link to={item.to} title={label}>
-                  <Icon aria-hidden />
-                  <span>{label}</span>
-                </Link>
+            ) : (
+              <SidebarMenuButton
+                tooltip={name}
+                className="cursor-default"
+                aria-disabled="true"
+                title={`${name} — not available yet`}
+                onClick={(event) => event.preventDefault()}
+              >
+                <Icon aria-hidden />
+                <span>{name}</span>
               </SidebarMenuButton>
-            </SidebarMenuItem>
-          );
-        })}
+            )}
+          </SidebarMenuItem>
+        ))}
       </SidebarMenu>
     </SidebarGroup>
   );

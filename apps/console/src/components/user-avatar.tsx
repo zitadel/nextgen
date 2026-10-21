@@ -47,6 +47,15 @@ export function avatarVars(seed: string): CSSProperties {
   } as CSSProperties;
 }
 
+/**
+ * What a person's avatar is generated from: their user id, so it survives a
+ * changed email and is the same on every screen. The identifier stands in
+ * only where no id is known.
+ */
+export function avatarSeed(user: { userId?: string; identifier?: string } | undefined): string {
+  return user?.userId ?? user?.identifier ?? "";
+}
+
 /** How much faster the gradient moves while the avatar's host is hovered. */
 const FAST = 4;
 

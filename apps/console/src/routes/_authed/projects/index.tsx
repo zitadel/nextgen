@@ -35,9 +35,10 @@ import { Page } from "@/components/layout";
  *
  * The sidebar's first entry, above the selected project's contents. It is not
  * scoped (`staticData.scope`), so it is listed with or without a selection and
- * is the one entry while nothing is selected. The project switcher's `All
- * projects` link leads here too, and it is where the console lands when there
- * are several projects and none is selected yet (`routes/_authed.tsx`). The
+ * is the one entry while nothing is selected. The top bar shows no project
+ * switcher here: this list is where a project is chosen, and it marks the
+ * selected one. It is where the console lands when there are several
+ * projects and none is selected yet (`routes/_authed.tsx`). The
  * guard then passes the screen it was asked for as `?next=`, and a row goes
  * back there with the project selected.
  *
@@ -147,7 +148,8 @@ function ProjectsScreen() {
           </TableBody>
         </Table>
         <CliHint>
-          Create a project locally with <CliCommand>{cliSetup(serverOrigin())}</CliCommand>.
+          Create a project and connect your app with{" "}
+          <CliCommand>{cliSetup(serverOrigin())}</CliCommand>.
         </CliHint>
       </div>
 

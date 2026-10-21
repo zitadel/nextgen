@@ -31,37 +31,34 @@ export function IdentityLinks({
   empty: string;
   linkIdps?: boolean;
 }) {
-  if (!links?.length) {
-    return (
-      <p className={`${METHOD_NOTE} px-6 pt-4 pb-5`}>{links ? empty : "Could not be loaded"}</p>
-    );
-  }
+  if (!links?.length) return <MethodNote>{links ? empty : FAILED}</MethodNote>;
 
   const byId = new Map((idps ?? []).map((idp) => [idp.id, idp]));
   return (
     <ul className="flex flex-col">
       {links.map((link) => {
         const idp = byId.get(link.connection_id);
+        // The connection list may be refused (`idp.read`); the id is still the
+        // honest name for it.
+        const name = idp ? (
+          <span className="text-foreground truncate text-sm font-medium">
+            {idp.definition.display_name}
+          </span>
+        ) : (
+          <span className="text-foreground truncate font-mono text-sm">{link.connection_id}</span>
+        );
         return (
           <li key={link.id} className={METHOD_ROW}>
             {idp && linkIdps ? (
               <Link
                 to="/authentication/idps/$idpId"
                 params={{ idpId: idp.id }}
-                className="text-foreground text-sm font-medium hover:underline"
+                className="min-w-0 hover:underline"
               >
-                {idp.definition.display_name}
+                {name}
               </Link>
-            ) : idp ? (
-              <span className="text-foreground truncate text-sm font-medium">
-                {idp.definition.display_name}
-              </span>
             ) : (
-              // The connection list may be refused (`idp.read`); the id is
-              // still the honest name for it.
-              <span className="text-foreground truncate font-mono text-sm">
-                {link.connection_id}
-              </span>
+              name
             )}
             <span className={`${METHOD_NOTE} shrink-0`}>Linked {formatDate(link.created_at)}</span>
           </li>
@@ -73,11 +70,7 @@ export function IdentityLinks({
 
 /** A user's passkeys, one row each: the name it was given and when it was added. */
 export function Passkeys({ passkeys, empty }: { passkeys: Passkey[] | undefined; empty: string }) {
-  if (!passkeys?.length) {
-    return (
-      <p className={`${METHOD_NOTE} px-6 pt-4 pb-5`}>{passkeys ? empty : "Could not be loaded"}</p>
-    );
-  }
+  if (!passkeys?.length) return <MethodNote>{passkeys ? empty : FAILED}</MethodNote>;
   return (
     <ul className="flex flex-col">
       {passkeys.map((passkey) => (
@@ -88,4 +81,12 @@ export function Passkeys({ passkeys, empty }: { passkeys: Passkey[] | undefined;
       ))}
     </ul>
   );
+}
+
+/** What a list shows when its read failed. */
+const FAILED = "Could not be loaded";
+
+/** A list's single line in place of rows: empty, or its read failed. */
+function MethodNote({ children }: { children: string }) {
+  return <p className={`${METHOD_NOTE} px-6 pt-4 pb-5`}>{children}</p>;
 }

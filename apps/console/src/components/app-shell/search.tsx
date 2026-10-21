@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Box, Boxes, CircleUserRound, List, type LucideIcon, Search } from "lucide-react";
+import { Box, Boxes, type LucideIcon, Search } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import {
@@ -17,18 +17,19 @@ import { queryActiveTeams } from "@/lib/teams";
 import { cn } from "@/lib/utils";
 
 import type { NavIcon } from "./icons";
-import { useNavItems } from "./use-nav-items";
+import { type NavItem, useNavItems } from "./use-nav-items";
 
 /**
  * Console search: the top bar's trigger and the "Go to" palette it opens (⌘K /
- * Ctrl K anywhere). It moves you somewhere — a page, the account, a team, a
- * project, your profile. Searching *inside* a list stays in that list's own
- * toolbar; this is navigation, not a results page.
+ * Ctrl K anywhere). It moves you somewhere — a page, a team, a project, your
+ * settings. Searching *inside* a list stays in that list's own toolbar; this
+ * is navigation, not a results page.
  *
- * Groups, top to bottom: pages in the selected project, the account, teams
- * (matched on the server, so a project with many is searched in full),
- * projects, you. Users are not offered: `POST /users/query` filters by id, schema, status and
- * team only — there is no email or name filter to search with.
+ * Groups, top to bottom: pages in the selected project, teams (matched on the
+ * server, so a project with many is searched in full), projects, and you (the
+ * Settings sidebar's pages). Users are not offered: `POST /users/query`
+ * filters by id, schema, status and team only — there is no email or name
+ * filter to search with.
  */
 export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
   return (
@@ -93,6 +94,7 @@ export function SearchDialog({
     [typed, projectId],
   );
   const pages = useNavItems();
+  const yours = useNavItems("settings");
 
   // A fresh palette each time it opens.
   useEffect(() => {
@@ -109,15 +111,16 @@ export function SearchDialog({
       go();
     };
 
-    // Every built page, in sidebar order.
-    const pageResults: Result[] = pages
-      .filter((item) => item.to && matches(item.nav.label))
-      .map((item) => ({
-        id: `page:${item.to}`,
-        icon: item.nav.icon ?? List,
-        label: item.nav.label,
-        go: close(() => void navigate({ to: item.to })),
-      }));
+    // Every built page of a sidebar, in its order.
+    const navResults = (items: NavItem[]): Result[] =>
+      items
+        .filter((item) => item.to && matches(item.nav.label))
+        .map((item) => ({
+          id: `page:${item.to}`,
+          icon: item.nav.icon,
+          label: item.nav.label,
+          go: close(() => void navigate({ to: item.to })),
+        }));
 
     const teamResults: Result[] = (q ? (teams ?? []) : []).map((team) => ({
       id: `team:${team.id}`,
@@ -137,24 +140,16 @@ export function SearchDialog({
         go: close(() => void navigate({ to: "/", search: { project: project.id } })),
       }));
 
-    const youResults: Result[] = matches("Profile")
-      ? [
-          {
-            id: "profile",
-            icon: CircleUserRound,
-            label: "Profile",
-            go: close(() => void navigate({ to: "/settings/profile" })),
-          },
-        ]
-      : [];
-
     return [
-      { heading: projectName ? `Pages in ${projectName}` : "Pages", results: pageResults },
+      {
+        heading: projectName ? `Pages in ${projectName}` : "Pages",
+        results: navResults(pages),
+      },
       { heading: "Teams", results: teamResults },
       { heading: "Projects", results: projectResults },
-      { heading: "You", results: youResults },
+      { heading: "You", results: navResults(yours) },
     ].filter((group) => group.results.length > 0);
-  }, [pages, teams, projects, projectName, q, navigate, onOpenChange]);
+  }, [pages, yours, teams, projects, projectName, q, navigate, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -170,7 +165,7 @@ export function SearchDialog({
             <CommandInput
               value={query}
               onValueChange={setQuery}
-              placeholder="Go to a page, Project or Team"
+              placeholder="Go to a page, project or team"
               aria-label="Search"
               className="h-12 pr-12 text-[15px]"
             />

@@ -24,7 +24,9 @@ import { TEST_PROJECT_ID } from "./project-scope.fixture";
  * The reads every `_authed` screen makes for its chrome rather than for the
  * screen under test: the context switcher and the `_authed` guard both list the
  * person's projects, and the default lists the fixture's project so the
- * selection most specs open under is a listed one. A spec about the switcher or
+ * selection most specs open under is a listed one. The profile's own reads
+ * (schema, passkeys, identity links) are defaulted too, since specs reach it
+ * through the account menu and the Settings view. A spec about the switcher or
  * the guard overrides it with `server.use(...)`.
  *
  * `GET /projects/{id}` is deliberately not defaulted: the switcher reads it only

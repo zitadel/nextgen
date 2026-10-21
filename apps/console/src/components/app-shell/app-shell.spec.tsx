@@ -27,10 +27,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * Guards against `aria-disabled` rows for unbuilt screens. Also covers the
  * theme toggle writing `data-theme` and persisting the preference.
  */
-// The Projects overview first, then the selected project's contents in the
-// order the design puts them, then the project's own settings. `User schemas`
-// nests beneath `Users` rather than adding a second
-// top-level row.
 // The design's single-level sidebar ("01 / Nav Level 1"), less the screens
 // that are not built (Deployments, Sessions).
 const NAV_ORDER = [
@@ -57,7 +53,7 @@ const HEALTH = "*/api/healthz";
 const USERS_QUERY = "*/api/users/query";
 // Some tests open on Teams to prove a switch keeps the screen.
 const TEAMS_QUERY = "*/api/teams/query";
-// `/settings` lands on Profile, which reads the signed-in person's own record.
+// `/settings` lands on the profile, which reads the signed-in person's own record.
 const MY_USER = "*/api/users/me";
 beforeEach(() =>
   server.use(
@@ -528,7 +524,7 @@ describe("project pill", () => {
 
 /**
  * Search moves you somewhere: the bar's field (or ⌘K / Ctrl K) opens a "Go to"
- * palette over pages, the account, teams found by name, projects and Profile.
+ * palette over pages, teams found by name, projects and your settings.
  */
 describe("search", () => {
   it("opens from the bar and goes to a page", async () => {
@@ -536,7 +532,7 @@ describe("search", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
 
-    await userEvent.type(dialog.getByPlaceholderText("Go to a page, Project or Team"), "tea");
+    await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "tea");
     await userEvent.click(await dialog.findByRole("option", { name: "Teams" }));
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
@@ -552,6 +548,17 @@ describe("search", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "Go to" })).not.toBeInTheDocument(),
     );
+  });
+
+  it("finds your settings by the Settings sidebar's name for them", async () => {
+    const router = renderShell();
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+
+    await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "sett");
+    await userEvent.click(await dialog.findByRole("option", { name: "Settings" }));
+
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
   });
 
   it("finds teams by name on the server and opens one", async () => {
@@ -582,7 +589,7 @@ describe("search", () => {
     const router = renderShell();
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
-    await userEvent.type(dialog.getByPlaceholderText("Go to a page, Project or Team"), "sup");
+    await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "sup");
 
     await userEvent.click(await dialog.findByRole("option", { name: /Support/ }));
     expect(filter).toContainEqual({ field: "name", operation: "contains", value: "sup" });
@@ -593,7 +600,7 @@ describe("search", () => {
     renderShell();
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
-    await userEvent.type(dialog.getByPlaceholderText("Go to a page, Project or Team"), "zzzz");
+    await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "zzzz");
     expect(await dialog.findByText("Nothing matches “zzzz”")).toBeInTheDocument();
   });
 });

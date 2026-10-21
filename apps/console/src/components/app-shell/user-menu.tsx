@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { UserAvatar, avatarVars } from "@/components/user-avatar";
+import { UserAvatar, avatarSeed, avatarVars } from "@/components/user-avatar";
 import { type ThemePreference, useTheme } from "@/theme";
 
 /** Route prefix that puts the shell into its Settings view. */
@@ -89,8 +89,8 @@ function ThemeRow() {
 }
 
 /**
- * Footer account entry: the signed-in person over the account they work in,
- * opening the account dropdown to the right of the sidebar (Console ADR 0003).
+ * Footer account entry: the signed-in person, opening the account dropdown to
+ * the right of the sidebar (Console ADR 0003).
  *
  * The person is named in ADR 058's order (display → identifier → user id):
  * once a name is set it leads, with the email beneath it; until then the
@@ -104,8 +104,13 @@ function ThemeRow() {
  * broken.
  */
 export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
-  const email = user?.identifier ?? user?.userId ?? "Signed in";
-  const name = user?.display ?? email;
+  // The name leads once set, with the email beneath it; until then the email
+  // stands alone. A blank name counts as none.
+  const display = user?.display?.trim() || undefined;
+  const email = user?.identifier;
+  const name = display ?? email ?? user?.userId ?? "Signed in";
+  const second = display && email;
+  const seed = avatarSeed(user);
   // The avatar's gradient moves faster while the row is hovered or its menu is open.
   const [hovered, setHovered] = useState(false);
   const [open, setOpen] = useState(false);
@@ -125,16 +130,16 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             // avatar, lifted 8px so the avatar keeps the height it had at the
             // middle of the 48px row.
             className="avatar-host h-auto min-h-12 py-2 pl-1 group-data-[collapsible=icon]:mb-2 group-data-[collapsible=icon]:min-h-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1!"
-            style={avatarVars(user?.userId ?? email)}
+            style={avatarVars(seed)}
             onPointerEnter={() => setHovered(true)}
             onPointerLeave={() => setHovered(false)}
           >
             {/* 24px in the footer row, generated from the user id. */}
-            <UserAvatar seed={user?.userId ?? email} fast={hovered || open} />
+            <UserAvatar seed={seed} fast={hovered || open} />
             {/* Hidden on the rail, so the avatar alone is what centres. */}
             <span className="flex min-w-0 flex-1 flex-col gap-1 group-data-[collapsible=icon]:hidden">
               <span className="truncate text-sm leading-none font-semibold">{name}</span>
-              {user?.display && <span className={FOOTER_SECOND_LINE}>{email}</span>}
+              {second && <span className={FOOTER_SECOND_LINE}>{second}</span>}
             </span>
             <ChevronRight
               className="ml-auto text-sidebar-foreground group-data-[collapsible=icon]:hidden"
@@ -152,9 +157,9 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             <DropdownMenuItem asChild className="flex-col items-start gap-1 py-2">
               <Link to="/settings/profile">
                 <span className="max-w-full truncate text-sm font-medium">{name}</span>
-                {user?.display && (
+                {second && (
                   <span className="max-w-full truncate text-xs leading-none text-muted-foreground">
-                    {email}
+                    {second}
                   </span>
                 )}
               </Link>

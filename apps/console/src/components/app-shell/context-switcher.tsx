@@ -7,7 +7,7 @@ import {
   useParams,
 } from "@tanstack/react-router";
 import { Box, Boxes, Check, ChevronsUpDown, type LucideIcon, Plus, Slash } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 
 import { AddTeamSheet } from "@/components/add-team-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -46,11 +46,8 @@ const NO_SELECTION = "Select a project";
 interface SwitcherOption {
   id: string;
   label: string;
-  /**
-   * Where following the row goes — for a project, the same screen re-scoped
-   * to it (`?project=`). Without one the row is a plain label.
-   */
-  link?: Pick<LinkProps, "to" | "params" | "search">;
+  /** Where following the row goes — for a project, the same screen re-scoped to it (`?project=`). */
+  link: Pick<LinkProps, "to" | "params" | "search">;
 }
 
 export function ContextSwitcher() {
@@ -180,7 +177,7 @@ function useScopeTarget(): (projectId: string) => NonNullable<SwitcherOption["li
 function useSelectedOption(
   selected: string | undefined,
   projects: SwitcherOption[] | undefined,
-): SwitcherOption | undefined {
+): Pick<SwitcherOption, "id" | "label"> | undefined {
   const listed = selected ? projects?.find((project) => project.id === selected) : undefined;
   const missing = selected !== undefined && projects !== undefined && listed === undefined;
   // Tagged with the id it answers for: a re-read keeps the last answer until
@@ -227,7 +224,6 @@ function Switcher({
   current?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const listId = useId();
 
   // Loading is the options not having answered yet — not the label being
   // absent, which is also what an empty answer looks like.
@@ -265,7 +261,7 @@ function Switcher({
         <p className="px-2 py-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {heading}
         </p>
-        <ul id={listId} aria-label={ariaLabel} className="flex flex-col">
+        <ul aria-label={ariaLabel} className="flex flex-col">
           {rows.length === 0 ? (
             <li className="px-2 py-1.5 text-sm text-muted-foreground">{emptyLabel}</li>
           ) : (
@@ -286,23 +282,9 @@ function Switcher({
                   // By id, not by label: two projects may share a name.
                   aria-current={selected ? "true" : undefined}
                 >
-                  {option.link ? (
-                    <Link
-                      {...option.link}
-                      onClick={() => setOpen(false)}
-                      // The ring is the buttons' (`ui/button.tsx`): the background
-                      // alone is also the hover state, so it cannot be what tells
-                      // a keyboard user where focus is.
-                      className={cn(
-                        ROW,
-                        "outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                      )}
-                    >
-                      {content}
-                    </Link>
-                  ) : (
-                    <div className={ROW}>{content}</div>
-                  )}
+                  <Link {...option.link} onClick={() => setOpen(false)} className={ROW}>
+                    {content}
+                  </Link>
                 </li>
               );
             })
@@ -319,12 +301,9 @@ function Switcher({
                 setOpen(false);
                 footer.onSelect();
               }}
-              // Laid out like a row (`ROW`): icon, then the label in line with
-              // the names above.
-              className={cn(
-                ROW,
-                "w-full text-left outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50",
-              )}
+              // Laid out like a row: icon, then the label in line with the
+              // names above.
+              className={ROW}
             >
               <footer.icon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
               <span className="flex-1 truncate text-sm text-foreground">{footer.label}</span>
@@ -346,5 +325,10 @@ function Switcher({
 const TRIGGER =
   "flex h-8 max-w-64 min-w-0 items-center gap-2 rounded-md px-2 text-sm transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent";
 
-/** A list row: 32px, glyph, name, and a check on the current one. */
-const ROW = "flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left";
+/**
+ * A list row: 32px, glyph, name, and a check on the current one. The focus
+ * ring is the buttons' (`ui/button.tsx`): the background alone is also the
+ * hover state, so it cannot be what tells a keyboard user where focus is.
+ */
+const ROW =
+  "flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50";
