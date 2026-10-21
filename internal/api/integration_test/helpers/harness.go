@@ -49,6 +49,7 @@ type Harness struct {
 	teamService           dependency[*service.TeamService]
 	brandingService       dependency[*service.BrandingService]
 	releaseService        dependency[service.ReleaseService]
+	deploymentService     dependency[*service.DeploymentService]
 	idpConnectionService  dependency[service.IDPConnectionService]
 	eventService          dependency[*service.EventService]
 	keyService            dependency[service.KeyService]

@@ -122,7 +122,7 @@ func TestCorrelatedEqualFilter(t *testing.T) {
 	col := database.Col(domain.SessionFieldLifecycleOwnerTeamID)
 	filter := database.CorrelatedEqual(col, "team_01H")
 	assert.Equal(t, col, filter.Column)
-	assert.Equal(t, "team_01H", filter.Value)
+	assert.Equal(t, []any{"team_01H"}, filter.Values)
 	assert.True(t, filter.Restricts(col))
 	assert.False(t, filter.Restricts(database.Col(domain.SessionFieldUserID)))
 
