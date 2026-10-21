@@ -78,6 +78,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin project={project} theme="light" onFlowComplete$={(detail) => track(detail)} />
 ```
 
+The widget waits for the `on…$` callbacks of `zitadel-flow-redirect`, `zitadel-flow-complete` and `zitadel-signout` to finish, up to two seconds, before it navigates, so a lazily loaded callback runs before the page unloads; the wrapper passes each callback's promise to the event's `waitUntil` for you.
+
 ## Standard HTML attributes
 
 `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabIndex`, `data-*` and `aria-*`) and pass them to the widget element, so you can position, style and label the widget without an extra wrapper element. Nothing else reaches the element: any other prop is ignored.

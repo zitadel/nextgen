@@ -49,6 +49,15 @@ describe("emitThenSettle", () => {
     expect(done).toHaveBeenCalledOnce();
   });
 
+  it("clears its timer once the listeners have settled", async () => {
+    const host = hostWithListener(() => new Promise((resolve) => setTimeout(resolve, 500)));
+
+    void emitThenSettle(host, "zitadel-test", {});
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("stops waiting for a promise that never settles after the wait limit", async () => {
     const done = vi.fn();
 
