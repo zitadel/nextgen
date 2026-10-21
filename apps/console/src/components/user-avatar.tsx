@@ -26,8 +26,8 @@ function hash(seed: string): number {
 
 /**
  * The colours for a seed, as the custom properties `.user-avatar` paints with
- * (`styles.css`): two different design-system starts and where along its flow
- * it starts, all taken from the hash, so a person keeps theirs on every
+ * (`styles.css`): two different design-system starts, the angle it starts at
+ * and where in its motion it starts, all taken from the hash, so a person keeps theirs on every
  * screen and device and two people rarely share one.
  *
  * Set on a hover host as well, they tint its hover wash with the same colours.
@@ -40,13 +40,14 @@ export function avatarVars(seed: string): CSSProperties {
   return {
     "--avatar-from": `var(${STARTS[from]})`,
     "--avatar-to": `var(${STARTS[to]})`,
-    // A negative delay starts the flow part-way along its path. The four
-    // periods (18, 26, 46 and 62s) only line up again after hours.
+    "--avatar-base": `${(h >>> 16) % 360}deg`,
+    // A negative delay starts the motion part-way through. The three
+    // periods (18, 26 and 60s) only line up again after over an hour.
     "--avatar-phase": `-${(h >>> 4) % 1200}s`,
   } as CSSProperties;
 }
 
-/** How much faster the colours flow while the avatar's host is hovered. */
+/** How much faster the gradient moves while the avatar's host is hovered. */
 const FAST = 8;
 
 /**
@@ -54,8 +55,8 @@ const FAST = 8;
  * picture. The id, not the email, seeds it, so it survives a changed email.
  * A picture can replace it once users can upload one.
  *
- * Its colours flow in a wandering direction, unless the person asked for
- * reduced motion. With `fast` they flow `FAST` times quicker: the playback rate
+ * Its gradient's direction wanders, unless the person asked for reduced
+ * motion. With `fast` it moves `FAST` times quicker: the playback rate
  * changes, not the duration, so the motion speeds up from where it is instead
  * of jumping.
  *

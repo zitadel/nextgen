@@ -123,89 +123,68 @@ select:-webkit-autofill {
 }
 
 /* The generated avatar (`components/user-avatar.tsx`): the person's two
-   design-system gradient starts, as a seamless two-axis pattern (blobs of the
-   first colour on the second, tiles twice the avatar's size) that flows
-   behind the circle.
+   design-system gradient starts as one linear gradient across the circle, so
+   both colours always show in the same proportion.
 
-   Each axis moves on its own: a steady drift plus a sway, all four on
-   different periods. The direction the colours flow in therefore wanders and
-   their speed rises and falls, so the motion never settles into a turn about
-   one axis. Each person starts at their own point (`--avatar-phase`), so a
-   list of avatars never moves in step. The component speeds it up while its
-   host is hovered. */
-@property --avatar-drift-x {
-  syntax: "<percentage>";
+   Only its direction moves, and not evenly: a slow turn plus two sways on
+   different periods, all registered angles so they interpolate. The gradient
+   drifts round, speeds up, slows and sometimes swings back, rather than
+   turning steadily about its centre. Each person starts from their own angle
+   (`--avatar-base`) and point in the motion (`--avatar-phase`), so a list of
+   avatars never moves in step. The component speeds it up while its host is
+   hovered. */
+@property --avatar-turn {
+  syntax: "<angle>";
   inherits: false;
-  initial-value: 0%;
+  initial-value: 0deg;
 }
 
-@property --avatar-drift-y {
-  syntax: "<percentage>";
+@property --avatar-sway-a {
+  syntax: "<angle>";
   inherits: false;
-  initial-value: 0%;
+  initial-value: 0deg;
 }
 
-@property --avatar-sway-x {
-  syntax: "<percentage>";
+@property --avatar-sway-b {
+  syntax: "<angle>";
   inherits: false;
-  initial-value: 0%;
+  initial-value: 0deg;
 }
 
-@property --avatar-sway-y {
-  syntax: "<percentage>";
-  inherits: false;
-  initial-value: 0%;
-}
-
-/* With tiles twice the avatar's size, 200% moves the pattern by one tile. */
-@keyframes avatar-drift-x {
+@keyframes avatar-turn {
   to {
-    --avatar-drift-x: 200%;
+    --avatar-turn: 360deg;
   }
 }
 
-@keyframes avatar-drift-y {
-  to {
-    --avatar-drift-y: 200%;
-  }
-}
-
-@keyframes avatar-sway-x {
+@keyframes avatar-sway-a {
   from {
-    --avatar-sway-x: -60%;
+    --avatar-sway-a: -90deg;
   }
   to {
-    --avatar-sway-x: 60%;
+    --avatar-sway-a: 90deg;
   }
 }
 
-@keyframes avatar-sway-y {
+@keyframes avatar-sway-b {
   from {
-    --avatar-sway-y: -60%;
+    --avatar-sway-b: -45deg;
   }
   to {
-    --avatar-sway-y: 60%;
+    --avatar-sway-b: 45deg;
   }
 }
 
 .user-avatar {
-  /* The second colour fills each tile from halfway out, so the tiles meet
-     seamlessly on every side. */
-  background-image: radial-gradient(
-    circle,
-    var(--avatar-from) 0%,
-    var(--avatar-to) 50%,
-    var(--avatar-to) 100%
+  background-image: linear-gradient(
+    calc(var(--avatar-base) + var(--avatar-turn) + var(--avatar-sway-a) + var(--avatar-sway-b)),
+    var(--avatar-from) 15%,
+    var(--avatar-to) 85%
   );
-  background-size: 200% 200%;
-  background-position:
-    calc(var(--avatar-drift-x) + var(--avatar-sway-x))
-    calc(var(--avatar-drift-y) + var(--avatar-sway-y));
   animation:
-    avatar-drift-x 46s linear infinite,
-    avatar-drift-y 62s linear infinite reverse,
-    avatar-sway-x 18s ease-in-out infinite alternate,
-    avatar-sway-y 26s ease-in-out infinite alternate;
+    avatar-turn 60s linear infinite,
+    avatar-sway-a 18s ease-in-out infinite alternate,
+    avatar-sway-b 26s ease-in-out infinite alternate;
   animation-delay: var(--avatar-phase);
 }
 
