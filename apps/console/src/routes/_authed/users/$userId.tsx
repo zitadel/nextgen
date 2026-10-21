@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { MetaItem } from "@/components/ui/meta-item";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -496,9 +497,14 @@ function ProfileField({
 
   return (
     <Field orientation="responsive">
-      <FieldLabel htmlFor={id} className={`${FIELD_LABEL} ${LABEL_COLUMN}`}>
-        {entry.label}
-      </FieldLabel>
+      {/* As in the add-user sheet: the marker is a sibling of the label, not
+          part of it, so the accessible name stays the field name. */}
+      <div className={`flex items-center gap-2 ${LABEL_COLUMN}`}>
+        <FieldLabel htmlFor={id} className={FIELD_LABEL}>
+          {entry.label}
+        </FieldLabel>
+        {!entry.required && <MetaItem>Optional</MetaItem>}
+      </div>
       <FieldContent>
         {entry.inputType === "boolean" ? (
           <div className="flex items-center gap-2">

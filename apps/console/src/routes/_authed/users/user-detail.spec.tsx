@@ -297,6 +297,17 @@ describe("user detail", () => {
     expect(screen.getByLabelText("Active")).toHaveAttribute("readonly");
   });
 
+  it("marks optional attributes beside their label, as the add-user sheet does", async () => {
+    stub();
+    await renderDetail();
+    await screen.findByLabelText("Company name");
+
+    // `companyName` is optional, `email` required and unmarked.
+    const markers = screen.getAllByText("Optional");
+    expect(markers).toHaveLength(1);
+    expect(markers[0]?.parentElement).toHaveTextContent("Company name");
+  });
+
   it("saves only the changed attributes, and keeps Save disabled until one changes", async () => {
     stub();
     const bodies: unknown[] = [];
