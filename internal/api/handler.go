@@ -24,6 +24,7 @@ type Handler struct {
 	teamService           *service.TeamService
 	brandingService       *service.BrandingService
 	releaseService        service.ReleaseService
+	deploymentService     *service.DeploymentService
 	idpConnectionService  service.IDPConnectionService
 	eventService          *service.EventService
 	tokenService          service.TokenService
@@ -57,6 +58,7 @@ func NewHandler(
 	teamService *service.TeamService,
 	brandingService *service.BrandingService,
 	releaseService service.ReleaseService,
+	deploymentService *service.DeploymentService,
 	idpConnectionService service.IDPConnectionService,
 	eventService *service.EventService,
 	tokenService service.TokenService,
@@ -78,6 +80,7 @@ func NewHandler(
 		teamService:           teamService,
 		brandingService:       brandingService,
 		releaseService:        releaseService,
+		deploymentService:     deploymentService,
 		idpConnectionService:  idpConnectionService,
 		eventService:          eventService,
 		tokenService:          tokenService,

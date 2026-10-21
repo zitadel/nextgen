@@ -26,6 +26,8 @@ export type ZlCheckboxChangeDetail = { name: string; checked: boolean; value: st
  *
  * Form participation: `<zl-checkbox>` is a form-associated custom element, so
  * it submits its `value` only when checked, exactly like a native checkbox.
+ *
+ * @fires {CustomEvent<ZlCheckboxChangeDetail>} zl-change - The checked state changed; carries the new value.
  */
 @customElement("zl-checkbox")
 export class ZlCheckbox extends FormAtom {

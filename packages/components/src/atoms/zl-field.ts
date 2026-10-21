@@ -49,6 +49,9 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *                clear button; still focusable and still submitted
  *
  * Form participation: `<zl-field>` is a form-associated custom element.
+ *
+ * @fires {CustomEvent<ZlFieldInputDetail>} zl-input - The field value changed; carries the field name and value.
+ * @fires {CustomEvent<ZlSubmitDetail>} zl-submit - A field affordance (e.g. forgot-password) requests a flow action.
  */
 @customElement("zl-field")
 export class ZlField extends FormAtom {

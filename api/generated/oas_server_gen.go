@@ -608,6 +608,14 @@ type Handler interface {
 	//
 	// GET /users/{user_id}
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
+	// GetUserPasswordState implements getUserPasswordState operation.
+	//
+	// Reports when the user's current password was set, and leaves `set_at` out
+	// when the user has none. The password and its hash are never returned;
+	// setting one is `PUT` on the same path.
+	//
+	// GET /users/{user_id}/password
+	GetUserPasswordState(ctx context.Context, params GetUserPasswordStateParams) (GetUserPasswordStateRes, error)
 	// GetVariable implements getVariable operation.
 	//
 	// Reads one variable by name, with its value per kind. A name with no
@@ -661,9 +669,9 @@ type Handler interface {
 	// By default the list is the history, newest first: every deployment of
 	// the project with every target it made the release live on. With
 	// `origin`, the history of that origin alone.
-	// With `live=true`, the list is what is served now: the project's newest
-	// primary deployment, narrowed to origins that are still primary, then the
-	// newest deployment to each live preview URL, newest first, narrowed to
+	// With `live=true`, the list is what is served now, newest first: the
+	// project's newest primary deployment, narrowed to origins that are still
+	// primary, and the newest deployment to each live preview URL, narrowed to
 	// the URLs it still serves. Combined with `origin`, it is the one
 	// deployment that origin serves, or empty.
 	// `expand: ["release"]` embeds the release each deployment made live; it
