@@ -918,7 +918,10 @@ export class ZitadelLogin extends ZitadelSurface {
 
     this.syncBackSentinel(wire.step);
 
-    if (this.maybeRedirectToProvider(wire)) return;
+    if (this.redirectsToProvider(wire)) {
+      void this.redirectToProvider(wire);
+      return;
+    }
     void this.maybeCompleteFlow(wire);
   }
 
@@ -976,31 +979,34 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Hand the browser to an identity provider.
+   * Whether the step hands the browser to an identity provider.
    *
-   * `step.redirect_url` is the engine's answer to `action: "sso"`: a full-page
-   * navigation to the provider's authorization endpoint, which is the only way
-   * the user can authenticate there. It is not a completion — the flow resumes
-   * when the provider returns to the callback — so it is deliberately separate
-   * from {@link maybeCompleteFlow} and emits its own event rather than
-   * `zitadel-flow-complete`, which hosts treat as "signed in".
-   *
-   * Returns whether it navigated, so the caller can stop.
+   * `step.redirect_url` is the engine's answer to `action: "sso"`. A terminal
+   * step carries `redirect_url` too — the engine copies the relying party's
+   * `redirect_uri` onto it when a sign-in completes (`terminate()` in
+   * flow_state_machine.go). That is a finished sign-in, not a trip to a
+   * provider, and it belongs to `maybeCompleteFlow`.
    */
-  private maybeRedirectToProvider(response: CreateFlow201): boolean {
+  private redirectsToProvider(response: CreateFlow201): boolean {
+    return Boolean(response.step.redirect_url) && !response.step.complete;
+  }
+
+  /**
+   * Hand the browser to the identity provider: a full-page navigation to its
+   * authorization endpoint, the only way the user can authenticate there. It is
+   * not a completion — the flow resumes when the provider returns to the
+   * callback — so it emits its own event rather than `zitadel-flow-complete`,
+   * which hosts treat as "signed in".
+   */
+  private async redirectToProvider(response: CreateFlow201): Promise<void> {
     const target = response.step.redirect_url;
-    // A terminal step carries `redirect_url` too — the engine copies the
-    // relying party's `redirect_uri` onto it when a sign-in completes
-    // (`terminate()` in flow_state_machine.go). That is a finished sign-in,
-    // not a trip to a provider, and it belongs to `maybeCompleteFlow`.
-    if (!target || response.step.complete) return false;
-    const settled = emitThenSettle(this, "zitadel-flow-redirect", {
+    if (!target) return;
+    await emitThenSettle(this, "zitadel-flow-redirect", {
       redirect_url: target,
       step: response.step,
     });
-    if (typeof window === "undefined") return false;
-    void settled.then(() => window.location.assign(target));
-    return true;
+    if (typeof window === "undefined") return;
+    window.location.assign(target);
   }
 
   /**
