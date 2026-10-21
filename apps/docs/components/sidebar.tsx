@@ -121,6 +121,15 @@ function StepRow({ up, children }: { up: boolean; children: ReactNode }) {
   );
 }
 
+/**
+ * No title: the site bar above (components/site-header.tsx) carries the logo.
+ * The empty box keeps the title's place, so the buttons beside it stay at the
+ * row's end.
+ */
+export function SidebarTitle({ className }: ComponentProps<"a">) {
+  return <span className={className} />;
+}
+
 /** Fumadocs' provider, with the tree the sidebar shows for the page. */
 export function SidebarProvider(props: ComponentProps<typeof SpaciousSidebarProvider>) {
   const { full } = useTreeContext();

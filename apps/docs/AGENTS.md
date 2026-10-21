@@ -41,6 +41,8 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
   ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-logo-and-the-favicons)).
 - `components/logo.tsx` copies `apps/website/app/logo.tsx` (its motion in
   `app/global.css`); change the copies together.
+- `components/site-header.tsx` copies the website's bar
+  (`apps/website/app/site-header.tsx`) in Fumadocs' colours; change both.
 - Link the website (`/`) with a plain `<a>`, never `next/link`: it is another
   deployment, which `next/link` would prefetch and route to in this app.
 

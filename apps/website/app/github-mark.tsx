@@ -1,4 +1,4 @@
-// GitHub's mark, as Fumadocs draws it in the docs' header.
+// GitHub's mark, as Fumadocs draws it.
 export function GitHubMark({ className }: { className?: string }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className={className}>

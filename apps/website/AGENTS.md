@@ -34,6 +34,11 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - `apps/docs/app/fonts/` holds the same Arimo file; update both.
 
+## The header
+
+- `apps/docs/components/site-header.tsx` copies `app/site-header.tsx` over
+  the docs, in their colours; change the copies together.
+
 ## The theme
 
 - Dark and light share one set of names in `app/globals.css`: add a color as

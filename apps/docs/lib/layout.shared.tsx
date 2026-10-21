@@ -1,54 +1,16 @@
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
-import { History, House } from "lucide-react";
-import type { ReactNode } from "react";
-
-import { Logo } from "@/components/logo";
-
-import { docsRoute, gitConfig } from "./shared";
 
 // The classes of the Spacious layout's own sidebar items (`itemVariants` in
 // fumadocs-ui's layouts/spacious/slots/sidebar), so these sit among them, and
-// their colours when inactive and active.
+// their colour when active.
 export const SIDEBAR_ITEM =
   "relative flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-start outline-none transition-colors focus-visible:ring-2 focus-visible:ring-fd-ring [&_svg]:size-4 [&_svg]:shrink-0";
-export const SIDEBAR_ITEM_IDLE = "text-fd-muted-foreground hover:text-fd-accent-foreground";
 export const SIDEBAR_ITEM_ACTIVE = "bg-fd-primary/10 text-fd-primary";
 
-// A link to another app of the cloud's host. Fumadocs renders a link item
-// through next/link, which would prefetch the page from this app and route
-// to it here, or, marked external, in a new tab; a custom item is a plain
-// <a> (AGENTS.md).
-function hostLink(href: string, icon: ReactNode, text: string) {
-  return {
-    type: "custom" as const,
-    children: (
-      <a href={href} className={`${SIDEBAR_ITEM} ${SIDEBAR_ITEM_IDLE}`}>
-        {icon}
-        {text}
-      </a>
-    ),
-  };
-}
-
+// The site bar over the layout (components/site-header.tsx) holds the logo,
+// the website's pages, GitHub and the theme, so Fumadocs shows none of them.
 export function baseOptions(): BaseLayoutProps {
   return {
-    nav: {
-      // The website's header, read out as "Zitadel Docs": its animated logo
-      // at its size, and in place of its Preview label the same pill saying
-      // where you are.
-      title: (
-        <>
-          <Logo id="docs-logo" className="h-6 w-auto" />
-          <span className="rounded-full border border-fd-border px-2.5 py-0.5 font-semibold text-fd-muted-foreground text-xs leading-4">
-            Docs
-          </span>
-        </>
-      ),
-      // The docs' home; on the cloud's host / is the website's start page.
-      url: docsRoute,
-    },
-    // The website's start page and its changelog, above the pages.
-    links: [hostLink("/", <House />, "Home"), hostLink("/changelog", <History />, "Changelog")],
-    githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
+    themeSwitch: { enabled: false },
   };
 }
