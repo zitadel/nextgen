@@ -419,7 +419,12 @@ export class ZlField extends FormAtom {
 
   private handleClear = (): void => {
     this.value = "";
-    emit<ZlFieldInputDetail>(this, "zl-input", { name: this.name, value: this.value });
+    emit<ZlFieldInputDetail>(
+      this,
+      "zl-input",
+      { name: this.name, value: this.value },
+      { composed: false },
+    );
     this.syncFormState();
     this.dispatchNativeInput();
     this.inputEl?.focus();
@@ -441,7 +446,12 @@ export class ZlField extends FormAtom {
     const input = event.target as HTMLInputElement;
     this.value = input.value;
     this.syncFormState();
-    emit<ZlFieldInputDetail>(this, "zl-input", { name: this.name, value: this.value });
+    emit<ZlFieldInputDetail>(
+      this,
+      "zl-input",
+      { name: this.name, value: this.value },
+      { composed: false },
+    );
     this.dispatchNativeInput(event);
   };
 

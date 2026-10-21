@@ -41,25 +41,26 @@ function project(id: string, name: string) {
  * console" all arrive, and `/settings` is where the account dropdown goes.
  */
 describe("landing routes", () => {
-  // `/` lands on Teams, a project-scoped screen, so with no `?project=` the
-  // `_authed` guard picks one (`resolveDefaultProjectScope`).
-  it("lands on Teams in the only project the person can act on", async () => {
-    const teamQueries: string[] = [];
+  // `/` lands on Users, a project-scoped screen, so with no `?project=` the
+  // `_authed` guard picks one (`resolveDefaultProjectScope`). Users, because
+  // whoever just signed up through the developer's app is listed there.
+  it("lands on Users in the only project the person can act on", async () => {
+    const userQueries: string[] = [];
     server.use(
       http.get("http://localhost/api/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
       ),
-      http.post("http://localhost/api/teams/query", ({ request }) => {
-        teamQueries.push(new URL(request.url).searchParams.get("project_id") ?? "");
-        return HttpResponse.json({ teams: [] });
+      http.post("http://localhost/api/users/query", ({ request }) => {
+        userQueries.push(new URL(request.url).searchParams.get("project_id") ?? "");
+        return HttpResponse.json({ users: [] });
       }),
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
-    expect(await screen.findByRole("heading", { name: "Teams" })).toBeInTheDocument();
-    expect(teamQueries).toEqual(["proj_1"]);
+    expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
+    expect(userQueries).toEqual(["proj_1"]);
   });
 
   it("lands on Projects when there are several to choose from", async () => {
@@ -150,11 +151,11 @@ describe("landing routes", () => {
       http.get("http://localhost/api/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
       ),
-      http.post("http://localhost/api/teams/query", () => HttpResponse.json({ teams: [] })),
+      http.post("http://localhost/api/users/query", () => HttpResponse.json({ users: [] })),
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
   });
 

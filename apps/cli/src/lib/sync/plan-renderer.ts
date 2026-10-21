@@ -232,7 +232,7 @@ const KNOWN_AFTER_APPLY = "(known after apply)";
 /**
  * Quote-escape a string value, then escape whatever could still drive the
  * terminal. The plan prints what the server stores, and `plan` and `apply`
- * read it verbatim so the diff and the write-back see the real bytes; this is
+ * read it verbatim so the diff sees the real bytes; this is
  * where it is made safe to print.
  */
 function escapeString(s: string): string {
@@ -547,11 +547,166 @@ function renderBlockStringDiff(
 }
 
 /**
+ * The keys that name an element of an array of objects. A flow's `steps` and
+ * each step's `actions` are named by `name`, which the dialect requires to be
+ * unique within its list; the others cover any later list of named objects.
+ */
+const ELEMENT_IDENTITY_KEYS = ["name", "id", "slug"] as const;
+
+/**
+ * The key that identifies every element of both arrays, or undefined when
+ * there is none: every element must be an object carrying that key as a
+ * string, unique within its array. Without one, elements can only be matched
+ * by position, and a changed array renders as a whole remove + add.
+ */
+function elementIdentityKey(
+  oldArr: ReadonlyArray<unknown>,
+  newArr: ReadonlyArray<unknown>,
+): string | undefined {
+  const all = [...oldArr, ...newArr];
+  if (all.length === 0 || !all.every(isPlainObject)) {
+    return undefined;
+  }
+  return ELEMENT_IDENTITY_KEYS.find((key) =>
+    [oldArr, newArr].every((arr) => {
+      const ids = arr.map((item) => (item as Record<string, unknown>)[key]);
+      return ids.every((id) => typeof id === "string") && new Set(ids).size === ids.length;
+    }),
+  );
+}
+
+function sameValue(a: unknown, b: unknown): boolean {
+  return stableStringify(a) === stableStringify(b);
+}
+
+function hiddenNote(count: number, noun: string): string {
+  return `# (${plural(count, `unchanged ${noun}`)} hidden)`;
+}
+
+/**
+ * Render a changed array element by element, so one edit inside a long list
+ * reads as one change rather than the whole list removed and added again.
+ *
+ * - Arrays of named objects (a flow's `steps`, a step's `actions`) are matched
+ *   by {@link elementIdentityKey}. A changed element renders as `~ {` with only
+ *   what changed in it, plus its name; added and removed elements render
+ *   whole; unchanged ones collapse into a `# (N unchanged elements hidden)`
+ *   line. An element that moved renders as removed and added.
+ * - Arrays of scalars (`fields`, `required`, `scopes`) render every item, with
+ *   `+` / `-` on the ones added or removed.
+ * - Anything else (objects with no shared identity, nested arrays) falls back
+ *   to a whole remove + add.
+ */
+function renderArrayDiff(
+  paddedKey: string,
+  oldArr: ReadonlyArray<unknown>,
+  newArr: ReadonlyArray<unknown>,
+  prefixCol: number,
+  tty: boolean,
+  lines: string[],
+): void {
+  const pad = " ".repeat(prefixCol);
+  const itemCol = prefixCol + 4;
+  const itemPad = " ".repeat(itemCol);
+  const closePad = " ".repeat(prefixCol + 2);
+  const yellow = (s: string) => paint(s, A.yellow, tty);
+  const green = (s: string) => paint(s, A.green, tty);
+  const red = (s: string) => paint(s, A.red, tty);
+  const identity = elementIdentityKey(oldArr, newArr);
+
+  const withinBudget = oldArr.length * newArr.length <= MAX_LCS_CELLS;
+
+  if (identity !== undefined && withinBudget) {
+    const idOf = (item: unknown) => (item as Record<string, string>)[identity] as string;
+    const oldById = new Map(oldArr.map((item) => [idOf(item), item]));
+    const newById = new Map(newArr.map((item) => [idOf(item), item]));
+
+    lines.push(yellow(`${pad}~ ${paddedKey} = [`));
+    let hidden = 0;
+    const flushHidden = () => {
+      if (hidden > 0) {
+        lines.push(`${itemPad}  ${hiddenNote(hidden, "element")}`);
+        hidden = 0;
+      }
+    };
+    for (const op of lcsDiff(oldArr.map(idOf), newArr.map(idOf))) {
+      const before = oldById.get(op.line) as Record<string, unknown>;
+      const after = newById.get(op.line) as Record<string, unknown>;
+      if (op.kind === "same" && sameValue(before, after)) {
+        hidden += 1;
+        continue;
+      }
+      flushHidden();
+      if (op.kind === "same") {
+        lines.push(yellow(`${itemPad}~ {`));
+        renderDiff(before, after, itemCol + 4, tty, lines, { compact: true, identity });
+        lines.push(yellow(`${" ".repeat(itemCol + 2)}},`));
+      } else {
+        const removed = op.kind === "del";
+        renderArrayItems(
+          [removed ? before : after],
+          removed ? "-" : "+",
+          itemCol,
+          { tty, deleteMode: false },
+          lines,
+        );
+      }
+    }
+    flushHidden();
+    lines.push(yellow(`${closePad}]`));
+    return;
+  }
+
+  if (withinBudget && [...oldArr, ...newArr].every(isPrimitive)) {
+    const label = (item: unknown) => fmtScalar(item as string | number | boolean | null);
+    lines.push(yellow(`${pad}~ ${paddedKey} = [`));
+    for (const op of lcsDiff(oldArr.map(label), newArr.map(label))) {
+      if (op.kind === "same") {
+        lines.push(`${itemPad}  ${op.line},`);
+      } else if (op.kind === "add") {
+        lines.push(green(`${itemPad}+ ${op.line},`));
+      } else {
+        lines.push(red(`${itemPad}- ${op.line},`));
+      }
+    }
+    lines.push(yellow(`${closePad}]`));
+    return;
+  }
+
+  if (oldArr.length === 0) {
+    lines.push(red(`${pad}- ${paddedKey} = []`));
+  } else {
+    lines.push(red(`${pad}- ${paddedKey} = [`));
+    renderArrayItems(oldArr, "-", itemCol, { tty, deleteMode: false }, lines);
+    lines.push(red(`${closePad}]`));
+  }
+  if (newArr.length === 0) {
+    lines.push(green(`${pad}+ ${paddedKey} = []`));
+  } else {
+    lines.push(green(`${pad}+ ${paddedKey} = [`));
+    renderArrayItems(newArr, "+", itemCol, { tty, deleteMode: false }, lines);
+    lines.push(green(`${closePad}]`));
+  }
+}
+
+/**
+ * How {@link renderDiff} renders what did not change.
+ *
+ * `compact` hides unchanged attributes behind one `# (N unchanged attributes
+ * hidden)` line, for the inside of a changed array element: there the point is
+ * which element changed and how, and its untouched rest is noise. `identity`
+ * names the attribute that is shown anyway, so the element can be recognised.
+ */
+type DiffOptions = { compact?: boolean; identity?: string };
+
+/**
  * Walks both old and new objects, emitting Terraform-style change lines.
  * Returns true if any actual change line (+ / - / ~) was emitted.
  *
  * Edge cases:
- * - Changed arrays render as a full remove + full add (no LCS diff).
+ * - Changed arrays render element by element ({@link renderArrayDiff}).
+ * - An unchanged array that holds objects collapses to a hidden-elements
+ *   line: a flow's whole `steps` list is not context for a top-level edit.
  * - Nested objects recurse, and the outer key is only marked `~` if a child
  *   actually changed; unchanged children render with the neutral prefix.
  * - A value whose type changed (e.g. string → object) also renders as a
@@ -563,13 +718,19 @@ function renderDiff(
   prefixCol: number,
   tty: boolean,
   lines: string[],
+  options: DiffOptions = {},
 ): boolean {
   const allKeys = [...new Set([...Object.keys(oldObj), ...Object.keys(newObj)])].sort();
-  const maxLen = allKeys.reduce((m, k) => Math.max(m, fieldLabel(k).length), 0);
+  const unchanged = (key: string) =>
+    Object.hasOwn(oldObj, key) && Object.hasOwn(newObj, key) && sameValue(oldObj[key], newObj[key]);
+  const shown = options.compact
+    ? allKeys.filter((key) => key === options.identity || !unchanged(key))
+    : allKeys;
+  const maxLen = shown.reduce((m, k) => Math.max(m, fieldLabel(k).length), 0);
   const pad = " ".repeat(prefixCol);
   let hasChanges = false;
 
-  for (const key of allKeys) {
+  for (const key of shown) {
     const pk = fieldLabel(key).padEnd(maxLen);
     const hasOld = Object.hasOwn(oldObj, key);
     const hasNew = Object.hasOwn(newObj, key);
@@ -623,36 +784,32 @@ function renderDiff(
       // Key-order-insensitive equality: the server echoes objects in its own
       // field order while local files are stably sorted — that difference is
       // not a change.
-      if (stableStringify(oldVal) === stableStringify(newVal)) {
+      if (sameValue(oldVal, newVal)) {
         if (newVal.length === 0) {
           lines.push(`${pad}  ${pk} = []`);
-        } else {
+        } else if (newVal.every(isPrimitive)) {
           lines.push(`${pad}  ${pk} = [`);
           renderArrayItems(newVal, " ", prefixCol + 4, { tty, deleteMode: false }, lines);
+          lines.push(`${" ".repeat(prefixCol + 2)}]`);
+        } else {
+          lines.push(`${pad}  ${pk} = [`);
+          lines.push(`${" ".repeat(prefixCol + 4)}  ${hiddenNote(newVal.length, "element")}`);
           lines.push(`${" ".repeat(prefixCol + 2)}]`);
         }
       } else {
         hasChanges = true;
-        const colR = (s: string) => paint(s, A.red, tty);
-        const colA = (s: string) => paint(s, A.green, tty);
-        if (oldVal.length === 0) {
-          lines.push(colR(`${pad}- ${pk} = []`));
-        } else {
-          lines.push(colR(`${pad}- ${pk} = [`));
-          renderArrayItems(oldVal, "-", prefixCol + 4, { tty, deleteMode: false }, lines);
-          lines.push(colR(`${" ".repeat(prefixCol + 2)}]`));
-        }
-        if (newVal.length === 0) {
-          lines.push(colA(`${pad}+ ${pk} = []`));
-        } else {
-          lines.push(colA(`${pad}+ ${pk} = [`));
-          renderArrayItems(newVal, "+", prefixCol + 4, { tty, deleteMode: false }, lines);
-          lines.push(colA(`${" ".repeat(prefixCol + 2)}]`));
-        }
+        renderArrayDiff(pk, oldVal, newVal, prefixCol, tty, lines);
       }
     } else if (isPlainObject(oldVal) && isPlainObject(newVal)) {
       const childLines: string[] = [];
-      const childHasChanges = renderDiff(oldVal, newVal, prefixCol + 4, tty, childLines);
+      const childHasChanges = renderDiff(
+        oldVal,
+        newVal,
+        prefixCol + 4,
+        tty,
+        childLines,
+        options.compact ? { compact: true } : {},
+      );
       if (childHasChanges) {
         hasChanges = true;
         const col = (s: string) => paint(s, A.yellow, tty);
@@ -679,6 +836,10 @@ function renderDiff(
     }
   }
 
+  const hidden = allKeys.length - shown.length;
+  if (hidden > 0) {
+    lines.push(`${pad}  ${hiddenNote(hidden, "attribute")}`);
+  }
   return hasChanges;
 }
 

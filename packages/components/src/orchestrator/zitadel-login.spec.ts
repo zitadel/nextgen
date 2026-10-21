@@ -20,11 +20,22 @@ import {
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from "vitest";
 
 import "./zitadel-login.js";
 import type { ZlAlert } from "../atoms/zl-alert.js";
 import type { ZlField } from "../atoms/zl-field.js";
+import type { CreateFlow201, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 import { loginPreviewStatesFor, type ZitadelLogin } from "./zitadel-login.js";
 
 const API_BASE = "https://flow.test.invalid";
@@ -132,6 +143,122 @@ describe("<zitadel-login> against the typed Flow API", () => {
     host.innerHTML = "";
   });
 
+  describe("zitadel-flow-input", () => {
+    type FieldKind = CreateFlow201StepFieldsItem["type"];
+
+    const TYPED_VALUE = "s3cret";
+
+    /** Serves a first step that holds a single field `f` of the given kind and autocomplete. */
+    function serveStepWithField(kind: FieldKind, autocomplete?: string): void {
+      const step: CreateFlow201["step"] = {
+        name: "challenge",
+        texts: { title_key: "identifier.title" },
+        fields: [{ name: "f", type: kind, text_key: "identifier.field.email", autocomplete }],
+        actions: [{ name: "submit", kind: "submit", text_key: "submit.signin", primary: true }],
+        gates: {},
+      };
+      const body: CreateFlow201 = {
+        id: "flow_test",
+        session_id: "sess_test",
+        session_token: "st_test",
+        step,
+        branding: {},
+      };
+      server.use(
+        http.post("*/flow", () => HttpResponse.json(body, { status: 201 }), { once: true }),
+      );
+    }
+
+    const SECRET_FIELD_CASES: ReadonlyArray<{
+      kind: FieldKind;
+      autocomplete?: string;
+      description: string;
+    }> = [
+      {
+        kind: "password",
+        autocomplete: "current-password",
+        description: "a password field for the current password",
+      },
+      { kind: "password", description: "a password field without an autocomplete token" },
+      {
+        kind: "password",
+        autocomplete: "new-password",
+        description: "a password field for a new password",
+      },
+      { kind: "text", autocomplete: "one-time-code", description: "a one-time-code field" },
+      {
+        kind: "text",
+        autocomplete: "ONE-TIME-CODE",
+        description: "a one-time-code token in uppercase",
+      },
+      {
+        kind: "text",
+        autocomplete: "section-x one-time-code",
+        description: "a one-time-code token among several tokens",
+      },
+    ];
+
+    const PLAIN_FIELD_CASES: ReadonlyArray<{
+      kind: FieldKind;
+      autocomplete?: string;
+      description: string;
+    }> = [
+      { kind: "email", autocomplete: "username", description: "an email field for a username" },
+      { kind: "text", description: "a plain text field without an autocomplete token" },
+      { kind: "tel", autocomplete: "tel", description: "a telephone field" },
+      { kind: "number", description: "a number field" },
+    ];
+
+    it.each(SECRET_FIELD_CASES)(
+      "does not dispatch zitadel-flow-input for $description",
+      async ({ kind, autocomplete }) => {
+        // Arrange
+        const heardOnPage = vi.fn();
+        const host = document.body.appendChild(document.createElement("div"));
+        serveStepWithField(kind, autocomplete);
+        document.addEventListener("zitadel-flow-input", heardOnPage);
+        onTestFinished(() => {
+          document.removeEventListener("zitadel-flow-input", heardOnPage);
+          host.remove();
+        });
+        const element = await mount(host);
+        await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="f"]'));
+
+        // Act
+        type(element, "f", TYPED_VALUE);
+
+        // Assert
+        expect(heardOnPage).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(PLAIN_FIELD_CASES)(
+      "dispatches zitadel-flow-input with name and value for $description",
+      async ({ kind, autocomplete }) => {
+        // Arrange
+        const heardOnPage = vi.fn();
+        const host = document.body.appendChild(document.createElement("div"));
+        serveStepWithField(kind, autocomplete);
+        document.addEventListener("zitadel-flow-input", heardOnPage);
+        onTestFinished(() => {
+          document.removeEventListener("zitadel-flow-input", heardOnPage);
+          host.remove();
+        });
+        const element = await mount(host);
+        await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="f"]'));
+
+        // Act
+        type(element, "f", TYPED_VALUE);
+
+        // Assert
+        expect(heardOnPage).toHaveBeenCalledOnce();
+        expect(heardOnPage.mock.calls[0]?.[0]).toMatchObject({
+          detail: { name: "f", value: TYPED_VALUE },
+        });
+      },
+    );
+  });
+
   it("starts a flow on mount and renders the first step", async () => {
     const element = await mount(host);
     const root = element.shadowRoot;
@@ -205,6 +332,23 @@ describe("<zitadel-login> against the typed Flow API", () => {
       kind: "createFlow",
       body: { purpose: "login", project_id: "demo-project" },
     });
+  });
+
+  it("sends the publishable-key attribute as the bearer on the first request", async () => {
+    _resetConfigForTesting();
+    const bearers: (string | null)[] = [];
+    server.events.on("request:start", ({ request }) => {
+      bearers.push(request.headers.get("authorization"));
+    });
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.setAttribute("project-id", "demo-project");
+    element.setAttribute("proxy-path", API_BASE);
+    element.setAttribute("publishable-key", "pk_test_123");
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+    server.events.removeAllListeners();
+
+    expect(bearers[0]).toBe("Bearer pk_test_123");
   });
 
   it("prefers the project property over the project-id attribute", async () => {
@@ -357,6 +501,44 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(completeEvents[0]?.detail.handoff_token).toBeTruthy();
   });
 
+  it("waits for work a zitadel-flow-complete listener registers before navigating", async () => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = "/admin";
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+      const finish = new AbortController();
+      const completed = vi.fn();
+      element.addEventListener("zitadel-flow-complete", (event) => {
+        completed();
+        if (event instanceof CustomEvent) {
+          event.detail.waitUntil(
+            new Promise((resolve) => finish.signal.addEventListener("abort", resolve)),
+          );
+        }
+      });
+
+      await advanceMockLoginFlow(element);
+      await vi.waitFor(() => expect(completed).toHaveBeenCalledOnce());
+      await element.updateComplete;
+      expect(assign).not.toHaveBeenCalled();
+
+      finish.abort();
+      await vi.waitFor(() => expect(assign).toHaveBeenCalledWith("/admin"));
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: location });
+    }
+  });
+
   it("does not paint the terminal step when it is about to navigate away", async () => {
     const assign = vi.fn();
     const { location } = window;
@@ -428,6 +610,68 @@ describe("<zitadel-login> against the typed Flow API", () => {
         configurable: true,
         value: location,
       });
+    }
+  });
+
+  it.each([
+    [
+      "the protected route the page's next names",
+      "?next=%2Fdashboard%3Ftab%3Droles",
+      false,
+      "/dashboard?tab=roles",
+    ],
+    ["post-sign-in-url when next names another host", "?next=%2F%2Fevil.example", false, "/admin"],
+    ["post-sign-in-url when next is a URL", "?next=https%3A%2F%2Fevil.example%2F", false, "/admin"],
+    ["post-sign-in-url when next carries a backslash", "?next=%2F%5Cevil.example", false, "/admin"],
+    ["post-sign-in-url with force-post-sign-in-url", "?next=%2Fdashboard", true, "/admin"],
+  ])("navigates to %s after sign-in", async (_, query, force, target) => {
+    const page = window.location.href;
+    history.replaceState(null, "", `/login${query}`);
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = "/admin";
+      element.forcePostSignInUrl = force;
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      await advanceMockLoginFlow(element);
+
+      await waitFor(() => (assign.mock.calls.length > 0 ? assign : null));
+      expect(assign).toHaveBeenCalledWith(target);
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: location });
+      history.replaceState(null, "", page);
+    }
+  });
+
+  it("does not navigate to the page's next when the host handles the handoff itself", async () => {
+    const page = window.location.href;
+    history.replaceState(null, "", "/login?next=%2Fdashboard");
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      const element = await mount(host);
+      await advanceMockLoginFlow(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-card"));
+
+      expect(assign).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: location });
+      history.replaceState(null, "", page);
     }
   });
 
@@ -2448,4 +2692,106 @@ describe("<zitadel-login preview-state> repaint", () => {
     expect(document.activeElement).toBe(control);
     control.remove();
   });
+});
+
+describe("<zitadel-login> resume-flow-id", () => {
+  it.each([undefined, null, ""])("reads %j as no handle", async (value) => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+    element.resumeFlowId = "flow_123";
+    expect(element.resumeFlowId).toBe("flow_123");
+
+    element.resumeFlowId = value;
+
+    expect(element.resumeFlowId).toBe("");
+  });
+
+  it("reads a removed attribute as no handle", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+    element.setAttribute("resume-flow-id", "flow_123");
+    expect(element.resumeFlowId).toBe("flow_123");
+
+    element.removeAttribute("resume-flow-id");
+
+    expect(element.resumeFlowId).toBe("");
+  });
+});
+
+describe("<zitadel-login> unset public properties", () => {
+  type Declaration = { attribute?: string | boolean; state?: boolean };
+  type Props = Record<string, unknown>;
+  const create = () => document.createElement("zitadel-login");
+  const declared = (
+    customElements.get("zitadel-login") as unknown as {
+      elementProperties: Map<string, Declaration>;
+    }
+  ).elementProperties;
+  // Every public property that has a declared default, read off a fresh element so a
+  // property added later is covered without touching this list.
+  const defaulted = [...declared]
+    .filter(([name, options]) => !options.state && (create() as unknown as Props)[name] != null)
+    .map(([name, options]) => ({
+      name,
+      attribute:
+        typeof options.attribute === "string"
+          ? options.attribute
+          : options.attribute === false
+            ? undefined
+            : name.toLowerCase(),
+      fallback: (create() as unknown as Props)[name],
+    }));
+  const other = (fallback: unknown) => (typeof fallback === "boolean" ? !fallback : "other");
+
+  it("covers the element's defaulted properties", () => {
+    expect(defaulted.length).toBeGreaterThan(0);
+  });
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned undefined",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned null",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = null;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "restores the default of $name when a set value is cleared",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = other(fallback);
+      expect(element[name]).toEqual(other(fallback));
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)("keeps a supplied value of $name", ({ name, fallback }) => {
+    const element = create() as unknown as Props;
+    element[name] = other(fallback);
+    expect(element[name]).toEqual(other(fallback));
+  });
+
+  it.each(defaulted.filter(({ attribute }) => attribute !== undefined))(
+    "restores the default of $name when its attribute is removed",
+    ({ name, attribute, fallback }) => {
+      const element = create();
+      element.setAttribute(attribute as string, typeof fallback === "boolean" ? "" : "other");
+      expect((element as unknown as Props)[name]).toEqual(other(fallback));
+      element.removeAttribute(attribute as string);
+      expect((element as unknown as Props)[name]).toEqual(fallback);
+    },
+  );
 });

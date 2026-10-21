@@ -232,6 +232,10 @@ func (s *stubQueryUsersService) GetMyUser(context.Context, service.GetMyUserInpu
 func (s *stubQueryUsersService) PatchUser(context.Context, service.PatchUserInput) (*domain.User, error) {
 	return nil, errors.New("unexpected PatchUser")
 }
+func (s *stubQueryUsersService) GetMyUserSchema(context.Context, service.GetMyUserInput) (*domain.JSONSchema, error) {
+	return nil, errors.New("unexpected GetMyUserSchema")
+}
+
 func (s *stubQueryUsersService) PatchMyUser(context.Context, service.PatchMyUserInput) (*domain.User, error) {
 	return nil, errors.New("unexpected PatchMyUser")
 }

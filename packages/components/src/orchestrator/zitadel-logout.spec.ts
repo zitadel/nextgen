@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -16,7 +16,8 @@ import type { ZitadelLogout } from "./zitadel-logout.js";
  * `zitadel-logout.browser.spec.ts`.
  */
 const API_BASE = "https://logout.test.invalid";
-const requestLog: { url: string; method: string; credentials: string }[] = [];
+const requestLog: { url: string; method: string; credentials: string; csrf: string | null }[] = [];
+const CSRF_TOKEN = "csrf_test";
 
 function sessionBody(display: string, identifier: string, userId: string) {
   const body: Record<string, unknown> = {
@@ -51,16 +52,27 @@ const meHandler = http.get(`${API_BASE}/sessions/me`, () => {
   return HttpResponse.json(sessionBody(currentName, currentEmail, currentUserId));
 });
 
+const csrfHandler = http.get(`${API_BASE}/sessions/me/csrf`, () => {
+  if (sessionStatus !== 200) {
+    return HttpResponse.json(
+      { code: "auth.unauthorized", message: "Missing or invalid session token." },
+      { status: sessionStatus },
+    );
+  }
+  return HttpResponse.json({ csrf_token: CSRF_TOKEN });
+});
+
 const okHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
   requestLog.push({
     url: request.url,
     method: request.method,
     credentials: request.credentials,
+    csrf: request.headers.get("x-zitadel-csrf"),
   });
   return new HttpResponse(null, { status: 204 });
 });
 
-const server = setupServer(meHandler, okHandler);
+const server = setupServer(meHandler, csrfHandler, okHandler);
 
 beforeAll(() => {
   configureZitadel({ proxyPath: API_BASE, projectId: "test" });
@@ -73,7 +85,7 @@ afterEach(() => {
   currentEmail = "";
   currentUserId = "user_test";
   sessionStatus = 200;
-  server.resetHandlers(meHandler, okHandler);
+  server.resetHandlers(meHandler, csrfHandler, okHandler);
 });
 
 afterAll(() => {
@@ -229,7 +241,7 @@ describe("<zitadel-logout>", () => {
     }
   });
 
-  it("calls DELETE /sessions/me with credentials, fires zitadel-signout", async () => {
+  it("calls DELETE /sessions/me with credentials and the CSRF token, fires zitadel-signout", async () => {
     currentName = "Alice Liddell";
     currentEmail = "alice@acme.com";
     const element = mount();
@@ -248,10 +260,11 @@ describe("<zitadel-logout>", () => {
 
     expect(requestLog).toHaveLength(1);
     expect(requestLog[0]?.method).toBe("DELETE");
-    expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me`);
+    expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me?project_id=test`);
     expect(requestLog[0]?.credentials).toBe("include");
+    expect(requestLog[0]?.csrf).toBe(CSRF_TOKEN);
     expect(signoutEvents).toHaveLength(1);
-    expect(signoutEvents[0]?.detail).toEqual({
+    expect(signoutEvents[0]?.detail).toMatchObject({
       display: "Alice Liddell",
       identifier: "alice@acme.com",
     });
@@ -278,6 +291,37 @@ describe("<zitadel-logout>", () => {
     expect(window.location.href).toBe("https://app.test/done");
   });
 
+  it("waits for work a zitadel-signout listener registers before navigating to post-sign-out-url", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, href: "" },
+      writable: true,
+    });
+    const element = mount();
+    element.postSignOutUrl = "https://app.test/done";
+    await flush(element);
+    const finish = new AbortController();
+    const signedOut = vi.fn();
+    element.addEventListener("zitadel-signout", (event) => {
+      signedOut();
+      if (event instanceof CustomEvent) {
+        event.detail.waitUntil(
+          new Promise((resolve) => finish.signal.addEventListener("abort", resolve)),
+        );
+      }
+    });
+
+    shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+    await element.updateComplete;
+    shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+    await vi.waitFor(() => expect(signedOut).toHaveBeenCalledOnce());
+    await element.updateComplete;
+    expect(window.location.href).toBe("");
+
+    finish.abort();
+    await vi.waitFor(() => expect(window.location.href).toBe("https://app.test/done"));
+  });
+
   it("signs out using project-id / proxy-path attributes with no global config", async () => {
     // Drop the global so only the declarative attributes can configure the
     // element; restore it afterwards so later tests keep their global config.
@@ -293,11 +337,64 @@ describe("<zitadel-logout>", () => {
       await new Promise((resolve) => setTimeout(resolve, 32));
 
       expect(requestLog).toHaveLength(1);
-      expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me`);
+      expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me?project_id=test`);
       expect(requestLog[0]?.credentials).toBe("include");
     } finally {
       configureZitadel({ proxyPath: API_BASE, projectId: "test" });
     }
+  });
+
+  // A session that ended elsewhere (signed out in another tab, or expired) is
+  // refused as no session at all: there is nothing left to sign out of.
+  it("completes sign-out when the session is already gone", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, href: "" },
+      writable: true,
+    });
+    const element = mount();
+    element.postSignOutUrl = "https://app.test/done";
+    await flush(element);
+    server.use(
+      http.delete(`${API_BASE}/sessions/me`, () =>
+        HttpResponse.json(
+          { code: "auth.unauthorized", message: "Missing or invalid session token." },
+          { status: 401 },
+        ),
+      ),
+    );
+
+    const signoutEvents: Event[] = [];
+    element.addEventListener("zitadel-signout", (event: Event) => signoutEvents.push(event));
+
+    shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+    await element.updateComplete;
+    shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    await element.updateComplete;
+
+    expect(signoutEvents).toHaveLength(1);
+    expect(element.shadowRoot?.querySelector(".error-bar")).toBeNull();
+    expect(window.location.href).toBe("https://app.test/done");
+  });
+
+  it("completes sign-out without a revoke when the token read finds no session", async () => {
+    const element = mount();
+    await flush(element);
+    sessionStatus = 401;
+
+    const signoutEvents: Event[] = [];
+    element.addEventListener("zitadel-signout", (event: Event) => signoutEvents.push(event));
+
+    shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+    await element.updateComplete;
+    shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    await element.updateComplete;
+
+    expect(requestLog).toHaveLength(0);
+    expect(signoutEvents).toHaveLength(1);
+    expect(element.shadowRoot?.querySelector(".error-bar")).toBeNull();
   });
 
   it("surfaces a network error in the dropdown without redirecting", async () => {
@@ -314,4 +411,80 @@ describe("<zitadel-logout>", () => {
     const errorBar = shadowQuery<HTMLElement>(element, ".error-bar");
     expect(errorBar.textContent?.trim().length).toBeGreaterThan(0);
   });
+});
+
+describe("<zitadel-logout> unset public properties", () => {
+  type Declaration = { attribute?: string | boolean; state?: boolean };
+  type Props = Record<string, unknown>;
+  const create = () => document.createElement("zitadel-logout");
+  const declared = (
+    customElements.get("zitadel-logout") as unknown as {
+      elementProperties: Map<string, Declaration>;
+    }
+  ).elementProperties;
+  // Every public property that has a declared default, read off a fresh element so a
+  // property added later is covered without touching this list.
+  const defaulted = [...declared]
+    .filter(([name, options]) => !options.state && (create() as unknown as Props)[name] != null)
+    .map(([name, options]) => ({
+      name,
+      attribute:
+        typeof options.attribute === "string"
+          ? options.attribute
+          : options.attribute === false
+            ? undefined
+            : name.toLowerCase(),
+      fallback: (create() as unknown as Props)[name],
+    }));
+  const other = (fallback: unknown) => (typeof fallback === "boolean" ? !fallback : "other");
+
+  it("covers the element's defaulted properties", () => {
+    expect(defaulted.length).toBeGreaterThan(0);
+  });
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned undefined",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned null",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = null;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "restores the default of $name when a set value is cleared",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = other(fallback);
+      expect(element[name]).toEqual(other(fallback));
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)("keeps a supplied value of $name", ({ name, fallback }) => {
+    const element = create() as unknown as Props;
+    element[name] = other(fallback);
+    expect(element[name]).toEqual(other(fallback));
+  });
+
+  it.each(defaulted.filter(({ attribute }) => attribute !== undefined))(
+    "restores the default of $name when its attribute is removed",
+    ({ name, attribute, fallback }) => {
+      const element = create();
+      element.setAttribute(attribute as string, typeof fallback === "boolean" ? "" : "other");
+      expect((element as unknown as Props)[name]).toEqual(other(fallback));
+      element.removeAttribute(attribute as string);
+      expect((element as unknown as Props)[name]).toEqual(fallback);
+    },
+  );
 });

@@ -1,6 +1,10 @@
 get:
   operationId: getUserPassword
   summary: Get user password state
+  description: |
+    Reports when the user's current password was set, and leaves `set_at` out
+    when the user has none. The password and its hash are never returned;
+    setting one is `PUT` on the same path.
   tags:
     - Users
   parameters:
@@ -49,14 +53,16 @@ get:
 put:
   operationId: setUserPassword
   summary: Set user password
+  description: |
+    Sets a user's password, hashed with the project's current password hashing
+    policy.
+
+    The new password replaces the current one, and setting it emits
+    `auth.factor.password.set`.
   tags:
     - Users
   parameters:
-    - name: user_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../../components/schemas/user-id.yaml
+    - $ref: ../../../../components/parameters/user-id.yaml
   security:
     - oauth2:
         - user.write

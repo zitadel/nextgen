@@ -40,6 +40,13 @@ func (f fakeUserSchemas) ListJSONSchemas(_ context.Context, opts *database.ListO
 	return out, nil
 }
 
+// unlistedUserSchemas resolves schema ids but lists no revision.
+type unlistedUserSchemas struct{ fakeUserSchemas }
+
+func (unlistedUserSchemas) ListJSONSchemas(context.Context, *database.ListOptions[domain.JSONSchemaField], JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
+	return &database.ListResult[*domain.JSONSchema]{}, nil
+}
+
 func TestResolveUserSchema(t *testing.T) {
 	human := &domain.JSONSchema{URL: "https://example.com/user.json", ObjectType: new("human-user")}
 	machine := &domain.JSONSchema{URL: "sch_machine", ObjectType: new("machine-user")}
@@ -61,7 +68,7 @@ func TestResolveUserSchema(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveUserSchema(t.Context(), schemas, "proj", tt.ref)
+			got, err := resolveUserSchema(t.Context(), schemas, domain.BuiltinSchemaBases{}, "proj", tt.ref)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				return
@@ -70,6 +77,22 @@ func TestResolveUserSchema(t *testing.T) {
 			assert.Same(t, tt.want, got)
 		})
 	}
+}
+
+// A built-in schema's `$id` resolves under whichever base the project stores
+// it at, so a flow may name the default schema under a base it was not
+// seeded under.
+func TestResolveUserSchemaUnderAnotherBuiltinBase(t *testing.T) {
+	bases := domain.NewBuiltinSchemaBases("https://schemas.test/builtin/v1", "https://schemas.test/builtin/v0")
+	stored := &domain.JSONSchema{URL: "https://schemas.test/builtin/v1/default-human-user.json", ObjectType: new("human-user")}
+	schemas := fakeUserSchemas{stored}
+
+	got, err := resolveUserSchema(t.Context(), schemas, bases, "proj", "https://schemas.test/builtin/v0/default-human-user.json")
+	require.NoError(t, err)
+	assert.Same(t, stored, got)
+
+	_, err = resolveUserSchema(t.Context(), schemas, bases, "proj", "https://schemas.test/builtin/v0/other.json")
+	assert.ErrorIs(t, err, domain.ErrJSONSchemaNotFound())
 }
 
 func TestSameUserSchema(t *testing.T) {
@@ -101,6 +124,43 @@ func TestSameUserSchema(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestUserSchemaRevisionURLs(t *testing.T) {
+	v1 := &domain.JSONSchema{URL: "sch_human_v1", ObjectType: new("human-user")}
+	v2 := &domain.JSONSchema{URL: "sch_human_v2", ObjectType: new("human-user")}
+	staff := &domain.JSONSchema{URL: "https://example.com/staff.json", ObjectType: new("staff-user")}
+	schemas := fakeUserSchemas{v1, v2, staff}
+
+	tests := []struct {
+		name     string
+		stmts    userSchemaStatements
+		schemaID string
+		want     []string
+		wantErr  error
+	}{
+		{name: "one revision", schemaID: staff.URL, want: []string{staff.URL}},
+		{name: "several revisions", schemaID: v2.URL, want: []string{v1.URL, v2.URL}},
+		{name: "unknown id", schemaID: "sch_unknown", wantErr: domain.ErrJSONSchemaNotFound()},
+		// The id resolves but the listing finds no revision: an empty list
+		// would compile to broken SQL in the users read.
+		{name: "no revisions listed", stmts: unlistedUserSchemas{schemas}, schemaID: v2.URL, wantErr: domain.ErrInternal(nil)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stmts := tt.stmts
+			if stmts == nil {
+				stmts = schemas
+			}
+			got, err := userSchemaRevisionURLs(t.Context(), stmts, "proj", tt.schemaID)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.ElementsMatch(t, tt.want, got)
 		})
 	}
 }

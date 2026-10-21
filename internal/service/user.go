@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -60,9 +61,8 @@ type PatchUserInput struct {
 }
 
 type PatchMyUserInput struct {
-	// SessionToken is the parsed session token, already verified at the API
-	// security boundary.
-	SessionToken *domain.Token
+	// Self is the caller, from their verified session (domain.SelfFromSession).
+	Self domain.Self
 	// Attributes is the partial attribute patch; nil values delete. The
 	// schema pointer is not self-service: it stays where it is.
 	Attributes map[string]any
@@ -108,9 +108,8 @@ type ListUserTeamsInput struct {
 }
 
 type GetMyUserInput struct {
-	// SessionToken is the parsed session token, already verified at the API
-	// security boundary.
-	SessionToken *domain.Token
+	// Self is the caller, from their verified session (domain.SelfFromSession).
+	Self domain.Self
 }
 
 type DeleteUserInput struct {
@@ -145,6 +144,7 @@ type UserService interface {
 	// nil when the user has none.
 	GetPasswordSetAt(ctx context.Context, input GetPasswordInput) (*time.Time, error)
 	GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error)
+	GetMyUserSchema(ctx context.Context, input GetMyUserInput) (*domain.JSONSchema, error)
 	PatchMyUser(ctx context.Context, input PatchMyUserInput) (*domain.User, error)
 }
 
@@ -155,6 +155,9 @@ type userService struct {
 	schemaStore domain.JSONSchemaStore
 	hashers     ProjectHasherResolver
 	refs        UserRefResolver
+	// builtinBases lets a filter on a built-in schema's `$id` match the users
+	// stored under any of its bases, the way schemaStore resolves one.
+	builtinBases domain.BuiltinSchemaBases
 }
 
 // NewUserService returns the interface rather than *userService, deliberately
@@ -168,16 +171,21 @@ func NewUserService(
 	schemaStore domain.JSONSchemaStore,
 	hashers ProjectHasherResolver,
 	refs UserRefResolver,
+	builtinBases domain.BuiltinSchemaBases,
 ) UserService {
 	return &userService{
-		v2Pool:      v2Pool,
-		schemaStore: schemaStore,
-		hashers:     hashers,
-		refs:        refs,
+		v2Pool:       v2Pool,
+		schemaStore:  schemaStore,
+		hashers:      hashers,
+		refs:         refs,
+		builtinBases: builtinBases,
 	}
 }
 
 func (s *userService) ApplyActions(ctx context.Context, actions ...UserAction) (err error) {
+	ctx, end := startSpan(ctx, "UserService.ApplyActions")
+	defer end(&err)
+
 	for _, action := range actions {
 		err = action.Prepare(ctx)
 		if err != nil {
@@ -220,6 +228,9 @@ func emitUserCreateFailedBestEffort(ctx context.Context, pool StatementPool, act
 }
 
 func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.CreateUser")
+	defer end(&err)
+
 	action := NewCreateUserAction(input, s.schemaStore)
 	if err := s.ApplyActions(ctx, action); err != nil {
 		emitUserCreateFailedBestEffort(ctx, s.v2Pool, action, err)
@@ -265,12 +276,18 @@ func (s *userService) attachUserRefs(ctx context.Context, projectID string, user
 	return nil
 }
 
-func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) error {
+func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) (err error) {
+	ctx, end := startSpan(ctx, "UserService.DeleteUser")
+	defer end(&err)
+
 	action := NewDeleteUserAction(input)
 	return s.ApplyActions(ctx, action)
 }
 
-func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error) {
+func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *ListUsersOutput, err error) {
+	ctx, end := startSpan(ctx, "UserService.ListUsers")
+	defer end(&err)
+
 	columnFilters, queryOpts, err := splitUserFilters(input.Filters)
 	if err != nil {
 		return nil, err
@@ -281,7 +298,7 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*Lis
 	filters := make([]database.Filter[domain.UserField], 0, len(columnFilters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID))
 	for _, f := range columnFilters {
-		filter, err := userFilter(f)
+		filter, err := userFilter(f, s.builtinBases)
 		if err != nil {
 			return nil, err
 		}
@@ -353,8 +370,10 @@ func splitUserFilters(filters []Filter) ([]Filter, UserQueryOptions, error) {
 // userFilter maps an API filter predicate to a storage filter. Operations the
 // v2 filter layer cannot express return [domain.ErrNotImplemented];
 // invalid field/operation/value combinations return [domain.ErrRequestInvalid].
-// [splitUserFilters] has already taken team_id out.
-func userFilter(f Filter) (database.Filter[domain.UserField], error) {
+// [splitUserFilters] has already taken team_id out. A `schema` equality names
+// a built-in schema's `$id` under any of its bases: users are stored under
+// the base their project holds the row at, whichever one the caller used.
+func userFilter(f Filter, builtinBases domain.BuiltinSchemaBases) (database.Filter[domain.UserField], error) {
 	switch f.Field {
 	case userFieldCreatedAt:
 		return createdAtFilter(f.Operation, database.Col(domain.UserFieldCreatedAt), f.Value)
@@ -368,6 +387,13 @@ func userFilter(f Filter) (database.Filter[domain.UserField], error) {
 		value, err := stringFilterValue(f)
 		if err != nil {
 			return nil, err
+		}
+		if equivalents := builtinBases.Equivalents(value); f.Operation == filterOpEquals && len(equivalents) > 1 {
+			spellings := make([]database.Filter[domain.UserField], 0, len(equivalents))
+			for _, url := range equivalents {
+				spellings = append(spellings, database.StringEqual(database.Col(domain.UserFieldSchemaURL), url))
+			}
+			return database.Or(spellings...), nil
 		}
 		return stringFilter(f.Operation, database.Col(domain.UserFieldSchemaURL), value)
 	case userFieldStatus:
@@ -436,6 +462,9 @@ func userField(field string) (domain.UserField, error) {
 }
 
 func (s *userService) ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error) {
+	ctx, end := startSpan(ctx, "UserService.ListPasskeys")
+	defer end(&err)
+
 	dbpasskeys, err := s.v2Pool.Statements().ListUserPasskeys(
 		ctx, &database.ListOptions[domain.UserPasskeyField]{
 			Filter: database.And(
@@ -471,6 +500,9 @@ func (s *userService) ListPasskeys(ctx context.Context, input ListPasskeysInput)
 // between links created in the same instant, so a page boundary never skips or
 // repeats one.
 func (s *userService) ListIdentityLinks(ctx context.Context, input ListIdentityLinksInput) (links []*domain.IDPIdentityLink, nextPage string, err error) {
+	ctx, end := startSpan(ctx, "UserService.ListIdentityLinks")
+	defer end(&err)
+
 	result, err := s.v2Pool.Statements().ListIDPIdentityLinks(
 		ctx, &database.ListOptions[domain.IDPIdentityLinkField]{
 			Filter: database.And(
@@ -508,7 +540,10 @@ func (s *userService) ListIdentityLinks(ctx context.Context, input ListIdentityL
 // The roster is not lifecycle ownership (ADR 024): a user can sit on several
 // rosters while owning their own lifecycle, which is reported on the user
 // itself.
-func (s *userService) ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error) {
+func (s *userService) ListUserTeams(ctx context.Context, input ListUserTeamsInput) (_ *ListUserTeamsOutput, err error) {
+	ctx, end := startSpan(ctx, "UserService.ListUserTeams")
+	defer end(&err)
+
 	onRoster := make([]database.Filter[domain.UserTeamField], 0, len(domain.RosterMembershipStatuses))
 	for _, status := range domain.RosterMembershipStatuses {
 		onRoster = append(onRoster, database.Equal(database.Col(domain.UserTeamFieldStatus), status.String()))
@@ -562,7 +597,10 @@ func (s *userService) requireUser(ctx context.Context, projectID, userID string)
 	return nil
 }
 
-func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error) {
+func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.GetUserByID")
+	defer end(&err)
+
 	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
 		database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
 		database.Equal(database.Col(domain.UserFieldID), input.UserID),
@@ -584,7 +622,10 @@ func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (*dom
 // fresh read and the patch statement refuses to write over a row whose
 // updated_at moved past that read, so a lost race re-merges against the
 // interleaved write instead of clobbering it.
-func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error) {
+func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.PatchUser")
+	defer end(&err)
+
 	const maxPatchAttempts = 3
 	for attempt := 1; ; attempt++ {
 		action := NewPatchUserAction(input, s.v2Pool, s.schemaStore)
@@ -603,27 +644,29 @@ func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (*dom
 	return s.GetUserByID(ctx, GetUserInput{ProjectID: input.ProjectID, UserID: input.UserID})
 }
 
-func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (*domain.User, error) {
-	sessionToken := input.SessionToken
-	if !validSessionToken(sessionToken) {
-		return nil, domain.ErrSessionTokenInvalid()
-	}
+func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.PatchMyUser")
+	defer end(&err)
 
-	// Identity and project both come from the token, so a caller can only
-	// ever patch themself — the same containment GetMyUser relies on.
 	return s.PatchUser(ctx, PatchUserInput{
-		ProjectID:  sessionToken.ProjectID,
-		UserID:     sessionToken.UserID,
+		ProjectID:  input.Self.ProjectID(),
+		UserID:     input.Self.UserID(),
 		Attributes: input.Attributes,
 	})
 }
 
 func (s *userService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
+	ctx, end := startSpan(ctx, "UserService.SetPassword")
+	defer end(&err)
+
 	action := NewSetUserPasswordAction(input, s.hashers)
 	return s.ApplyActions(ctx, action)
 }
 
-func (s *userService) GetPasswordSetAt(ctx context.Context, input GetPasswordInput) (*time.Time, error) {
+func (s *userService) GetPasswordSetAt(ctx context.Context, input GetPasswordInput) (_ *time.Time, err error) {
+	ctx, end := startSpan(ctx, "UserService.GetPasswordSetAt")
+	defer end(&err)
+
 	password, err := s.v2Pool.Statements().GetUserPassword(ctx, database.And(
 		database.Equal(database.Col(domain.UserPasswordFieldProjectID), input.ProjectID),
 		database.Equal(database.Col(domain.UserPasswordFieldUserID), input.UserID),
@@ -638,15 +681,42 @@ func (s *userService) GetPasswordSetAt(ctx context.Context, input GetPasswordInp
 	return &password.CreatedAt, nil
 }
 
-func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error) {
-	sessionToken := input.SessionToken
-	if !validSessionToken(sessionToken) {
-		return nil, domain.ErrSessionTokenInvalid()
-	}
+func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.GetMyUser")
+	defer end(&err)
 
+	user, err := s.ownUser(ctx, input.Self)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.attachUserRefs(ctx, input.Self.ProjectID(), user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// GetMyUserSchema returns the schema the caller's own record is validated
+// against — the one PatchMyUser validates against.
+func (s *userService) GetMyUserSchema(ctx context.Context, input GetMyUserInput) (_ *domain.JSONSchema, err error) {
+	ctx, end := startSpan(ctx, "UserService.GetMyUserSchema")
+	defer end(&err)
+
+	user, err := s.ownUser(ctx, input.Self)
+	if err != nil {
+		return nil, err
+	}
+	schema, err := s.v2Pool.Statements().GetJSONSchemaByID(ctx, input.Self.ProjectID(), user.SchemaURL)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to get the user's schema from database")
+	}
+	return schema, nil
+}
+
+// ownUser reads the caller's own record.
+func (s *userService) ownUser(ctx context.Context, self domain.Self) (*domain.User, error) {
 	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
-		database.Equal(database.Col(domain.UserFieldProjectID), sessionToken.ProjectID),
-		database.Equal(database.Col(domain.UserFieldID), sessionToken.UserID),
+		database.Equal(database.Col(domain.UserFieldProjectID), self.ProjectID()),
+		database.Equal(database.Col(domain.UserFieldID), self.UserID()),
 	), UserQueryOptions{})
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -654,10 +724,6 @@ func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (*dom
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
 	}
-	if err := s.attachUserRefs(ctx, sessionToken.ProjectID, user); err != nil {
-		return nil, err
-	}
-
 	return user, nil
 }
 
@@ -700,10 +766,12 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 
 	o.schemaJSON = schemaEntity.Schema
 	o.CreateUser, err = domain.NewCreateUser(domain.CreateUserParams{
-		ProjectID:  o.ProjectID,
-		TeamID:     o.TeamID,
-		ID:         o.ID,
-		SchemaURL:  o.SchemaURL,
+		ProjectID: o.ProjectID,
+		TeamID:    o.TeamID,
+		ID:        o.ID,
+		// The row that was found, which can sit under another built-in base
+		// than the one the caller named (domain.BuiltinSchemaBases).
+		SchemaURL:  schemaEntity.URL,
 		Schema:     schemaEntity.Schema,
 		Attributes: o.Attributes,
 	})
@@ -801,11 +869,12 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get unique attribute scopes from database")
 	}
 
-	targetSchemaURL := user.SchemaURL
-	if o.SchemaURL != nil {
-		targetSchemaURL = *o.SchemaURL
+	targetSchemaURL := gu.Value(o.SchemaURL)
+	if targetSchemaURL == "" {
+		targetSchemaURL = user.SchemaURL
 	}
-	schemaEntity, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, targetSchemaURL)
+
+	targetSchema, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, targetSchemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return domain.ErrUserInvalid().
@@ -815,11 +884,23 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
-	o.schemaJSON = schemaEntity.Schema
+	// Compare rows, not spellings: the store resolves a built-in schema named
+	// under another base to the row the user may already be stored under.
+	if targetSchema.URL != user.SchemaURL {
+		currentSchema, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, user.SchemaURL)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to get the user's current schema from database")
+		}
+		if err := domain.CheckUserSchemaMigration(currentSchema, targetSchema); err != nil {
+			return err
+		}
+	}
+
+	o.schemaJSON = targetSchema.Schema
 	o.patch, err = domain.NewPatchUser(domain.PatchUserParams{
 		Current:              user,
-		SchemaURL:            targetSchemaURL,
-		Schema:               schemaEntity.Schema,
+		SchemaURL:            targetSchema.URL,
+		Schema:               targetSchema.Schema,
 		AttributesPatch:      o.Attributes,
 		StoredRegistryScopes: storedScopes,
 	})
@@ -882,7 +963,9 @@ func (o *SetPasswordUserAction) Prepare(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
+	_, end := startSpan(ctx, "password.Hash")
 	o.hash, err = domain.HashPassword(o.Password, hasher)
+	end(&err)
 	return err
 }
 
@@ -945,11 +1028,6 @@ func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error
 	})
 }
 
-// validSessionToken reports whether the token is present and not expired.
-func validSessionToken(token *domain.Token) bool {
-	return token != nil && (token.ExpiresAt == nil || !time.Now().After(*token.ExpiresAt))
-}
-
 // UserStatementsLookup adapts [UserStatements] to [UserLookup] for AuthAttemptService.
 type UserStatementsLookup struct {
 	Pool StatementPool
@@ -957,10 +1035,15 @@ type UserStatementsLookup struct {
 
 // GetByAttributes resolves a login identifier, so it matches only uniquely
 // registered values: an equal value in a non-unique property of another user
-// must not make the lookup ambiguous and reject the sign-in.
-func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
+// must not make the lookup ambiguous and reject the sign-in. It matches only
+// users of the given schema URLs, so a user of another schema can neither
+// match nor collide (ADR 058 §5).
+func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID string, schemaURLs []string, attrs []domain.Attribute) (*domain.User, error) {
 	return l.Pool.Statements().GetUser(ctx,
-		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+			database.Or(equalIDFilters(domain.UserFieldSchemaURL, schemaURLs)...),
+		),
 		UserQueryOptions{Attributes: attrs, UniqueAttributesOnly: true},
 	)
 }

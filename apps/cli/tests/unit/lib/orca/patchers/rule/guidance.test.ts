@@ -109,6 +109,7 @@ describe("guidance content", () => {
 
   it("points agents at the dialect meta-schemas and the plan/apply loop", () => {
     const agents = agentsGuidanceSection(ctx);
+    expect(agents).toContain('"$schema": "./.zitadel/meta/project.json"');
     expect(agents).toContain('"$schema": "../meta/flow-definition.json"');
     expect(agents).toContain(".zitadel/meta/user-schema.json");
     expect(agents).toContain("npx @zitadel/cli@0.1.0-alpha.15 plan");
@@ -147,8 +148,12 @@ describe("guidance content", () => {
     expect(agents).toContain("`matcher`");
     expect(agents).toContain("no-store");
     expect(agents).toContain("401/auth.unauthorized");
+    expect(agents).toContain("403/sess.project_mismatch");
     expect(agents).toContain("404/sess.not_found");
     expect(agents).toContain("non-empty `user_id`");
+    // The read names the app's project, so another project's session on the
+    // same host never reads as signed in.
+    expect(agents).toContain("NEXT_PUBLIC_ZITADEL_PROJECT_ID");
 
     // Nuxt: the composable the scaffolded auth plugin seeds — no Next helper.
     const nuxtCtx = {
@@ -166,9 +171,10 @@ describe("guidance content", () => {
       framework: { id: "react", devPort: 5173, url: "http://localhost:5173" },
     } as PatchContext;
     const reactAgents = agentsGuidanceSection(reactCtx);
-    expect(reactAgents).toContain("/__nextgen/sessions/me");
+    expect(reactAgents).toContain("/__nextgen/sessions/me?project_id=");
     expect(reactAgents).toContain('cache: "no-store"');
     expect(reactAgents).toContain("401/auth.unauthorized");
+    expect(reactAgents).toContain("403/sess.project_mismatch");
     expect(reactAgents).toContain("404/sess.not_found");
     expect(reactAgents).toContain("unknown/error, never signed-out");
     expect(reactAgents).not.toContain("@zitadel/sdk-next/session");
@@ -204,5 +210,16 @@ describe("guidance content", () => {
     const nuxtAgents = agentsGuidanceSection(nuxtCtx);
     expect(nuxtAgents).toContain('variant="widget"');
     expect(nuxtAgents).not.toContain("@zitadel/sdk-next/jsx");
+  });
+});
+
+describe("moving the dev port", () => {
+  it.each([
+    ["README", readmeGuidanceSection],
+    ["AGENTS.md", agentsGuidanceSection],
+  ])("the %s section names the command for a taken port", (_name, section) => {
+    const out = section(ctx);
+    expect(out).toContain("EADDRINUSE");
+    expect(out).toContain("npx @zitadel/cli@0.1.0-alpha.15 setup --dev-port <port>");
   });
 });

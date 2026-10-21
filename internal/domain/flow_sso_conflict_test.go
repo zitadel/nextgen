@@ -11,8 +11,8 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// conflictStep is the sso-conflict step `zitadel sso enable` writes: a
-// password, a passkey and a way out to sign in as someone else.
+// conflictStep is the sso-conflict step `zitadel auth-method sso enable`
+// writes: a password, a passkey and a way out to sign in as someone else.
 func conflictStep() domain.FlowDefinitionStep {
 	login := domain.FlowDefinitionPurposeLogin
 	return domain.FlowDefinitionStep{
@@ -33,7 +33,8 @@ func conflictStep() domain.FlowDefinitionStep {
 }
 
 // conflictDefinition is purposeNavDefinition with a typed registration
-// collision retargeted to the conflict step, as `zitadel sso enable` does.
+// collision retargeted to the conflict step, as `zitadel auth-method sso
+// enable` does.
 func conflictDefinition() *domain.FlowDefinition {
 	def := purposeNavDefinition()
 	for i := range def.Steps {

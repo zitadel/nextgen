@@ -107,8 +107,8 @@ Asset URLs live on branding; the orchestrator loads them. They are not colour to
 | ------------------------------------ | ---------------------------------------------------------------------------------- |
 | `logo_url`                           | Single-mark fallback, used only when neither side names one                        |
 | `hero_url`                           | An image in templates that reference it (revisions published from the split and hero designs); the bundled default does not use it |
-| design-system default font           | Loaded by the orchestrator as `<link rel="stylesheet">` (`applyDefaultFont`, default Arimo) so the brand face paints with no branding; dropped when `typography.font_url` is set. See [ADR 025](../../adrs/025-default-brand-font-loading.md) |
-| `typography.font_url`                | Tenant override; injected by the orchestrator as `<link rel="stylesheet">` before the widget paints, replacing the default font. `variant="page"` only: in `variant="widget"` the component applies the family and leaves loading to the embedding page |
+| design-system default font           | None loaded: the orchestrator fetches no face of its own, so an unbranded login renders in the token stack (Arimo where the page or OS has it, else the system font) with no font-CDN request. First-party shells self-host Arimo. See [ADR 025](../../adrs/025-default-brand-font-loading.md) |
+| `typography.font_url`                | Tenant opt-in; injected by the orchestrator as `<link rel="stylesheet">` before the widget paints. `variant="page"` only: in `variant="widget"` the component applies the family and leaves loading to the embedding page |
 | `theme.light.logo_url` / `theme.dark.logo_url` | The mark for that side. The orchestrator resolves one from the active theme and hands it to the template as `logo_url`; a side without a mark shows none, because a logo is pixels and is never recoloured |
 | `shape.logo_scale`                   | `--zl-logo-scale`, a multiplier on the logo height caps                            |
 

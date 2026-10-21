@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -49,6 +52,222 @@ func TestInvalidSessionCredential(t *testing.T) {
 	require.Equal(t, sessionUnauthorizedMessage, err.Message)
 }
 
+// TestMySessionHoldsTheSessionToTheNamedProject drives the /sessions/me
+// operations through the generated server. With project_id, a session of
+// another project is refused with 403 sess.project_mismatch before it is looked
+// up, and the refusal clears no cookie; a session of the named project, or a
+// request that names none, is served as before.
+func TestMySessionHoldsTheSessionToTheNamedProject(t *testing.T) {
+	t.Parallel()
+
+	operations := []struct {
+		name   string
+		method string
+		path   string
+		// withUser: the operation reads the session with the user's identity.
+		withUser bool
+		served   int
+	}{
+		{name: "read", method: http.MethodGet, path: "/sessions/me", withUser: true, served: http.StatusOK},
+		{name: "csrf token", method: http.MethodGet, path: "/sessions/me/csrf", served: http.StatusOK},
+		{name: "sign-out", method: http.MethodDelete, path: "/sessions/me", served: http.StatusNoContent},
+	}
+	tests := []struct {
+		name    string
+		query   string
+		refused bool
+	}{
+		{name: "a session of another project", query: "?project_id=proj_app", refused: true},
+		{name: "a session of the named project", query: "?project_id=proj_other"},
+		{name: "a request that names no project", query: ""},
+	}
+	for _, op := range operations {
+		for _, tc := range tests {
+			t.Run(op.name+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				ctrl := gomock.NewController(t)
+				sid := "sess_1"
+				tokens := servicemocks.NewMockTokenService(ctrl)
+				tokens.EXPECT().IntrospectToken(gomock.Any(), "cookie").Return(&domain.Token{
+					Type:      domain.TokenTypeSessionToken,
+					ProjectID: "proj_other",
+					SessionID: &sid,
+					TokenID:   "tkn_1",
+					UserID:    "user_1",
+				}, nil)
+				// No expectation on a refused request: a lookup would fail the test.
+				sessions := servicemocks.NewMockSessionService(ctrl)
+				if !tc.refused {
+					sessions.EXPECT().
+						Get(gomock.Any(), service.GetSessionInput{ProjectID: "proj_other", SessionID: sid, WithUserIdentity: op.withUser}).
+						Return(&domain.Session{
+							ProjectID: "proj_other",
+							ID:        sid,
+							TokenID:   "tkn_1",
+							UserID:    new("user_1"),
+							ExpiresAt: time.Now().Add(time.Hour),
+						}, nil)
+					if op.method == http.MethodDelete {
+						sessions.EXPECT().
+							Delete(gomock.Any(), service.DeleteSessionInput{ProjectID: "proj_other", SessionID: sid}).
+							Return(nil)
+					}
+				}
+				srv, err := api.NewServer(&Handler{sessionService: sessions}, NewSecurityHandler(tokens), api.WithErrorHandler(OgenErrorHandler))
+				require.NoError(t, err)
+
+				req := httptest.NewRequest(op.method, op.path+tc.query, nil)
+				req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "cookie"})
+				// Sign-out is a write: the hold is checked once the token passed.
+				req.Header.Set(CSRFHeader, CSRFToken("cookie"))
+				rec := httptest.NewRecorder()
+				WithCSRFRequest(srv).ServeHTTP(rec, req)
+
+				if !tc.refused {
+					require.Equal(t, op.served, rec.Code, rec.Body.String())
+					return
+				}
+				require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+				require.JSONEq(t,
+					`{"code":"sess.project_mismatch","message":"The session belongs to a different project."}`,
+					rec.Body.String(),
+				)
+				require.Empty(t, rec.Header().Values("Set-Cookie"), "the session of another project keeps its cookie")
+			})
+		}
+	}
+}
+
+// TestMyUserHoldsTheSessionToTheNamedProject drives the operations on the
+// cookie's user (/users/me) through the generated server the same way: with
+// project_id, a session of another project is refused with 403
+// sess.project_mismatch before the user, its schema, its teams or its projects
+// are looked up, and the refusal clears no cookie; a session of the named
+// project, or a request that names none, is served as before.
+func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
+	t.Parallel()
+
+	operations := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{name: "read", method: http.MethodGet, path: "/users/me"},
+		{name: "patch", method: http.MethodPatch, path: "/users/me", body: `{"attributes":{"nickname":"Myself"}}`},
+		{name: "projects", method: http.MethodGet, path: "/users/me/projects"},
+		{name: "schema", method: http.MethodGet, path: "/users/me/schema"},
+		{name: "teams", method: http.MethodGet, path: "/users/me/teams"},
+	}
+	tests := []struct {
+		name    string
+		query   string
+		refused bool
+	}{
+		{name: "a session of another project", query: "?project_id=proj_app", refused: true},
+		{name: "a session of the named project", query: "?project_id=proj_other"},
+		{name: "a request that names no project", query: ""},
+	}
+	for _, op := range operations {
+		for _, tc := range tests {
+			t.Run(op.name+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				ctrl := gomock.NewController(t)
+				sid := "sess_1"
+				token := &domain.Token{
+					Type:      domain.TokenTypeSessionToken,
+					ProjectID: "proj_other",
+					SessionID: &sid,
+					TokenID:   "tkn_1",
+					UserID:    "user_1",
+				}
+				tokens := servicemocks.NewMockTokenService(ctrl)
+				tokens.EXPECT().IntrospectToken(gomock.Any(), "cookie").Return(token, nil)
+				// No expectation on a refused request: a lookup would fail the test.
+				users := &myUserService{}
+				projects := servicemocks.NewMockProjectService(ctrl)
+				if !tc.refused && op.path == "/users/me/projects" {
+					projects.EXPECT().
+						ListAuthorized(gomock.Any(), service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_other", UserID: "user_1", Limit: 20}).
+						Return(&service.ListProjectsResponse{}, nil)
+				}
+				srv, err := api.NewServer(&Handler{userService: users, projectService: projects}, NewSecurityHandler(tokens), api.WithErrorHandler(OgenErrorHandler))
+				require.NoError(t, err)
+
+				req := httptest.NewRequest(op.method, op.path+tc.query, strings.NewReader(op.body))
+				req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "cookie"})
+				if op.body != "" {
+					req.Header.Set("Content-Type", "application/json")
+					req.Header.Set(CSRFHeader, CSRFToken("cookie"))
+				}
+				rec := httptest.NewRecorder()
+				WithCSRFRequest(srv).ServeHTTP(rec, req)
+
+				if !tc.refused {
+					require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+					if op.path != "/users/me/projects" {
+						require.Equal(t, []string{token.ProjectID + "/" + token.UserID}, users.served, "the user is the session's")
+					}
+					return
+				}
+				require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+				require.JSONEq(t,
+					`{"code":"sess.project_mismatch","message":"The session belongs to a different project."}`,
+					rec.Body.String(),
+				)
+				require.Empty(t, rec.Header().Values("Set-Cookie"), "the session of another project keeps its cookie")
+				require.Empty(t, users.served, "a refused request reads and changes no user")
+			})
+		}
+	}
+}
+
+// myUserService answers the calls on the cookie's user and records the project
+// and user each was asked for, as "project/user". Any other method panics.
+type myUserService struct {
+	service.UserService
+	served []string
+}
+
+func (s *myUserService) serve(projectID, userID string) {
+	s.served = append(s.served, projectID+"/"+userID)
+}
+
+func (s *myUserService) GetMyUser(_ context.Context, input service.GetMyUserInput) (*domain.User, error) {
+	s.serve(input.Self.ProjectID(), input.Self.UserID())
+	return myUser(input.Self), nil
+}
+
+func (s *myUserService) PatchMyUser(_ context.Context, input service.PatchMyUserInput) (*domain.User, error) {
+	s.serve(input.Self.ProjectID(), input.Self.UserID())
+	return myUser(input.Self), nil
+}
+
+func (s *myUserService) GetMyUserSchema(_ context.Context, input service.GetMyUserInput) (*domain.JSONSchema, error) {
+	s.serve(input.Self.ProjectID(), input.Self.UserID())
+	return &domain.JSONSchema{
+		ProjectID: input.Self.ProjectID(),
+		URL:       "sch_1",
+		Schema:    []byte(`{"kind":"user-schema","objectType":"human-user","metaSchema":"https://x/user-schema.json","x-auth-methods":{"password":{"enabled":true}}}`),
+	}, nil
+}
+
+func (s *myUserService) ListUserTeams(_ context.Context, input service.ListUserTeamsInput) (*service.ListUserTeamsOutput, error) {
+	s.serve(input.ProjectID, input.UserID)
+	return &service.ListUserTeamsOutput{}, nil
+}
+
+func myUser(self domain.Self) *domain.User {
+	return &domain.User{
+		ProjectID: self.ProjectID(),
+		ID:        self.UserID(),
+		SchemaURL: "sch_1",
+		Metadata:  domain.UserMetadata{Status: domain.UserStatusActive},
+	}
+}
+
 // RevokeMySession is idempotent: logging out a session that is already gone
 // still returns 204 and clears the cookie, rather than surfacing a 404.
 func TestRevokeMySession_IdempotentWhenSessionGone(t *testing.T) {
@@ -70,7 +289,7 @@ func TestRevokeMySession_IdempotentWhenSessionGone(t *testing.T) {
 		TokenID:   "tkn_1",
 	})
 
-	res, err := h.RevokeMySession(ctx)
+	res, err := h.RevokeMySession(ctx, api.RevokeMySessionParams{})
 	require.NoError(t, err)
 	nc, ok := res.(*api.RevokeMySessionNoContent)
 	require.True(t, ok, "want 204 no-content, got %T", res)

@@ -4,8 +4,9 @@ description: >-
   Set up and manage Zitadel authentication in a local project with the
   agent-friendly `zitadel` CLI. Use when the user wants to add login,
   registration, or session handling, create a Zitadel project, scaffold auth
-  for a Next.js, React, Vue, Angular, Nuxt, Solid, Svelte, or Qwik app, or plan and apply Zitadel
-  config changes from repo state.
+  for a Next.js, Nuxt, SvelteKit, SolidStart, Qwik Router, TanStack Start, React,
+  Vue, Angular, Solid, Svelte, or Qwik app, or plan and apply Zitadel config
+  changes from repo state.
 ---
 
 # Zitadel CLI
@@ -35,7 +36,16 @@ npx @zitadel/cli@alpha <command> --non-interactive --json
 Always pass `@alpha`: bare `npx @zitadel/cli` resolves npm's `latest` tag,
 which still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N`
 selector in agent scripts and bug reports for reproducibility.
-The CLI requires Node.js 24+.
+The CLI requires Node.js 24+. When `setup` creates a new app it first checks the running Node.js against the `engines.node` of the framework CLI it is about to run (`@angular/cli`, `nuxi`, `create-vite`, `create-next-app`). Only the Angular CLI refuses a Node it does not accept, and that range can be newer than 24.0: if `setup` refuses with `E_VALIDATION` naming the Node versions Angular accepts, switch to one of them and run it again. The Angular CLI checks each major on its own, so only 22.22.3+ on 22, 24.15.0+ on 24 and 26.x are accepted (23 and 25 run with a warning), and Node 27 or later is refused even though the published range reads `>=26.0.0`. For the other frameworks the CLI carries on, so `setup` adds a warning to the envelope's `warnings` and continues.
+
+The app's framework must be at or above a minimum version: Next.js 15.2.3,
+React 18, Vue 3.2, Nuxt 4, Angular 17, Solid 1.6, Svelte 5, Qwik 2.0.0-beta.45. Newer major
+versions are not refused. `setup` and `doctor` refuse an app below its minimum,
+by declared range or installed release, with `E_UNSUPPORTED_PROJECT_SHAPE`
+(exit 3); `setup` refuses before it scaffolds or patches anything, while
+`doctor --fix` can still repair unrelated files, so do not assume a floor error
+left the project untouched. The message names the minimum and the hint says to
+upgrade, so upgrade the app and rerun rather than retrying.
 
 ## Using the CLI
 
@@ -73,13 +83,45 @@ The CLI requires Node.js 24+.
   both `--flag value` and `--flag=value`, and `--no-telemetry`-style negation.
   Two deliberate deviations worth knowing: `-n` is `--non-interactive` (not
   `--dry-run`, which is long-only), and machine output is `--json` (not
-  `--output json`).
+  `--output json`). `api` takes `-X` for the method, as curl does, and `-F` for
+  a typed field, as `gh api` and `vercel api` do (not curl's form field).
+- **Writing a resource's body.** A `create` or `update` takes every field of
+  its body as a flag, nested ones too: a nested field's flag is its dot path
+  joined with `-` (`oidc.client_id` is `--oidc-client-id`), a list is a
+  repeated flag, a boolean takes `--no-<flag>` for `false`, and an open record
+  (`attributes`) takes repeated `key=value` entries. `--set <path>=<value>`
+  (or `<path>:=<json>` for JSON) reaches any field by its dot path, and
+  `--data` / `--file` take the whole document. They combine: the document
+  first, then the field flags, then each `--set`, with objects merging key by
+  key. `resources --json` lists each write's fields with their dot path
+  (`name`), `flag` (`null` when only `--set` reaches it), `kind` and
+  `required`; `--dry-run --json` returns the body that would be sent. For a
+  deeply nested body, writing the document and passing it with `--file -` is
+  often simplest.
+- **Calling an operation no command covers.** `zitadel api <operation>` calls
+  any operation of the API with the resolved server and `.zitadel/secret`.
+  Name it by its `operationId` (`queryUsers`, as the API reference and
+  `@zitadel/api` spell it) or by its path (`/users/query`; `-X` picks the
+  method where a path has several). Path parameters follow as arguments, in
+  path order; a `project_id` left out is the project's own. `-F name=value`
+  (or `name:=json`) sets a query parameter when the operation declares one by
+  that name, else a dot path into the body, typed by the operation's schema;
+  a list parameter takes one `-F` per value. `--input <path>` or `--input -`
+  takes the whole body, under the `-F` fields. `--paginate` follows
+  `next_page_token` to the last page. `--dry-run` sends nothing and returns
+  the request. An operation only an end user's session or the login flow's
+  cookie authenticates is refused with `E_VALIDATION`. Prefer a resource
+  command where one exists: `api ls --json` names it in each operation's
+  `command`.
 - **Never put secrets on the command line.** A property whose name reads as a
   credential (`password`, `client_secret`, `api_key`, …) is refused anywhere on
-  argv — as an `--attributes` entry and inside an inline `--data` body alike,
-  since argv is visible to other processes and kept in shell history. Send such
-  bodies with `--file <path>` or `--file -` (stdin), which never pass through
-  argv.
+  argv when it holds free-form text — as a field flag, a `--set` or
+  `--attributes` entry, and inside an inline `--data` body alike, since argv is
+  visible to other processes and kept in shell history. Send such bodies with
+  `--file <path>` or `--file -` (stdin), which never pass through argv. A
+  `${{ NAME }}` reference to a project variable is not a secret and may stay on
+  argv (a connection's `client_secret` takes nothing else); write it in single
+  quotes, since inside double quotes the shell reads `${` as its own expansion.
 - **Streams.** Capture stdout and stderr separately when scripting. The machine
   contract is one parseable JSON object on stdout; installer, audit, and
   package-manager progress belongs on stderr.
@@ -100,6 +142,7 @@ npx @zitadel/cli@alpha --help               # every command, grouped by purpose
 npx @zitadel/cli@alpha commands             # flat list of all commands
 npx @zitadel/cli@alpha <command> --help     # a command's flags, which are required, and examples
 npx @zitadel/cli@alpha resources --json     # the resource surface in one call (see below); contacts no server
+npx @zitadel/cli@alpha api ls --json        # every API operation, its parameters, body and paging; contacts no server
 ```
 
 `--help` groups the surface into project commands (create a project and scaffold
@@ -146,8 +189,18 @@ Each invocation prints one JSON object:
   `data.unsupported_deletions` counts removed files whose resource cannot be
   deleted yet (they are kept, and are not part of `total`); on `apply` the files
   are listed in `data.unsupported_deletion_files`.
+- `apply` leaves the files under `.zitadel/` as written: what the server stores
+  is never written back, and a field a file leaves out reads as the server's
+  default, so `plan` reports no change after an `apply`. `data.files_updated`
+  lists the one rewrite: a flow whose `user_schema` pinned a schema revision id
+  the apply superseded, re-pinned to the new revision's id.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
+- `api` emits the response body as `data`, exactly as the API reference
+  documents it (`null` for a response without one); with `--paginate`, the
+  page's list holds every page's items. `api --dry-run` emits the request
+  instead: `{operation, method, url, body?}`. A refusal from the server is the
+  error envelope, with its status and body in `details`.
 
 Common error codes point at their own fix in `next_commands`:
 
@@ -273,7 +326,12 @@ directory. Any other non-empty directory stops setup with a hint to pass
 `--force`. Pass it only for a directory whose contents may be replaced: files
 the new app also has, such as `package.json`, are overwritten. Without a
 terminal `setup` cannot ask which framework to scaffold, so pass `--framework`;
-the error lists the choices in `details.frameworks`.
+the error lists the choices in `details.frameworks`. `setup --dry-run` creates
+no app: where it would scaffold one, it previews the project, and
+`data.files_written` is empty, because those files depend on the generated app.
+When setup fails after scaffolding a new app, before its default schema and
+flow are uploaded, it removes the app again and puts back what the directory
+held, so rerunning the same `setup` starts over.
 
 `start` reuses a server already running in the directory only when it is the
 release this CLI ships; one an earlier release started is restarted, and its
@@ -289,11 +347,16 @@ replaces a file at a path setup writes, but not the app's root component or
 request boundary at another path.
 
 The app may also live in a subdirectory of the one `start` ran in: `setup`,
-`console` and `--server local` read `.zitadel/local/` from the working
+`console`, `--server local` and `doctor` read `.zitadel/local/` from the working
 directory or the nearest parent that has it (up to the home directory), so
-`mkdir my-app && cd my-app` after `start` works too. `stop`, `reset`, `logs`,
-`status` and `doctor` read only the working directory's `.zitadel/local/`, so
-run them where `start` ran. On a local
+`mkdir my-app && cd my-app` after `start` works too. `doctor` checks that
+server and its port, but runs its project checks in the working directory, so run
+it from the app. When that server is unhealthy it suggests `start` and
+`reset --force` with `--cwd` set to the directory that holds it (when that path needs
+shell quoting the commands are left out, the hint names the directory, and
+`doctor --json` returns the argument lists in `details.suggested_args` to run as they are). `stop`,
+`reset`, `logs` and `status` read only the working directory's
+`.zitadel/local/`, so run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
 local admin's team and ends `data.next_commands` with `console`; when it finds
 no local admin for that server on the way up, it says so in the envelope's
@@ -311,6 +374,20 @@ auth flow in a visible browser by registering a unique user, logging out, loggin
 back in with the same email/password, and ending on the signed-in profile page.
 Do not treat a rendered login or registration form as completion.
 
+To move a set-up app to another dev port (the dev server exits with
+`EADDRINUSE`, or another app needs the port), run `setup --dev-port <port>` in
+the app; never change the port in one file by hand. In a directory with a
+`zitadel.json`, `setup` returns `status: "skipped"` with `reason:
+"already-initialized"`, unless `--dev-port` is given: then it moves the app.
+It allows the new origin on the server first, and a refusal changes nothing.
+It then rewrites the dev script or dev-server config, `ZITADEL_ISSUER` in
+`.env.local`, `zitadel.json`, `.zitadel/secret` and the README/AGENTS.md
+guidance, and removes the old origin. `data.previous_issuer` and `data.issuer`
+name both origins, and `data.moved` is `false` when the app was already on that
+port. A social sign-in provider still redirects to the old port: `warnings`
+names the redirect URI to add at each provider. Restart the dev server
+afterwards.
+
 To change how users sign in after setup, use the `auth-method` commands. Each
 sign-in method has its own command, with `--schema` when the project has more
 than one:
@@ -322,6 +399,12 @@ than one:
   stdin when non-interactive. Any other OpenID Connect provider is
   `--provider custom` with `--slug`, `--display-name`, `--issuer` and optionally
   `--scopes` (default `openid profile email`).
+  An issuer on `http://localhost:<port>` (a test provider on this machine)
+  works against a server `zitadel start` runs as a process: `start` sets
+  `NEXTGEN_HTTPCLIENT_ALLOW_LIST=localhost,127.0.0.0/8,::1/128` unless
+  `.env.local`, `.env` or the shell sets it, and setting it empty turns it off.
+  Under `--runtime docker` localhost is the container, so the provider is not
+  reachable. Otherwise `sso enable` warns in `warnings` that sign-in will fail.
   `auth-method sso disable --provider google` removes a provider; a custom one
   is named by its slug, as in `auth-method sso disable --provider acme-sso`.
 

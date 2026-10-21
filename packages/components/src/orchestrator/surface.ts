@@ -1,10 +1,10 @@
 import { LitElement } from "lit";
-import { property } from "lit/decorators.js";
+import { property } from "../internal/property.js";
 import type { ZitadelProject } from "@zitadel/api/config";
 
 import type { Branding } from "./branding.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
-import { applyDefaultFont, applyFontUrl } from "./font-loader.js";
+import { applyFontUrl } from "./font-loader.js";
 import type { ProjectAttrs } from "./resolve-api.js";
 import { ThemeController, type ThemeMode } from "./theme-controller.js";
 
@@ -40,9 +40,22 @@ export class ZitadelConfigured extends LitElement {
    */
   @property({ type: String }) accessor url = "";
 
+  /**
+   * The project's publishable key (ADR 036), set declaratively in HTML. It is
+   * browser-safe by construction (an origin-scoped bearer), so it may sit in
+   * markup; it lets a server-rendered page start its first request already
+   * authenticated. Never put a project secret here.
+   */
+  @property({ type: String, attribute: "publishable-key" }) accessor publishableKey = "";
+
   /** Declarative config read from this element's attributes. */
   protected get projectAttrs(): ProjectAttrs {
-    return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
+    return {
+      projectId: this.projectId,
+      proxyPath: this.proxyPath,
+      url: this.url,
+      publishableKey: this.publishableKey,
+    };
   }
 }
 
@@ -58,7 +71,7 @@ export function stampTheme(host: HTMLElement, controller: ThemeController): void
  *
  * Owns the `variant` / `theme` public properties, the {@link ThemeController},
  * and the per-update surface application (base tokens, branding overrides,
- * font links, and the `data-theme` host stamp). Subclasses call
+ * font link, and the `data-theme` host stamp). Subclasses call
  * {@link applySurfaceTheme} from their `willUpdate` so the resolved theme is
  * committed in the same update cycle that reads it.
  *
@@ -68,9 +81,9 @@ export class ZitadelSurface extends ZitadelConfigured {
   /**
    * Sizing/chrome mode. Components size to content; pages compose them —
    * so the default is `widget`: content-sized, transparent host, no
-   * document-level default-font injection. Dedicated routes — the hosted
-   * shell and the scaffolded pages — opt into `page`, which claims the
-   * viewport, paints the surface background, and ships the brand font.
+   * document-level font injection. Dedicated routes — the hosted shell and
+   * the scaffolded pages — opt into `page`, which claims the viewport, paints
+   * the surface background, and links the tenant's `font_url` when it has one.
    * Fine-grained height override in both modes: `--zl-page-min-height`.
    */
   @property({ type: String, reflect: true }) accessor variant: "widget" | "page" = "widget";
@@ -103,7 +116,7 @@ export class ZitadelSurface extends ZitadelConfigured {
   /**
    * Resolve the active theme and commit it to this element's surface: adopt
    * the base token sheet, layer the branding overrides, manage the
-   * document-level font links, and stamp `data-theme` / `data-theme-dark` on
+   * document-level font link, and stamp `data-theme` / `data-theme-dark` on
    * the host so token lookups (and host-page selectors) flip with the mode.
    * `branding` is `undefined` for surfaces without a tenant payload — the
    * theme then resolves through the element preference and variant fallback.
@@ -121,16 +134,14 @@ export class ZitadelSurface extends ZitadelConfigured {
       applyBrandingTokens(root, branding);
       // Fonts load as a document-level `<link>`, because `@font-face` inside a
       // shadow tree never registers. That makes injection a page-wide grant,
-      // so neither face goes into a document we do not own: on a dedicated
-      // page we ship the design-system face and hand over to the tenant's
-      // when there is one, and in widget mode we inject neither. An embedded
-      // widget applies `typography.font_family` and relies on the embedding
-      // app — which owns its typography, its CSP and its visitors' font-CDN
-      // connections — to have loaded the face.
-      const page = this.variant === "page";
-      const tenantFontUrl = page ? (branding?.typography?.font_url ?? null) : null;
-      applyDefaultFont(root, page && !tenantFontUrl ? undefined : null);
-      applyFontUrl(root, tenantFontUrl);
+      // so only the tenant's own `font_url` is ever linked, and only on a
+      // dedicated page. Without one the token stack falls back to the system
+      // font: the package fetches no face of its own, so no visitor's address
+      // reaches a font CDN unless the tenant opted in (ADR 025, amended). An
+      // embedded widget applies `typography.font_family` and relies on the
+      // embedding app — which owns its typography, its CSP and its visitors'
+      // font-CDN connections — to have loaded the face.
+      applyFontUrl(root, this.variant === "page" ? (branding?.typography?.font_url ?? null) : null);
     }
     stampTheme(this, this.themeController);
   }

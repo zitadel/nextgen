@@ -48,6 +48,9 @@ tasks:
       # not a task dep on server: server depends on console, and console's dev
       # tasks depend on cli (#1487), so that edge would close a project cycle.
       - "/apps/server/bin/**/*"
+      # The spec files whose `x-zitadel-cli` names the api-coverage test checks
+      # against the commands.
+      - "/api/openapi/endpoints/**/methods.yaml"
     options:
       # The built oclif commands import @zitadel/{api,config,sdk-next} from
       # those packages' dist/ at runtime. Their build-release tasks rewrite
@@ -56,6 +59,17 @@ tasks:
       # graph), so a shared mutex keeps them from cleaning a dist while
       # these tests import from it.
       mutex: "public-dist"
+
+  check-advisories:
+    command: "corepack pnpm run check-advisories"
+    options:
+      # It asks the npm advisory database about the package versions the
+      # scaffolders pin, so it needs the network, and its answer changes when
+      # an advisory is published, with no input changing: never cached, and
+      # left out of `moon ci`. scaffold-advisories.yml runs it nightly and on
+      # changes to the scaffolders, with `moon exec --ignore-ci-checks`.
+      cache: false
+      runInCI: "skip"
 
   readme:
     command: "corepack pnpm run readme"

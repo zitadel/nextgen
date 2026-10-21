@@ -118,6 +118,7 @@ describe("seedUser via connectZitadel", () => {
     const zitadel = connectZitadel(handle);
     expect(zitadel.appEnv).toEqual({
       ZITADEL_URL: BASE,
+      ZITADEL_PROJECT_ID: "proj_1",
       NEXT_PUBLIC_ZITADEL_PROJECT_ID: "proj_1",
       ZITADEL_PROJECT_SECRET: "secret_1",
     });

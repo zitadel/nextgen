@@ -1,11 +1,12 @@
 import "server-only";
 
-import type { GetMySession200 } from "@zitadel/api/generated/model";
-
+import { getZitadelConfig } from "@zitadel/api/config";
+import { checkOpaqueSessionToken, jwtNamesProject } from "@zitadel/sdk-core/middleware";
+import { joinURL } from "ufo";
 import { headers } from "next/headers";
 import { cache } from "react";
 
-import type { AuthResult, ClientSession, NextgenMiddlewareOptions } from "./types.js";
+import type { AuthResult, NextgenMiddlewareOptions } from "./types.js";
 
 import { isJwtShaped, verifyJwt } from "./lib/jwt.js";
 
@@ -21,6 +22,7 @@ import { isJwtShaped, verifyJwt } from "./lib/jwt.js";
 export type AuthOptions = Pick<
   NextgenMiddlewareOptions,
   | "url"
+  | "projectId"
   | "allowedAlgorithms"
   | "clockSkewMs"
   | "audience"
@@ -30,64 +32,17 @@ export type AuthOptions = Pick<
 >;
 
 /**
- * Validates an opaque (non-JWT) session token against the backend's
- * `GET /sessions/me` and returns the client-safe identity, or `null` when the
- * backend does not confirm a signed-in user.
+ * Checks an opaque (non-JWT) session token against the backend's
+ * `GET /sessions/me`, held to `projectId` (see `checkOpaqueSessionToken` in
+ * `@zitadel/sdk-core`, which the middleware uses too).
  *
  * Wrapped in React's `cache()` so that many components calling `auth()` in
  * the same render pass share a single backend round-trip. Arguments are
  * primitives on purpose — `cache()` memoises by argument identity.
- *
- * Fail-closed: network errors, timeouts, and unexpected statuses all resolve
- * to `null` (signed out). Unexpected failures are logged so a broken proxy or
- * unreachable backend is distinguishable from a genuinely missing session.
  */
-const validateOpaqueSession = cache(
-  async (token: string, issuerUrl: string, timeoutMs: number): Promise<ClientSession | null> => {
-    try {
-      const res = await fetch(`${issuerUrl}/sessions/me`, {
-        method: "GET",
-        headers: { accept: "application/json", cookie: `__nextgen_session=${token}` },
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-
-      // 401 = no/invalid session token, 404 = session gone (revoked/expired):
-      // both are the server's definitive "not signed in".
-      if (res.status === 401 || res.status === 404) {
-        return null;
-      }
-
-      if (!res.ok) {
-        console.warn(
-          `[nextgen] auth(): session validation failed with HTTP ${res.status} from ` +
-            `${issuerUrl}/sessions/me — treating as signed out. If this persists, the ` +
-            `backend URL is likely misconfigured (ZITADEL_URL or the \`url\` option).`,
-        );
-        return null;
-      }
-
-      const session = (await res.json()) as GetMySession200;
-
-      // An anonymous session (no verified user factor yet) has no user_id —
-      // for server-rendered UI that is "not signed in".
-      if (!session.user_id) {
-        return null;
-      }
-
-      return {
-        userId: session.user_id,
-        identifier: session.user?.identifier ?? null,
-        identifierProperty: session.user?.identifier_property ?? null,
-        display: session.user?.display ?? null,
-      };
-    } catch {
-      console.warn(
-        `[nextgen] auth(): could not reach ${issuerUrl}/sessions/me to validate the ` +
-          `session token — treating as signed out.`,
-      );
-      return null;
-    }
-  },
+const checkOpaqueSession = cache(
+  (token: string, issuerUrl: string, timeoutMs: number, projectId: string) =>
+    checkOpaqueSessionToken(token, issuerUrl, timeoutMs, projectId),
 );
 
 /**
@@ -107,9 +62,21 @@ const validateOpaqueSession = cache(
  *   `cache()`.
  *
  * The header alone is never proof of anything: on routes the middleware
- * `matcher` does not cover, the middleware cannot neutralise a forged
+ * `matcher` does not cover, the middleware cannot refuse a forged
  * client-supplied header, so `auth()` re-verifies every value it reads.
  * A header value that fails verification is treated as signed out.
+ *
+ * Either way a session counts only in the app's own project: `projectId`,
+ * else `ZITADEL_PROJECT_ID`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, else the
+ * project of `configureZitadel()` when it has run in this server runtime. A
+ * JWT must name it in `aud`; an opaque token must be a session of that
+ * project. With no project, nobody is signed in. A middleware built with
+ * `createProxy(config)` holds sessions to `config.projectId`: pass the same
+ * project here unless it comes from one of those variables.
+ *
+ * A backend that answers with an unexpected status, or not at all, reads as
+ * signed out and is logged, so a broken proxy or an unreachable backend is
+ * distinguishable from a missing session.
  *
  * **Matcher precondition (read this):** the middleware only tunnels the
  * session token on routes covered by its `matcher`. On uncovered routes the
@@ -154,6 +121,9 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
 
   const {
     url = process.env.ZITADEL_URL ?? "http://localhost:8080",
+    projectId = process.env.ZITADEL_PROJECT_ID ||
+      process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ||
+      getZitadelConfig()?.projectId,
     allowedAlgorithms = ["RS256", "ES256"] as const,
     clockSkewMs = 5000,
     audience,
@@ -161,6 +131,11 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
     jwksTimeoutMs,
     opaqueTokenTimeoutMs = 5000,
   } = options;
+
+  if (!projectId) {
+    warnMissingProject();
+    return { isAuthenticated: false, session: null };
+  }
 
   if (isJwtShaped(token)) {
     const payload = await verifyJwt(token, {
@@ -172,7 +147,7 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
       jwksTimeoutMs,
     });
 
-    if (payload?.sub) {
+    if (payload?.sub && jwtNamesProject(payload, projectId)) {
       return {
         isAuthenticated: true,
         session: {
@@ -185,6 +160,11 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
       };
     }
 
+    if (payload?.sub) {
+      // Verified, but issued for another project: not a user of this one.
+      return { isAuthenticated: false, session: null };
+    }
+
     // A middleware-tunnelled JWT always verifies (the middleware applied the
     // same checks moments earlier). Reaching this branch means the header was
     // NOT vetted by the middleware — a route outside the `matcher` received a
@@ -195,15 +175,41 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
       "[nextgen] auth(): rejected an x-nextgen-auth-token header that failed JWT " +
         "verification. If this route is not covered by the middleware matcher, this was " +
         "a forged client header; otherwise check that auth() and the middleware use the " +
-        `same verification options and that the JWKS endpoint at ${url}/auth/keys is reachable.`,
+        `same verification options and that the JWKS endpoint at ${joinURL(url, "/auth/keys")} is reachable.`,
     );
     return { isAuthenticated: false, session: null };
   }
 
-  const session = await validateOpaqueSession(token, url, opaqueTokenTimeoutMs);
-  if (session) {
-    return { isAuthenticated: true, session: { ...session, token } };
+  // A refused session, an anonymous one and one of another project read as
+  // signed out here. So does a check without a verdict, which
+  // `checkOpaqueSessionToken` logs with its cause.
+  const check = await checkOpaqueSession(token, url, opaqueTokenTimeoutMs, projectId);
+  if (check.verdict === "live" && check.session.userId) {
+    return {
+      isAuthenticated: true,
+      session: {
+        userId: check.session.userId,
+        identifier: check.session.identifier,
+        identifierProperty: check.session.identifierProperty,
+        display: check.session.display,
+        token,
+      },
+    };
   }
-
   return { isAuthenticated: false, session: null };
+}
+
+let warnedMissingProject = false;
+
+/** Says once per process why `auth()` signs no one in: no project is configured. */
+function warnMissingProject(): void {
+  if (warnedMissingProject) {
+    return;
+  }
+  warnedMissingProject = true;
+  console.warn(
+    "[nextgen] auth(): no project id is configured, so no session counts as signed in. " +
+      "Set ZITADEL_PROJECT_ID, or pass the middleware's `projectId` to auth() (with " +
+      "createProxy(config), that is config.projectId).",
+  );
 }

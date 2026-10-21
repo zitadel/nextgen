@@ -253,35 +253,32 @@ type Invoker interface {
 	CreateIdp(ctx context.Context, request *CreateIdpRequest, params CreateIdpParams) (CreateIdpRes, error)
 	// CreateProject invokes createProject operation.
 	//
-	// Create project.
+	// Creates a project and returns its project secret and preview secret, which no
+	// other endpoint returns.
+	// The request needs no credential and is rate-limited. Unless `seed_defaults` is
+	// `false`, the project starts with a default user schema and flow; the CLI turns
+	// that off and uploads its own from `.zitadel/`.
 	//
 	// POST /projects
 	CreateProject(ctx context.Context, request *CreateProjectRequest) (CreateProjectRes, error)
 	// CreateRelease invokes createRelease operation.
 	//
-	// Assembles a release from revisions that already exist, supplied as
-	// `(kind, revision_id)` pairs. No new revisions are allocated: to build a
-	// release from the files on disk, use `POST /releases/build`, which
-	// allocates them.
-	// Every referenced `revision_id` must exist in the project. Each one's
-	// handle is read from the revision itself and recorded on the release, so a
-	// resource is always pinned under the identity it declares.
-	// Every handle a pinned resource references, such as a flow definition's
-	// `user_schema` naming a schema by `objectType`, or a flow step's
-	// `sso_providers` naming IDP connections by `slug`, must be pinned by the
-	// same release. A handle the release does not pin refuses the request with
-	// `rel.unresolved_reference`. The message names the pointer and the handle
-	// that did not resolve, for example
-	// `flow_definition default-login: user_schema human-user not found`,
-	// because a release pins many and the code alone does not say which one
-	// failed.
-	// Idempotent on the pinned set: metadata is excluded from the comparison,
-	// so re-submitting the same revisions with a different `message` answers
-	// `200` with the release that already pins them rather than creating a
-	// second one. A release the project did not hold before answers `201`.
-	// Creating a release does not deploy it. A release is not tied to an
-	// origin, and the same release can later be deployed to any number of
-	// origins unchanged.
+	// Assembles a release from existing revisions, given as
+	// `(kind, revision_id)` pairs. To build one from files on disk, use
+	// `POST /releases/build`.
+	// Each revision must exist in the project and is recorded under the handle
+	// it declares. The release must be complete and consistent:
+	// - Every handle its revisions name must be in the release: a flow's
+	// `user_schema`, and the IDP connections named by a flow step's
+	// `sso_providers` or a schema's `x-auth-methods.sso.providers`. A missing
+	// one answers `rel.unresolved_reference`, naming the resource and the
+	// handle, e.g. `flow_definition default-login: user_schema human-user not found`.
+	// - Every flow is validated as on save, against the user schema revision
+	// in the release. A flow that fails answers `rel.invalid`, with the
+	// reason in `details`.
+	// Idempotent on the set of revisions: the same revisions with a different
+	// `message` answer `200` with the existing release. A new release answers
+	// `201`. Creating a release does not deploy it.
 	//
 	// POST /releases
 	CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
@@ -322,13 +319,18 @@ type Invoker interface {
 	CreateSession(ctx context.Context, request *CreateSessionRequest) (CreateSessionRes, error)
 	// CreateTeam invokes createTeam operation.
 	//
-	// Create team.
+	// Creates a team in the project, with a name no other team in the project has.
+	// A taken name is refused with `409 team.already_exists`. The new team has no
+	// members yet.
 	//
 	// POST /teams
 	CreateTeam(ctx context.Context, request *CreateTeamRequest, params CreateTeamParams) (CreateTeamRes, error)
 	// CreateUser invokes createUser operation.
 	//
-	// Create user.
+	// Creates a user whose attributes satisfy the user schema the request names.
+	// The server assigns the user's id. With `team_id`, the user also becomes an
+	// active member of that team. A value the schema marks unique that another
+	// user already holds is refused with `409`.
 	//
 	// POST /users
 	CreateUser(ctx context.Context, request *CreateUserRequest, params CreateUserParams) (CreateUserRes, error)
@@ -361,7 +363,10 @@ type Invoker interface {
 	DeleteTeam(ctx context.Context, params DeleteTeamParams) (DeleteTeamRes, error)
 	// DeleteUserByID invokes DeleteUserByID operation.
 	//
-	// Delete user by ID.
+	// Deletes a user and removes them from every team they belong to.
+	// The user is removed, not deactivated, and the deletion emits `user.deleted`.
+	// With a project secret the request is idempotent: deleting a user that exists
+	// in no project succeeds without changing anything.
 	//
 	// DELETE /users/{user_id}
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
@@ -535,12 +540,13 @@ type Invoker interface {
 	//
 	// Returns the current state of the current session including its factors and all currently
 	// satisfied assurance levels.
+	// With `project_id`, the session is returned only when it belongs to that project.
 	// `assurance_levels[]` may shrink over time as factor freshness windows expire,
 	// without the session itself expiring. Use step-up authentication (a new `auth_attempt`
 	// against the same `session_id`) to restore a dropped assurance level.
 	//
 	// GET /sessions/me
-	GetMySession(ctx context.Context) (GetMySessionRes, error)
+	GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error)
 	// GetMySessionCsrfToken invokes getMySessionCsrfToken operation.
 	//
 	// Returns the session-bound token for cross-site request forgery protection
@@ -550,15 +556,29 @@ type Invoker interface {
 	// HttpOnly cookie is still the credential, and a cross-site page cannot
 	// read this response. It stays the same for the life of the session, so a
 	// client fetches it once per session.
+	// With `project_id`, the token is returned only when the session belongs to
+	// that project.
 	//
 	// GET /sessions/me/csrf
-	GetMySessionCsrfToken(ctx context.Context) (GetMySessionCsrfTokenRes, error)
+	GetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (GetMySessionCsrfTokenRes, error)
 	// GetMyUser invokes getMyUser operation.
 	//
-	// Get my user information.
+	// Returns the user signed in to the session that authenticates the request.
+	// The project and the user both come from the session cookie, so a caller only
+	// ever reads their own user.
+	// With `project_id`, the user is returned only when the session belongs to
+	// that project.
 	//
 	// GET /users/me
-	GetMyUser(ctx context.Context) (GetMyUserRes, error)
+	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)
+	// GetMyUserSchema invokes getMyUserSchema operation.
+	//
+	// The schema the signed-in user's own record is validated against.
+	// With `project_id`, the schema is returned only when the session belongs to
+	// that project.
+	//
+	// GET /users/me/schema
+	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
 	// GetProject invokes getProject operation.
 	//
 	// Returns the current state of a project.
@@ -618,13 +638,17 @@ type Invoker interface {
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
 	// GetUserByID invokes GetUserByID operation.
 	//
-	// Get user by ID.
+	// Returns a user by its id, with the attributes its schema defines.
+	// With `team_id`, the user is returned only while they are an active member of
+	// that team.
 	//
 	// GET /users/{user_id}
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetUserPassword invokes getUserPassword operation.
 	//
-	// Get user password state.
+	// Reports when the user's current password was set, and leaves `set_at` out
+	// when the user has none. The password and its hash are never returned;
+	// setting one is `PUT` on the same path.
 	//
 	// GET /users/{user_id}/password
 	GetUserPassword(ctx context.Context, params GetUserPasswordParams) (GetUserPasswordRes, error)
@@ -735,9 +759,20 @@ type Invoker interface {
 	// This is not the same question as `queryProjects`, which answers with the one
 	// project the calling credential is bound to. Here the session is the caller
 	// and the grants are the answer, so the list spans projects.
+	// With `project_id`, the projects are listed only when the session belongs to
+	// that project. It names the project the session was signed in to, not one to
+	// list.
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
+	// ListMyTeams invokes listMyTeams operation.
+	//
+	// The signed-in user's own team roster, ordered by team name.
+	// With `project_id`, the teams are listed only when the session belongs to
+	// that project.
+	//
+	// GET /users/me/teams
+	ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error)
 	// ListPreviews invokes listPreviews operation.
 	//
 	// Lists the project's live previews, newest first by `created_at`. An
@@ -776,7 +811,10 @@ type Invoker interface {
 	ListUserIdentityLinks(ctx context.Context, params ListUserIdentityLinksParams) (ListUserIdentityLinksRes, error)
 	// ListUserPasskeys invokes listUserPasskeys operation.
 	//
-	// List user passkeys.
+	// Returns the passkeys registered for a user, newest first, paginated with a
+	// cursor.
+	// Each passkey carries its id, its name and when it was registered, never the
+	// credential itself.
 	//
 	// GET /users/{user_id}/passkeys
 	ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (ListUserPasskeysRes, error)
@@ -796,9 +834,11 @@ type Invoker interface {
 	// Partially updates the caller's own schema-defined attributes. The merged
 	// result is validated against the user's schema before commit. Concurrent
 	// writes are last-write-wins.
+	// With `project_id`, the user is updated only when the session belongs to
+	// that project.
 	//
 	// PATCH /users/me
-	PatchMyUser(ctx context.Context, request *PatchMyUserRequest) (PatchMyUserRes, error)
+	PatchMyUser(ctx context.Context, request *PatchMyUserRequest, params PatchMyUserParams) (PatchMyUserRes, error)
 	// PatchProject invokes patchProject operation.
 	//
 	// Updates the state of a project.
@@ -843,7 +883,11 @@ type Invoker interface {
 	QueryIdps(ctx context.Context, request *QueryIdpsRequest, params QueryIdpsParams) (QueryIdpsRes, error)
 	// QueryProjects invokes queryProjects operation.
 	//
-	// Query projects.
+	// Returns the project the project secret belongs to, as a page of at most one
+	// project.
+	// A credential is scoped to one project until ADR 036 widens it, so the filters
+	// and sorting apply to that project alone. The projects a signed-in person can
+	// act on are listed by `GET /users/me/projects`.
 	//
 	// POST /projects/query
 	QueryProjects(ctx context.Context, request *QueryProjectsRequest) (QueryProjectsRes, error)
@@ -897,12 +941,15 @@ type Invoker interface {
 	//
 	// Logs out by permanently deleting the session.
 	// The `__nextgen_session` cookie issued at creation (or superseded by a handoff
-	// exchange) is required. Idempotent: if the session is already gone this still
-	// returns 204. Any tokens derived from the session are invalidated, and the
-	// cookie itself is cleared in the response.
+	// exchange) is required, with the session's token from `GET /sessions/me/csrf`
+	// in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
+	// this still returns 204. Any tokens derived from the session are invalidated,
+	// and the cookie itself is cleared in the response.
+	// With `project_id`, only a session of that project is deleted. A session of
+	// another project is left alone, and so is its cookie.
 	//
 	// DELETE /sessions/me
-	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
+	RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error)
 	// RevokeRelease invokes revokeRelease operation.
 	//
 	// Marks the release revoked, so that its content is never served again.
@@ -966,7 +1013,10 @@ type Invoker interface {
 	RollbackDeployment(ctx context.Context, request OptRollbackDeploymentRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
 	// SetUserPassword invokes setUserPassword operation.
 	//
-	// Set user password.
+	// Sets a user's password, hashed with the project's current password hashing
+	// policy.
+	// The new password replaces the current one, and setting it emits
+	// `auth.factor.password.set`.
 	//
 	// PUT /users/{user_id}/password
 	SetUserPassword(ctx context.Context, request *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error)
@@ -2853,7 +2903,11 @@ func (c *Client) sendCreateIdp(ctx context.Context, request *CreateIdpRequest, p
 
 // CreateProject invokes createProject operation.
 //
-// Create project.
+// Creates a project and returns its project secret and preview secret, which no
+// other endpoint returns.
+// The request needs no credential and is rate-limited. Unless `seed_defaults` is
+// `false`, the project starts with a default user schema and flow; the CLI turns
+// that off and uploads its own from `.zitadel/`.
 //
 // POST /projects
 func (c *Client) CreateProject(ctx context.Context, request *CreateProjectRequest) (CreateProjectRes, error) {
@@ -2939,29 +2993,22 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 
 // CreateRelease invokes createRelease operation.
 //
-// Assembles a release from revisions that already exist, supplied as
-// `(kind, revision_id)` pairs. No new revisions are allocated: to build a
-// release from the files on disk, use `POST /releases/build`, which
-// allocates them.
-// Every referenced `revision_id` must exist in the project. Each one's
-// handle is read from the revision itself and recorded on the release, so a
-// resource is always pinned under the identity it declares.
-// Every handle a pinned resource references, such as a flow definition's
-// `user_schema` naming a schema by `objectType`, or a flow step's
-// `sso_providers` naming IDP connections by `slug`, must be pinned by the
-// same release. A handle the release does not pin refuses the request with
-// `rel.unresolved_reference`. The message names the pointer and the handle
-// that did not resolve, for example
-// `flow_definition default-login: user_schema human-user not found`,
-// because a release pins many and the code alone does not say which one
-// failed.
-// Idempotent on the pinned set: metadata is excluded from the comparison,
-// so re-submitting the same revisions with a different `message` answers
-// `200` with the release that already pins them rather than creating a
-// second one. A release the project did not hold before answers `201`.
-// Creating a release does not deploy it. A release is not tied to an
-// origin, and the same release can later be deployed to any number of
-// origins unchanged.
+// Assembles a release from existing revisions, given as
+// `(kind, revision_id)` pairs. To build one from files on disk, use
+// `POST /releases/build`.
+// Each revision must exist in the project and is recorded under the handle
+// it declares. The release must be complete and consistent:
+// - Every handle its revisions name must be in the release: a flow's
+// `user_schema`, and the IDP connections named by a flow step's
+// `sso_providers` or a schema's `x-auth-methods.sso.providers`. A missing
+// one answers `rel.unresolved_reference`, naming the resource and the
+// handle, e.g. `flow_definition default-login: user_schema human-user not found`.
+// - Every flow is validated as on save, against the user schema revision
+// in the release. A flow that fails answers `rel.invalid`, with the
+// reason in `details`.
+// Idempotent on the set of revisions: the same revisions with a different
+// `message` answer `200` with the existing release. A new release answers
+// `201`. Creating a release does not deploy it.
 //
 // POST /releases
 func (c *Client) CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error) {
@@ -3403,7 +3450,9 @@ func (c *Client) sendCreateSession(ctx context.Context, request *CreateSessionRe
 
 // CreateTeam invokes createTeam operation.
 //
-// Create team.
+// Creates a team in the project, with a name no other team in the project has.
+// A taken name is refused with `409 team.already_exists`. The new team has no
+// members yet.
 //
 // POST /teams
 func (c *Client) CreateTeam(ctx context.Context, request *CreateTeamRequest, params CreateTeamParams) (CreateTeamRes, error) {
@@ -3555,7 +3604,10 @@ func (c *Client) sendCreateTeam(ctx context.Context, request *CreateTeamRequest,
 
 // CreateUser invokes createUser operation.
 //
-// Create user.
+// Creates a user whose attributes satisfy the user schema the request names.
+// The server assigns the user's id. With `team_id`, the user also becomes an
+// active member of that team. A value the schema marks unique that another
+// user already holds is refused with `409`.
 //
 // POST /users
 func (c *Client) CreateUser(ctx context.Context, request *CreateUserRequest, params CreateUserParams) (CreateUserRes, error) {
@@ -4028,7 +4080,10 @@ func (c *Client) sendDeleteTeam(ctx context.Context, params DeleteTeamParams) (r
 
 // DeleteUserByID invokes DeleteUserByID operation.
 //
-// Delete user by ID.
+// Deletes a user and removes them from every team they belong to.
+// The user is removed, not deactivated, and the deletion emits `user.deleted`.
+// With a project secret the request is idempotent: deleting a user that exists
+// in no project succeeds without changing anything.
 //
 // DELETE /users/{user_id}
 func (c *Client) DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error) {
@@ -6556,17 +6611,18 @@ func (c *Client) sendGetLive(ctx context.Context) (res GetLiveRes, err error) {
 //
 // Returns the current state of the current session including its factors and all currently
 // satisfied assurance levels.
+// With `project_id`, the session is returned only when it belongs to that project.
 // `assurance_levels[]` may shrink over time as factor freshness windows expire,
 // without the session itself expiring. Use step-up authentication (a new `auth_attempt`
 // against the same `session_id`) to restore a dropped assurance level.
 //
 // GET /sessions/me
-func (c *Client) GetMySession(ctx context.Context) (GetMySessionRes, error) {
-	res, err := c.sendGetMySession(ctx)
+func (c *Client) GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error) {
+	res, err := c.sendGetMySession(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetMySession(ctx context.Context) (res GetMySessionRes, err error) {
+func (c *Client) sendGetMySession(ctx context.Context, params GetMySessionParams) (res GetMySessionRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMySession"),
 		semconv.HTTPRequestMethodKey.String("GET"),
@@ -6606,6 +6662,30 @@ func (c *Client) sendGetMySession(ctx context.Context) (res GetMySessionRes, err
 	var pathParts [1]string
 	pathParts[0] = "/sessions/me"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
@@ -6672,14 +6752,16 @@ func (c *Client) sendGetMySession(ctx context.Context) (res GetMySessionRes, err
 // HttpOnly cookie is still the credential, and a cross-site page cannot
 // read this response. It stays the same for the life of the session, so a
 // client fetches it once per session.
+// With `project_id`, the token is returned only when the session belongs to
+// that project.
 //
 // GET /sessions/me/csrf
-func (c *Client) GetMySessionCsrfToken(ctx context.Context) (GetMySessionCsrfTokenRes, error) {
-	res, err := c.sendGetMySessionCsrfToken(ctx)
+func (c *Client) GetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (GetMySessionCsrfTokenRes, error) {
+	res, err := c.sendGetMySessionCsrfToken(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetMySessionCsrfToken(ctx context.Context) (res GetMySessionCsrfTokenRes, err error) {
+func (c *Client) sendGetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (res GetMySessionCsrfTokenRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMySessionCsrfToken"),
 		semconv.HTTPRequestMethodKey.String("GET"),
@@ -6719,6 +6801,30 @@ func (c *Client) sendGetMySessionCsrfToken(ctx context.Context) (res GetMySessio
 	var pathParts [1]string
 	pathParts[0] = "/sessions/me/csrf"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
@@ -6778,15 +6884,19 @@ func (c *Client) sendGetMySessionCsrfToken(ctx context.Context) (res GetMySessio
 
 // GetMyUser invokes getMyUser operation.
 //
-// Get my user information.
+// Returns the user signed in to the session that authenticates the request.
+// The project and the user both come from the session cookie, so a caller only
+// ever reads their own user.
+// With `project_id`, the user is returned only when the session belongs to
+// that project.
 //
 // GET /users/me
-func (c *Client) GetMyUser(ctx context.Context) (GetMyUserRes, error) {
-	res, err := c.sendGetMyUser(ctx)
+func (c *Client) GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error) {
+	res, err := c.sendGetMyUser(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetMyUser(ctx context.Context) (res GetMyUserRes, err error) {
+func (c *Client) sendGetMyUser(ctx context.Context, params GetMyUserParams) (res GetMyUserRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMyUser"),
 		semconv.HTTPRequestMethodKey.String("GET"),
@@ -6826,6 +6936,30 @@ func (c *Client) sendGetMyUser(ctx context.Context) (res GetMyUserRes, err error
 	var pathParts [1]string
 	pathParts[0] = "/users/me"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
@@ -6876,6 +7010,139 @@ func (c *Client) sendGetMyUser(ctx context.Context) (res GetMyUserRes, err error
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMyUserResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetMyUserSchema invokes getMyUserSchema operation.
+//
+// The schema the signed-in user's own record is validated against.
+// With `project_id`, the schema is returned only when the session belongs to
+// that project.
+//
+// GET /users/me/schema
+func (c *Client) GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error) {
+	res, err := c.sendGetMyUserSchema(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (res GetMyUserSchemaRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getMyUserSchema"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/users/me/schema"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetMyUserSchemaOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/users/me/schema"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetMyUserSchemaOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetMyUserSchemaResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -7718,7 +7985,9 @@ func (c *Client) sendGetTeam(ctx context.Context, params GetTeamParams) (res Get
 
 // GetUserByID invokes GetUserByID operation.
 //
-// Get user by ID.
+// Returns a user by its id, with the attributes its schema defines.
+// With `team_id`, the user is returned only while they are an active member of
+// that team.
 //
 // GET /users/{user_id}
 func (c *Client) GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error) {
@@ -7882,7 +8151,9 @@ func (c *Client) sendGetUserByID(ctx context.Context, params GetUserByIDParams) 
 
 // GetUserPassword invokes getUserPassword operation.
 //
-// Get user password state.
+// Reports when the user's current password was set, and leaves `set_at` out
+// when the user has none. The password and its hash are never returned;
+// setting one is `PUT` on the same path.
 //
 // GET /users/{user_id}/password
 func (c *Client) GetUserPassword(ctx context.Context, params GetUserPasswordParams) (GetUserPasswordRes, error) {
@@ -9894,6 +10165,9 @@ func (c *Client) sendListIdpRevisions(ctx context.Context, params ListIdpRevisio
 // This is not the same question as `queryProjects`, which answers with the one
 // project the calling credential is bound to. Here the session is the caller
 // and the grants are the answer, so the list spans projects.
+// With `project_id`, the projects are listed only when the session belongs to
+// that project. It names the project the session was signed in to, not one to
+// list.
 //
 // GET /users/me/projects
 func (c *Client) ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error) {
@@ -9984,6 +10258,26 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 			return res, errors.Wrap(err, "encode query")
 		}
 	}
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
 	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
@@ -10035,6 +10329,179 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 
 	stage = "DecodeResponse"
 	result, err := decodeListMyProjectsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListMyTeams invokes listMyTeams operation.
+//
+// The signed-in user's own team roster, ordered by team name.
+// With `project_id`, the teams are listed only when the session belongs to
+// that project.
+//
+// GET /users/me/teams
+func (c *Client) ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error) {
+	res, err := c.sendListMyTeams(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListMyTeams(ctx context.Context, params ListMyTeamsParams) (res ListMyTeamsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listMyTeams"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/users/me/teams"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListMyTeamsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/users/me/teams"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, ListMyTeamsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeListMyTeamsResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -10833,7 +11300,10 @@ func (c *Client) sendListUserIdentityLinks(ctx context.Context, params ListUserI
 
 // ListUserPasskeys invokes listUserPasskeys operation.
 //
-// List user passkeys.
+// Returns the passkeys registered for a user, newest first, paginated with a
+// cursor.
+// Each passkey carries its id, its name and when it was registered, never the
+// credential itself.
 //
 // GET /users/{user_id}/passkeys
 func (c *Client) ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (ListUserPasskeysRes, error) {
@@ -11158,11 +11628,23 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, ListUserTeamsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -11199,14 +11681,16 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 // Partially updates the caller's own schema-defined attributes. The merged
 // result is validated against the user's schema before commit. Concurrent
 // writes are last-write-wins.
+// With `project_id`, the user is updated only when the session belongs to
+// that project.
 //
 // PATCH /users/me
-func (c *Client) PatchMyUser(ctx context.Context, request *PatchMyUserRequest) (PatchMyUserRes, error) {
-	res, err := c.sendPatchMyUser(ctx, request)
+func (c *Client) PatchMyUser(ctx context.Context, request *PatchMyUserRequest, params PatchMyUserParams) (PatchMyUserRes, error) {
+	res, err := c.sendPatchMyUser(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendPatchMyUser(ctx context.Context, request *PatchMyUserRequest) (res PatchMyUserRes, err error) {
+func (c *Client) sendPatchMyUser(ctx context.Context, request *PatchMyUserRequest, params PatchMyUserParams) (res PatchMyUserRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -11255,6 +11739,30 @@ func (c *Client) sendPatchMyUser(ctx context.Context, request *PatchMyUserReques
 	var pathParts [1]string
 	pathParts[0] = "/users/me"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "PATCH", u)
@@ -11943,7 +12451,11 @@ func (c *Client) sendQueryIdps(ctx context.Context, request *QueryIdpsRequest, p
 
 // QueryProjects invokes queryProjects operation.
 //
-// Query projects.
+// Returns the project the project secret belongs to, as a page of at most one
+// project.
+// A credential is scoped to one project until ADR 036 widens it, so the filters
+// and sorting apply to that project alone. The projects a signed-in person can
+// act on are listed by `GET /users/me/projects`.
 //
 // POST /projects/query
 func (c *Client) QueryProjects(ctx context.Context, request *QueryProjectsRequest) (QueryProjectsRes, error) {
@@ -12800,17 +13312,20 @@ func (c *Client) sendRemovePreview(ctx context.Context, request *RemovePreviewRe
 //
 // Logs out by permanently deleting the session.
 // The `__nextgen_session` cookie issued at creation (or superseded by a handoff
-// exchange) is required. Idempotent: if the session is already gone this still
-// returns 204. Any tokens derived from the session are invalidated, and the
-// cookie itself is cleared in the response.
+// exchange) is required, with the session's token from `GET /sessions/me/csrf`
+// in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
+// this still returns 204. Any tokens derived from the session are invalidated,
+// and the cookie itself is cleared in the response.
+// With `project_id`, only a session of that project is deleted. A session of
+// another project is left alone, and so is its cookie.
 //
 // DELETE /sessions/me
-func (c *Client) RevokeMySession(ctx context.Context) (RevokeMySessionRes, error) {
-	res, err := c.sendRevokeMySession(ctx)
+func (c *Client) RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error) {
+	res, err := c.sendRevokeMySession(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendRevokeMySession(ctx context.Context) (res RevokeMySessionRes, err error) {
+func (c *Client) sendRevokeMySession(ctx context.Context, params RevokeMySessionParams) (res RevokeMySessionRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("revokeMySession"),
 		semconv.HTTPRequestMethodKey.String("DELETE"),
@@ -12850,6 +13365,30 @@ func (c *Client) sendRevokeMySession(ctx context.Context) (res RevokeMySessionRe
 	var pathParts [1]string
 	pathParts[0] = "/sessions/me"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "DELETE", u)
@@ -13399,7 +13938,10 @@ func (c *Client) sendRollbackDeployment(ctx context.Context, request OptRollback
 
 // SetUserPassword invokes setUserPassword operation.
 //
-// Set user password.
+// Sets a user's password, hashed with the project's current password hashing
+// policy.
+// The new password replaces the current one, and setting it emits
+// `auth.factor.password.set`.
 //
 // PUT /users/{user_id}/password
 func (c *Client) SetUserPassword(ctx context.Context, request *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error) {
