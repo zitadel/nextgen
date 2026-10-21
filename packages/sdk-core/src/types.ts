@@ -28,8 +28,18 @@ export interface ZitadelFlowInputDetail {
   readonly value: string;
 }
 
+/**
+ * Carried by the events after which the widget navigates. A listener whose work
+ * must finish first (an async handler, a lazily loaded callback) passes its
+ * promise to `waitUntil`; the widget navigates once every promise has settled,
+ * or after a short timeout.
+ */
+export interface ZitadelNavigationDetail {
+  readonly waitUntil: (work: Promise<unknown>) => void;
+}
+
 /** Payload of the `zitadel-flow-complete` event. */
-export interface ZitadelFlowCompleteDetail {
+export interface ZitadelFlowCompleteDetail extends ZitadelNavigationDetail {
   readonly behavior: CreateFlow201StepComplete;
   readonly redirect_uri?: string;
   readonly handoff_token?: string;
@@ -41,7 +51,7 @@ export interface ZitadelFlowCompleteDetail {
  * browser to an identity provider. Distinct from `zitadel-flow-complete`:
  * nobody is signed in yet, and the flow resumes when the provider returns.
  */
-export interface ZitadelFlowRedirectDetail {
+export interface ZitadelFlowRedirectDetail extends ZitadelNavigationDetail {
   readonly redirect_url: string;
   readonly step: CreateFlow201Step;
 }
@@ -52,7 +62,7 @@ export interface ZitadelFlowErrorDetail {
 }
 
 /** Payload of the `zitadel-signout` event. */
-export interface ZitadelSignoutDetail {
+export interface ZitadelSignoutDetail extends ZitadelNavigationDetail {
   /** The signed-out user's display rendering ("" when none was resolved). */
   readonly display: string;
   /** The signed-out user's login identifier ("" when none was resolved). */

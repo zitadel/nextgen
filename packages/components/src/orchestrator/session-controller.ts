@@ -2,7 +2,7 @@ import type { ReactiveController, ReactiveControllerHost } from "lit";
 
 import { getSession, revokeSession } from "./api-client.js";
 import type { resolveApi } from "./resolve-api.js";
-import { emit } from "../internal/emit.js";
+import { emitThenSettle } from "../internal/emit.js";
 
 type Resolved = ReturnType<typeof resolveApi>;
 
@@ -92,7 +92,10 @@ export class SessionController implements ReactiveController {
     this.loading = false;
     this.host.requestUpdate();
     onRevoked?.();
-    emit(this.host, "zitadel-signout", { display: this.display, identifier: this.identifier });
+    await emitThenSettle(this.host, "zitadel-signout", {
+      display: this.display,
+      identifier: this.identifier,
+    });
     return true;
   }
 

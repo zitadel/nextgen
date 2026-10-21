@@ -304,6 +304,30 @@ describe("ZitadelLogout", () => {
     },
   );
 
+  it("registers its lazy callback with waitUntil so the widget navigates only after it ran", async () => {
+    const finished: string[] = [];
+    const registered: Promise<unknown>[] = [];
+    const host = await renderWidget(
+      <ZitadelLogout
+        project={project}
+        onSignout$={$(async () => {
+          await Promise.resolve();
+          finished.push("signout");
+        })}
+      />,
+    );
+    const el = widgetIn(host, widgetTags.logout);
+    const detail = { waitUntil: (work: Promise<unknown>) => registered.push(work) };
+
+    await vi.waitFor(() => {
+      el.dispatchEvent(new CustomEvent("zitadel-signout", { detail }));
+      expect(registered).not.toHaveLength(0);
+    });
+    await Promise.all(registered);
+
+    expect(finished).not.toHaveLength(0);
+  });
+
   it("populates a consumer ref with the underlying element", async () => {
     const consumerRef = { value: undefined } as Signal<ZitadelLogoutElement | undefined>;
     const host = await renderWidget(<ZitadelLogout project={project} ref={consumerRef} />);

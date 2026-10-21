@@ -18,7 +18,7 @@ import "../atoms/index.js";
 import type { ZlFieldInputDetail, ZlSubmitDetail } from "../atoms/index.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
-import { emit } from "../internal/emit.js";
+import { emit, emitThenSettle } from "../internal/emit.js";
 import { escapeHtml } from "../internal/escape-html.js";
 import {
   exchangeSession,
@@ -994,9 +994,12 @@ export class ZitadelLogin extends ZitadelSurface {
     // (`terminate()` in flow_state_machine.go). That is a finished sign-in,
     // not a trip to a provider, and it belongs to `maybeCompleteFlow`.
     if (!target || response.step.complete) return false;
-    emit(this, "zitadel-flow-redirect", { redirect_url: target, step: response.step });
+    const settled = emitThenSettle(this, "zitadel-flow-redirect", {
+      redirect_url: target,
+      step: response.step,
+    });
     if (typeof window === "undefined") return false;
-    window.location.assign(target);
+    void settled.then(() => window.location.assign(target));
     return true;
   }
 
@@ -1017,7 +1020,7 @@ export class ZitadelLogin extends ZitadelSurface {
     const behavior = response.step.complete;
     if (!behavior) return;
 
-    emit(this, "zitadel-flow-complete", {
+    await emitThenSettle(this, "zitadel-flow-complete", {
       behavior,
       redirect_uri: response.redirect_uri,
       handoff_token: response.handoff_token,

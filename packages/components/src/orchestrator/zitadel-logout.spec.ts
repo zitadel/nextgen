@@ -264,7 +264,7 @@ describe("<zitadel-logout>", () => {
     expect(requestLog[0]?.credentials).toBe("include");
     expect(requestLog[0]?.csrf).toBe(CSRF_TOKEN);
     expect(signoutEvents).toHaveLength(1);
-    expect(signoutEvents[0]?.detail).toEqual({
+    expect(signoutEvents[0]?.detail).toMatchObject({
       display: "Alice Liddell",
       identifier: "alice@acme.com",
     });

@@ -186,9 +186,22 @@ function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps
   setProp(el, "suppressHeader", props.suppressHeader);
 }
 
-/** Hands the detail of a widget event to its handler; a plain event carries none and is not one. */
-function withDetail<Detail>(event: Event, handler: ((detail: Detail) => void) | undefined): void {
-  if (event instanceof CustomEvent) handler?.(event.detail);
+/**
+ * Hands the detail of a widget event to its handler; a plain event carries none and is not one.
+ * A QRL loads lazily and runs asynchronously, so an event that navigates gets the QRL's promise
+ * through `waitUntil` and the widget holds its navigation until the handler has run.
+ */
+function withDetail<Detail>(
+  event: Event,
+  handler: QRL<(detail: Detail) => void> | undefined,
+): void {
+  if (!(event instanceof CustomEvent) || !handler) {
+    return;
+  }
+  const running = handler(event.detail);
+  if (event.detail && typeof event.detail.waitUntil === "function") {
+    event.detail.waitUntil(running);
+  }
 }
 
 /**
