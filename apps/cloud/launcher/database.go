@@ -50,6 +50,12 @@ func gitRef() string {
 
 var notIdentifierChar = regexp.MustCompile(`[^a-z0-9_]+`)
 
+// previewSchemaEpoch is mixed into the preview database name hash. Bump it
+// when sticky preview databases cannot remigrate (goose out-of-order after a
+// migration renumber) so the next deploy gets a fresh empty database. The
+// orphaned name is left for later cleanup.
+const previewSchemaEpoch = "2"
+
 // previewDatabaseName is the database of a preview: one per Git branch, so a
 // branch keeps its data across pushes and from before its pull request
 // exists. Postgres names hold 63 bytes; the readable part is cut short and a
@@ -62,7 +68,7 @@ func previewDatabaseName(ref string) (string, error) {
 	if len(slug) > 40 {
 		slug = strings.TrimRight(slug[:40], "_")
 	}
-	sum := sha256.Sum256([]byte(ref))
+	sum := sha256.Sum256([]byte(previewSchemaEpoch + "\n" + ref))
 	hash := hex.EncodeToString(sum[:4])
 	if slug == "" {
 		return "preview_" + hash, nil
@@ -208,16 +214,17 @@ func dropPreviewDatabase(ctx context.Context, baseDSN, name string) error {
 }
 
 func dropDatabaseAsConnectingOrAdmin(ctx context.Context, conn *pgx.Conn, identifier string) error {
-	_, err := conn.Exec(ctx, "DROP DATABASE IF EXISTS "+identifier+" WITH (FORCE)")
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) || pgErr.Code != "42501" { // insufficient_privilege
-		return err
+	drop := "DROP DATABASE IF EXISTS " + identifier + " WITH (FORCE)"
+	// Prefer adminRole first: createDatabase often owns the DB as postgres.
+	if _, setErr := conn.Exec(ctx, "SET ROLE "+pgx.Identifier{adminRole}.Sanitize()); setErr == nil {
+		_, err := conn.Exec(ctx, drop)
+		_, _ = conn.Exec(context.WithoutCancel(ctx), "RESET ROLE")
+		if err == nil {
+			return nil
+		}
+		// Fall through and try as the connecting role.
 	}
-	if _, setErr := conn.Exec(ctx, "SET ROLE "+pgx.Identifier{adminRole}.Sanitize()); setErr != nil {
-		return fmt.Errorf("%w; cannot act as %s to drop: %v", err, adminRole, setErr)
-	}
-	defer func() { _, _ = conn.Exec(context.WithoutCancel(ctx), "RESET ROLE") }()
-	_, err = conn.Exec(ctx, "DROP DATABASE IF EXISTS "+identifier+" WITH (FORCE)")
+	_, err := conn.Exec(ctx, drop)
 	return err
 }
 
