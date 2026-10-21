@@ -195,6 +195,32 @@ describe("setupMockHandlers", () => {
   });
 
   /**
+   * redirect_uri on create is caller input a terminal `redirect` step sends the
+   * browser to, so the mock parses it with the same hardened check as the
+   * engine (`internal/api/flow.go`). The full bypass corpus is covered on its
+   * own in redirect-target.spec.ts; here it is enough to prove the create
+   * handler wires it.
+   */
+  test("accepts a safe redirect_uri on create", async () => {
+    const start = await createFlow({
+      purpose: "login",
+      project_id: PROJECT_ID,
+      redirect_uri: "https://app.test/callback?code=abc",
+    });
+    expect(start.step.name).toBe("identifier");
+  });
+
+  test("refuses an unsafe redirect_uri on create", async () => {
+    await expect(
+      createFlow({
+        purpose: "login",
+        project_id: PROJECT_ID,
+        redirect_uri: "https://app.test//evil.example/login",
+      }),
+    ).rejects.toMatchObject({ status: 400, body: { code: "req.invalid" } });
+  });
+
+  /**
    * A provider id on an ordinary submit is a malformed request, not a choice
    * of provider. The engine reserves `action: "sso"` for that, so the mock
    * must not accept the looser shape and hand back a pass the engine would
