@@ -51,7 +51,9 @@ const shellHandlers = [
       },
     }),
   ),
-  // The person's own sign-in methods, on account settings' profile: none.
+  // The person's own sign-in methods, on account settings' profile: none, and
+  // no password.
+  http.get("*/api/users/me/password", () => HttpResponse.json({})),
   http.get("*/api/users/me/passkeys", () => HttpResponse.json({ passkeys: [] })),
   http.get("*/api/users/me/identity_links", () => HttpResponse.json({ identity_links: [] })),
 ];

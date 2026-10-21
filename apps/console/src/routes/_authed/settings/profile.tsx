@@ -6,7 +6,7 @@ import { DETAIL_CARD, DETAIL_TITLE } from "@/components/detail-page";
 import { FormError } from "@/components/form-error";
 import { Page, SettingsColumn } from "@/components/layout";
 import { SettingsCard, SettingsSection } from "@/components/settings-card";
-import { IdentityLinks, Passkeys } from "@/components/sign-in-methods";
+import { IdentityLinks, MethodNote, Passkeys } from "@/components/sign-in-methods";
 import { PAGE_TITLE_ROW } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -25,7 +25,7 @@ import { api } from "@/api/zitadel";
 import { consoleSessionProject, invalidateSessionCache } from "@/auth/session";
 import { useSubmit } from "@/hooks/use-submit";
 import { fetchAllIdps, fetchMyIdentityLinks } from "@/lib/idp";
-import { fetchMyPasskeys } from "@/lib/passkeys";
+import { fetchMyPasskeys, fetchMyPasswordSetAt, passwordState } from "@/lib/sign-in-methods";
 import { displayValue, field } from "@/lib/record";
 import { type SchemaField, attributeValue, schemaFields } from "@/lib/schema";
 import { readOwnUserSchema } from "@/lib/user-schema";
@@ -42,9 +42,9 @@ import { userAttributes } from "@/lib/user";
  * the sidebar footer, so the page reads as theirs at a glance.
  *
  * Under it, the person's sign-in methods, read with the session alone
- * (`/users/me/passkeys`, `/users/me/identity_links`). Read-only: adding or
- * removing one has no self-service endpoint yet, and whether a password is
- * set is not readable, so password is not listed.
+ * (`/users/me/password`, `/users/me/passkeys`, `/users/me/identity_links`).
+ * Read-only: setting a password or adding and removing the rest has no
+ * self-service endpoint yet.
  */
 export const Route = createFileRoute("/_authed/settings/profile")({
   staticData: {
@@ -53,9 +53,11 @@ export const Route = createFileRoute("/_authed/settings/profile")({
   loader: async () => {
     // A failed schema read leaves the identifier alone (below), and a failed
     // sign-in method read costs its list, never the screen.
-    const [user, schema, passkeys, identityLinks] = await Promise.all([
+    const [user, schema, passwordSetAt, passkeys, identityLinks] = await Promise.all([
       api.getMyUser(consoleSessionProject()),
       readOwnUserSchema().catch(() => undefined),
+      // `null`: no password; `undefined`: it could not be read.
+      fetchMyPasswordSetAt().catch(() => undefined),
       fetchMyPasskeys().catch(() => undefined),
       fetchMyIdentityLinks().catch(() => undefined),
     ]);
@@ -65,7 +67,7 @@ export const Route = createFileRoute("/_authed/settings/profile")({
     const projectId = consoleSessionProject()?.project_id;
     const idps =
       projectId && identityLinks?.length ? await fetchAllIdps(projectId).catch(() => null) : null;
-    return { user, schema, passkeys, identityLinks, idps };
+    return { user, schema, passwordSetAt, passkeys, identityLinks, idps };
   },
   component: ProfileScreen,
 });
@@ -90,7 +92,7 @@ function identifierFallback(user: Record<string, unknown>): SchemaField[] {
 }
 
 function ProfileScreen() {
-  const { user, schema, passkeys, identityLinks, idps } = Route.useLoaderData();
+  const { user, schema, passwordSetAt, passkeys, identityLinks, idps } = Route.useLoaderData();
   const record = user as Record<string, unknown>;
   const attributes = userAttributes(record);
   // The read-only row is whatever the schema designates as the identifier, or,
@@ -159,9 +161,12 @@ function ProfileScreen() {
 
         <SettingsSection
           title="Sign-in methods"
-          description="The passkeys you registered, and the identity provider accounts linked to you when you signed in with them."
+          description="Your password, the passkeys you registered, and the identity provider accounts linked to you when you signed in with them."
         >
           <Card className={DETAIL_CARD}>
+            <h3 className={METHOD_HEAD}>Password</h3>
+            <MethodNote>{passwordState(passwordSetAt)}</MethodNote>
+            <Separator />
             <h3 className={METHOD_HEAD}>Passkeys</h3>
             <Passkeys passkeys={passkeys} empty="You have not added a passkey." />
             <Separator />

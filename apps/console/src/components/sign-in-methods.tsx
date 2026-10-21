@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 
 import { formatDate } from "@/lib/date";
 import type { IdpConnection, UserIdentityLink } from "@/lib/idp";
-import type { Passkey } from "@/lib/passkeys";
+import type { Passkey } from "@/lib/sign-in-methods";
 
 // Long utility strings live as named constants so Tailwind's scanner sees the
 // full literal (it never sees a concatenated fragment).
@@ -86,7 +86,7 @@ export function Passkeys({ passkeys, empty }: { passkeys: Passkey[] | undefined;
 /** What a list shows when its read failed. */
 const FAILED = "Could not be loaded";
 
-/** A list's single line in place of rows: empty, or its read failed. */
-function MethodNote({ children }: { children: string }) {
+/** A method's single line in place of rows: its state, empty, or a failed read. */
+export function MethodNote({ children }: { children: string }) {
   return <p className={`${METHOD_NOTE} px-6 pt-4 pb-5`}>{children}</p>;
 }

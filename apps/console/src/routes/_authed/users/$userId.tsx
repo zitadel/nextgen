@@ -30,6 +30,7 @@ import {
   fetchAllIdps,
   fetchUserIdentityLinks,
 } from "@/lib/idp";
+import { passwordState } from "@/lib/sign-in-methods";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { displayValue, field } from "@/lib/record";
 import {
@@ -229,13 +230,6 @@ function AuthenticationRows({ rows }: { rows: AuthenticationRow[] }) {
       ))}
     </ul>
   );
-}
-
-function passwordState(setAt: string | null | undefined): string {
-  if (setAt === undefined) return "Could not be loaded";
-  // When it was set, not "verified": an operator may have set it, and no
-  // check of it is recorded.
-  return setAt === null ? "Not set" : `Set ${formatDateTime(setAt)}`;
 }
 
 /**

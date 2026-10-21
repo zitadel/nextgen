@@ -17,6 +17,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 const ME_URL = "http://localhost/api/users/me";
 const SCHEMA_URL = "*/api/users/me/schema";
 const PASSKEYS_URL = "*/api/users/me/passkeys";
+const PASSWORD_URL = "*/api/users/me/password";
 const LINKS_URL = "*/api/users/me/identity_links";
 
 /** The shipped default: email only, nothing designated for display. */
@@ -225,9 +226,10 @@ describe("settings profile, generated from the schema", () => {
     await waitFor(() => expect(patched).toEqual({ attributes: { name: "Maya" } }));
   });
 
-  it("lists the person's own passkeys and linked accounts", async () => {
+  it("lists the person's own password, passkeys and linked accounts", async () => {
     server.use(
       http.get(ME_URL, () => HttpResponse.json(me())),
+      http.get(PASSWORD_URL, () => HttpResponse.json({ set_at: "2026-08-01T10:00:00Z" })),
       http.get(PASSKEYS_URL, () =>
         HttpResponse.json({
           passkeys: [{ id: "pk_1", name: "MacBook", created_at: "2026-09-01T10:00:00Z" }],
@@ -244,6 +246,7 @@ describe("settings profile, generated from the schema", () => {
     await renderAt("/settings/profile");
 
     expect(await screen.findByText("MacBook")).toBeInTheDocument();
+    expect(screen.getByText(/^Set /)).toBeInTheDocument();
     // The connections are not readable here, so the id names the provider.
     expect(screen.getByText("idp_google")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "idp_google" })).not.toBeInTheDocument();
@@ -252,6 +255,8 @@ describe("settings profile, generated from the schema", () => {
   it("says so when the person has no sign-in methods beyond their identifier", async () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
+
+    expect(await screen.findByText("Not set")).toBeInTheDocument();
 
     expect(await screen.findByText("You have not added a passkey.")).toBeInTheDocument();
     expect(screen.getByText("No identity provider account is linked to you.")).toBeInTheDocument();
