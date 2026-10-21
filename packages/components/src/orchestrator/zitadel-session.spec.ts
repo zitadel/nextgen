@@ -260,7 +260,7 @@ describe("<zitadel-session>", () => {
     expect(deleteLog[0]?.credentials).toBe("include");
     expect(deleteLog[0]?.csrf).toBe(CSRF_TOKEN);
     expect(events).toHaveLength(1);
-    expect(events[0]?.detail).toEqual({ display: "", identifier: "alice@acme.com" });
+    expect(events[0]?.detail).toMatchObject({ display: "", identifier: "alice@acme.com" });
   });
 
   // The token read names the project too, so a session of another project is
@@ -369,6 +369,31 @@ describe("<zitadel-session>", () => {
 
     expect(deleteLog).toHaveLength(1);
     expect(loc.current).toBe("https://app.test/login");
+  });
+
+  it("waits for work a zitadel-signout listener registers before navigating to post-sign-out-url", async () => {
+    const loc = stubLocation();
+    const element = mount();
+    element.postSignOutUrl = "https://app.test/login";
+    await flush(element);
+    const finish = new AbortController();
+    const signedOut = vi.fn();
+    element.addEventListener("zitadel-signout", (event) => {
+      signedOut();
+      if (event instanceof CustomEvent) {
+        event.detail.waitUntil(
+          new Promise((resolve) => finish.signal.addEventListener("abort", resolve)),
+        );
+      }
+    });
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await vi.waitFor(() => expect(signedOut).toHaveBeenCalledOnce());
+    await element.updateComplete;
+    expect(loc.current).toBe("");
+
+    finish.abort();
+    await vi.waitFor(() => expect(loc.current).toBe("https://app.test/login"));
   });
 
   it("signs out using project-id / proxy-path attributes with no global config", async () => {

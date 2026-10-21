@@ -3,16 +3,9 @@ title: Variables
 description: OpenAPI operations for project variables and secrets.
 ---
 
-import { Card, Cards } from "fumadocs-ui/components/card";
-
 Variables are named values a project stores. Today an OIDC identity provider
 connection references them as `${{ NAME }}` in its `client_id` and
 `client_secret`. Secrets are variables whose value is stored encrypted and never
 read back.
 
-<Cards>
-  <Card title="Get variables" href="/docs/reference/api/variables/getVariables" />
-  <Card title="Update variables" href="/docs/reference/api/variables/updateVariables" />
-  <Card title="Get a variable" href="/docs/reference/api/variables/getVariable" />
-  <Card title="Delete a variable" href="/docs/reference/api/variables/deleteVariable" />
-</Cards>
+<Operations />

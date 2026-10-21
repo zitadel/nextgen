@@ -57,11 +57,16 @@ func battleDeploymentsOfOrigin(t *testing.T, d dialect) {
 }
 
 // The live view pages through the correlated live predicate; every seeded
-// deployment serves its own origin.
+// preview deployment serves its own URL.
 func battleLiveDeployments(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureReleaseProject(t, d.stmts)
-	want := seedDeployments(t, d, projectID, distinctOrigin)
+	want := make([]string, 0, 5)
+	for i := range 5 {
+		rel := createRelease(t, d.stmts, projectID, string(rune('a'+i)), domain.ReleaseMetadata{})
+		origin := fmt.Sprintf("https://acme-live%d-acmeinc.vercel.app", i)
+		want = append(want, deploy(t, d.stmts, projectID, rel.ID, []string{origin}, previewDeploy(time.Hour)).ID)
+	}
 	now := time.Now()
 	orderAsc := deployment.NewestFirst()
 	orderAsc.Direction = database.OrderAsc

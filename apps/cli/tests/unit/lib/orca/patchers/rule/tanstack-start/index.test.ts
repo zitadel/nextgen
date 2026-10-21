@@ -8,7 +8,7 @@ import { TanStackStartPatcher } from "../../../../../../../src/lib/orca/patchers
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
-function ctx(appDir = "src"): PatchContext {
+function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
   return {
     framework: { id: "tanstack-start", appDir, devPort: 3000, url: "http://localhost:3000" },
     rendererId: "react",
@@ -22,6 +22,7 @@ function ctx(appDir = "src"): PatchContext {
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
     cliVersion: "0.1.0-alpha.0",
+    scaffoldedFramework,
   };
 }
 
@@ -57,6 +58,20 @@ describe("TanStackStartPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
     expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelSession");
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("#0f0f11");
+  });
+
+  it("keeps a pre-existing app's landing page, writing the rest (ADR 044)", () => {
+    const plan = new TanStackStartPatcher().plan(ctx("src", false));
+
+    // The user's own landing page is left untouched, so setup never conflicts
+    // on it or overwrites it under --force — a pre-existing src/start.ts (e.g.
+    // another auth provider's) still conflicts, which is the intended refusal.
+    expect(writeContents(plan, "src/routes/index.tsx")).toBeUndefined();
+    // The auth boundary and the auth routes are still written.
+    expect(writeContents(plan, "src/start.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
+    expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
+    expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelSession");
   });
 
   // CSRF must run before auth, so a cross-site server-function call is
@@ -169,6 +184,21 @@ describe("TanStackStartPatcher.artifacts", () => {
     expect(artifacts.markedFiles).toContain("src/routes/login.tsx");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-tanstack-start"]);
     expect(artifacts.configEdits).toEqual(["package.json"]);
+  });
+
+  it("declares the landing page as conditionally scaffolded", () => {
+    // Written only on fresh scaffolds, so the managed-files check must not
+    // expect it on a manifest-less pre-existing app.
+    const artifacts = new TanStackStartPatcher().artifacts({
+      framework: {
+        id: "tanstack-start",
+        appDir: "src",
+        devPort: 3000,
+        url: "http://localhost:3000",
+      },
+      rendererId: "react",
+    });
+    expect(artifacts.conditionalFiles).toEqual(expect.arrayContaining(["src/routes/index.tsx"]));
   });
 });
 

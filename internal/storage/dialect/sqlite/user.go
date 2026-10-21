@@ -173,6 +173,47 @@ func (us userStatements) GetUserUniqueAttributeScopes(ctx context.Context, proje
 	return scopes, wrapError(rows.Err())
 }
 
+// GetTakenUniqueAttributeKeys implements [service.UserStatements].
+func (us userStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projectID, userID string, claims []service.UniqueAttributeClaim) ([]domain.AttributeKey, error) {
+	if len(claims) == 0 {
+		return nil, nil
+	}
+	var compiler statementCompiler
+	compiler.WriteString("SELECT key FROM user_unique_attributes WHERE project_id = ")
+	compiler.WriteArg(projectID)
+	compiler.WriteString(" AND user_id <> ")
+	compiler.WriteArg(userID)
+	compiler.WriteString(" AND (")
+	for i, claim := range claims {
+		if i > 0 {
+			compiler.WriteString(" OR ")
+		}
+		compiler.WriteString("(team_id = ")
+		compiler.WriteArg(claim.TeamID)
+		compiler.WriteString(" AND key = ")
+		compiler.WriteArg(claim.Key)
+		compiler.WriteString(" AND value_hash = ")
+		compiler.WriteArg(claim.ValueHash[:])
+		compiler.WriteString(")")
+	}
+	compiler.WriteString(")")
+	rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+
+	var keys []domain.AttributeKey
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		keys = append(keys, domain.AttributeKey(key))
+	}
+	return keys, wrapError(rows.Err())
+}
+
 // PatchUser implements [service.UserStatements] as a full rewrite of the
 // user's attribute and registry rows; a registry insert colliding with
 // another user's claim still surfaces as a UniqueError.

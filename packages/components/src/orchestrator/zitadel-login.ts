@@ -161,6 +161,16 @@ function apiErrorCode(error: unknown): string {
     : "";
 }
 
+/**
+ * Orchestrator element `<zitadel-login>` — drives a login flow end to end and
+ * surfaces its progress through the public `zitadel-*` events.
+ *
+ * @fires {CustomEvent<ZitadelFlowStepDetail>} zitadel-flow-step - A new flow step was rendered.
+ * @fires {CustomEvent<ZitadelFlowInputDetail>} zitadel-flow-input - A field in the current step changed.
+ * @fires {CustomEvent<ZitadelFlowRedirectDetail>} zitadel-flow-redirect - The flow is navigating to an external target.
+ * @fires {CustomEvent<ZitadelFlowCompleteDetail>} zitadel-flow-complete - The flow reached a terminal step.
+ * @fires {CustomEvent<ZitadelFlowErrorDetail>} zitadel-flow-error - The flow failed; carries the error message.
+ */
 @customElement("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
@@ -325,6 +335,12 @@ export class ZitadelLogin extends ZitadelSurface {
   @state() private accessor completing = false;
 
   @state() private accessor startupError: string | null = null;
+
+  /**
+   * The action of the submit in flight, so only the control that started it
+   * shows progress. Set and cleared with `loading`, which is what re-renders.
+   */
+  private pendingAction: string | null = null;
 
   @state() private accessor formValues: Record<string, string> = {};
 
@@ -807,7 +823,7 @@ export class ZitadelLogin extends ZitadelSurface {
       if (this.restarting) {
         wire = { ...wire, step: { ...wire.step, error: "error.flow_restart_required" } };
       }
-      this.applyResponse(wire);
+      void this.applyResponse(wire);
       // Symmetric with `submit()`: every applied step announces itself, the
       // first one included. A host app driving its own chrome from the step
       // (progress, headings, analytics) would otherwise see nothing until
@@ -886,7 +902,7 @@ export class ZitadelLogin extends ZitadelSurface {
     return error;
   }
 
-  private applyResponse(wire: CreateFlow201): void {
+  private async applyResponse(wire: CreateFlow201): Promise<void> {
     this.restarting = false;
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
@@ -918,7 +934,7 @@ export class ZitadelLogin extends ZitadelSurface {
 
     this.syncBackSentinel(wire.step);
 
-    if (this.maybeRedirectToProvider(wire)) return;
+    if (await this.maybeRedirectToProvider(wire)) return;
     void this.maybeCompleteFlow(wire);
   }
 
@@ -987,14 +1003,19 @@ export class ZitadelLogin extends ZitadelSurface {
    *
    * Returns whether it navigated, so the caller can stop.
    */
-  private maybeRedirectToProvider(response: CreateFlow201): boolean {
+  private async maybeRedirectToProvider(response: CreateFlow201): Promise<boolean> {
     const target = response.step.redirect_url;
     // A terminal step carries `redirect_url` too — the engine copies the
     // relying party's `redirect_uri` onto it when a sign-in completes
     // (`terminate()` in flow_state_machine.go). That is a finished sign-in,
     // not a trip to a provider, and it belongs to `maybeCompleteFlow`.
     if (!target || response.step.complete) return false;
-    emit(this, "zitadel-flow-redirect", { redirect_url: target, step: response.step });
+    await emit(
+      this,
+      "zitadel-flow-redirect",
+      { redirect_url: target, step: response.step },
+      { waitForListeners: true },
+    );
     if (typeof window === "undefined") return false;
     window.location.assign(target);
     return true;
@@ -1017,12 +1038,17 @@ export class ZitadelLogin extends ZitadelSurface {
     const behavior = response.step.complete;
     if (!behavior) return;
 
-    emit(this, "zitadel-flow-complete", {
-      behavior,
-      redirect_uri: response.redirect_uri,
-      handoff_token: response.handoff_token,
-      handoff_token_expires_at: response.handoff_token_expires_at,
-    });
+    await emit(
+      this,
+      "zitadel-flow-complete",
+      {
+        behavior,
+        redirect_uri: response.redirect_uri,
+        handoff_token: response.handoff_token,
+        handoff_token_expires_at: response.handoff_token_expires_at,
+      },
+      { waitForListeners: true },
+    );
 
     if (typeof window === "undefined") return;
     if (behavior === "redirect" && response.redirect_uri) {
@@ -1105,11 +1131,13 @@ export class ZitadelLogin extends ZitadelSurface {
       // reconnect `<zl-passkey>` and start a second WebAuthn ceremony. A
       // preview renders none at all: the atom starts its ceremony on connect.
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
+      identifier: step.identifier ?? null,
       messages: [],
       identity: this.deriveIdentity(),
       errors,
       branding: this.brandingForTemplate(),
       loading: this.loading,
+      pending_action: this.pendingAction,
     };
 
     let raw: string;
@@ -1510,6 +1538,7 @@ export class ZitadelLogin extends ZitadelSurface {
     // this one check keeps a preview from ever writing to the flow.
     if (!this.response || this.loading || this.preview) return;
     const { id, session_token } = this.response;
+    this.pendingAction = action ?? "submit";
     this.loading = true;
     try {
       // Only send field values the current step defines. `formValues` carries
@@ -1530,12 +1559,13 @@ export class ZitadelLogin extends ZitadelSurface {
       };
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       const wire = await apiSubmitStep(api, id, body);
-      this.applyResponse(wire);
+      void this.applyResponse(wire);
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
       if (await this.restartIfRequired(error)) return;
       this.handleTransportError(error);
     } finally {
+      this.pendingAction = null;
       this.loading = false;
     }
     // Preview switched on while this submit was in flight: show the step it

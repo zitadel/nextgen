@@ -7,6 +7,13 @@ import type { ScaffoldPosture } from "../../sync/types";
  * component, so nothing survives for a widget to embed into; they keep the
  * page posture until a non-destructive route/layout insertion contract
  * exists for their routers.
+ *
+ * SvelteKit, SolidStart, Qwik Router and TanStack Start now skip the shell and
+ * landing page on a pre-existing app too, but stay out of this set until their
+ * page templates honour `ctx.posture`: Next and Nuxt render `variant="widget"`
+ * cards in a layout-neutral wrapper for the widget posture, whereas the four
+ * ignore posture and always paint page chrome, so recording `widget` for them
+ * would misdescribe what was written.
  */
 const ROUTE_BASED_FRAMEWORKS: ReadonlySet<string> = new Set(["next", "nuxt"]);
 

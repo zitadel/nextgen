@@ -83,7 +83,8 @@ upgrade, so upgrade the app and rerun rather than retrying.
   both `--flag value` and `--flag=value`, and `--no-telemetry`-style negation.
   Two deliberate deviations worth knowing: `-n` is `--non-interactive` (not
   `--dry-run`, which is long-only), and machine output is `--json` (not
-  `--output json`).
+  `--output json`). `api` takes `-X` for the method, as curl does, and `-F` for
+  a typed field, as `gh api` and `vercel api` do (not curl's form field).
 - **Writing a resource's body.** A `create` or `update` takes every field of
   its body as a flag, nested ones too: a nested field's flag is its dot path
   joined with `-` (`oidc.client_id` is `--oidc-client-id`), a list is a
@@ -97,6 +98,21 @@ upgrade, so upgrade the app and rerun rather than retrying.
   `required`; `--dry-run --json` returns the body that would be sent. For a
   deeply nested body, writing the document and passing it with `--file -` is
   often simplest.
+- **Calling an operation no command covers.** `zitadel api <operation>` calls
+  any operation of the API with the resolved server and `.zitadel/secret`.
+  Name it by its `operationId` (`queryUsers`, as the API reference and
+  `@zitadel/api` spell it) or by its path (`/users/query`; `-X` picks the
+  method where a path has several). Path parameters follow as arguments, in
+  path order; a `project_id` left out is the project's own. `-F name=value`
+  (or `name:=json`) sets a query parameter when the operation declares one by
+  that name, else a dot path into the body, typed by the operation's schema;
+  a list parameter takes one `-F` per value. `--input <path>` or `--input -`
+  takes the whole body, under the `-F` fields. `--paginate` follows
+  `next_page_token` to the last page. `--dry-run` sends nothing and returns
+  the request. An operation only an end user's session or the login flow's
+  cookie authenticates is refused with `E_VALIDATION`. Prefer a resource
+  command where one exists: `api ls --json` names it in each operation's
+  `command`.
 - **Never put secrets on the command line.** A property whose name reads as a
   credential (`password`, `client_secret`, `api_key`, …) is refused anywhere on
   argv when it holds free-form text — as a field flag, a `--set` or
@@ -126,6 +142,7 @@ npx @zitadel/cli@alpha --help               # every command, grouped by purpose
 npx @zitadel/cli@alpha commands             # flat list of all commands
 npx @zitadel/cli@alpha <command> --help     # a command's flags, which are required, and examples
 npx @zitadel/cli@alpha resources --json     # the resource surface in one call (see below); contacts no server
+npx @zitadel/cli@alpha api ls --json        # every API operation, its parameters, body and paging; contacts no server
 ```
 
 `--help` groups the surface into project commands (create a project and scaffold
@@ -179,6 +196,11 @@ Each invocation prints one JSON object:
   the apply superseded, re-pinned to the new revision's id.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
+- `api` emits the response body as `data`, exactly as the API reference
+  documents it (`null` for a response without one); with `--paginate`, the
+  page's list holds every page's items. `api --dry-run` emits the request
+  instead: `{operation, method, url, body?}`. A refusal from the server is the
+  error envelope, with its status and body in `details`.
 
 Common error codes point at their own fix in `next_commands`:
 

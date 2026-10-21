@@ -501,6 +501,44 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(completeEvents[0]?.detail.handoff_token).toBeTruthy();
   });
 
+  it("waits for work a zitadel-flow-complete listener registers before navigating", async () => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = "/admin";
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+      const finish = new AbortController();
+      const completed = vi.fn();
+      element.addEventListener("zitadel-flow-complete", (event) => {
+        completed();
+        if (event instanceof CustomEvent) {
+          event.detail.waitUntil(
+            new Promise((resolve) => finish.signal.addEventListener("abort", resolve)),
+          );
+        }
+      });
+
+      await advanceMockLoginFlow(element);
+      await vi.waitFor(() => expect(completed).toHaveBeenCalledOnce());
+      await element.updateComplete;
+      expect(assign).not.toHaveBeenCalled();
+
+      finish.abort();
+      await vi.waitFor(() => expect(assign).toHaveBeenCalledWith("/admin"));
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: location });
+    }
+  });
+
   it("does not paint the terminal step when it is about to navigate away", async () => {
     const assign = vi.fn();
     const { location } = window;
@@ -1723,16 +1761,21 @@ describe("<zitadel-login> against the typed Flow API", () => {
       await waitFor(() => element.shadowRoot?.querySelector('zl-field[type="password"]'));
     }
 
-    it("renders no visible control for the kind: back action (gesture-only)", async () => {
+    it("renders no generic control for the kind: back action, only the account's change link", async () => {
       const element = await mount(host);
       await navigateToRegisterPassword(element);
 
       // The step carries a kind: "back" action on the wire, but the template
-      // renders nothing for it — the browser's back gesture is the affordance
-      // (ADR 022). The kind-based exclusion also keeps it out of the generic
-      // secondary-button loop.
-      expect(element.shadowRoot?.querySelector('[data-action="back"]')).toBeNull();
+      // renders no Back button for it — the browser's back gesture is the
+      // affordance for step traversal (ADR 022). The kind-based exclusion also
+      // keeps it out of the generic secondary-button loop. The one control
+      // wired to it is the contextual correction beside the account the step
+      // names.
       expect(element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]')).toBeNull();
+      const wired = element.shadowRoot?.querySelectorAll('[data-action="back"]') ?? [];
+      expect(Array.from(wired, (el) => el.getAttribute("data-testid"))).toEqual([
+        "zitadel-action-change-account",
+      ]);
     });
 
     it("pushes a single sentinel entry without touching the URL", async () => {
