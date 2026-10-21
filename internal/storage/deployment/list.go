@@ -31,13 +31,16 @@ func ByIDs(projectID string, ids []string) database.Filter[domain.DeploymentFiel
 }
 
 // ListOptions lists a project's deployments newest first; a non-nil origin
-// narrows it to that origin's history.
-func ListOptions(projectID string, origin *string, limit uint32) *database.ListOptions[domain.DeploymentField] {
+// narrows it to that origin's history, a non-nil releaseID to that release.
+func ListOptions(projectID string, origin, releaseID *string, limit uint32) *database.ListOptions[domain.DeploymentField] {
 	filters := []database.Filter[domain.DeploymentField]{
 		database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID),
 	}
 	if origin != nil {
 		filters = append(filters, database.CorrelatedEqual(database.Col(domain.DeploymentFieldOrigin), *origin))
+	}
+	if releaseID != nil {
+		filters = append(filters, database.Equal(database.Col(domain.DeploymentFieldReleaseID), *releaseID))
 	}
 	return &database.ListOptions[domain.DeploymentField]{
 		Filter: database.And(filters...),
@@ -50,7 +53,7 @@ func ListOptions(projectID string, origin *string, limit uint32) *database.ListO
 
 // NewestOfKindOptions lists the project's newest deployment of kind.
 func NewestOfKindOptions(projectID string, kind domain.DeploymentOriginKind) *database.ListOptions[domain.DeploymentField] {
-	opts := ListOptions(projectID, nil, 1)
+	opts := ListOptions(projectID, nil, nil, 1)
 	opts.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.DeploymentFieldOriginKind), kind.String()))
 	return opts
 }
@@ -59,11 +62,7 @@ func NewestOfKindOptions(projectID string, kind domain.DeploymentOriginKind) *da
 // first; a non-nil releaseID narrows it to that release. ListLiveDeployments
 // applies the time with LiveAt.
 func LiveListOptions(projectID string, releaseID *string, limit uint32) *database.ListOptions[domain.DeploymentField] {
-	opts := ListOptions(projectID, nil, limit)
-	if releaseID != nil {
-		opts.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.DeploymentFieldReleaseID), *releaseID))
-	}
-	return opts
+	return ListOptions(projectID, nil, releaseID, limit)
 }
 
 // LiveAt returns opts narrowed to the deployments some origin serves at now.

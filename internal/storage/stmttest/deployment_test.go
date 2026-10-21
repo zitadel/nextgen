@@ -60,7 +60,7 @@ func tryDeploy(t *testing.T, stmts service.AllStatements, projectID, releaseID s
 
 func history(t *testing.T, stmts service.AllStatements, projectID, origin string) []*domain.Deployment {
 	t.Helper()
-	result, err := stmts.ListDeployments(unfilteredListCtx(t), deployment.ListOptions(projectID, &origin, 50))
+	result, err := stmts.ListDeployments(unfilteredListCtx(t), deployment.ListOptions(projectID, &origin, nil, 50))
 	require.NoError(t, err)
 	return result.Items
 }
@@ -361,12 +361,36 @@ func TestDeploymentStatements_ListIsProjectScopedNewestFirst(t *testing.T) {
 		second := deploy(t, d.stmts, projectID, rel.ID, []string{wwwOrigin}, deployArgs{})
 		deploy(t, d.stmts, otherProject, otherRel.ID, []string{appOrigin}, deployArgs{})
 
-		result, err := d.stmts.ListDeployments(unfilteredListCtx(t), deployment.ListOptions(projectID, nil, 50))
+		result, err := d.stmts.ListDeployments(unfilteredListCtx(t), deployment.ListOptions(projectID, nil, nil, 50))
 		require.NoError(t, err)
 		assert.Equal(t, []string{second.ID, first.ID}, deployment.DeploymentIDs(result.Items))
 		assert.Equal(t, []string{wwwOrigin}, result.Items[0].Origins())
 
 		assert.Empty(t, history(t, d.stmts, otherProject, wwwOrigin))
+	})
+}
+
+// The release filter keeps a release's deployments, superseded ones
+// included, and composes with the origin filter.
+func TestDeploymentStatements_HistoryOfOneRelease(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		relA := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
+
+		both := deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		previews := deploy(t, d.stmts, projectID, relA.ID, []string{gitOrigin}, previewDeploy(time.Hour))
+		deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+
+		list := func(origin, releaseID *string) []string {
+			result, err := d.stmts.ListDeployments(unfilteredListCtx(t), deployment.ListOptions(projectID, origin, releaseID, 50))
+			require.NoError(t, err)
+			return deployment.DeploymentIDs(result.Items)
+		}
+		assert.Equal(t, []string{previews.ID, both.ID}, list(nil, new(relA.ID)))
+		assert.Equal(t, []string{both.ID}, list(new(wwwOrigin), new(relA.ID)))
+		assert.Empty(t, list(new(gitOrigin), new(relB.ID)))
+		assert.Empty(t, list(nil, new("rel_01KX9Z9Z9Z9Z9Z9Z9Z9Z9Z9Z9Z")))
 	})
 }
 

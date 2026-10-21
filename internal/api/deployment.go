@@ -112,6 +112,9 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 	if origin, ok := params.Origin.Get(); ok {
 		input.Origin = new(string(origin))
 	}
+	if releaseID, ok := params.ReleaseID.Get(); ok {
+		input.ReleaseID = new(string(releaseID))
+	}
 	result, err := h.deploymentService.List(ctx, input)
 	if err != nil {
 		return nil, err

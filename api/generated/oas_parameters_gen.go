@@ -5211,6 +5211,9 @@ type ListDeploymentsParams struct {
 	// exactly as the deployment records it. An origin no deployment targeted
 	// answers an empty list, not an error.
 	Origin OptOrigin `json:",omitempty,omitzero"`
+	// Narrows the list to the deployments of this release. A release no
+	// deployment made live answers an empty list, not an error.
+	ReleaseID OptReleaseID `json:",omitempty,omitzero"`
 	// Lists what each target serves now instead of the history. Defaults
 	// to `false`.
 	Live OptBool `json:",omitempty,omitzero"`
@@ -5240,6 +5243,15 @@ func unpackListDeploymentsParams(packed middleware.Parameters) (params ListDeplo
 		}
 		if v, ok := packed[key]; ok {
 			params.Origin = v.(OptOrigin)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "release_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ReleaseID = v.(OptReleaseID)
 		}
 	}
 	{
@@ -5393,6 +5405,69 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "origin",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: release_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "release_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotReleaseIDVal ReleaseID
+				if err := func() error {
+					var paramsDotReleaseIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotReleaseIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotReleaseIDVal = ReleaseID(paramsDotReleaseIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ReleaseID.SetTo(paramsDotReleaseIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.ReleaseID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "release_id",
 			In:   "query",
 			Err:  err,
 		}

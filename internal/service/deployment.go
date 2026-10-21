@@ -53,6 +53,8 @@ type ListDeploymentsInput struct {
 	ProjectID string
 	// Origin narrows the list to one origin's history.
 	Origin *string
+	// ReleaseID narrows the list to one release's deployments.
+	ReleaseID *string
 	// Live lists what is served now instead of the history.
 	Live bool
 	// IncludeReleases embeds the release each deployment made live (ADR 059).
@@ -298,7 +300,7 @@ func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput
 	if input.Live {
 		result, err = s.listLive(ctx, input)
 	} else {
-		opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
+		opts := deployment.ListOptions(input.ProjectID, input.Origin, input.ReleaseID, uint32(normalizeLimit(input.Limit)))
 		opts.Pagination.Cursor = []byte(input.PageToken)
 		result, err = s.v2Pool.Statements().ListDeployments(ctx, opts)
 	}
@@ -423,7 +425,7 @@ func (s *DeploymentService) listLive(ctx context.Context, input ListDeploymentsI
 	}
 	if input.Origin != nil {
 		served, err := s.servedAt(ctx, input.ProjectID, domain.PrimaryOrigins(origins), *input.Origin)
-		if err != nil || served == nil {
+		if err != nil || !ofRelease(served, input.ReleaseID) {
 			return &database.ListResult[*domain.Deployment]{}, err
 		}
 		return &database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{served}}, nil
@@ -444,14 +446,14 @@ func (s *DeploymentService) listLive(ctx context.Context, input ListDeploymentsI
 		if err != nil {
 			return nil, err
 		}
-		if primary != nil {
+		if ofRelease(primary, input.ReleaseID) {
 			items = append(items, primary)
 			limit--
 		}
 	}
 	// A page holding only the primary deployment still looks for one preview,
 	// to know whether a later page exists.
-	opts := deployment.LiveListOptions(input.ProjectID, nil, max(limit, 1))
+	opts := deployment.LiveListOptions(input.ProjectID, input.ReleaseID, max(limit, 1))
 	opts.Filter = database.And(opts.Filter,
 		database.Equal(database.Col(domain.DeploymentFieldOriginKind), domain.DeploymentOriginKindPreview.String()))
 	opts.Pagination.Cursor = []byte(cursor)
@@ -522,6 +524,12 @@ func (s *DeploymentService) livePrimary(ctx context.Context, projectID string, o
 		return nil, err
 	}
 	return narrowed(newest, origins), nil
+}
+
+// ofRelease reports whether entity exists and, for a non-nil releaseID, made
+// that release live.
+func ofRelease(entity *domain.Deployment, releaseID *string) bool {
+	return entity != nil && (releaseID == nil || entity.ReleaseID == *releaseID)
 }
 
 // livePreviewsToken prefixes the page token of a later live-view page, which

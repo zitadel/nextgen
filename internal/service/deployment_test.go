@@ -14,6 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/deployment"
 )
 
 const appOrigin = "https://app.acme.com"
@@ -537,6 +538,43 @@ func TestDeploymentServiceListLivePagesPastThePrimary(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []*domain.Deployment{primary}, first.Items)
 		assert.Empty(t, first.NextPageToken)
+	})
+}
+
+// With release_id, the live view drops a primary deployment of another
+// release; the previews are narrowed in storage.
+func TestDeploymentServiceListLiveOfOneRelease(t *testing.T) {
+	primary := &domain.Deployment{
+		ProjectID: "proj_1", ID: "dep_primary", ReleaseID: "rel_other", OriginKind: domain.DeploymentOriginKindPrimary,
+		Targets: []domain.DeploymentTarget{{Origin: appOrigin}},
+	}
+
+	t.Run("the whole view", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectProjectOrigins(statements, appPrimary)
+		expectNewestPrimary(statements, primary)
+		preview := &domain.Deployment{ID: "dep_preview", ReleaseID: "rel_1", OriginKind: domain.DeploymentOriginKindPreview}
+		statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, _ time.Time, opts *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
+				want := database.And(deployment.LiveListOptions("proj_1", new("rel_1"), 1).Filter,
+					database.Equal(database.Col(domain.DeploymentFieldOriginKind), domain.DeploymentOriginKindPreview.String()))
+				assert.Equal(t, want, opts.Filter, "the previews are narrowed to the release")
+				return &database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{preview}}, nil
+			})
+
+		result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, ReleaseID: new("rel_1")})
+		require.NoError(t, err)
+		assert.Equal(t, []*domain.Deployment{preview}, result.Items)
+	})
+
+	t.Run("one origin", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectProjectOrigins(statements, appPrimary)
+		expectNewestPrimary(statements, primary)
+
+		result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, Origin: new(appOrigin), ReleaseID: new("rel_1")})
+		require.NoError(t, err)
+		assert.Empty(t, result.Items)
 	})
 }
 

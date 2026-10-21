@@ -679,12 +679,14 @@ type Invoker interface {
 	// Lists what ran where, and when.
 	// By default the list is the history, newest first: every deployment of
 	// the project with every target it made the release live on. With
-	// `origin`, the history of that origin alone.
+	// `origin`, the history of that origin alone. With `release_id`, the
+	// deployments of that release alone.
 	// With `live=true`, the list is what is served now: the project's newest
 	// primary deployment, narrowed to origins that are still primary, then the
 	// newest deployment to each live preview URL, newest first, narrowed to
 	// the URLs it still serves. Combined with `origin`, it is the one
-	// deployment that origin serves, or empty.
+	// deployment that origin serves, or empty. Combined with `release_id`,
+	// the deployments of the live view that serve that release.
 	// `expand: ["release"]` embeds the release each deployment made live; it
 	// requires `release.read` and does not change the ordering or the page
 	// tokens.
@@ -8835,12 +8837,14 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 // Lists what ran where, and when.
 // By default the list is the history, newest first: every deployment of
 // the project with every target it made the release live on. With
-// `origin`, the history of that origin alone.
+// `origin`, the history of that origin alone. With `release_id`, the
+// deployments of that release alone.
 // With `live=true`, the list is what is served now: the project's newest
 // primary deployment, narrowed to origins that are still primary, then the
 // newest deployment to each live preview URL, newest first, narrowed to
 // the URLs it still serves. Combined with `origin`, it is the one
-// deployment that origin serves, or empty.
+// deployment that origin serves, or empty. Combined with `release_id`,
+// the deployments of the live view that serve that release.
 // `expand: ["release"]` embeds the release each deployment made live; it
 // requires `release.read` and does not change the ordering or the page
 // tokens.
@@ -8921,6 +8925,26 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Origin.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "release_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "release_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ReleaseID.Get(); ok {
 				if unwrapped := string(val); true {
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}

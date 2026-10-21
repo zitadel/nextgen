@@ -1,0 +1,8 @@
+name: release_id
+in: query
+required: false
+description: |
+  Narrows the list to the deployments of this release. A release no
+  deployment made live answers an empty list, not an error.
+schema:
+  $ref: '../schemas/release-id.yaml'
