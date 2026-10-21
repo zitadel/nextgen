@@ -422,6 +422,23 @@ func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID
 	return user.ID, nil
 }
 
+// UserHasPasskey reads one passkey row of the user. A passkey ceremony on a
+// step with this user bound lists the same rows as allowCredentials, so the
+// answer tells the visitor nothing that choosing the action would not.
+func (r *FlowSSOIdentityResolver) UserHasPasskey(ctx context.Context, projectID, userID string) (bool, error) {
+	opts := &database.ListOptions[domain.UserPasskeyField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
+		),
+	}
+	result, err := r.db.Statements().ListUserPasskeys(ctx, opts.WithLimit(1))
+	if err != nil {
+		return false, fmt.Errorf("read user passkeys: %w", err)
+	}
+	return len(result.Items) > 0, nil
+}
+
 // storedUserSchemaMatches compares a stored user's schema with the flow's.
 // Both ids come from stored records, never from the request, so a schema the
 // project does not hold is an inconsistency on the server's side and not a

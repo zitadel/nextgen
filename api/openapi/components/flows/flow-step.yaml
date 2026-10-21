@@ -132,7 +132,10 @@ properties:
         type: string
         description: |
           The identifier the user supplied. Use it as the input's
-          `value`, verbatim.
+          `value`, verbatim. After an identity provider's sign-in
+          collided with an existing account, it is the address that
+          provider verified; an address the provider did not verify is
+          not sent unless the user typed it.
         example: alice@acme.com
       autocomplete:
         type: string
