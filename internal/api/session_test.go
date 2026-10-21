@@ -143,8 +143,9 @@ func TestMySessionHoldsTheSessionToTheNamedProject(t *testing.T) {
 // cookie's user (/users/me) through the generated server the same way: with
 // project_id, a session of another project is refused with 403
 // sess.project_mismatch before the user, its schema, its teams, its sign-in
-// methods or its projects are looked up, and the refusal clears no cookie; a session of the named
-// project, or a request that names none, is served as before.
+// methods or its projects are looked up, and the refusal clears no cookie; a
+// session of the named project, or a request that names none, is served as
+// before.
 func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
 	t.Parallel()
 

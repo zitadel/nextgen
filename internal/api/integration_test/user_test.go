@@ -1557,8 +1557,8 @@ func TestListPasskeys(t *testing.T) {
 }
 
 // TestSelfAccessReads: a person reads their own schema, roster and sign-in
-// methods with only their session, and anything short of a user-bound session gets the 401 the
-// contract declares.
+// methods with only their session, and anything short of a user-bound session
+// gets the 401 the contract declares.
 func TestSelfAccessReads(t *testing.T) {
 	t.Parallel()
 
