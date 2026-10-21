@@ -807,7 +807,7 @@ export class ZitadelLogin extends ZitadelSurface {
       if (this.restarting) {
         wire = { ...wire, step: { ...wire.step, error: "error.flow_restart_required" } };
       }
-      this.applyResponse(wire);
+      void this.applyResponse(wire);
       // Symmetric with `submit()`: every applied step announces itself, the
       // first one included. A host app driving its own chrome from the step
       // (progress, headings, analytics) would otherwise see nothing until
@@ -886,7 +886,7 @@ export class ZitadelLogin extends ZitadelSurface {
     return error;
   }
 
-  private applyResponse(wire: CreateFlow201): void {
+  private async applyResponse(wire: CreateFlow201): Promise<void> {
     this.restarting = false;
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
@@ -918,10 +918,7 @@ export class ZitadelLogin extends ZitadelSurface {
 
     this.syncBackSentinel(wire.step);
 
-    if (this.redirectsToProvider(wire)) {
-      void this.redirectToProvider(wire);
-      return;
-    }
+    if (await this.maybeRedirectToProvider(wire)) return;
     void this.maybeCompleteFlow(wire);
   }
 
@@ -979,36 +976,33 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Whether the step hands the browser to an identity provider.
+   * Hand the browser to an identity provider.
    *
-   * `step.redirect_url` is the engine's answer to `action: "sso"`. A terminal
-   * step carries `redirect_url` too — the engine copies the relying party's
-   * `redirect_uri` onto it when a sign-in completes (`terminate()` in
-   * flow_state_machine.go). That is a finished sign-in, not a trip to a
-   * provider, and it belongs to `maybeCompleteFlow`.
+   * `step.redirect_url` is the engine's answer to `action: "sso"`: a full-page
+   * navigation to the provider's authorization endpoint, which is the only way
+   * the user can authenticate there. It is not a completion — the flow resumes
+   * when the provider returns to the callback — so it is deliberately separate
+   * from {@link maybeCompleteFlow} and emits its own event rather than
+   * `zitadel-flow-complete`, which hosts treat as "signed in".
+   *
+   * Returns whether it navigated, so the caller can stop.
    */
-  private redirectsToProvider(response: CreateFlow201): boolean {
-    return Boolean(response.step.redirect_url) && !response.step.complete;
-  }
-
-  /**
-   * Hand the browser to the identity provider: a full-page navigation to its
-   * authorization endpoint, the only way the user can authenticate there. It is
-   * not a completion — the flow resumes when the provider returns to the
-   * callback — so it emits its own event rather than `zitadel-flow-complete`,
-   * which hosts treat as "signed in".
-   */
-  private async redirectToProvider(response: CreateFlow201): Promise<void> {
+  private async maybeRedirectToProvider(response: CreateFlow201): Promise<boolean> {
     const target = response.step.redirect_url;
-    if (!target) return;
+    // A terminal step carries `redirect_url` too — the engine copies the
+    // relying party's `redirect_uri` onto it when a sign-in completes
+    // (`terminate()` in flow_state_machine.go). That is a finished sign-in,
+    // not a trip to a provider, and it belongs to `maybeCompleteFlow`.
+    if (!target || response.step.complete) return false;
     await emit(
       this,
       "zitadel-flow-redirect",
       { redirect_url: target, step: response.step },
       { waitForListeners: true },
     );
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") return false;
     window.location.assign(target);
+    return true;
   }
 
   /**
@@ -1546,7 +1540,7 @@ export class ZitadelLogin extends ZitadelSurface {
       };
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       const wire = await apiSubmitStep(api, id, body);
-      this.applyResponse(wire);
+      void this.applyResponse(wire);
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
       if (await this.restartIfRequired(error)) return;

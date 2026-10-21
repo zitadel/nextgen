@@ -89,6 +89,7 @@ async function dispatchUntilForwarded(
   detail: Record<string, unknown>,
   received: readonly Record<string, unknown>[],
 ): Promise<void> {
+  detail.waitUntil = () => {};
   const deadline = Date.now() + 1000;
   while (!received.includes(detail)) {
     el.dispatchEvent(new CustomEvent(eventName, { detail }));

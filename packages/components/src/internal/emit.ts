@@ -8,11 +8,9 @@
  * the widget: it still bubbles to listeners in the same shadow tree (the
  * orchestrator's own), but is never seen from the page, capture phase included.
  *
- * Pass `{ waitForListeners: true }` for an event after which the element
- * navigates: its detail then carries `waitUntil(promise)`, and the returned
- * promise resolves once the promises the listeners passed have settled, or
- * after {@link LISTENER_WAIT_MS}. It resolves at once when the option is off or
- * no listener registered work, so other callers can ignore it.
+ * With `{ waitForListeners: true }` the detail carries `waitUntil(promise)` and
+ * the returned promise settles once the listeners' work has, or after
+ * {@link LISTENER_WAIT_MS}; otherwise it resolves at once.
  *
  * Centralising the dispatch shape keeps every event contract identical and
  * removes the repeated `new CustomEvent(..., { bubbles: true, composed: true,
