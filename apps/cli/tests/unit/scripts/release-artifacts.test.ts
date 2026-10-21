@@ -35,7 +35,6 @@ type ReleaseArtifactsModule = {
     ) => Promise<void>;
   }) => Promise<{ archives: string[]; checksumPath: string }>;
   SERVER_PLATFORMS: Array<{ goos: string; goarch: string }>;
-  TAG_PRERELEASE_AS_LATEST: boolean;
   readServerRelease: (repoRoot: string) => Promise<{
     name: string;
     version: string;
@@ -159,17 +158,11 @@ describe("release artifact helpers", () => {
     ]);
   });
 
-  // Temporary, paired with TAG_PRERELEASE_AS_LATEST in release-artifacts.mjs:
-  // pre-GA there is no stable release to own `:latest`, so the alpha train
-  // carries it. Delete this and restore the prerelease case above when the flag
-  // goes back to false on `changeset pre exit`.
-  it("also adds latest for prereleases while the alpha train owns it", async () => {
-    const { containerTags, TAG_PRERELEASE_AS_LATEST } = await loadModule();
+  it("keeps latest off prereleases", async () => {
+    const { containerTags } = await loadModule();
 
-    expect(TAG_PRERELEASE_AS_LATEST).toBe(true);
     expect(containerTags({ version: "1.2.3-alpha.1", prerelease: true })).toEqual([
       "ghcr.io/zitadel/nextgen:1.2.3-alpha.1",
-      "ghcr.io/zitadel/nextgen:latest",
     ]);
   });
 

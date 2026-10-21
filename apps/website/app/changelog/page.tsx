@@ -11,17 +11,19 @@ import {
   Filtered,
   NoneFiltered,
 } from "./changelog-filter";
-import { BUMP_LABELS, bumpsIn, componentOf, componentsIn, facetOf } from "./filter";
+import {
+  componentOf,
+  componentsIn,
+  facetOf,
+  KIND_LABELS,
+  KINDS,
+  type Kind,
+  kindOf,
+  kindsIn,
+} from "./filter";
 import { Markdown } from "./markdown";
 import { OpenLinkedRelease } from "./open-linked-release";
-import {
-  BUMPS,
-  type Bump,
-  type Change,
-  fetchReleases,
-  RELEASE_COUNT,
-  type Release,
-} from "./releases";
+import { type Change, fetchReleases, RELEASE_COUNT, type Release } from "./releases";
 
 // The page is built with the releases GitHub has then, and built again in the
 // background at most every 15 minutes, when a visit finds it older
@@ -98,7 +100,7 @@ export default async function ChangelogPage() {
           {releases ? (
             <ChangelogFilter
               components={components}
-              bumps={bumpsIn(releases)}
+              kinds={kindsIn(releases)}
               facets={releases.flatMap((release) => release.changes.map(facetOf))}
             >
               <div className="mt-10">
@@ -133,7 +135,7 @@ export default async function ChangelogPage() {
 
 /**
  * One release, the newest open and the others folded to their version, date
- * and count: the maintainers' notes, the changes by bump, then what the
+ * and count: the maintainers' notes, the changes by kind, then what the
  * release body says of changes it left out. The filters show the changes,
  * and the pointers to left-out ones, that match the visitor's choice.
  */
@@ -176,11 +178,11 @@ function ReleaseEntry({ release, open }: { release: Release; open: boolean }) {
         <div className="flex flex-col gap-8 pb-10 sm:pl-7">
           {release.notes && <Markdown>{release.notes}</Markdown>}
           <NoneFiltered facets={facets} />
-          {BUMPS.map((bump) => (
+          {KINDS.map((kind) => (
             <ChangeGroup
-              key={bump}
-              bump={bump}
-              changes={release.changes.filter((change) => change.bump === bump)}
+              key={kind}
+              kind={kind}
+              changes={release.changes.filter((change) => kindOf(change) === kind)}
             />
           ))}
           {release.notices.map((notice) =>
@@ -206,12 +208,12 @@ function ReleaseEntry({ release, open }: { release: Release; open: boolean }) {
   );
 }
 
-function ChangeGroup({ bump, changes }: { bump: Bump; changes: Change[] }) {
+function ChangeGroup({ kind, changes }: { kind: Kind; changes: Change[] }) {
   if (changes.length === 0) return null;
   return (
     <Filtered facets={changes.map(facetOf)}>
       <div>
-        <h3 className="font-mono text-text-muted text-xs leading-4">{BUMP_LABELS[bump]} changes</h3>
+        <h3 className="font-mono text-text-muted text-xs leading-4">{KIND_LABELS[kind]} changes</h3>
         <ul className="mt-2">
           {changes.map((change) => (
             <Filtered key={`${change.source?.href} ${change.summary}`} facets={[facetOf(change)]}>

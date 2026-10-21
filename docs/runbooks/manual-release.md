@@ -57,10 +57,10 @@ gh run rerun <run-id> --repo zitadel/nextgen --failed
 ```
 
 Prefer that over `recover_version` when a preflight stopped the run:
-`recover_version` publishes `main`'s head, and refuses while `main` holds
-changesets the version commit did not record. Re-run before the next version
-PR lands. Publishing the older version after it would move the npm pre tag
-(`alpha`) and the container's `:latest` back to it.
+`recover_version` publishes `main`'s head, which must still carry that
+version. Re-run before the next version
+PR lands. Publishing the older version after it would move npm's `latest` and
+the container's `:latest` back to it.
 
 Use `release-publish` with `recover_version=<version>` for an already-versioned
 release when any publish-side artifact may be missing. It verifies the
@@ -90,7 +90,6 @@ be a generated version commit" gate, but it still requires:
 
 - the checked-out `@zitadel/server` version to equal `recover_version`;
 - the workflow to run from `main`;
-- no unrecorded pending release changesets;
 - the normal artifact preflight and snapshot verification to pass.
 
 After the recovery run, verify the public surfaces and draft release shell:
@@ -124,3 +123,54 @@ moon run release:snapshot
 moon run release:publish -- --dry-run  # from a generated version commit
 moon run release:publish -- --dry-run --recover-version 0.1.0-alpha.8
 ```
+
+## Renumbering the 1.0.0-alpha releases
+
+Once, for [ADR 074](../adrs/074-preview-releases-on-0x.md). Run it from a
+checkout of `main`, with `gh` signed in as a maintainer, Docker logged in to
+`ghcr.io` with `write:packages`, and npm signed in as an owner of the
+`@zitadel` packages.
+
+1. Rename the tags and releases before you publish the `v0.1.0` draft: the
+   website changelog sorts releases by version, and would list `0.1.0` under
+   the old names.
+
+   ```sh
+   git fetch --tags origin
+   for n in 20 21 22 23 24 25 28; do
+     old="v1.0.0-alpha.$n" new="v0.1.0-alpha.$n" notes="$(mktemp)"
+     git push origin "$(git rev-parse "$old^{commit}"):refs/tags/$new"
+     { printf 'Published to npm and ghcr.io as `%s`.\n\n' "${old#v}"
+       gh release view "$old" --repo zitadel/nextgen --json body -q .body; } > "$notes"
+     gh release edit "$old" --repo zitadel/nextgen --tag "$new" \
+       --title "Zitadel NextGen $new" --notes-file "$notes"
+     git push origin ":refs/tags/$old" && git tag -d "$old"
+   done
+   ```
+
+2. Add the new tag to each image and keep the old one: a CLI of that version
+   starts the image of its own version.
+
+   ```sh
+   for n in 20 21 22 23 24 25 28; do
+     docker buildx imagetools create \
+       --tag "ghcr.io/zitadel/nextgen:0.1.0-alpha.$n" \
+       "ghcr.io/zitadel/nextgen:1.0.0-alpha.$n"
+   done
+   ```
+
+3. Merge the `build: version packages` PR that releases `0.1.0` soon after
+   the PR that adopted ADR 074: until `0.1.0` is on npm, the docs'
+   `npx @zitadel/cli@latest` runs the placeholder build.
+4. Once `0.1.0` is on npm, deprecate the `1.0.0-alpha` versions and move
+   `alpha` to `0.1.0`:
+
+   ```sh
+   for pkg in $(node -p "require('./.changeset/config.json').fixed[0].join(' ')"); do
+     npm deprecate "$pkg@>=1.0.0-alpha.0 <1.0.0" "Superseded by the 0.x releases: install $pkg@latest"
+     npm dist-tag add "$pkg@0.1.0" alpha
+   done
+   ```
+
+5. Add the product notes to the `v0.1.0` draft release and publish it; it
+   becomes the repository's latest release.

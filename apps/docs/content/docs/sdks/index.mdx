@@ -6,10 +6,10 @@ description: Framework packages and shared client surfaces for the Zitadel previ
 import { Card, Cards } from "fumadocs-ui/components/card";
 import { Callout } from "fumadocs-ui/components/callout";
 
-The preview publishes framework SDKs, shared UI components, and the generated API client in one alpha package train. Pick an SDK by how your app renders: server frameworks proxy and verify sessions in middleware, SPA frameworks render the same auth widgets behind a same-origin proxy.
+The preview publishes framework SDKs, shared UI components, and the generated API client in one release train. Pick an SDK by how your app renders: server frameworks proxy and verify sessions in middleware, SPA frameworks render the same auth widgets behind a same-origin proxy.
 
 <Callout title="Start with the CLI" type="info">
-  Prefer `npx @zitadel/cli@alpha setup` for app setup — it scaffolds the right package and proxy for your framework. Use these SDK pages when reviewing generated files, customizing routes, or integrating manually.
+  Prefer `npx @zitadel/cli@latest setup` for app setup — it scaffolds the right package and proxy for your framework. Use these SDK pages when reviewing generated files, customizing routes, or integrating manually.
 </Callout>
 
 ## Server frameworks
@@ -49,7 +49,7 @@ Lower-level packages the framework SDKs are built on. Reach for these to embed t
 
 ## Choosing an SDK
 
-All packages ship on the `@alpha` dist-tag and move together as one release train. Install them with the tag (`pnpm add @zitadel/sdk-next@alpha`): `latest` doesn't follow the train.
+All packages ship on npm's `latest` tag and move together as one release train, so install one version of all of them (`pnpm add @zitadel/sdk-next@latest`). Until 1.0.0, a minor version can break, and its release note marks it **Breaking:**.
 
 | Framework | Package | Rendering | Same-origin `/__nextgen/*` proxy | CLI scaffolds |
 | --------- | ------- | --------- | -------------------------------- | ------------- |

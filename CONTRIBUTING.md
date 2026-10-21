@@ -257,7 +257,9 @@ Use `corepack pnpm exec changeset status --since origin/main` when you want to
 preview the package bumps Changesets will plan from your PR. Pull requests also
 get an informational Changesets comment; maintainers use that and the
 [changeset decision table](.changeset/README.md#decision-table) to review release
-intent.
+intent. CI runs `node scripts/check-changesets-status.mjs --pending`, which
+refuses a `major` bump before 1.0.0
+([preview versions](.changeset/README.md#preview-versions)).
 
 Task runs are accelerated by Moon's remote cache, configured under `remote` in
 [`.moon/workspace.yml`](.moon/workspace.yml); Depot CI runners authenticate
