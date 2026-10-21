@@ -39,13 +39,13 @@ func (s *DeploymentService) ListPreviews(ctx context.Context, input ListPreviews
 }
 
 // RemovePreview ends a preview at once. Idempotent: an origin with no
-// preview is not an error. The deployments to it stay in the history.
+// live preview is not an error, and an expired one is left for the sweep. The deployments to it stay in the history.
 func (s *DeploymentService) RemovePreview(ctx context.Context, projectID, origin string) (err error) {
 	ctx, end := startSpan(ctx, "DeploymentService.RemovePreview")
 	defer end(&err)
 
 	return s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		deleted, err := tx.Statements().DeletePreview(ctx, projectID, origin)
+		deleted, err := tx.Statements().DeleteLivePreview(ctx, projectID, origin, time.Now())
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to delete preview")
 		}

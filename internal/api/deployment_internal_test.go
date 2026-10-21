@@ -118,4 +118,16 @@ func TestDeploymentAccessRow(t *testing.T) {
 		domain.ErrEnvironmentProjectNotFound().Code)
 	assertDomainCode(t, requireProjectAccess(operator, stmts, "proj_b", deploymentAccess, opRead),
 		domain.ErrDeploymentNotFound().Code)
+
+	// A member without deployment.read: the previews gate refuses rather than
+	// leaving a list filter that the preview list cannot apply.
+	deny, foothold := false, true
+	member := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID:     "proj_platform",
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_alice",
+	})
+	assertDomainCode(t,
+		requireProjectAccess(member, stubAuthzStmts{allowCheck: &deny, foothold: &foothold}, "proj_a", deploymentAccess, opRead),
+		domain.ErrDeploymentPermissionDenied().Code)
 }

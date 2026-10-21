@@ -159,8 +159,9 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 }
 
 func (h *Handler) ListPreviews(ctx context.Context, params api.ListPreviewsParams) (api.ListPreviewsRes, error) {
-	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment)
-	if err != nil {
+	// A preview has no id for a list filter to scope, so access is
+	// project-wide or nothing.
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
 		return nil, err
 	}
 

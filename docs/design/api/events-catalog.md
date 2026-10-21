@@ -204,6 +204,6 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 | `team.membership.updated` | [#879](https://github.com/zitadel/nextgen/issues/879) membership + claim CompleteClaim path — join ids + status |
 | `claim.challenge_created` / `claim.completed` | [#880](https://github.com/zitadel/nextgen/issues/880) claim lifecycle emitters |
 | `session.expired` | [#881](https://github.com/zitadel/nextgen/issues/881) session reaper |
-| `preview.expired` | [#1573](https://github.com/zitadel/nextgen/issues/1573) preview expiry sweep |
+| `preview.expired` | [#2280](https://github.com/zitadel/nextgen/issues/2280) preview expiry sweep |
 | `schema.deleted` | [#882](https://github.com/zitadel/nextgen/issues/882) schema delete API |
 | `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs — same `AuthFactorPayload` rules |

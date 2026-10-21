@@ -12,31 +12,13 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const previewOrigin = "https://acme-git-sso-acmeinc.vercel.app"
 
-func newMockedPreviewService(t *testing.T) (*service.DeploymentService, *servicemocks.MockAllStatements) {
-	t.Helper()
-	ctrl := gomock.NewController(t)
-	pool := servicemocks.NewMockPool(ctrl)
-	statements := servicemocks.NewMockAllStatements(ctrl)
-	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
-	pool.EXPECT().Statements().Return(statements).AnyTimes()
-	pool.EXPECT().
-		Transaction(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
-			return fn(ctx, statementer)
-		}).
-		AnyTimes()
-	statementer.EXPECT().Statements().Return(statements).AnyTimes()
-	return service.NewDeploymentService(service.NewPool(pool)), statements
-}
-
 func TestDeploymentServiceListPreviews(t *testing.T) {
-	svc, statements := newMockedPreviewService(t)
+	svc, statements := newStrictDeploymentService(t)
 	live := &domain.Preview{ProjectID: "proj_1", Origin: previewOrigin, ExpiresAt: time.Now().Add(time.Hour)}
 	statements.EXPECT().ListPreviews(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.PreviewField]) (*database.ListResult[*domain.Preview], error) {
@@ -51,12 +33,15 @@ func TestDeploymentServiceListPreviews(t *testing.T) {
 }
 
 func TestDeploymentServiceRemovePreviewAuditsRemoval(t *testing.T) {
-	svc, statements := newMockedPreviewService(t)
-	statements.EXPECT().DeletePreview(gomock.Any(), "proj_1", previewOrigin).Return(true, nil)
+	svc, statements := newStrictDeploymentService(t)
+	statements.EXPECT().DeleteLivePreview(gomock.Any(), "proj_1", previewOrigin, gomock.Any()).Return(true, nil)
 	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, event *domain.Event) error {
 			assert.Equal(t, domain.EventTypePreviewRemoved, event.EventType)
 			assert.Equal(t, previewOrigin, *event.EntityID)
+			assert.Equal(t, "proj_1", event.ProjectID)
+			assert.Equal(t, "preview", *event.EntityType)
+			assert.JSONEq(t, `{"origin":"`+previewOrigin+`"}`, string(event.Payload))
 			return nil
 		})
 
@@ -65,15 +50,15 @@ func TestDeploymentServiceRemovePreviewAuditsRemoval(t *testing.T) {
 
 // No preview to remove is not an error, and nothing is audited.
 func TestDeploymentServiceRemovePreviewIsIdempotent(t *testing.T) {
-	svc, statements := newMockedPreviewService(t)
-	statements.EXPECT().DeletePreview(gomock.Any(), "proj_1", previewOrigin).Return(false, nil)
+	svc, statements := newStrictDeploymentService(t)
+	statements.EXPECT().DeleteLivePreview(gomock.Any(), "proj_1", previewOrigin, gomock.Any()).Return(false, nil)
 
 	require.NoError(t, svc.RemovePreview(t.Context(), "proj_1", previewOrigin))
 }
 
 func TestDeploymentServiceRemovePreviewStorageError(t *testing.T) {
-	svc, statements := newMockedPreviewService(t)
-	statements.EXPECT().DeletePreview(gomock.Any(), "proj_1", previewOrigin).Return(false, errors.New("boom"))
+	svc, statements := newStrictDeploymentService(t)
+	statements.EXPECT().DeleteLivePreview(gomock.Any(), "proj_1", previewOrigin, gomock.Any()).Return(false, errors.New("boom"))
 
 	err := svc.RemovePreview(t.Context(), "proj_1", previewOrigin)
 	de, ok := errors.AsType[domain.Error](err)

@@ -23,6 +23,14 @@ var deployedAt = time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC)
 
 func newMockedDeploymentService(t *testing.T) (*service.DeploymentService, *servicemocks.MockAllStatements) {
 	t.Helper()
+	svc, statements := newStrictDeploymentService(t)
+	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	return svc, statements
+}
+
+// newStrictDeploymentService leaves InsertEvent for the test to expect.
+func newStrictDeploymentService(t *testing.T) (*service.DeploymentService, *servicemocks.MockAllStatements) {
+	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
@@ -35,7 +43,6 @@ func newMockedDeploymentService(t *testing.T) (*service.DeploymentService, *serv
 		}).
 		AnyTimes()
 	statementer.EXPECT().Statements().Return(statements).AnyTimes()
-	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	return service.NewDeploymentService(service.NewPool(pool)), statements
 }
 

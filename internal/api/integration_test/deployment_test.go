@@ -562,26 +562,20 @@ func TestDeploymentReads(t *testing.T) {
 	})
 }
 
-// TestPreviews seeds previews through the deployment service, since a
-// deployment over HTTP still answers 501, then lists and removes them.
+// TestPreviews deploys to two preview URLs, then lists and removes them.
 func TestPreviews(t *testing.T) {
 	t.Parallel()
 
-	fixture := newReleaseFixture(t)
-	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: fixture.pointers()})
-	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
+	fixture := newDeploymentFixture(t)
 	project := api.ProjectID(fixture.project)
-	origins := []string{"https://acme-git-sso-acmeinc.vercel.app", "https://acme-k3x9v2-acmeinc.vercel.app"}
+	origins := []string{previewOrigin, "https://acme-k3x9v2-acmeinc.vercel.app"}
 
-	_, err := service.NewDeploymentService(harness.EnsureServiceDB(t)).Create(t.Context(), service.CreateDeploymentInput{
-		ProjectID:  fixture.project,
-		ReleaseID:  string(created.(*api.CreateReleaseCreated).ID),
-		OriginKind: domain.DeploymentOriginKindPreview,
-		Origins:    origins,
-		Reason:     domain.DeploymentReasonDeploy,
-		PreviewTTL: 168 * time.Hour,
+	resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(fixture.release.ID),
+		Targets:   api.DeploymentTargetsRequest(origins),
+		TTL:       api.NewOptPreviewTTL("168h"),
 	})
-	require.NoError(t, err)
+	require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
 
 	list := func(t *testing.T) []string {
 		t.Helper()
