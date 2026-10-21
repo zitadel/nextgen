@@ -6677,6 +6677,7 @@ func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
 }
 
 func (*AuthUnauthorized) completeClaimRes()       {}
+func (*AuthUnauthorized) getMyPasswordStateRes()  {}
 func (*AuthUnauthorized) getMyUserSchemaRes()     {}
 func (*AuthUnauthorized) listMyIdentityLinksRes() {}
 func (*AuthUnauthorized) listMyPasskeysRes()      {}
@@ -28897,6 +28898,186 @@ func (s GetLiveOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetLiveOK) getLiveRes() {}
+
+// GetMyPasswordStateErrorResponse represents sum type.
+type GetMyPasswordStateErrorResponse struct {
+	Type                GetMyPasswordStateErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
+}
+
+// GetMyPasswordStateErrorResponseType is oneOf type of GetMyPasswordStateErrorResponse.
+type GetMyPasswordStateErrorResponseType string
+
+// Possible values for GetMyPasswordStateErrorResponseType.
+const (
+	AuthUnauthorizedGetMyPasswordStateErrorResponse    GetMyPasswordStateErrorResponseType = "auth.unauthorized"
+	InternalGetMyPasswordStateErrorResponse            GetMyPasswordStateErrorResponseType = "internal"
+	ReqInvalidGetMyPasswordStateErrorResponse          GetMyPasswordStateErrorResponseType = "req.invalid"
+	SessProjectMismatchGetMyPasswordStateErrorResponse GetMyPasswordStateErrorResponseType = "sess.project_mismatch"
+	UserNotFoundGetMyPasswordStateErrorResponse        GetMyPasswordStateErrorResponseType = "user.not_found"
+)
+
+// IsAuthUnauthorized reports whether GetMyPasswordStateErrorResponse is AuthUnauthorized.
+func (s GetMyPasswordStateErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetMyPasswordStateErrorResponse
+}
+
+// IsInternal reports whether GetMyPasswordStateErrorResponse is Internal.
+func (s GetMyPasswordStateErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetMyPasswordStateErrorResponse
+}
+
+// IsReqInvalid reports whether GetMyPasswordStateErrorResponse is ReqInvalid.
+func (s GetMyPasswordStateErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetMyPasswordStateErrorResponse
+}
+
+// IsSessProjectMismatch reports whether GetMyPasswordStateErrorResponse is SessProjectMismatch.
+func (s GetMyPasswordStateErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchGetMyPasswordStateErrorResponse
+}
+
+// IsUserNotFound reports whether GetMyPasswordStateErrorResponse is UserNotFound.
+func (s GetMyPasswordStateErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundGetMyPasswordStateErrorResponse
+}
+
+// SetAuthUnauthorized sets GetMyPasswordStateErrorResponse to AuthUnauthorized.
+func (s *GetMyPasswordStateErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetMyPasswordStateErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetMyPasswordStateErrorResponse is AuthUnauthorized.
+func (s GetMyPasswordStateErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetMyPasswordStateErrorResponse returns new GetMyPasswordStateErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetMyPasswordStateErrorResponse(v AuthUnauthorized) GetMyPasswordStateErrorResponse {
+	var s GetMyPasswordStateErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetMyPasswordStateErrorResponse to Internal.
+func (s *GetMyPasswordStateErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetMyPasswordStateErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetMyPasswordStateErrorResponse is Internal.
+func (s GetMyPasswordStateErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetMyPasswordStateErrorResponse returns new GetMyPasswordStateErrorResponse from Internal.
+func NewInternalGetMyPasswordStateErrorResponse(v Internal) GetMyPasswordStateErrorResponse {
+	var s GetMyPasswordStateErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetMyPasswordStateErrorResponse to ReqInvalid.
+func (s *GetMyPasswordStateErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetMyPasswordStateErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetMyPasswordStateErrorResponse is ReqInvalid.
+func (s GetMyPasswordStateErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetMyPasswordStateErrorResponse returns new GetMyPasswordStateErrorResponse from ReqInvalid.
+func NewReqInvalidGetMyPasswordStateErrorResponse(v ReqInvalid) GetMyPasswordStateErrorResponse {
+	var s GetMyPasswordStateErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets GetMyPasswordStateErrorResponse to SessProjectMismatch.
+func (s *GetMyPasswordStateErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchGetMyPasswordStateErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if GetMyPasswordStateErrorResponse is SessProjectMismatch.
+func (s GetMyPasswordStateErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchGetMyPasswordStateErrorResponse returns new GetMyPasswordStateErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchGetMyPasswordStateErrorResponse(v SessProjectMismatch) GetMyPasswordStateErrorResponse {
+	var s GetMyPasswordStateErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUserNotFound sets GetMyPasswordStateErrorResponse to UserNotFound.
+func (s *GetMyPasswordStateErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundGetMyPasswordStateErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if GetMyPasswordStateErrorResponse is UserNotFound.
+func (s GetMyPasswordStateErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundGetMyPasswordStateErrorResponse returns new GetMyPasswordStateErrorResponse from UserNotFound.
+func NewUserNotFoundGetMyPasswordStateErrorResponse(v UserNotFound) GetMyPasswordStateErrorResponse {
+	var s GetMyPasswordStateErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// GetMyPasswordStateErrorResponseStatusCode wraps GetMyPasswordStateErrorResponse with StatusCode.
+type GetMyPasswordStateErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetMyPasswordStateErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetMyPasswordStateErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetMyPasswordStateErrorResponseStatusCode) GetResponse() GetMyPasswordStateErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetMyPasswordStateErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetMyPasswordStateErrorResponseStatusCode) SetResponse(val GetMyPasswordStateErrorResponse) {
+	s.Response = val
+}
+
+func (*GetMyPasswordStateErrorResponseStatusCode) getMyPasswordStateRes() {}
 
 // GetMySessionCsrfTokenErrorResponse represents sum type.
 type GetMySessionCsrfTokenErrorResponse struct {
@@ -67259,6 +67440,7 @@ func (s *SessProjectMismatch) SetDetails(val OptSessProjectMismatchDetails) {
 	s.Details = val
 }
 
+func (*SessProjectMismatch) getMyPasswordStateRes()  {}
 func (*SessProjectMismatch) getMyUserRes()           {}
 func (*SessProjectMismatch) getMyUserSchemaRes()     {}
 func (*SessProjectMismatch) listMyIdentityLinksRes() {}
@@ -75078,6 +75260,34 @@ func (s *UserPasswordState) SetSetAt(val OptDateTime) {
 }
 
 func (*UserPasswordState) getUserPasswordStateRes() {}
+
+// UserPasswordStateHeaders wraps UserPasswordState with response headers.
+type UserPasswordStateHeaders struct {
+	CacheControl OptString
+	Response     UserPasswordState
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *UserPasswordStateHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *UserPasswordStateHeaders) GetResponse() UserPasswordState {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *UserPasswordStateHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *UserPasswordStateHeaders) SetResponse(val UserPasswordState) {
+	s.Response = val
+}
+
+func (*UserPasswordStateHeaders) getMyPasswordStateRes() {}
 
 // Merged schema.
 // Ref: #

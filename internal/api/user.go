@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"time"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -437,12 +438,37 @@ func (h *Handler) GetUserPasswordState(ctx context.Context, params api.GetUserPa
 	if err != nil {
 		return nil, err
 	}
+	res := userPasswordState(setAt)
+	return &res, nil
+}
 
-	res := &api.UserPasswordState{}
+// GetMyPasswordState serves the signed-in user's own password state on the
+// session alone, the read GetUserPasswordState answers for a caller who may
+// read the user.
+func (h *Handler) GetMyPasswordState(ctx context.Context, params api.GetMyPasswordStateParams) (api.GetMyPasswordStateRes, error) {
+	self, err := requireSelf(ctx, params.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	setAt, err := h.userService.GetPasswordSetAt(ctx, service.GetPasswordInput{
+		ProjectID: self.ProjectID(),
+		UserID:    self.UserID(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &api.UserPasswordStateHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     userPasswordState(setAt),
+	}, nil
+}
+
+func userPasswordState(setAt *time.Time) api.UserPasswordState {
+	res := api.UserPasswordState{}
 	if setAt != nil {
 		res.SetAt = api.NewOptDateTime(*setAt)
 	}
-	return res, nil
+	return res
 }
 
 // GetMyUser reads the user of the cookie's session, held to project_id when the

@@ -499,6 +499,16 @@ type Handler interface {
 	//
 	// GET /livez
 	GetLive(ctx context.Context) (GetLiveRes, error)
+	// GetMyPasswordState implements getMyPasswordState operation.
+	//
+	// Reports when the signed-in user's current password was set, and leaves
+	// `set_at` out when they have none. The password and its hash are never
+	// returned.
+	// With `project_id`, the state is read only when the session belongs to that
+	// project.
+	//
+	// GET /users/me/password
+	GetMyPasswordState(ctx context.Context, params GetMyPasswordStateParams) (GetMyPasswordStateRes, error)
 	// GetMySession implements getMySession operation.
 	//
 	// Returns the current state of the current session including its factors and all currently

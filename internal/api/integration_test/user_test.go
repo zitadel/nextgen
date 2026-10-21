@@ -1421,6 +1421,11 @@ func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	require.IsType(t, &api.SessProjectMismatch{}, links, helpers.MustMarshal(t, links))
 	assert.Equal(t, "sess.project_mismatch", links.(*api.SessProjectMismatch).Code)
 
+	passwordState, err := client.GetMyPasswordState(t.Context(), api.GetMyPasswordStateParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, passwordState, helpers.MustMarshal(t, passwordState))
+	assert.Equal(t, "sess.project_mismatch", passwordState.(*api.SessProjectMismatch).Code)
+
 	read, err = client.GetMyUser(t.Context(), api.GetMyUserParams{ProjectID: own})
 	require.NoError(t, err)
 	require.IsType(t, &api.User{}, read, helpers.MustMarshal(t, read))
@@ -1452,6 +1457,12 @@ func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	links, err = client.ListMyIdentityLinks(t.Context(), api.ListMyIdentityLinksParams{ProjectID: own})
 	require.NoError(t, err)
 	require.IsType(t, &api.ListUserIdentityLinksResponseHeaders{}, links, helpers.MustMarshal(t, links))
+
+	// The session was made with a password, so its state carries when it was set.
+	passwordState, err = client.GetMyPasswordState(t.Context(), api.GetMyPasswordStateParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.UserPasswordStateHeaders{}, passwordState, helpers.MustMarshal(t, passwordState))
+	assert.True(t, passwordState.(*api.UserPasswordStateHeaders).Response.SetAt.IsSet())
 }
 
 func TestListPasskeys(t *testing.T) {
@@ -1556,9 +1567,9 @@ func TestListPasskeys(t *testing.T) {
 	})
 }
 
-// TestSelfAccessReads: a person reads their own schema, roster and sign-in
-// methods with only their session, and anything short of a user-bound session
-// gets the 401 the contract declares.
+// TestSelfAccessReads: a person reads their own schema, roster, sign-in methods
+// and password state with only their session, and anything short of a
+// user-bound session gets the 401 the contract declares.
 func TestSelfAccessReads(t *testing.T) {
 	t.Parallel()
 
@@ -1597,6 +1608,14 @@ func TestSelfAccessReads(t *testing.T) {
 		assert.Equal(t, "laptop", passkeys[0].Name)
 	})
 
+	t.Run("own password state, without a grant", func(t *testing.T) {
+		t.Parallel()
+		// The user signs in with a cookie, not a password, so they have none.
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/password", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.False(t, helpers.MustUnmarshal[api.UserPasswordState](t, []byte(body)).SetAt.IsSet())
+	})
+
 	t.Run("own identity links, without a grant", func(t *testing.T) {
 		t.Parallel()
 		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/identity_links", "", nil)
@@ -1610,7 +1629,7 @@ func TestSelfAccessReads(t *testing.T) {
 	anonymous, err := session.Token(crypter)
 	require.NoError(t, err)
 
-	for _, path := range []string{"/users/me", "/users/me/schema", "/users/me/teams", "/users/me/passkeys", "/users/me/identity_links"} {
+	for _, path := range []string{"/users/me", "/users/me/schema", "/users/me/teams", "/users/me/passkeys", "/users/me/identity_links", "/users/me/password"} {
 		for name, cookie := range map[string]*http.Cookie{
 			"anonymous session": {Name: "__nextgen_session", Value: anonymous},
 			"no cookie":         nil,

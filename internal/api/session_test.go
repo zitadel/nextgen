@@ -143,7 +143,7 @@ func TestMySessionHoldsTheSessionToTheNamedProject(t *testing.T) {
 // cookie's user (/users/me) through the generated server the same way: with
 // project_id, a session of another project is refused with 403
 // sess.project_mismatch before the user, its schema, its teams, its sign-in
-// methods or its projects are looked up, and the refusal clears no cookie; a
+// methods, its password state or its projects are looked up, and the refusal clears no cookie; a
 // session of the named project, or a request that names none, is served as
 // before.
 func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
@@ -162,6 +162,7 @@ func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
 		{name: "teams", method: http.MethodGet, path: "/users/me/teams"},
 		{name: "passkeys", method: http.MethodGet, path: "/users/me/passkeys"},
 		{name: "identity links", method: http.MethodGet, path: "/users/me/identity_links"},
+		{name: "password", method: http.MethodGet, path: "/users/me/password"},
 	}
 	tests := []struct {
 		name    string
@@ -270,6 +271,11 @@ func (s *myUserService) ListPasskeys(_ context.Context, input service.ListPasske
 func (s *myUserService) ListIdentityLinks(_ context.Context, input service.ListIdentityLinksInput) ([]*domain.IDPIdentityLink, string, error) {
 	s.serve(input.ProjectID, input.UserID)
 	return nil, "", nil
+}
+
+func (s *myUserService) GetPasswordSetAt(_ context.Context, input service.GetPasswordInput) (*time.Time, error) {
+	s.serve(input.ProjectID, input.UserID)
+	return nil, nil
 }
 
 func myUser(self domain.Self) *domain.User {

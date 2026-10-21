@@ -138,6 +138,8 @@ paths:
     $ref: endpoints/users/me/identity_links/methods.yaml
   /users/me/passkeys:
     $ref: endpoints/users/me/passkeys/methods.yaml
+  /users/me/password:
+    $ref: endpoints/users/me/password/methods.yaml
   /users/me/projects:
     $ref: endpoints/users/me/projects/methods.yaml
   /users/me/schema:

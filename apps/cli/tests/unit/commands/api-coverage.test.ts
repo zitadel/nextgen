@@ -96,6 +96,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   listMyTeams: "the end user's own view of themselves, on their own credential",
   listMyPasskeys: "the end user's own view of themselves, on their own credential",
   listMyIdentityLinks: "the end user's own view of themselves, on their own credential",
+  getMyPasswordState: "the end user's own view of themselves, on their own credential",
   getMySession: "the end user's own session, on their own credential",
   getMySessionCsrfToken:
     "the session's CSRF token (ADR 053 §5), read on the session's own credential; only the local-admin claim helper, not a command, uses it",

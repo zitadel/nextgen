@@ -144,6 +144,7 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.ListMyTeamsOperation:           true,
 	api.ListMyPasskeysOperation:        true,
 	api.ListMyIdentityLinksOperation:   true,
+	api.GetMyPasswordStateOperation:    true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous
@@ -163,6 +164,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.ListMyTeamsOperation:         true,
 	api.ListMyPasskeysOperation:      true,
 	api.ListMyIdentityLinksOperation: true,
+	api.GetMyPasswordStateOperation:  true,
 	api.GetProjectOperation:          true,
 	api.PatchProjectOperation:        true,
 	// Console management screens (#1300 §1). Their writes need the CSRF token
