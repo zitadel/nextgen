@@ -68,9 +68,13 @@ export function inputAttributes(entry: SchemaField): { type: string; step?: stri
  * string, but JSON Schema validates a `number`/`integer` property against a
  * JSON number, and `"42"` would be rejected. A value that will not parse is
  * sent through untouched so the server explains why, rather than becoming
- * `NaN` — which `JSON.stringify` would silently turn into `null`.
+ * `NaN`, which `JSON.stringify` would silently turn into `null`. A boolean
+ * is `"true"` or `"false"`, as a switch writes it; other text is sent as typed.
  */
 export function attributeValue(entry: SchemaField, value: string): unknown {
+  if (entry.inputType === "boolean" && (value === "true" || value === "false")) {
+    return value === "true";
+  }
   if (entry.inputType !== "number") return value;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : value;

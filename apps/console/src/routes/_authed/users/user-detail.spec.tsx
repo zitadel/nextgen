@@ -98,6 +98,30 @@ async function renderDetail(project?: string) {
   return router;
 }
 
+/** Serves `sch_business` with the given properties and required keys. */
+function stubSchema(properties: Record<string, unknown>, required: string[] = ["email"]) {
+  server.use(
+    http.get(`${SCHEMAS_URL}/sch_business`, () =>
+      HttpResponse.json({
+        id: "sch_business",
+        schema: { title: "Business", required, properties },
+      }),
+    ),
+  );
+}
+
+/** Accepts every `PATCH /users/{id}` and records its body. */
+function capturePatches(): unknown[] {
+  const bodies: unknown[] = [];
+  server.use(
+    http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+      bodies.push(await request.json());
+      return HttpResponse.json({ id: USER_ID });
+    }),
+  );
+  return bodies;
+}
+
 describe("user detail", () => {
   it("builds the profile from the user's own schema", async () => {
     stub();
@@ -265,11 +289,11 @@ describe("user detail", () => {
     expect(await screen.findByLabelText("Headcount")).toHaveValue(42);
     // `step="any"`: a fraction must not fail the input's own validation.
     expect(screen.getByLabelText("Headcount")).toHaveAttribute("step", "any");
-    // `false` is a value, not an absence — it must not render as empty. No text
-    // control writes a boolean, so it stays read-only.
-    expect(screen.getByLabelText("Verified")).toHaveValue("false");
-    expect(screen.getByLabelText("Verified")).toHaveAttribute("readonly");
-    // A union is no different: a text input would write `"true"`.
+    // `false` is a value, not an absence: a switch shows it as off, and editable.
+    const verified = screen.getByRole("switch", { name: "Verified" });
+    expect(verified).not.toBeChecked();
+    expect(verified).toBeEnabled();
+    // A union stays read-only text: a text input would write `"true"`.
     expect(screen.getByLabelText("Active")).toHaveAttribute("readonly");
   });
 
@@ -319,6 +343,105 @@ describe("user detail", () => {
     await userEvent.clear(screen.getByLabelText("Company name"));
     await userEvent.click(save);
     await waitFor(() => expect(bodies).toEqual([{ attributes: { companyName: null } }]));
+  });
+
+  it("says a required field is required once it is emptied", async () => {
+    stub();
+    await renderDetail();
+
+    const email = await screen.findByLabelText("Email");
+    // Nothing is marked before an edit.
+    expect(screen.queryByText("This field is required.")).not.toBeInTheDocument();
+    expect(email).not.toHaveAttribute("aria-invalid");
+
+    await userEvent.clear(email);
+    expect(screen.getByText("This field is required.")).toBeInTheDocument();
+    expect(email).toHaveAttribute("aria-invalid", "true");
+    expect(email).toHaveAccessibleDescription("This field is required.");
+
+    await userEvent.type(email, "m@a.co");
+    expect(screen.queryByText("This field is required.")).not.toBeInTheDocument();
+    expect(email).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("renders a boolean attribute as a switch named by its label", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", verified: true },
+      },
+    });
+    stubSchema(
+      {
+        email: { type: "string" },
+        verified: { type: "boolean", title: "Verified" },
+        vip: { type: "boolean", title: "VIP" },
+      },
+      ["email", "verified"],
+    );
+    await renderDetail();
+
+    // The Yes/No text is hidden from screen readers, because the switch
+    // reports its own state; so it is checked beside each switch.
+    const verified = await screen.findByRole("switch", { name: "Verified" });
+    expect(verified).toBeChecked();
+    expect(verified).toHaveAttribute("aria-required", "true");
+    expect(within(verified.parentElement as HTMLElement).getByText("Yes")).toBeInTheDocument();
+    // An absent value shows as off.
+    const vip = screen.getByRole("switch", { name: "VIP" });
+    expect(vip).not.toBeChecked();
+    expect(vip).toHaveAttribute("aria-required", "false");
+    expect(within(vip.parentElement as HTMLElement).getByText("No")).toBeInTheDocument();
+  });
+
+  it("locks a boolean whose stored value is not a boolean, and shows it as stored", async () => {
+    // Shown as off, a stored "yes" would read as No and be overwritten by a
+    // toggle the user meant as a correction.
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", verified: "yes" },
+      },
+    });
+    stubSchema({ email: { type: "string" }, verified: { type: "boolean", title: "Verified" } });
+    await renderDetail();
+
+    const verified = await screen.findByRole("switch", { name: "Verified" });
+    expect(verified).toBeDisabled();
+    const text = within(verified.parentElement as HTMLElement);
+    expect(text.getByText("yes")).toBeInTheDocument();
+    expect(text.queryByText("No")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["a stored true", { verified: true }, false],
+    ["an absent value", {}, true],
+  ])("sends %s toggled as a JSON boolean, and only that key", async (_, stored, sent) => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", ...stored } },
+    });
+    stubSchema({ email: { type: "string" }, verified: { type: "boolean", title: "Verified" } });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("switch", { name: "Verified" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { verified: sent } }]));
+  });
+
+  it("counts a switch toggled back to what it showed as no change", async () => {
+    // Absent shows as off, so off again is not a change to `false`.
+    stub({ user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co" } } });
+    stubSchema({ email: { type: "string" }, verified: { type: "boolean", title: "Verified" } });
+    await renderDetail();
+
+    const verified = await screen.findByRole("switch", { name: "Verified" });
+    await userEvent.click(verified);
+    await userEvent.click(verified);
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
   it("shows the status and created date the server stamped", async () => {
