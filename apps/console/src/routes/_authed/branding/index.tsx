@@ -151,7 +151,7 @@ function BrandingScreen() {
   const revisionMode = revision.theme?.mode ?? "auto";
 
   return (
-    <Page>
+    <Page fill>
       <ResourceTitle>Branding</ResourceTitle>
 
       {/* Three rows on a phone, one on a desktop: the flow selector, then the
@@ -245,11 +245,13 @@ function BrandingScreen() {
       </div>
 
       {/* The panel is long and the preview is content-sized, so the row takes
-          its height from the viewport and the panel scrolls inside it —
-          otherwise the grid stretches the preview to the panel's full length.
+          what the page leaves under the toolbar (`Page fill`, `flex-1`) and
+          the panel scrolls inside it — otherwise the grid stretches the
+          preview to the panel's full length, and a fixed `100vh` offset
+          overflows whenever the chrome above changes.
           302px is the design's 300 plus the 1px card border each side, so the
           content the rows align to is the 276 the design lays them out in. */}
-      <div className="mt-3 grid gap-4 lg:h-[calc(100vh-11rem)] lg:grid-cols-[minmax(0,1fr)_302px] lg:px-2">
+      <div className="mt-3 grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_302px] lg:px-2">
         <Card className="flex min-h-[29rem] items-center justify-center overflow-auto border-foreground/10 p-6 shadow-xs lg:min-h-[32rem]">
           {/* The widget is content-sized, so the preview constrains the width
               rather than the element: that is what an embedding page does. */}
