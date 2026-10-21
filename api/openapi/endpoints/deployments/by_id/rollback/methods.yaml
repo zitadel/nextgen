@@ -1,5 +1,6 @@
 post:
   operationId: rollbackDeployment
+  x-zitadel-cli: deployment rollback
   summary: Roll back to a deployment
   description: |
     Re-deploys the release of the deployment named in the path to `primary`,

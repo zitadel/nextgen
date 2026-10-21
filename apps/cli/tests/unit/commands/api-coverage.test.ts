@@ -416,6 +416,9 @@ describe("the CLI covers the API client", () => {
  * entry cannot outlive the sharing that justifies it.
  */
 const SHARES_OPERATION: Readonly<Record<string, string>> = {
+  // Builds a release from `.zitadel/` exactly as `deploy` does, without
+  // deploying it, so `POST /releases/build` names `deploy`.
+  "release create": "deploy",
   // Reads the project to report its origin patterns; `projects get` is the
   // command the reference shows for `GET /projects/{id}`.
   "origin list": "projects get",
