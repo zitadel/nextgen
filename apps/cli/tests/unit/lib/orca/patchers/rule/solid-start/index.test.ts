@@ -8,7 +8,7 @@ import { SolidStartPatcher } from "../../../../../../../src/lib/orca/patchers/ru
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
-function ctx(appDir = "src"): PatchContext {
+function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
   return {
     framework: { id: "solid-start", appDir, devPort: 3000, url: "http://localhost:3000" },
     rendererId: "solid",
@@ -22,6 +22,7 @@ function ctx(appDir = "src"): PatchContext {
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
     cliVersion: "0.1.0-alpha.0",
+    scaffoldedFramework,
   };
 }
 
@@ -63,6 +64,19 @@ describe("SolidStartPatcher.plan", () => {
     );
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("clientOnly(() =>");
     expect(writeContents(plan, "src/routes/profile.tsx")).toContain("clientOnly(() =>");
+  });
+
+  it("keeps a pre-existing app's landing page, writing the rest (ADR 044)", () => {
+    const plan = new SolidStartPatcher().plan(ctx("src", false));
+
+    // The user's own landing page is left untouched, so setup never conflicts
+    // on it or overwrites it under --force.
+    expect(writeContents(plan, "src/routes/index.tsx")).toBeUndefined();
+    // The auth boundary and the auth routes are still written.
+    expect(writeContents(plan, "src/middleware.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
+    expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
+    expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelSession");
   });
 
   it("seeds the public project id and edits vite.config", () => {
@@ -148,6 +162,16 @@ describe("SolidStartPatcher.artifacts", () => {
     expect(artifacts.markedFiles).toContain("src/routes/login.tsx");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-solid-start", "@zitadel/sdk-solid"]);
     expect(artifacts.configEdits).toEqual(["vite.config.*", "package.json"]);
+  });
+
+  it("declares the landing page as conditionally scaffolded", () => {
+    // Written only on fresh scaffolds, so the managed-files check must not
+    // expect it on a manifest-less pre-existing app.
+    const artifacts = new SolidStartPatcher().artifacts({
+      framework: { id: "solid-start", appDir: "src", devPort: 3000, url: "http://localhost:3000" },
+      rendererId: "solid",
+    });
+    expect(artifacts.conditionalFiles).toEqual(expect.arrayContaining(["src/routes/index.tsx"]));
   });
 });
 
