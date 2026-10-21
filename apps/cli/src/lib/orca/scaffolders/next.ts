@@ -1,7 +1,16 @@
 import { AbstractCLIScaffolder } from "./cli";
 import type { NodeEngines } from "./node-engines";
 
-const CREATE_NEXT_APP_VERSION = "16.2.4";
+/**
+ * The `create-next-app` release setup runs, pinned exactly so a fresh app is
+ * the one the patcher was written against. `create-next-app` writes `next` at
+ * its own version, so this is also the Next.js every fresh app runs, until its
+ * developer upgrades it. Its route protection is `nextgenMiddleware`, which
+ * runs in Next's Middleware / Proxy, and 16.2.x had several bypasses of that
+ * layer: keep the pin on a release with no high or critical advisory, as
+ * `cli:check-advisories` checks.
+ */
+const CREATE_NEXT_APP_VERSION = "16.4.2";
 
 /** Scaffolds a new Next.js App Router project with `create-next-app`. */
 export class NextScaffolder extends AbstractCLIScaffolder {
@@ -13,6 +22,10 @@ export class NextScaffolder extends AbstractCLIScaffolder {
     fallback: ">=20.9.0",
     enforcement: "warn",
   };
+  override readonly pinnedPackages: ReadonlyArray<string> = [
+    `create-next-app@${CREATE_NEXT_APP_VERSION}`,
+    `next@${CREATE_NEXT_APP_VERSION}`,
+  ];
 
   /**
    * Runs the pinned `create-next-app` version in `cwd`, creating a TypeScript

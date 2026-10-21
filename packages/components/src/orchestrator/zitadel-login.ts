@@ -33,9 +33,10 @@ import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
-import { en, builtinLocales, mergeLocale, type Locale } from "./locales/index.js";
+import { localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { resolveApi } from "./resolve-api.js";
+import { returnPathFromLocation } from "./return-path.js";
 import { createSanitiser } from "./sanitiser.js";
 import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
@@ -160,6 +161,16 @@ function apiErrorCode(error: unknown): string {
     : "";
 }
 
+/**
+ * Orchestrator element `<zitadel-login>` — drives a login flow end to end and
+ * surfaces its progress through the public `zitadel-*` events.
+ *
+ * @fires {CustomEvent<ZitadelFlowStepDetail>} zitadel-flow-step - A new flow step was rendered.
+ * @fires {CustomEvent<ZitadelFlowInputDetail>} zitadel-flow-input - A field in the current step changed.
+ * @fires {CustomEvent<ZitadelFlowRedirectDetail>} zitadel-flow-redirect - The flow is navigating to an external target.
+ * @fires {CustomEvent<ZitadelFlowCompleteDetail>} zitadel-flow-complete - The flow reached a terminal step.
+ * @fires {CustomEvent<ZitadelFlowErrorDetail>} zitadel-flow-error - The flow failed; carries the error message.
+ */
 @customElement("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
@@ -196,11 +207,25 @@ export class ZitadelLogin extends ZitadelSurface {
    * URL to navigate to after a successful embedded sign-in. When set, the
    * orchestrator exchanges the terminal `handoff_token` via the generated
    * API client (setting the session cookie) and then performs a full
-   * navigation to this URL so host middleware can observe the cookie.
-   * For `complete: "redirect"` the orchestrator follows `redirect_uri`
-   * instead and does not run the exchange.
+   * navigation so host middleware can observe the cookie.
+   *
+   * The navigation returns to the path the page's `next` query parameter
+   * names, when that is a path on this origin: every server SDK's middleware
+   * sends a signed-out request for a protected route to the login page with
+   * `?next=<path>`. Without one, or with {@link forcePostSignInUrl}, it goes
+   * to this URL. For `complete: "redirect"` the orchestrator follows
+   * `redirect_uri` instead and does not run the exchange.
    */
   @property({ type: String, attribute: "post-sign-in-url" }) accessor postSignInUrl = "";
+
+  /**
+   * Go to {@link postSignInUrl} after sign-in even when the page's `next`
+   * query parameter names a path to return to. For a host that keeps a value
+   * of its own in `next`, such as the console, whose `next` is relative to its
+   * deployment prefix and already joined with it in `postSignInUrl`.
+   */
+  @property({ type: Boolean, attribute: "force-post-sign-in-url" })
+  accessor forcePostSignInUrl = false;
 
   /**
    * Existing flow handle to resume rather than start a new flow. When set,
@@ -286,7 +311,8 @@ export class ZitadelLogin extends ZitadelSurface {
    * Custom locale dictionaries keyed by language code. Entries may be
    * partial — each is merged over the built-in dictionary for its language,
    * so a preset like {@link businessLocales} (or a hand-written subset) is
-   * directly assignable:
+   * directly assignable. The `en` entries also fill whatever another language
+   * has no text for ({@link localeFor}):
    *
    * ```ts
    * import { businessLocales } from "@zitadel/components";
@@ -309,6 +335,12 @@ export class ZitadelLogin extends ZitadelSurface {
   @state() private accessor completing = false;
 
   @state() private accessor startupError: string | null = null;
+
+  /**
+   * The action of the submit in flight, so only the control that started it
+   * shows progress. Set and cleared with `loading`, which is what re-renders.
+   */
+  private pendingAction: string | null = null;
 
   @state() private accessor formValues: Record<string, string> = {};
 
@@ -440,27 +472,18 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Resolves the effective locale dictionary. The built-in dictionary for the
-   * resolved language is used as the base; entries from the `locales` map (if
-   * set) are merged on top by {@link mergeLocale}, so partial overrides work
-   * without importing the full base dictionary. The merge also drops a
-   * built-in `<step>.description.sso` when the integrator rewrote that step's
-   * description without one, so their text is what the `t` fallback shows.
+   * Resolves the effective locale dictionary for the resolved language, with
+   * the `locales` map merged over the built-in copy ({@link localeFor}).
    *
    * Priority: explicit `lang` attr → `navigator.language` (user preference)
-   * → `document.documentElement.lang` (page default) → English fallback.
+   * → `document.documentElement.lang` (page default).
    */
   private resolveLocale(): Locale {
     const code =
       this.lang ||
       (typeof navigator !== "undefined" ? navigator.language : "") ||
       (typeof document !== "undefined" ? document.documentElement.lang : "");
-    const primary = (code.split("-")[0] ?? "").toLowerCase();
-    const builtin = builtinLocales[primary] ?? en;
-    const custom = this.locales?.[primary];
-    if (!custom) return builtin;
-
-    return mergeLocale(builtin, custom);
+    return localeFor(code, this.locales);
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
@@ -800,7 +823,7 @@ export class ZitadelLogin extends ZitadelSurface {
       if (this.restarting) {
         wire = { ...wire, step: { ...wire.step, error: "error.flow_restart_required" } };
       }
-      this.applyResponse(wire);
+      void this.applyResponse(wire);
       // Symmetric with `submit()`: every applied step announces itself, the
       // first one included. A host app driving its own chrome from the step
       // (progress, headings, analytics) would otherwise see nothing until
@@ -879,7 +902,7 @@ export class ZitadelLogin extends ZitadelSurface {
     return error;
   }
 
-  private applyResponse(wire: CreateFlow201): void {
+  private async applyResponse(wire: CreateFlow201): Promise<void> {
     this.restarting = false;
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
@@ -911,7 +934,7 @@ export class ZitadelLogin extends ZitadelSurface {
 
     this.syncBackSentinel(wire.step);
 
-    if (this.maybeRedirectToProvider(wire)) return;
+    if (await this.maybeRedirectToProvider(wire)) return;
     void this.maybeCompleteFlow(wire);
   }
 
@@ -980,14 +1003,19 @@ export class ZitadelLogin extends ZitadelSurface {
    *
    * Returns whether it navigated, so the caller can stop.
    */
-  private maybeRedirectToProvider(response: CreateFlow201): boolean {
+  private async maybeRedirectToProvider(response: CreateFlow201): Promise<boolean> {
     const target = response.step.redirect_url;
     // A terminal step carries `redirect_url` too — the engine copies the
     // relying party's `redirect_uri` onto it when a sign-in completes
     // (`terminate()` in flow_state_machine.go). That is a finished sign-in,
     // not a trip to a provider, and it belongs to `maybeCompleteFlow`.
     if (!target || response.step.complete) return false;
-    emit(this, "zitadel-flow-redirect", { redirect_url: target, step: response.step });
+    await emit(
+      this,
+      "zitadel-flow-redirect",
+      { redirect_url: target, step: response.step },
+      { waitForListeners: true },
+    );
     if (typeof window === "undefined") return false;
     window.location.assign(target);
     return true;
@@ -1000,7 +1028,8 @@ export class ZitadelLogin extends ZitadelSurface {
    *   `response.redirect_uri` (OIDC/SAML `auth_request_id` resolved). This
    *   takes precedence over `post-sign-in-url`.
    * - `step.complete === "show"` — when `post-sign-in-url` is set, exchange
-   *   the `handoff_token` for a session cookie and navigate there.
+   *   the `handoff_token` for a session cookie and navigate to
+   *   {@link postSignInTarget}.
    *
    * `zitadel-flow-complete` is always emitted so hosts with custom post-sign-in
    * flows can handle the handoff themselves when `post-sign-in-url` is omitted.
@@ -1009,12 +1038,17 @@ export class ZitadelLogin extends ZitadelSurface {
     const behavior = response.step.complete;
     if (!behavior) return;
 
-    emit(this, "zitadel-flow-complete", {
-      behavior,
-      redirect_uri: response.redirect_uri,
-      handoff_token: response.handoff_token,
-      handoff_token_expires_at: response.handoff_token_expires_at,
-    });
+    await emit(
+      this,
+      "zitadel-flow-complete",
+      {
+        behavior,
+        redirect_uri: response.redirect_uri,
+        handoff_token: response.handoff_token,
+        handoff_token_expires_at: response.handoff_token_expires_at,
+      },
+      { waitForListeners: true },
+    );
 
     if (typeof window === "undefined") return;
     if (behavior === "redirect" && response.redirect_uri) {
@@ -1032,13 +1066,25 @@ export class ZitadelLogin extends ZitadelSurface {
           "<zitadel-login>",
         );
         await exchangeSession(api, { handoff_token: handoffToken }, { project_id: cfg.projectId });
-        window.location.assign(this.postSignInUrl);
+        window.location.assign(this.postSignInTarget());
       } catch (error) {
         this.handleTransportError(error);
       } finally {
         this.loading = false;
       }
     }
+  }
+
+  /**
+   * Where a completed sign-in sends the browser: back to the protected route
+   * the server SDK's middleware sent it from (the page's `next` query
+   * parameter), when that is a path on this origin, else `post-sign-in-url`.
+   * Read at completion, not at mount: the flow keeps the page's query, and a
+   * provider callback returns to the same URL (see {@link returnTargetFor}).
+   */
+  private postSignInTarget(): string {
+    if (this.forcePostSignInUrl) return this.postSignInUrl;
+    return returnPathFromLocation() ?? this.postSignInUrl;
   }
 
   private renderStep(step: CreateFlow201Step, engine: Liquid): string {
@@ -1085,11 +1131,13 @@ export class ZitadelLogin extends ZitadelSurface {
       // reconnect `<zl-passkey>` and start a second WebAuthn ceremony. A
       // preview renders none at all: the atom starts its ceremony on connect.
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
+      identifier: step.identifier ?? null,
       messages: [],
       identity: this.deriveIdentity(),
       errors,
       branding: this.brandingForTemplate(),
       loading: this.loading,
+      pending_action: this.pendingAction,
     };
 
     let raw: string;
@@ -1253,6 +1301,16 @@ export class ZitadelLogin extends ZitadelSurface {
     this.formValues = { ...this.formValues, [name]: value };
     this.syncFieldElementValue(name, value);
     this.clearStaleErrors(name);
+    // The widget never broadcasts a password or one-time-code value through its
+    // own events. It cannot hide the input from other scripts on the same page.
+    const field = this.response?.step.fields?.find((candidate) => candidate.name === name);
+    const autocompleteTokens = (field?.autocomplete ?? "").toLowerCase().split(/\s+/);
+    const secretTokens = ["current-password", "new-password", "one-time-code"];
+    const hasSecretToken = autocompleteTokens.some((token) => secretTokens.includes(token));
+    const isSecret = field?.type === "password" || hasSecretToken;
+    if (isSecret) {
+      return;
+    }
     emit(this, "zitadel-flow-input", { name, value });
   };
 
@@ -1480,6 +1538,7 @@ export class ZitadelLogin extends ZitadelSurface {
     // this one check keeps a preview from ever writing to the flow.
     if (!this.response || this.loading || this.preview) return;
     const { id, session_token } = this.response;
+    this.pendingAction = action ?? "submit";
     this.loading = true;
     try {
       // Only send field values the current step defines. `formValues` carries
@@ -1500,12 +1559,13 @@ export class ZitadelLogin extends ZitadelSurface {
       };
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       const wire = await apiSubmitStep(api, id, body);
-      this.applyResponse(wire);
+      void this.applyResponse(wire);
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
       if (await this.restartIfRequired(error)) return;
       this.handleTransportError(error);
     } finally {
+      this.pendingAction = null;
       this.loading = false;
     }
     // Preview switched on while this submit was in flight: show the step it

@@ -61,21 +61,6 @@ describe("variable resolve", () => {
         expect(result).toFailWith("E_NETWORK");
       });
 
-      it("refuses to pick between two live deployments", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://a.example.com");
-        await app.addPrimaryOrigin("https://b.example.com");
-        await app.deployData(["--origin", "https://a.example.com"]);
-        await app.editUserSchema((schema) => {
-          schema.properties.one = { type: "string" };
-        });
-        await app.deployData(["--origin", "https://b.example.com"]);
-
-        const result = await app.resolveVariables();
-
-        expect(result).toFailWith("E_VALIDATION");
-      });
-
       it("is a miss for an origin with nothing deployed", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
@@ -96,15 +81,16 @@ describe("variable resolve", () => {
         expect(result).toSuggest("origin list");
       });
 
-      it("suggests deploying to a primary origin nothing is deployed to, alone", async () => {
+      it("suggests deploying to a primary origin added since the last deploy", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://a.example.com");
         await app.addPrimaryOrigin("https://b.example.com");
-        await app.deployData(["--origin", "https://a.example.com"]);
+        await app.deployData();
+        await app.addPrimaryOrigin("https://c.example.com");
 
-        const result = await app.resolveVariables({ origin: "https://b.example.com" });
+        const result = await app.resolveVariables({ origin: "https://c.example.com" });
 
-        expect(result).toSuggest("deploy --origin https://b.example.com");
+        expect(result).toSuggest("deploy");
       });
 
       it("suggests no deploy for a preview origin, which only a preview build serves", async () => {

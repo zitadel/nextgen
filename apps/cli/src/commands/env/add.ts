@@ -157,7 +157,7 @@ export default class EnvAdd extends BaseCommand {
         name: `${basename(cwd)}-${name}`,
         ...(issuer === undefined
           ? {}
-          : { origins: [{ pattern: issuer, kind: "preview" as const }] }),
+          : { origins: [{ pattern: issuer, kind: "primary" as const }] }),
         seed_defaults: false,
       });
       consola.success(`Created project ${created.id}`);

@@ -3,13 +3,28 @@
   "extends": ["//"],
   "tasks": {
     // Bundles api/openapi into .generated/, which lib/openapi.ts imports,
-    // applying the repo's Redocly config.
+    // applying the repo's Redocly config, and the CLI's command reference,
+    // which its reference test writes and lib/cli-reference.ts imports.
     "generate": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/**/*.yaml", "$TURBO_ROOT$/redocly.yaml"],
-      "outputs": [".generated/openapi.mjs", ".generated/openapi.d.mts"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/api/openapi/**/*.yaml",
+        "$TURBO_ROOT$/redocly.yaml",
+        "$TURBO_ROOT$/apps/cli/command-reference.json"
+      ],
+      "outputs": [
+        ".generated/openapi.mjs",
+        ".generated/openapi.d.mts",
+        ".generated/cli.mjs",
+        ".generated/cli.d.mts"
+      ]
     },
+    // The API reference's TypeScript samples compile against the client
+    // (scripts/sdk-samples.ts, tsconfig.samples.json), whose endpoints its
+    // generate task writes from the same spec, and whose runtime they call.
     "typecheck": {
-      "dependsOn": ["generate"]
+      "dependsOn": ["generate", "@zitadel/api#generate"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/api/src/**"]
     },
     // The build script bundles again before `next build`, because the
     // hosted cloud's docs service runs the script without a task runner.

@@ -124,7 +124,8 @@ export function getRuntime(): ConsoleRuntime {
  *
  * Not the project being managed, and never selected as one: management calls
  * use the selected project (`src/lib/project-scope.ts`), chosen from the
- * person's own projects. This one is for sign-in and claim.
+ * person's own projects. This one is for sign-in and claim, and for holding the
+ * cookie's session to the console (`consoleSessionProject` in `auth/session.ts`).
  */
 export function getConsoleProjectId(): string {
   return getRuntime().console_project_id || "";

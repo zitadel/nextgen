@@ -13,6 +13,8 @@ import {
   type VariableRow,
   type VariableType,
   type VariableValue,
+  type VariableKind,
+  variableReadScope,
   variableScope,
 } from "../../lib/variables";
 import { inShell } from "../../lib/suggestion";
@@ -170,16 +172,24 @@ export default class VariableSet extends EnvironmentCommand {
       parse: (raw: string) => parseVariableValue(raw, type),
     });
 
-    // The write answers with the project's variables read back, so the output is
-    // the store's own answer: a secret says only that a value is held (ADR 062
-    // §7), never the value itself. The kind this write did not touch is read in
-    // the same answer.
-    const stored = (
+    // The write answers with the kind it wrote, so a secret says only that a
+    // value is held (ADR 062 §7), never the value itself. The kind this write
+    // did not touch is read in a separate call: the platform never merges the
+    // two kinds in one answer.
+    const written = (
       await client.updateVariables({ [name]: { value, secret: flags.secret } }, scope)
     )[name];
     this.recordTelemetry({ is_secret: flags.secret });
-    const primary = stateOf(stored?.primary);
-    const previewState = stateOf(stored?.preview);
+    const stateOfKind = async (kind: VariableKind): Promise<KindState> =>
+      stateOf(
+        written?.[kind] !== undefined
+          ? written[kind]
+          : (await client.getVariables(variableReadScope(projectId, kind === "preview")))[name]?.[
+              kind
+            ],
+      );
+    const primary = await stateOfKind("primary");
+    const previewState = await stateOfKind("preview");
 
     return this.emit({
       status: "ok",

@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
+	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/go-jose/go-jose/v4"
@@ -13,6 +15,8 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/op"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/cache"
@@ -184,6 +188,100 @@ func TestKeyService_GetCrypter(t *testing.T) {
 			assert.Equal(t, domain.ErrEncryptionKeyNotFound().Code, de.Code)
 		})
 	})
+}
+
+// spanTree renders the spans under parent, one per line, indented by depth and
+// in start order, each with its attributes.
+func spanTree(spans tracetest.SpanStubs, parent trace.SpanID) []string {
+	var lines []string
+	var walk func(parent trace.SpanID, indent string)
+	walk = func(parent trace.SpanID, indent string) {
+		var children tracetest.SpanStubs
+		for _, s := range spans {
+			if s.Parent.SpanID() == parent {
+				children = append(children, s)
+			}
+		}
+		slices.SortStableFunc(children, func(a, b tracetest.SpanStub) int { return a.StartTime.Compare(b.StartTime) })
+		for _, s := range children {
+			line := indent + s.Name
+			for _, a := range s.Attributes {
+				line += fmt.Sprintf(" %s=%s", a.Key, a.Value.Emit())
+			}
+			lines = append(lines, line)
+			walk(s.SpanContext.SpanID(), indent+"  ")
+		}
+	}
+	walk(parent, "")
+	return lines
+}
+
+// A cold token key resolves in two levels: its own read and unwrap under the
+// project KEK, and below that the KEK's read and its unwrap under the master
+// key (the RSA operation). A warm key is one cache hit with nothing below it.
+func TestKeyService_GetCrypter_spans(t *testing.T) {
+	svc, statements, masterKey := newMockedKeyService(t)
+	kek := newActiveKEK(t, "proj-1", masterKey)
+	kekCrypter, err := kek.Crypter(masterKey)
+	require.NoError(t, err)
+	tokenKey := newTokenEncryptionKey(t, "tek_child_1", "proj-1", kekCrypter)
+	gomock.InOrder(
+		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(tokenKey, nil),
+		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(kek, nil),
+	)
+
+	for _, call := range []struct {
+		name string
+		want []string
+	}{
+		{name: "cold", want: []string{
+			"KeyService.GetCrypter cache.hit=false",
+			"  KeyService.GetEncryptionKey",
+			"  KeyService.GetCrypter cache.hit=false",
+			"    KeyService.GetEncryptionKey",
+			"    KeyService.unwrapKey key.kind=master",
+			"  KeyService.unwrapKey key.kind=project",
+		}},
+		{name: "warm", want: []string{
+			"KeyService.GetCrypter cache.hit=true",
+		}},
+	} {
+		ctx := sampledRequest(t)
+		_, err := svc.GetCrypter(ctx, tokenKey.ID, jose.A256GCM)
+		require.NoError(t, err)
+
+		assert.Equal(t, call.want, spanTree(service.SpanExporter.GetSpans(), trace.SpanContextFromContext(ctx).SpanID()), call.name)
+	}
+}
+
+// The active key is read on every call; only its unwrap is cached.
+func TestKeyService_GetProjectCrypter_spans(t *testing.T) {
+	svc, statements, masterKey := newMockedKeyService(t)
+	tokenKey, err := domain.NewEncryptionKey("proj-1", domain.EncryptionKeyPurposeToken, jose.A256GCM, masterKey)
+	require.NoError(t, err)
+	tokenKey.ID = "encryption_key_token"
+	statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(tokenKey, nil).Times(2)
+
+	for _, call := range []struct {
+		name string
+		want []string
+	}{
+		{name: "cold", want: []string{
+			"KeyService.GetProjectCrypter cache.hit=false",
+			"  KeyService.GetProjectEncryptionKey",
+			"  KeyService.unwrapKey key.kind=master",
+		}},
+		{name: "warm", want: []string{
+			"KeyService.GetProjectCrypter cache.hit=true",
+			"  KeyService.GetProjectEncryptionKey",
+		}},
+	} {
+		ctx := sampledRequest(t)
+		_, err := svc.GetProjectCrypter(ctx, "proj-1", domain.EncryptionKeyPurposeToken)
+		require.NoError(t, err)
+
+		assert.Equal(t, call.want, spanTree(service.SpanExporter.GetSpans(), trace.SpanContextFromContext(ctx).SpanID()), call.name)
+	}
 }
 
 func TestKeyService_GetProjectCrypter(t *testing.T) {

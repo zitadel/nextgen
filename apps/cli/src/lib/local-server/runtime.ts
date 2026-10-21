@@ -8,7 +8,7 @@ import { isErrno, ZitadelError } from "../errors";
 import { isPortableShellWord } from "../public-cli";
 import { unscopedCommand } from "../suggestion";
 import { parseJsonObject } from "../json";
-import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary } from "./env-vars";
+import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
 export const DEFAULT_LOCAL_SERVER_IMAGE = `${LOCAL_SERVER_IMAGE_NAME}:latest`;
@@ -238,6 +238,28 @@ export function sameLocalServer(a: string, b: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * How the server at `serverUrl` reaches this machine's loopback, judged by the
+ * nearest runtime record: `allowed` when that record's process server got the
+ * loopback allow list, `container` when it runs in Docker (its localhost is
+ * the container), `unknown` for any other server or an unreadable record.
+ */
+export async function loopbackReach(
+  cwd: string,
+  serverUrl: string,
+): Promise<"allowed" | "container" | "unknown"> {
+  const nearest = await readNearestRuntimeMetadata(cwd).catch(() => undefined);
+  if (!nearest || !sameLocalServer(nearest.runtime.server_url, serverUrl)) {
+    return "unknown";
+  }
+  if (nearest.runtime.backend === "docker") {
+    return "container";
+  }
+  return Object.keys(LOCAL_DEFAULTS).every((name) => nearest.runtime.env?.injected.includes(name))
+    ? "allowed"
+    : "unknown";
 }
 
 /** Runtime metadata of the server started in `cwd` or the nearest parent with one. */

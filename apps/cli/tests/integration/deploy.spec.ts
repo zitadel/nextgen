@@ -129,38 +129,13 @@ describe("deploy", () => {
         expect(result).toFailWith("E_CREDENTIAL_MISSING");
       });
 
-      it("refuses an --origin that is not an origin of the project", async () => {
+      it("takes no --origin, as primary origins are never named one by one", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
+        await app.addPrimaryOrigin("https://app.example.com");
 
-        const result = await app.deploy(["--origin", "https://elsewhere.example.com"]);
+        const result = await app.deploy(["--origin", "https://app.example.com"]);
 
         expect(result).toFailWith("E_VALIDATION");
-      });
-
-      it("refuses an --origin a preview wildcard covers as a preview", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin("https://*-acme.vercel.app", "preview");
-
-        // The concrete URL is covered by the preview wildcard, not equal to it.
-        // An exact-match check would miss it and mislabel it "not an origin";
-        // it must be recognised as the preview it is.
-        const result = await app.deploy(["--origin", "https://x-acme.vercel.app"]);
-
-        expect(result).toFailWith("E_VALIDATION");
-        expect(result).toExplain("is a preview origin");
-      });
-
-      it("accepts a primary --origin even when a preview wildcard also covers it", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin("https://*-acme.vercel.app", "preview");
-        await app.addPrimaryOrigin("https://app-acme.vercel.app");
-
-        // A literal beats a wildcard: the exact primary is a primary target
-        // although the preview wildcard would match it too.
-        const data = await app.deployData(["--origin", "https://app-acme.vercel.app"]);
-
-        expect(data.origins).toEqual(["https://app-acme.vercel.app"]);
       });
 
       it("omits the guard on a first deploy, when nothing is live", async () => {
@@ -189,24 +164,6 @@ describe("deploy", () => {
         const second = await app.deployData();
 
         expect(second.content_hash).toBe(first.content_hash);
-      });
-
-      it("deploys to every primary after a deploy to one of them", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://a.example.com");
-        await app.addPrimaryOrigin("https://b.example.com");
-        await app.deployData();
-        await app.editUserSchema((schema) => {
-          schema.properties.one = { type: "string" };
-        });
-        await app.deployData(["--origin", "https://a.example.com"]);
-        await app.editUserSchema((schema) => {
-          schema.properties.two = { type: "string" };
-        });
-
-        const result = await app.deploy();
-
-        expect(result).toSucceed();
       });
 
       it("says a revoked release cannot be deployed rather than reporting a race", async () => {
@@ -254,17 +211,6 @@ describe("deploy", () => {
         const result = await app.deploy();
 
         expect(result).toHintAt("deploy -m");
-      });
-
-      it("keeps the --origin in the hint when another deploy lands first", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin("https://a.example.com");
-        await app.deployData(["--origin", "https://a.example.com"]);
-        platform.racesTheNextDeploy();
-
-        const result = await app.deploy(["--origin", "https://a.example.com"]);
-
-        expect(result).toHintAt("--origin https://a.example.com");
       });
 
       it("validates and writes nothing on a dry run", async () => {

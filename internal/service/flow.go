@@ -75,21 +75,29 @@ type ResolveFlowHint struct {
 func NewFlowService(
 	v2Pool *DB,
 	stateMachine domain.FlowStateMachine,
+	builtinBases domain.BuiltinSchemaBases,
 ) FlowService {
 	return &flowService{
 		v2Pool:       v2Pool,
 		stateMachine: stateMachine,
+		builtinBases: builtinBases,
 	}
 }
 
 type flowService struct {
 	v2Pool       *DB
 	stateMachine domain.FlowStateMachine
+	// builtinBases resolves a definition's user schema given as a built-in
+	// schema's `$id` under whichever base the project stores it.
+	builtinBases domain.BuiltinSchemaBases
 }
 
 var _ FlowService = (*flowService)(nil)
 
-func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
+func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *domain.FlowDefinition, err error) {
+	ctx, end := startSpan(ctx, "FlowService.Resolve")
+	defer end(&err)
+
 	if req.Name != nil {
 		return s.resolveByName(ctx, req)
 	}
@@ -215,7 +223,10 @@ func (s *flowService) resolveFlowSession(ctx context.Context, req StartFlowReque
 	return session.ID, nil
 }
 
-func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.FlowStepResult, error) {
+func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (_ domain.FlowStepResult, err error) {
+	ctx, end := startSpan(ctx, "FlowService.Start")
+	defer end(&err)
+
 	if req.Definition == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
 	}
@@ -225,9 +236,10 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 		return domain.FlowStepResult{}, domain.ErrRequestInvalid().WithMessage("session_id must not be empty")
 	}
 
-	// The definition names its schema by objectType, but the flow and the users
-	// it creates are validated against one revision, pinned here at start.
-	userSchema, schemaErr := resolveUserSchema(ctx, s.v2Pool.Statements(), req.Definition.ProjectID, req.Definition.UserSchema)
+	// The definition names its schema by objectType or id, but the flow and
+	// the users it creates are validated against one revision, pinned here at
+	// start.
+	userSchema, schemaErr := resolveUserSchema(ctx, s.v2Pool.Statements(), s.builtinBases, req.Definition.ProjectID, req.Definition.UserSchema)
 	if schemaErr != nil {
 		return domain.FlowStepResult{}, domain.ErrInternal(schemaErr).WithMessage(
 			fmt.Sprintf("failed to resolve user schema %q of flow definition %s", req.Definition.UserSchema, req.Definition.ID))
@@ -266,7 +278,10 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
-func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain.FlowStepResult, error) {
+func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (_ domain.FlowStepResult, err error) {
+	ctx, end := startSpan(ctx, "FlowService.Submit")
+	defer end(&err)
+
 	if req.State == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: submit without state")
 	}
@@ -309,7 +324,10 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain
 	}, nil
 }
 
-func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (domain.FlowStepResult, error) {
+func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (_ domain.FlowStepResult, err error) {
+	ctx, end := startSpan(ctx, "FlowService.GetStep")
+	defer end(&err)
+
 	if req.State == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: get step without state")
 	}

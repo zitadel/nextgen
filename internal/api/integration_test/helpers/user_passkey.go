@@ -14,7 +14,7 @@ type UserPasskeyFixture struct {
 	Pool *service.DB
 }
 
-func (h *Harness) EnsureUserPasskeyFixture(t *testing.T) UserPasskeyFixture {
+func (h *Harness) EnsureUserPasskeyFixture(t testing.TB) UserPasskeyFixture {
 	t.Helper()
 	return UserPasskeyFixture{Pool: h.EnsureServiceDB(t)}
 }

@@ -16,7 +16,9 @@ import (
 
 // Import loads bootstrap users from JSON files into the database.
 // dialect is the configured database dialect name (e.g. "postgres"); used to reject unsupported backends.
-func Import(ctx context.Context, v2Pool service.StatementPool, hashValidator crypto.HashValidator, dialect string, paths []string) error {
+// builtinBases maps a document's schema URL onto the row the project stores
+// it under when the two name the same built-in under different bases.
+func Import(ctx context.Context, v2Pool service.StatementPool, hashValidator crypto.HashValidator, dialect string, builtinBases domain.BuiltinSchemaBases, paths []string) error {
 	if len(paths) == 0 {
 		return nil
 	}
@@ -25,7 +27,7 @@ func Import(ctx context.Context, v2Pool service.StatementPool, hashValidator cry
 	}
 
 	for _, path := range paths {
-		if err := importFile(ctx, v2Pool, hashValidator, path); err != nil {
+		if err := importFile(ctx, v2Pool, hashValidator, builtinBases, path); err != nil {
 			return fmt.Errorf("user file %q: %w", path, err)
 		}
 	}
@@ -36,6 +38,7 @@ func importFile(
 	ctx context.Context,
 	v2Pool service.StatementPool,
 	hashValidator crypto.HashValidator,
+	builtinBases domain.BuiltinSchemaBases,
 	path string,
 ) error {
 	doc, err := ParseFile(path)
@@ -46,6 +49,14 @@ func importFile(
 		return err
 	}
 	pw, err := parsePasswordAuthenticator(doc.Authenticators)
+	if err != nil {
+		return err
+	}
+
+	// Before the placeholder below can stand in for it: a document naming the
+	// default schema under a legacy base meets a project seeded under the
+	// current one, and the user must point at the seeded row to sign in.
+	doc.Header.SchemaURL, err = storedSchemaURL(ctx, v2Pool.Statements(), builtinBases, doc.Header)
 	if err != nil {
 		return err
 	}
@@ -168,6 +179,20 @@ func buildCreateAttributes(
 		out = append(out, *attr)
 	}
 	return out, nil
+}
+
+// storedSchemaURL returns the URL the project stores the document's schema
+// under: the header's own when that row exists or none does, else the URL of
+// the row that names the same built-in under another base.
+func storedSchemaURL(ctx context.Context, stmts domain.JSONSchemaGetter, builtinBases domain.BuiltinSchemaBases, h Header) (string, error) {
+	stored, err := builtinBases.GetJSONSchema(ctx, stmts, h.ProjectID, h.SchemaURL)
+	if err == nil {
+		return stored.URL, nil
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return h.SchemaURL, nil
+	}
+	return "", fmt.Errorf("look up json_schema %q: %w", h.SchemaURL, err)
 }
 
 // loadUserSchema reads the user's schema document so attribute uniqueness can

@@ -1,0 +1,7 @@
+name: id
+in: path
+required: true
+description: The unique identifier of the schema.
+schema:
+  type: string
+example: sch_01KWHF2XY6RN7F0N9WD3P2E4YM

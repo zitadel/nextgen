@@ -75,19 +75,17 @@ describe("deployment create", () => {
         expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(0);
       });
 
-      it("refuses an --origin a preview pattern covers", async () => {
+      it("takes no --origin, as primary origins are never named one by one", async () => {
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        await app.addOrigin("https://*-acme.vercel.app", "preview");
-        const release = await aRelease(app);
+        await app.addPrimaryOrigin("https://app.example.com");
 
         const result = await app.run([
           "deployment",
           "create",
           "--release",
-          release,
+          "rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
           "--origin",
-          "https://pr-7-acme.vercel.app",
+          "https://app.example.com",
           "--non-interactive",
           "--json",
         ]);

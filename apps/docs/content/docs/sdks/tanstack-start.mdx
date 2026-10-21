@@ -1,0 +1,146 @@
+---
+title: TanStack Start SDK
+description: Request middleware, route guards, and React widgets for TanStack Start applications.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { File, Files } from "fumadocs-ui/components/files";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+
+The TanStack Start SDK is a global request middleware that proxies and verifies sessions on the server, plus typed React wrappers for the login and logout widgets on its `/react` entry.
+
+<Callout title="Generated setup" type="info">
+  The CLI writes `src/start.ts`, the server entry TanStack Start loads on its own, and writes the backend URL, the project secret, and the project id to `.env.local`.
+</Callout>
+
+## Install
+
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add @zitadel/sdk-tanstack-start@alpha
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install @zitadel/sdk-tanstack-start@alpha
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add @zitadel/sdk-tanstack-start@alpha
+    ```
+  </Tab>
+</Tabs>
+
+## Setup
+
+<Tabs items={["CLI generated", "Manual"]}>
+  <Tab>
+    The CLI adds the server entry, the routes, environment files, and the SDK package.
+
+    <Files>
+      <File name="src/start.ts" />
+      <File name="src/routes/index.tsx" />
+      <File name="src/routes/login.tsx" />
+      <File name="src/routes/register.tsx" />
+      <File name="src/routes/profile.tsx" />
+      <File name=".env.local" />
+      <File name=".env.example" />
+      <File name="package.json" />
+    </Files>
+
+    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
+  </Tab>
+  <Tab>
+    Create `src/start.ts`. Having this file opts the app out of TanStack Start's automatic CSRF protection for server functions, so restore it and run it before auth:
+
+    ```ts
+    import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
+    import { createNextgenRequestMiddleware } from "@zitadel/sdk-tanstack-start/server";
+
+    const csrfMiddleware = createCsrfMiddleware({
+      filter: (ctx) => ctx.handlerType === "serverFn",
+    });
+
+    const authMiddleware = createMiddleware({ type: "request" }).server(
+      createNextgenRequestMiddleware({
+        protectedRoutes: ["/profile"],
+        loginPath: "/login",
+      }),
+    );
+
+    export const startInstance = createStart(() => ({
+      requestMiddleware: [csrfMiddleware, authMiddleware],
+    }));
+    ```
+
+    `protectedRoutes` only guards document requests. A client-side `<Link>` never reaches the request middleware, so guard the route itself in `beforeLoad` by calling a server function. A route's own `beforeLoad` context does not carry the session; a server function's does.
+
+    ```tsx
+    import { createFileRoute, redirect } from "@tanstack/react-router";
+    import { createServerFn } from "@tanstack/react-start";
+    import { getAuth } from "@zitadel/sdk-tanstack-start/server";
+
+    // A server function's return value reaches the browser, so return only
+    // client-safe fields: `getAuth` also carries the raw session token.
+    const fetchAuth = createServerFn().handler(({ context }) => {
+      const auth = getAuth(context);
+      return auth.isAuthenticated
+        ? { isAuthenticated: true as const, userId: auth.session.userId }
+        : { isAuthenticated: false as const };
+    });
+
+    export const Route = createFileRoute("/profile")({
+      beforeLoad: async () => {
+        const auth = await fetchAuth();
+        if (!auth.isAuthenticated) {
+          throw redirect({ to: "/login" });
+        }
+      },
+    });
+    ```
+
+    Never return `getAuth(context)` itself from a server function: its `session` carries the raw session token, and a server function's result reaches browser scripts. Return only `userId` and other client-safe fields.
+
+    Render the widgets from `@zitadel/sdk-tanstack-start/react`. They mount client-only: on the server and during hydration they render nothing, so no flow starts before the app hydrates with its config. The `/react` entry also exports `businessLocales` and the Login, Logout and Session prop types; `@zitadel/sdk-tanstack-start/client` exports only `configureZitadel`, `getApi` and `getZitadelConfig`, with no element classes.
+
+    ```tsx
+    import { createFileRoute } from "@tanstack/react-router";
+    import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
+    import { ZitadelSession } from "@zitadel/sdk-tanstack-start/react";
+
+    const project = configureZitadel({
+      projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
+      proxyPath: "/__nextgen",
+    });
+
+    export const Route = createFileRoute("/profile")({
+      component: () => <ZitadelSession project={project} postSignOutUrl="/login" />,
+    });
+    ```
+
+    `ZitadelLogin` takes the callbacks `onFlowStep`, `onFlowInput`, `onFlowComplete`, `onFlowRedirect` and `onFlowError`; `ZitadelLogout` and `ZitadelSession` take `onSignout`. Each receives the event detail. The signed-in card for a profile page is `ZitadelSession`, as above.
+  </Tab>
+</Tabs>
+
+## Runtime model
+
+<Steps>
+  <Step>The middleware proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
+  <Step>It verifies the session token and passes the result on as `nextgenAuth` in the request context, which server functions receive; read it with `getAuth(context)`.</Step>
+  <Step>It redirects unauthenticated document requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in. Routes guard client-side navigation in `beforeLoad`.</Step>
+</Steps>
+
+## Verify
+
+- Start the app with `npm run dev`. Setup already wrote the URL, the secret, and the project id to `.env.local`.
+- Visit `/login` and register a user.
+- Confirm `/profile` shows signed-in state.
+- Log out and confirm `/profile` redirects to `/login`, both on a direct visit and from the landing page's link.
+
+## See also
+
+- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [`@zitadel/sdk-tanstack-start` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-tanstack-start) and the [CLI TanStack Start patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/tanstack-start).

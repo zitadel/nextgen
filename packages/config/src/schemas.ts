@@ -39,9 +39,9 @@ export const localFileReferenceSchema = z.strictObject({ $file: z.string().min(1
 export const brandingConfigSchema = z
   .strictObject({
     // Strict, unlike the generated wire schema: a typo like `hero_urll`
-    // must fail plan, not silently pass, get ignored by the server, and
-    // vanish on canonical write-back. The editor meta-schema already
-    // rejects unknown keys; the CLI gate has to agree.
+    // must fail plan, not silently pass and get ignored by the server. The
+    // editor meta-schema already rejects unknown keys; the CLI gate has to
+    // agree.
     ...CreateBrandingBody.shape,
     // Raw strings instead of the generated uri fields: those trim and
     // normalize before refinement runs, hiding exactly the forms the wire

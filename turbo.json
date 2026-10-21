@@ -139,12 +139,17 @@
         "scripts/ci-mode.mjs",
         "scripts/ci-mode.test.mjs",
         "scripts/dev-process.mjs",
+        "scripts/dev-process.test.mjs",
+        "scripts/shims/pnpm",
         "scripts/generate-meta-schemas.ts",
         "scripts/generate-meta-schemas.test.ts",
         "scripts/release-artifacts.mjs",
         "scripts/release-github.mjs",
         "scripts/release-github.test.mjs",
         "scripts/release-manifest.mjs",
+        "scripts/render-builtin-schemas.mjs",
+        "scripts/render-builtin-schemas.test.mjs",
+        "api/openapi/endpoints/schemas/*.json",
         "scripts/assert-file.mjs",
         "vitest.config.ts"
       ]

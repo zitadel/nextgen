@@ -1,10 +1,14 @@
 {
   "title": "SDKs",
   "pages": [
-    "index",
+    "proxy",
     "---Server frameworks---",
     "next",
     "nuxt",
+    "sveltekit",
+    "solid-start",
+    "qwik-router",
+    "tanstack-start",
     "---SPA frameworks---",
     "react",
     "vue",

@@ -151,7 +151,7 @@ describe("claim page", () => {
           projects: claimed ? [{ id: PROJECT_ID, name: "Claimed" }] : [],
         }),
       ),
-      http.post("*/api/teams/query", () => HttpResponse.json({ teams: [] })),
+      http.post("*/api/users/query", () => HttpResponse.json({ users: [] })),
     );
     stubComplete(() => {
       claimed = true;
@@ -167,7 +167,7 @@ describe("claim page", () => {
     const { router } = await renderAt(CLAIM_PATH);
     await userEvent.click(await screen.findByRole("link", { name: "Open the console" }));
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: PROJECT_ID });
   });
 

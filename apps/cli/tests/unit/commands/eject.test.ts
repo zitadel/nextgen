@@ -89,6 +89,41 @@ async function makeManagedViteProject(): Promise<string> {
   return cwd;
 }
 
+/**
+ * A Nuxt 4 app as an older setup left it: the two plugins setup used to write
+ * (one still managed, one the user took over) beside a managed page.
+ */
+async function makeOlderNuxtProject(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-nuxt-"));
+  tempDirs.push(cwd);
+  await mkdir(join(cwd, ".zitadel"), { recursive: true });
+  await mkdir(join(cwd, "app/pages"), { recursive: true });
+  await mkdir(join(cwd, "app/plugins"), { recursive: true });
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({
+      name: "demo",
+      dependencies: { nuxt: "^4.1.0", "@zitadel/sdk-nuxt": "latest" },
+    }),
+  );
+  await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ project: "proj-001" }));
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ project_id: "proj-001" }));
+  await writeFile(join(cwd, "nuxt.config.ts"), "export default defineNuxtConfig({});\n");
+  await writeFile(
+    join(cwd, "app/pages/login.vue"),
+    `<script setup>\n// ${MANAGED_MARKER}\n</script>\n`,
+  );
+  await writeFile(
+    join(cwd, "app/plugins/zitadel-components.client.ts"),
+    `// ${MANAGED_MARKER}\nimport "@zitadel/components";\n`,
+  );
+  await writeFile(
+    join(cwd, "app/plugins/auth.server.ts"),
+    "export default defineNuxtPlugin(() => {});\n",
+  );
+  return cwd;
+}
+
 afterEach(async () => {
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
@@ -228,6 +263,15 @@ describe("eject command", () => {
     );
     // The edited config file itself is left in place.
     expect(await exists(join(cwd, "vite.config.ts"))).toBe(true);
+  });
+
+  it("removes the managed Nuxt plugins an older setup wrote and keeps an edited one", async () => {
+    const cwd = await makeOlderNuxtProject();
+
+    await eject(cwd, ["--force"]);
+
+    expect(await exists(join(cwd, "app/plugins/zitadel-components.client.ts"))).toBe(false);
+    expect(await exists(join(cwd, "app/plugins/auth.server.ts"))).toBe(true);
   });
 
   it("emits a skipped envelope when there is nothing to eject", async () => {

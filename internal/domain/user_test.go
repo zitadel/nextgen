@@ -1,6 +1,8 @@
 package domain_test
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -298,7 +300,7 @@ func TestNewPatchUser(t *testing.T) {
 			Schema:          []byte(minimalUserSchema),
 			AttributesPatch: map[string]any{"email": nil},
 		})
-		require.ErrorIs(t, err, domain.ErrUserInvalid())
+		requireInvalidFields(t, err, "email")
 	})
 
 	t.Run("the merged document is what validates, not the patch", func(t *testing.T) {
@@ -308,7 +310,7 @@ func TestNewPatchUser(t *testing.T) {
 			Schema:          []byte(minimalUserSchema),
 			AttributesPatch: map[string]any{"email": 5},
 		})
-		require.ErrorIs(t, err, domain.ErrUserInvalid())
+		requireInvalidFields(t, err, "email")
 	})
 
 	// Mirrors the create-side guard: a user is stored as its attribute rows,
@@ -353,7 +355,7 @@ func TestNewPatchUser(t *testing.T) {
 			Schema:          []byte(schemaV2),
 			AttributesPatch: map[string]any{},
 		})
-		require.ErrorIs(t, err, domain.ErrUserInvalid(), "v2 requires department, the patch did not bring it")
+		requireInvalidFields(t, err, "department") // v2 requires department, the patch did not bring it
 
 		got, err := domain.NewPatchUser(domain.PatchUserParams{
 			Current:         patchTestCurrentUser(),
@@ -390,6 +392,58 @@ func TestNewPatchUser(t *testing.T) {
 	})
 }
 
+func TestCheckUserSchemaMigration(t *testing.T) {
+	t.Parallel()
+
+	schema := func(url string, objectType *string) *domain.JSONSchema {
+		return &domain.JSONSchema{ProjectID: "proj_1", URL: url, ObjectType: objectType}
+	}
+	humanV1 := schema("https://example.test/human/v1.json", new("human-user"))
+	humanV2 := schema("https://example.test/human/v2.json", new("human-user"))
+	machine := schema("https://example.test/machine.json", new("machine-user"))
+	fetched := schema("https://example.test/fetched.json", nil)
+
+	t.Run("a revision of the same objectType passes in either direction", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, domain.CheckUserSchemaMigration(humanV1, humanV2))
+		assert.NoError(t, domain.CheckUserSchemaMigration(humanV2, humanV1))
+	})
+
+	t.Run("another objectType is refused and both are named", func(t *testing.T) {
+		t.Parallel()
+		err := domain.CheckUserSchemaMigration(humanV1, machine)
+		require.ErrorIs(t, err, domain.ErrUserInvalid())
+
+		var de domain.Error
+		require.ErrorAs(t, err, &de)
+		assert.Equal(t, map[string]string{
+			"schema":              "https://example.test/machine.json",
+			"object_type":         "machine-user",
+			"current_schema":      "https://example.test/human/v1.json",
+			"current_object_type": "human-user",
+		}, de.Details)
+	})
+
+	// Without an objectType there is nothing to group revisions by, so such a
+	// schema is a revision of nothing but itself.
+	t.Run("a schema without objectType is refused on either side", func(t *testing.T) {
+		t.Parallel()
+		require.ErrorIs(t, domain.CheckUserSchemaMigration(fetched, humanV1), domain.ErrUserInvalid())
+		require.ErrorIs(t, domain.CheckUserSchemaMigration(humanV1, fetched), domain.ErrUserInvalid())
+		require.ErrorIs(t, domain.CheckUserSchemaMigration(fetched, schema("https://example.test/other.json", nil)), domain.ErrUserInvalid())
+	})
+
+	// The meta-schema accepts an empty objectType, which groups nothing either.
+	t.Run("an empty objectType is no shared logical schema", func(t *testing.T) {
+		t.Parallel()
+		err := domain.CheckUserSchemaMigration(
+			schema("https://example.test/empty-a.json", new("")),
+			schema("https://example.test/empty-b.json", new("")),
+		)
+		require.ErrorIs(t, err, domain.ErrUserInvalid())
+	})
+}
+
 // A user is stored as its attribute rows, so an empty document is refused at
 // the domain rather than reaching the dialects' identical guard, which would
 // answer 500. All-optional schemas make it a document the schema accepts.
@@ -411,4 +465,133 @@ func TestNewCreateUser_AttributesRequired(t *testing.T) {
 		Attributes: map[string]any{},
 	})
 	require.ErrorIs(t, err, domain.ErrUserInvalid())
+}
+
+// requireInvalidFields asserts the schema failure: user.attributes_invalid
+// naming exactly the given request paths, with the validator error kept as
+// parent.
+func requireInvalidFields(t *testing.T, err error, fields ...string) {
+	t.Helper()
+	require.ErrorIs(t, err, domain.ErrUserAttributesInvalid(nil))
+	var derr domain.Error
+	require.ErrorAs(t, err, &derr)
+	keys := make([]domain.AttributeKey, 0, len(fields))
+	for _, field := range fields {
+		keys = append(keys, domain.AttributeKey(field))
+	}
+	assert.Equal(t, domain.UserAttributesDetails{Keys: keys}, derr.Details)
+	assert.NotEmpty(t, domain.ValidationFailures(err), "the validator error stays the parent, for the log")
+	assert.True(t, domain.IsUserInvalid(err))
+}
+
+// A schema failure names every failing field by its path from the request
+// body, the way request validation does, and never echoes a value.
+func TestNewCreateUser_SchemaFailureNamesFields(t *testing.T) {
+	const schema = `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id": "https://example.test/schema.json",
+		"type": "object",
+		"additionalProperties": false,
+		"required": ["email", "country"],
+		"properties": {
+			"email": {"type": "string"},
+			"country": {"type": "string"},
+			"department": {"type": "string"},
+			"age": {"type": "integer"},
+			"tags": {"type": "array", "items": {"type": "string"}},
+			"addresses": {
+				"type": "array",
+				"items": {"type": "object", "properties": {"zip": {"type": "string", "pattern": "^[0-9]+$"}}}
+			},
+			"labels": {"type": "object", "propertyNames": {"pattern": "^[a-z]+$"}},
+			"address": {
+				"type": "object",
+				"required": ["zip"],
+				"properties": {
+					"zip": {"type": "string", "pattern": "^[0-9]+$"},
+					"city": {"type": "string"}
+				}
+			}
+		},
+		"allOf": [{"required": ["department"]}]
+	}`
+
+	tests := []struct {
+		name   string
+		attrs  map[string]any
+		fields []string
+	}{
+		{
+			name:   "missing required and wrong type",
+			attrs:  map[string]any{"email": "a@example.com", "department": "x", "age": "42"},
+			fields: []string{"age", "country"},
+		},
+		{
+			name: "nested property",
+			attrs: map[string]any{
+				"email": "a@example.com", "country": "CH", "department": "x",
+				"address": map[string]any{"zip": "secret-value"},
+			},
+			fields: []string{"address.zip"},
+		},
+		{
+			name: "nested required property",
+			attrs: map[string]any{
+				"email": "a@example.com", "country": "CH", "department": "x",
+				"address": map[string]any{"city": "Bern"},
+			},
+			fields: []string{"address.zip"},
+		},
+		{
+			name:   "required through allOf",
+			attrs:  map[string]any{"email": "a@example.com", "country": "CH"},
+			fields: []string{"department"},
+		},
+		{
+			name:   "undeclared property of a closed schema",
+			attrs:  map[string]any{"email": "a@example.com", "country": "CH", "department": "x", "nickname": "al"},
+			fields: []string{"nickname"},
+		},
+		{
+			name:   "array element names the array",
+			attrs:  map[string]any{"email": "a@example.com", "country": "CH", "department": "x", "tags": []any{"ok", 5}},
+			fields: []string{"tags"},
+		},
+		{
+			name: "property of an array element names the array",
+			attrs: map[string]any{
+				"email": "a@example.com", "country": "CH", "department": "x",
+				"addresses": []any{map[string]any{"zip": "secret-value"}},
+			},
+			fields: []string{"addresses"},
+		},
+		{
+			// The rejected name is the value, so the object holding it is
+			// named.
+			name: "rejected property name names its object",
+			attrs: map[string]any{
+				"email": "a@example.com", "country": "CH", "department": "x",
+				"labels": map[string]any{"secret-value": "x"},
+			},
+			fields: []string{"labels"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := domain.NewCreateUser(domain.CreateUserParams{
+				ProjectID:  "proj_1",
+				SchemaURL:  "https://example.test/schema.json",
+				Schema:     []byte(schema),
+				Attributes: tt.attrs,
+			})
+			requireInvalidFields(t, err, tt.fields...)
+			var derr domain.Error
+			require.ErrorAs(t, err, &derr)
+			assert.NotContains(t, fmt.Sprint(derr.Details), "secret-value")
+		})
+	}
+}
+
+func TestInvalidAttributeKeys(t *testing.T) {
+	assert.Nil(t, domain.InvalidAttributeKeys(errors.New("not a validation error"), nil))
 }

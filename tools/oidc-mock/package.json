@@ -1,0 +1,13 @@
+{
+  "name": "@zitadel/oidc-mock",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A test-only OpenID Connect provider for the journey e2e runner, a nested Go module. This manifest only gives the task runner its scripts; nothing is published.",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "format": "node ../../scripts/go-format-check.mjs",
+    "vet": "go vet ./...",
+    "build": "go build -o dist/oidc-mock .",
+    "test": "go test -timeout 2m ./..."
+  }
+}

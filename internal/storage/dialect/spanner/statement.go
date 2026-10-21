@@ -12,6 +12,7 @@ type statements struct {
 	jsonSchemaStatements
 	releaseStatements
 	idpConnectionStatements
+	policyStatements
 	idpIdentityLinkStatements
 	deploymentStatements
 	previewStatements
@@ -45,6 +46,7 @@ func (s statements) Statements() service.AllStatements {
 func (s statements) IsStatements() {}
 
 func newStatements(db queryExecutor) statements {
+	db = traced(db)
 	return statements{
 		projectStatements:             newProjectStatements(db),
 		originStatements:              newOriginStatements(db),
@@ -53,6 +55,7 @@ func newStatements(db queryExecutor) statements {
 		jsonSchemaStatements:          newJSONSchemaStatements(db),
 		releaseStatements:             newReleaseStatements(db),
 		idpConnectionStatements:       newIDPConnectionStatements(db),
+		policyStatements:              newPolicyStatements(db),
 		idpIdentityLinkStatements:     newIDPIdentityLinkStatements(db),
 		deploymentStatements:          newDeploymentStatements(db),
 		previewStatements:             newPreviewStatements(db),

@@ -4,9 +4,10 @@ import { jsonRpcMessage } from "./support";
 
 /**
  * What agents use besides the pages: the search the site's own dialog calls,
- * the MCP server, the plain-text answers, the Open Graph image. They live
- * under /docs beside the pages, so an agent asking for Markdown or plain text
- * must reach them unchanged: proxy.ts leaves them out of its matcher (#1685).
+ * the MCP server, the plain-text answers, the OpenAPI document, the Open Graph
+ * image. They live under /docs beside the pages, so an agent asking for
+ * Markdown or plain text must reach them unchanged: proxy.ts leaves them out
+ * of its matcher (#1685).
  */
 
 test("search answers JSON hits under /docs", async ({ request }) => {
@@ -25,6 +26,7 @@ test("the routes that are not pages answer an agent that asks for text", async (
     ["/docs/api/search?query=passkey", "application/json"],
     ["/docs/llms.txt", "text/plain"],
     ["/docs/llms-full.txt", "text/plain"],
+    ["/docs/openapi.json", "application/json"],
   ];
   for (const accept of ["text/plain", "text/markdown"]) {
     for (const [route, type] of routes) {
@@ -35,13 +37,49 @@ test("the routes that are not pages answer an agent that asks for text", async (
   }
 });
 
+test("the whole OpenAPI document is served as JSON, and llms.txt links it", async ({ request }) => {
+  const response = await request.get("/docs/openapi.json");
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toContain("application/json");
+  const document = (await response.json()) as {
+    openapi: string;
+    info: { title: string };
+    paths: Record<string, unknown>;
+  };
+  expect(document.openapi).toMatch(/^3\.1\./);
+  expect(document.info.title).not.toBe("");
+  expect(Object.keys(document.paths).length).toBeGreaterThan(0);
+  // Bundled (scripts/bundle-openapi.mjs): every reference points into the
+  // document itself, at something there.
+  const refs = [...JSON.stringify(document).matchAll(/"\$ref":"([^"]*)"/g)].map(
+    ([, ref = ""]) => ref,
+  );
+  expect(refs.length).toBeGreaterThan(0);
+  const target = (ref: string) =>
+    ref
+      .slice(2)
+      .split("/")
+      .map((key) => decodeURIComponent(key).replace(/~1/g, "/").replace(/~0/g, "~"))
+      .reduce<unknown>(
+        (node, key) => (node as Record<string, unknown> | undefined)?.[key],
+        document,
+      );
+  expect(
+    [...new Set(refs)].filter((ref) => !ref.startsWith("#/") || target(ref) === undefined),
+    "references that do not resolve inside the document",
+  ).toEqual([]);
+
+  const index = await (await request.get("/docs/llms.txt")).text();
+  expect(index).toContain("](/docs/openapi.json)");
+});
+
 test("a page advertises its Open Graph image, and the image renders", async ({ request }) => {
-  const html = await (await request.get("/docs/cli")).text();
+  const html = await (await request.get("/docs/get-started/quickstart")).text();
   const [, image = ""] = html.match(/<meta property="og:image" content="([^"]+)"/) ?? [];
   expect(image).not.toBe("");
   // Absolute, from the metadata base of the deployment; the path is the contract.
   const path = new URL(image).pathname;
-  expect(path).toBe("/docs/og/cli/image.png");
+  expect(path).toBe("/docs/og/get-started/quickstart/image.png");
   const response = await request.get(path);
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"]).toBe("image/png");
@@ -95,15 +133,28 @@ test.describe("the MCP server", () => {
     );
   });
 
-  test("serves a page's Markdown through get_page", async ({ request }) => {
+  test("lists each page by the URL get_page takes", async ({ request }) => {
+    // Not the Markdown URLs /docs/llms.txt lists (lib/source.ts).
     const response = await call(request, {
-      id: 3,
+      id: 4,
       method: "tools/call",
-      params: { name: "get_page", arguments: { url: "/docs/cli" } },
+      params: { name: "list_pages", arguments: {} },
     });
     expect(response.status()).toBe(200);
     const result = (await jsonRpcMessage(response)).result as CallToolResult;
     expect(result.isError).toBeFalsy();
-    expect(result.content[0]?.text).toMatch(/^# CLI \(\/docs\/cli\)/);
+    expect(result.content[0]?.text).toContain("(/docs/get-started/quickstart)");
+  });
+
+  test("serves a page's Markdown through get_page", async ({ request }) => {
+    const response = await call(request, {
+      id: 3,
+      method: "tools/call",
+      params: { name: "get_page", arguments: { url: "/docs/get-started/quickstart" } },
+    });
+    expect(response.status()).toBe(200);
+    const result = (await jsonRpcMessage(response)).result as CallToolResult;
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0]?.text).toMatch(/^# Quickstart \(\/docs\/get-started\/quickstart\)/);
   });
 });
