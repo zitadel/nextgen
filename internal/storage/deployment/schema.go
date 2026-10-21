@@ -1,6 +1,8 @@
 package deployment
 
 import (
+	"strings"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -32,20 +34,33 @@ type Tables struct {
 // preview row while it is the newest row to its URL, the URL is not a primary
 // origin, and its preview is live.
 func RowServes(tables Tables, placeholder string) string {
-	return rowServesOpen(tables) + placeholder + `)))`
+	return `(` + primaryRowServes(tables) + ` OR ` + previewRowServes(tables, placeholder) + `)`
 }
 
-func rowServesOpen(tables Tables) string {
-	primaryOrigin := `EXISTS (SELECT 1 FROM ` + tables.ProjectOrigins + ` po` +
-		` WHERE po.project_id = t.project_id AND po.pattern = t.origin AND po.kind = 'primary')`
+func primaryRowServes(tables Tables) string {
 	newerPrimary := `EXISTS (SELECT 1 FROM ` + tables.Deployments + ` np` +
 		` WHERE np.project_id = t.project_id AND np.origin_kind = 'primary'` +
 		` AND (np.deployed_at > t.deployed_at OR (np.deployed_at = t.deployed_at AND np.id > t.deployment_id)))`
-	return `((t.origin_kind = 'primary' AND ` + primaryOrigin + ` AND NOT ` + newerPrimary + `)` +
-		` OR (t.origin_kind = 'preview' AND NOT ` + NewerOriginRowExists(tables.Origins) + ` AND NOT ` + primaryOrigin +
-		` AND EXISTS (SELECT 1 FROM ` + tables.Previews + ` p` +
-		` WHERE p.project_id = t.project_id AND p.origin = t.origin AND p.expires_at > `
+	return `(t.origin_kind = 'primary' AND ` + isPrimaryOrigin(tables) + ` AND NOT ` + newerPrimary + `)`
 }
+
+func previewRowServes(tables Tables, placeholder string) string {
+	previewLive := `EXISTS (SELECT 1 FROM ` + tables.Previews + ` p` +
+		` WHERE p.project_id = t.project_id AND p.origin = t.origin AND p.expires_at > ` + placeholder + `)`
+	return `(t.origin_kind = 'preview' AND NOT ` + NewerOriginRowExists(tables.Origins) +
+		` AND NOT ` + isPrimaryOrigin(tables) + ` AND ` + previewLive + `)`
+}
+
+// isPrimaryOrigin holds while the origin of row t is a primary origin of the
+// project.
+func isPrimaryOrigin(tables Tables) string {
+	return `EXISTS (SELECT 1 FROM ` + tables.ProjectOrigins + ` po` +
+		` WHERE po.project_id = t.project_id AND po.pattern = t.origin AND po.kind = 'primary')`
+}
+
+// liveValue marks where the Live filter's value goes, so the predicate is
+// written whole and cut around it.
+const liveValue = "\x00"
 
 // NewSchema binds deployment list/filter/order fields for one dialect's table
 // names. Origin and Live are correlated predicates over the origin rows.
@@ -53,6 +68,7 @@ func NewSchema(tables Tables) database.Schema[domain.DeploymentField, domain.Dep
 	deploymentsTable := tables.Deployments
 	ownOrigins := `SELECT 1 FROM ` + tables.Origins + ` t` +
 		` WHERE t.project_id = ` + deploymentsTable + `.project_id AND t.deployment_id = ` + deploymentsTable + `.id`
+	liveBefore, liveAfter, _ := strings.Cut(`EXISTS (`+ownOrigins+` AND `+RowServes(tables, liveValue)+`)`, liveValue)
 	return database.NewSchema(map[domain.DeploymentField]database.FieldBinding[domain.Deployment]{
 		domain.DeploymentFieldProjectID: {
 			SQLName:  "project_id",
@@ -85,8 +101,8 @@ func NewSchema(tables Tables) database.Schema[domain.DeploymentField, domain.Dep
 			Computed:  true,
 		},
 		domain.DeploymentFieldLive: {
-			SQLName:   `EXISTS (` + ownOrigins + ` AND ` + rowServesOpen(tables),
-			SQLSuffix: "))))",
+			SQLName:   liveBefore,
+			SQLSuffix: liveAfter,
 			Computed:  true,
 		},
 	})
