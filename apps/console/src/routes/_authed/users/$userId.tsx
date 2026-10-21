@@ -288,7 +288,7 @@ function ProfileField({ label, value }: { label: string; value: string }) {
 
   return (
     <Field>
-      <FieldLabel htmlFor={id}>
+      <FieldLabel htmlFor={id} className="text-foreground">
         {label}
       </FieldLabel>
       <Input id={id} readOnly value={value} />
