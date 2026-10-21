@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -15,23 +14,13 @@ func (h Handler) CreateAuthAttempt(ctx context.Context, req *api.CreateAuthAttem
 	input := service.CreateAuthAttemptInput{
 		ProjectID: string(req.GetProjectID()),
 	}
-	var sessionID, sessionToken *string
-	if id, ok := req.GetSessionID().Get(); ok {
-		sessionID = new(string(id))
-	}
-	if token, ok := req.GetSessionToken().Get(); ok {
-		sessionToken = new(string(token))
-	}
-	// A step-up attempt inherits the session's verified factors, so the
-	// caller must prove it holds the session, not just name it.
-	proven, err := h.provenSessionID(ctx, input.ProjectID, sessionID, sessionToken)
-	if errors.Is(err, errSessionNotProven) {
-		return nil, domain.ErrAuthAttemptInvalidRequest().WithMessage(sessionProofMessage)
-	}
+	sessionID, err := h.provenSessionID(ctx, input.ProjectID,
+		string(req.GetSessionID().Or("")), string(req.GetSessionToken().Or("")),
+		domain.ErrAuthAttemptInvalidRequest)
 	if err != nil {
 		return nil, err
 	}
-	input.SessionID = proven
+	input.SessionID = sessionID
 	// TODO: handle challenge nonce in the future
 
 	attempt, err := h.authAttemptService.Create(ctx, input)

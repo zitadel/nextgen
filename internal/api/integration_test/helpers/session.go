@@ -40,7 +40,9 @@ func (h *Harness) CreateSession(t testing.TB, projectID string, ttl time.Duratio
 
 // SessionToken returns the session_token a client holds for session, as
 // POST /sessions and the handoff exchange return it. A request that runs a
-// sign-in against an existing session must present it (step-up proof).
+// sign-in against an existing session must present it (step-up proof). Only a
+// session with a token record (CreateActiveSession's) gets a token that
+// introspection checks against that record.
 func (h *Harness) SessionToken(t testing.TB, session *domain.Session) string {
 	t.Helper()
 	crypter, err := h.EnsureKeyService(t).GetProjectCrypter(t.Context(), session.ProjectID, domain.EncryptionKeyPurposeToken)

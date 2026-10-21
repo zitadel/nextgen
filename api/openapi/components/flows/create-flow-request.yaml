@@ -36,9 +36,7 @@ properties:
     description: |
       Existing session to attach to (for step-up / reauth).
       Omit to let the flow create a new session implicitly.
-
-      Requires `session_token`: a session id names a session but does not
-      prove the caller holds it.
+      Requires `session_token`.
   session_token:
     $ref: ../schemas/session-proof-token.yaml
   auth_request_id:

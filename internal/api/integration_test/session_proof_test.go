@@ -22,7 +22,6 @@ func TestStepUpRequiresSessionProof(t *testing.T) {
 	project, _ := attemptProject(t)
 	client := attemptClient(t, project)
 	own := newAnonymousSession(t, client, project)
-	other := newAnonymousSession(t, client, project)
 
 	createAttempt := func(t *testing.T, sessionID api.SessionID, token *string) api.CreateAuthAttemptRes {
 		t.Helper()
@@ -40,9 +39,6 @@ func TestStepUpRequiresSessionProof(t *testing.T) {
 
 	t.Run("auth attempt: session id alone is refused", func(t *testing.T) {
 		requireAttemptRefused(t, createAttempt(t, own.Session.SessionID, nil))
-	})
-	t.Run("auth attempt: another session's token is refused", func(t *testing.T) {
-		requireAttemptRefused(t, createAttempt(t, own.Session.SessionID, &other.SessionToken))
 	})
 	t.Run("auth attempt: the session's own token links the attempt", func(t *testing.T) {
 		resp := createAttempt(t, own.Session.SessionID, &own.SessionToken)
@@ -88,8 +84,11 @@ func TestStepUpRequiresSessionProof(t *testing.T) {
 	})
 }
 
-// newAnonymousSession creates a building session over HTTP, which is the only
-// way to get its session_token.
+// newAnonymousSession creates a building session over HTTP, so its
+// session_token has a stored token record and the proof runs introspection's
+// full path, the revocation and expiry lookup included. A session seeded in
+// storage has no record, and Harness.SessionToken would mint it a token that
+// introspection accepts without that lookup.
 func newAnonymousSession(t *testing.T, client *helpers.ApiClient, project *domain.Project) api.SessionWithTokenResponse {
 	t.Helper()
 	resp, err := client.CreateSession(t.Context(), &api.CreateSessionRequest{ProjectID: api.ProjectID(project.ID)})

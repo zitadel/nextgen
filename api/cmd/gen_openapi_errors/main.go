@@ -970,7 +970,9 @@ var operationExcludedErrors = map[string][]string{
 		"domain.ErrIDPScopesMissingOpenID",
 	},
 	// A new flow has no parked SSO row, so the collection step's prefill
-	// returns before it reads the attempt's row or a connection.
+	// returns before it reads the attempt's row or a connection. A
+	// session_token that introspection rejects is refused as req.invalid
+	// (provenSessionID), so tkn.revoked never reaches the response.
 	"createFlow": {
 		"domain.ErrAuthAttemptNotFound",
 		"domain.ErrFlowRestartRequired",
@@ -979,6 +981,15 @@ var operationExcludedErrors = map[string][]string{
 		"domain.ErrIDPEndpointsPartial",
 		"domain.ErrIDPProtocolBlockMissing",
 		"domain.ErrIDPScopesMissingOpenID",
+		"domain.ErrTokenRevoked",
+	},
+	// A session_token that introspection rejects is refused as
+	// att.invalid_request (provenSessionID), so the token's own codes never
+	// reach the response.
+	"createAuthAttempt": {
+		"domain.ErrEncryptionKeyNotFound",
+		"domain.ErrInvalidToken",
+		"domain.ErrTokenRevoked",
 	},
 }
 

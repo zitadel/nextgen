@@ -109,19 +109,27 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
 
+// isRejectedToken reports whether a failed IntrospectToken judged the presented
+// credential and rejected it (malformed, undecryptable, naming an unknown key,
+// expired or revoked), rather than failing to decide. Every check that turns
+// introspection into a refusal asks this, so the session cookie and the
+// step-up proof refuse the same tokens.
+func isRejectedToken(err error) bool {
+	return errors.Is(err, domain.ErrInvalidToken()) ||
+		errors.Is(err, domain.ErrInvalidTokenIdentifiers()) ||
+		errors.Is(err, domain.ErrTokenRevoked()) ||
+		errors.Is(err, domain.ErrEncryptionKeyNotFound())
+}
+
 // introspectionFailure decides what a failed IntrospectToken means for the
-// request. Only a credential the server judged and rejected (malformed,
-// undecryptable, naming an unknown key, expired or revoked) is an unsatisfied
+// request. Only a rejected credential ([isRejectedToken]) is an unsatisfied
 // requirement: 401. Anything else means the server could not tell (the token
 // store or key store failed), so it becomes an internal error and the error
 // handler answers 500. Collapsing it into a 401 would tell every client its
 // session is dead during an outage, and SDKs clear their session cookie on a
 // 401.
 func introspectionFailure(err error) error {
-	if errors.Is(err, domain.ErrInvalidToken()) ||
-		errors.Is(err, domain.ErrInvalidTokenIdentifiers()) ||
-		errors.Is(err, domain.ErrTokenRevoked()) ||
-		errors.Is(err, domain.ErrEncryptionKeyNotFound()) {
+	if isRejectedToken(err) {
 		return ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 	if errors.Is(err, domain.ErrInternal(nil)) {
