@@ -83,7 +83,7 @@ export const Route = createFileRoute("/_authed/users/$userId")({
       fetchUserIdentityLinks(params.userId).catch(() => undefined),
       // `null`: the user has no password; `undefined`: it could not be read.
       api
-        .getUserPassword(params.userId)
+        .getUserPasswordState(params.userId)
         .then((result) => result.set_at ?? null)
         .catch(() => undefined),
     ]);
