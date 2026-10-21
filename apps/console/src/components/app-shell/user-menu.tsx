@@ -120,12 +120,16 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             tooltip={name}
             aria-label={`Account: ${name}`}
             // The avatar's colours sweep across the row on hover (`styles.css`).
-            className="avatar-host h-auto min-h-12 py-2"
+            // Collapsed to the rail, the row is the rail's 32px square with the
+            // 24px avatar centred 4px in on every side; `min-h-12` would
+            // otherwise stretch it into a 32x48 pill.
+            className="avatar-host h-auto min-h-12 py-2 group-data-[collapsible=icon]:min-h-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1!"
             style={avatarVars(user?.userId ?? email)}
           >
             {/* 24px in the footer row, generated from the user id. */}
             <UserAvatar seed={user?.userId ?? email} />
-            <span className="flex min-w-0 flex-1 flex-col gap-1">
+            {/* Hidden on the rail, so the avatar alone is what centres. */}
+            <span className="flex min-w-0 flex-1 flex-col gap-1 group-data-[collapsible=icon]:hidden">
               <span className="truncate text-sm leading-none font-semibold">{name}</span>
               {user?.display ? (
                 <span className={FOOTER_SECOND_LINE}>{email}</span>
@@ -135,7 +139,10 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
                 account && <span className={FOOTER_SECOND_LINE}>{account.name}</span>
               )}
             </span>
-            <ChevronRight className="ml-auto text-sidebar-foreground" aria-hidden />
+            <ChevronRight
+              className="ml-auto text-sidebar-foreground group-data-[collapsible=icon]:hidden"
+              aria-hidden
+            />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent
