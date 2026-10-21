@@ -114,6 +114,7 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			h.EnsureTeamService(t),
 			h.EnsureBrandingService(t),
 			h.EnsureReleaseService(t),
+			h.EnsureDeploymentService(t),
 			h.EnsureIDPConnectionService(t),
 			h.EnsureEventService(t),
 			h.EnsureTokenService(t),

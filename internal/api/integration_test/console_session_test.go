@@ -209,10 +209,10 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 	t.Run("cannot list another project's branding", func(t *testing.T) {
 		resp, err := session.ListBranding(t.Context(), api.ListBrandingParams{ProjectID: otherID})
 		require.NoError(t, err)
-		require.IsType(t, &api.ErrorDetailsStatusCode{}, resp, helpers.MustMarshal(t, resp))
-		denied := resp.(*api.ErrorDetailsStatusCode)
+		require.IsType(t, &api.ListBrandingErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		denied := resp.(*api.ListBrandingErrorResponseStatusCode)
 		assert.Equal(t, http.StatusNotFound, denied.StatusCode)
-		assert.Equal(t, api.ErrorCode("brnd.not_found"), denied.Response.Code)
+		assert.True(t, denied.Response.IsBrndNotFound(), helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("cannot create a team in another project", func(t *testing.T) {
