@@ -340,7 +340,10 @@ function ProfileCard({
           .map((property) => property.key),
         ...fields
           .filter(
-            (entry) => entry.inputType === "boolean" && !isBooleanOrAbsent(attributes[entry.key]),
+            (entry) =>
+              entry.inputType === "boolean" &&
+              attributes[entry.key] != null &&
+              typeof attributes[entry.key] !== "boolean",
           )
           .map((entry) => entry.key),
       ]),
@@ -480,10 +483,6 @@ function patchOf(
     patch[entry.key] = value === "" ? null : attributeValue(entry, value);
   }
   return patch;
-}
-
-function isBooleanOrAbsent(value: unknown): boolean {
-  return value === undefined || value === null || typeof value === "boolean";
 }
 
 /** One attribute of the profile, as a switch for a boolean. */
