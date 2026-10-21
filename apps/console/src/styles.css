@@ -122,19 +122,17 @@ select:-webkit-autofill {
   caret-color: var(--color-foreground);
 }
 
-/* The generated avatar (`components/user-avatar.tsx`): a ball painted with
-   the person's two design-system gradient starts, rolling about at random.
-   The paint (`::before`) is a seamless two-axis pattern (blobs of the first
-   colour on the second, tiles twice the ball's size) that moves behind fixed
-   shading (`::after`: a darker rim and a broad soft light), so the colours
-   travel across a curved surface instead of a flat disc turning in place.
+/* The generated avatar (`components/user-avatar.tsx`): the person's two
+   design-system gradient starts, as a seamless two-axis pattern (blobs of the
+   first colour on the second, tiles twice the avatar's size) that flows
+   behind the circle.
 
    Each axis moves on its own: a steady drift plus a sway, all four on
-   different periods. The direction the ball rolls in therefore wanders, and
-   its speed rises and falls, like a ball pushed about on the floor rather
-   than spun on a finger. Each person starts at their own point
-   (`--avatar-phase`), so a list of avatars never moves in step. The
-   component speeds it up while its host is hovered. */
+   different periods. The direction the colours flow in therefore wanders and
+   their speed rises and falls, so the motion never settles into a turn about
+   one axis. Each person starts at their own point (`--avatar-phase`), so a
+   list of avatars never moves in step. The component speeds it up while its
+   host is hovered. */
 @property --avatar-drift-x {
   syntax: "<percentage>";
   inherits: false;
@@ -159,7 +157,7 @@ select:-webkit-autofill {
   initial-value: 0%;
 }
 
-/* With tiles twice the ball's size, 200% moves the pattern by one tile. */
+/* With tiles twice the avatar's size, 200% moves the pattern by one tile. */
 @keyframes avatar-drift-x {
   to {
     --avatar-drift-x: 200%;
@@ -191,20 +189,6 @@ select:-webkit-autofill {
 }
 
 .user-avatar {
-  position: relative;
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.user-avatar::before,
-.user-avatar::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-}
-
-.user-avatar::before {
   /* The second colour fills each tile from halfway out, so the tiles meet
      seamlessly on every side. */
   background-image: radial-gradient(
@@ -223,16 +207,6 @@ select:-webkit-autofill {
     avatar-sway-x 18s ease-in-out infinite alternate,
     avatar-sway-y 26s ease-in-out infinite alternate;
   animation-delay: var(--avatar-phase);
-}
-
-.user-avatar::after {
-  background-image:
-    radial-gradient(
-      circle at 35% 30%,
-      color-mix(in oklab, white 28%, transparent) 0%,
-      transparent 60%
-    ),
-    radial-gradient(circle, transparent 50%, color-mix(in oklab, black 45%, transparent) 100%);
 }
 
 /* A hover host (the sidebar footer) carries the same colours: on hover or
@@ -269,7 +243,7 @@ select:-webkit-autofill {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .user-avatar::before {
+  .user-avatar {
     animation: none;
   }
 

@@ -26,7 +26,7 @@ function hash(seed: string): number {
 
 /**
  * The colours for a seed, as the custom properties `.user-avatar` paints with
- * (`styles.css`): two different design-system starts and where along its roll
+ * (`styles.css`): two different design-system starts and where along its flow
  * it starts, all taken from the hash, so a person keeps theirs on every
  * screen and device and two people rarely share one.
  *
@@ -40,13 +40,13 @@ export function avatarVars(seed: string): CSSProperties {
   return {
     "--avatar-from": `var(${STARTS[from]})`,
     "--avatar-to": `var(${STARTS[to]})`,
-    // A negative delay starts the roll part-way along its path. The four
+    // A negative delay starts the flow part-way along its path. The four
     // periods (18, 26, 46 and 62s) only line up again after hours.
     "--avatar-phase": `-${(h >>> 4) % 1200}s`,
   } as CSSProperties;
 }
 
-/** How much faster the ball rolls while the avatar's host is hovered. */
+/** How much faster the colours flow while the avatar's host is hovered. */
 const FAST = 8;
 
 /**
@@ -54,8 +54,8 @@ const FAST = 8;
  * picture. The id, not the email, seeds it, so it survives a changed email.
  * A picture can replace it once users can upload one.
  *
- * It rolls about like a painted ball, unless the person asked for reduced
- * motion. With `fast` it rolls `FAST` times quicker: the playback rate
+ * Its colours flow in a wandering direction, unless the person asked for
+ * reduced motion. With `fast` they flow `FAST` times quicker: the playback rate
  * changes, not the duration, so the motion speeds up from where it is instead
  * of jumping.
  *
@@ -73,8 +73,7 @@ export function UserAvatar({
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
-    // `subtree`: the roll runs on the `::before` paint, not the element.
-    for (const animation of ref.current?.getAnimations?.({ subtree: true }) ?? []) {
+    for (const animation of ref.current?.getAnimations?.() ?? []) {
       animation.updatePlaybackRate(fast ? FAST : 1);
     }
   }, [fast]);

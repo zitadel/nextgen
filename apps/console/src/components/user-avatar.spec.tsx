@@ -27,8 +27,8 @@ describe("avatarVars", () => {
 });
 
 describe("UserAvatar", () => {
-  it("speeds its roll up from where it is, without restarting it", () => {
-    // jsdom runs no CSS animations, so stand in for the roll.
+  it("speeds its flow up from where it is, without restarting it", () => {
+    // jsdom runs no CSS animations, so stand in for the flow.
     const updatePlaybackRate = vi.fn();
     Object.defineProperty(HTMLElement.prototype, "getAnimations", {
       configurable: true,
