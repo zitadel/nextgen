@@ -120,13 +120,26 @@ build (semver) and a plain `go run` build (`dev`).
 
 Contributors testing the published CLI flow against local workspace packages use
 `moon run workspace:cli -- start` and `moon run workspace:cli -- setup --server local`
-instead of `npx`. This requires the source repository to be checked out.
+instead of `npx`; from an app directory outside the checkout,
+`node <checkout>/scripts/run-cli.mjs …` does the same. This requires the source
+repository to be checked out, and corepack: without a `pnpm` on `PATH`, the
+wrapper puts [`scripts/shims/pnpm`](scripts/shims/pnpm) there for every build
+and for the generated app's install.
 
-Before invoking the local CLI, the wrapper builds and packs the public workspace
-packages, publishes them to a persistent local Verdaccio registry under
-`tmp/cli-local-registry`, and points the generated app install at that registry.
+For `setup`, the wrapper builds (cached) and packs only the packages a generated
+app installs (`APP_RELEASE_PACKAGES` in
+[`scripts/release-manifest.mjs`](scripts/release-manifest.mjs)), publishes them
+to a local Verdaccio registry under `tmp/cli-local-registry`, and points the
+generated app install at that registry. Test the release tarballs with
+`moon run release:pack` or the [journey](e2e/journey/AGENTS.md) instead.
 Set `ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` to install public npm packages in the
-generated app instead of local ones.
+generated app instead of local ones. The scaffolded app's lockfile points at the
+wrapper's local registry, so reinstalling it after the wrapper exits fails until
+that version is published on npm.
+
+The wrapper sets `ZITADEL_TELEMETRY_ENV=development` unless you set it, so local
+builds, which report their unreleased version, stay out of the production
+telemetry project.
 
 Pass `--runtime docker`, `--image <tag>`, or set `ZITADEL_LOCAL_IMAGE=<tag>` when
 intentionally testing the Docker backend.

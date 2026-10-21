@@ -20,16 +20,16 @@ func TestFlowSSOProviderResolver_Resolve_DropsUnknownSlugsKeepsOrder(t *testing.
 	// Storage order is unspecified, so the mock answers out of step order.
 	connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google", "gone", "github"}).
 		Return([]*domain.IDPConnection{
-			{Slug: "github", Document: []byte(`{"display_name":"GitHub"}`)},
-			{Slug: "google", Document: []byte(`{"display_name":"Google","template":"google"}`)},
+			{ID: "idp-2", Slug: "github", Document: []byte(`{"display_name":"GitHub"}`)},
+			{ID: "idp-1", Slug: "google", Document: []byte(`{"display_name":"Google","template":"google"}`)},
 		}, nil)
 
 	got, err := service.NewFlowSSOProviderResolver(connections).
 		Resolve(t.Context(), "proj-1", "identifier", []string{"google", "gone", "github"})
 	require.NoError(t, err)
 	assert.Equal(t, []domain.FlowSSOProvider{
-		{ID: "google", Name: "Google", Template: "google"},
-		{ID: "github", Name: "GitHub"},
+		{ID: "google", Name: "Google", Template: "google", ConnectionID: "idp-1"},
+		{ID: "github", Name: "GitHub", ConnectionID: "idp-2"},
 	}, got)
 }
 

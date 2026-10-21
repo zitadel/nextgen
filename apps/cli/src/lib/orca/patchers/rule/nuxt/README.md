@@ -3,6 +3,8 @@
 Integrates Zitadel auth into a Nuxt app. Like Next, Nuxt proxies and verifies
 the session server-side — here through the `@zitadel/sdk-nuxt` module.
 
+The detector requires `nuxt` 4 or newer; older versions are refused.
+
 ## What it patches
 
 - `app.vue` — router root

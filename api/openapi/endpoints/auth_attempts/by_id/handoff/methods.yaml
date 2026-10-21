@@ -12,6 +12,9 @@ post:
     - Single-use (atomic exchange, no retry)
     - Audience-bound (requires matching project key for exchange)
     - Idempotency-safe within a 5-minute window (see conventions)
+
+    Reuses the deployment sealed when the attempt was created. If that release
+    was revoked since, the response is `409` with `rel.revoked`.
   tags:
     - Authentication Attempts
   security:
@@ -31,5 +34,18 @@ post:
         application/json:
           schema:
             $ref: handoff-response.yaml
+    '409':
+      description: |
+        The sealed release was revoked (`rel.revoked`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+          examples:
+            revoked:
+              summary: The sealed release was revoked
+              value:
+                code: rel.revoked
+                message: 'the release this attempt runs on was revoked'
     default:
       $ref: createHandoff-error-response.yaml

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"go.uber.org/mock/gomock"
 
@@ -221,6 +222,9 @@ func (s *stubQueryUsersService) GetUserByID(context.Context, service.GetUserInpu
 }
 func (s *stubQueryUsersService) SetPassword(context.Context, service.SetPasswordInput) error {
 	return errors.New("unexpected SetPassword")
+}
+func (s *stubQueryUsersService) GetPasswordSetAt(context.Context, service.GetPasswordInput) (*time.Time, error) {
+	return nil, errors.New("unexpected GetPasswordSetAt")
 }
 func (s *stubQueryUsersService) GetMyUser(context.Context, service.GetMyUserInput) (*domain.User, error) {
 	return nil, errors.New("unexpected GetMyUser")

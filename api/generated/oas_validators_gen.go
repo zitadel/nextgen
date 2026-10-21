@@ -3478,86 +3478,19 @@ func (s *CreateAuthAttemptRequest) Validate() error {
 	return nil
 }
 
-func (s *CreateDeploymentBadRequest) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if value, ok := s.Details.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "details",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s *CreateDeploymentBadRequestDetails) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.Kind.Validate(); err != nil {
+func (s CreateDeploymentBadRequest) Validate() error {
+	switch s.Type {
+	case DepInvalidCreateDeploymentBadRequest:
+		return nil // no validation needed
+	case DeploymentVariablesMissingCreateDeploymentBadRequest:
+		if err := s.DeploymentVariablesMissing.Validate(); err != nil {
 			return err
 		}
 		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "kind",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if s.Names == nil {
-			return errors.New("nil is invalid value")
-		}
-		if err := (validate.Array{
-			MinLength:    1,
-			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
-		}).ValidateLength(len(s.Names)); err != nil {
-			return errors.Wrap(err, "array")
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "names",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s CreateDeploymentBadRequestDetailsKind) Validate() error {
-	switch s {
-	case "primary":
-		return nil
-	case "preview":
-		return nil
+	case ReqInvalidCreateDeploymentBadRequest:
+		return nil // no validation needed
 	default:
-		return errors.Errorf("invalid value: %v", s)
+		return errors.Errorf("invalid type %q", s.Type)
 	}
 }
 
@@ -4372,6 +4305,17 @@ func (s *Deployment) Validate() error {
 		})
 	}
 	if err := func() error {
+		if err := s.Kind.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "kind",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if s.Targets == nil {
 			return errors.New("nil is invalid value")
 		}
@@ -4404,6 +4348,17 @@ func (s *Deployment) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "targets",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Status.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "status",
 			Error: err,
 		})
 	}
@@ -4657,6 +4612,17 @@ func (s DeploymentID) Validate() error {
 	return nil
 }
 
+func (s DeploymentKind) Validate() error {
+	switch s {
+	case "primary":
+		return nil
+	case "preview":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *DeploymentMetadata) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -4772,6 +4738,17 @@ func (s DeploymentReason) Validate() error {
 	}
 }
 
+func (s DeploymentStatus) Validate() error {
+	switch s {
+	case "live":
+		return nil
+	case "inactive":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *DeploymentTarget) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -4836,6 +4813,71 @@ func (s DeploymentTargetsRequest) Validate() error {
 				Error: err,
 			})
 		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DeploymentVariablesMissing) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Details.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "details",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DeploymentVariablesMissingDetails) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Kind.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "kind",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if s.Names == nil {
+			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    1,
+			MinLengthSet: true,
+			MaxLength:    0,
+			MaxLengthSet: false,
+		}).ValidateLength(len(s.Names)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "names",
+			Error: err,
+		})
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
@@ -8385,6 +8427,29 @@ func (s *ListUserIdentityLinksResponse) Validate() error {
 	return nil
 }
 
+func (s *ListUserIdentityLinksResponseHeaders) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *ListUserPasskeysResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -8399,6 +8464,29 @@ func (s *ListUserPasskeysResponse) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "passkeys",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ListUserPasskeysResponseHeaders) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
 			Error: err,
 		})
 	}

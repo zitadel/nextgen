@@ -1,0 +1,11 @@
+type: string
+format: password
+writeOnly: true
+description: |
+  The `session_token` of the session the request runs against, as
+  `POST /sessions` or `POST /sessions/exchange` returned it. It proves the
+  caller holds that session. Required with `session_id`, and must belong to the
+  same session and project; with `session_token` alone, the request runs
+  against the token's session. A missing, foreign, expired or revoked token is
+  refused with the same invalid-request error, whether or not the session
+  exists.

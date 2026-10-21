@@ -185,6 +185,72 @@ func TestAuthAttempt_IsCompleted(t *testing.T) {
 	}
 }
 
+// TestAuthAttempt_IsCompleted_RequiresCredential pins the fail-closed rule:
+// the identifier (user factor) alone never completes an attempt, whatever
+// RequiredChecks says, so a session can never be minted on an identifier-only
+// attempt. A verified credential-class factor (password, passkey, or SSO) is
+// required.
+func TestAuthAttempt_IsCompleted_RequiresCredential(t *testing.T) {
+	tests := []struct {
+		name          string
+		required      []domain.AuthCheckType
+		checks        []domain.AuthCheck
+		wantCompleted bool
+	}{
+		{
+			name:          "empty required, identifier only, not completed",
+			required:      nil,
+			checks:        []domain.AuthCheck{domain.SetAuthFactorUser(time.Now())},
+			wantCompleted: false,
+		},
+		{
+			name:          "required user only, identifier only, not completed",
+			required:      []domain.AuthCheckType{domain.AuthCheckTypeUser},
+			checks:        []domain.AuthCheck{domain.SetAuthFactorUser(time.Now())},
+			wantCompleted: false,
+		},
+		{
+			name:          "empty required, identifier plus password, completed",
+			required:      nil,
+			checks:        []domain.AuthCheck{domain.SetAuthFactorUser(time.Now()), domain.SetAuthFactorPassword(time.Now())},
+			wantCompleted: true,
+		},
+		{
+			name:          "empty required, passkey alone, completed",
+			required:      nil,
+			checks:        []domain.AuthCheck{domain.SetAuthFactorPasskey(time.Now())},
+			wantCompleted: true,
+		},
+		{
+			name:          "empty required, sso alone, completed",
+			required:      nil,
+			checks:        []domain.AuthCheck{&domain.AuthFactorSSO{ConnectionID: "conn-1", LinkID: "link-1"}},
+			wantCompleted: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			attempt := &domain.AuthAttempt{RequiredChecks: tt.required, Checks: tt.checks}
+			assert.Equal(t, tt.wantCompleted, attempt.IsCompleted())
+		})
+	}
+}
+
+// TestAuthAttempt_PrepareHandoff_IdentifierOnly is the domain-layer
+// reproduction of the auth hole: an attempt that verified only the identifier
+// must not mint a handoff token.
+func TestAuthAttempt_PrepareHandoff_IdentifierOnly(t *testing.T) {
+	ttl := time.Minute
+	attempt := &domain.AuthAttempt{
+		CreatedAt:  time.Now(),
+		TimeToLive: &ttl,
+		Checks:     []domain.AuthCheck{domain.SetAuthFactorUser(time.Now())},
+	}
+	err := attempt.PrepareHandoff()
+	assert.ErrorIs(t, err, domain.ErrAuthAttemptNotCompleted())
+	assert.Nil(t, attempt.HandoffToken)
+}
+
 func TestAuthAttempt_IsHandedOff(t *testing.T) {
 	t.Run("nil handoff token", func(t *testing.T) {
 		attempt := &domain.AuthAttempt{}
@@ -194,7 +260,7 @@ func TestAuthAttempt_IsHandedOff(t *testing.T) {
 	t.Run("non-nil handoff token", func(t *testing.T) {
 		attempt := &domain.AuthAttempt{
 			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
-			Checks:         []domain.AuthCheck{domain.SetAuthFactorUser(time.Now())},
+			Checks:         []domain.AuthCheck{domain.SetAuthFactorUser(time.Now()), domain.SetAuthFactorPassword(time.Now())},
 		}
 		err := attempt.PrepareHandoff()
 		require.NoError(t, err)
@@ -267,7 +333,7 @@ func TestAuthAttempt_PrepareChallenge(t *testing.T) {
 			TimeToLive: &ttl,
 		}
 		attempt.RequiredChecks = []domain.AuthCheckType{domain.AuthCheckTypeUser}
-		attempt.Checks = []domain.AuthCheck{domain.SetAuthFactorUser(time.Now())}
+		attempt.Checks = []domain.AuthCheck{domain.SetAuthFactorUser(time.Now()), domain.SetAuthFactorPassword(time.Now())}
 		err := attempt.PrepareHandoff()
 		require.NoError(t, err)
 
@@ -403,7 +469,7 @@ func TestAuthAttempt_PrepareVerification(t *testing.T) {
 			CreatedAt:      time.Now(),
 			TimeToLive:     &ttl,
 			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
-			Checks:         []domain.AuthCheck{domain.SetAuthFactorUser(time.Now())},
+			Checks:         []domain.AuthCheck{domain.SetAuthFactorUser(time.Now()), domain.SetAuthFactorPassword(time.Now())},
 		}
 		err := attempt.PrepareHandoff()
 		require.NoError(t, err)
@@ -550,7 +616,7 @@ func TestAuthAttempt_PrepareHandoff(t *testing.T) {
 			CreatedAt:      time.Now(),
 			TimeToLive:     &ttl,
 			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
-			Checks:         []domain.AuthCheck{domain.SetAuthFactorUser(time.Now())},
+			Checks:         []domain.AuthCheck{domain.SetAuthFactorUser(time.Now()), domain.SetAuthFactorPassword(time.Now())},
 		}
 		err := attempt.PrepareHandoff()
 		require.NoError(t, err)
@@ -564,7 +630,7 @@ func TestAuthAttempt_PrepareHandoff(t *testing.T) {
 			CreatedAt:      time.Now(),
 			TimeToLive:     &ttl,
 			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
-			Checks:         []domain.AuthCheck{domain.SetAuthFactorUser(time.Now())},
+			Checks:         []domain.AuthCheck{domain.SetAuthFactorUser(time.Now()), domain.SetAuthFactorPassword(time.Now())},
 		}
 		err := attempt.PrepareHandoff()
 		assert.NoError(t, err)

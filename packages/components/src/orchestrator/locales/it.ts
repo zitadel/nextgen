@@ -158,6 +158,7 @@ export const it: Locale = {
   // Fallback generico per la chiave `<step>.action.back` iniettata dal motore
   // (vedi INJECTED_KEY_FALLBACKS in liquid.ts).
   "action.back": "Indietro",
+  "action.use_another_account": "Usa un altro account",
 
   // --- SSO ---
   "sso.continue_with": "Continua con {name}",

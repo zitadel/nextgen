@@ -625,7 +625,8 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	// schema consumes only the top-level properties it defines.
 	claims := ssoSchemaClaims(schema, parked.Claims)
 	probeClaims, uniqueClaims := ssoUniqueClaims(schema, claims)
-	if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims, claims); err != nil || bound {
+	identifier := newSchemaReader(schema).String(SchemaAnnotationIdentifier)
+	if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims, claims, identifier); err != nil || bound {
 		return FlowImplicitOutcomeUserAlreadyExists, err
 	}
 	// Neither linked to nor colliding with the user the flow or its attempt
@@ -666,12 +667,12 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 		// Another flow took a unique value since the probe (a request on this
 		// attempt loses on the parked row instead): whoever took a probed
 		// attribute is bound, and anything else falls back to collection.
-		if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims, claims); err != nil || bound {
+		if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims, claims, identifier); err != nil || bound {
 			return FlowImplicitOutcomeUserAlreadyExists, err
 		}
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}
-	if errors.Is(err, ErrUserInvalid()) {
+	if IsUserInvalid(err) {
 		// A claim the user may edit fails the schema (too long, bad format):
 		// collect it so the user can fix it.
 		return FlowImplicitOutcomeSSOUserNotFound, nil
@@ -845,8 +846,9 @@ var errSSOUnroutable = errors.New("flow state machine: sso outcome cannot route 
 // that user, so a row another request replaced binds nothing
 // (ErrSSOStateInvalid) and a retry after a lost cookie catches up from the
 // marker. It returns errSSOUnroutable, before binding, when step cannot route
-// user_already_exists.
-func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, step *FlowDefinitionStep, parked *FlowSSOParkedIdentity, probeClaims []string, values map[string]any) (bool, error) {
+// user_already_exists. identifier is the property the schema designates as
+// the identifier, for [recordSSOConflict].
+func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, step *FlowDefinitionStep, parked *FlowSSOParkedIdentity, probeClaims []string, values map[string]any, identifier string) (bool, error) {
 	for _, name := range probeClaims {
 		value, ok := maputil.GetNested[any](values, AttributeKey(name).Nodes())
 		if !ok || value == nil || value == "" {
@@ -882,9 +884,48 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 			return false, fmt.Errorf("flow state machine: bind sso collision: %w", err)
 		}
 		recordResolvedUser(state, owner)
+		recordSSOConflict(state, parked, values, identifier)
 		return true, nil
 	}
 	return false, nil
+}
+
+// recordSSOConflict notes what the steps after a collision show the bound
+// user: the connection whose sign-in collided, which they leave out, and the
+// account's identifier, which [pairedIdentifier] hands the step.
+//
+// The step names the account only by a value the visitor brought: one the
+// provider verified, so the visitor proved they hold it, or one they typed on
+// this flow. Either way the step adds nothing to what the conflict itself
+// confirms, that an account with this value exists
+// (docs/design/idp/3-social-login-flow.md, Enumeration Note). An identifier
+// claim the provider did not verify names nothing unless the visitor submitted
+// that same value on this flow, and a value typed earlier that is not the
+// colliding one is dropped, so the step never names another account.
+func recordSSOConflict(state *FlowState, parked *FlowSSOParkedIdentity, values map[string]any, identifier string) {
+	state.CollectedData.SSOConflictConnectionID = parked.ConnectionID
+	if identifier == "" {
+		return
+	}
+	path := AttributeKey(identifier).Nodes()
+	value, ok := maputil.GetNested[string](values, path)
+	if !ok || value == "" {
+		// The provider sent no identifier: what the visitor typed, if
+		// anything, stays, as after a typed collision.
+		return
+	}
+	claim, claimed := maputil.GetNested[string](parked.Claims, path)
+	switch {
+	case claimed && claim == value && parked.Verified[path[0]]:
+		_ = maputil.SetNested(state.CollectedData.UserData, path, value)
+	case claimed && claim == value:
+		// Unverified. An empty value reads as absent to every reader.
+		if typed, ok := collectedString(state.CollectedData.UserData, identifier); ok && typed != value {
+			_ = maputil.SetNested(state.CollectedData.UserData, path, "")
+		}
+	}
+	// Otherwise the value is the visitor's own typing on a collection step,
+	// already in UserData.
 }
 
 // ssoClaimsComplete reports whether the claims can create a user unattended:
@@ -1514,7 +1555,8 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		}
 	}
 	probe, _ := ssoUniqueClaims(schema, attributes)
-	bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes)
+	identifier := root.String(SchemaAnnotationIdentifier)
+	bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes, identifier)
 	if result, handled, err := r.ssoCollectionBindResult(pc, resolved, loadInput, bound, err); handled {
 		return result, err
 	}
@@ -1553,35 +1595,36 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 	case errors.Is(err, ErrUserAlreadyExists()):
 		// Another flow took a unique value since the probe: whoever took it
 		// is bound.
-		bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes)
+		bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes, identifier)
 		if result, handled, err := r.ssoCollectionBindResult(pc, resolved, loadInput, bound, err); handled {
 			return result, err
 		}
 		return r.renderStepError(pc, resolved, new(FlowStepErrorUserAlreadyExists))
 	case errors.Is(err, ErrSSOStateInvalid()):
 		return r.resolveStaleSSOSubmit(pc, resolved, loadInput)
-	case errors.Is(err, ErrUserInvalid()):
+	case errors.Is(err, ErrUserPasswordPolicyViolation(nil)):
+		// The password the user chose breaks the policy: show it on the
+		// password field, as registration does, so they can pick another.
+		if derr, ok := errors.AsType[Error](err); ok {
+			if details, ok := derr.Details.(PasswordPolicyViolations); ok {
+				return r.renderStepError(pc, resolved, new(PasswordPolicyStepError(details.Violations)))
+			}
+		}
+		return FlowStepResult{}, fmt.Errorf("flow state machine: create sso user: %w", err)
+	case IsUserInvalid(err):
 		// RequiredPaths does not see a property that allOf or a reference
 		// requires. The schema library locates it by keyword, as in
 		// properties/account allOf/0 required/id. It reports a property a then
 		// requires the same way, without the condition, so that one is treated
 		// as required too. anyOf and oneOf report no location, so their
 		// failures stay sso_user_invalid.
-	failures:
 		for _, ve := range ValidationFailures(err) {
 			if ve.Loc == nil || len(*ve.Loc) == 0 || !strings.HasPrefix((*ve.Loc)[len(*ve.Loc)-1], "required/") {
 				continue
 			}
-			var path AttributeKey
-			for _, segment := range *ve.Loc {
-				keyword, name, _ := strings.Cut(segment, "/")
-				switch keyword {
-				case "properties", "required":
-					path = path.AppendNode(name)
-				case "allOf":
-				default:
-					continue failures
-				}
+			path, complete := ValidationErrAttributeKey(ve, attributes)
+			if !complete {
+				continue
 			}
 			if !slices.ContainsFunc(resolved.Fields, func(f FlowField) bool { return f.Name == string(path) }) {
 				return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUserCannotBeCreated))
@@ -2289,10 +2332,11 @@ func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinition
 	}
 
 	// Skip handoff when no user was resolved (e.g. user_not_found →
-	// no-account). PrepareHandoff can't catch this today: attempts are
-	// started with empty RequiredChecks, so IsCompleted is vacuously
-	// true and a token would be minted. Remove once the policy engine
-	// populates RequiredChecks.
+	// no-account): render the terminal step without minting a token. Handoff
+	// itself now fails closed on an identifier-only attempt (IsCompleted
+	// requires a verified credential-class factor), but a no-account terminal
+	// has nothing to hand off and must return the step cleanly rather than
+	// surface ErrAuthAttemptNotCompleted.
 	if pc.state.CollectedData.UserID == "" {
 		return FlowStepResult{State: pc.state, Step: rendered}, nil
 	}
@@ -2404,11 +2448,25 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 	if err != nil {
 		return nil, err
 	}
+	conflict := state.CollectedData.SSOConflictConnectionID
+	if conflict != "" {
+		// Choosing the provider whose sign-in collided would collide again.
+		providers = slices.DeleteFunc(providers, func(p FlowSSOProvider) bool {
+			return p.ConnectionID == conflict
+		})
+	}
+	offerPasskey, err := r.offersPasskey(ctx, state, step)
+	if err != nil {
+		return nil, err
+	}
 	// Surface only user-selectable actions declared on the step.
 	// Implicit outcomes (e.g. user_not_found) live in step.Transitions
 	// but are engine-emitted routing keys, not buttons for the client.
 	actions := make([]FlowAction, 0, len(step.Actions)+1)
 	for _, a := range step.Actions {
+		if a.Kind == FlowActionKindPasskey && !offerPasskey {
+			continue
+		}
 		textKey := a.TextKey
 		if textKey == "" {
 			textKey = step.Name + ".action." + a.Name
@@ -2448,6 +2506,26 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 		SSOProviders: providers,
 		Identifier:   pairedIdentifier(resolved, state.CollectedData.UserData),
 	}, nil
+}
+
+// offersPasskey reports whether the step's passkey sign-in actions are shown.
+// They are, except to a user bound by an external sign-in's collision who has
+// no passkey: the ceremony could only fail for them. That reveals nothing the
+// action would not, since a ceremony for a bound user lists that user's
+// passkeys as allowCredentials. Anyone else is never asked, so the step does
+// not depend on an account the visitor has not reached.
+func (r *FlowStateMachineRuntime) offersPasskey(ctx context.Context, state *FlowState, step *FlowDefinitionStep) (bool, error) {
+	if state.CollectedData.SSOConflictConnectionID == "" || state.CollectedData.UserID == "" {
+		return true, nil
+	}
+	if !stepHasActionKind(step, FlowActionKindPasskey) {
+		return true, nil
+	}
+	has, err := r.ssoIdentities.UserHasPasskey(ctx, state.ProjectID, state.CollectedData.UserID)
+	if err != nil {
+		return false, fmt.Errorf("flow state machine: read passkeys of the bound user: %w", err)
+	}
+	return has, nil
 }
 
 // applyAutocomplete stamps each field's autofill token. The purpose is not
@@ -2564,6 +2642,7 @@ func recordResolvedUser(state *FlowState, userID string) {
 func clearUserBoundState(state *FlowState) {
 	state.ClearPendingChallenge()
 	state.CollectedData.UserID = ""
+	state.CollectedData.SSOConflictConnectionID = ""
 }
 
 // prefillFromCollected sets FlowField.Value from collectedData for any field

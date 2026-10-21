@@ -8,7 +8,7 @@ import { SvelteKitPatcher } from "../../../../../../../src/lib/orca/patchers/rul
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
-function ctx(appDir = "src"): PatchContext {
+function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
   return {
     framework: { id: "sveltekit", appDir, devPort: 5173, url: "http://localhost:5173" },
     rendererId: "svelte",
@@ -22,6 +22,7 @@ function ctx(appDir = "src"): PatchContext {
     issuer: "http://localhost:5173",
     server: "https://api.zitadel.cloud",
     cliVersion: "0.1.0-alpha.0",
+    scaffoldedFramework,
   };
 }
 
@@ -49,6 +50,20 @@ describe("SvelteKitPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("background:#0f0f11");
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("@zitadel/sdk-svelte");
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("ZitadelLogin");
+  });
+
+  it("keeps a pre-existing app's shell and landing page, writing the rest (ADR 044)", () => {
+    const plan = new SvelteKitPatcher().plan(ctx("src", false));
+
+    // The user's own root layout and landing page are left untouched, so
+    // setup never conflicts on them or overwrites them under --force.
+    expect(writeContents(plan, "src/routes/+layout.svelte")).toBeUndefined();
+    expect(writeContents(plan, "src/routes/+page.svelte")).toBeUndefined();
+    // The auth boundary and the auth routes are still written.
+    expect(writeContents(plan, "src/hooks.server.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain('purpose="login"');
+    expect(writeContents(plan, "src/routes/register/+page.svelte")).toContain('purpose="register"');
+    expect(writeContents(plan, "src/routes/profile/+page.svelte")).toContain("ZitadelSession");
   });
 
   const widgetPages = [
@@ -167,6 +182,18 @@ describe("SvelteKitPatcher.artifacts", () => {
     expect(artifacts.markedFiles).toContain("src/routes/login/+page.svelte");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-sveltekit", "@zitadel/sdk-svelte"]);
     expect(artifacts.configEdits).toEqual(["package.json"]);
+  });
+
+  it("declares the app shell and landing page as conditionally scaffolded", () => {
+    // Written only on fresh scaffolds, so the managed-files check must not
+    // expect them on a manifest-less pre-existing app.
+    const artifacts = new SvelteKitPatcher().artifacts({
+      framework: { id: "sveltekit", appDir: "src", devPort: 5173, url: "http://localhost:5173" },
+      rendererId: "svelte",
+    });
+    expect(artifacts.conditionalFiles).toEqual(
+      expect.arrayContaining(["src/routes/+layout.svelte", "src/routes/+page.svelte"]),
+    );
   });
 });
 

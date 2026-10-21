@@ -27,10 +27,11 @@ const packages = tarballs.map((file) => {
   return { tarball, manifest };
 });
 
-// Each package is two npm calls, mostly npm's own start-up time; one after
-// the other, the 20 packages took ~14 s of every journey run. They are
-// independent of each other, so a few run at once.
-await mapWithConcurrency(packages, 6, async ({ tarball, manifest }) => {
+// Each package is two npm calls that spend most of their time idle: npm's
+// start-up, then seconds of waiting before it exits (2-10 s each on a busy
+// machine). They are independent of each other, so most of them run at once;
+// at six, the CLI wrapper's 16 packages took three rounds of 10-30 s.
+await mapWithConcurrency(packages, 16, async ({ tarball, manifest }) => {
   await run("npm", [
     "publish",
     tarball,
