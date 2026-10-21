@@ -22,6 +22,7 @@ import {
   RowMenu,
 } from "@/components/resource-list";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { CLI_SETUP, CliCommand, CliHint } from "@/components/cli-hint";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatDate } from "@/lib/date";
@@ -144,6 +145,9 @@ function ProjectsScreen() {
             )}
           </TableBody>
         </Table>
+        <CliHint>
+          Create a project locally with <CliCommand>{CLI_SETUP}</CliCommand>.
+        </CliHint>
       </div>
 
       <LoadMore paging={paging} />

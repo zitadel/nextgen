@@ -1,0 +1,38 @@
+import type { ReactNode } from "react";
+
+import { InlineCode } from "@/components/ui/inline-code";
+
+/**
+ * The CLI the footers tell an operator to run (decisions log D0b): the
+ * published package, invoked without installing it. The repo is in changesets
+ * prerelease mode on the `alpha` dist-tag, which is the tag the design names.
+ */
+const CLI = "npx @zitadel/cli@alpha";
+
+/** `apply`: writes the local definitions to the project. */
+export const CLI_APPLY = `${CLI} apply`;
+
+/** `setup`: creates a project and connects the app in the current directory. */
+export const CLI_SETUP = `${CLI} setup`;
+
+/**
+ * The footer line under a document or a resource table that says how to change
+ * what it shows from the CLI. It sits inside the bordered panel, ruled off
+ * above.
+ *
+ * Inline flow, not a flex row: the design is three auto-layout children with a
+ * 4px gap, which puts a space in front of the full stop. Normal inline text
+ * wraps the same way and lets the punctuation hug the command.
+ */
+export function CliHint({ children }: { children: ReactNode }) {
+  return (
+    <p className="border-t border-border py-3 pr-3 pl-4 text-xs leading-4 text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
+/** A CLI command inside a `CliHint`. */
+export function CliCommand({ children }: { children: string }) {
+  return <InlineCode className="text-[10px]">{children}</InlineCode>;
+}
