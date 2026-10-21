@@ -778,7 +778,9 @@ func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDP
 
 // GetUserPassword implements getUserPassword operation.
 //
-// Get user password state.
+// Reports when the user's current password was set, and leaves `set_at` out
+// when the user has none. The password and its hash are never returned;
+// setting one is `PUT` on the same path.
 //
 // GET /users/{user_id}/password
 func (UnimplementedHandler) GetUserPassword(ctx context.Context, params GetUserPasswordParams) (r GetUserPasswordRes, _ error) {
