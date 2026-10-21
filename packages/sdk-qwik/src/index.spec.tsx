@@ -29,10 +29,12 @@ import {
   sessionConfig,
 } from "./__tests__/config-parity-harness";
 import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
+import { resume, serverMarkup } from "./__tests__/resume-server-markup";
 import { UnsetPropHarness } from "./__tests__/unset-prop-harness";
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 import {
   businessLocales,
+  configureZitadel,
   ZitadelLogin,
   type ZitadelLoginProps,
   ZitadelLogout,
@@ -40,6 +42,8 @@ import {
   ZitadelSession,
   type ZitadelSessionProps,
 } from "./index";
+
+const waitFor = vi.waitFor;
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -590,6 +594,68 @@ describe("resumed server markup", () => {
       purpose: "register",
       project_id: "proj-test",
     });
+  });
+});
+
+describe("resuming a server-rendered login", () => {
+  it("starts its first flow with the purpose the server rendered", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = await serverMarkup({ project: globalProject, purpose: "register" });
+    const firstStep = new Promise((resolve) =>
+      host
+        .querySelector(widgetTags.login)
+        ?.addEventListener("zitadel-flow-step", resolve, { once: true }),
+    );
+
+    resume(host);
+
+    await firstStep;
+    const bodies = await Promise.all(
+      fetched.mock.calls.map(async ([input, init]) =>
+        JSON.parse(
+          String(init?.body ?? (input instanceof Request ? await input.clone().text() : "null")),
+        ),
+      ),
+    );
+    const created = bodies.filter((body) => body?.project_id);
+    expect(created).toHaveLength(1);
+    expect(created[0]).toMatchObject({ purpose: "register" });
+    host.remove();
+  });
+
+  it("loads the supplied flow on its first request instead of creating one", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = await serverMarkup({ project: globalProject, resumeFlowId: "flow_123" });
+    const rendered = host.querySelector(widgetTags.login);
+    expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
+    const firstStep = new Promise((resolve) =>
+      rendered?.addEventListener("zitadel-flow-step", resolve, { once: true }),
+    );
+
+    resume(host);
+
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
+    expect(first.method).toBe("GET");
+    expect(first.url).toContain("flow_123");
+    expect(host.querySelector(widgetTags.login)).toBe(rendered);
+    await firstStep;
+    await rendered?.updateComplete;
+    await Promise.all(fetched.mock.results.map((result) => result.value));
+    expect(fetched).toHaveBeenCalledTimes(1);
+    host.remove();
   });
 });
 

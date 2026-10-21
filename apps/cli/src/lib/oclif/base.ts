@@ -9,6 +9,7 @@ import { toZitadelError, type ZitadelError } from "../errors";
 import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
 import { type Asker, input as askInput } from "../input";
 import { isObject } from "../json";
+import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
 import { DEFAULT_SERVER, resolveServer } from "../server";
@@ -240,6 +241,14 @@ export abstract class BaseCommand extends Command {
    */
   protected createTelemetry(deps: TelemetryDeps): Telemetry {
     return Telemetry.create(deps);
+  }
+
+  /**
+   * Which local servers are running on the machine. Production asks `ps`; a
+   * test overrides this, like {@link createTelemetry}, to answer for the machine.
+   */
+  protected localServers(): LocalServers {
+    return new PsLocalServers();
   }
 
   private openTelemetry(flag: boolean | undefined): void {

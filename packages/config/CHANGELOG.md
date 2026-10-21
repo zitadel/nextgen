@@ -1,5 +1,30 @@
 # @zitadel/config
 
+## 1.0.0-alpha.28
+
+### Patch Changes
+
+- [#2056](https://github.com/zitadel/nextgen/pull/2056) [`d04f94b`](https://github.com/zitadel/nextgen/commit/d04f94b50061418b1dba90f3f8b8ddfa0dee9adf) Thanks [@fforootd](https://github.com/fforootd)! - Built-in schemas are now named under `https://zitadel.com/schemas/v1`, for example `https://zitadel.com/schemas/v1/user-schema.json`, instead of `https://nextgen.com/api/schemas`, a domain Zitadel does not own. The base is an identifier, not an address: the server never fetches a URL in either namespace. Existing projects need no change: a built-in schema's id resolves under either base everywhere the API reads one, including `GET /schemas/{id}`, a flow definition's `user_schema`, a release's schema pointer, the users list's `schema` filter, and bootstrap user documents. A server still configured with the previous base accepts the new ids too. Projects created by `zitadel setup` from now on reference the new URLs, so pair this CLI with a server from this release or later.
+
+- [#2153](https://github.com/zitadel/nextgen/pull/2153) [`21ac783`](https://github.com/zitadel/nextgen/commit/21ac783d40f0480d93aaea550eb938e8f98a96dd) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel plan` shows an edit inside a list as the lines that changed. A flow's
+  steps and a step's actions are matched by `name`, so adding a field to one step
+  prints that one line under the step, with the untouched steps summarized as
+  hidden, instead of the whole `steps` list removed and added again. Lists of
+  values such as `fields` mark the items added or removed.
+
+  `zitadel apply` and `zitadel setup` no longer rewrite your `.zitadel/` files
+  with what the server stored: after applying a connection, `.zitadel/idps/*.json`
+  no longer gains `pkce_enabled`, `token_endpoint_auth_method` and
+  `id_token_mapping`. A field you leave out reads as the server's default, so
+  `plan` reports no change after an `apply`. The one file `apply` still rewrites,
+  and lists in `files_updated`, is a flow whose `user_schema` pins a schema
+  revision id the apply superseded.
+
+- [#2151](https://github.com/zitadel/nextgen/pull/2151) [`b53ef49`](https://github.com/zitadel/nextgen/commit/b53ef494bce234fc3f1e54c6cb4bd0cf288423c5) Thanks [@fforootd](https://github.com/fforootd)! - Editors no longer flag `zitadel.json` for an unreachable schema. `zitadel setup` now writes the schema of `zitadel.json` to `.zitadel/meta/project.json`, next to the flow and user-schema dialects, and points the file's `$schema` at it, so editors validate the project configuration offline instead of trying to load `https://schemas.zitadel.com/v2/project.schema.json`, which never existed. In a project set up earlier, delete the `$schema` line from `zitadel.json` to silence the warning; only editors read it.
+
+- Updated dependencies [[`0f4b901`](https://github.com/zitadel/nextgen/commit/0f4b901f60f2ed20bff71e321564d3b1fc187eab), [`628e101`](https://github.com/zitadel/nextgen/commit/628e101e5c254ab8bdaca830fc6e4acbd084b41e), [`12b3226`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f), [`f65cebe`](https://github.com/zitadel/nextgen/commit/f65cebe8142daaab33882a8ae22822a75bd94e6f), [`e90dade`](https://github.com/zitadel/nextgen/commit/e90dade940d52ce4827ed63d0171d0de68cf2959)]:
+  - @zitadel/api@1.0.0-alpha.28
+
 ## 1.0.0-alpha.27
 
 ### Patch Changes
