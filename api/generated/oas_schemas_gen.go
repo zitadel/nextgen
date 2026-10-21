@@ -16557,7 +16557,7 @@ type CreateUserRequest struct {
 	// created using the `/schemas` endpoint. A default schema is provided.
 	Schema string `json:"schema"`
 	// The user's schema-defined content. Validated against `schema`; a
-	// property the schema does not permit is rejected with `user.invalid`.
+	// property the schema does not permit is rejected with `req.invalid`.
 	Attributes CreateUserRequestAttributes `json:"attributes"`
 }
 
@@ -16582,7 +16582,7 @@ func (s *CreateUserRequest) SetAttributes(val CreateUserRequestAttributes) {
 }
 
 // The user's schema-defined content. Validated against `schema`; a
-// property the schema does not permit is rejected with `user.invalid`.
+// property the schema does not permit is rejected with `req.invalid`.
 type CreateUserRequestAttributes map[string]jx.Raw
 
 func (s *CreateUserRequestAttributes) init() CreateUserRequestAttributes {
@@ -56699,7 +56699,7 @@ func (*PatchUserByIDUnauthorized) patchUserByIDRes() {}
 // key stays untouched, an object merges recursively, `null` deletes the
 // attribute, and any other value replaces the stored one. The merged result
 // is validated as a whole against the user's schema, so a patch that deletes
-// or invalidates a required property is rejected with `user.invalid`.
+// or invalidates a required property is rejected with `req.invalid`.
 // `schema` moves the user to another registered schema — the ADR 009 §4
 // upgrade mechanism. The target must be a revision of the user's current
 // schema (the same `objectType`), newer or older; a schema of another

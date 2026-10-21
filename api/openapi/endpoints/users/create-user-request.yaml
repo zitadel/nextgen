@@ -28,4 +28,4 @@ properties:
     additionalProperties: true
     description: |
       The user's schema-defined content. Validated against `schema`; a
-      property the schema does not permit is rejected with `user.invalid`.
+      property the schema does not permit is rejected with `req.invalid`.

@@ -222,7 +222,7 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 		// ogen's validation rejected do go into details.
 		invalid := domain.ErrRequestInvalid()
 		if fields := validationFieldPaths(err); len(fields) > 0 {
-			invalid = invalid.WithDetails(map[string][]string{"fields": fields})
+			invalid = invalid.WithDetails(domain.InvalidFieldPathsDetails{Fields: fields})
 		}
 		details = domainErrorDetails(invalid)
 

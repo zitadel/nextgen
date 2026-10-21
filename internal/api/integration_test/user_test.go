@@ -279,7 +279,10 @@ func TestCreateUser(t *testing.T) {
 
 			resp, err = client.CreateUser(t.Context(), user, params)
 			assert.NoError(t, err)
-			assert.IsType(t, &api.CreateUserConflict{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateUserConflict{}, resp, helpers.MustMarshal(t, resp))
+			conflict := resp.(*api.CreateUserConflict)
+			assert.Equal(t, api.ErrorCode(domain.ErrUserAlreadyExists().Code), conflict.Code)
+			assert.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Details.Value["details"]))
 		})
 	})
 }
@@ -724,7 +727,12 @@ func TestPatchUser(t *testing.T) {
 			"attributes": map[string]any{"email": 5},
 		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 		require.NoError(t, err)
-		assert.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		// Answered like request validation: the field is named, its value is not.
+		invalid := resp.(*api.PatchUserByIDBadRequest)
+		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), invalid.Code)
+		assert.Equal(t, domain.ErrRequestInvalid().Message, invalid.Message)
+		assert.JSONEq(t, `{"fields":["attributes.email"]}`, string(invalid.Details.Value["details"]))
 	})
 
 	t.Run("an unknown schema pointer is refused", func(t *testing.T) {
@@ -781,10 +789,12 @@ func TestPatchUser(t *testing.T) {
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 		return resp.(*api.User)
 	}
-	requireUserInvalid := func(t *testing.T, resp api.PatchUserByIDRes) {
+	requireAttributesInvalid := func(t *testing.T, resp api.PatchUserByIDRes, wantFields string) {
 		t.Helper()
 		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), resp.(*api.PatchUserByIDBadRequest).Code)
+		invalid := resp.(*api.PatchUserByIDBadRequest)
+		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), invalid.Code)
+		assert.JSONEq(t, wantFields, string(invalid.Details.Value["details"]))
 	}
 
 	t.Run("an older revision is validated like a newer one", func(t *testing.T) {
@@ -797,7 +807,7 @@ func TestPatchUser(t *testing.T) {
 			"schema": revisionV2,
 		}), params)
 		require.NoError(t, err)
-		requireUserInvalid(t, resp)
+		requireAttributesInvalid(t, resp, `{"fields":["attributes.country","attributes.nickname"]}`)
 		unchanged := getUser(t, user.ID)
 		assert.Equal(t, revisionV1, unchanged.Schema)
 		assert.Equal(t, "Nick", userProp(t, *unchanged, "nickname"))
@@ -816,7 +826,7 @@ func TestPatchUser(t *testing.T) {
 			"schema": revisionV1,
 		}), params)
 		require.NoError(t, err)
-		requireUserInvalid(t, resp)
+		requireAttributesInvalid(t, resp, `{"fields":["attributes.country"]}`)
 		unchanged = getUser(t, user.ID)
 		assert.Equal(t, revisionV2, unchanged.Schema)
 		assert.Equal(t, "CH", userProp(t, *unchanged, "country"))
@@ -844,7 +854,11 @@ func TestPatchUser(t *testing.T) {
 			"attributes": map[string]any{"email": "testpatchuser.taken@example.com"},
 		}), api.PatchUserByIDParams{UserID: api.UserID(userB.ID)})
 		require.NoError(t, err)
-		assert.IsType(t, &api.PatchUserByIDConflict{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.PatchUserByIDConflict{}, resp, helpers.MustMarshal(t, resp))
+		// The taken attribute is named, the user holding it is not.
+		conflict := resp.(*api.PatchUserByIDConflict)
+		assert.Equal(t, api.ErrorCode(domain.ErrUserAlreadyExists().Code), conflict.Code)
+		assert.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Details.Value["details"]))
 	})
 
 	t.Run("unknown user", func(t *testing.T) {
@@ -976,18 +990,22 @@ func TestPatchUserFailedMigration(t *testing.T) {
 		collide    bool
 		wantStatus any
 		wantCode   string
+		// wantFields, when set, is the details.fields a schema failure names.
+		wantFields string
 	}{
 		{
 			name:         "a required attribute of the target revision is missing",
 			targetSchema: requiresGivenName,
 			wantStatus:   &api.PatchUserByIDBadRequest{},
-			wantCode:     domain.ErrUserInvalid().Code,
+			wantCode:     domain.ErrRequestInvalid().Code,
+			wantFields:   `{"fields":["attributes.givenName"]}`,
 		},
 		{
 			name:         "a value violates a tightened rule",
 			targetSchema: restrictsColor,
 			wantStatus:   &api.PatchUserByIDBadRequest{},
-			wantCode:     domain.ErrUserInvalid().Code,
+			wantCode:     domain.ErrRequestInvalid().Code,
+			wantFields:   `{"fields":["attributes.color"]}`,
 		},
 		{
 			name:         "a value collides with another user's unique attribute",
@@ -1028,6 +1046,9 @@ func TestPatchUserFailedMigration(t *testing.T) {
 			require.NoError(t, err)
 			require.IsType(t, tc.wantStatus, resp, helpers.MustMarshal(t, resp))
 			assertAuthzError(t, resp, tc.wantCode)
+			if tc.wantFields != "" {
+				assert.JSONEq(t, tc.wantFields, string(resp.(*api.PatchUserByIDBadRequest).Details.Value["details"]))
+			}
 
 			after := readStored(t, user.ID)
 			assert.Equal(t, before.schemaURL, after.schemaURL, "schema reference")
