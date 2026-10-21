@@ -70428,11 +70428,16 @@ func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
 type RollbackDeploymentErrorResponse struct {
 	Type                RollbackDeploymentErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
+	DepConflict         DepConflict
+	DepInvalid          DepInvalid
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	EnvProjectNotFound  EnvProjectNotFound
+	EvtInvalid          EvtInvalid
 	Internal            Internal
 	NotImplemented      NotImplemented
+	ProjNotFound        ProjNotFound
+	RelNotFound         RelNotFound
 	ReqInvalid          ReqInvalid
 }
 
@@ -70442,17 +70447,32 @@ type RollbackDeploymentErrorResponseType string
 // Possible values for RollbackDeploymentErrorResponseType.
 const (
 	AuthUnauthorizedRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.invalid"
 	DepNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.not_found"
 	DepPermissionDeniedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.permission_denied"
 	EnvProjectNotFoundRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "evt.invalid"
 	InternalRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "internal"
 	NotImplementedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundRollbackDeploymentErrorResponse        RollbackDeploymentErrorResponseType = "proj.not_found"
+	RelNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "rel.not_found"
 	ReqInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether RollbackDeploymentErrorResponse is AuthUnauthorized.
 func (s RollbackDeploymentErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedRollbackDeploymentErrorResponse
+}
+
+// IsDepConflict reports whether RollbackDeploymentErrorResponse is DepConflict.
+func (s RollbackDeploymentErrorResponse) IsDepConflict() bool {
+	return s.Type == DepConflictRollbackDeploymentErrorResponse
+}
+
+// IsDepInvalid reports whether RollbackDeploymentErrorResponse is DepInvalid.
+func (s RollbackDeploymentErrorResponse) IsDepInvalid() bool {
+	return s.Type == DepInvalidRollbackDeploymentErrorResponse
 }
 
 // IsDepNotFound reports whether RollbackDeploymentErrorResponse is DepNotFound.
@@ -70470,6 +70490,11 @@ func (s RollbackDeploymentErrorResponse) IsEnvProjectNotFound() bool {
 	return s.Type == EnvProjectNotFoundRollbackDeploymentErrorResponse
 }
 
+// IsEvtInvalid reports whether RollbackDeploymentErrorResponse is EvtInvalid.
+func (s RollbackDeploymentErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidRollbackDeploymentErrorResponse
+}
+
 // IsInternal reports whether RollbackDeploymentErrorResponse is Internal.
 func (s RollbackDeploymentErrorResponse) IsInternal() bool {
 	return s.Type == InternalRollbackDeploymentErrorResponse
@@ -70478,6 +70503,16 @@ func (s RollbackDeploymentErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether RollbackDeploymentErrorResponse is NotImplemented.
 func (s RollbackDeploymentErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedRollbackDeploymentErrorResponse
+}
+
+// IsProjNotFound reports whether RollbackDeploymentErrorResponse is ProjNotFound.
+func (s RollbackDeploymentErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundRollbackDeploymentErrorResponse
+}
+
+// IsRelNotFound reports whether RollbackDeploymentErrorResponse is RelNotFound.
+func (s RollbackDeploymentErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundRollbackDeploymentErrorResponse
 }
 
 // IsReqInvalid reports whether RollbackDeploymentErrorResponse is ReqInvalid.
@@ -70503,6 +70538,48 @@ func (s RollbackDeploymentErrorResponse) GetAuthUnauthorized() (v AuthUnauthoriz
 func NewAuthUnauthorizedRollbackDeploymentErrorResponse(v AuthUnauthorized) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetDepConflict sets RollbackDeploymentErrorResponse to DepConflict.
+func (s *RollbackDeploymentErrorResponse) SetDepConflict(v DepConflict) {
+	s.Type = DepConflictRollbackDeploymentErrorResponse
+	s.DepConflict = v
+}
+
+// GetDepConflict returns DepConflict and true boolean if RollbackDeploymentErrorResponse is DepConflict.
+func (s RollbackDeploymentErrorResponse) GetDepConflict() (v DepConflict, ok bool) {
+	if !s.IsDepConflict() {
+		return v, false
+	}
+	return s.DepConflict, true
+}
+
+// NewDepConflictRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from DepConflict.
+func NewDepConflictRollbackDeploymentErrorResponse(v DepConflict) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetDepConflict(v)
+	return s
+}
+
+// SetDepInvalid sets RollbackDeploymentErrorResponse to DepInvalid.
+func (s *RollbackDeploymentErrorResponse) SetDepInvalid(v DepInvalid) {
+	s.Type = DepInvalidRollbackDeploymentErrorResponse
+	s.DepInvalid = v
+}
+
+// GetDepInvalid returns DepInvalid and true boolean if RollbackDeploymentErrorResponse is DepInvalid.
+func (s RollbackDeploymentErrorResponse) GetDepInvalid() (v DepInvalid, ok bool) {
+	if !s.IsDepInvalid() {
+		return v, false
+	}
+	return s.DepInvalid, true
+}
+
+// NewDepInvalidRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from DepInvalid.
+func NewDepInvalidRollbackDeploymentErrorResponse(v DepInvalid) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetDepInvalid(v)
 	return s
 }
 
@@ -70569,6 +70646,27 @@ func NewEnvProjectNotFoundRollbackDeploymentErrorResponse(v EnvProjectNotFound) 
 	return s
 }
 
+// SetEvtInvalid sets RollbackDeploymentErrorResponse to EvtInvalid.
+func (s *RollbackDeploymentErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidRollbackDeploymentErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if RollbackDeploymentErrorResponse is EvtInvalid.
+func (s RollbackDeploymentErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from EvtInvalid.
+func NewEvtInvalidRollbackDeploymentErrorResponse(v EvtInvalid) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets RollbackDeploymentErrorResponse to Internal.
 func (s *RollbackDeploymentErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalRollbackDeploymentErrorResponse
@@ -70608,6 +70706,48 @@ func (s RollbackDeploymentErrorResponse) GetNotImplemented() (v NotImplemented, 
 func NewNotImplementedRollbackDeploymentErrorResponse(v NotImplemented) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjNotFound sets RollbackDeploymentErrorResponse to ProjNotFound.
+func (s *RollbackDeploymentErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundRollbackDeploymentErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if RollbackDeploymentErrorResponse is ProjNotFound.
+func (s RollbackDeploymentErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from ProjNotFound.
+func NewProjNotFoundRollbackDeploymentErrorResponse(v ProjNotFound) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetRelNotFound sets RollbackDeploymentErrorResponse to RelNotFound.
+func (s *RollbackDeploymentErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundRollbackDeploymentErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if RollbackDeploymentErrorResponse is RelNotFound.
+func (s RollbackDeploymentErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from RelNotFound.
+func NewRelNotFoundRollbackDeploymentErrorResponse(v RelNotFound) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetRelNotFound(v)
 	return s
 }
 
