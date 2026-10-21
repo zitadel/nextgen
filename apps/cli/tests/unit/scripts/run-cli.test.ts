@@ -452,6 +452,11 @@ describe("run-cli wrapper", () => {
     });
 
     expect(prepareLocalRegistry).toHaveBeenCalledOnce();
+    // Only what a generated app installs, over the proxy store of earlier runs.
+    expect(prepareLocalRegistry.mock.calls[0]?.[0]).toMatchObject({
+      packageSet: "app",
+      resetStorage: false,
+    });
     expect(run).toHaveBeenCalledOnce();
     expect(run!.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
     expect(run!.mock.calls[0]?.[2].env).toMatchObject({
