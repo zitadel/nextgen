@@ -1040,3 +1040,31 @@ func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
 		})
 	}
 }
+
+// One passkey row is enough to answer, so the read asks for one, of this
+// user in this project.
+func TestFlowSSOIdentityResolver_UserHasPasskey(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		keys []*domain.UserPasskey
+		want bool
+	}{
+		{name: "none", want: false},
+		{name: "one", keys: []*domain.UserPasskey{{UserID: "user-1"}}, want: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newSSOResolverFixture(t)
+			f.stmts.EXPECT().
+				ListUserPasskeys(gomock.Any(), gomock.Cond(func(opts *database.ListOptions[domain.UserPasskeyField]) bool {
+					return opts.Pagination.Limit == 1 && opts.Filter != nil
+				})).
+				Return(&database.ListResult[*domain.UserPasskey]{Items: tt.keys}, nil)
+
+			got, err := f.resolver.UserHasPasskey(t.Context(), ssoProjectID, "user-1")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

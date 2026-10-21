@@ -205,6 +205,11 @@ type CollectedFlowData struct {
 	UserData    map[string]any
 	UserID      string
 	AuthMethods CollectedAuthMethodData
+	// SSOConflictConnectionID is the connection whose sign-in collided with
+	// the bound user (user_already_exists from an external identity). The
+	// steps shown to that user leave this provider out: choosing it again
+	// collides again. Cleared with the bound user.
+	SSOConflictConnectionID string `json:",omitempty"`
 }
 
 type CollectedAuthMethodData struct {
