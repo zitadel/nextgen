@@ -84,3 +84,12 @@ export {
   type SchemaFile,
   selectSchema,
 } from "./schemas";
+
+export {
+  type ConnectionMappings,
+  type ConnectionStatus,
+  mappingLines,
+  readMappings,
+  statusLine,
+  stillToConfigure,
+} from "./mappings";

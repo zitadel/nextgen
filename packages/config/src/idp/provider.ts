@@ -34,6 +34,12 @@ export type ConnectionEndpoints = {
 export type ScaffoldOptions = {
   /** Properties the target user schema defines, which bounds the claim mapping. */
   readonly schemaProperties: Iterable<string>;
+  /**
+   * The properties among them that are unique (`x-unique` of `project` or
+   * `team`). Verification is only read for these, so a verification of any
+   * other is left out of the document. Omit it to leave every one in.
+   */
+  readonly uniqueProperties?: Iterable<string>;
   /** Slug to write under; defaults to the provider's own. */
   readonly slug?: ConnectionSlug;
   /** `$schema` pointer, relative to `.zitadel/idps/`. */
@@ -130,4 +136,33 @@ export function referencedVariable(value: string): string | undefined {
 /** Whether a stored value is a reference rather than a credential. */
 export function isVariableReference(value: string): boolean {
   return referencedVariable(value) !== undefined;
+}
+
+/**
+ * The top-level properties of a user schema that scope their uniqueness, or
+ * one of their nested properties does. The engine asks about a verified value
+ * at the top-level property in both cases.
+ */
+export function uniquePropertyNames(schema: object): string[] {
+  const properties = (schema as { properties?: unknown }).properties;
+  if (typeof properties !== "object" || properties === null) {
+    return [];
+  }
+  const unique = (definition: unknown): boolean => {
+    if (typeof definition !== "object" || definition === null) {
+      return false;
+    }
+    const record = definition as { "x-unique"?: unknown; properties?: unknown };
+    if (record["x-unique"] === "project" || record["x-unique"] === "team") {
+      return true;
+    }
+    return (
+      typeof record.properties === "object" &&
+      record.properties !== null &&
+      Object.values(record.properties).some(unique)
+    );
+  };
+  return Object.entries(properties)
+    .filter(([, definition]) => unique(definition))
+    .map(([name]) => name);
 }

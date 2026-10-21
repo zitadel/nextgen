@@ -113,7 +113,7 @@ export interface ConnectionDocument {
   protocol?: string;
   display_name?: string;
   subject_claim?: string;
-  oidc: { issuer: string; client_id?: string; client_secret?: string };
+  oidc: { issuer: string; client_id?: string; client_secret?: string; scopes?: string[] };
   claim_mapping?: Record<string, string>;
   verified_claims?: Record<string, string>;
 }
@@ -281,6 +281,23 @@ export class ScaffoldedApp {
     );
   }
 
+  /** `auth-method sso enable --dry-run` without `--json`, for a spec asserting what the developer reads. */
+  enableSsoDryRun(provider: string, credentials: Credentials): Promise<CliResult> {
+    return this.pipingStdin(credentials.secret, () =>
+      this.cli([
+        "auth-method",
+        "sso",
+        "enable",
+        "--non-interactive",
+        "--dry-run",
+        "--provider",
+        provider,
+        "--client-id",
+        credentials.clientId,
+      ]),
+    );
+  }
+
   enableSso(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>
       this.cli([
@@ -369,6 +386,27 @@ export class ScaffoldedApp {
   enableSsoWith(args: string[], secret = "a-client-secret"): Promise<CliResult> {
     return this.pipingSecret(secret, () =>
       this.cli(["auth-method", "sso", "enable", "--non-interactive", "--json", ...args]),
+    );
+  }
+
+  /** `setup` with a custom connection, without `--json`, for a spec asserting what the developer reads. */
+  setupWithCustomSsoRendered(
+    connection: CustomConnection,
+    credentials: Credentials,
+  ): Promise<CliResult> {
+    return this.pipingSecret(credentials.secret, () =>
+      this.cli([
+        "setup",
+        "--non-interactive",
+        "--skip-install",
+        "--framework",
+        "next",
+        "--sso",
+        "custom",
+        ...customFlags(connection, "--sso-"),
+        "--sso-client-id",
+        credentials.clientId,
+      ]),
     );
   }
 
@@ -760,6 +798,13 @@ export class ScaffoldedApp {
       `.zitadel/idps/${name}.json`,
       await this.readProjectFile(`.zitadel/idps/${slug}.json`),
     );
+  }
+
+  /** A connection file as it is on disk. */
+  async connectionOf(slug: string): Promise<ConnectionDocument> {
+    return JSON.parse(
+      await this.readProjectFile(`.zitadel/idps/${slug}.json`),
+    ) as ConnectionDocument;
   }
 
   /** The project-relative path of a connection's file, as a command reports it. */

@@ -45,12 +45,16 @@ properties:
       per spec. Override it where `sub` is pairwise, e.g. Entra `oid`.
   claim_mapping:
     type: object
+    propertyNames:
+      pattern: '^[^.]+$'
     additionalProperties:
       type: string
       pattern: ^[^$]
-    description: "Maps user-schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored."
+    description: "Maps user-schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored. A key is one property name, so it cannot contain a dot."
   verified_claims:
     type: object
+    propertyNames:
+      pattern: '^[^.]+$'
     additionalProperties:
       anyOf:
       - const: true
@@ -144,6 +148,9 @@ properties:
         items:
           type: string
           minLength: 1
+          # RFC 6749 section 3.3: a scope is one token, so no space (which would
+          # fuse two scopes into one the provider has never heard of), no quote.
+          pattern: '^[\x21\x23-\x5B\x5D-\x7E]+$'
         uniqueItems: true
         minItems: 1
         contains:

@@ -239,7 +239,7 @@ describe("apply", () => {
         [
           "subject_claim",
           (connection: ConnectionDocument) => {
-            connection.subject_claim = "email";
+            connection.subject_claim = "oid";
           },
         ],
       ])("to the %s is refused and leaves the platform as it was", async (_field, edit) => {

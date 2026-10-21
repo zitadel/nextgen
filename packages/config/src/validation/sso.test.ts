@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { getDefaultHumanUserSchema, SETUP_PRESETS, SETUP_USE_CASES } from "../defaults.js";
+import { CustomOidcProvider, DEFAULT_SCOPES, GoogleProvider } from "../idp/index.js";
+import { displayName, issuer, slug } from "../idp/test-support.js";
+
 import {
   VALIDATION_RULES,
   validateProject,
@@ -19,15 +23,20 @@ type Step = {
   transitions: Record<string, { target: string }>;
 };
 type Schema = {
+  required?: string[];
+  "x-identifier"?: string;
   properties: Record<string, object>;
-  "x-auth-methods": { sso: { enabled: boolean; providers: string[] } };
+  "x-auth-methods": {
+    sso: { enabled: boolean; providers: string[] };
+    password?: { enabled: boolean };
+  };
 };
 type Connection = {
   slug: string;
   claim_mapping?: Record<string, string>;
   verified_claims?: Record<string, string>;
   provisioning?: { creation: "auto" | "disabled" };
-  oidc?: { client_id: string; client_secret: string };
+  oidc?: { client_id: string; client_secret: string; scopes?: string[] };
 };
 type Project = {
   schemas: Record<string, Schema>;
@@ -338,6 +347,413 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
       },
     ],
   },
+  {
+    name: "a mistyped mapping target that is one letter off a property",
+    edit: (p) => {
+      schemaOf(p).properties.contactEmail = {};
+      connectionOf(p).claim_mapping = { email: "email", contactEmial: "mail" };
+    },
+    expect: [
+      {
+        rule: "sso/orphaned-mapping-target",
+        file: GOOGLE,
+        says: ["contactEmial", 'Did you mean "contactEmail"?', "Fix the name"],
+      },
+    ],
+  },
+  {
+    name: "a mapping target that differs from a property only in case",
+    edit: (p) => {
+      schemaOf(p).properties.givenName = {};
+      connectionOf(p).claim_mapping = { email: "email", givenname: "given_name" };
+    },
+    expect: [
+      {
+        rule: "sso/orphaned-mapping-target",
+        file: GOOGLE,
+        says: ["givenname", 'Did you mean "givenName"?'],
+      },
+    ],
+  },
+  {
+    name: "a mistyped verification key",
+    edit: (p) => {
+      schemaOf(p).properties.contactEmail = { "x-unique": "project" };
+      connectionOf(p).claim_mapping = { email: "email", contactEmial: "mail" };
+      connectionOf(p).verified_claims = { contactEmial: "mail_verified" };
+    },
+    expect: [
+      { rule: "sso/orphaned-mapping-target", file: GOOGLE, says: ["contactEmial"] },
+      {
+        rule: "sso/orphaned-verification-key",
+        file: GOOGLE,
+        says: ["contactEmial", 'Did you mean "contactEmail"?', "can never verify"],
+      },
+    ],
+  },
+  {
+    name: "a mapped property is verified but not unique, so nothing reads the verification",
+    edit: (p) => {
+      schemaOf(p).properties.givenName = {};
+      connectionOf(p).claim_mapping = { email: "email", givenName: "given_name" };
+      connectionOf(p).verified_claims = { givenName: "given_name_verified" };
+    },
+    expect: [
+      {
+        rule: "sso/verification-needs-unique",
+        file: GOOGLE,
+        says: ["givenName", "not unique", "x-unique", "remove it from verified_claims"],
+      },
+    ],
+  },
+  {
+    name: "a mapped property is verified and its x-unique scope is unspecified",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": "unspecified" };
+      connectionOf(p).verified_claims = { email: "email_verified" };
+    },
+    expect: [
+      { rule: "sso/verification-needs-unique", file: GOOGLE, says: ["email", "not unique"] },
+    ],
+  },
+  {
+    name: "a mapped property is verified and its x-unique scope is null",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": null };
+      connectionOf(p).verified_claims = { email: "email_verified" };
+    },
+    expect: [
+      { rule: "sso/verification-needs-unique", file: GOOGLE, says: ["email", "not unique"] },
+    ],
+  },
+  {
+    name: "a standard claim is mapped without the scope that returns it",
+    edit: (p) => {
+      schemaOf(p).properties.givenName = { type: "string" };
+      connectionOf(p).oidc = { client_id: "a", client_secret: "b", scopes: ["openid", "email"] };
+      connectionOf(p).claim_mapping = { email: "email", givenName: "given_name" };
+    },
+    expect: [
+      {
+        rule: "sso/claim-needs-scope",
+        file: GOOGLE,
+        says: ["claim_mapping", "given_name", '"profile"', 'Add "profile" to oidc.scopes'],
+      },
+    ],
+  },
+  {
+    name: "a verification reads a standard claim without the scope that returns it",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": "project" };
+      connectionOf(p).oidc = { client_id: "a", client_secret: "b", scopes: ["openid", "profile"] };
+      connectionOf(p).claim_mapping = { email: "email" };
+      connectionOf(p).verified_claims = { email: "email_verified" };
+    },
+    expect: [
+      { rule: "sso/claim-needs-scope", file: GOOGLE, says: ["claim_mapping", '"email"'] },
+      {
+        rule: "sso/claim-needs-scope",
+        file: GOOGLE,
+        says: ["verified_claims", "email_verified", '"email"'],
+      },
+    ],
+  },
+  {
+    name: "a number claim is mapped into a string property",
+    edit: (p) => {
+      schemaOf(p).properties.refreshedAt = { type: "string" };
+      connectionOf(p).claim_mapping = { email: "email", refreshedAt: "updated_at" };
+    },
+    expect: [
+      {
+        rule: "sso/claim-type-mismatch",
+        file: GOOGLE,
+        says: ["updated_at", "number claim", "refreshedAt", "string", "change the type"],
+      },
+    ],
+  },
+  {
+    name: "a boolean claim is mapped into a string property",
+    edit: (p) => {
+      schemaOf(p).properties.verified = { type: "string" };
+      connectionOf(p).claim_mapping = { email: "email", verified: "email_verified" };
+    },
+    expect: [
+      { rule: "sso/claim-type-mismatch", file: GOOGLE, says: ["boolean claim", "verified"] },
+    ],
+  },
+  {
+    name: "an object claim is mapped into a string property",
+    edit: (p) => {
+      schemaOf(p).properties.home = { type: "string" };
+      connectionOf(p).claim_mapping = { email: "email", home: "address" };
+    },
+    expect: [{ rule: "sso/claim-type-mismatch", file: GOOGLE, says: ["object claim", "home"] }],
+  },
+  {
+    name: "a string claim is mapped into an integer property",
+    edit: (p) => {
+      schemaOf(p).properties.age = { type: "integer" };
+      connectionOf(p).claim_mapping = { email: "email", age: "birthdate" };
+    },
+    expect: [
+      {
+        rule: "sso/claim-type-mismatch",
+        file: GOOGLE,
+        says: ["birthdate", "string claim", "integer"],
+      },
+    ],
+  },
+  {
+    name: "a verification reads a claim that is not a boolean",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": "project" };
+      connectionOf(p).verified_claims = { email: "email" };
+    },
+    expect: [
+      {
+        rule: "sso/verification-source-not-boolean",
+        file: GOOGLE,
+        says: ["email", "string claim", "email_verified", "use true"],
+      },
+    ],
+  },
+  {
+    name: "a claim name with a space around it",
+    edit: (p) => {
+      connectionOf(p).claim_mapping = { email: "email " };
+    },
+    expect: [
+      {
+        rule: "sso/claim-name-whitespace",
+        file: GOOGLE,
+        says: ["claim_mapping", '"email "', "Remove the space"],
+      },
+    ],
+  },
+  {
+    name: "a verification source with a space around it",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": "project" };
+      connectionOf(p).verified_claims = { email: " email_verified" };
+    },
+    expect: [
+      {
+        rule: "sso/claim-name-whitespace",
+        file: GOOGLE,
+        says: ["verified_claims", '" email_verified"'],
+      },
+    ],
+  },
+  {
+    name: "a subject claim with a space around it",
+    edit: (p) => {
+      (connectionOf(p) as { subject_claim?: string }).subject_claim = "oid ";
+    },
+    expect: [
+      { rule: "sso/claim-name-whitespace", file: GOOGLE, says: ["subject_claim", '"oid "'] },
+    ],
+  },
+  {
+    name: "the subject is a profile claim the user can change",
+    edit: (p) => {
+      (connectionOf(p) as { subject_claim?: string }).subject_claim = "email";
+    },
+    expect: [
+      {
+        rule: "sso/subject-claim-unstable",
+        file: GOOGLE,
+        says: ['subject_claim is "email"', "can change", '"sub"'],
+      },
+    ],
+  },
+  {
+    name: "the user-creating step leaves out a required property no provider maps",
+    edit: (p) => {
+      schemaOf(p).properties.companyName = { type: "string" };
+      schemaOf(p).required = ["email", "companyName"];
+    },
+    expect: [
+      {
+        rule: "sso/collection-misses-required",
+        file: LOGIN,
+        steps: ["register-sso"],
+        says: ['"companyName"', "create_user_with_sso", "Add it to fields"],
+      },
+    ],
+  },
+  {
+    name: "the user-creating step leaves out a property only one of two providers maps",
+    edit: (p) => {
+      schemaOf(p).properties.companyName = { type: "string" };
+      schemaOf(p).required = ["email", "companyName"];
+      schemaOf(p)["x-auth-methods"].sso.providers = ["google", "other"];
+      p.connections[".zitadel/idps/other.json"] = { slug: "other", claim_mapping: { email: "e" } };
+      connectionOf(p).claim_mapping = { email: "email", companyName: "org" };
+      stepOf(p, "identifier").sso_providers = ["google", "other"];
+    },
+    expect: [
+      {
+        rule: "sso/collection-misses-required",
+        file: LOGIN,
+        steps: ["register-sso"],
+        says: ['"companyName"', "every provider", "map"],
+      },
+    ],
+  },
+  {
+    name: "the user-creating step leaves out the property people sign in by",
+    edit: (p) => {
+      schemaOf(p).properties.username = { type: "string" };
+      schemaOf(p)["x-identifier"] = "username";
+      schemaOf(p)["x-auth-methods"].password = { enabled: true };
+    },
+    expect: [
+      {
+        rule: "sso/collection-misses-required",
+        file: LOGIN,
+        steps: ["register-sso"],
+        says: ['"username"', "signs people in by"],
+      },
+    ],
+  },
+  {
+    name: "a schema lists a provider twice",
+    edit: (p) => {
+      schemaOf(p)["x-auth-methods"].sso.providers = ["google", "google"];
+    },
+    expect: [{ rule: "sso/duplicate-provider", file: STAFF, says: ['"google"', "more than once"] }],
+  },
+  {
+    name: "a step offers a provider twice",
+    edit: (p) => {
+      stepOf(p, "identifier").sso_providers = ["google", "google"];
+    },
+    expect: [
+      {
+        rule: "sso/duplicate-provider",
+        file: LOGIN,
+        steps: ["identifier"],
+        says: ['"google"', "twice"],
+      },
+    ],
+  },
+  {
+    name: "the email is filled from one claim and verified by the verification of another",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": "project" };
+      connectionOf(p).claim_mapping = { email: "preferred_username" };
+      connectionOf(p).verified_claims = { email: "email_verified" };
+    },
+    expect: [
+      {
+        rule: "sso/verification-claim-mismatch",
+        file: GOOGLE,
+        says: ["email_verified", '"preferred_username"', 'Fill "email" from "email"'],
+      },
+    ],
+  },
+  {
+    name: "the phone number is verified by a claim that vouches for something else",
+    edit: (p) => {
+      schemaOf(p).properties.phone = { "x-unique": "project" };
+      connectionOf(p).claim_mapping = { email: "email", phone: "email" };
+      connectionOf(p).verified_claims = { phone: "phone_number_verified" };
+    },
+    expect: [
+      {
+        rule: "sso/verification-claim-mismatch",
+        file: GOOGLE,
+        says: ["phone_number_verified", '"phone_number"'],
+      },
+    ],
+  },
+  {
+    name: "a step list where two user-creating steps each miss a different required property",
+    edit: (p) => {
+      schemaOf(p).properties.a = { type: "string" };
+      schemaOf(p).properties.b = { type: "string" };
+      schemaOf(p).required = ["a", "b", "email"];
+      stepOf(p, "register-sso").fields = ["email", "b"];
+      p.flows[LOGIN]?.body.steps.push(
+        aStep("register-other", { on_success: "create_user_with_sso", fields: ["email", "a"] }),
+      );
+    },
+    expect: [
+      {
+        rule: "sso/collection-misses-required",
+        file: LOGIN,
+        steps: ["register-sso"],
+        says: ['"a"'],
+      },
+      {
+        rule: "sso/collection-misses-required",
+        file: LOGIN,
+        steps: ["register-other"],
+        says: ['"b"'],
+      },
+    ],
+  },
+  {
+    name: "a claim read by two rows and missing its scope",
+    edit: (p) => {
+      connectionOf(p).oidc = { client_id: "a", client_secret: "b", scopes: ["openid"] };
+      connectionOf(p).claim_mapping = { email: "email", mail: "email" };
+      schemaOf(p).properties.mail = { type: "string" };
+      schemaOf(p)["x-identifier"] = "email";
+    },
+    expect: [
+      { rule: "sso/claim-needs-scope", file: GOOGLE, says: ['claim_mapping reads "email"'] },
+    ],
+  },
+  {
+    name: "an object claim is mapped into a string property, said with the right article",
+    edit: (p) => {
+      schemaOf(p).properties.home = { type: "string" };
+      connectionOf(p).claim_mapping = { email: "email", home: "address" };
+    },
+    expect: [{ rule: "sso/claim-type-mismatch", file: GOOGLE, says: ["an object claim"] }],
+  },
+  {
+    name: "a connection no schema lists and no flow offers, with a subject the user can change",
+    edit: (p) => {
+      p.connections[".zitadel/idps/spare.json"] = {
+        slug: "spare",
+        subject_claim: "email",
+        claim_mapping: { email: "email" },
+      } as Connection;
+    },
+    expect: [
+      { rule: "sso/subject-claim-unstable", file: ".zitadel/idps/spare.json", says: ["email"] },
+    ],
+  },
+  {
+    name: "a misspelt section of a connection",
+    edit: (p) => {
+      (connectionOf(p) as Record<string, unknown>).claim_maping = { contactEmail: "mail" };
+    },
+    expect: [
+      {
+        rule: "sso/unknown-connection-field",
+        file: GOOGLE,
+        says: ['"claim_maping"', 'Did you mean "claim_mapping"?', "a connection"],
+      },
+    ],
+  },
+  {
+    name: "a misspelt field of the oidc block",
+    edit: (p) => {
+      connectionOf(p).oidc = { client_id: "a", client_secret: "b" };
+      (connectionOf(p).oidc as Record<string, unknown>).scope = ["openid"];
+    },
+    expect: [
+      {
+        rule: "sso/unknown-connection-field",
+        file: GOOGLE,
+        says: ['"scope"', 'Did you mean "scopes"?', "the oidc block"],
+      },
+    ],
+  },
 ];
 
 /** The edits that sit on a rule's boundary and must be accepted. */
@@ -383,10 +799,231 @@ const accepted: Array<{ name: string; edit: (project: Project) => void }> = [
   {
     name: "a target only one of two referencing schemas defines",
     edit: (p) => {
-      schemaOf(p).properties.staffNumber = {};
+      schemaOf(p).properties.staffNumber = { "x-unique": "project" };
       p.schemas[PARTNERS] = aSchema();
       connectionOf(p).claim_mapping = { email: "email", staffNumber: "employee_id" };
       connectionOf(p).verified_claims = { staffNumber: "employee_verified" };
+    },
+  },
+  {
+    name: "a verified property unique at the project scope",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": "project" };
+      connectionOf(p).verified_claims = { email: "email_verified" };
+    },
+  },
+  {
+    name: "a verified property unique at the team scope",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": "team" };
+      connectionOf(p).verified_claims = { email: "trusted" };
+    },
+  },
+  {
+    name: "a verified property unique in only one of two referencing schemas",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": "project" };
+      p.schemas[PARTNERS] = aSchema();
+      connectionOf(p).verified_claims = { email: "email_verified" };
+    },
+  },
+  {
+    name: "standard claims read under the scopes that return them",
+    edit: (p) => {
+      schemaOf(p).properties.givenName = { type: "string" };
+      schemaOf(p).properties.email = { type: "string", "x-unique": "project" };
+      connectionOf(p).oidc = {
+        client_id: "a",
+        client_secret: "b",
+        scopes: ["openid", "profile", "email"],
+      };
+      connectionOf(p).claim_mapping = { email: "email", givenName: "given_name" };
+      connectionOf(p).verified_claims = { email: "email_verified" };
+    },
+  },
+  {
+    name: "a connection with no scopes written down",
+    edit: (p) => {
+      connectionOf(p).claim_mapping = { email: "email" };
+    },
+  },
+  {
+    name: "a number claim mapped into an integer property",
+    edit: (p) => {
+      schemaOf(p).properties.refreshedAt = { type: "integer" };
+      connectionOf(p).claim_mapping = { email: "email", refreshedAt: "updated_at" };
+    },
+  },
+  {
+    name: "a number claim mapped into a number property",
+    edit: (p) => {
+      schemaOf(p).properties.score = { type: "number" };
+      connectionOf(p).claim_mapping = { email: "email", score: "updated_at" };
+    },
+  },
+  {
+    name: "a claim mapped into a property with no declared type",
+    edit: (p) => {
+      schemaOf(p).properties.refreshedAt = {};
+      connectionOf(p).claim_mapping = { email: "email", refreshedAt: "updated_at" };
+    },
+  },
+  {
+    name: "a claim mapped into a property typed as a list of types that includes its own",
+    edit: (p) => {
+      schemaOf(p).properties.refreshedAt = { type: ["string", "number"] };
+      connectionOf(p).claim_mapping = { email: "email", refreshedAt: "updated_at" };
+    },
+  },
+  {
+    name: "a claim the standard does not define, whatever the property type",
+    edit: (p) => {
+      schemaOf(p).properties.staffNumber = { type: "integer" };
+      connectionOf(p).claim_mapping = { email: "email", staffNumber: "employee_id" };
+    },
+  },
+  {
+    name: "a claim mapped into a property typed in only one of two schemas that disagree",
+    edit: (p) => {
+      schemaOf(p).properties.refreshedAt = { type: "string" };
+      p.schemas[PARTNERS] = aSchema({}, { refreshedAt: { type: "integer" } });
+      connectionOf(p).claim_mapping = { email: "email", refreshedAt: "updated_at" };
+    },
+  },
+  {
+    name: "a verification that trusts the provider outright",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": "project" };
+      (connectionOf(p) as { verified_claims?: Record<string, unknown> }).verified_claims = {
+        email: true,
+      };
+    },
+  },
+  {
+    name: "a subject claim that never changes",
+    edit: (p) => {
+      (connectionOf(p) as { subject_claim?: string }).subject_claim = "oid";
+    },
+  },
+  {
+    name: "the subject read from sub",
+    edit: (p) => {
+      (connectionOf(p) as { subject_claim?: string }).subject_claim = "sub";
+    },
+  },
+  {
+    name: "a required property the user-creating step asks for",
+    edit: (p) => {
+      schemaOf(p).properties.companyName = { type: "string" };
+      schemaOf(p).required = ["email", "companyName"];
+      stepOf(p, "register-sso").fields = ["email", "companyName"];
+    },
+  },
+  {
+    name: "a required property every provider maps",
+    edit: (p) => {
+      schemaOf(p).properties.companyName = { type: "string" };
+      schemaOf(p).required = ["email", "companyName"];
+      connectionOf(p).claim_mapping = { email: "email", companyName: "org" };
+    },
+  },
+  {
+    name: "a required object the user-creating step asks for by a nested field",
+    edit: (p) => {
+      schemaOf(p).properties.address = { type: "object" };
+      schemaOf(p).required = ["email", "address"];
+      stepOf(p, "register-sso").fields = ["email", "address.street"];
+    },
+  },
+  {
+    name: "a required property when the only provider cannot create users",
+    edit: (p) => {
+      schemaOf(p).properties.companyName = { type: "string" };
+      schemaOf(p).required = ["email", "companyName"];
+      connectionOf(p).provisioning = { creation: "disabled" };
+      stepOf(p, "identifier").transitions = { sso_authenticated: { target: "done" } };
+    },
+  },
+  {
+    name: "the identifier is asked for by the user-creating step",
+    edit: (p) => {
+      schemaOf(p)["x-identifier"] = "email";
+    },
+  },
+  {
+    name: "the email verified by the claim that vouches for it",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": "project" };
+      connectionOf(p).claim_mapping = { email: "email" };
+      connectionOf(p).verified_claims = { email: "email_verified" };
+    },
+  },
+  {
+    name: "a property filled from one claim and verified by a claim the standard does not define",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": "project" };
+      connectionOf(p).claim_mapping = { email: "mail" };
+      connectionOf(p).verified_claims = { email: "mail_confirmed" };
+    },
+  },
+  {
+    name: "a username filled from the claim the identifier reads",
+    edit: (p) => {
+      schemaOf(p).properties.username = { type: "string" };
+      schemaOf(p)["x-identifier"] = "username";
+      stepOf(p, "register-sso").fields = ["email", "username"];
+      connectionOf(p).claim_mapping = { email: "email", username: "email" };
+    },
+  },
+  {
+    name: "a verification of an object whose nested property is unique",
+    edit: (p) => {
+      schemaOf(p).properties.address = {
+        type: "object",
+        properties: { street: { type: "string", "x-unique": "project" } },
+      };
+      connectionOf(p).claim_mapping = { email: "email", address: "address" };
+      (connectionOf(p) as { verified_claims?: Record<string, unknown> }).verified_claims = {
+        address: true,
+      };
+    },
+  },
+  {
+    name: "a verification source named like an Object.prototype member",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": "project" };
+      connectionOf(p).claim_mapping = { email: "constructor" };
+      connectionOf(p).verified_claims = { email: "toString" };
+    },
+  },
+  {
+    name: "an identifier the user-creating step does not ask for, on a schema without a password",
+    edit: (p) => {
+      schemaOf(p).properties.username = { type: "string" };
+      schemaOf(p)["x-identifier"] = "username";
+    },
+  },
+  {
+    name: "a nested identifier the user-creating step asks for by its path",
+    edit: (p) => {
+      schemaOf(p).properties.profile = {
+        type: "object",
+        properties: { mail: { type: "string", "x-unique": "project" } },
+      };
+      schemaOf(p)["x-identifier"] = "profile.mail";
+      schemaOf(p)["x-auth-methods"].password = { enabled: true };
+      stepOf(p, "register-sso").fields = ["email", "profile.mail"];
+    },
+  },
+  {
+    name: "a custom scope that may bundle the claims read",
+    edit: (p) => {
+      connectionOf(p).oidc = {
+        client_id: "a",
+        client_secret: "b",
+        scopes: ["openid", "directory"],
+      };
+      connectionOf(p).claim_mapping = { email: "email" };
     },
   },
   {
@@ -403,7 +1040,7 @@ const accepted: Array<{ name: string; edit: (project: Project) => void }> = [
       p.connections[".zitadel/idps/spare.json"] = {
         slug: "spare",
         claim_mapping: { typo: "x" },
-        verified_claims: { other: "y" },
+        verified_claims: { typo: "y" },
       };
     },
   },
@@ -455,6 +1092,109 @@ describe("how the rules read the project", () => {
     });
 
     expect(issues.map((issue) => issue.rule)).toEqual(["sso/orphaned-mapping-target"]);
+  });
+
+  it("suggests nothing for a name that is far from every property", () => {
+    const issues = validate((p) => {
+      schemaOf(p).properties.contactEmail = {};
+      connectionOf(p).claim_mapping = { email: "email", department: "dept" };
+    });
+
+    expect(issues.map((issue) => issue.message).join("\n")).not.toContain("Did you mean");
+  });
+
+  it("suggests nothing when two properties are equally close", () => {
+    const issues = validate((p) => {
+      schemaOf(p).properties.mobile1 = {};
+      schemaOf(p).properties.mobile2 = {};
+      connectionOf(p).claim_mapping = { email: "email", mobile3: "phone" };
+    });
+
+    expect(issues.map((issue) => issue.message).join("\n")).not.toContain("Did you mean");
+  });
+
+  it("does not suggest a property that is already mapped", () => {
+    const issues = validate((p) => {
+      connectionOf(p).claim_mapping = { email: "email", emial: "mail" };
+    });
+
+    expect(issues.map((issue) => issue.message).join("\n")).not.toContain("Did you mean");
+  });
+
+  it("allows only one edit in a short name", () => {
+    const issues = validate((p) => {
+      schemaOf(p).properties.city = {};
+      connectionOf(p).claim_mapping = { email: "email", cit: "city_name", ctyy: "c" };
+    });
+
+    expect(issues.map((issue) => issue.message).join("\n")).toContain('Did you mean "city"?');
+  });
+
+  it("does not ask for uniqueness of a verified key it already reports as unmapped", () => {
+    const issues = validate((p) => {
+      schemaOf(p).properties.givenName = {};
+      connectionOf(p).verified_claims = { givenName: "given_name_verified" };
+    });
+
+    expect(issues.map((issue) => issue.rule)).toEqual(["sso/unmapped-verification-key"]);
+  });
+
+  it("suggests nothing for a short name two edits away", () => {
+    const issues = validate((p) => {
+      schemaOf(p).properties.city = {};
+      connectionOf(p).claim_mapping = { email: "email", ctyy: "c" };
+    });
+
+    expect(issues.map((issue) => issue.message).join("\n")).not.toContain("Did you mean");
+  });
+
+  it("suggests nothing for a one-character name", () => {
+    const issues = validate((p) => {
+      schemaOf(p).properties.x = {};
+      connectionOf(p).claim_mapping = { email: "email", y: "c" };
+    });
+
+    expect(issues.map((issue) => issue.message).join("\n")).not.toContain("Did you mean");
+  });
+
+  it("reports a provider listed twice and missing its file once", () => {
+    const issues = validate((p) => {
+      schemaOf(p)["x-auth-methods"].sso.providers = ["google", "ghost", "ghost"];
+    });
+
+    expect(issues.filter((issue) => issue.rule === "sso/connection-resolves")).toHaveLength(1);
+  });
+
+  it("reports one missing scope once, however many claims need it", () => {
+    const issues = validate((p) => {
+      schemaOf(p).properties.givenName = { type: "string" };
+      schemaOf(p).properties.familyName = { type: "string" };
+      connectionOf(p).oidc = { client_id: "a", client_secret: "b", scopes: ["openid"] };
+      connectionOf(p).claim_mapping = {
+        email: "email",
+        givenName: "given_name",
+        familyName: "family_name",
+      };
+    });
+
+    const profile = issues.filter(
+      (issue) => issue.rule === "sso/claim-needs-scope" && issue.message.includes('"profile"'),
+    );
+    expect(profile).toHaveLength(1);
+    expect(profile[0]?.message).toContain('"given_name", "family_name"');
+  });
+
+  it("treats a space the way the server does, a byte-order mark as no space", () => {
+    const issues = validate((p) => {
+      connectionOf(p).claim_mapping = { email: "email\u0085" };
+    });
+
+    expect(issues.map((issue) => issue.rule)).toContain("sso/claim-name-whitespace");
+    expect(
+      validate((p) => {
+        connectionOf(p).claim_mapping = { email: "email\uFEFF" };
+      }).map((issue) => issue.rule),
+    ).not.toContain("sso/claim-name-whitespace");
   });
 
   it("reports one cause once, however many steps it is made on", () => {
@@ -604,4 +1344,62 @@ describe("how the rules read the project", () => {
 
     expect(issues.map((issue) => issue.rule)).toEqual(["sso/orphaned-mapping-target"]);
   });
+});
+
+describe("a connection the CLI scaffolds", () => {
+  const providers = [
+    ["Google", () => new GoogleProvider()],
+    [
+      "a custom connection",
+      () =>
+        new CustomOidcProvider({
+          slug: slug("acme-sso"),
+          displayName: displayName("Acme SSO"),
+          issuer: issuer("https://sso.acme.example"),
+          scopes: DEFAULT_SCOPES,
+        }),
+    ],
+    [
+      "a custom connection with only openid",
+      () =>
+        new CustomOidcProvider({
+          slug: slug("acme-sso"),
+          displayName: displayName("Acme SSO"),
+          issuer: issuer("https://sso.acme.example"),
+          scopes: ["openid"],
+        }),
+    ],
+  ] as const;
+
+  it.each(
+    providers.flatMap(([name, make]) =>
+      SETUP_PRESETS.flatMap((preset) =>
+        SETUP_USE_CASES.map((useCase) => ({ name, make, preset, useCase })),
+      ),
+    ),
+  )(
+    "breaks no rule for $name on the $preset preset and $useCase use case",
+    ({ make, preset, useCase }) => {
+      const provider = make();
+      const schema = getDefaultHumanUserSchema({ preset, useCase }) as unknown as {
+        properties: Record<string, unknown>;
+      };
+      const connection = provider.connection({ schemaProperties: Object.keys(schema.properties) });
+      const tree: ProjectTree = {
+        schemas: new Map([
+          [
+            STAFF,
+            {
+              ...schema,
+              "x-auth-methods": { sso: { enabled: true, providers: [connection.slug as string] } },
+            },
+          ],
+        ]),
+        flows: new Map(),
+        connections: new Map([[GOOGLE, connection]]),
+      };
+
+      expect(validateProject(tree)).toEqual([]);
+    },
+  );
 });

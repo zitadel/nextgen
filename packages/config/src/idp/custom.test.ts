@@ -90,6 +90,55 @@ describe("CustomOidcProvider", () => {
     expect(document(["givenName"])).not.toHaveProperty("verified_claims");
   });
 
+  it.each([
+    [["openid"], {}, undefined],
+    [["openid", "email"], { email: "email" }, { email: "email_verified" }],
+    [["openid", "profile"], { givenName: "given_name", familyName: "family_name" }, undefined],
+    [
+      ["openid", "profile", "email"],
+      { email: "email", givenName: "given_name", familyName: "family_name" },
+      { email: "email_verified" },
+    ],
+  ])(
+    "maps only the claims the scopes %j return, and verifies only what it maps",
+    (scopes, mapping, verified) => {
+      const narrowed = new CustomOidcProvider({
+        ...input,
+        scopes: scopes as unknown as typeof DEFAULT_SCOPES,
+      });
+
+      const connection = narrowed.connection({
+        schemaProperties: ["email", "givenName", "familyName"],
+      });
+
+      expect(connection.claim_mapping).toEqual(
+        Object.keys(mapping).length > 0 ? mapping : undefined,
+      );
+      expect(connection.verified_claims).toEqual(verified);
+    },
+  );
+
+  it("verifies an email only when the schema makes it unique, the only case verification is read", () => {
+    const withUnique = provider.connection({
+      schemaProperties: ["email"],
+      uniqueProperties: ["email"],
+    });
+    const withoutUnique = provider.connection({
+      schemaProperties: ["email"],
+      uniqueProperties: [],
+    });
+
+    expect(withUnique.verified_claims).toEqual({ email: "email_verified" });
+    expect(withoutUnique.verified_claims).toBeUndefined();
+    expect(withoutUnique.claim_mapping).toEqual({ email: "email" });
+  });
+
+  it("keeps every verification when it is not told which properties are unique", () => {
+    expect(provider.connection({ schemaProperties: ["email"] }).verified_claims).toEqual({
+      email: "email_verified",
+    });
+  });
+
   it("does not ask for the provider's account to be selected, as Google's does", () => {
     expect(document(["email"]).oidc).not.toHaveProperty("static_authorize_parameters");
   });

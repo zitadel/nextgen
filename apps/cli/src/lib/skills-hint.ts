@@ -1,10 +1,9 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import consola from "consola";
 import * as rosie from "rosie-skills";
 
-import { command, wrapForBox } from "./box";
+import { command, printBox } from "./term/box";
 import { telemetryConfigDir } from "./telemetry/identity";
 
 export type SkillsHintInput = {
@@ -49,19 +48,17 @@ export async function showSkillsHint({ env, interactive }: SkillsHintInput): Pro
       flag: "wx",
     });
 
-    consola.box({
+    printBox({
       title: "Zitadel skills",
-      message: wrapForBox(
-        [
-          `Zitadel detected AI coding agents on this machine: ${names.join(", ")}.`,
-          "They work best with the Zitadel skills installed. To add them, run:",
-          "",
-          `  ${command(INSTALL_COMMAND)}`,
-          "",
-          "This banner shows once. Set NO_SKILLS_PROMPT=1 to never see it.",
-        ].join("\n"),
-      ),
-      style: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
+      tone: "info",
+      message: [
+        `Zitadel detected AI coding agents on this machine: ${names.join(", ")}.`,
+        "They work best with the Zitadel skills installed. To add them, run:",
+        "",
+        `  ${command(INSTALL_COMMAND)}`,
+        "",
+        "This banner shows once. Set NO_SKILLS_PROMPT=1 to never see it.",
+      ].join("\n"),
     });
   } catch {
     // A hint must never break `setup` or the root help.

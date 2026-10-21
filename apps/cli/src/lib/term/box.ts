@@ -1,3 +1,5 @@
+import consola from "consola";
+import { box } from "consola/utils";
 import pc from "picocolors";
 import wrapAnsi from "wrap-ansi";
 
@@ -48,4 +50,39 @@ export function renderBoxActions(actions: BoxAction[]): string {
       action.command ? `${action.text}\n\n  ${command(action.command)}` : action.text,
     )
     .join("\n\n");
+}
+
+/** What a box means, and so its colour: `success` for a result, `info` for a hint. */
+export type BoxTone = "success" | "info";
+
+const BORDER = { success: "green", info: "cyan" } as const;
+
+export type BoxOptions = {
+  readonly title: string;
+  /** The content as written: it is wrapped to the terminal here, so do not wrap it first. */
+  readonly message: string;
+  /** Defaults to `success`. */
+  readonly tone?: BoxTone;
+};
+
+function frame({ title, tone = "success" }: BoxOptions) {
+  return {
+    title,
+    style: { padding: 1, borderStyle: "rounded", borderColor: BORDER[tone] },
+  } as const;
+}
+
+/**
+ * A rounded, padded frame around a message, as a string. Every box the CLI
+ * draws goes through here, so its look and its wrapping to the terminal are
+ * decided once. Use this where output is returned (a command's `pretty`), and
+ * {@link printBox} where it is logged.
+ */
+export function renderBox(options: BoxOptions): string {
+  return box(wrapForBox(options.message), frame(options));
+}
+
+/** Log a box with consola, so it follows the same log level and `--json` silence as every message. */
+export function printBox(options: BoxOptions): void {
+  consola.box({ ...frame(options), message: wrapForBox(options.message) });
 }

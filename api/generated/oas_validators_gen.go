@@ -7362,7 +7362,7 @@ func (s *IdpConnectionOidc) Validate() error {
 					MaxLengthSet:  false,
 					Email:         false,
 					Hostname:      false,
-					Regex:         nil,
+					Regex:         regexMap["^[\\x21\\x23-\\x5B\\x5D-\\x7E]+$"],
 					MinNumeric:    0,
 					MinNumericSet: false,
 					MaxNumeric:    0,
