@@ -2,7 +2,7 @@
 
 > **Status:** Proposed
 > **Date:** 2026-10-21
-> **Implementation state:** §1 is implemented. Team detail
+> **Implementation state:** §1 and §3 are implemented. §4 is open. Team detail
 > (`src/routes/_authed/teams/$teamId.tsx`) has Overview and Members tabs.
 > §2 is the recorded target, not built.
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
@@ -79,6 +79,40 @@ The Settings view is the person's own space and has no section headings.
 opening its settings. **Settings** is their profile. This is a different
 team set from §1 and §2: the person's roster in the sign-in project, not the
 selected project's teams.
+
+### 4. Open: a person in more than one account
+
+Not decided; recorded for the follow-up. An account is a team in the
+platform project. The console today assumes the person has one:
+
+- The sidebar footer, the "Your account" badge on Overview and search name
+  the first team on the person's roster (`lib/account.ts`, `limit: 1`),
+  which is alphabetical order, not a choice.
+- The project switcher and search list every project the person holds a
+  grant on (`GET /users/me/projects`), across all their accounts, in one
+  list with no account shown.
+
+So with two accounts the footer names one account while the projects mix
+both. Making it consistent means showing the account on every project:
+
+- **Top bar:** `Account ▾ / Project ▾ / Team ▾`. The account comes first and
+  filters the project switcher and search; footer and account settings
+  follow the selected account. The selection lives in the URL, like
+  `?project=`.
+- **Until an account is chosen:** projects grouped by account in the switcher.
+  Projects with no owner sit under "No account".
+- **Projects list and project settings:** an Account column or field.
+
+It needs, first:
+
+- **Backend:** the owning team on the project response (`owner_team_id`, with
+  its name or an expand) and an `owner_team_id` filter on
+  `GET /users/me/projects`. The owner is already recorded when a project is
+  claimed (`GET /projects/{id}/claim/status` returns its `team_id`), but no
+  project read exposes it.
+- **Product decision (#333):** whether account membership grants access to
+  the account's projects, or only grants do. That decides whether the
+  switcher lists the account's projects or only the person's.
 
 ## Consequences
 
