@@ -291,29 +291,19 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 // servedOrigins lists, sorted, the origins serving the release at now and the
 // deployment pinning each, from the same live view the deployments list reads.
 func servedOrigins(ctx context.Context, stmts DeploymentStatements, projectID, releaseID string, now time.Time) ([]domain.ReleaseInUseOrigin, error) {
+	result, err := stmts.ListLiveDeployments(WithAuthzListUnrestricted(ctx), now, deployment.LiveListOptions(projectID, &releaseID, 0))
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list the live deployments")
+	}
 	var served []domain.ReleaseInUseOrigin
-	opts := deployment.LiveListOptions(projectID, &releaseID, liveDeploymentPageSize)
-	for {
-		page, err := stmts.ListLiveDeployments(WithAuthzListUnrestricted(ctx), now, opts)
-		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to list the live deployments")
+	for _, live := range result.Items {
+		for _, origin := range live.Origins() {
+			served = append(served, domain.ReleaseInUseOrigin{Origin: origin, DeploymentID: live.ID})
 		}
-		for _, d := range page.Items {
-			for _, origin := range d.Origins() {
-				served = append(served, domain.ReleaseInUseOrigin{Origin: origin, DeploymentID: d.ID})
-			}
-		}
-		if len(page.NextCursor) == 0 {
-			break
-		}
-		opts.Pagination.Cursor = page.NextCursor
 	}
 	slices.SortFunc(served, func(a, b domain.ReleaseInUseOrigin) int { return strings.Compare(a.Origin, b.Origin) })
 	return served, nil
 }
-
-// liveDeploymentPageSize pages the live deployments a revoke checks.
-const liveDeploymentPageSize = 100
 
 func (s *releaseService) List(ctx context.Context, input ListReleasesInput) (_ *ListReleasesOutput, err error) {
 	ctx, end := startSpan(ctx, "ReleaseService.List")
