@@ -220,6 +220,16 @@ describe("setupMockHandlers", () => {
     ).rejects.toMatchObject({ status: 400, body: { code: "req.invalid" } });
   });
 
+  test("refuses a redirect_uri longer than the 2048 maxLength on create", async () => {
+    await expect(
+      createFlow({
+        purpose: "login",
+        project_id: PROJECT_ID,
+        redirect_uri: `https://app.test/${"a".repeat(2100)}`,
+      }),
+    ).rejects.toMatchObject({ status: 400, body: { code: "req.invalid" } });
+  });
+
   /**
    * A provider id on an ordinary submit is a malformed request, not a choice
    * of provider. The engine reserves `action: "sso"` for that, so the mock

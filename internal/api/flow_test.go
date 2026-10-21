@@ -303,6 +303,10 @@ func TestCreateFlow_RejectsAnUnsafeRedirectURI(t *testing.T) {
 			name:        "a non-http(s) scheme",
 			redirectURI: "javascript:alert(1)",
 		},
+		{
+			name:        "a redirect_uri longer than the 2048 maxLength",
+			redirectURI: "https://app.test/" + strings.Repeat("a", 2100),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
