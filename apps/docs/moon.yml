@@ -26,6 +26,8 @@ tasks:
       - "/redocly.yaml"
       # Written by the CLI's reference test from its command table.
       - "/apps/cli/command-reference.json"
+      # Written by Changesets on every release: the release notes.
+      - "/apps/cli/CHANGELOG.md"
     outputs:
       - ".generated/openapi.mjs"
       - ".generated/openapi.d.mts"

@@ -58,7 +58,8 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
   `moon run docs:generate` bundles it into `.generated/openapi.mjs`.
 - The CLI reference pages come from the CLI's `command-reference.json`
   (`lib/cli-reference.ts`), which the CLI's reference test writes: change the
-  command, never the page ([`apps/cli/AGENTS.md`](../cli/AGENTS.md)).
+  command, never the page ([`apps/cli/AGENTS.md`](../cli/AGENTS.md)). Its
+  release notes come from the CLI's `CHANGELOG.md`: fix an entry there.
 - The API reference's Errors page comes from the error schemas and each
   operation's error set (`lib/error-reference.ts`): change the server's errors,
   never the page ([`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#error-codes)).

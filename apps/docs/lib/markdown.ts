@@ -6,15 +6,20 @@ import type { TOCItemType } from "fumadocs-core/toc";
 // and the API's Errors page (lib/error-reference.ts): the same text for the
 // page (components/markdown-page.tsx), its Markdown twin and search.
 
+/** Outside a code span, what `pattern` matches is escaped. */
+export function escapeOutsideCode(value: string, pattern: RegExp) {
+  return value
+    .split(/(`[^`]*`)/)
+    .map((part, i) => (i % 2 === 1 ? part : part.replace(pattern, "\\$&")))
+    .join("");
+}
+
 /**
  * Plain text with code in backticks, as Markdown. Outside a code span, a `*`
  * and a `<` that would open an HTML tag stay what they are.
  */
 export function text(value: string) {
-  return value
-    .split(/(`[^`]*`)/)
-    .map((part, i) => (i % 2 === 1 ? part : part.replace(/\*|<(?=[A-Za-z/!?])/g, "\\$&")))
-    .join("");
+  return escapeOutsideCode(value, /\*|<(?=[A-Za-z/!?])/g);
 }
 
 export type MarkdownPageData = {
