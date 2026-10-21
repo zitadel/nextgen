@@ -93,8 +93,16 @@ export const Route = createFileRoute("/_authed/users/$userId")({
 // The panel body is 24px in from the card edge and 20px down, with 16px between
 // the header, the divider and the content.
 const CARD_HEAD = "flex items-center gap-3 px-6 pt-5 pb-4";
-// Label and control split the wide row in halves, as on Settings → Profile.
-const LABEL_HALF = "@md/field-group:min-w-px @md/field-group:flex-[1_0_0]!";
+// The design's label column on a wide row, for the fields and for the card's
+// title, so the revision box starts where the inputs do: 203px plus the row's
+// 12px gap is the design's 215px. The `!` beats the responsive Field's own
+// `flex-auto` on its label.
+const LABEL_COLUMN = "@md/field-group:flex-[0_0_203px]!";
+// The design's inputs are 360px wide rather than stretched across the row.
+const INPUT_WIDTH = "max-w-90";
+// The design's field label is the body face at 14/21, regular weight, where
+// `FieldLabel` defaults to the display face.
+const FIELD_LABEL = "text-foreground font-sans leading-normal";
 const ROW = "flex items-center justify-between gap-4 px-6 pt-4 pb-5";
 // A row's secondary text: counts, dates, and the states that stand in for them.
 const ROW_NOTE = "text-muted-foreground text-[13px] leading-[22px]";
@@ -147,9 +155,13 @@ function UserDetail() {
         <TabsContent value="overview" className="flex flex-col gap-4">
           <Card className={DETAIL_CARD}>
             {/* The row wraps rather than truncate the id, and the box grows
-                past its 24px when the id breaks across lines. */}
-            <div className="flex flex-wrap items-center gap-2 px-6 pt-5 pb-4">
-              <span className="text-foreground font-serif text-base leading-5">User schema</span>
+                past its 24px when the id breaks across lines. It is a
+                `field-group` container with the fields' inset and gap, so the
+                title takes the label column at the fields' breakpoint. */}
+            <div className="@container/field-group flex flex-wrap items-center gap-x-3 gap-y-2 px-6 pt-5 pb-4">
+              <span className={`text-foreground font-serif text-base leading-5 ${LABEL_COLUMN}`}>
+                User schema
+              </span>
               {schema && schemaId && (
                 <Button
                   asChild
@@ -314,11 +326,11 @@ function ProfileField({ label, value }: { label: string; value: string }) {
 
   return (
     <Field orientation="responsive">
-      <FieldLabel htmlFor={id} className={`text-foreground ${LABEL_HALF}`}>
+      <FieldLabel htmlFor={id} className={`${FIELD_LABEL} ${LABEL_COLUMN}`}>
         {label}
       </FieldLabel>
       <FieldContent>
-        <Input id={id} readOnly value={value} />
+        <Input id={id} readOnly value={value} className={INPUT_WIDTH} />
       </FieldContent>
     </Field>
   );
