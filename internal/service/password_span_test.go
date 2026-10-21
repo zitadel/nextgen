@@ -46,7 +46,7 @@ func spanNamed(t *testing.T, name string) tracetest.SpanStub {
 func TestSetPasswordAction_Prepare_span(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	hasher := cryptomock.NewMockHasher(ctrl)
-	hasher.EXPECT().Hash("s3cret").Return("hash", nil)
+	hasher.EXPECT().Hash(gomock.Any(), "s3cret").Return("hash", nil)
 
 	action := service.NewSetUserPasswordAction(service.SetPasswordInput{
 		ProjectID: "proj_1",
@@ -75,7 +75,7 @@ func TestAuthAttemptService_VerifyProof_Password_wrongPasswordSpan(t *testing.T)
 		},
 	}, nil)
 	stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(&domain.UserPassword{EncodedHash: "encoded"}, nil)
-	verifier.EXPECT().VerifyHash("encoded", "wrong").Return(errors.New("mismatch"))
+	verifier.EXPECT().VerifyHash(gomock.Any(), "encoded", "wrong").Return(errors.New("mismatch"))
 	stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 	svc := newAuthAttemptSvcWithVerifier(ctrl, stmts, nil, nil, verifier)

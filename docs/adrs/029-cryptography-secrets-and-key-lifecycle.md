@@ -51,6 +51,16 @@ The deployment restricts what a project may choose:
 Those same limits are where a compliance profile (see [NIST](#nist)) will narrow
 the choice, so the per-project mechanism does not need to know about it.
 
+The server bounds how much hashing runs at once, deployment-wide
+(`password_hasher.concurrency`). Each hash or verification takes a share of one
+memory budget: its own estimated memory, floored at `memory_budget /
+max_operations` so cheap algorithms are capped in number too. A hash that gets no
+share within `max_wait` is refused with `429 Too Many Requests` and
+`Retry-After`; the refusal is never recorded as a failed attempt, because it says
+nothing about the password. The limits above size the worst case: the largest
+hash they admit is the largest share a single verification can take, so
+tightening them is also how an operator keeps the budget honest.
+
 #### Tokens
 
 (Generated) Tokens should never be stored in the database. If a field is

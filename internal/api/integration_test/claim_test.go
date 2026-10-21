@@ -150,7 +150,7 @@ func TestClaimHappyPath(t *testing.T) {
 		InitialMembershipTeamID: &team.ID,
 		Attributes:              domain.CreateAttributes{*emailAttr},
 	}))
-	encodedHash, err := harness.EnsureHasher(t).Hash(userPass)
+	encodedHash, err := harness.EnsureHasher(t).Hash(t.Context(), userPass)
 	require.NoError(t, err)
 	require.NoError(t, harness.EnsureUserFixture(t).SetPassword(t.Context(), &domain.SetUserPassword{
 		ProjectID:   platform.ID,

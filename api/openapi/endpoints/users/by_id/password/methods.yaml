@@ -87,6 +87,15 @@ put:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
+    '429':
+      description: |
+        The server is hashing as many passwords as it allows right now and
+        could not take this one within its wait. Nothing was changed; retry
+        after the number of seconds in the `Retry-After` header.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
     '500':
       description: Something went wrong on the server. This was not your fault.
       content:

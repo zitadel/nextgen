@@ -778,7 +778,7 @@ func TestAuthAttemptService_VerifyProof_Password(t *testing.T) {
 			UserID:      "user-1",
 			EncodedHash: "encoded",
 		}, nil)
-		verifier.EXPECT().VerifyHash("encoded", "secret").Return(nil)
+		verifier.EXPECT().VerifyHash(gomock.Any(), "encoded", "secret").Return(nil)
 		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, factor domain.AuthFactor, _ string) error {
 			succeededFactor = factor
 			return nil

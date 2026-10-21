@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"maps"
@@ -81,8 +82,8 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 
 	hasher := cryptomock.NewMockHasher(mock)
 	hasher.EXPECT().
-		Hash(gomock.Any()).
-		DoAndReturn(func(s string) (string, error) { return "hashed:" + s, nil }).
+		Hash(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, s string) (string, error) { return "hashed:" + s, nil }).
 		AnyTimes()
 
 	schemaResolver := domainmock.NewMockSchemaResolver(mock)
@@ -5100,16 +5101,16 @@ func unlinkedParked(claims map[string]any, verified map[string]bool) *domain.Flo
 // x-unique ones verified.
 func completeClaims() (map[string]any, map[string]bool) {
 	return map[string]any{
-			"email":       "alice@example.com",
-			"username":    "alice",
-			"given_name":  "Alice",
-			"family_name": "Liddell",
-			"badge":       "b-7",
-		}, map[string]bool{
-			"email":    true,
-			"username": true,
-			"badge":    true,
-		}
+		"email":       "alice@example.com",
+		"username":    "alice",
+		"given_name":  "Alice",
+		"family_name": "Liddell",
+		"badge":       "b-7",
+	}, map[string]bool{
+		"email":    true,
+		"username": true,
+		"badge":    true,
+	}
 }
 
 // withSSOOutcomeSteps routes the two creation outcomes to their own steps.

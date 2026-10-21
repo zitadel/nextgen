@@ -1028,6 +1028,9 @@ func testHasherFactory(t *testing.T) *crypto.HasherFactory {
 				MinThreads: 1, MaxThreads: 8,
 			},
 		},
+		// Parallel tests hash at once; the Go zero value would refuse the ones
+		// that find every slot taken instead of letting them wait.
+		Concurrency: crypto.HashConcurrencyConfig{MaxWait: 30 * time.Second},
 	}
 	factory, err := cfg.NewHasherFactory()
 	require.NoError(t, err)

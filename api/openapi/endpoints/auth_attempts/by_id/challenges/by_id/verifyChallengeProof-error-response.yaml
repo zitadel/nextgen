@@ -19,6 +19,7 @@ content:
         - $ref: '../../../../../components/schemas/errors/user-invalid.yaml'
         - $ref: '../../../../../components/schemas/errors/user-not_found.yaml'
         - $ref: '../../../../../components/schemas/errors/user-password_empty.yaml'
+        - $ref: '../../../../../components/schemas/errors/user-password_hashing_busy.yaml'
         - $ref: '../../../../../components/schemas/errors/user-password_policy_violation.yaml'
         - $ref: '../../../../../components/schemas/errors/user-password_too_long.yaml'
       discriminator:
@@ -39,6 +40,7 @@ content:
           user.invalid: '../../../../../components/schemas/errors/user-invalid.yaml'
           user.not_found: '../../../../../components/schemas/errors/user-not_found.yaml'
           user.password_empty: '../../../../../components/schemas/errors/user-password_empty.yaml'
+          user.password_hashing_busy: '../../../../../components/schemas/errors/user-password_hashing_busy.yaml'
           user.password_policy_violation: '../../../../../components/schemas/errors/user-password_policy_violation.yaml'
           user.password_too_long: '../../../../../components/schemas/errors/user-password_too_long.yaml'
     examples:
@@ -117,6 +119,11 @@ content:
         value:
           code: user.password_empty
           message: 'The password must not be empty.'
+      user.password_hashing_busy:
+        summary: user.password_hashing_busy
+        value:
+          code: user.password_hashing_busy
+          message: 'The server is hashing too many passwords right now. Try again in a moment.'
       user.password_policy_violation:
         summary: user.password_policy_violation
         value:

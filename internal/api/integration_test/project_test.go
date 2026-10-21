@@ -629,8 +629,8 @@ func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
 	// password written under one method readable after the project picks
 	// another.
 	verifier := harness.EnsureHashVerifier(t)
-	assert.NoError(t, verifier.VerifyHash(defaultHash, password))
-	assert.NoError(t, verifier.VerifyHash(ownHash, password))
+	assert.NoError(t, verifier.VerifyHash(t.Context(), defaultHash, password))
+	assert.NoError(t, verifier.VerifyHash(t.Context(), ownHash, password))
 
 	// Handing the project back to the default moves the next password written,
 	// not the one already stored.

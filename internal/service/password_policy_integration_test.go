@@ -20,9 +20,11 @@ import (
 // checks and writes, not about hashing.
 type plainHasher struct{}
 
-func (plainHasher) Hash(password string) (string, error) { return "plain$" + password, nil }
+func (plainHasher) Hash(_ context.Context, password string) (string, error) {
+	return "plain$" + password, nil
+}
 
-func (plainHasher) VerifyHash(encoded, password string) error {
+func (plainHasher) VerifyHash(_ context.Context, encoded, password string) error {
 	if encoded == "plain$"+password {
 		return nil
 	}

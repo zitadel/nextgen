@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"context"
 	"errors"
 	"time"
 	"unicode/utf8"
@@ -30,6 +31,14 @@ func ErrUserPasswordTooLong() Error {
 	return newError("user.password_too_long", "The password is too long for the project's password hashing method.", nil, nil)
 }
 
+// ErrUserPasswordHashingBusy answers a password that could not be hashed or
+// checked because the server is already hashing as much as it allows
+// ([crypto.ErrHashingBusy]). It says nothing about the password, so it is
+// never a failed attempt, and the client may retry.
+func ErrUserPasswordHashingBusy() Error {
+	return newError("user.password_hashing_busy", "The server is hashing too many passwords right now. Try again in a moment.", nil, nil)
+}
+
 // PasswordPolicyViolations is the client-facing detail of
 // [ErrUserPasswordPolicyViolation]: every failed rule keyed by name with the
 // value of the setting it is named after, e.g. {"min_length": 12}, the same
@@ -52,7 +61,7 @@ func NormalizePassword(password string) string {
 	return norm.NFC.String(password)
 }
 
-func HashPassword(password string, hasher crypto.Hasher) (string, error) {
+func HashPassword(ctx context.Context, password string, hasher crypto.Hasher) (string, error) {
 	normalized := NormalizePassword(password)
 	if normalized == "" {
 		return "", ErrUserPasswordEmpty()
@@ -62,12 +71,15 @@ func HashPassword(password string, hasher crypto.Hasher) (string, error) {
 	if utf8.RuneCountInString(normalized) > MaxPasswordLength {
 		return "", ErrUserPasswordTooLong().WithMessage("The password is too long. It can be at most 64 characters.")
 	}
-	hash, err := hasher.Hash(normalized)
+	hash, err := hasher.Hash(ctx, normalized)
 	if errors.Is(err, crypto.ErrPasswordTooLong) {
 		// bcrypt takes 72 bytes, fewer than 64 code points can need.
 		return "", ErrUserPasswordTooLong().
 			WithMessage("The password is too long for the project's password hashing method. Choose a shorter password.").
 			WithParent(err)
+	}
+	if errors.Is(err, crypto.ErrHashingBusy) {
+		return "", ErrUserPasswordHashingBusy().WithParent(err)
 	}
 	if err != nil {
 		return "", ErrInternal(err).WithMessage("failed to hash password")
@@ -83,12 +95,25 @@ type UserPassword struct {
 	CreatedAt   time.Time
 }
 
-func (u *UserPassword) Verify(password string, verifier crypto.HashVerifier) error {
+// Verify checks password against the stored hash. Any answer about the
+// password, a mismatch or a hash that cannot be read, is
+// [ErrUserPasswordInvalid]. A check that never ran, because the server is
+// hashing as much as it allows or the caller gave up waiting, is reported as
+// what it is: a caller that counted it as a wrong password would lock the
+// user out for the server's load.
+func (u *UserPassword) Verify(ctx context.Context, password string, verifier crypto.HashVerifier) error {
 	normalized := NormalizePassword(password)
-	if verifier.VerifyHash(u.EncodedHash, normalized) != nil {
+	err := verifier.VerifyHash(ctx, u.EncodedHash, normalized)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, crypto.ErrHashingBusy):
+		return ErrUserPasswordHashingBusy().WithParent(err)
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		return err
+	default:
 		return ErrUserPasswordInvalid()
 	}
-	return nil
 }
 
 type SetUserPassword struct {

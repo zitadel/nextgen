@@ -810,13 +810,24 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		}
 		// A variable of its own: err is returned as is above, and the error
 		// response generator would count a wrong password as returnable there.
-		_, end := startSpan(ctx, "password.Verify")
-		verifyErr := password.Verify(p.Password, s.passwordVerifier)
+		verifyCtx, end := startSpan(ctx, "password.Verify")
+		verifyErr := password.Verify(verifyCtx, p.Password, s.passwordVerifier)
 		end(&verifyErr)
-		if verifyErr != nil {
+		switch {
+		case verifyErr == nil:
+			return passwordChallenge, attempt.SetPasswordFactor(), nil, nil
+		case errors.Is(verifyErr, domain.ErrUserPasswordInvalid()):
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(verifyErr)
+		case errors.Is(verifyErr, domain.ErrUserPasswordHashingBusy()):
+			// The check never ran: no failed check, as for a fault above, or
+			// the server's load would lock the user out. Rebuilt rather than
+			// returned as is, so the generator does not count the wrong
+			// password Verify also answers with as returnable here.
+			return nil, nil, nil, domain.ErrUserPasswordHashingBusy().WithParent(verifyErr)
+		default:
+			// The caller gave up while the check waited for its slot.
+			return nil, nil, nil, domain.ErrInternal(verifyErr)
 		}
-		return passwordChallenge, attempt.SetPasswordFactor(), nil, nil
 
 	case PasskeyProof:
 		challenge, userFactor, err := attempt.PreparePasskeyVerification(challengeID)
