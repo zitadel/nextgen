@@ -123,8 +123,10 @@ properties:
         credential-shaped control, and a hidden-typed input is easy to
         skip.
 
-      It is not display text: do not render it as a greeting or a label.
-      `texts.description_key` is the place for that.
+      The client may also show it as the account being signed in to, next
+      to a way to change it (the step's `back` action, which returns to
+      the step that collects the identifier). Do not build other text from
+      it; `texts.description_key` is the place for that.
     properties:
       value:
         type: string

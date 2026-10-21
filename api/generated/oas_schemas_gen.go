@@ -25539,8 +25539,10 @@ type FlowStep struct {
 	// with CSS over `type="hidden"`: a manager looks for a
 	// credential-shaped control, and a hidden-typed input is easy to
 	// skip.
-	// It is not display text: do not render it as a greeting or a label.
-	// `texts.description_key` is the place for that.
+	// The client may also show it as the account being signed in to, next
+	// to a way to change it (the step's `back` action, which returns to
+	// the step that collects the identifier). Do not build other text from
+	// it; `texts.description_key` is the place for that.
 	Identifier OptFlowStepIdentifier `json:"identifier"`
 	// Ordered list of available user actions. The LiquidJS template iterates
 	// this array and builds a name-indexed map locally for keyed lookup.
@@ -25990,8 +25992,10 @@ func (s *FlowStepGates) init() FlowStepGates {
 // with CSS over `type="hidden"`: a manager looks for a
 // credential-shaped control, and a hidden-typed input is easy to
 // skip.
-// It is not display text: do not render it as a greeting or a label.
-// `texts.description_key` is the place for that.
+// The client may also show it as the account being signed in to, next
+// to a way to change it (the step's `back` action, which returns to
+// the step that collects the identifier). Do not build other text from
+// it; `texts.description_key` is the place for that.
 type FlowStepIdentifier struct {
 	// The identifier the user supplied. Use it as the input's
 	// `value`, verbatim. After an identity provider's sign-in
