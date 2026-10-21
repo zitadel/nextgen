@@ -8,46 +8,32 @@
  * the widget: it still bubbles to listeners in the same shadow tree (the
  * orchestrator's own), but is never seen from the page, capture phase included.
  *
+ * Pass `{ waitForListeners: true }` for an event after which the element
+ * navigates: its detail then carries `waitUntil(promise)`, and the returned
+ * promise resolves once the promises the listeners passed have settled, or
+ * after {@link LISTENER_WAIT_MS}. It resolves at once when the option is off or
+ * no listener registered work, so other callers can ignore it.
+ *
  * Centralising the dispatch shape keeps every event contract identical and
  * removes the repeated `new CustomEvent(..., { bubbles: true, composed: true,
  * detail })` boilerplate.
  */
-export function emit<T = undefined>(
+export async function emit<T extends object = object>(
   host: HTMLElement,
   type: string,
   detail?: T,
-  options: { readonly composed?: boolean } = {},
-): boolean {
-  return host.dispatchEvent(
-    new CustomEvent<T>(type, {
-      bubbles: true,
-      composed: options.composed ?? true,
-      detail: detail as T,
-    }),
-  );
-}
-
-/** How long a navigating event waits for its listeners' `waitUntil` work before navigating anyway. */
-export const LISTENER_WAIT_MS = 2000;
-
-/**
- * Dispatch an event whose element navigates right after, then resolve once the
- * promises its listeners handed to `detail.waitUntil` have settled, or after
- * {@link LISTENER_WAIT_MS}, whichever is first. Resolves immediately when no
- * listener registers, so a synchronous host never waits.
- */
-export async function emitThenSettle<T extends object>(
-  host: HTMLElement,
-  type: string,
-  detail: T,
+  options: { readonly composed?: boolean; readonly waitForListeners?: boolean } = {},
 ): Promise<void> {
   const pending: Promise<unknown>[] = [];
-  emit(host, type, {
-    ...detail,
-    waitUntil: (work: Promise<unknown>) => {
-      pending.push(work);
-    },
-  });
+  host.dispatchEvent(
+    new CustomEvent(type, {
+      bubbles: true,
+      composed: options.composed ?? true,
+      detail: options.waitForListeners
+        ? { ...detail, waitUntil: (work: Promise<unknown>) => void pending.push(work) }
+        : detail,
+    }),
+  );
   if (pending.length === 0) {
     return;
   }
@@ -58,3 +44,6 @@ export async function emitThenSettle<T extends object>(
   await Promise.race([Promise.allSettled(pending), expired]);
   clearTimeout(timeout);
 }
+
+/** How long a navigating event waits for its listeners' `waitUntil` work. */
+export const LISTENER_WAIT_MS = 2000;

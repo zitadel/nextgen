@@ -11,9 +11,9 @@ const src = join(process.cwd(), "src");
 
 // Both dispatch forms, any quote style, digits allowed in the event name. The
 // target may be a member expression, as in a controller's `emit(this.host, …)`:
-//   emit(this, "zitadel-…")   emitThenSettle(this, "zitadel-…")   emit(host, 'zitadel-…')   new CustomEvent(`zitadel-…`)
+//   emit(this, "zitadel-…")   emit(host, 'zitadel-…')   new CustomEvent(`zitadel-…`)
 const WIDGET_EVENT =
-  /(?:emit(?:ThenSettle)?\(\s*[\w.]+\s*,\s*|new\s+CustomEvent\(\s*)["'`](zitadel-[a-z0-9-]+)["'`]/g;
+  /(?:emit\(\s*[\w.]+\s*,\s*|new\s+CustomEvent\(\s*)["'`](zitadel-[a-z0-9-]+)["'`]/g;
 
 function dispatchedWidgetEvents(): string[] {
   const events = new Set<string>();

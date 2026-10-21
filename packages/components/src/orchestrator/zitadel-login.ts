@@ -18,7 +18,7 @@ import "../atoms/index.js";
 import type { ZlFieldInputDetail, ZlSubmitDetail } from "../atoms/index.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
-import { emit, emitThenSettle } from "../internal/emit.js";
+import { emit } from "../internal/emit.js";
 import { escapeHtml } from "../internal/escape-html.js";
 import {
   exchangeSession,
@@ -1001,10 +1001,12 @@ export class ZitadelLogin extends ZitadelSurface {
   private async redirectToProvider(response: CreateFlow201): Promise<void> {
     const target = response.step.redirect_url;
     if (!target) return;
-    await emitThenSettle(this, "zitadel-flow-redirect", {
-      redirect_url: target,
-      step: response.step,
-    });
+    await emit(
+      this,
+      "zitadel-flow-redirect",
+      { redirect_url: target, step: response.step },
+      { waitForListeners: true },
+    );
     if (typeof window === "undefined") return;
     window.location.assign(target);
   }
@@ -1026,12 +1028,17 @@ export class ZitadelLogin extends ZitadelSurface {
     const behavior = response.step.complete;
     if (!behavior) return;
 
-    await emitThenSettle(this, "zitadel-flow-complete", {
-      behavior,
-      redirect_uri: response.redirect_uri,
-      handoff_token: response.handoff_token,
-      handoff_token_expires_at: response.handoff_token_expires_at,
-    });
+    await emit(
+      this,
+      "zitadel-flow-complete",
+      {
+        behavior,
+        redirect_uri: response.redirect_uri,
+        handoff_token: response.handoff_token,
+        handoff_token_expires_at: response.handoff_token_expires_at,
+      },
+      { waitForListeners: true },
+    );
 
     if (typeof window === "undefined") return;
     if (behavior === "redirect" && response.redirect_uri) {
