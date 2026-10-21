@@ -165,6 +165,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	// (ADR 053 §5, csrf.go).
 	api.CreateUserOperation:            true,
 	api.GetUserByIDOperation:           true,
+	api.PatchUserByIDOperation:         true,
 	api.ListUserTeamsOperation:         true,
 	api.ListUserPasskeysOperation:      true,
 	api.ListUserIdentityLinksOperation: true,
@@ -212,28 +213,23 @@ func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
 	return v, ok && v != nil
 }
 
-// requireSelf resolves the caller of a self-access operation (`/me`). A
-// refusal answers like a missing session, so it never tells a caller that its
-// cookie is genuine but its user is gone (#553).
-func requireSelf(ctx context.Context) (domain.Self, error) {
-	token, _ := sessionTokenFromContext(ctx)
+// requireSelf resolves the caller of a self-access operation (`/me`). With
+// project_id, a session of another project is refused first, whatever state it
+// is in (holdSessionToProject). Any other refusal answers like a missing
+// session, so it never tells a caller that its cookie is genuine but its user
+// is gone (#553).
+func requireSelf(ctx context.Context, projectID api.OptProjectID) (domain.Self, error) {
+	token, ok := sessionTokenFromContext(ctx)
+	if ok {
+		if err := holdSessionToProject(token, projectID); err != nil {
+			return domain.Self{}, err
+		}
+	}
 	self, err := domain.SelfFromSession(token, time.Now())
 	if err != nil {
 		return domain.Self{}, invalidSessionCredential(err)
 	}
 	return self, nil
-}
-
-// requireSelfInProject is requireSelf for the self-access operations that take
-// project_id: a session of another project is refused first, whatever state it
-// is in (holdSessionToProject).
-func requireSelfInProject(ctx context.Context, projectID api.OptProjectID) (domain.Self, error) {
-	if token, ok := sessionTokenFromContext(ctx); ok {
-		if err := holdSessionToProject(token, projectID); err != nil {
-			return domain.Self{}, err
-		}
-	}
-	return requireSelf(ctx)
 }
 
 type contextKey struct{}

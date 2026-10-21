@@ -146,6 +146,23 @@ describe("ZitadelLogout", () => {
     },
   );
 
+  it("passes an async callback's promise to the event's waitUntil", async () => {
+    const ran = vi.fn();
+    const registered: Array<Promise<unknown>> = [];
+    const { container } = render(ZitadelLogout, {
+      props: { project, onSignout: () => Promise.resolve().then(() => ran()) },
+    });
+    const el = widgetIn(container, widgetTags.logout);
+    el.dispatchEvent(
+      new CustomEvent("zitadel-signout", {
+        detail: { waitUntil: (work: Promise<unknown>) => registered.push(work) },
+      }),
+    );
+    expect(registered).toHaveLength(1);
+    await registered[0];
+    expect(ran).toHaveBeenCalledOnce();
+  });
+
   it("exposes the underlying element via getElement()", () => {
     const { component, container } = render(ZitadelLogout, {
       props: { project },

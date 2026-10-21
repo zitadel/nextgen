@@ -142,9 +142,9 @@ func TestMySessionHoldsTheSessionToTheNamedProject(t *testing.T) {
 // TestMyUserHoldsTheSessionToTheNamedProject drives the operations on the
 // cookie's user (/users/me) through the generated server the same way: with
 // project_id, a session of another project is refused with 403
-// sess.project_mismatch before the user or its projects are looked up, and the
-// refusal clears no cookie; a session of the named project, or a request that
-// names none, is served as before.
+// sess.project_mismatch before the user, its schema, its teams or its projects
+// are looked up, and the refusal clears no cookie; a session of the named
+// project, or a request that names none, is served as before.
 func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
 	t.Parallel()
 
@@ -157,6 +157,8 @@ func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
 		{name: "read", method: http.MethodGet, path: "/users/me"},
 		{name: "patch", method: http.MethodPatch, path: "/users/me", body: `{"attributes":{"nickname":"Myself"}}`},
 		{name: "projects", method: http.MethodGet, path: "/users/me/projects"},
+		{name: "schema", method: http.MethodGet, path: "/users/me/schema"},
+		{name: "teams", method: http.MethodGet, path: "/users/me/teams"},
 	}
 	tests := []struct {
 		name    string
@@ -205,10 +207,8 @@ func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
 
 				if !tc.refused {
 					require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-					if op.path == "/users/me" {
-						self, err := domain.SelfFromSession(token, time.Now())
-						require.NoError(t, err)
-						require.Equal(t, []domain.Self{self}, users.served, "the user is the session's")
+					if op.path != "/users/me/projects" {
+						require.Equal(t, []string{token.ProjectID + "/" + token.UserID}, users.served, "the user is the session's")
 					}
 					return
 				}
@@ -224,21 +224,39 @@ func TestMyUserHoldsTheSessionToTheNamedProject(t *testing.T) {
 	}
 }
 
-// myUserService answers the reads and patches of the cookie's user and records
-// the caller each was asked for. Any other method panics.
+// myUserService answers the calls on the cookie's user and records the project
+// and user each was asked for, as "project/user". Any other method panics.
 type myUserService struct {
 	service.UserService
-	served []domain.Self
+	served []string
+}
+
+func (s *myUserService) serve(projectID, userID string) {
+	s.served = append(s.served, projectID+"/"+userID)
 }
 
 func (s *myUserService) GetMyUser(_ context.Context, input service.GetMyUserInput) (*domain.User, error) {
-	s.served = append(s.served, input.Self)
+	s.serve(input.Self.ProjectID(), input.Self.UserID())
 	return myUser(input.Self), nil
 }
 
 func (s *myUserService) PatchMyUser(_ context.Context, input service.PatchMyUserInput) (*domain.User, error) {
-	s.served = append(s.served, input.Self)
+	s.serve(input.Self.ProjectID(), input.Self.UserID())
 	return myUser(input.Self), nil
+}
+
+func (s *myUserService) GetMyUserSchema(_ context.Context, input service.GetMyUserInput) (*domain.JSONSchema, error) {
+	s.serve(input.Self.ProjectID(), input.Self.UserID())
+	return &domain.JSONSchema{
+		ProjectID: input.Self.ProjectID(),
+		URL:       "sch_1",
+		Schema:    []byte(`{"kind":"user-schema","objectType":"human-user","metaSchema":"https://x/user-schema.json","x-auth-methods":{"password":{"enabled":true}}}`),
+	}, nil
+}
+
+func (s *myUserService) ListUserTeams(_ context.Context, input service.ListUserTeamsInput) (*service.ListUserTeamsOutput, error) {
+	s.serve(input.ProjectID, input.UserID)
+	return &service.ListUserTeamsOutput{}, nil
 }
 
 func myUser(self domain.Self) *domain.User {

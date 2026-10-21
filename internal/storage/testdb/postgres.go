@@ -10,10 +10,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver used by wait.ForSQL
+	"github.com/moby/moby/api/types/network"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -64,9 +64,8 @@ func startPostgresContainerOnce(ctx context.Context) (string, func(), error) {
 			"POSTGRES_PASSWORD": "postgres",
 			"POSTGRES_DB":       "postgres",
 		},
-		WaitingFor: wait.ForSQL("5432/tcp", "pgx", func(host, port string) string {
-			mapped, _, _ := strings.Cut(port, "/")
-			return fmt.Sprintf("postgresql://postgres:postgres@%s:%s/postgres?sslmode=disable", host, mapped)
+		WaitingFor: wait.ForSQL("5432/tcp", "pgx", func(host string, port network.Port) string {
+			return fmt.Sprintf("postgresql://postgres:postgres@%s:%s/postgres?sslmode=disable", host, port.Port())
 		}).WithStartupTimeout(120 * time.Second),
 	}
 

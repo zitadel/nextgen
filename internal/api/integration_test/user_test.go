@@ -1270,8 +1270,8 @@ func TestGetMyUser(t *testing.T) {
 // TestMyUser_HoldsTheSessionToTheNamedProject pins project-bound calls on the
 // session's user: with project_id, a live session of another project on the
 // same server is refused with 403 sess.project_mismatch by the user read, its
-// patch and the list of its projects alike, and the refused patch changes
-// nothing. Its own project is served as before.
+// patch, its schema and the lists of its projects and teams alike, and the
+// refused patch changes nothing. Its own project is served as before.
 func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	t.Parallel()
 
@@ -1337,6 +1337,16 @@ func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	require.IsType(t, &api.SessProjectMismatch{}, listed, helpers.MustMarshal(t, listed))
 	assert.Equal(t, "sess.project_mismatch", listed.(*api.SessProjectMismatch).Code)
 
+	schema, err := client.GetMyUserSchema(t.Context(), api.GetMyUserSchemaParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, schema, helpers.MustMarshal(t, schema))
+	assert.Equal(t, "sess.project_mismatch", schema.(*api.SessProjectMismatch).Code)
+
+	teams, err := client.ListMyTeams(t.Context(), api.ListMyTeamsParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, teams, helpers.MustMarshal(t, teams))
+	assert.Equal(t, "sess.project_mismatch", teams.(*api.SessProjectMismatch).Code)
+
 	read, err = client.GetMyUser(t.Context(), api.GetMyUserParams{ProjectID: own})
 	require.NoError(t, err)
 	require.IsType(t, &api.User{}, read, helpers.MustMarshal(t, read))
@@ -1351,6 +1361,15 @@ func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	listed, err = client.ListMyProjects(t.Context(), api.ListMyProjectsParams{ProjectID: own})
 	require.NoError(t, err)
 	require.IsType(t, &api.ListMyProjectsResponseHeaders{}, listed, helpers.MustMarshal(t, listed))
+
+	schema, err = client.GetMyUserSchema(t.Context(), api.GetMyUserSchemaParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.SchemaHeaders{}, schema, helpers.MustMarshal(t, schema))
+	assert.Equal(t, read.(*api.User).Schema, schema.(*api.SchemaHeaders).Response.ID)
+
+	teams, err = client.ListMyTeams(t.Context(), api.ListMyTeamsParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListUserTeamsResponseHeaders{}, teams, helpers.MustMarshal(t, teams))
 }
 
 func TestListPasskeys(t *testing.T) {

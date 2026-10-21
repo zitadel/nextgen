@@ -30,7 +30,7 @@ import {
 } from "@/lib/project-scope";
 import type { SchemaField } from "@/lib/schema";
 import type { UserTeam } from "@/lib/user";
-import { columnsForUsers, fetchUsers, toUserRow } from "@/lib/user-list";
+import { columnsBeyondIdentity, columnsForUsers, fetchUsers, toUserRow } from "@/lib/user-list";
 import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/users/")({
@@ -104,6 +104,9 @@ function UsersScreen() {
     () => users.map((user, index) => toUserRow(user, index, columns)),
     [users, columns],
   );
+  // Each value once per row: a column that only repeats what the User cell
+  // already shows is dropped (under the default schema, the email).
+  const shown = useMemo(() => columnsBeyondIdentity(columns, rows), [columns, rows]);
 
   return (
     <Page>
@@ -124,15 +127,15 @@ function UsersScreen() {
         Users
       </ResourceTitle>
 
-      {/* The column set is schema-driven and so has no fixed width; the design
-          scrolls the table horizontally rather than compressing cells. */}
+      {/* The column set is schema-driven and so has no fixed width. The ID
+          gives way first; a schema with more columns than fit scrolls the
+          table horizontally rather than compressing cells. */}
       <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
         <Table className="text-xs">
           <TableHeader>
             <ResourceHeaderRow>
               <ResourceHeadCell>User</ResourceHeadCell>
-              <ResourceHeadCell>Identifier</ResourceHeadCell>
-              {columns.map((column) => (
+              {shown.map((column) => (
                 <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
               ))}
               <ResourceHeadCell>Status</ResourceHeadCell>
@@ -144,7 +147,7 @@ function UsersScreen() {
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <ResourceEmptyRow colSpan={columns.length + (teamsExpanded ? 6 : 5)}>
+              <ResourceEmptyRow colSpan={shown.length + (teamsExpanded ? 5 : 4)}>
                 No users yet.
               </ResourceEmptyRow>
             ) : (
@@ -153,7 +156,11 @@ function UsersScreen() {
                   {/* The User column renders the server-resolved identity
                       (display → identifier → id, ADR 058 §3a) and carries the
                       link to the detail screen — schema-driven columns cannot
-                      promise a meaningful leading value, this cell always can. */}
+                      promise a meaningful leading value, this cell always can.
+                      The designated identifier (x-identifier) sits under a
+                      display name rather than in a column of its own, so a
+                      mixed-schema list still reads it down one column; its
+                      tooltip names the property it came from. */}
                   <TableCell className={`${RESOURCE_CELL} ${CLAMP} text-sm`}>
                     <Link
                       to="/users/$userId"
@@ -162,18 +169,16 @@ function UsersScreen() {
                     >
                       {user.name}
                     </Link>
+                    {user.secondary && (
+                      <span
+                        className="text-muted-foreground block truncate text-xs"
+                        title={user.identifierProperty}
+                      >
+                        {user.secondary}
+                      </span>
+                    )}
                   </TableCell>
-                  {/* The designated identifier (x-identifier) — role-named, so a
-                      mixed-schema list reads down one column whether a row's
-                      identifier is an email or a loginname; the tooltip names
-                      the property it came from. */}
-                  <TableCell
-                    className={`${RESOURCE_CELL_MUTED} ${CLAMP}`}
-                    title={user.identifierProperty}
-                  >
-                    {user.identifier ?? "—"}
-                  </TableCell>
-                  {columns.map((column) => (
+                  {shown.map((column) => (
                     <TableCell key={column.key} className={`${RESOURCE_CELL_MUTED} ${CLAMP}`}>
                       {user.values[column.key] ?? "—"}
                     </TableCell>
@@ -186,7 +191,15 @@ function UsersScreen() {
                       <TeamCell teams={user.teams} truncated={user.teamsTruncated} />
                     </TableCell>
                   )}
-                  <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
+                  {/* The ID takes whatever width the other columns leave
+                      (`w-full max-w-0`) and truncates inside it, so the
+                      default schema's table fits a 1024px window without
+                      scrolling. The tooltip and a copy of the text keep the
+                      whole id. */}
+                  <TableCell
+                    className={`${RESOURCE_CELL} text-foreground w-full max-w-0 min-w-40 truncate text-sm`}
+                    title={user.id}
+                  >
                     {user.id}
                   </TableCell>
                   <TableCell className={RESOURCE_CELL}>

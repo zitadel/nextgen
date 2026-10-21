@@ -102,4 +102,4 @@ The demo imports the package from `dist/`, not source.
 | ------ | ---- |
 | `plugins/auth.server.ts` | Seeds `useState('nextgen-auth')` from verified middleware context |
 
-**Fonts and branding** — same as demo-next: the mock server applies `defaultDevBranding` (Arimo `font_url`), and `<zitadel-login>` injects it as a `<link rel="stylesheet">` in the host document `<head>` — **not** the shadow root, since browsers ignore `@font-face` declared inside a shadow tree; the shadow DOM's `font-family` resolves against the document-level face. `assets/css/demo-host.css` sets host `body` styles to match Next's `layout.tsx`. Headings use the same Arimo family rendered bold; tenants override the face via `branding.font_url`.
+**Fonts and branding** — same as demo-next: the mock server sets no font and `<zitadel-login>` loads none of its own, so the login renders in the token stack (Arimo where installed, else the system font) with no font-CDN request. `assets/css/demo-host.css` sets host `body` styles to match Next's `layout.tsx`. To render a face, load it in the app, or set branding `typography.font_url`, which a `variant="page"` login links in the document `<head>`.

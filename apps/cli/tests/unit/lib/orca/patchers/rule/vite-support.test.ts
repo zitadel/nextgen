@@ -96,6 +96,20 @@ describe("viteProxyEdit", () => {
     expect(out).not.toContain("5173");
   });
 
+  it("moves a server.port still on the port the app is moving off", () => {
+    const move = viteProxyEdit(5180, "http://127.0.0.1:8099", 5173);
+    const out = move("export default defineConfig({ server: { port: 5173 } });");
+    expect(out).toContain("5180");
+    expect(out).not.toContain("5173");
+  });
+
+  it("keeps a server.port the app is not moving off", () => {
+    const move = viteProxyEdit(5180, "http://127.0.0.1:8099", 5173);
+    const out = move("export default defineConfig({ server: { port: 4000 } });");
+    expect(out).toContain("4000");
+    expect(out).not.toContain("5180");
+  });
+
   it("leaves server.host unset so the user can opt into network binding", () => {
     const out = edit("export default defineConfig({});");
     expect(out).not.toContain("host:");

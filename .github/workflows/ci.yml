@@ -34,6 +34,12 @@ jobs:
       # warns on every process that also sees NO_COLOR. Blank it so only the
       # test output is left in the log.
       NO_COLOR: ""
+      # Keep testcontainers from starting its Ryuk reaper. Ryuk is the postgres
+      # lane's only image from Docker Hub (testcontainers/ryuk), whose pull rate
+      # limit then fails the lane. Nothing here needs reaping: every test
+      # package stops its own container, and the runner goes away after the
+      # job with whatever a crashed test binary left running.
+      TESTCONTAINERS_RYUK_DISABLED: "true"
     steps:
       # Depot runs some jobs on plain EC2 instances, whose root disk is an EBS
       # volume that writes about 250 MB/s. Linux writes dirty pages back only
@@ -81,12 +87,12 @@ jobs:
           fi
           nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
-      # Keyed on both modules' go.sum (tools/bench is a module of its own)
-      # instead of setup-go's default, go.mod. ci-turbo.yml shared the go.mod
-      # key until it got a cache of its own, and its entry there for Go 1.26.8
-      # holds Go's own cache files. On Depot this job builds through GOCACHEPROG
-      # (`depot gocache`, which keeps depot-* files in GOCACHE), so it cannot
-      # use them.
+      # Keyed on every module's go.sum (tools/bench and tools/oidc-mock are
+      # modules of their own) instead of setup-go's default, go.mod.
+      # ci-turbo.yml shared the go.mod key until it got a cache of its own,
+      # and its entry there for Go 1.26.8 holds Go's own cache files. On Depot
+      # this job builds through GOCACHEPROG (`depot gocache`, which keeps
+      # depot-* files in GOCACHE), so it cannot use them.
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -94,6 +100,7 @@ jobs:
           cache-dependency-path: |
             go.sum
             tools/bench/go.sum
+            tools/oidc-mock/go.sum
 
       - uses: pnpm/action-setup@v5
         with:

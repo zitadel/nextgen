@@ -9,6 +9,7 @@ import {
   userAttributes,
   userIdentifier,
   userIdentity,
+  userIdentitySecondary,
   userMetadata,
   userTeams,
 } from "./user";
@@ -127,10 +128,14 @@ export interface UserRow {
    * column, the row menu's accessible name, and the delete dialog's heading.
    */
   name: string;
-  /** The designated identifier — its own column: platform-derived like Status
-   * and ID, so it sits outside the schema-driven set (D4). */
+  /** The designated identifier, whether or not it is the row's `name`. */
   identifier?: string;
-  /** The schema property the identifier came from (e.g. "email"), as the cell's tooltip. */
+  /**
+   * The identifier as a muted line under `name`: set only when a display name
+   * leads, since the identifier is `name` itself otherwise.
+   */
+  secondary?: string;
+  /** The schema property the identifier came from (e.g. "email"), as the line's tooltip. */
   identifierProperty?: string;
   /** Rendered cell values, keyed by schema property. */
   values: Record<string, string>;
@@ -162,9 +167,33 @@ export function toUserRow(
     values,
     name: userIdentity(user) ?? id,
     identifier: userIdentifier(user),
+    secondary: userIdentitySecondary(user),
     identifierProperty: field(user, "identifier_property"),
     status: userMetadata(user).status,
     teams: userTeams(user),
     teamsTruncated: user.teams_truncated === true,
   };
+}
+
+/**
+ * The schema columns that tell the reader something the User cell does not.
+ *
+ * The User cell already shows each row's display name and identifier, and the
+ * identifier is usually a schema property too: under the default schema the
+ * email would otherwise read three times in one row. A column is dropped when
+ * every value it holds repeats its own row's name or identifier; one with any
+ * other value stays whole, so a mixed-schema list keeps the column for the
+ * rows that need it. A column with no values at all is kept, as before.
+ */
+export function columnsBeyondIdentity(columns: SchemaField[], rows: UserRow[]): SchemaField[] {
+  return columns.filter((column) => {
+    let repeats = false;
+    for (const row of rows) {
+      const value = row.values[column.key];
+      if (value === undefined) continue;
+      if (value !== row.name && value !== row.identifier) return true;
+      repeats = true;
+    }
+    return !repeats;
+  });
 }

@@ -16,9 +16,10 @@ func (h *Harness) EnsureReleaseService(t testing.TB) service.ReleaseService {
 		h.releaseService.value = service.NewReleaseService(
 			db,
 			h.EnsureSchemaService(t),
-			service.NewFlowDefinitionService(db, h.EnsureSchemaValidator(t), nil),
+			service.NewFlowDefinitionService(db, h.EnsureSchemaValidator(t), nil, BuiltinSchemaBases()),
 			h.EnsureBrandingService(t),
 			service.NewIDPConnectionService(db, h.EnsureSchemaValidator(t)),
+			BuiltinSchemaBases(),
 		)
 	}
 	return h.releaseService.value

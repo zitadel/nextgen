@@ -36,7 +36,7 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
   `proxy.ts` as an exclusion, or a request for Markdown gets a 404.
 - Keep `assetPrefix`; never switch to `basePath`, or the URLs in `llms.txt`,
   the Markdown and the MCP answers lose their `/docs`.
-- Link content by full path: `/docs/cli`, not `/cli`.
+- Link content by full path: `/docs/reference/cli`, not `/reference/cli`.
 - The favicons are the cloud's, which the website serves at `/favicons/`
   ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-logo-and-the-favicons)).
 - `components/logo.tsx` copies `apps/website/app/logo.tsx` (its motion in
@@ -46,9 +46,25 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 
 ## Content
 
+- Leave `index` out of a folder's `meta.json` `pages`: Fumadocs then opens it
+  from the folder's own entry instead of listing it as a child that repeats the
+  folder's name.
+- A sidebar section (`components/sidebar.tsx`) is a folder with `root: true`
+  and `pagesIndex: "index"`: a root folder has no index otherwise.
+- When a page moves, add its old and new URL to `lib/moved.json`:
+  `next.config.mjs` redirects it and its `.md` twin, and a test follows each.
 - A page's URL is its path under `content/docs/`. The API reference pages per
   operation and per webhook come from the OpenAPI document (`lib/source.ts`);
   `moon run docs:generate` bundles it into `.generated/openapi.mjs`.
+- An API tag's page is prose and `<Operations />`, its operations from that
+  document; give its folder no `meta.json`, so the sidebar keeps their order.
+- The CLI reference pages come from the CLI's `command-reference.json`
+  (`lib/cli-reference.ts`), which the CLI's reference test writes: change the
+  command, never the page ([`apps/cli/AGENTS.md`](../cli/AGENTS.md)). Its
+  release notes come from the CLI's `CHANGELOG.md`: fix an entry there.
+- The API reference's Errors page comes from the error schemas and each
+  operation's error set (`lib/error-reference.ts`): change the server's errors,
+  never the page ([`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#error-codes)).
 - An operation's description is its page body; its first sentence is the
   page's description everywhere else (`lib/description.ts`). The spec's side
   is in [`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone).
@@ -59,7 +75,8 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
   Markdown link to one: link prose to the section's page.
 - An operation's samples are its `@zitadel/api` call (`lib/sdk-sample.ts`),
   its `zitadel` command (`x-zitadel-cli`, `lib/cli-sample.ts`) and cURL
-  (`components/api-page.tsx`).
+  (`components/api-page.tsx`); its Markdown repeats all three for the default
+  request (`lib/source.ts`).
 - `typecheck` compiles every sample against `@zitadel/api`
   (`scripts/sdk-samples.ts`). A new security scheme fails it until
   `lib/sdk-sample.ts` can authenticate with it.
