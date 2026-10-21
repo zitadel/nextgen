@@ -175,7 +175,9 @@ search, and publishes LLM-friendly text at `/docs/llms.txt`,
 
 This repository is pre-release. The Go `server` command serves the OpenAPI
 surface and embeds the console and login UIs at `/ui/console/` and `/ui/login/`.
-CI produces installable snapshots for review, not official releases.
+Releases are `0.x` previews on npm's `latest` tag, and until 1.0.0 a minor
+release can carry a breaking change
+([ADR 074](docs/adrs/074-preview-releases-on-0x.md)).
 
 For product direction and the four pillars, see [VISION.md](VISION.md).
 
