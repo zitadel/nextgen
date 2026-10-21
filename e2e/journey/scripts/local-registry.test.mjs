@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, test } from "vitest";
 
+import { APP_RELEASE_PACKAGES } from "../../../scripts/release-manifest.mjs";
 import {
   localRegistryPaths,
   localRegistryPort,
@@ -189,6 +190,59 @@ test("uses prebuilt tarballs without rebuilding release packages", async () => {
   assert.equal(
     await readFile(join(paths.tarballsDir, "zitadel-cli-0.1.0-alpha.5.tgz"), "utf8"),
     "@zitadel/cli\n",
+  );
+});
+
+test("builds and packs only what a generated app installs for the app package set", async () => {
+  const repoRoot = await fixtureRepo();
+  for (const pkg of APP_RELEASE_PACKAGES) {
+    await mkdir(join(repoRoot, pkg.dir, "dist"), { recursive: true });
+  }
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  tempDirs.push(workDir);
+  const paths = localRegistryPaths(workDir);
+  const env = { PATH: "/bin" };
+  const runCalls = [];
+  const packs = [];
+
+  await prepareLocalRegistry({
+    env,
+    packageSet: "app",
+    paths,
+    registryPort: 51_234,
+    registryUrl: "http://127.0.0.1:51234",
+    repoRoot,
+    run: async (command, args, options) => {
+      runCalls.push({ command, args, options });
+    },
+    runCapture: async (command, args, options) => {
+      packs.push({ command, args, options });
+      return { stdout: "", stderr: "" };
+    },
+    startLocalRegistry: async () => ({ exitCode: null, logFile: paths.registryLogPath }),
+    waitForHttp: async () => undefined,
+    workDir,
+  });
+
+  // The packages' cached dev builds; no release:pack, no server binaries.
+  assert.deepEqual(runCalls[0], {
+    command: "moon",
+    args: ["run", ...APP_RELEASE_PACKAGES.map((pkg) => `${pkg.moonProject}:build`)],
+    options: { cwd: repoRoot, env },
+  });
+  assert.ok(!runCalls.some((call) => call.args.includes("release:pack")));
+  assert.deepEqual(
+    packs.map((call) => call.args[2]).sort(),
+    APP_RELEASE_PACKAGES.map((pkg) => pkg.dir).sort(),
+  );
+  for (const call of packs) {
+    assert.equal(call.command, "corepack");
+    assert.deepEqual(call.args.slice(3), ["pack", "--pack-destination", paths.tarballsDir]);
+    assert.equal(call.options.env, env);
+  }
+  assert.deepEqual(
+    runCalls.find((call) => call.args[0] === "e2e/journey/scripts/verify-tarballs.mjs").args,
+    ["e2e/journey/scripts/verify-tarballs.mjs", paths.tarballsDir, "--app-packages"],
   );
 });
 

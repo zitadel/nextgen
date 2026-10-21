@@ -61,7 +61,13 @@ export async function main(options = {}) {
         onStarted: (registry) => {
           registryProcess = registry;
         },
+        // What a generated app installs, from cached dev builds; the release
+        // tarballs are release:pack's.
+        packageSet: "app",
         paths: localRegistryPaths(registryWorkDir),
+        // Keep what Verdaccio proxied from npmjs for the next setup; it drops
+        // and republishes only the @zitadel packages.
+        resetStorage: false,
         registryPort,
         registryUrl,
         repoRoot,
@@ -92,7 +98,7 @@ export function withDevelopmentTelemetry(env) {
 }
 
 // A stale install (lockfile changed since the last `pnpm install`) makes the
-// task chain behind every CLI command fail deep inside cli:test with
+// builds behind every CLI command fail deep inside a task with
 // misleading module-resolution errors, so fail fast with the remedy instead.
 // mtime is a heuristic: a branch switch can rewrite an unchanged lockfile and
 // report stale, but the remedy is then a fast no-op install.
