@@ -259,6 +259,19 @@ func TestAddChildSiteFloatAndLookupWalk(t *testing.T) {
 	if lt == nil {
 		t.Fatal("expected latest trace after lookup")
 	}
+	tl := app.latestTimeline()
+	if tl == nil || tl.StepCount < 1 {
+		t.Fatalf("expected timeline steps after lookup, got %+v", tl)
+	}
+	// OnHop GET+POST plus semantic lookup should collapse into fewer site steps.
+	if len(lt.Hops) >= 3 && tl.StepCount >= len(lt.Hops) {
+		t.Fatalf("timeline should group hops: raw=%d steps=%d", len(lt.Hops), tl.StepCount)
+	}
+	for _, s := range tl.Steps {
+		if s.Caller != "UI" {
+			t.Fatalf("timeline caller=%q want UI", s.Caller)
+		}
+	}
 }
 
 func TestLabRedirectsAndNoTraceDrawer(t *testing.T) {

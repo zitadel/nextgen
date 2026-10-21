@@ -207,9 +207,10 @@ type pageData struct {
 	Project       *projectDetail
 	Platform      *platformDetail
 	Teams         []cell.TeamView
-	Trace         []traceEntry
-	LatestTrace   *traceEntry
-	Now           string
+	Trace          []traceEntry
+	LatestTrace    *traceEntry
+	LatestTimeline *timelineView
+	Now            string
 	ScenarioOK    string
 	ScenarioErr   string
 	SignIn        *signInResult
@@ -1563,6 +1564,16 @@ func (a *App) fetchChildren(ctx context.Context, baseURL string) ([]childRow, er
 
 func (a *App) render(w http.ResponseWriter, name string, data any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if pd, ok := data.(pageData); ok {
+		if pd.LatestTimeline == nil {
+			if pd.LatestTrace != nil {
+				pd.LatestTimeline = a.buildTimeline(*pd.LatestTrace)
+			} else {
+				pd.LatestTimeline = a.latestTimeline()
+			}
+		}
+		data = pd
+	}
 	if err := a.tmpl.ExecuteTemplate(w, name, data); err != nil {
 		a.Log.Printf("template %s: %v", name, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
