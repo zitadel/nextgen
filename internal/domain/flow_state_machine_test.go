@@ -7242,6 +7242,13 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 			},
 			wantErr: domain.FlowStepErrorSSOUserInvalid,
 		},
+		"password the policy rejects": {
+			expect: func(w *flowTestWorld) {
+				probeMisses(w)
+				w.expectCreateLinked(complete, "", "", domain.ErrUserPasswordPolicyViolation(map[string]any{"max_length": int64(64)}))
+			},
+			wantErr: "error.x-auth-methods#password_max_length",
+		},
 		"taken value without an owner": {
 			expect: func(w *flowTestWorld) {
 				probeMisses(w)

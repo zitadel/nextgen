@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-core",
-  "version": "1.0.0-alpha.27",
+  "version": "1.0.0-alpha.28",
   "description": "Core types and shared utilities for Zitadel SDKs",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#readme",
   "bugs": {
@@ -55,6 +55,7 @@
     "ufo": "catalog:"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/components": "workspace:*",

@@ -438,7 +438,7 @@ func TestSetPasswordAction_UsesPasswordRowID(t *testing.T) {
 		ProjectID: "proj_1",
 		UserID:    "user_1",
 		Password:  "s3cret",
-	}, service.FixedProjectHasherResolver{Hasher: hasher})
+	}, service.FixedProjectHasherResolver{Hasher: hasher}, noPolicyGate(t))
 	require.NoError(t, action.Prepare(t.Context()))
 
 	stmts := servicemocks.NewMockAllStatements(ctrl)

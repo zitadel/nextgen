@@ -47,7 +47,9 @@ const NEVER_SHOWN = ["App groups", "Applications", "Analytics", "Activity Log", 
 // `GET /users/me/projects` is the authorized-projects query (#1228): what the
 // signed-in person can act on, read with the session cookie.
 const MY_PROJECTS = "*/api/users/me/projects";
-// `/` lands on Teams, so most tests read it once a project is selected.
+// `/` lands on Users, so most tests read it once a project is selected.
+const USERS_QUERY = "*/api/users/query";
+// Some tests open on Teams to prove a switch keeps the screen.
 const TEAMS_QUERY = "*/api/teams/query";
 // `/settings` lands on Profile, which reads the signed-in person's own record.
 const MY_USER = "*/api/users/me";
@@ -59,6 +61,7 @@ beforeEach(() =>
     http.get(MY_USER, () =>
       HttpResponse.json({ id: "user_1", attributes: { email: "dev@zitadel.local" } }),
     ),
+    http.post(USERS_QUERY, () => HttpResponse.json({ users: [] })),
     http.post(TEAMS_QUERY, () => HttpResponse.json({ teams: [] })),
   ),
 );
@@ -365,7 +368,7 @@ describe("project pill", () => {
     const list = within(await screen.findByRole("list", { name: "Switch project" }));
     await userEvent.click(list.getByRole("link", { name: "Delta" }));
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" });
   });
 

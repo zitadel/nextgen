@@ -83,6 +83,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin project={project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
 
+When your callback for `zitadel-flow-complete`, `zitadel-flow-redirect` or `zitadel-signout` returns a promise, the widget waits for it to settle (up to two seconds) before it navigates.
+
 ## Standard HTML attributes
 
 `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`className`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabIndex`, `data-*` and `aria-*`) and pass them to the widget element, so you can position, style and label the widget without an extra wrapper element. Nothing else reaches the element: any other prop is ignored.
@@ -96,6 +98,12 @@ Each widget event reaches the callback in the last column, which receives the ev
 If your app renders on the server, mount the widget on the client only, after hydration, or pass `project-id` and `proxy-path` to the `ZitadelLogin` wrapper as strings (they are written into the server markup as attributes), because a widget that starts before its configuration arrives shows an error instead of the flow.
 
 React 19 does not apply an object property such as `project` while hydrating a server-rendered custom element, so on a server-rendered page pass `project-id` and `proxy-path` as strings instead of a `project` handle.
+
+### Edge runtimes
+
+The wrapper loads on edge runtimes such as Cloudflare Workers and Vercel Edge, which have no DOM. It renders each widget by its tag name there and registers the elements only in the browser, so the markup a server sends is the same on every runtime.
+
+The edge checks run against React 19. A server render of a widget with React 18.3 under the `browser` condition, which is how bundlers resolve `@lit/react` for the edge, logs React's development-only warning that `useLayoutEffect` does nothing on the server (twice per widget) and renders the same markup; the Node build of `@lit/react` logs nothing, and the production build of React drops the warning.
 
 ## Proxying to the backend (deployment)
 

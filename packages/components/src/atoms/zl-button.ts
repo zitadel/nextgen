@@ -31,6 +31,8 @@ import "./zl-icon.js";
  * The atom always renders a real `<button>` inside the shadow root —
  * `delegatesFocus` ensures Tab lands on it and `<zl-field>`'s
  * Enter-to-submit pipe still fires the host form.
+ *
+ * @fires {CustomEvent<ZlSubmitDetail>} zl-submit - A non-submit or form-less button was activated; carries the flow `action`.
  */
 @customElement("zl-button")
 export class ZlButton extends LitElement {

@@ -2,6 +2,8 @@ package domain
 
 import (
 	"errors"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -319,6 +321,21 @@ func (e FlowFieldValidationErrors) StepError() string {
 		parts[i] = err.TextKey()
 	}
 	return strings.Join(parts, "; ")
+}
+
+// FlowFieldPassword is the reserved field a flow collects a password in.
+const FlowFieldPassword = authMethodPrefix + "password"
+
+// PasswordPolicyStepError renders a password policy violation for a flow
+// step: one field-validation key per failed rule on the password field
+// (`error.x-auth-methods#password_min_length`), in rule-name order, so the
+// form shows it next to the field like any other validation error.
+func PasswordPolicyStepError(violations map[string]any) string {
+	errs := make(FlowFieldValidationErrors, 0, len(violations))
+	for _, rule := range slices.Sorted(maps.Keys(violations)) {
+		errs = append(errs, FlowFieldValidationError{Field: FlowFieldPassword, Rule: FlowFieldValidationRule(rule)})
+	}
+	return errs.StepError()
 }
 
 // FlowImplicitOutcomeUserNotFound drives the login → register flip.

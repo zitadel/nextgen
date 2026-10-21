@@ -29,16 +29,15 @@ var csrfOriginGuard = http.NewCrossOriginProtection()
 // csrfTokenExemptOperations are the state-changing requests the session
 // cookie may authenticate without the X-Zitadel-CSRF token; every other one
 // needs it (ADR 053 §5), so an operation that starts accepting the cookie is
-// protected without being listed. These still get the origin check. Logout
-// (revokeMySession) is exempt because customer apps call it through the SDK
-// proxies, which cannot supply the token yet; the POST query operations are
-// reads.
+// protected without being listed. These still get the origin check. The POST
+// query operations are reads. Sign-out (revokeMySession) needs the token like
+// every other write: the session widgets read it through the app's SDK proxy,
+// which forwards only the app's own cookie (ADR 073).
 var csrfTokenExemptOperations = map[api.OperationName]bool{
-	api.RevokeMySessionOperation: true,
-	api.QueryUsersOperation:      true,
-	api.QueryTeamsOperation:      true,
-	api.QueryGrantsOperation:     true,
-	api.QueryIdpsOperation:       true,
+	api.QueryUsersOperation:  true,
+	api.QueryTeamsOperation:  true,
+	api.QueryGrantsOperation: true,
+	api.QueryIdpsOperation:   true,
 }
 
 type csrfRequestKey struct{}

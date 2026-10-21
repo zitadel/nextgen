@@ -3,8 +3,15 @@ package defaults
 
 import _ "embed"
 
+// DefaultBuiltinSchemaBase is the namespace the built-in schemas are named
+// under, and the server's default `schema.builtin_public_base`. It is an
+// identifier, not an address: it is stamped into schema documents and stored
+// rows, and nothing under it is fetched. TypeScript's twin is
+// DEFAULT_BUILTIN_SCHEMA_BASE in packages/config/src/defaults.ts.
+const DefaultBuiltinSchemaBase = "https://zitadel.com/schemas/v1"
+
 // DefaultFlowSchemaURI is the canonical flow definition authoring schema URI.
-const DefaultFlowSchemaURI = "https://nextgen.com/flow-definition.json"
+const DefaultFlowSchemaURI = DefaultBuiltinSchemaBase + "/flow-definition.json"
 
 //go:embed default-human-user.json
 var defaultHumanUserSchema []byte

@@ -285,6 +285,9 @@ func writeErrorResponses(
 		if endpoint.csrfChecked {
 			errFuncs = append(errFuncs, csrfErrors...)
 		}
+		errFuncs = slices.DeleteFunc(errFuncs, func(errFunc string) bool {
+			return slices.Contains(remappedErrors, errFunc)
+		})
 		if excluded := operationExcludedErrors[endpoint.operationID]; len(excluded) > 0 {
 			errFuncs = slices.DeleteFunc(errFuncs, func(errFunc string) bool {
 				return slices.Contains(excluded, errFunc)
@@ -917,11 +920,30 @@ func acceptsSessionCookie(op methodsFileOperation) bool {
 	return false
 }
 
+// remappedErrors are domain sentinels that errorResponse answers under another
+// code on every operation, so no operation's union lists them. Each one's
+// public code is a transport error, already in every union. gen_error_schemas
+// still writes their schema, as it does for every domain code.
+var remappedErrors = []string{
+	// Attributes failing the user schema answer req.invalid, the way request
+	// validation answers a malformed body.
+	"domain.ErrUserAttributesInvalid",
+}
+
 // operationExcludedErrors drops internal sentinels from the generated default
 // error union when the API handler intentionally remaps them to a different
 // public code before the response is written.
 var operationExcludedErrors = map[string][]string{
-	"listMyProjects": {"domain.ErrSessionTokenInvalid"},
+	// Self-access operations answer any refused session as auth.unauthorized
+	// (requireSelf, #553).
+	"getMyUser":           {"domain.ErrSessionTokenInvalid"},
+	"patchMyUser":         {"domain.ErrSessionTokenInvalid"},
+	"getMyUserSchema":     {"domain.ErrSessionTokenInvalid"},
+	"listMyTeams":         {"domain.ErrSessionTokenInvalid"},
+	"listMyPasskeys":      {"domain.ErrSessionTokenInvalid"},
+	"listMyIdentityLinks": {"domain.ErrSessionTokenInvalid"},
+	"getMyPasswordState":  {"domain.ErrSessionTokenInvalid"},
+	"listMyProjects":      {"domain.ErrSessionTokenInvalid"},
 	// The flow engine catches a stale parked SSO row with errors.Is and renders
 	// the step; the analysis cannot see that check prune the error. The SSO
 	// resolver turns a user schema the project does not hold into

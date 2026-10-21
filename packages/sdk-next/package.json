@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-next",
-  "version": "1.0.0-alpha.27",
+  "version": "1.0.0-alpha.28",
   "description": "Next.js helpers and mock auth UI for Zitadel",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-next#readme",
   "bugs": {
@@ -18,6 +18,7 @@
   "type": "module",
   "sideEffects": [
     "./dist/client.js",
+    "./dist/components.js",
     "./dist/auth.js",
     "./dist/provider.js"
   ],
@@ -33,6 +34,10 @@
     "./client": {
       "types": "./dist/client.d.ts",
       "import": "./dist/client.js"
+    },
+    "./components": {
+      "types": "./dist/components.d.ts",
+      "import": "./dist/components.js"
     },
     "./react": {
       "types": "./dist/react.d.ts",
@@ -66,6 +71,7 @@
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/sdk-core": "workspace:*",
+    "@zitadel/sdk-react": "workspace:*",
     "server-only": "^0.0.1",
     "ufo": "catalog:"
   },
@@ -75,10 +81,12 @@
     "react-dom": ">=18"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "jsdom": "catalog:",
     "next": "^16.3.8",

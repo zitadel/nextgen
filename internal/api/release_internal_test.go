@@ -135,10 +135,51 @@ func TestRevokeReleaseNotImplemented(t *testing.T) {
 	assert.Equal(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
 }
 
-// Pins build's answer until the service can build: 501, not the 500 the
-// generated stub's sentinel would map to.
-func TestBuildReleaseNotImplemented(t *testing.T) {
-	_, err := (&Handler{}).BuildRelease(t.Context(), &api.BuildReleaseRequest{}, api.BuildReleaseParams{})
-	require.Error(t, err)
-	assert.Equal(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
+func TestRequireBuildKindScopes(t *testing.T) {
+	t.Parallel()
+
+	bundle := api.ConfigurationBundle{
+		Branding: api.NewOptBranding(api.Branding{
+			Layout: api.NewOptBrandingLayout(api.BrandingLayoutCentered),
+		}),
+		Idps: []api.IdpConnection{{Slug: "google"}},
+	}
+
+	t.Run("project.write covers every kind", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"project.write", "release.write"},
+		})
+		require.NoError(t, requireBuildKindScopes(ctx, bundle))
+	})
+
+	t.Run("missing branding.write is named", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write", "idp.write"},
+		})
+		err := requireBuildKindScopes(ctx, bundle)
+		require.Error(t, err)
+		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
+		assert.Contains(t, err.Error(), "branding.write")
+	})
+
+	t.Run("missing idp.write is named", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write", "branding.write"},
+		})
+		err := requireBuildKindScopes(ctx, bundle)
+		require.Error(t, err)
+		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
+		assert.Contains(t, err.Error(), "idp.write")
+	})
+
+	t.Run("empty kinds need no extra scope", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write"},
+		})
+		require.NoError(t, requireBuildKindScopes(ctx, api.ConfigurationBundle{}))
+	})
 }

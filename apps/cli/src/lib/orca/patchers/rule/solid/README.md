@@ -2,6 +2,8 @@
 
 Integrates Zitadel auth into a Vite + Solid single-page app.
 
+The detector requires `solid-js` 1.6 or newer; older versions are refused.
+
 ## What it patches
 
 - `src/App.tsx` — auth entry that renders the Zitadel login/logout widgets

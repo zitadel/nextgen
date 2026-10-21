@@ -114,6 +114,7 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			h.EnsureTeamService(t),
 			h.EnsureBrandingService(t),
 			h.EnsureReleaseService(t),
+			h.EnsureDeploymentService(t),
 			h.EnsureIDPConnectionService(t),
 			h.EnsureEventService(t),
 			h.EnsureTokenService(t),
@@ -123,7 +124,7 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			service.NewVariableService(h.EnsureServiceDB(t), h.EnsureKeyService(t)),
 			h.EnsureServiceDB(t),
 			platform.ID,
-		)
+		).WithBuiltinSchemaBases(BuiltinSchemaBases())
 	}
 	return h.handler.value
 }

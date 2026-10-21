@@ -1,9 +1,15 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
 // The website's animated logo, a copy of apps/website/app/logo.tsx: change
 // both together (AGENTS.md). Its Lottie (zitadel/new-website's
 // public/cms/zitadel-hover-alpha-opt.json) holds only vectors, so it is drawn
 // here as SVG at the Lottie's own size and coordinates, and its motion lives in
 // app/global.css (.logo): no player library, and nothing to load before it
-// shows. Every path is `currentColor`, so it follows the theme.
+// shows. Every path is `currentColor`, so it follows the theme. A hover on it,
+// or on the link around it, plays it once to the end; with `autoplay`, it
+// also plays by itself now and then.
 
 // The icon, at rest; it turns about (63, 63).
 const icon =
@@ -39,16 +45,64 @@ const letters = [
   { id: "l", d: "M477.46 20.93L477.46 100.44L489.5 100.44L489.5 20.93L477.46 20.93Z" },
 ];
 
+// The quiet spell between two plays by itself, at random in this range (ms).
+const AUTOPLAY_REST = [9000, 18000] as const;
+
 // `id` prefixes the ids of the clip path and the letters, so two logos on one
 // page stay apart.
-export function Logo({ className, id: prefix = "logo" }: { className?: string; id?: string }) {
+export function Logo({
+  className,
+  id: prefix = "logo",
+  autoplay = false,
+}: {
+  className?: string;
+  id?: string;
+  autoplay?: boolean;
+}) {
+  const root = useRef<SVGSVGElement>(null);
+  const [playing, setPlaying] = useState(false);
+
+  // At rest, the next play by itself is a spell away: a hover meanwhile
+  // plays it, and a play under way runs to its end, never over again.
+  useEffect(() => {
+    if (!autoplay || playing || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+    const [shortest, longest] = AUTOPLAY_REST;
+    let rest: ReturnType<typeof setTimeout>;
+    // In a background tab it waits another spell rather than play unseen.
+    const wait = () => {
+      rest = setTimeout(
+        () => (document.hidden ? wait() : setPlaying(true)),
+        shortest + Math.random() * (longest - shortest),
+      );
+    };
+    wait();
+    return () => clearTimeout(rest);
+  }, [autoplay, playing]);
+
+  useEffect(() => {
+    const target = root.current?.closest("a") ?? root.current;
+    const play = () => setPlaying(true);
+    target?.addEventListener("pointerenter", play);
+    return () => target?.removeEventListener("pointerenter", play);
+  }, []);
+
   return (
     <svg
+      ref={root}
       viewBox="0 0 495 122"
       role="img"
       aria-label="Zitadel"
       fill="currentColor"
       className={`logo ${className ?? ""}`}
+      data-playing={playing || undefined}
+      // The last letter lands last: the play is over, the next hover replays it.
+      onAnimationEnd={(event) => {
+        if (event.target === event.currentTarget.querySelector(".logo-letter:last-child")) {
+          setPlaying(false);
+        }
+      }}
     >
       <defs>
         <clipPath id={`${prefix}-window`}>

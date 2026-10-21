@@ -15,6 +15,8 @@ import type {
 // Installs the early event buffer before the elements register (and so before any
 // of them can emit); keep it directly above the components import.
 import "./early-events";
+// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
+// The edge build of the components package has no elements, so this does nothing there.
 import "@zitadel/components";
 import { component$, useSignal, useVisibleTask$, type QRL, type Signal } from "@qwik.dev/core";
 import { standardAttributes } from "@zitadel/sdk-core/types";
@@ -184,8 +186,22 @@ function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps
   setProp(el, "suppressHeader", props.suppressHeader);
 }
 
-function eventDetail<T>(event: Event): T {
-  return (event as CustomEvent<T>).detail;
+/**
+ * Forwards a widget event's detail to the app callback, and registers the
+ * callback's returned promise — from an async handler or a Qwik QRL — on the
+ * detail's `waitUntil`. The three navigating events (flow-complete,
+ * flow-redirect, signout) then wait for it before the widget navigates; other
+ * events carry no `waitUntil`, so the call is a no-op.
+ */
+function withDetail<Detail>(
+  event: Event,
+  handler: ((detail: Detail) => unknown) | undefined,
+): void {
+  if (!(event instanceof CustomEvent) || !handler) {
+    return;
+  }
+  const result = handler(event.detail);
+  event.detail.waitUntil?.(result);
 }
 
 /**
@@ -242,11 +258,11 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
       // Re-run whenever any prop changes, then re-apply the config reactively.
       track(() => ({ ...props }));
       bindLoginConfig(el, props);
-      const onStep = (event: Event): void => void props.onFlowStep$?.(eventDetail(event));
-      const onInput = (event: Event): void => void props.onFlowInput$?.(eventDetail(event));
-      const onComplete = (event: Event): void => void props.onFlowComplete$?.(eventDetail(event));
-      const onRedirect = (event: Event): void => void props.onFlowRedirect$?.(eventDetail(event));
-      const onError = (event: Event): void => void props.onFlowError$?.(eventDetail(event));
+      const onStep = (event: Event): void => withDetail(event, props.onFlowStep$);
+      const onInput = (event: Event): void => withDetail(event, props.onFlowInput$);
+      const onComplete = (event: Event): void => withDetail(event, props.onFlowComplete$);
+      const onRedirect = (event: Event): void => withDetail(event, props.onFlowRedirect$);
+      const onError = (event: Event): void => withDetail(event, props.onFlowError$);
       cleanup(
         listenWithReplay(el, {
           "zitadel-flow-step": onStep,
@@ -313,7 +329,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
       }
       track(() => ({ ...props }));
       bindLogoutConfig(el, props);
-      const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
+      const onSignout = (event: Event): void => withDetail(event, props.onSignout$);
       cleanup(listenWithReplay(el, { "zitadel-signout": onSignout }));
     },
     { strategy: "document-ready" },
@@ -372,7 +388,7 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
       }
       track(() => ({ ...props }));
       bindSessionConfig(el, props);
-      const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
+      const onSignout = (event: Event): void => withDetail(event, props.onSignout$);
       cleanup(listenWithReplay(el, { "zitadel-signout": onSignout }));
     },
     { strategy: "document-ready" },

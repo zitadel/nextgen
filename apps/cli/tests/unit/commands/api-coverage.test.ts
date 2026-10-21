@@ -92,6 +92,11 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // operator credential (ADR 036), so these are not its to call.
   getMyUser: "the end user's own view of themselves, on their own credential",
   patchMyUser: "the end user's own view of themselves, on their own credential",
+  getMyUserSchema: "the end user's own view of themselves, on their own credential",
+  listMyTeams: "the end user's own view of themselves, on their own credential",
+  listMyPasskeys: "the end user's own view of themselves, on their own credential",
+  listMyIdentityLinks: "the end user's own view of themselves, on their own credential",
+  getMyPasswordState: "the end user's own view of themselves, on their own credential",
   getMySession: "the end user's own session, on their own credential",
   getMySessionCsrfToken:
     "the session's CSRF token (ADR 053 §5), read on the session's own credential; only the local-admin claim helper, not a command, uses it",
@@ -118,6 +123,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   listUserTeams: "not yet exposed — follow-up, a user sub-resource listing",
   listUserPasskeys: "not yet exposed — follow-up, a user sub-resource listing",
   listUserIdentityLinks: "not yet exposed — follow-up, a user sub-resource listing",
+  getUserPasswordState: "not yet exposed — follow-up, a user sub-resource read",
   addOrigin: "not yet exposed — `zitadel origin add` lands with the origins CLI surface (#1578)",
   removeOrigin:
     "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
