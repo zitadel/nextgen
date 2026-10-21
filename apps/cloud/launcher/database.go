@@ -176,6 +176,10 @@ func ensurePreviewDatabase(ctx context.Context, baseDSN, name, ref string, now t
 // call recreates it empty. Used when goose refuses to migrate because the
 // sticky preview still carries an older version set (for example after a
 // migration was renumbered on the branch). Production never calls this.
+//
+// Preview databases are often owned by adminRole (createDatabase elevates when
+// the migrator lacks CREATEDB), so DROP mirrors that elevation: try as the
+// connecting role, then once as adminRole on insufficient_privilege.
 func dropPreviewDatabase(ctx context.Context, baseDSN, name string) error {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
@@ -196,11 +200,25 @@ func dropPreviewDatabase(ctx context.Context, baseDSN, name string) error {
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
 
 	identifier := pgx.Identifier{name}.Sanitize()
-	if _, err := conn.Exec(ctx, "DROP DATABASE IF EXISTS "+identifier+" WITH (FORCE)"); err != nil {
+	if err := dropDatabaseAsConnectingOrAdmin(ctx, conn, identifier); err != nil {
 		return fmt.Errorf("drop preview database %s: %w", name, err)
 	}
 	fmt.Fprintf(os.Stderr, "launcher: dropped preview database %s to remigrate from an empty schema\n", name)
 	return nil
+}
+
+func dropDatabaseAsConnectingOrAdmin(ctx context.Context, conn *pgx.Conn, identifier string) error {
+	_, err := conn.Exec(ctx, "DROP DATABASE IF EXISTS "+identifier+" WITH (FORCE)")
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "42501" { // insufficient_privilege
+		return err
+	}
+	if _, setErr := conn.Exec(ctx, "SET ROLE "+pgx.Identifier{adminRole}.Sanitize()); setErr != nil {
+		return fmt.Errorf("%w; cannot act as %s to drop: %v", err, adminRole, setErr)
+	}
+	defer func() { _, _ = conn.Exec(context.WithoutCancel(ctx), "RESET ROLE") }()
+	_, err = conn.Exec(ctx, "DROP DATABASE IF EXISTS "+identifier+" WITH (FORCE)")
+	return err
 }
 
 // adminRole is PlanetScale's default role. A dashboard role that inherits it
