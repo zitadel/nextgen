@@ -211,7 +211,7 @@ func TestSSOCallbackSignsInTheLinkedUser(t *testing.T) {
 	f := newSSOCallbackFixture(t)
 	userID := f.createUser(t, defaultSchemaURL())
 	f.link(t, f.connection.ID, "sub-1", userID)
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 	authorize, binding := f.submitSSO(t, flow)
 	state := authorize.Query().Get("state")
 
@@ -243,7 +243,7 @@ func TestSSOCallbackOnTheProxyStrippedPath(t *testing.T) {
 	f := newSSOCallbackFixture(t)
 	userID := f.createUser(t, defaultSchemaURL())
 	f.link(t, f.connection.ID, "sub-1", userID)
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 	authorize, binding := f.submitSSO(t, flow)
 
 	resp := f.callback(t, strings.TrimPrefix(f.returnPath(t), "/__nextgen"), "state="+url.QueryEscape(authorize.Query().Get("state"))+"&code=the-code", binding)
@@ -260,7 +260,7 @@ func TestSSOCallbackOnAnotherConnectionsPathIsRefused(t *testing.T) {
 	f := newSSOCallbackFixture(t)
 	userID := f.createUser(t, defaultSchemaURL())
 	f.link(t, f.connection.ID, "sub-1", userID)
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 	authorize, binding := f.submitSSO(t, flow)
 
 	resp := f.callback(t, iapi.IDPCallbackPath("other"), "state="+url.QueryEscape(authorize.Query().Get("state"))+"&code=the-code", binding)
@@ -284,7 +284,7 @@ func TestSSOCallbackChecksTheIssuerParameter(t *testing.T) {
 	f := newSSOCallbackFixture(t)
 	userID := f.createUser(t, defaultSchemaURL())
 	f.link(t, f.connection.ID, "sub-1", userID)
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 
 	authorize, binding := f.submitSSO(t, flow)
 	resp := f.callback(t, f.returnPath(t), "state="+url.QueryEscape(authorize.Query().Get("state"))+"&code=the-code&iss="+url.QueryEscape("https://evil.example.test"), binding)
@@ -309,7 +309,7 @@ func TestSSOCallbackOnTheSharedPathIsNotProcessed(t *testing.T) {
 	f := newSSOCallbackFixture(t)
 	userID := f.createUser(t, defaultSchemaURL())
 	f.link(t, f.connection.ID, "sub-1", userID)
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 	authorize, binding := f.submitSSO(t, flow)
 	state := "state=" + url.QueryEscape(authorize.Query().Get("state"))
 
@@ -335,7 +335,7 @@ func TestSSOCallbackProviderDeclineRendersCancelledAndAllowsARetry(t *testing.T)
 	f := newSSOCallbackFixture(t)
 	userID := f.createUser(t, defaultSchemaURL())
 	f.link(t, f.connection.ID, "sub-1", userID)
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 	authorize, binding := f.submitSSO(t, flow)
 
 	resp := f.callback(t, f.returnPath(t),
@@ -364,7 +364,7 @@ func TestSSOCallbackWithoutTheBindingCookieLeavesTheStateUsable(t *testing.T) {
 	f := newSSOCallbackFixture(t)
 	userID := f.createUser(t, defaultSchemaURL())
 	f.link(t, f.connection.ID, "sub-1", userID)
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 	authorize, binding := f.submitSSO(t, flow)
 	state := authorize.Query().Get("state")
 
@@ -382,7 +382,7 @@ func TestSSOCallbackForAReplacedStateFailsLikeAReusedOne(t *testing.T) {
 	f := newSSOCallbackFixture(t)
 	userID := f.createUser(t, defaultSchemaURL())
 	f.link(t, f.connection.ID, "sub-1", userID)
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 	first, firstCookie := f.submitSSO(t, flow)
 	second, secondCookie := f.submitSSO(t, flow)
 
@@ -402,7 +402,7 @@ func TestSSOCallbackForAReplacedStateFailsLikeAReusedOne(t *testing.T) {
 // confirms what exists.
 func TestSSOCallbackAnswersInvalidStatesUniformly(t *testing.T) {
 	f := newSSOCallbackFixture(t)
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 	authorize, binding := f.submitSSO(t, flow)
 	state := authorize.Query().Get("state")
 	consumed := f.callback(t, f.returnPath(t),
@@ -433,7 +433,7 @@ func TestSSOCallbackLeaksNoSecretIntoResponsesOrLog(t *testing.T) {
 	f := newSSOCallbackFixture(t)
 	userID := f.createUser(t, defaultSchemaURL())
 	f.link(t, f.connection.ID, "sub-1", userID)
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 	authorize, binding := f.submitSSO(t, flow)
 	state := authorize.Query().Get("state")
 

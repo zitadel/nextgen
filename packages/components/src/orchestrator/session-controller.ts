@@ -10,6 +10,8 @@ type Resolved = ReturnType<typeof resolveApi>;
  * The signed-in identity and the sign-out call shared by `<zitadel-session>`
  * and `<zitadel-logout>`: one `GET /sessions/me` once a project is resolvable,
  * and `DELETE /sessions/me` that fires `zitadel-signout` on success.
+ *
+ * @fires {CustomEvent<ZitadelSignoutDetail>} zitadel-signout - The session was revoked; carries the display and identifier.
  */
 export class SessionController implements ReactiveController {
   display = "";
@@ -25,10 +27,6 @@ export class SessionController implements ReactiveController {
   // One-shot guard: the fetch runs once config is resolvable, at connect time
   // or after a framework assigns `project` post-mount.
   private identityRequested = false;
-
-  // The cookie holds a live session of another project: not this app's to
-  // revoke. On a shared host (localhost) it is, for example, the Console's.
-  private otherProjectSession = false;
 
   /**
    * @param resolve Returns the host's project and API handle, throwing while no
@@ -69,11 +67,13 @@ export class SessionController implements ReactiveController {
   }
 
   /**
-   * Revokes the session with credentials; the server clears the cookie. Fires
-   * `zitadel-signout` (after `onRevoked`) and resolves `true` on success; on failure sets
-   * `errorMessage` and resolves `false`. When the identity read found a session
-   * of another project, nobody is signed in here: that session is left alone
-   * and sign-out completes without a revoke.
+   * Revokes the session in the host's project with credentials; the server
+   * clears the cookie. Fires `zitadel-signout` (after `onRevoked`) and resolves
+   * `true` on success; on failure sets `errorMessage` and resolves `false`.
+   * The revoke is sent whatever the identity read found, since the cookie may
+   * have changed since: a session that is already gone, or one of another
+   * project that the server refuses to revoke, leaves nobody signed in here, so
+   * sign-out completes and the other project's session stays.
    */
   async signOut(onRevoked?: () => void): Promise<boolean> {
     this.loading = true;
@@ -81,9 +81,8 @@ export class SessionController implements ReactiveController {
     this.host.requestUpdate();
 
     try {
-      if (!this.otherProjectSession) {
-        await revokeSession(this.resolve().api);
-      }
+      const { api, project } = this.resolve();
+      await revokeSession(api, project.projectId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       this.errorMessage = message || "Sign-out failed. Please try again.";
@@ -95,7 +94,12 @@ export class SessionController implements ReactiveController {
     this.loading = false;
     this.host.requestUpdate();
     onRevoked?.();
-    emit(this.host, "zitadel-signout", { display: this.display, identifier: this.identifier });
+    await emit(
+      this.host,
+      "zitadel-signout",
+      { display: this.display, identifier: this.identifier },
+      { waitForListeners: true },
+    );
     return true;
   }
 
@@ -114,10 +118,8 @@ export class SessionController implements ReactiveController {
   private async loadIdentity({ api, project }: Resolved): Promise<void> {
     try {
       const session = await getSession(api, project.projectId);
-      if (session === null) {
-        this.otherProjectSession = true;
-        return;
-      }
+      // A live session of another project: nobody to show here.
+      if (session === null) return;
       this.display = session.user?.display ?? "";
       this.identifier = session.user?.identifier ?? "";
       this.userId = session.user_id ?? "";

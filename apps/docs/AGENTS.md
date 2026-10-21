@@ -1,161 +1,108 @@
 # Agent Instructions — `apps/docs`
 
-The documentation site. Read together with the [root `AGENTS.md`](../../AGENTS.md)
-and [`apps/AGENTS.md`](../AGENTS.md).
-
-Fumadocs on Next.js, laid out as Fumadocs' Next.js template
-(`create-fumadocs-app`) lays it out: `app/docs` serves `content/docs`,
-`lib/source.ts` defines the collection with Fumadocs MDX's macro and loads it,
-and the search, `llms.txt`, Markdown, Open Graph and MCP routes are Fumadocs'
-own recipes. The layout is Fumadocs' Spacious layout, the one fumadocs.dev
-uses, in the console's look (below). Reach for a Fumadocs recipe before writing
-something of our own.
+The documentation site: Fumadocs on Next.js, laid out as Fumadocs' Next.js
+template lays it out, in its Spacious layout. Reach for a Fumadocs recipe
+before writing something of our own. Shared app rules:
+[`apps/AGENTS.md`](../AGENTS.md).
 
 ## The look
 
-The console's palette, faces and logo on Fumadocs' own components; the docs
-share no components with the console, only what the design system owns.
+The console's palette, faces and logo on Fumadocs' own components and
+geometry.
 
-- Colours come from `@zitadel/design-tokens`. `app/global.css` imports
-  Fumadocs' shadcn preset, which reads the standard shadcn names
-  (`--background`, `--sidebar`, …), and fills them from the `--zl-*` tokens. A
-  colour is a token, never a hex value; a missing one belongs in Figma
+- A colour is a `--zl-*` token, never a hex value: `app/global.css` fills
+  Fumadocs' shadcn names from them. A missing one belongs in Figma
   ([`packages/design-tokens/AGENTS.md`](../../packages/design-tokens/AGENTS.md)).
-- The theme switch sets both `class` and `data-theme` on `<html>`
-  (`app/layout.tsx`): Fumadocs styles its dark theme by the class, the tokens
-  switch on the attribute.
-- Arimo for text, APK Futural for the page title, the sections of a page and
-  the "Docs" beside the logo, both through `next/font/local` from
-  `app/fonts/`, so the build fetches nothing. `Arimo-latin.woff2` is Arimo's
-  variable font (every weight from 400 to 700) in the latin subset, with its
-  licence, the SIL Open Font License, beside it (`Arimo-OFL.txt`); the website
-  holds the same file and says where it comes from
-  ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-fonts)). APK Futural
-  is a licensed face with one weight, so a heading in it is never bold.
-- Code, in the pages and in the API reference's samples, is in the design
-  system's syntax colours through Shiki's CSS-variables theme
-  (`lib/code-theme.ts`), aliased as the console aliases them.
-- The geometry stays Fumadocs': its radii and spacing, not the console's 8px
-  corners.
-
-After a change to `app/global.css`, `next dev` may keep serving the old
-stylesheet; delete `.next/dev` and start it again.
+- The theme switch sets both `class` (Fumadocs) and `data-theme` (the tokens)
+  on `<html>` (`app/layout.tsx`).
+- Fonts load through `next/font/local` from `app/fonts/`, so the build fetches
+  nothing. APK Futural has one weight: never set a heading in it bold. The
+  Arimo file is the website's; update both
+  ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-fonts)).
+- Code uses the design system's syntax colours through Shiki's CSS-variables
+  theme (`lib/code-theme.ts`).
+- After a change to `app/global.css`, if `next dev` keeps the old stylesheet,
+  delete `.next/dev` and restart.
 
 ## Everything under `/docs`
 
-The hosted cloud routes only `/docs` and `/docs/(.*)` to this app; every other
-path belongs to another service, `/_next/` to the website (repo-root
-[`vercel.json`](../../vercel.json), [`apps/cloud/README.md`](../cloud/README.md)).
-So the template's root routes live under `/docs` here:
+The cloud routes only `/docs` and `/docs/(.*)` to this app (repo-root
+[`vercel.json`](../../vercel.json)), so the template's root routes (search,
+MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 
-| Route | Template |
-| --- | --- |
-| `/docs/api/search` | `/api/search` |
-| `/docs/api/mcp` | `/api/mcp` (`fumadocs-core/mcp`) |
-| `/docs/llms.txt`, `/docs/llms-full.txt` | `/llms.txt`, `/llms-full.txt` |
-| `/docs/og/<page>/image.png` | `/og/docs/<page>/image.png` |
-| `/docs/<page>.md`, the overview `/docs/index.md` | the same, through `proxy.ts` |
-
-- A new route goes under `app/docs/`, never at the app's root. `app/llms.mdx/`
-  is the one exception: only `proxy.ts` reaches it.
+- Put a new route under `app/docs/`, never at the app's root; `app/llms.mdx/`
+  is the one exception, reached only through `proxy.ts`.
 - A route under `app/docs/` that is not a page goes into the `matcher` of
-  `proxy.ts` as an exclusion, or an agent asking for Markdown gets a 404.
-- Scripts and styles load from `/docs/_next/` (`assetPrefix`). Do not switch to
-  `basePath`: the URLs in `llms.txt`, the Markdown and the MCP answers would
-  lose their `/docs`.
-- A link in the content is the page's full path: `/docs/cli`, not `/cli`.
-- The favicons are the one exception: `app/layout.tsx` links the cloud's, which
-  the website serves at `/favicons/`
+  `proxy.ts` as an exclusion, or a request for Markdown gets a 404.
+- Keep `assetPrefix`; never switch to `basePath`, or the URLs in `llms.txt`,
+  the Markdown and the MCP answers lose their `/docs`.
+- Link content by full path: `/docs/reference/cli`, not `/reference/cli`.
+- The favicons are the cloud's, which the website serves at `/favicons/`
   ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-logo-and-the-favicons)).
-- The sidebar's title is the website's header: its animated logo
-  (`components/logo.tsx`, a copy of `apps/website/app/logo.tsx`, with its
-  motion in `app/global.css`) and, in place of the website's Preview label, a
-  Docs pill in the same style (`lib/layout.shared.tsx`). Change the copies
-  together. The logo plays while the pointer is on it or its link, as on the
-  website, and never on its own.
-- The sidebar links the website at `/` above the pages
-  (`lib/layout.shared.tsx`); the storybook goes unlinked, as in the website's
-  header. The website is a deployment of its own, so the link is a plain
-  `<a>`: a custom item, styled as the layout's own items. A link item would go
-  through `next/link`, which prefetches from this app and routes there in it,
-  or, marked external, opens a new tab.
+- `components/logo.tsx` copies `apps/website/app/logo.tsx` (its motion in
+  `app/global.css`); change the copies together.
+- Link the website (`/`) with a plain `<a>`, never `next/link`: it is another
+  deployment, which `next/link` would prefetch and route to in this app.
 
 ## Content
 
-- A page's URL is its path under `content/docs/`. The API reference's own pages
-  are in `content/docs/reference/api/`; a page per operation, and per webhook
-  (one per event type, under `event-webhooks/`), comes from the OpenAPI
-  document (`lib/source.ts`).
-- An operation's or a webhook's OpenAPI `description` is Markdown for the
-  body of its page, which shows all of it; the page's header is its title.
-  Everything else (the metadata, the Open Graph image, `llms.txt`, search)
-  gets its first sentence as plain text or the whole of it, as
-  `lib/description.ts` explains. The spec's side of that, a first sentence
-  that stands on its own, is in
-  [`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone).
-- An operation's or a webhook's page is a client component, and Fumadocs
-  hands it the whole OpenAPI document. `openapiPageProps` (`lib/source.ts`)
-  hands it its operations or webhooks, the components they reference and the
-  security schemes instead, so a page is about 250 KB of HTML, not 900 KB.
-  Render one through it, never `getOpenAPIPageProps()` directly.
-- `moon run docs:generate` bundles `api/openapi` into `.generated/openapi.mjs`,
-  which `lib/openapi.ts` imports. The content needs no generation step.
-- A page's Markdown (`/docs/cli.md`, or `/docs/cli` with `Accept:
-  text/markdown`) is its processed Markdown; an operation's or a webhook's is
-  the operation or webhook with every schema it references, an operation's
-  with its call through `@zitadel/api` and its CLI command too (`docsLlms` in
-  `lib/source.ts`). `llms-full.txt` leaves the operations and webhooks out,
-  and its test fails on a Markdown link to one of them, so prose links to
-  their section's page (a section page's `<Card>` is fine).
-- An operation's samples are its call through `@zitadel/api`, its `zitadel`
-  command where the spec names one (`x-zitadel-cli`, `lib/cli-sample.ts`), then
-  cURL (`components/api-page.tsx`), not Fumadocs' plain HTTP in languages
-  Zitadel ships no SDK for; a webhook's page shows its payload, not a call.
-  `lib/sdk-sample.ts` writes the call as orval generates the client, picking
-  the credential from the operation's security; the page calls it with the
-  request the reader is looking at, the Markdown with the default request
-  (`lib/default-request.ts`, with Fumadocs' own sampler).
-- `typecheck` compiles every operation's sample against `@zitadel/api`
-  (`scripts/sdk-samples.ts`, `tsconfig.samples.json`): a renamed operation, a
-  changed argument order or an example the schema rejects fails it. A new
-  security scheme fails it too, until `lib/sdk-sample.ts` knows how to
-  authenticate with it.
+- Leave `index` out of a folder's `meta.json` `pages`: Fumadocs then opens it
+  from the folder's own entry instead of listing it as a child that repeats the
+  folder's name.
+- A sidebar section (`components/sidebar.tsx`) is a folder with `root: true`
+  and `pagesIndex: "index"`: a root folder has no index otherwise.
+- When a page moves, add its old and new URL to `lib/moved.json`:
+  `next.config.mjs` redirects it and its `.md` twin, and a test follows each.
+- A page's URL is its path under `content/docs/`. The API reference pages per
+  operation and per webhook come from the OpenAPI document (`lib/source.ts`);
+  `moon run docs:generate` bundles it into `.generated/openapi.mjs`.
+- An API tag's page is prose and `<Operations />`, its operations from that
+  document; give its folder no `meta.json`, so the sidebar keeps their order.
+- The CLI reference pages come from the CLI's `command-reference.json`
+  (`lib/cli-reference.ts`), which the CLI's reference test writes: change the
+  command, never the page ([`apps/cli/AGENTS.md`](../cli/AGENTS.md)). Its
+  release notes come from the CLI's `CHANGELOG.md`: fix an entry there.
+- The API reference's Errors page comes from the error schemas and each
+  operation's error set (`lib/error-reference.ts`): change the server's errors,
+  never the page ([`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#error-codes)).
+- An operation's description is its page body; its first sentence is the
+  page's description everywhere else (`lib/description.ts`). The spec's side
+  is in [`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone).
+- Render an operation or webhook page through `openapiPageProps`
+  (`lib/source.ts`), never `getOpenAPIPageProps()` directly, which hands the
+  client component the whole OpenAPI document.
+- `llms-full.txt` leaves out operations and webhooks, and its test fails on a
+  Markdown link to one: link prose to the section's page.
+- An operation's samples are its `@zitadel/api` call (`lib/sdk-sample.ts`),
+  its `zitadel` command (`x-zitadel-cli`, `lib/cli-sample.ts`) and cURL
+  (`components/api-page.tsx`); its Markdown repeats all three for the default
+  request (`lib/source.ts`).
+- `typecheck` compiles every sample against `@zitadel/api`
+  (`scripts/sdk-samples.ts`). A new security scheme fails it until
+  `lib/sdk-sample.ts` can authenticate with it.
 
-## Checks
+## Checks and tests
 
-`moon run docs:typecheck docs:lint docs:build`, and `moon run docs:start` to
-look at the build on port 3003. On Vercel the build runs `pnpm run build`,
-never moon: moon cannot archive the symlinks Vercel's Next.js adapter writes
-into `.next/output`.
+```sh
+moon run docs:typecheck docs:lint docs:build
+moon run docs:start   # the build on port 3003
+moon run docs:e2e     # tests/ against the local build
+CLOUD_URL=https://cloud-….vercel.app moon run docs:e2e-deployment
+```
 
-## Tests
-
-`tests/` is the site's contract suite (Playwright), written against a URL
-rather than the code. `moon run docs:e2e` runs it against the local build on
-port 3003 (`playwright.config.mts`); `CLOUD_URL=https://cloud-….vercel.app
-moon run docs:e2e-deployment` against a deployment of the hosted cloud
-(`playwright.deployment.config.mts`), with `VERCEL_AUTOMATION_BYPASS_SECRET`
-for its protection. `pnpm check:cloud` runs that beside the console's
-deployment suite, as
-[`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) does for every
-deployment ([runbook](../../docs/runbooks/cloud.md#checking-a-deployment-by-hand)).
-The specs use paths only, so one spec proves both.
-
-- `/docs/llms.txt` is the suite's page list: every page it names is fetched as
-  HTML, at its `.md` URL and through `Accept: text/markdown`, and every site
-  link in the Markdown must resolve. A page needs no test of its own.
-- The routes that are not pages each have a test in `tests/agents.spec.ts`:
-  search, the MCP server (`initialize`, `tools/list`, `get_page`), the
-  plain-text answers, the Open Graph image. A new route under `app/docs/` gets
-  one there, and goes into the matcher of `proxy.ts` (above).
-- `tests/pages.spec.ts` also pins the assets to `/docs/_next/` and
-  `llms-full.txt` to the pages without the API operations.
-- Two browser tests (`*.browser.spec.ts`, Chromium): the site hydrates and
-  navigates, and a page wears the look in both themes, each colour and face
-  compared with the token it should resolve to. The second catches a Fumadocs
-  upgrade that renames an element `app/global.css` styles by its id.
-  Everything else is HTTP through Playwright's request fixture.
-- Against a deployment, no traces and no HTML report, and the workflow uploads
-  the screenshots alone: the repository is public, and a trace or the error of
-  a failed request holds the bypass secret
-  ([`docs/runbooks/cloud.md`](../../docs/runbooks/cloud.md#deployment-checks)).
+- Vercel builds with `pnpm run build`, never moon: moon cannot archive the
+  symlinks Vercel's Next.js adapter writes into `.next/output`.
+- `tests/` is a contract suite written against a URL, so the same specs check
+  the local build and any deployment. A deployment run needs
+  `VERCEL_AUTOMATION_BYPASS_SECRET`.
+- `pnpm check:cloud` runs the docs, console and schemas deployment suites, as
+  [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml)
+  does for every deployment
+  ([runbook](../../docs/runbooks/cloud.md#checking-a-deployment-by-hand)).
+- `/docs/llms.txt` is the suite's page list: every page in it is fetched as
+  HTML and as Markdown, and its site links must resolve. A page needs no test
+  of its own.
+- A new non-page route gets a test in `tests/agents.spec.ts`.
+- Against a deployment, record no traces and no HTML report: the repository is
+  public, and both would hold the bypass secret
+  ([runbook](../../docs/runbooks/cloud.md#deployment-checks)).

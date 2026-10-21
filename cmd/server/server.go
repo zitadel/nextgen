@@ -43,6 +43,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
@@ -50,6 +51,7 @@ import (
 	_ "github.com/zitadel/nextgen/internal/storage/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
 	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite"
+	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
@@ -183,7 +185,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	// ── Repositories ─────────────────
 	serviceDBPool := service.NewPool(pool.(service.Pool))
-	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
 
 	// ── Schema Stuff ─────────────────
@@ -210,10 +211,18 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaCache, 10, cfg.Schema.ResolveTimeout, egressClient, builtinPublicBase)
 	// storageSchemaResolver without an HTTP client to fetch tenant schemas from the cache/storage
 	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaCache, 10, 0, nil, builtinPublicBase)
-	schemaValidator, err := domain.NewSchemaValidator(builtinPublicBase.String())
+	// The config string rather than the parsed URL: an empty base is the
+	// validator's error to report, not a nil dereference here.
+	schemaValidator, err := domain.NewSchemaValidator(cfg.Schema.BuiltinPublicBase)
 	if err != nil {
 		return fmt.Errorf("failed to build schema validator: %w", err)
 	}
+	// The built-in schema namespace, built once and handed to everything that
+	// reads a schema by URL: users, flows, releases and bootstrap documents
+	// name the default schema under whichever base was current when they were
+	// written, and must find the row the project stores it at under any other.
+	builtinBases := domain.BuiltinSchemaBasesFor(cfg.Schema.BuiltinPublicBase)
+	schemaStore := domain.WithBuiltinSchemaAliases(serviceDBPool.Statements(), builtinBases)
 
 	userLookup := service.UserStatementsLookup{Pool: serviceDBPool}
 	userRefs := service.StatementsUserRefResolver{Pool: serviceDBPool}
@@ -245,7 +254,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	})
 	projectService := service.NewProjectService(
 		serviceDBPool,
-		builtinPublicBase.String(),
+		cfg.Schema.BuiltinPublicBase,
 		schemaValidator,
 		keyService,
 		hasherFactory,
@@ -262,15 +271,16 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to bootstrap platform project: %w", err)
 	}
 
-	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
+	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
 		return fmt.Errorf("failed to bootstrap users: %w", err)
 	}
 
-	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator)
+	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator, builtinBases)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		serviceDBPool,
 		schemaValidator,
 		nil,
+		builtinBases,
 	)
 	teamService := service.NewTeamService(serviceDBPool)
 	// The claim and dashboard URLs hang off the console, reached at the
@@ -284,15 +294,37 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
-	releaseService := service.NewReleaseService(serviceDBPool)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
+	releaseService := service.NewReleaseService(
+		serviceDBPool,
+		schemaService,
+		flowDefinitionSvc,
+		brandingService,
+		idpConnectionService,
+		builtinBases,
+	)
+	deploymentService := service.NewDeploymentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
+	// Operation policies (ADR 066). Every template is compiled and checked
+	// here, so a template the server cannot evaluate stops it before it
+	// serves traffic. No project can store an instance yet, so the gate holds
+	// passwords to the server's length cap only.
+	policyEngine, err := policy.New()
+	if err != nil {
+		return fmt.Errorf("failed to compile the policy catalog: %w", err)
+	}
+	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, service.NoPolicyResolver{}, passwordHasher, serviceDBPool)
+	if err != nil {
+		return err
+	}
 	userService := service.NewUserService(
 		serviceDBPool,
 		schemaStore,
 		projectHashers,
+		passwordPolicy,
 		userRefs,
+		builtinBases,
 	)
 
 	// The platform project's registration side effect (#527): every flow-created
@@ -312,24 +344,28 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore)
 	createUserHandler := service.NewFlowCreateUserHandler(
 		projectHashers,
+		passwordPolicy,
 		userService,
 		schemaStore,
 		serviceDBPool,
 	)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
-		schemaStore,
+		// The raw statements: the state machine only hands this store to the
+		// resolver, which follows the namespace itself, so the aliasing wrapper
+		// would only double the reads of a miss.
+		serviceDBPool.Statements(),
 		fields,
 		createUserHandler,
 		flowAuth,
 		service.NewFlowSSOProviderResolver(idpConnectionService),
-		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers),
+		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers, passwordPolicy),
 		service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
 		time.Now,
 	)
 	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
 
-	flowService := service.NewFlowService(serviceDBPool, stateMachine)
+	flowService := service.NewFlowService(serviceDBPool, stateMachine, builtinBases)
 	tokenService := service.NewTokenService(keyService, serviceDBPool)
 
 	// ── Default project resolution ──
@@ -381,6 +417,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			teamService,
 			brandingService,
 			releaseService,
+			deploymentService,
 			idpConnectionService,
 			eventService,
 			tokenService,
@@ -392,7 +429,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams),
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases),
 		api.NewSecurityHandler(tokenService),
 		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider())...)
 	if err != nil {
@@ -568,7 +605,10 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("schema.lru_cache_size", 1000) // todo: temp, review
 	v.SetDefault("keys.crypter_lru_cache_size", 1000)
 	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
-	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
+	// An identifier namespace, not an address: it is stamped into documents
+	// and stored rows, so moving it means adding the new base to
+	// domain.KnownBuiltinSchemaBases, which keeps every earlier one resolving.
+	v.SetDefault("schema.builtin_public_base", configdefaults.DefaultBuiltinSchemaBase)
 	v.SetDefault("schema.resolve_timeout", domain.DefaultJSONSchemaResolveTimeout)
 	// Egress policy for user-injectable URLs (ADR 061). The deny list
 	// blocks by default; allow_list carves exceptions out of it, e.g.

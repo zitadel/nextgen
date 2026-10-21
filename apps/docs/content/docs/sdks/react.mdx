@@ -11,7 +11,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 The React SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
 
 <Callout title="SPA proxy requirement" type="warn">
-  React apps do not have server middleware by default. The CLI configures a Vite dev proxy; production deployments need an equivalent same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/concepts/sdk-proxy).
+  React apps do not have server middleware by default. The CLI configures a Vite dev proxy; production deployments need an equivalent same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/sdks/proxy).
 </Callout>
 
 ## Install
@@ -113,12 +113,20 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin project={project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
 
+## Standard HTML attributes
+
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`className`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabIndex`, `data-*` and `aria-*`) and pass them to the widget element, so you can position, style and label the widget without an extra wrapper element. Nothing else reaches the element: any other prop is ignored.
+
+```tsx
+<ZitadelLogin project={project} className="login" data-testid="login" aria-label="Sign in" />
+```
+
 ## Runtime model
 
 <Steps>
   <Step>The widgets call the configured proxy path on the same origin.</Step>
   <Step>In local Vite development, the generated proxy forwards `/__nextgen/*` to Zitadel and adds the project secret to the session exchange, and to no other call.</Step>
-  <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, so that proxy must add the project secret to the session exchange, and to no other call. A plain rewrite cannot do that (see [SDK proxy](/docs/concepts/sdk-proxy#spas-in-production)).</Step>
+  <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, so that proxy must add the project secret to the session exchange, and to no other call. A plain rewrite cannot do that (see [SDK proxy](/docs/sdks/proxy#spas-in-production)).</Step>
 </Steps>
 
 If your app renders on the server, mount the widget on the client only, after hydration, or pass `project-id` and `proxy-path` to the `ZitadelLogin` wrapper as strings (they are written into the server markup as attributes), because a widget that starts before its configuration arrives shows an error instead of the flow.
@@ -134,6 +142,6 @@ React 19 does not apply an object property such as `project` while hydrating a s
 
 ## See also
 
-- [SDK proxy](/docs/concepts/sdk-proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and what it must do in production.
+- [SDK proxy](/docs/sdks/proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and what it must do in production.
 - [Components](/docs/sdks/components) — the shared web components these wrappers render.
 - [`@zitadel/sdk-react` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-react) and the [CLI React patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/react).

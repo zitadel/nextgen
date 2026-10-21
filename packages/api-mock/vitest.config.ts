@@ -7,8 +7,8 @@ import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
  * Two projects in one config, selected per lane (no separate config files):
  *
  * - `unit` (node): the canonical contract test for the mock handlers against
- *   `msw/node`'s `setupServer`. The fast local `test` = `vitest run --project
- *   unit`.
+ *   `msw/node`'s `setupServer`. The fast local lane is `test:unit` =
+ *   `vitest run --project unit`.
  * - `browser` (real Chromium via Playwright): smoke-tests `setupMock(worker)`
  *   against `msw/browser`. Local-only selector `test:browser` = `vitest run
  *   --project browser`.

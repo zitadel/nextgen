@@ -1,16 +1,11 @@
 <script lang="ts">
   import '@zitadel/components';
+  import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelLogin as ZitadelLoginElement } from '@zitadel/components';
 
-  import type {
-    ZitadelFlowCompleteDetail,
-    ZitadelFlowErrorDetail,
-    ZitadelFlowInputDetail,
-    ZitadelFlowRedirectDetail,
-    ZitadelFlowStepDetail,
-    ZitadelLoginProps,
-  } from './types';
+  import type { ZitadelLoginSvelteProps } from './types';
   import { assignGiven } from './given';
+  import { withDetail } from './events';
   import { onClient, proxyPathAttr } from './attributes';
 
   let {
@@ -33,7 +28,11 @@
     onFlowComplete,
     onFlowRedirect,
     onFlowError,
-  }: ZitadelLoginProps = $props();
+    ...rest
+  }: ZitadelLoginSvelteProps = $props();
+
+  // The standard HTML attributes are the only extra props the element takes.
+  const attributes = $derived(standardAttributes(rest));
 
   let el: ZitadelLoginElement | undefined = $state();
 
@@ -66,16 +65,21 @@
     if (!node) {
       return;
     }
-    const step = (event: Event): void =>
-      onFlowStep?.((event as CustomEvent<ZitadelFlowStepDetail>).detail);
-    const input = (event: Event): void =>
-      onFlowInput?.((event as CustomEvent<ZitadelFlowInputDetail>).detail);
-    const complete = (event: Event): void =>
-      onFlowComplete?.((event as CustomEvent<ZitadelFlowCompleteDetail>).detail);
-    const redirect = (event: Event): void =>
-      onFlowRedirect?.((event as CustomEvent<ZitadelFlowRedirectDetail>).detail);
-    const error = (event: Event): void =>
-      onFlowError?.((event as CustomEvent<ZitadelFlowErrorDetail>).detail);
+    const step = (event: Event): void => {
+      withDetail(event, onFlowStep);
+    };
+    const input = (event: Event): void => {
+      withDetail(event, onFlowInput);
+    };
+    const complete = (event: Event): void => {
+      withDetail(event, onFlowComplete);
+    };
+    const redirect = (event: Event): void => {
+      withDetail(event, onFlowRedirect);
+    };
+    const error = (event: Event): void => {
+      withDetail(event, onFlowError);
+    };
     node.addEventListener('zitadel-flow-step', step);
     node.addEventListener('zitadel-flow-input', input);
     node.addEventListener('zitadel-flow-complete', complete);
@@ -92,6 +96,7 @@
 </script>
 
 <zitadel-login
+  {...attributes}
   bind:this={el}
   project={onClient(project)}
   {purpose}

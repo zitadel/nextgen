@@ -8,7 +8,7 @@ import { QwikRouterPatcher } from "../../../../../../../src/lib/orca/patchers/ru
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
-function ctx(appDir = "src"): PatchContext {
+function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
   return {
     framework: { id: "qwik-router", appDir, devPort: 5173, url: "http://localhost:5173" },
     rendererId: "qwik",
@@ -22,6 +22,7 @@ function ctx(appDir = "src"): PatchContext {
     issuer: "http://localhost:5173",
     server: "https://api.zitadel.cloud",
     cliVersion: "0.1.0-alpha.0",
+    scaffoldedFramework,
   };
 }
 
@@ -50,6 +51,19 @@ describe("QwikRouterPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("background:#0f0f11");
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("@zitadel/sdk-qwik");
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("ZitadelLogin");
+  });
+
+  it("keeps a pre-existing app's landing page, writing the rest (ADR 044)", () => {
+    const plan = new QwikRouterPatcher().plan(ctx("src", false));
+
+    // The user's own landing page is left untouched, so setup never conflicts
+    // on it or overwrites it under --force.
+    expect(writeContents(plan, "src/routes/index.tsx")).toBeUndefined();
+    // The auth boundary and the auth routes are still written.
+    expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "src/routes/login/index.tsx")).toContain('purpose="login"');
+    expect(writeContents(plan, "src/routes/register/index.tsx")).toContain('purpose="register"');
+    expect(writeContents(plan, "src/routes/profile/index.tsx")).toContain("ZitadelSession");
   });
 
   // The pages render the Qwik 2 @zitadel/sdk-qwik widgets, so they must be on
@@ -156,6 +170,16 @@ describe("QwikRouterPatcher.artifacts", () => {
     expect(artifacts.markedFiles).toContain("src/routes/login/index.tsx");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-qwik-router", "@zitadel/sdk-qwik"]);
     expect(artifacts.configEdits).toEqual(["package.json"]);
+  });
+
+  it("declares the landing page as conditionally scaffolded", () => {
+    // Written only on fresh scaffolds, so the managed-files check must not
+    // expect it on a manifest-less pre-existing app.
+    const artifacts = new QwikRouterPatcher().artifacts({
+      framework: { id: "qwik-router", appDir: "src", devPort: 5173, url: "http://localhost:5173" },
+      rendererId: "qwik",
+    });
+    expect(artifacts.conditionalFiles).toEqual(expect.arrayContaining(["src/routes/index.tsx"]));
   });
 });
 

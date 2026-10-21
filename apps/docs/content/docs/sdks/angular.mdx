@@ -11,7 +11,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 The Angular SDK is the SPA wrapper for the shared Zitadel login and logout widgets, exposed as standalone components.
 
 <Callout title="Generated proxy" type="info">
-  Angular uses a dev-server proxy config rather than Vite middleware. Production still needs a same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/concepts/sdk-proxy).
+  Angular uses a dev-server proxy config rather than Vite middleware. Production still needs a same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/sdks/proxy).
 </Callout>
 
 ## Install
@@ -115,12 +115,20 @@ Each widget event reaches the callback in the last column, which receives the ev
 <zitadel-auth-login [project]="project" theme="light" (flowComplete)="track($event)" />
 ```
 
+## Standard HTML attributes
+
+The Angular components are tags (`zitadel-auth-login`, `zitadel-auth-logout` and `zitadel-auth-session`), and a tag already carries the standard HTML attributes: put `class`, `style`, `id`, `data-*` or `aria-*` on it and Angular applies them to the tag, not to the widget inside it.
+
+```html
+<zitadel-auth-login [project]="project" class="login" data-testid="login" aria-label="Sign in" />
+```
+
 ## Runtime model
 
 <Steps>
   <Step>The Angular wrapper renders the underlying custom element.</Step>
   <Step>The generated dev proxy forwards `/__nextgen/*` and adds the project secret to the session exchange, and to no other call.</Step>
-  <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, so that proxy must add the project secret to the session exchange, and to no other call. A plain rewrite cannot do that (see [SDK proxy](/docs/concepts/sdk-proxy#spas-in-production)).</Step>
+  <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, so that proxy must add the project secret to the session exchange, and to no other call. A plain rewrite cannot do that (see [SDK proxy](/docs/sdks/proxy#spas-in-production)).</Step>
 </Steps>
 
 If your app renders on the server, mount the widget on the client only, after hydration (the `zitadel-auth-login` wrapper sets `projectId` and `proxyPath` as element properties, so adding them to the wrapper does not put them in server markup), or use a raw `<zitadel-login>` element with `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
@@ -134,6 +142,6 @@ If your app renders on the server, mount the widget on the client only, after hy
 
 ## See also
 
-- [SDK proxy](/docs/concepts/sdk-proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and what it must do in production.
+- [SDK proxy](/docs/sdks/proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and what it must do in production.
 - [Components](/docs/sdks/components) — the shared web components these wrappers render.
 - [`@zitadel/sdk-angular` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-angular) and the [CLI Angular patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/angular).

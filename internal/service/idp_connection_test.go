@@ -441,3 +441,88 @@ func TestIDPConnectionService_ListFilters(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveExistingIDP_HistoricalMatchReuses(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	svc := service.NewIDPConnectionServiceForTest(nil, nil)
+
+	stale := &domain.IDPConnection{
+		ProjectID:  idpProjectID,
+		ID:         "idp_1",
+		Slug:       "google",
+		RevisionID: "idprev_1",
+		Document:   googleConnection("https://accounts.google.com", "A"),
+		CreatedAt:  time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
+	want := googleConnection("https://accounts.google.com", "B")
+	matched := *stale
+	matched.Document = want
+	matched.RevisionID = "idprev_2"
+
+	stmts.EXPECT().ListIDPConnectionRevisions(gomock.Any(), idpProjectID, "idp_1", gomock.Any()).
+		Return(&database.ListResult[*domain.IDPConnection]{Items: []*domain.IDPConnection{&matched, stale}}, nil)
+
+	got, err := service.ResolveExistingIDP(svc, t.Context(), stmts, stale, want)
+	require.NoError(t, err)
+	assert.Equal(t, "idprev_2", got.Connection.RevisionID)
+}
+
+func TestResolveExistingIDP_PostLockEqualitySkipsRevise(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	svc := service.NewIDPConnectionServiceForTest(nil, nil)
+
+	stale := &domain.IDPConnection{
+		ProjectID:  idpProjectID,
+		ID:         "idp_1",
+		Slug:       "google",
+		RevisionID: "idprev_1",
+		Document:   googleConnection("https://accounts.google.com", "A"),
+	}
+	want := googleConnection("https://accounts.google.com", "B")
+	locked := *stale
+	locked.Document = want
+	locked.RevisionID = "idprev_2"
+
+	stmts.EXPECT().ListIDPConnectionRevisions(gomock.Any(), idpProjectID, "idp_1", gomock.Any()).
+		Return(&database.ListResult[*domain.IDPConnection]{Items: []*domain.IDPConnection{stale}}, nil)
+	gomock.InOrder(
+		stmts.EXPECT().LockIDPConnection(gomock.Any(), idpProjectID, "idp_1").Return(nil),
+		stmts.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(&locked, nil),
+	)
+
+	got, err := service.ResolveExistingIDP(svc, t.Context(), stmts, stale, want)
+	require.NoError(t, err)
+	assert.Equal(t, "idprev_2", got.Connection.RevisionID)
+}
+
+func TestResolveOrCreate_SlugTakenReentersResolve(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	svc := service.NewIDPConnectionServiceForTest(nil, nil)
+
+	doc := googleConnection("https://accounts.google.com", "Google")
+	winner := &domain.IDPConnection{
+		ProjectID:  idpProjectID,
+		ID:         "idp_1",
+		Slug:       "google",
+		RevisionID: "idprev_1",
+		Document:   doc,
+	}
+
+	gomock.InOrder(
+		stmts.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil)),
+		stmts.EXPECT().CreateIDPConnection(gomock.Any(), gomock.Any()).
+			Return(database.NewUniqueError("idp_connections", "idp_connections_slug", nil)),
+		stmts.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(winner, nil),
+	)
+
+	got, err := service.ResolveOrCreateIDP(svc, t.Context(), stmts, idpProjectID, "google", doc)
+	require.NoError(t, err)
+	assert.Equal(t, "idp_1", got.Connection.ID)
+	assert.False(t, got.Created)
+}

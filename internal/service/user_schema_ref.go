@@ -20,14 +20,15 @@ type userSchemaStatements interface {
 
 // resolveUserSchema returns the project's newest revision of the user schema
 // ref names: an objectType, or a schema id (`$id` URL or minted sch_ id) that
-// stands for its objectType.
+// stands for its objectType. A `$id` under one of the built-in bases resolves
+// under every base bases knows (domain.BuiltinSchemaBases).
 //
 // TODO(#536): interim. Latest-wins holds only until the revision is resolved
 // from the release the request runs under; only this lookup changes then.
-func resolveUserSchema(ctx context.Context, stmts userSchemaStatements, projectID, ref string) (*domain.JSONSchema, error) {
+func resolveUserSchema(ctx context.Context, stmts userSchemaStatements, bases domain.BuiltinSchemaBases, projectID, ref string) (*domain.JSONSchema, error) {
 	handle := ref
 	if isUserSchemaID(ref) {
-		objectType, err := userSchemaObjectType(ctx, stmts, projectID, ref)
+		objectType, err := schemaObjectType(bases.GetJSONSchema(ctx, stmts, projectID, ref))
 		if err != nil {
 			return nil, err
 		}
@@ -52,7 +53,11 @@ func resolveUserSchema(ctx context.Context, stmts userSchemaStatements, projectI
 // userSchemaObjectType returns the objectType the schema id (`$id` URL or
 // minted sch_ id) is a revision of. Every revision of a schema shares it.
 func userSchemaObjectType(ctx context.Context, stmts userSchemaReader, projectID, schemaID string) (string, error) {
-	schema, err := stmts.GetJSONSchemaByID(ctx, projectID, schemaID)
+	return schemaObjectType(stmts.GetJSONSchemaByID(ctx, projectID, schemaID))
+}
+
+// schemaObjectType maps a schema read onto the objectType it declares.
+func schemaObjectType(schema *domain.JSONSchema, err error) (string, error) {
 	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 		return "", domain.ErrJSONSchemaNotFound()
 	}

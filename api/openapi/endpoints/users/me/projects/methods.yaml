@@ -9,6 +9,10 @@ get:
     This is not the same question as `queryProjects`, which answers with the one
     project the calling credential is bound to. Here the session is the caller
     and the grants are the answer, so the list spans projects.
+
+    With `project_id`, the projects are listed only when the session belongs to
+    that project. It names the project the session was signed in to, not one to
+    list.
   tags:
     - Projects
   security:
@@ -16,6 +20,7 @@ get:
   parameters:
     - $ref: ../../../../components/parameters/limit.yaml
     - $ref: ../../../../components/parameters/page-token.yaml
+    - $ref: ../../../../components/parameters/session-project-id.yaml
   responses:
     '200':
       description: The projects the session user can act on.
@@ -38,6 +43,12 @@ get:
         application/json:
           schema:
             $ref: ../../../../components/schemas/errors/auth-unauthorized.yaml
+    '403':
+      description: The session belongs to a different project than `project_id`.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/sess-project_mismatch.yaml
     '500':
       description: Something went wrong on the server. This was not your fault.
       content:

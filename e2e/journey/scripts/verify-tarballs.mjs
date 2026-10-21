@@ -3,23 +3,30 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 import { packageName, readManifest } from "./lib.mjs";
 
 const [tarballsDir, ...flags] = process.argv.slice(2);
 if (!tarballsDir || tarballsDir.startsWith("--")) {
-  throw new Error("usage: node e2e/journey/scripts/verify-tarballs.mjs <tarballs-dir>");
+  throw new Error(
+    "usage: node e2e/journey/scripts/verify-tarballs.mjs <tarballs-dir> [--app-packages]",
+  );
 }
-if (flags.length > 0) {
-  throw new Error(`unknown flags: ${flags.join(", ")}`);
+const unknownFlags = flags.filter((flag) => flag !== "--app-packages");
+if (unknownFlags.length > 0) {
+  throw new Error(`unknown flags: ${unknownFlags.join(", ")}`);
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
 // Journey registries and release artifact dirs carry the same set: exactly
-// the public release packages, nothing on top.
+// the public release packages, nothing on top. `--app-packages` checks the
+// contributor CLI wrapper's set instead: exactly what a generated app installs.
+const packageDirs = flags.includes("--app-packages")
+  ? APP_RELEASE_PACKAGES.map((pkg) => pkg.dir)
+  : PUBLIC_PACKAGE_DIRS;
 const requiredPackageNames = new Set(
-  await Promise.all(PUBLIC_PACKAGE_DIRS.map((dir) => packageName(repoRoot, dir))),
+  await Promise.all(packageDirs.map((dir) => packageName(repoRoot, dir))),
 );
 const dependencyFields = [
   "dependencies",

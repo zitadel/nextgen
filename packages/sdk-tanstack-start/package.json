@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-tanstack-start",
-  "version": "1.0.0-alpha.27",
+  "version": "1.0.0-alpha.28",
   "description": "TanStack Start request middleware and helpers for Zitadel",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-tanstack-start#readme",
   "bugs": {
@@ -51,10 +51,11 @@
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/sdk-core": "workspace:*",
-    "@zitadel/sdk-react": "workspace:*"
+    "@zitadel/sdk-react": "workspace:*",
+    "ufo": "catalog:"
   },
   "peerDependencies": {
-    "@tanstack/react-start": ">=1",
+    "@tanstack/react-start": ">=1.168.10",
     "react": ">=18",
     "react-dom": ">=18"
   },

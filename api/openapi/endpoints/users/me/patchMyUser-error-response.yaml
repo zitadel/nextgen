@@ -9,7 +9,7 @@ content:
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
-        - $ref: '../../../components/schemas/errors/sess-token_invalid.yaml'
+        - $ref: '../../../components/schemas/errors/sess-project_mismatch.yaml'
         - $ref: '../../../components/schemas/errors/user-already_exists.yaml'
         - $ref: '../../../components/schemas/errors/user-conflict.yaml'
         - $ref: '../../../components/schemas/errors/user-invalid.yaml'
@@ -22,7 +22,7 @@ content:
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
-          sess.token_invalid: '../../../components/schemas/errors/sess-token_invalid.yaml'
+          sess.project_mismatch: '../../../components/schemas/errors/sess-project_mismatch.yaml'
           user.already_exists: '../../../components/schemas/errors/user-already_exists.yaml'
           user.conflict: '../../../components/schemas/errors/user-conflict.yaml'
           user.invalid: '../../../components/schemas/errors/user-invalid.yaml'
@@ -53,11 +53,11 @@ content:
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
-      sess.token_invalid:
-        summary: sess.token_invalid
+      sess.project_mismatch:
+        summary: sess.project_mismatch
         value:
-          code: sess.token_invalid
-          message: 'The session token is invalid (either malformed or expired).'
+          code: sess.project_mismatch
+          message: 'The session belongs to a different project.'
       user.already_exists:
         summary: user.already_exists
         value:

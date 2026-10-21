@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, test } from "vitest";
 
-import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 import { packageName } from "./lib.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -100,6 +100,24 @@ test("rejects a @zitadel/cli tarball missing the agent skill bundle", () => {
   const result = runVerify(cliMissingSkillDir);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /missing CLI agent skill files/);
+});
+
+test("--app-packages accepts exactly what a generated app installs", async () => {
+  const appSetDir = join(fixtureRoot, "app-set");
+  await mkdir(appSetDir, { recursive: true });
+  for (const pkg of APP_RELEASE_PACKAGES) {
+    await makeTarball(appSetDir, pkg.name);
+  }
+
+  const result = runVerify(appSetDir, "--app-packages");
+  assert.equal(result.status, 0, result.stderr);
+  // Without the flag the CLI and server tarballs are missing.
+  assert.match(runVerify(appSetDir).stderr, /missing tarball for @zitadel\/cli/);
+  // The release set carries packages a generated app never installs.
+  assert.match(
+    runVerify(releaseSetDir, "--app-packages").stderr,
+    /unexpected package @zitadel\/(cli|server)/,
+  );
 });
 
 test("unknown flags are rejected", () => {

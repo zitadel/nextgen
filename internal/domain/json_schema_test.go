@@ -338,7 +338,10 @@ func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
 	t.Run("URL under base but unknown path falls back to DB and errors when not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		store := domainmock.NewMockJSONSchemaStore(ctrl)
-		store.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj-1", "https://example.test/app/schemas/unknown/v.json").Return(nil, database.NewNoRowFoundError(nil))
+		// The same path under every other known base names the same document.
+		for _, candidate := range domain.BuiltinSchemaBasesFor(base.String()).Equivalents("https://example.test/app/schemas/unknown/v.json") {
+			store.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj-1", candidate).Return(nil, database.NewNoRowFoundError(nil))
+		}
 		r := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 0, nil, base)
 		_, err := r.Resolve(ctx, store, "proj-1", "https://example.test/app/schemas/unknown/v.json", nil)
 		require.Error(t, err)

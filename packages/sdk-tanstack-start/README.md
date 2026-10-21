@@ -10,7 +10,7 @@ pnpm add @zitadel/sdk-tanstack-start@alpha
 
 ## Requirements
 
-Peer dependencies: `@tanstack/react-start >=1`, `react >=18` and `react-dom >=18`.
+Peer dependencies: `@tanstack/react-start >=1.168.10`, `react >=18` and `react-dom >=18`.
 
 TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
 
@@ -150,7 +150,7 @@ const onFlowComplete = (detail: ZitadelFlowCompleteDetail) => console.log(detail
 
 | Option              | Type                 | Default                      | Description                                                          |
 | ------------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------- |
-| `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend                                 |
+| `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend. A trailing slash is ignored.   |
 | `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project secret, sent as the bearer on the handoff exchange only           |
 | `projectId`         | `string`             | `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID` env | The project this app signs its users in to. A session of any other project on the server reads as signed out and keeps its cookie; with no project, no session counts |
 | `proxyPath`         | `string`             | `"/__nextgen"`               | Path prefix proxied to the auth backend                              |
