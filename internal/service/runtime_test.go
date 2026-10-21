@@ -66,6 +66,52 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		assert.True(t, errors.Is(err, domain.ErrProjectPreviewNotLive(nil)))
 	})
 
+	t.Run("empty allowlist with no deployment keeps pre-resolution path", func(t *testing.T) {
+		resolver, statements, _ := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{origin}).
+			Return([]domain.OriginDeployment{}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, origin)
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("loopback with no deployment keeps pre-resolution path", func(t *testing.T) {
+		resolver, statements, _ := newMockedRuntimeResolver(t)
+		loopback := "http://localhost:3000"
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+			Origins: []domain.Origin{
+				{Pattern: origin, Kind: domain.OriginKindPrimary},
+			},
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{loopback}).
+			Return([]domain.OriginDeployment{}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, loopback)
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("primary origin with no deployment is not deployed", func(t *testing.T) {
+		resolver, statements, _ := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+			Origins: []domain.Origin{
+				{Pattern: origin, Kind: domain.OriginKindPrimary},
+			},
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{origin}).
+			Return([]domain.OriginDeployment{}, nil)
+
+		_, err := resolver.Resolve(t.Context(), projectID, origin)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, domain.ErrReleaseNotDeployed(nil)))
+	})
+
 	t.Run("primary origin with deployment seals release", func(t *testing.T) {
 		resolver, statements, releases := newMockedRuntimeResolver(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{

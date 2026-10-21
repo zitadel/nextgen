@@ -76,6 +76,10 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin string)
 		logger.Warn("runtime resolution refused", attrs...)
 		return nil, err
 	}
+	if resolution == nil {
+		logger.Info("runtime resolution deferred", slog.String("reason", "open_admission_no_deployment"))
+		return nil, nil
+	}
 	logger.Info("runtime resolved", resolution.logAttrs()...)
 	return resolution, nil
 }
@@ -105,6 +109,14 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 		return nil, err
 	}
 	if dep == nil {
+		// Empty allowlist and loopback admit without a stored pattern. Until the
+		// project default target lands, that open admission keeps the
+		// pre-resolution newest-revision path when nothing is deployed yet —
+		// the same interim createFlow uses for a missing Origin header.
+		// A primary/preview pattern match still refuses with rel.not_deployed.
+		if matched.open {
+			return nil, nil
+		}
 		return nil, domain.ErrReleaseNotDeployed(map[string]string{"origin": matched.origin}).
 			WithMessage("nothing is deployed to " + matched.origin)
 	}
@@ -144,11 +156,13 @@ func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origi
 	return dep, nil
 }
 
-// matchedOrigin is an origin the gate admitted: the exact string, and
-// whether it was admitted by a preview row rather than a primary pattern.
+// matchedOrigin is an origin the gate admitted: the exact string, whether it
+// was admitted by a preview row rather than a primary pattern, and whether
+// admission was open (empty allowlist or loopback) rather than a stored pattern.
 type matchedOrigin struct {
 	origin  string
 	preview bool
+	open    bool
 }
 
 // Gate decides whether a request from origin may be served at all. An absent
@@ -166,7 +180,7 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 			WithMessage(origin + " is not an origin of this project")
 	}
 	if len(project.Origins) == 0 || domain.IsLoopbackOrigin(normalized) {
-		return &matchedOrigin{origin: normalized}, nil
+		return &matchedOrigin{origin: normalized, open: true}, nil
 	}
 	entry, ok := domain.MatchOrigin(project.Origins, normalized)
 	if !ok {
