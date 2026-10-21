@@ -48,7 +48,7 @@ export function avatarVars(seed: string): CSSProperties {
 }
 
 /** How much faster the gradient moves while the avatar's host is hovered. */
-const FAST = 8;
+const FAST = 4;
 
 /**
  * A person's avatar: a gradient generated from their user id rather than a
