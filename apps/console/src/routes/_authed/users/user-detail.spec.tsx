@@ -295,16 +295,51 @@ describe("user detail", () => {
     );
     await renderDetail();
 
-    // An integer property edits through a number input.
-    expect(await screen.findByLabelText("Headcount")).toHaveValue(42);
-    // `step="any"`: a fraction must not fail the input's own validation.
-    expect(screen.getByLabelText("Headcount")).toHaveAttribute("step", "any");
+    // An integer property edits as text, which `attributeValue` parses.
+    expect(await screen.findByLabelText("Headcount")).toHaveValue("42");
     // `false` is a value, not an absence: a switch shows it as off, and editable.
     const verified = screen.getByRole("switch", { name: "Verified" });
     expect(verified).not.toBeChecked();
     expect(verified).toBeEnabled();
     // A union stays read-only text: a text input would write `"true"`.
     expect(screen.getByLabelText("Active")).toHaveAttribute("readonly");
+  });
+
+  it("sends a changed number typed as its schema declares", async () => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", headcount: 42 } },
+    });
+    stubSchema({ email: { type: "string" }, headcount: { type: "integer", title: "Headcount" } });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const headcount = await screen.findByLabelText("Headcount");
+    await userEvent.clear(headcount);
+    await userEvent.type(headcount, "43");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { headcount: 43 } }]));
+  });
+
+  it.each([
+    ["hex, which `Number` would read as 16", "0x10"],
+    ["a whole number past 2^53, which `Number` would round", "9007199254740993"],
+    ["a number that does not parse, rather than deleting it", "4e"],
+  ])("sends %s as typed", async (_, typed) => {
+    // The server's message then says what is wrong with it.
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", headcount: 42 } },
+    });
+    stubSchema({ email: { type: "string" }, headcount: { type: "integer", title: "Headcount" } });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const headcount = await screen.findByLabelText("Headcount");
+    await userEvent.clear(headcount);
+    await userEvent.type(headcount, typed);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { headcount: typed } }]));
   });
 
   it("marks optional attributes beside their label, as the add-user sheet does", async () => {
