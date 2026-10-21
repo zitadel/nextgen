@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"net"
 	"strings"
 	"time"
 )
@@ -110,4 +111,120 @@ func CompactOrigins(origins []Origin) []Origin {
 		out = append(out, o)
 	}
 	return out
+}
+
+// NormalizeOrigin lowercases and validates an origin or an origin pattern:
+// scheme://host[:port], no path, query, fragment or credentials. A `*` is
+// accepted anywhere in the host, which is what makes this usable for
+// patterns too; a request origin is matched literally afterwards.
+func NormalizeOrigin(raw string) (string, error) {
+	origin := strings.ToLower(strings.TrimSpace(raw))
+	scheme, host, ok := strings.Cut(origin, "://")
+	if !ok || (scheme != "https" && scheme != "http") {
+		return "", ErrOriginInvalid()
+	}
+	if host == "" || strings.ContainsAny(host, "/?#@ \t") {
+		return "", ErrOriginInvalid()
+	}
+	hostname, port := splitHostPort(host)
+	if hostname == "" || strings.HasPrefix(hostname, ".") || strings.HasSuffix(hostname, ".") || strings.Contains(hostname, "..") {
+		return "", ErrOriginInvalid()
+	}
+	if port != "" {
+		for _, r := range port {
+			if r < '0' || r > '9' {
+				return "", ErrOriginInvalid()
+			}
+		}
+	}
+	return origin, nil
+}
+
+func splitHostPort(host string) (hostname, port string) {
+	if strings.HasPrefix(host, "[") {
+		end := strings.Index(host, "]")
+		if end < 0 {
+			return host, ""
+		}
+		rest := host[end+1:]
+		if strings.HasPrefix(rest, ":") {
+			return host[:end+1], rest[1:]
+		}
+		return host, ""
+	}
+	if i := strings.LastIndex(host, ":"); i >= 0 {
+		return host[:i], host[i+1:]
+	}
+	return host, ""
+}
+
+// MatchOrigin returns the entry that admits origin. A literal match beats a
+// wildcard match, and among wildcards the first in the list wins. Scheme and
+// port compare literally; there is no loopback aliasing, because the
+// WebAuthn relying-party id derives from the host.
+func MatchOrigin(patterns []Origin, origin string) (Origin, bool) {
+	origin = strings.ToLower(strings.TrimSpace(origin))
+	if origin == "" {
+		return Origin{}, false
+	}
+	var wildcard *Origin
+	for i := range patterns {
+		entry := patterns[i]
+		if !strings.Contains(entry.Pattern, "*") {
+			if entry.Pattern == origin {
+				return entry, true
+			}
+			continue
+		}
+		if wildcard == nil && matchOriginPattern(entry.Pattern, origin) {
+			wildcard = &patterns[i]
+		}
+	}
+	if wildcard != nil {
+		return *wildcard, true
+	}
+	return Origin{}, false
+}
+
+// matchOriginPattern reports whether a wildcard pattern covers origin. Each
+// `*` stands for one or more characters, none of them a dot, so a wildcard
+// never crosses a label boundary.
+func matchOriginPattern(pattern, origin string) bool {
+	return matchStars(pattern, origin)
+}
+
+func matchStars(pattern, s string) bool {
+	if pattern == "" {
+		return s == ""
+	}
+	if pattern[0] != '*' {
+		return s != "" && s[0] == pattern[0] && matchStars(pattern[1:], s[1:])
+	}
+	for i := 1; i <= len(s); i++ {
+		if s[i-1] == '.' {
+			return false
+		}
+		if matchStars(pattern[1:], s[i:]) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsLoopbackOrigin reports whether origin points at the local machine:
+// localhost, a *.localhost name, or a loopback IP literal.
+func IsLoopbackOrigin(origin string) bool {
+	_, host, ok := strings.Cut(strings.ToLower(origin), "://")
+	if !ok {
+		return false
+	}
+	hostname, _ := splitHostPort(host)
+	hostname = strings.Trim(hostname, "[]")
+	if hostname == "localhost" || strings.HasSuffix(hostname, ".localhost") {
+		return true
+	}
+	if ip := net.ParseIP(hostname); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
 }

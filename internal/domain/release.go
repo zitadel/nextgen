@@ -123,6 +123,11 @@ type Release struct {
 	RevokedAt   *time.Time
 }
 
+// Revoked reports whether the release can no longer be served or deployed.
+func (r *Release) Revoked() bool {
+	return r != nil && r.RevokedAt != nil
+}
+
 // ReleaseField enumerates the fields of Release which can be used for
 // filtering and ordering in list operations. Pointers and metadata live in
 // columns no query filters on, so they are not bound.
