@@ -205,6 +205,30 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
   expect(failures(results), "operations without their @zitadel/api call").toEqual([]);
 });
 
+test("every API tag's page links each of its operations, as HTML and as Markdown", async ({
+  request,
+}) => {
+  test.setTimeout(120_000);
+  const tags = new Map<string, string[]>();
+  for (const { url } of await indexedPages(request)) {
+    if (!operationPage.test(url)) continue;
+    const tag = url.slice(0, url.lastIndexOf("/"));
+    tags.set(tag, [...(tags.get(tag) ?? []), url]);
+  }
+
+  // The tables lib/source.ts generates from the pages under the tag's.
+  const results = await mapLimit([...tags], concurrency, async ([tag, operations]) => {
+    const html = await (await request.get(tag)).text();
+    const markdown = await (await request.get(markdownUrl(tag))).text();
+    const missing = operations.filter(
+      (url) => !html.includes(`href="${url}"`) || !markdown.includes(`](${url})`),
+    );
+    return missing.length > 0 ? `${tag}: no link to ${missing.join(", ")}` : null;
+  });
+  expect(tags.size).toBeGreaterThan(0);
+  expect(failures(results), "API tag pages that leave out an operation").toEqual([]);
+});
+
 test("every CLI command shows its usage, in tables whose rows keep their cells", async ({
   request,
 }) => {
