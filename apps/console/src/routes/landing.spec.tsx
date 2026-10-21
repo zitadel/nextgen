@@ -198,12 +198,18 @@ describe("landing routes", () => {
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
   });
 
-  it("lands on Overview from settings", async () => {
-    // The account dropdown's target is a page of its own: the person's teams.
+  it("lands on Settings from settings", async () => {
+    // Settings has no landing page of its own; the account dropdown's target
+    // forwards to the profile, its only screen.
+    server.use(
+      http.get("http://localhost/api/users/me", () =>
+        HttpResponse.json({ id: "user_1", attributes: { email: "maya@example.com" } }),
+      ),
+    );
     const router = await renderAt("/settings");
 
-    expect(await screen.findByRole("heading", { name: "Overview" })).toBeInTheDocument();
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toMatch(/^\/settings\/?$/));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
+    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
     // No Admins row survives from when that screen lived here.
     expect(screen.queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
   });

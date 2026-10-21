@@ -10,10 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar, avatarVars } from "@/components/user-avatar";
-import { useSessionCached } from "@/hooks/use-async";
-import { readAccountTeam } from "@/lib/account";
 import { type ThemePreference, useTheme } from "@/theme";
 
 /** Route prefix that puts the shell into its Settings view. */
@@ -29,7 +26,7 @@ export interface ShellUser {
 /** The separators sit flush against the rows, so the default `-mx-1 my-1` comes off. */
 const MENU_SEPARATOR = "mx-0 my-0";
 
-/** The footer's second line: the email under a name, else the account. */
+/** The footer's second line: the email under a name. */
 const FOOTER_SECOND_LINE = "truncate text-xs font-light text-muted-foreground";
 
 const THEMES: { value: ThemePreference; label: string; icon: LucideIcon }[] = [
@@ -96,12 +93,11 @@ function ThemeRow() {
  *
  * The person is named in ADR 058's order (display → identifier → user id):
  * once a name is set it leads, with the email beneath it; until then the
- * email leads, with the account beneath it — their team in the sign-in project
- * (`lib/account.ts`).
+ * email stands alone. Accounts are not shown while the cloud does not use
+ * them (Console ADR 0005 §3).
  *
  * The dropdown follows Vercel's: the person heads it and opens their profile
- * (Settings) in account settings, whose sidebar also lists Overview (their
- * teams, the account among them); then Theme and Log out.
+ * (Settings); then Theme and Log out.
  * Nothing else repeats a Settings page. `Documentation` and `Feedback` are
  * parked: neither has a destination yet, and a row that does nothing reads as
  * broken.
@@ -109,7 +105,6 @@ function ThemeRow() {
 export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
   const email = user?.identifier ?? user?.userId ?? "Signed in";
   const name = user?.display ?? email;
-  const account = useSessionCached(readAccountTeam, null);
 
   return (
     <SidebarMenuItem>
@@ -131,13 +126,7 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             {/* Hidden on the rail, so the avatar alone is what centres. */}
             <span className="flex min-w-0 flex-1 flex-col gap-1 group-data-[collapsible=icon]:hidden">
               <span className="truncate text-sm leading-none font-semibold">{name}</span>
-              {user?.display ? (
-                <span className={FOOTER_SECOND_LINE}>{email}</span>
-              ) : account === undefined ? (
-                <Skeleton className="h-4 w-24" />
-              ) : (
-                account && <span className={FOOTER_SECOND_LINE}>{account.name}</span>
-              )}
+              {user?.display && <span className={FOOTER_SECOND_LINE}>{email}</span>}
             </span>
             <ChevronRight
               className="ml-auto text-sidebar-foreground group-data-[collapsible=icon]:hidden"

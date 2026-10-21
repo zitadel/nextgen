@@ -215,7 +215,7 @@ describe("settings view", () => {
 
 /**
  * The footer names the signed-in person — by name over their email once a name
- * is set, else by email over the account they work in — and the sidebar's
+ * is set, else by email alone — and the sidebar's
  * header carries the one collapse toggle, beside the logo.
  */
 describe("sidebar chrome", () => {
@@ -226,7 +226,7 @@ describe("sidebar chrome", () => {
     expect(account).toHaveTextContent("test.user@example.com");
   });
 
-  it("names the account under the email while the person has no name", async () => {
+  it("shows the email alone while the person has no name", async () => {
     const session = makeTestSession();
     vi.mocked(fetchSession).mockResolvedValue({
       ...session,
@@ -237,7 +237,8 @@ describe("sidebar chrome", () => {
       const account = await screen.findByRole("button", {
         name: "Account: test.user@example.com",
       });
-      await waitFor(() => expect(account).toHaveTextContent("Test account"));
+      // No account line: accounts are not surfaced (Console ADR 0005 §3).
+      expect(account).toHaveTextContent(/^test\.user@example\.com$/);
     } finally {
       vi.mocked(fetchSession).mockImplementation(async () => makeTestSession());
     }

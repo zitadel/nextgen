@@ -159,8 +159,7 @@ function ProfileScreen() {
         <div className={PAGE_TITLE_ROW}>
           <h1 className={DETAIL_TITLE}>Settings</h1>
         </div>
-        {/* Says whose settings these are, as Overview's Teams heading says what
-            it lists: the nav label alone does not. */}
+        {/* Says whose settings these are: the nav label alone does not. */}
         <div className={RESOURCE_TABLE_TOP}>
           <h2 className={EYEBROW}>Your profile</h2>
           <p className="mt-1 text-sm text-muted-foreground">

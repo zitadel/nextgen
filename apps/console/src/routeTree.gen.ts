@@ -29,7 +29,6 @@ import { Route as AuthedSettingsProfileRouteImport } from './routes/_authed/sett
 import { Route as AuthedSchemasSchemaIdRouteImport } from './routes/_authed/schemas/$schemaId'
 import { Route as AuthedProjectsProjectIdRouteImport } from './routes/_authed/projects/$projectId'
 import { Route as AuthedFlowDefinitionsDefinitionIdRouteImport } from './routes/_authed/flow-definitions/$definitionId'
-import { Route as AuthedSettingsTeamsTeamIdRouteImport } from './routes/_authed/settings/teams/$teamId'
 import { Route as AuthedAuthenticationIdpsIdpIdRouteImport } from './routes/_authed/authentication/idps/$idpId'
 
 const LoginRoute = LoginRouteImport.update({
@@ -134,12 +133,6 @@ const AuthedFlowDefinitionsDefinitionIdRoute =
     path: '/flow-definitions/$definitionId',
     getParentRoute: () => AuthedRoute,
   } as any)
-const AuthedSettingsTeamsTeamIdRoute =
-  AuthedSettingsTeamsTeamIdRouteImport.update({
-    id: '/settings/teams/$teamId',
-    path: '/settings/teams/$teamId',
-    getParentRoute: () => AuthedRoute,
-  } as any)
 const AuthedAuthenticationIdpsIdpIdRoute =
   AuthedAuthenticationIdpsIdpIdRouteImport.update({
     id: '/authentication/idps/$idpId',
@@ -168,7 +161,6 @@ export interface FileRoutesByFullPath {
   '/teams/': typeof AuthedTeamsIndexRoute
   '/users/': typeof AuthedUsersIndexRoute
   '/authentication/idps/$idpId': typeof AuthedAuthenticationIdpsIdpIdRoute
-  '/settings/teams/$teamId': typeof AuthedSettingsTeamsTeamIdRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -191,7 +183,6 @@ export interface FileRoutesByTo {
   '/teams': typeof AuthedTeamsIndexRoute
   '/users': typeof AuthedUsersIndexRoute
   '/authentication/idps/$idpId': typeof AuthedAuthenticationIdpsIdpIdRoute
-  '/settings/teams/$teamId': typeof AuthedSettingsTeamsTeamIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -216,7 +207,6 @@ export interface FileRoutesById {
   '/_authed/teams/': typeof AuthedTeamsIndexRoute
   '/_authed/users/': typeof AuthedUsersIndexRoute
   '/_authed/authentication/idps/$idpId': typeof AuthedAuthenticationIdpsIdpIdRoute
-  '/_authed/settings/teams/$teamId': typeof AuthedSettingsTeamsTeamIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -241,7 +231,6 @@ export interface FileRouteTypes {
     | '/teams/'
     | '/users/'
     | '/authentication/idps/$idpId'
-    | '/settings/teams/$teamId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -264,7 +253,6 @@ export interface FileRouteTypes {
     | '/teams'
     | '/users'
     | '/authentication/idps/$idpId'
-    | '/settings/teams/$teamId'
   id:
     | '__root__'
     | '/_authed'
@@ -288,7 +276,6 @@ export interface FileRouteTypes {
     | '/_authed/teams/'
     | '/_authed/users/'
     | '/_authed/authentication/idps/$idpId'
-    | '/_authed/settings/teams/$teamId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -439,13 +426,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedFlowDefinitionsDefinitionIdRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/settings/teams/$teamId': {
-      id: '/_authed/settings/teams/$teamId'
-      path: '/settings/teams/$teamId'
-      fullPath: '/settings/teams/$teamId'
-      preLoaderRoute: typeof AuthedSettingsTeamsTeamIdRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/authentication/idps/$idpId': {
       id: '/_authed/authentication/idps/$idpId'
       path: '/authentication/idps/$idpId'
@@ -475,7 +455,6 @@ interface AuthedRouteChildren {
   AuthedTeamsIndexRoute: typeof AuthedTeamsIndexRoute
   AuthedUsersIndexRoute: typeof AuthedUsersIndexRoute
   AuthedAuthenticationIdpsIdpIdRoute: typeof AuthedAuthenticationIdpsIdpIdRoute
-  AuthedSettingsTeamsTeamIdRoute: typeof AuthedSettingsTeamsTeamIdRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
@@ -498,7 +477,6 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedTeamsIndexRoute: AuthedTeamsIndexRoute,
   AuthedUsersIndexRoute: AuthedUsersIndexRoute,
   AuthedAuthenticationIdpsIdpIdRoute: AuthedAuthenticationIdpsIdpIdRoute,
-  AuthedSettingsTeamsTeamIdRoute: AuthedSettingsTeamsTeamIdRoute,
 }
 
 const AuthedRouteWithChildren =

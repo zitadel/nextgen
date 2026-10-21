@@ -72,28 +72,32 @@ team is a scope, following Vercel's model:
 The tabs from §1 become the team nav's first entries, so nothing built under
 §1 is thrown away.
 
-### 3. Account settings list the person's teams
+### 3. Accounts are not surfaced yet
 
-The Settings view is the person's own space and has no section headings.
-**Overview** lists the teams they are on (`GET /users/me/teams`), each
-opening its settings. **Settings** is their profile. This is a different
-team set from §1 and §2: the person's roster in the sign-in project, not the
-selected project's teams.
+The Settings view is the person's own space, with no section headings, and
+holds one screen: **Settings**, their profile. The cloud does not use
+accounts (teams in the platform project) for anything a person acts on, so
+the console shows none: no account under the person's name, no list of
+their teams, no account rename, and no account in search.
+
+When accounts matter, they come back as §4 describes: an **Overview** listing
+the person's accounts (`GET /users/me/teams`), each opening its settings,
+and the account shown on every project.
 
 ### 4. Open: a person in more than one account
 
 Not decided; recorded for the follow-up. An account is a team in the
 platform project. The console today assumes the person has one:
 
-- The sidebar footer, the "Your account" badge on Overview and search name
-  the first team on the person's roster (`lib/account.ts`, `limit: 1`),
-  which is alphabetical order, not a choice.
+- An account shown anywhere would be the first team on the person's roster
+  (`GET /users/me/teams?limit=1`), which is alphabetical order, not a choice.
+  That is one reason §3 shows none.
 - The project switcher and search list every project the person holds a
   grant on (`GET /users/me/projects`), across all their accounts, in one
   list with no account shown.
 
-So with two accounts the footer names one account while the projects mix
-both. Making it consistent means showing the account on every project:
+So with two accounts, naming one account would contradict a project list
+that mixes both. Making it consistent means showing the account on every project:
 
 - **Top bar:** `Account ▾ / Project ▾ / Team ▾`. The account comes first and
   filters the project switcher and search; footer and account settings

@@ -103,19 +103,15 @@ describe("settings profile", () => {
     expect(email).toHaveAttribute("placeholder", "No email address");
   });
 
-  it("marks Settings in the flat account nav, under Overview", async () => {
+  it("marks Settings, the account nav's only row", async () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
     await screen.findByRole("heading", { name: "Settings" });
 
     const nav = screen.getByRole("navigation", { name: "Account settings" });
     const links = within(nav).getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(["Overview", "Settings"]);
-    expect(within(nav).getByRole("link", { name: "Settings" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(within(nav).getByRole("link", { name: "Overview" })).not.toHaveAttribute("aria-current");
+    expect(links.map((link) => link.textContent)).toEqual(["Settings"]);
+    expect(links[0]).toHaveAttribute("aria-current", "page");
   });
 
   it("offers the name the schema designates for display, and saves it", async () => {

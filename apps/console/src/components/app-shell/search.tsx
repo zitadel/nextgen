@@ -1,13 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import {
-  Box,
-  Boxes,
-  Building2,
-  CircleUserRound,
-  List,
-  type LucideIcon,
-  Search,
-} from "lucide-react";
+import { Box, Boxes, CircleUserRound, List, type LucideIcon, Search } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import {
@@ -19,8 +11,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { useAsync, useSessionCached } from "@/hooks/use-async";
-import { readAccountTeam } from "@/lib/account";
+import { useAsync } from "@/hooks/use-async";
 import { useMyProjects, useProjectScope } from "@/lib/project-scope";
 import { queryActiveTeams } from "@/lib/teams";
 import { cn } from "@/lib/utils";
@@ -92,7 +83,6 @@ export function SearchDialog({
   const navigate = useNavigate();
   const projectId = useProjectScope();
   const projects = useMyProjects();
-  const account = useSessionCached(readAccountTeam, null);
   // One request per pause in typing, not per keystroke.
   const typed = useDebounced(open ? query.trim() : "", TYPING_PAUSE_MS);
   const teams = useAsync(
@@ -130,22 +120,6 @@ export function SearchDialog({
         go: close(() => void navigate({ to: item.to })),
       }));
 
-    const accountResults: Result[] =
-      account && (matches("Account") || matches(account.name))
-        ? [
-            {
-              id: "account",
-              icon: Building2,
-              label: "Account settings",
-              context: account.name,
-              go: close(
-                () =>
-                  void navigate({ to: "/settings/teams/$teamId", params: { teamId: account.id } }),
-              ),
-            },
-          ]
-        : [];
-
     const teamResults: Result[] = (q ? (teams ?? []) : []).map((team) => ({
       id: `team:${team.id}`,
       icon: Box,
@@ -160,7 +134,6 @@ export function SearchDialog({
         id: `project:${project.id}`,
         icon: Boxes,
         label: project.name,
-        context: account?.name,
         // Selecting a project is a navigation: the selection lives in the URL.
         go: close(() => void navigate({ to: "/", search: { project: project.id } })),
       }));
@@ -178,19 +151,18 @@ export function SearchDialog({
 
     return [
       { heading: projectName ? `Pages in ${projectName}` : "Pages", results: pageResults },
-      { heading: "Account", results: accountResults },
       { heading: "Teams", results: teamResults },
       { heading: "Projects", results: projectResults },
       { heading: "You", results: youResults },
     ].filter((group) => group.results.length > 0);
-  }, [pages, account, teams, projects, projectName, q, navigate, onOpenChange]);
+  }, [pages, teams, projects, projectName, q, navigate, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false} className={PALETTE}>
         <DialogTitle className="sr-only">Go to</DialogTitle>
         <DialogDescription className="sr-only">
-          Search for a page, the account, a team or a project.
+          Search for a page, a team or a project.
         </DialogDescription>
         {/* Filtering is ours, not cmdk's: teams arrive already filtered by the
             server, and every group matches the same way (substring, any case). */}

@@ -1,4 +1,4 @@
-import { Link, useMatch, useMatchRoute } from "@tanstack/react-router";
+import { Link, useMatchRoute } from "@tanstack/react-router";
 // `BookOpen` / `Search` return with the parked footer items below.
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
@@ -183,22 +183,17 @@ function SettingsHeader() {
 }
 
 /**
- * Settings nav: one flat list, as Vercel's account view draws it — Overview
- * (the teams the person is on) over Settings (the person themselves).
+ * Settings nav: one flat list, as Vercel's account view draws it. Settings
+ * (the person's profile) is its only row while accounts are not surfaced
+ * (Console ADR 0005 §3).
  *
  * Rows attach the same way Portal's do, through `staticData.nav` on the route,
  * and declare `view: "settings"` so they leave the primary list alone. Each
- * marks only its own page: Overview's path is the prefix of every settings
- * path.
- *
- * A team opened from Overview nests under it, the way User schemas sits under
- * Users: the nested row says where you are, and Overview is the way back up
- * (D13: no back buttons or breadcrumbs).
+ * marks only its own page.
  */
 function SettingsNav() {
   const items = useNavItems("settings");
   const matchRoute = useMatchRoute();
-  const openTeam = useMatch({ from: "/_authed/settings/teams/$teamId", shouldThrow: false });
 
   return (
     <SidebarGroup role="navigation" aria-label="Account settings" className="pt-4 pb-0">
@@ -217,22 +212,6 @@ function SettingsNav() {
                   <span>{label}</span>
                 </Link>
               </SidebarMenuButton>
-              {item.to === SETTINGS_PATH && openTeam && (
-                <SidebarMenuSub>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton asChild isActive>
-                      <Link
-                        to="/settings/teams/$teamId"
-                        params={{ teamId: openTeam.params.teamId }}
-                        title={openTeam.loaderData?.team?.name}
-                      >
-                        {/* A team the person may not read has no name to show. */}
-                        <span>{openTeam.loaderData?.team?.name ?? "Team"}</span>
-                      </Link>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                </SidebarMenuSub>
-              )}
             </SidebarMenuItem>
           );
         })}

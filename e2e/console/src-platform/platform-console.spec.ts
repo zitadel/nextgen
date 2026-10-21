@@ -128,30 +128,3 @@ test("a platform operator adds their name from the account menu", async ({ page,
   await named.click();
   await expect(page.getByRole("menuitem", { name: /^Ada Lovelace/ })).toContainText(operator.email);
 });
-
-/**
- * Account settings → Overview lists the operator's account: the personal team
- * created for them at sign-up, which opens to its rename (#1890 grants them it),
- * shown in the footer.
- */
-test("a platform operator renames their account", async ({ page, seed }) => {
-  const operator = seed.identity();
-
-  await page.goto("/ui/console/");
-  await registerWithPassword(page, operator);
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  // The landing redirect must settle first, or it interrupts the next goto.
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
-
-  await page.goto("/ui/console/settings");
-  // Their only team, the one created at sign-up.
-  await page.getByRole("main").getByRole("link").first().click();
-  const field = page.getByLabel("Team name");
-  await field.fill("Acme Platform");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expectNoErrorBoundary(page);
-
-  await expect(page.getByRole("button", { name: `Account: ${operator.email}` })).toContainText(
-    "Acme Platform",
-  );
-});

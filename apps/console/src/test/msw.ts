@@ -24,8 +24,7 @@ import { TEST_PROJECT_ID } from "./project-scope.fixture";
  * The reads every `_authed` screen makes for its chrome rather than for the
  * screen under test: the context switcher and the `_authed` guard both list the
  * person's projects, and the default lists the fixture's project so the
- * selection most specs open under is a listed one. The sidebar footer reads the
- * person's own roster for the account it names (`lib/account.ts`). A spec about the switcher or
+ * selection most specs open under is a listed one. A spec about the switcher or
  * the guard overrides it with `server.use(...)`.
  *
  * `GET /projects/{id}` is deliberately not defaulted: the switcher reads it only
@@ -53,20 +52,6 @@ const shellHandlers = [
   // The person's own sign-in methods, on account settings' profile: none.
   http.get("*/api/users/me/passkeys", () => HttpResponse.json({ passkeys: [] })),
   http.get("*/api/users/me/identity_links", () => HttpResponse.json({ identity_links: [] })),
-  // The person's own roster, which names the account in the sidebar footer.
-  http.get("*/api/users/me/teams", () =>
-    HttpResponse.json({
-      teams: [
-        {
-          id: "team_account",
-          name: "Test account",
-          membership_status: "active",
-          created_at: "2026-01-01T00:00:00Z",
-          updated_at: "2026-01-01T00:00:00Z",
-        },
-      ],
-    }),
-  ),
 ];
 
 export const server = setupServer(...shellHandlers);
