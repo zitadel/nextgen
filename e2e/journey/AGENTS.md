@@ -35,6 +35,8 @@ the repo root.
   consumer suite in `e2e/journey/fixtures/testkit/`. It never sets
   `ZITADEL_SERVER_BINARY` or `NEXTGEN_*`: proving the published binary works
   unconfigured is the point.
+- Skip a spec that needs the mock OIDC provider when `JOURNEY_OIDC_MOCK_URL`
+  is unset: lanes on `--runtime docker` or without a built mock start none.
 
 ## Packages and the registry
 

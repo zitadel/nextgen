@@ -20,7 +20,7 @@ export class TanStackStartDetector implements Detector {
   readonly framework = "tanstack-start";
   readonly displayName = "TanStack Start";
   readonly versionPackage = "@tanstack/react-start";
-  readonly versionFloor = "1";
+  readonly versionFloor = "1.168.10";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);

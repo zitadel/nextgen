@@ -125,13 +125,6 @@ describe("SchemaSyncer", () => {
         receivedBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: "schema-id-1" }, { status: 201 });
       }),
-      http.get(`${BASE}/schemas/schema-id-1`, () =>
-        HttpResponse.json({
-          id: "schema-id-1",
-          schema: { kind: "user-schema", version: 1 },
-          metadata: { created_at: "2026-01-01T00:00:00Z" },
-        }),
-      ),
     );
     const [schema] = makeSyncers({
       client,
@@ -143,33 +136,11 @@ describe("SchemaSyncer", () => {
 
     const result = await schema.create(data);
 
-    expect(result.id).toBe("schema-id-1");
-    // The stored body comes from the follow-up fetch, feeding write-back —
-    // the document unwrapped from the envelope, never the envelope itself.
-    expect(result.canonical).toEqual({ kind: "user-schema", version: 1 });
+    // Only the id: the stored body is not read back, since nothing writes it to the file.
+    expect(result).toEqual({ id: "schema-id-1" });
     expect(new URL(receivedUrl).searchParams.get("project_id")).toBe("proj-1");
     expect(receivedBody).toEqual(data);
     expect(receivedBody.$id).toBeUndefined();
-  });
-
-  it("create degrades to no canonical body when the follow-up fetch fails", async () => {
-    server.use(
-      http.post(`${BASE}/schemas`, () => HttpResponse.json({ id: "schema-id-2" }, { status: 201 })),
-      http.get(`${BASE}/schemas/schema-id-2`, () =>
-        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
-      ),
-    );
-    const [schema] = makeSyncers({
-      client,
-      projectId: "proj-1",
-      env: {},
-      cwd: "/tmp/zitadel-sync-test",
-    });
-
-    const result = await schema.create({ kind: "user-schema" });
-
-    expect(result.id).toBe("schema-id-2");
-    expect(result.canonical).toBeUndefined();
   });
 
   it("update throws E_NOT_IMPLEMENTED — schemas are revisioned, edits publish a new revision", async () => {
@@ -335,9 +306,7 @@ describe("FlowDefinitionSyncer", () => {
 
     const result = await flow.create(data);
 
-    expect(result.id).toBe("flow-id-1");
-    // The response envelope's flow_definition is the canonical stored body.
-    expect(result.canonical).toEqual({ name: "Default", audience: {} });
+    expect(result).toEqual({ id: "flow-id-1" });
     expect(receivedBody).toEqual({
       project_id: "proj-1",
       schema_uri: DEFAULT_FLOW_SCHEMA_URI,
@@ -514,7 +483,7 @@ describe("BrandingSyncer", () => {
     const [, , , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
 
     // A typo like hero_urll would otherwise pass plan, be ignored by the
-    // server, and vanish on canonical write-back.
+    // server, and do nothing.
     expect(() =>
       branding.validate({ ...descriptor, hero_urll: "https://cdn.example.com/hero.png" }),
     ).toThrow(ZitadelError);
@@ -551,7 +520,7 @@ describe("BrandingSyncer", () => {
     expect(after.liquid_template).toBe(edited);
   });
 
-  it("create POSTs the inlined wire body and returns the canonical in file-ref form", async () => {
+  it("create POSTs the inlined wire body and returns the revision id", async () => {
     const cwd = await makeBrandingProject();
     let receivedBody: unknown;
     let receivedProjectId: string | null = null;
@@ -583,26 +552,24 @@ describe("BrandingSyncer", () => {
       liquid_template: VALID_TEMPLATE,
       logo_url: "https://cdn.example.com/logo.svg",
     });
-    expect(result.id).toBe("brnd-1");
-    expect(result.canonical).toEqual({
-      layout: "split",
-      liquid_template: { $file: "./login.liquid" },
-      logo_url: "https://cdn.example.com/logo.svg",
-    });
+    expect(result).toEqual({ id: "brnd-1" });
   });
 
-  it("create writes a differing canonical template back to the referenced file", async () => {
+  it("create leaves the referenced template as written when the server answers another", async () => {
     const { readFile } = await import("node:fs/promises");
     const { join } = await import("node:path");
     const cwd = await makeBrandingProject();
-    const serverTemplate = `<p data-server="1">canonical</p>{% mandatory_gates %}`;
+    const authored = await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8");
     server.use(
       http.post(`${BASE}/branding`, () =>
         HttpResponse.json(
           {
             id: "brnd-2",
             created_at: "2026-07-20T00:00:00Z",
-            branding: { layout: "split", liquid_template: serverTemplate },
+            branding: {
+              layout: "split",
+              liquid_template: `<p data-server="1">canonical</p>{% mandatory_gates %}`,
+            },
           },
           { status: 201 },
         ),
@@ -612,8 +579,7 @@ describe("BrandingSyncer", () => {
 
     await branding.create(descriptor);
 
-    const onDisk = await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8");
-    expect(onDisk).toBe(serverTemplate);
+    expect(await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).toBe(authored);
   });
 
   it("update and delete throw E_NOT_IMPLEMENTED (revisioned resource)", async () => {
@@ -863,50 +829,24 @@ describe("IdpConnectionSyncer", () => {
     await expect(idp.fetch?.("idp_1")).rejects.toBeInstanceOf(FatalFetchError);
   });
 
-  it("refuses a create response holding a secret value, before it is written to disk", async () => {
-    // The canonical body from a mutation is written back into
-    // `.zitadel/idps/`, which is committed. This is the last point before the
-    // credential would land in a file.
-    const resolved = {
-      ...connection,
-      oidc: { ...connection.oidc, client_secret: "GOCSPX-a-real-secret" },
-    };
-    server.use(
-      http.post(`${BASE}/idps`, () =>
-        HttpResponse.json(
-          { id: "idp_1", revision_id: "idprev_1", definition: resolved },
-          { status: 201 },
-        ),
-      ),
-    );
+  it("compares a stored connection that spells out the server's defaults equal to the file", () => {
     const [, idp] = makeSyncers({
       client,
       projectId: "proj-1",
       env: {},
       cwd: "/tmp/zitadel-sync-test",
     });
-
-    await expect(idp.create(connection)).rejects.toMatchObject({ code: "E_VALIDATION" });
-  });
-
-  it("refuses an update response holding a secret value", async () => {
-    const resolved = {
+    const stored = {
       ...connection,
-      oidc: { ...connection.oidc, client_secret: "GOCSPX-a-real-secret" },
+      oidc: {
+        ...connection.oidc,
+        id_token_mapping: false,
+        pkce_enabled: true,
+        token_endpoint_auth_method: "client_secret_basic",
+      },
     };
-    server.use(
-      http.post(`${BASE}/idps`, () =>
-        HttpResponse.json({ id: "idp_1", revision_id: "idprev_2", definition: resolved }),
-      ),
-    );
-    const [, idp] = makeSyncers({
-      client,
-      projectId: "proj-1",
-      env: {},
-      cwd: "/tmp/zitadel-sync-test",
-    });
 
-    await expect(idp.update("idp_1", connection)).rejects.toMatchObject({ code: "E_VALIDATION" });
+    expect(idp.normalize?.(stored)).toEqual(idp.normalize?.(connection));
   });
 
   it("create posts the document under the project and keeps the returned id", async () => {
@@ -929,8 +869,7 @@ describe("IdpConnectionSyncer", () => {
 
     const result = await idp.create(connection);
 
-    expect(result.id).toBe("idp_1");
-    expect(result.canonical).toEqual(connection);
+    expect(result).toEqual({ id: "idp_1" });
     expect(body).toEqual({ idp: connection });
   });
 
@@ -952,10 +891,7 @@ describe("IdpConnectionSyncer", () => {
 
     // The id is reported, not the one it was handed: the slug decides which
     // connection the write landed on, so state follows the answer.
-    expect(await idp.update("idp_1", connection)).toEqual({
-      id: "idp_1",
-      canonical: connection,
-    });
+    expect(await idp.update("idp_1", connection)).toEqual({ id: "idp_1" });
   });
 
   it("reports the new connection when an edited slug lands on a different one", async () => {

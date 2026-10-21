@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { type APIRequestContext, expect, test } from "@playwright/test";
 
 import {
@@ -15,9 +17,9 @@ import {
 
 /**
  * Every page, through the index agents read first: /docs/llms.txt lists each
- * page with its site-relative URL (skills/zitadel/SKILL.md tells agents to
- * prefix it with the docs' origin). The suite keeps no list of its own, so a
- * page is covered the moment it is written.
+ * page with its site-relative Markdown URL (skills/zitadel/SKILL.md tells
+ * agents to prefix it with the docs' origin). The suite keeps no list of its
+ * own, so a page is covered the moment it is written.
  */
 
 // Requests in flight at once over the page list.
@@ -26,6 +28,10 @@ const concurrency = 8;
 // An operation page is /docs/reference/api/<tag>/<operation>; the tag's own
 // page, one level up, is content like any other.
 const operationPage = /^\/docs\/reference\/api\/[^/]+\/[^/]+$/;
+
+// The CLI reference is /docs/reference/cli, and a command's page has the
+// command's words as the segments after it: /docs/reference/cli/users/list.
+const cliReferencePage = /^\/docs\/reference\/cli(?:\/(.+))?$/;
 
 async function indexedPages(request: APIRequestContext): Promise<IndexedPage[]> {
   const response = await request.get("/docs/llms.txt");
@@ -42,14 +48,26 @@ test("the index lists every section, each page once, under /docs", async ({ requ
   const index = await response.text();
 
   // The sections skills/zitadel/SKILL.md describes to agents.
-  for (const section of ["Get started", "Concepts", "CLI", "SDKs", "API reference"]) {
+  for (const section of [
+    "Get started",
+    "Guides",
+    "Concepts",
+    "SDKs",
+    "CLI reference",
+    "API reference",
+  ]) {
     expect(index, `section ${section}`).toMatch(new RegExp(`^- ${section}$`, "m"));
   }
 
   const pages = parseIndex(index);
+  // Each entry is the page's Markdown URL, which answers as listed.
+  expect(
+    pages.filter((page) => page.markdown !== markdownUrl(page.url)).map((page) => page.markdown),
+    "index entries that are not a page's Markdown URL",
+  ).toEqual([]);
   const urls = pages.map((page) => page.url);
   expect(urls).toEqual(
-    expect.arrayContaining(["/docs", "/docs/get-started/quickstart", "/docs/cli"]),
+    expect.arrayContaining(["/docs", "/docs/get-started/quickstart", "/docs/reference/cli"]),
   );
   expect(
     urls.filter((url) => url !== "/docs" && !url.startsWith("/docs/")),
@@ -143,7 +161,7 @@ test("every page negotiates Markdown through Accept", async ({ request }) => {
   expect(failures(results), "pages that do not negotiate Markdown").toEqual([]);
 });
 
-test("every API operation shows its call through @zitadel/api and its CLI command", async ({
+test("every API operation shows its call through @zitadel/api, its CLI command and cURL", async ({
   request,
 }) => {
   test.setTimeout(120_000);
@@ -167,12 +185,43 @@ test("every API operation shows its call through @zitadel/api and its CLI comman
     if (command && !markdown.includes(`npx @zitadel/cli@alpha ${command}`)) {
       return `${markdownUrl(url)}: no \`${command}\` command`;
     }
+    // And with cURL, as the page's last sample (lib/source.ts).
+    if (!/```bash\ncurl -X [A-Z]+ 'http:\/\/localhost:8080\//.test(markdown)) {
+      return `${markdownUrl(url)}: no cURL command`;
+    }
     const html = await (await request.get(url)).text();
     if (!html.includes("@zitadel/api/")) return `${url}: no @zitadel/api sample`;
     return null;
   });
   expect(operations).toBeGreaterThan(0);
   expect(failures(results), "operations without their @zitadel/api call").toEqual([]);
+});
+
+test("every CLI command shows its usage, in tables whose rows keep their two cells", async ({
+  request,
+}) => {
+  test.setTimeout(120_000);
+  const pages = (await indexedPages(request)).filter((page) => cliReferencePage.test(page.url));
+
+  // A command's usage runs the command its URL names, and a `|` in the help
+  // it is generated from, as in a list's `--filter` grammar, stays inside its
+  // table cell (lib/cli-reference.ts). A cell splits at every `|` it does not
+  // escape, in a code span too.
+  const cells = (row: string) => row.slice(1, -1).split(/(?<!\\)\|/).length;
+  let commands = 0;
+  const results = await mapLimit(pages, concurrency, async ({ url }) => {
+    const markdown = await (await request.get(markdownUrl(url))).text();
+    const words = cliReferencePage.exec(url)?.[1];
+    if (words) {
+      commands++;
+      const usage = `## Usage\n\n\`\`\`sh\nnpx @zitadel/cli@alpha ${words.split("/").join(" ")} `;
+      if (!markdown.includes(usage)) return `${markdownUrl(url)}: no usage of its command`;
+    }
+    const ragged = markdown.split("\n").find((line) => line.startsWith("| ") && cells(line) !== 2);
+    return ragged ? `${markdownUrl(url)}: a table row that is not two cells: ${ragged}` : null;
+  });
+  expect(commands).toBeGreaterThan(0);
+  expect(failures(results), "CLI reference pages whose Markdown is wrong").toEqual([]);
 });
 
 test("a page that does not exist is a 404, as HTML and as Markdown", async ({ request }) => {
@@ -182,6 +231,30 @@ test("a page that does not exist is a 404, as HTML and as Markdown", async ({ re
     headers: { Accept: "text/markdown" },
   });
   expect(negotiated.status()).toBe(404);
+});
+
+test("a page that moved redirects to where it is now, as HTML and as Markdown", async ({
+  request,
+}) => {
+  // The pages next.config.mjs redirects, from their old URL to their new one.
+  const moved = JSON.parse(
+    readFileSync(new URL("../lib/moved.json", import.meta.url), "utf8"),
+  ) as Record<string, string>;
+  const twins = Object.entries(moved).flatMap(([from, to]) => [
+    [from, to],
+    [`${from}.md`, `${to}.md`],
+  ]);
+
+  const results = await mapLimit(twins, concurrency, async ([from = "", to = ""]) => {
+    const response = await request.get(from, { maxRedirects: 0 });
+    const location = new URL(response.headers().location ?? "", "http://docs").pathname;
+    if (response.status() !== 308 || location !== to) {
+      return `${from}: ${response.status()} to ${location}`;
+    }
+    const target = await request.get(to);
+    return target.status() === 200 ? null : `${to}: ${target.status()}`;
+  });
+  expect(failures(results), "moved pages that do not redirect to a page").toEqual([]);
 });
 
 test("llms-full.txt carries every page but the API operations", async ({ request }) => {
@@ -207,7 +280,7 @@ test("llms-full.txt carries every page but the API operations", async ({ request
 });
 
 test("scripts and styles load from /docs/_next/", async ({ request }) => {
-  const html = await (await request.get("/docs/cli")).text();
+  const html = await (await request.get("/docs/get-started/quickstart")).text();
   // With Skew Protection on, the cloud appends `?dpl=<deployment>` to each URL.
   const assets = [
     ...new Set(

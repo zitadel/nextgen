@@ -102,12 +102,12 @@ export function clientMethod(operationId: string): string {
   return camel.charAt(0).toLowerCase() + camel.slice(1);
 }
 
-type Authentication = "none" | "secret" | "session";
+export type Authentication = "none" | "secret" | "session";
 
 // A project secret is the server-side credential: the bearer the oauth2 scheme
 // accepts. An operation that accepts only the session cookie is called from
 // the browser, through the framework SDK's proxy, which carries the cookie.
-function authentication(operation: OperationObject): Authentication {
+export function authentication(operation: OperationObject): Authentication {
   const requirements = operation.security ?? [];
   if (requirements.length === 0 || requirements.some((item) => Object.keys(item).length === 0)) {
     return "none";
