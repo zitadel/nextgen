@@ -57,6 +57,7 @@ type timelineSwimlane struct {
 }
 
 type rawTimelineStep struct {
+	fromURL   string
 	cellURL   string
 	projectID string
 	get       *cell.TraceHop
@@ -80,7 +81,8 @@ func (a *App) buildTimeline(entry traceEntry) *timelineView {
 	return buildTimeline(entry, a.labelMap(), a.copyDelayPairs())
 }
 
-// buildTimeline groups raw OnHop + semantic LookupWalk hops into one step per site visit.
+// buildTimeline prefers the authoritative walk-response chain (From set / semantic
+// miss|hit|tombstone) over flattening UI OnHop fan-out duplicates.
 func buildTimeline(entry traceEntry, labels map[string]string, delays map[string]int) *timelineView {
 	v := &timelineView{
 		At:      entry.At,
@@ -103,18 +105,20 @@ func buildTimeline(entry traceEntry, labels map[string]string, delays map[string
 		homeHint = m[1]
 	}
 
-	var prevLabel string
 	var cumulative int64
 	steps := make([]timelineStep, 0, len(raw))
 	for i, r := range raw {
 		label := labelForCell(r.cellURL, labels)
+		caller := "UI"
+		if strings.TrimSpace(r.fromURL) != "" {
+			caller = labelForCell(r.fromURL, labels)
+		}
+
 		pairDelay := int64(0)
 		pairHint := "entry"
-		if i > 0 && prevLabel != "" && label != "" {
-			pairDelay = int64(delayBetweenLabels(prevLabel, label, delays))
-			if pairDelay > 0 || prevLabel != label {
-				pairHint = prevLabel + "↔" + label
-			}
+		if caller != "" && label != "" && caller != "UI" && caller != label {
+			pairDelay = int64(delayBetweenLabels(caller, label, delays))
+			pairHint = caller + "↔" + label
 		}
 
 		result := "—"
@@ -127,16 +131,19 @@ func buildTimeline(entry traceEntry, labels map[string]string, delays map[string
 			if r.lookup.Method != "" {
 				method = r.lookup.Method
 			}
+			if projectID == "" && r.lookup.ProjectID != "" {
+				projectID = r.lookup.ProjectID
+			}
 		} else if r.get != nil {
-			// Site visit with parent resolve only (unusual).
 			method = r.get.Method
 			result = r.get.Result
 			wireMs = r.get.Ms
 		}
 
-		stepMs := pairDelay
-		if wireMs > 0 {
-			stepMs += wireMs
+		// Authoritative hop.Ms already includes pairwise sleep on cell→parent walk calls.
+		stepMs := wireMs
+		if stepMs == 0 && pairDelay > 0 {
+			stepMs = pairDelay
 		}
 		cumulative += stepMs
 
@@ -158,7 +165,7 @@ func buildTimeline(entry traceEntry, labels map[string]string, delays map[string
 
 		step := timelineStep{
 			N:            i + 1,
-			Caller:       "UI",
+			Caller:       caller,
 			CellLabel:    label,
 			Method:       method,
 			ProjectID:    projectID,
@@ -176,7 +183,7 @@ func buildTimeline(entry traceEntry, labels map[string]string, delays map[string
 		}
 		if r.get != nil {
 			step.Parent = &timelineParent{
-				Caller:    "UI",
+				Caller:    caller,
 				CellLabel: label,
 				Method:    r.get.Method,
 				Result:    r.get.Result,
@@ -184,7 +191,6 @@ func buildTimeline(entry traceEntry, labels map[string]string, delays map[string
 			}
 		}
 		steps = append(steps, step)
-		prevLabel = label
 	}
 
 	for i := range steps {
@@ -217,6 +223,11 @@ func buildTimeline(entry traceEntry, labels map[string]string, delays map[string
 }
 
 func groupHopsIntoSteps(hops []cell.TraceHop) []rawTimelineStep {
+	chain := selectWalkChainHops(hops)
+	if len(chain) > 0 {
+		return stepsFromWalkChain(chain)
+	}
+
 	var steps []rawTimelineStep
 	used := make([]bool, len(hops))
 
@@ -226,6 +237,7 @@ func groupHopsIntoSteps(hops []cell.TraceHop) []rawTimelineStep {
 			continue
 		}
 		steps = append(steps, rawTimelineStep{
+			fromURL:   h.From,
 			cellURL:   h.Cell,
 			projectID: projID,
 			get:       hopPtr(h),
@@ -240,6 +252,7 @@ func groupHopsIntoSteps(hops []cell.TraceHop) []rawTimelineStep {
 		idx := findStepForLookup(steps, h.Cell)
 		if idx < 0 {
 			steps = append(steps, rawTimelineStep{
+				fromURL: h.From,
 				cellURL: h.Cell,
 				lookup:  hopPtr(h),
 			})
@@ -257,12 +270,81 @@ func groupHopsIntoSteps(hops []cell.TraceHop) []rawTimelineStep {
 	// Fallback for non-walk actions: one step per hop.
 	for _, h := range hops {
 		steps = append(steps, rawTimelineStep{
+			fromURL:   h.From,
 			cellURL:   h.Cell,
-			projectID: projectIDFromMethod(h.Method),
+			projectID: firstNonEmpty(h.ProjectID, projectIDFromMethod(h.Method)),
 			lookup:    hopPtr(h),
 		})
 	}
 	return steps
+}
+
+// selectWalkChainHops prefers authoritative delegated-walk hops (From set and/or
+// semantic miss|hit|tombstone / local lookup). Keeps a single UI→entry OnHop
+// when present, then the server response chain — drops duplicate GET+POST fan-out.
+func selectWalkChainHops(hops []cell.TraceHop) []cell.TraceHop {
+	var semantic []cell.TraceHop
+	var uiEntry *cell.TraceHop
+	for i := range hops {
+		h := hops[i]
+		if isWalkChainHop(h) {
+			semantic = append(semantic, h)
+			continue
+		}
+		if uiEntry == nil && h.From == "" && isWalkMethod(h.Method) && isHTTPStatusResult(h.Result) {
+			cp := h
+			uiEntry = &cp
+		}
+	}
+	if len(semantic) == 0 {
+		return nil
+	}
+	out := make([]cell.TraceHop, 0, len(semantic)+1)
+	if uiEntry != nil {
+		// Avoid duplicating the same entry walk if the chain already starts with it.
+		first := semantic[0]
+		sameTarget := cell.BaseURLOf(uiEntry.Cell) == cell.BaseURLOf(first.Cell)
+		if !(sameTarget && isWalkMethod(first.Method) && first.From == "") {
+			out = append(out, *uiEntry)
+		}
+	}
+	out = append(out, semantic...)
+	return out
+}
+
+func stepsFromWalkChain(hops []cell.TraceHop) []rawTimelineStep {
+	steps := make([]rawTimelineStep, 0, len(hops))
+	for _, h := range hops {
+		steps = append(steps, rawTimelineStep{
+			fromURL:   h.From,
+			cellURL:   h.Cell,
+			projectID: firstNonEmpty(h.ProjectID, projectIDFromMethod(h.Method)),
+			lookup:    hopPtr(h),
+		})
+	}
+	return steps
+}
+
+func isWalkChainHop(h cell.TraceHop) bool {
+	if strings.TrimSpace(h.From) != "" {
+		return true
+	}
+	if isLocalLookupMethod(h.Method) {
+		return true
+	}
+	if isSemanticLookupResult(h.Result) {
+		return true
+	}
+	return false
+}
+
+func isWalkMethod(method string) bool {
+	m := strings.ToLower(strings.TrimSpace(method))
+	return strings.Contains(m, "/v1/lookup/walk")
+}
+
+func isLocalLookupMethod(method string) bool {
+	return strings.EqualFold(strings.TrimSpace(method), "local lookup")
 }
 
 func findStepForLookup(steps []rawTimelineStep, hopCell string) int {
@@ -278,20 +360,16 @@ func findStepForLookup(steps []rawTimelineStep, hopCell string) int {
 		if !isSemanticLookupResult(steps[i].lookup.Result) {
 			return i
 		}
-		// Keep scanning: later non-semantic slots first; remember last same-cell.
 		best = i
 	}
 	if best >= 0 && !isSemanticLookupResult(steps[best].lookup.Result) {
 		return best
 	}
-	// All same-cell steps already semantic: upgrade the first same-cell without a
-	// stronger result, else the first same-cell step.
 	for i := range steps {
 		if cell.BaseURLOf(steps[i].cellURL) != base {
 			continue
 		}
 		if steps[i].lookup != nil && isSemanticLookupResult(steps[i].lookup.Result) {
-			// Prefer leaving existing semantic; allow upgrade only if duplicate cell walk.
 			continue
 		}
 		return i
@@ -307,15 +385,26 @@ func findStepForLookup(steps []rawTimelineStep, hopCell string) int {
 func mergeLookup(step *rawTimelineStep, h cell.TraceHop) {
 	if step.lookup == nil {
 		step.lookup = hopPtr(h)
+		if step.fromURL == "" {
+			step.fromURL = h.From
+		}
+		if step.projectID == "" {
+			step.projectID = h.ProjectID
+		}
 		return
 	}
 	if shouldPreferLookupResult(h.Result, step.lookup.Result) {
 		cp := h
-		// Keep higher wire ms if semantic hop has 0.
 		if cp.Ms == 0 && step.lookup.Ms > 0 {
 			cp.Ms = step.lookup.Ms
 		}
 		step.lookup = &cp
+		if h.From != "" {
+			step.fromURL = h.From
+		}
+		if h.ProjectID != "" {
+			step.projectID = h.ProjectID
+		}
 	}
 }
 
@@ -324,7 +413,6 @@ func shouldPreferLookupResult(next, cur string) bool {
 		return true
 	}
 	if isSemanticLookupResult(next) && isSemanticLookupResult(cur) {
-		// Prefer hit/tombstone over miss when both present (unlikely).
 		n := strings.ToLower(next)
 		c := strings.ToLower(cur)
 		if n == c {
@@ -376,6 +464,15 @@ func parseGetProject(method string) (string, bool) {
 func projectIDFromMethod(method string) string {
 	if id, ok := parseGetProject(method); ok {
 		return id
+	}
+	return ""
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
 	}
 	return ""
 }

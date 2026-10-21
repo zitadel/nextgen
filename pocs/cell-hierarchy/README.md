@@ -22,6 +22,7 @@ Rules:
 - All objects live in **one cell only**.
 - Parent site’s lookup table holds floated keys from children (float-up).
 - **Lookup parent chain is site-only** — never platform. Platform holds teams/ops, not customer user lookup rows.
+- **Lookup walk is delegated up parent sites**: the UI (or any client) POSTs `/v1/lookup/walk` once to the entry cell; that cell resolves locally, then HTTP-calls its parent’s `/v1/lookup/walk`, and so on to the root. The response `trace` is the authoritative UI → entry → … → root chain (not a client fan-out to every cell).
 - Workspace ↔ customer team = `customer_team_id` (tuple binding deferred).
 - **Users + lookup only** for now (apps / grants / interests / tuples / groups deferred).
 - Restart proof: create user on a child site → float to parent sites → lookup from sibling finds home via site chain.

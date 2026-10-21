@@ -196,9 +196,15 @@ func startCell(t *testing.T, wantURL, label string, isParent bool) (*httptest.Se
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := cell.NewServer(store, cell.NewPeerClient(), nil)
+	peer := cell.NewPeerClient()
+	srv := cell.NewServer(store, peer, nil)
 	ts := httptest.NewServer(srv.Handler())
 	rewriteMetaURL(t, store, ts.URL)
+	peer.SelfURL = cell.NormalizeURL(ts.URL)
+	if peer.URLLabels == nil {
+		peer.URLLabels = map[string]string{}
+	}
+	peer.URLLabels[cell.NormalizeURL(ts.URL)] = label
 	cleanup := func() {
 		ts.Close()
 		_ = store.Close()

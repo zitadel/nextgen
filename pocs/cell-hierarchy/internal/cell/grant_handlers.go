@@ -290,7 +290,7 @@ func (s *Server) handleCreateTuple(w http.ResponseWriter, r *http.Request) {
 	case SubjectKindUser:
 		if homeProjectID == "" || homeCellURL == "" {
 			start := time.Now()
-			result, hops, walkErr := s.Peer.LookupWalk(r.Context(), meta.URL, p.ID, key)
+			result, hops, walkErr := s.walkLookup(r.Context(), p.ID, key)
 			trace = append(trace, hops...)
 			if walkErr != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": walkErr.Error(), "trace": trace})

@@ -263,14 +263,25 @@ func TestAddChildSiteFloatAndLookupWalk(t *testing.T) {
 	if tl == nil || tl.StepCount < 1 {
 		t.Fatalf("expected timeline steps after lookup, got %+v", tl)
 	}
-	// OnHop GET+POST plus semantic lookup should collapse into fewer site steps.
-	if len(lt.Hops) >= 3 && tl.StepCount >= len(lt.Hops) {
-		t.Fatalf("timeline should group hops: raw=%d steps=%d", len(lt.Hops), tl.StepCount)
-	}
+	// Single UI→entry OnHop plus server walk chain (not one UI caller per site).
+	uiCallers := 0
 	for _, s := range tl.Steps {
-		if s.Caller != "UI" {
-			t.Fatalf("timeline caller=%q want UI", s.Caller)
+		if s.Caller == "UI" {
+			uiCallers++
 		}
+	}
+	if uiCallers > 1 {
+		t.Fatalf("expected at most one UI→entry step, got %d UI callers in %+v", uiCallers, resultsOf(tl))
+	}
+	hasSemantic := false
+	for _, h := range lt.Hops {
+		if h.From != "" && (h.Result == "miss" || h.Result == "hit" || h.Result == "tombstone") {
+			hasSemantic = true
+			break
+		}
+	}
+	if !hasSemantic {
+		t.Fatalf("expected delegated walk hops with From set, got %+v", lt.Hops)
 	}
 }
 

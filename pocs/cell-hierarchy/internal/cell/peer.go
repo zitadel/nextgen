@@ -349,51 +349,44 @@ func (c *PeerClient) Lookup(ctx context.Context, cellURL, projectID, key string)
 	}, out.Trace, err
 }
 
-// LookupWalk starts at projectID on startCellURL and walks UP parent project pointers only.
-// Each hop delays using the previous cell URL as from (pairwise matrix).
+// LookupWalk asks the entry cell to walk the parent site chain.
+// The client makes one POST /v1/lookup/walk; the cell delegates to parents.
+// UI entry hops use zero pairwise delay (from=target when no SelfURL/ctx from).
 func (c *PeerClient) LookupWalk(ctx context.Context, startCellURL, projectID, key string) (LookupResult, []TraceHop, error) {
-	var trace []TraceHop
-	cellURL := NormalizeURL(startCellURL)
-	curProjectID := projectID
-	prevURL := ""
-	if c.SelfURL != "" {
-		prevURL = NormalizeURL(c.SelfURL)
+	if FromCellURL(ctx) == "" && (c == nil || c.SelfURL == "") {
+		ctx = WithFromCellURL(ctx, startCellURL)
 	}
-	if from := FromCellURL(ctx); from != "" {
-		prevURL = from
+	return c.LookupWalkRemote(ctx, startCellURL, projectID, key)
+}
+
+// LookupWalkRemote POSTs /v1/lookup/walk on cellURL (cell→parent Peer hop).
+// Pairwise delay applies via applyExtraDelay (SelfURL / FromCellURL → target).
+func (c *PeerClient) LookupWalkRemote(ctx context.Context, cellURL, projectID, key string) (LookupResult, []TraceHop, error) {
+	var out struct {
+		Hit           bool       `json:"hit"`
+		Tombstoned    bool       `json:"tombstoned"`
+		HomeProjectID string     `json:"home_project_id"`
+		HomeCellURL   string     `json:"home_cell_url"`
+		State         string     `json:"state"`
+		FoundAt       string     `json:"found_at"`
+		Trace         []TraceHop `json:"trace"`
+		Error         string     `json:"error"`
 	}
-	for {
-		hopCtx := ctx
-		if prevURL != "" {
-			hopCtx = WithFromCellURL(ctx, prevURL)
-		} else {
-			// First UI hop with no prior: treat as same-cell (from=target).
-			hopCtx = WithFromCellURL(ctx, cellURL)
-		}
-		proj, err := c.GetProject(hopCtx, cellURL, curProjectID)
-		if err != nil {
-			return LookupResult{}, trace, err
-		}
-		res, hops, err := c.Lookup(hopCtx, cellURL, curProjectID, key)
-		trace = append(trace, hops...)
-		if err != nil {
-			return LookupResult{}, trace, err
-		}
-		if res.Tombstoned {
-			res.FoundAtProjectID = curProjectID
-			return res, trace, nil
-		}
-		if res.Hit {
-			res.FoundAtProjectID = curProjectID
-			return res, trace, nil
-		}
-		if proj.ParentProjectID == "" || proj.ParentCellURL == "" {
-			return LookupResult{Hit: false}, trace, nil
-		}
-		prevURL = cellURL
-		cellURL = NormalizeURL(proj.ParentCellURL)
-		curProjectID = proj.ParentProjectID
+	err := c.doJSONAllowError(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/lookup/walk", map[string]any{
+		"project_id": projectID,
+		"key":        key,
+	}, &out)
+	if err != nil {
+		return LookupResult{}, out.Trace, err
 	}
+	if out.Error != "" {
+		return LookupResult{}, out.Trace, fmt.Errorf("%s", out.Error)
+	}
+	return LookupResult{
+		Hit: out.Hit, Tombstoned: out.Tombstoned || out.State == LookupStateTombstone,
+		HomeProjectID: out.HomeProjectID, HomeCellURL: out.HomeCellURL,
+		State: out.State, FoundAtProjectID: out.FoundAt,
+	}, out.Trace, nil
 }
 
 type RegisterInterestRequest struct {

@@ -12,10 +12,12 @@ import (
 )
 
 type TraceHop struct {
-	Cell   string `json:"cell"`
-	Method string `json:"method"`
-	Ms     int64  `json:"ms"`
-	Result string `json:"result"`
+	Cell      string `json:"cell"`
+	Method    string `json:"method"`
+	Ms        int64  `json:"ms"`
+	Result    string `json:"result"`
+	From      string `json:"from,omitempty"`       // caller cell URL; empty for UI→entry OnHop
+	ProjectID string `json:"project_id,omitempty"` // project resolved / looked up at this hop
 }
 
 type ProjectView struct {
@@ -695,21 +697,104 @@ func (s *Server) handleLookupWalk(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "project_id_and_key_required")
 		return
 	}
-	meta, err := s.Store.GetMeta()
+	result, trace, err := s.walkLookup(r.Context(), req.ProjectID, key)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	result, trace, err := s.Peer.LookupWalk(r.Context(), meta.URL, req.ProjectID, key)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error(), "trace": trace})
+		status := http.StatusBadRequest
+		if errors.Is(err, ErrProjectNotFound) {
+			status = http.StatusNotFound
+		}
+		writeJSON(w, status, map[string]any{"error": err.Error(), "trace": trace})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"hit":             result.Hit,
+		"tombstoned":      result.Tombstoned,
 		"home_project_id": result.HomeProjectID,
 		"home_cell_url":   result.HomeCellURL,
+		"state":           result.State,
 		"found_at":        result.FoundAtProjectID,
 		"trace":           trace,
 	})
+}
+
+// walkLookup resolves the key starting at projectID on this cell, then delegates
+// up the parent site chain via POST /v1/lookup/walk (never fans out from the client).
+func (s *Server) walkLookup(ctx context.Context, projectID, key string) (LookupResult, []TraceHop, error) {
+	meta, err := s.Store.GetMeta()
+	if err != nil {
+		return LookupResult{}, nil, err
+	}
+	selfURL := NormalizeURL(meta.URL)
+	proj, err := s.Store.GetProject(projectID)
+	if err != nil {
+		return LookupResult{}, nil, err
+	}
+
+	var trace []TraceHop
+	start := time.Now()
+	entry, err := s.Store.GetLookup(key)
+	localMs := time.Since(start).Milliseconds()
+	localHop := TraceHop{
+		From:      selfURL,
+		Cell:      selfURL,
+		Method:    "local lookup",
+		Ms:        localMs,
+		ProjectID: projectID,
+	}
+
+	if errors.Is(err, ErrLookupNotFound) {
+		localHop.Result = "miss"
+		trace = append(trace, localHop)
+		parentID := strings.TrimSpace(proj.ParentProjectID)
+		parentCell := strings.TrimSpace(proj.ParentCellURL)
+		if parentID == "" || parentCell == "" {
+			return LookupResult{Hit: false}, trace, nil
+		}
+		parentCell = NormalizeURL(parentCell)
+		hopStart := time.Now()
+		parentCtx := WithFromCellURL(ctx, selfURL)
+		parentRes, parentTrace, walkErr := s.Peer.LookupWalkRemote(parentCtx, parentCell, parentID, key)
+		callMs := time.Since(hopStart).Milliseconds()
+		callResult := "miss"
+		if walkErr != nil {
+			callResult = "error"
+		} else if parentRes.Tombstoned {
+			callResult = "tombstone"
+		} else if parentRes.Hit {
+			callResult = "hit"
+		}
+		trace = append(trace, TraceHop{
+			From:      selfURL,
+			Cell:      parentCell,
+			Method:    "POST /v1/lookup/walk",
+			Ms:        callMs,
+			Result:    callResult,
+			ProjectID: parentID,
+		})
+		trace = append(trace, parentTrace...)
+		if walkErr != nil {
+			return LookupResult{}, trace, walkErr
+		}
+		return parentRes, trace, nil
+	}
+	if err != nil {
+		return LookupResult{}, trace, err
+	}
+
+	if entry.State == LookupStateTombstone {
+		localHop.Result = "tombstone"
+		trace = append(trace, localHop)
+		return LookupResult{
+			Hit: false, Tombstoned: true,
+			HomeProjectID: entry.HomeProjectID, HomeCellURL: entry.HomeCellURL,
+			State: entry.State, FoundAtProjectID: projectID,
+		}, trace, nil
+	}
+
+	localHop.Result = "hit"
+	trace = append(trace, localHop)
+	return LookupResult{
+		Hit: true, HomeProjectID: entry.HomeProjectID, HomeCellURL: entry.HomeCellURL,
+		State: entry.State, FoundAtProjectID: projectID,
+	}, trace, nil
 }
