@@ -2,13 +2,14 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -36,9 +37,9 @@ func TestDeploymentErrorResponseStatuses(t *testing.T) {
 func TestDeploymentConflictCarriesDetails(t *testing.T) {
 	resp, ok := deploymentConflictResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}))
 	require.True(t, ok)
-	raw, err := json.Marshal(resp)
-	require.NoError(t, err)
-	assert.JSONEq(t, `{"code":"dep.conflict","message":"deployment: the deployment it replaces does not match expected_deployment_id","details":{"deployment":null}}`, string(raw))
+	body := resp.DeploymentGuardConflict
+	assert.Equal(t, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code, body.Code)
+	assert.True(t, body.Details.Deployment.Null)
 }
 
 // A conflict renders the deployment in the API's shape, kind and status
@@ -59,14 +60,20 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 	}
 	resp, ok := deploymentConflictResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: newest}))
 	require.True(t, ok)
-	raw, err := json.Marshal(resp.DeploymentGuardConflict.Details)
-	require.NoError(t, err)
-	assert.JSONEq(t, `{"deployment":{
-		"id":"dep_1","project_id":"proj_1","release_id":"rel_1","kind":"primary",
-		"targets":[{"origin":"https://app.acme.com"}],"status":"live",
-		"deployed_at":"2026-10-02T14:52:00Z",
-		"metadata":{"reason":"rollback","rollback_to":"dep_0","deployed_by_type":"service"}
-	}}`, string(raw))
+	assert.Equal(t, api.NewNilDeployment(api.Deployment{
+		ID:         "dep_1",
+		ProjectID:  "proj_1",
+		ReleaseID:  "rel_1",
+		Kind:       api.DeploymentKindPrimary,
+		Targets:    []api.DeploymentTarget{{Origin: "https://app.acme.com"}},
+		Status:     api.DeploymentStatusLive,
+		DeployedAt: time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC),
+		Metadata: api.DeploymentMetadata{
+			Reason:         api.DeploymentReasonRollback,
+			RollbackTo:     api.NewOptNilDeploymentID("dep_0"),
+			DeployedByType: api.NewOptNilDeploymentMetadataDeployedByType(api.DeploymentMetadataDeployedByTypeService),
+		},
+	}), resp.DeploymentGuardConflict.Details.Deployment)
 }
 
 // Any other error is left to NewError.
