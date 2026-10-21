@@ -1,4 +1,4 @@
-import { rcompare, valid } from "semver";
+import { lt, rcompare, valid } from "semver";
 
 // The changelog's data: the repository's GitHub Releases, read back from the
 // body the release automation writes (scripts/release-github.mjs). A body
@@ -15,6 +15,12 @@ const REPOSITORY = "zitadel/nextgen";
  * five already come to some 120 KB compressed.
  */
 export const RELEASE_COUNT = 5;
+
+/**
+ * The first release the page lists. The `0.1.0-alpha.N` previews before it are
+ * deprecated (docs/adrs/074-preview-releases-on-0x.md); GitHub keeps them.
+ */
+export const FIRST_RELEASE = "0.1.0";
 
 // The generated block and the placeholder for the notes above it, as
 // scripts/release-github.mjs writes them.
@@ -97,15 +103,21 @@ export async function fetchReleases(token = process.env.WEBSITE_GITHUB_TOKEN): P
   return parseReleases(await response.json());
 }
 
-/** The published releases of GitHub's answer, the highest version first. */
+/** The published releases of GitHub's answer from FIRST_RELEASE on, the highest version first. */
 export function parseReleases(json: unknown): Release[] {
   if (!Array.isArray(json)) {
     throw new Error("GitHub's answer is not a list of releases");
   }
   return (json as GitHubRelease[])
-    .filter((release) => !release.draft)
+    .filter((release) => !release.draft && !beforeFirstRelease(release.tag_name))
     .map(parseRelease)
     .sort(newestFirst);
+}
+
+// A tag that is no version stays, as newestFirst places it last.
+function beforeFirstRelease(tag: string): boolean {
+  const version = valid(tag);
+  return version !== null && lt(version, FIRST_RELEASE);
 }
 
 export function parseRelease(release: GitHubRelease): Release {

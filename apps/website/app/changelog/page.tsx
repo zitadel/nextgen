@@ -23,7 +23,7 @@ import {
 } from "./filter";
 import { Markdown } from "./markdown";
 import { OpenLinkedRelease } from "./open-linked-release";
-import { type Change, fetchReleases, RELEASE_COUNT, type Release } from "./releases";
+import { type Change, FIRST_RELEASE, fetchReleases, RELEASE_COUNT, type Release } from "./releases";
 
 // The page is built with the releases GitHub has then, and built again in the
 // background at most every 15 minutes, when a visit finds it older
@@ -117,7 +117,16 @@ export default async function ChangelogPage() {
                 ))}
               </ol>
               <p className="mt-8 text-sm text-text-muted leading-6">
-                The last {RELEASE_COUNT} releases; {github} has every one.
+                {releases.length < RELEASE_COUNT ? (
+                  <>
+                    Every release from {FIRST_RELEASE} on; {github} also has the alpha previews
+                    before it.
+                  </>
+                ) : (
+                  <>
+                    The last {RELEASE_COUNT} releases; {github} has every one.
+                  </>
+                )}
               </p>
               <OpenLinkedRelease />
             </ChangelogFilter>
