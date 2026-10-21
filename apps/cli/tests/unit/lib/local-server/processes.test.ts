@@ -8,7 +8,7 @@ vi.mock("node:child_process", () => ({
 
 const mockExecFile = vi.mocked(execFile);
 
-import { PsLocalServers } from "../../../../src/lib/local-server/processes";
+import { discoverManagedRuntimeProcesses } from "../../../../src/lib/local-server/processes";
 
 function whenPs(
   impl: (
@@ -32,7 +32,7 @@ beforeEach(() => {
   mockExecFile.mockReset();
 });
 
-describe("PsLocalServers", () => {
+describe("discoverManagedRuntimeProcesses", () => {
   it("returns only CLI-managed local runtime processes", async () => {
     whenPs((args, cb) => {
       if (args[0] === "axo") {
@@ -58,7 +58,7 @@ describe("PsLocalServers", () => {
       cb(null, env);
     });
 
-    const discovery = await new PsLocalServers().current();
+    const discovery = await discoverManagedRuntimeProcesses();
 
     expect(discovery).toMatchObject({
       supported: true,
@@ -88,7 +88,7 @@ describe("PsLocalServers", () => {
       );
     });
 
-    const discovery = await new PsLocalServers().current();
+    const discovery = await discoverManagedRuntimeProcesses();
 
     expect(discovery.processes).toHaveLength(1);
     expect(discovery.processes[0]).toMatchObject({
@@ -103,7 +103,7 @@ describe("PsLocalServers", () => {
     });
     whenPs((_args, cb) => cb(enoent, ""));
 
-    await expect(new PsLocalServers().current()).resolves.toMatchObject({
+    await expect(discoverManagedRuntimeProcesses()).resolves.toMatchObject({
       supported: false,
       processes: [],
     });

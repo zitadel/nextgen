@@ -9,7 +9,7 @@ import { failureAdvice } from "../../../src/commands/doctor";
 import type { LocalServers } from "../../../src/lib/local-server/processes";
 import { publicCliCommand } from "../../../src/lib/public-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
-import { aMachineRunning, doctorSeeing } from "../../helpers/local-servers";
+import { aMachineRunning } from "../../helpers/local-servers";
 import { nextPort } from "../../helpers/ports";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
@@ -681,7 +681,7 @@ describe("doctor's managed runtime process check", () => {
         DOCKER_LOG: fake.logPath,
       },
       undefined,
-      doctorSeeing(servers),
+      servers,
     );
     return parseJson(res.stdout);
   }

@@ -21,7 +21,7 @@ import {
 } from "../../../src/lib/local-server/runtime";
 import Reset from "../../../src/commands/reset";
 import { nextPort } from "../../helpers/ports";
-import { aMachineRunning, doctorSeeing, stopSeeing } from "../../helpers/local-servers";
+import { aMachineRunning } from "../../helpers/local-servers";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
@@ -295,7 +295,7 @@ describe("local runtime commands", () => {
       ["doctor", "--cwd", cwd, "--json", "--port", String(port)],
       { ZITADEL_SERVER_BINARY: fake.binPath },
       undefined,
-      doctorSeeing(servers),
+      servers,
     );
 
     expect(result.exitCode).toBe(0);
@@ -877,7 +877,7 @@ describe("local runtime commands", () => {
       ["stop", "--cwd", cwd, "--json", "--all"],
       {},
       undefined,
-      stopSeeing(servers),
+      servers,
     );
 
     expect(result.exitCode).toBe(0);

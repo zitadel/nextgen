@@ -3,6 +3,7 @@ import { format } from "node:util";
 
 import { run } from "@oclif/core";
 
+import type { LocalServers } from "../../src/lib/local-server/processes";
 import { publicCliCommand } from "../../src/lib/public-cli";
 import { cliPackageRoot } from "./oclif-build";
 
@@ -17,15 +18,16 @@ const cliVersion = JSON.parse(
  * `run*` functions to stdout exactly as in production. Requires the CLI to have
  * been built (vitest global setup builds `dist/index.mjs`). `root` is the
  * package oclif loads; pass a staged copy to exercise a published layout.
- * `command` runs a command class of the source (for the command `argv` names)
- * instead of the built one, for a test that subclasses it to replace a seam
- * such as `localServers`.
+ *
+ * `doctor` and `stop` run from the source with `machine` as the servers the
+ * machine runs, none unless a test gives some, so no run reads the host's
+ * processes and a Zitadel running on the developer's machine changes no result.
  */
 export async function runCliForTest(
   argv: string[],
   env: NodeJS.ProcessEnv = {},
   root: string = cliPackageRoot,
-  command?: { run(argv: string[], root: string): Promise<unknown> },
+  machine?: LocalServers,
 ) {
   let stdout = "";
   let stderr = "";
@@ -56,6 +58,7 @@ export async function runCliForTest(
 
   let exitCode = 0;
   try {
+    const command = await commandSeeing(argv[0], machine);
     await (command ? command.run(argv.slice(1), root) : run(argv, root));
   } catch (error) {
     exitCode = exitCodeOf(error);
@@ -75,6 +78,21 @@ export async function runCliForTest(
   }
 
   return { exitCode, stdout, stderr };
+}
+
+/** The source command that asks `machine` which servers run, for the commands that ask. */
+async function commandSeeing(
+  name: string | undefined,
+  machine: LocalServers | undefined,
+): Promise<{ run(argv: string[], root: string): Promise<unknown> } | undefined> {
+  if (name !== "doctor" && name !== "stop") {
+    return undefined;
+  }
+  // Loaded here, not at the top: this module is loaded by the test setup, ahead
+  // of any test's mocks, and the commands must not be.
+  const { aMachineRunning, doctorSeeing, stopSeeing } = await import("./local-servers");
+  const servers = machine ?? aMachineRunning();
+  return name === "doctor" ? doctorSeeing(servers) : stopSeeing(servers);
 }
 
 function exitCodeOf(error: unknown): number {

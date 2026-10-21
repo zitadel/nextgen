@@ -15,52 +15,53 @@ export type ManagedRuntimeDiscovery = Readonly<{
   supported: boolean;
 }>;
 
-/**
- * Which CLI-managed local Zitadel servers are running on the machine, whichever
- * directory started them. Everything that asks goes through this, so a test can
- * answer for the machine instead of reading it.
- */
-export interface LocalServers {
-  current(opts?: { readonly timeoutMs?: number }): Promise<ManagedRuntimeDiscovery>;
-}
-
 type ProcessRow = Readonly<{
   command: string;
   pid: number;
   ppid?: number;
 }>;
 
+/**
+ * Which CLI-managed local Zitadel servers are running on the machine, whichever
+ * directory started them. Everything that asks goes through this, so a test can
+ * answer for the machine instead of reading it.
+ */
+export interface LocalServers {
+  current(): Promise<ManagedRuntimeDiscovery>;
+}
+
 /** The real answer: the machine's processes, read with `ps`. */
 export class PsLocalServers implements LocalServers {
-  async current(opts?: { readonly timeoutMs?: number }): Promise<ManagedRuntimeDiscovery> {
-    if (process.platform === "win32") {
-      return {
-        supported: false,
-        processes: [],
-        error: "process sweep is not available on Windows",
-      };
-    }
-
-    const timeoutMs = opts?.timeoutMs ?? 1000;
-    let rows: ReadonlyArray<ProcessRow>;
-    try {
-      rows = parsePsRows(await runPs(["axo", "pid=,ppid=,command="], timeoutMs));
-    } catch (error) {
-      return { supported: false, processes: [], error: errorMessage(error) };
-    }
-
-    const candidates = rows.filter((row) => isRuntimeCandidate(row.command));
-    const hydrated = await Promise.all(
-      candidates.map(async (row) => ({
-        ...row,
-        command: await hydrateCommand(row.pid, row.command, timeoutMs),
-      })),
-    );
-    const processes = hydrated
-      .map(toManagedRuntimeProcess)
-      .filter((candidate): candidate is ManagedRuntimeProcess => candidate !== undefined);
-    return { supported: true, processes: uniqueByPid(processes) };
+  current(): Promise<ManagedRuntimeDiscovery> {
+    return discoverManagedRuntimeProcesses();
   }
+}
+
+export async function discoverManagedRuntimeProcesses(opts?: {
+  readonly timeoutMs?: number;
+}): Promise<ManagedRuntimeDiscovery> {
+  if (process.platform === "win32") {
+    return { supported: false, processes: [], error: "process sweep is not available on Windows" };
+  }
+
+  let rows: ReadonlyArray<ProcessRow>;
+  try {
+    rows = parsePsRows(await runPs(["axo", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000));
+  } catch (error) {
+    return { supported: false, processes: [], error: errorMessage(error) };
+  }
+
+  const candidates = rows.filter((row) => isRuntimeCandidate(row.command));
+  const hydrated = await Promise.all(
+    candidates.map(async (row) => ({
+      ...row,
+      command: await hydrateCommand(row.pid, row.command, opts?.timeoutMs ?? 1000),
+    })),
+  );
+  const processes = hydrated
+    .map(toManagedRuntimeProcess)
+    .filter((candidate): candidate is ManagedRuntimeProcess => candidate !== undefined);
+  return { supported: true, processes: uniqueByPid(processes) };
 }
 
 function runPs(args: string[], timeoutMs: number): Promise<string> {
