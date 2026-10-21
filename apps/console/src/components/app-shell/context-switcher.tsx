@@ -1,7 +1,15 @@
-import { Link, type LinkProps, useMatch, useMatches, useParams } from "@tanstack/react-router";
-import { Box, Boxes, Check, ChevronsUpDown, type LucideIcon, Search, Slash } from "lucide-react";
+import {
+  Link,
+  type LinkProps,
+  useMatch,
+  useMatches,
+  useNavigate,
+  useParams,
+} from "@tanstack/react-router";
+import { Box, Boxes, Check, ChevronsUpDown, type LucideIcon, Plus, Slash } from "lucide-react";
 import { useId, useState } from "react";
 
+import { AddTeamSheet } from "@/components/add-team-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -21,12 +29,9 @@ import {
  * slash and the team switcher, as the design's navbar draws them. Built on
  * shadcn `Popover`.
  *
- * The project popover's footer links to the Projects overview (`All projects`),
- * the same screen as the sidebar's first entry, for someone already in the
- * switcher looking for a project it does not list.
- *
- * No create action in the footer: this component backs both switchers, so one
- * shared button would be mislabelled in one of them.
+ * The project popover has no footer: the sidebar's first entry is the
+ * Projects overview. The team popover's footer adds a team, opening the Add
+ * team drawer and then the new team.
  */
 
 /**
@@ -68,7 +73,6 @@ export function ContextSwitcher() {
         options={projects}
         emptyLabel={projects?.length === 0 ? NO_PROJECTS : NO_SELECTION}
         ariaLabel="Switch project"
-        footer={{ label: "All projects", link: { to: "/projects" } }}
       />
       {/* The team switcher joins the bar once a team is open — the team is the
           context then, and following another team from the list switches it.
@@ -88,7 +92,9 @@ export function ContextSwitcher() {
 /**
  * The open team and the project's active teams, each a link to its own page —
  * so choosing one is a navigation, like choosing a project. One page of teams:
- * the list is a way across, `All teams` is the directory.
+ * the list is a way across; the sidebar's Teams is the directory. Its footer
+ * adds a team. The drawer lives outside the popover, which unmounts on close,
+ * and opens the new team once it is created.
  */
 function TeamSwitcher({ projectId, teamId }: { projectId: string; teamId: string }) {
   // The open team as its page loaded it. The page's loader re-runs after a
@@ -100,23 +106,32 @@ function TeamSwitcher({ projectId, teamId }: { projectId: string; teamId: string
     [],
     [projectId, openTeam?.updatedAt],
   );
+  const [adding, setAdding] = useState(false);
+  const navigate = useNavigate();
 
   return (
-    <Switcher
-      icon={Box}
-      heading="Teams"
-      label={openTeam?.loaderData?.team.name}
-      currentId={teamId}
-      options={teams?.map((team) => ({
-        id: team.id,
-        label: team.name,
-        link: { to: "/teams/$teamId", params: { teamId: team.id } },
-      }))}
-      emptyLabel="No teams"
-      ariaLabel="Switch team"
-      footer={{ label: "All teams", link: { to: "/teams" } }}
-      current
-    />
+    <>
+      <Switcher
+        icon={Box}
+        heading="Teams"
+        label={openTeam?.loaderData?.team.name}
+        currentId={teamId}
+        options={teams?.map((team) => ({
+          id: team.id,
+          label: team.name,
+          link: { to: "/teams/$teamId", params: { teamId: team.id } },
+        }))}
+        emptyLabel="No teams"
+        ariaLabel="Switch team"
+        footer={{ label: "Add team", icon: Plus, onSelect: () => setAdding(true) }}
+        current
+      />
+      <AddTeamSheet
+        open={adding}
+        onOpenChange={setAdding}
+        onCreated={(team) => navigate({ to: "/teams/$teamId", params: { teamId: team.id } })}
+      />
+    </>
   );
 }
 
@@ -201,32 +216,22 @@ function Switcher({
   /** Shown in place of a label once the options have loaded and there are none. */
   emptyLabel: string;
   ariaLabel: string;
-  /** A link beneath the options — the overview of all of them. */
-  footer?: { label: string; link: Pick<LinkProps, "to" | "search"> };
+  /** An action beneath the options, which closes the popover first. */
+  footer?: { label: string; icon: LucideIcon; onSelect: () => void };
   /** The innermost context in the bar, whose label the design sets semibold. */
   current?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const listId = useId();
 
   // Loading is the options not having answered yet — not the label being
   // absent, which is also what an empty answer looks like.
   const loading = options === undefined;
-  const empty = options?.length === 0;
 
-  const rows = (options ?? []).filter((option) =>
-    option.label.toLowerCase().includes(query.trim().toLowerCase()),
-  );
+  const rows = options ?? [];
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) setQuery("");
-      }}
-    >
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button type="button" aria-label={ariaLabel} className={TRIGGER}>
           <Icon size={16} className="shrink-0 text-foreground" aria-hidden />
@@ -255,24 +260,9 @@ function Switcher({
         <p className="px-2 py-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {heading}
         </p>
-        <div className="mb-1 flex items-center gap-2 rounded-sm border border-input px-2 py-1.5">
-          <Search size={16} className="shrink-0 text-muted-foreground" aria-hidden />
-          <input
-            type="search"
-            name={`${listId}-search`}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search"
-            aria-label={`${ariaLabel} search`}
-            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-          />
-        </div>
-
         <ul id={listId} aria-label={ariaLabel} className="flex flex-col">
           {rows.length === 0 ? (
-            <li className="px-2 py-1.5 text-sm text-muted-foreground">
-              {empty ? emptyLabel : "No results"}
-            </li>
+            <li className="px-2 py-1.5 text-sm text-muted-foreground">{emptyLabel}</li>
           ) : (
             // Links, not buttons: selecting a project or a team is a navigation —
             // the project lives in the URL (`?project=`), the team is the page.
@@ -315,16 +305,25 @@ function Switcher({
         </ul>
 
         {footer && (
-          <div className="-mx-1 mt-1 border-t border-border px-1 pt-1">
-            <Link
-              {...footer.link}
-              onClick={() => setOpen(false)}
-              // No icon, but indented like one: `pl-8` is a row's `px-2` plus its
-              // 16px icon and `gap-2`, so the label lines up with the names above.
-              className="flex h-8 w-full items-center rounded-sm pr-2 pl-8 text-left text-sm text-foreground outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          // `foreground/10`, as the account menu's hairlines: `border` is the
+          // popover's own colour on the dark theme and would not show.
+          <div className="-mx-1 mt-1 border-t border-foreground/10 px-1 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                footer.onSelect();
+              }}
+              // Laid out like a row (`ROW`): icon, then the label in line with
+              // the names above.
+              className={cn(
+                ROW,
+                "w-full text-left outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50",
+              )}
             >
-              {footer.label}
-            </Link>
+              <footer.icon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+              <span className="flex-1 truncate text-sm text-foreground">{footer.label}</span>
+            </button>
           </div>
         )}
       </PopoverContent>

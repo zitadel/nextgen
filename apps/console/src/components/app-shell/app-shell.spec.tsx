@@ -294,6 +294,42 @@ describe("team switcher", () => {
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams/team_b"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
   });
+
+  it("adds a team from beneath the list and opens it", async () => {
+    const created: unknown[] = [];
+    server.use(
+      http.post(TEAMS_QUERY, () => HttpResponse.json({ teams: TEAMS })),
+      http.get("*/api/teams/:teamId", ({ params }) =>
+        HttpResponse.json(
+          TEAMS.find((team) => team.id === params.teamId) ?? {
+            ...TEAMS[0],
+            id: "team_new",
+            name: "Acme Labs",
+          },
+        ),
+      ),
+      http.post("*/api/teams", async ({ request }) => {
+        created.push(await request.json());
+        return HttpResponse.json({ ...TEAMS[0], id: "team_new", name: "Acme Labs" });
+      }),
+    );
+    const router = renderShell(scopedPath("/teams/team_a", "proj_1"));
+    const switcher = await screen.findByRole("button", { name: "Switch team" });
+    await waitFor(() => expect(switcher).toHaveTextContent("Acme Inc"));
+
+    await userEvent.click(switcher);
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "All teams" })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Add team" }));
+
+    // The popover closes; the drawer opens in its place.
+    expect(screen.queryByRole("list", { name: "Switch team" })).not.toBeInTheDocument();
+    await userEvent.type(await screen.findByLabelText("Team name"), "Acme Labs");
+    await userEvent.click(screen.getByRole("button", { name: "Add team" }));
+
+    expect(created).toEqual([{ name: "Acme Labs" }]);
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams/team_new"));
+  });
 });
 
 describe("theme toggle", () => {
@@ -468,19 +504,15 @@ describe("project pill", () => {
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" });
   });
 
-  it("links to the overview of every project beneath the list", async () => {
-    const router = renderShell();
+  it("lists the projects alone, with no search and no footer", async () => {
+    renderShell();
     const pill = await screen.findByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
     await userEvent.click(pill);
 
-    const all = await screen.findByRole("link", { name: "All projects" });
-    // The selection rides along: the overview is a look around, not a reset.
-    expect(all).toHaveAttribute("href", scopedPath("/projects", "proj_1"));
-    await userEvent.click(all);
-
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
-    expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();
+    await screen.findByRole("list", { name: "Switch project" });
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "All projects" })).not.toBeInTheDocument();
   });
 
   it("says there are no projects instead of loading forever", async () => {
