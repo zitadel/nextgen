@@ -1127,6 +1127,28 @@ function releaseResponse(release: ReleaseRecord): Record<string, unknown> {
   };
 }
 
+/**
+ * Which origins a deployment went to: a preview target carries an expiry, a
+ * primary one never does, and the two cannot be mixed in one deployment.
+ */
+function deploymentKind(deployment: DeploymentRecord): "primary" | "preview" {
+  return deployment.targets.some((target) => target.expiresAt !== null) ? "preview" : "primary";
+}
+
+/**
+ * Whether the deployment still serves its release: `live` while at least one
+ * of its targets is served by it, `inactive` once a later deployment replaced
+ * every one, or its previews expired or were removed.
+ */
+function deploymentStatus(deployment: DeploymentRecord): "live" | "inactive" {
+  return deployment.targets.some(
+    (target) =>
+      newestDeploymentForOrigin(deployment.projectId, target.origin)?.id === deployment.id,
+  )
+    ? "live"
+    : "inactive";
+}
+
 /** The wire shape of a deployment, optionally over a restricted target set. */
 function deploymentResponse(
   deployment: DeploymentRecord,
@@ -1142,6 +1164,8 @@ function deploymentResponse(
         ? { origin: target.origin }
         : { origin: target.origin, expires_at: target.expiresAt },
     ),
+    kind: deploymentKind(deployment),
+    status: deploymentStatus(deployment),
     deployed_at: deployment.deployedAt,
     metadata: {
       reason: deployment.reason,

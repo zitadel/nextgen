@@ -1919,6 +1919,37 @@ describe("api-mock releases and deployments", () => {
     expect(((await unknown.json()) as { code: string }).code).toBe("proj.origin_not_allowed");
   });
 
+  test("carries the deployment kind, and turns a replaced one inactive", async () => {
+    const project = await newProject("deploy-kind-status");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const first = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+
+    const live = await createDeployment(project.id, project.secret, {
+      release_id: first.id,
+      targets: ["primary"],
+    });
+    expect(await live.json()).toMatchObject({ kind: "primary", status: "live" });
+
+    await createDeployment(project.id, project.secret, {
+      release_id: second.id,
+      targets: ["primary"],
+    });
+
+    const history = (await (
+      await fetch(`${BASE}/deployments?project_id=${project.id}`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      })
+    ).json()) as { deployments: { release_id: string; status: string }[] };
+    expect(history.deployments.find((entry) => entry.release_id === first.id)?.status).toBe(
+      "inactive",
+    );
+  });
+
   test("refuses a primary origin named one by one", async () => {
     const project = await newProject("deploy-exact-primary");
     await addPrimary(project.id, project.secret, "https://app.acme.com");
