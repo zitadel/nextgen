@@ -213,7 +213,7 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 
 	case isCSRFError(err):
 		status = http.StatusForbidden
-		logged = domain.ErrAuthCSRFInvalid()
+		_ = errors.As(err, &logged)
 		details = domainErrorDetails(logged)
 
 	case isSecurityError(err):

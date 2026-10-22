@@ -514,6 +514,25 @@ func TestErrorResponse_serverFaultsAre5xx(t *testing.T) {
 	}
 }
 
+// A CSRF refusal is logged as the error the check returned, not a fresh one
+// built in the error handler, so its cause and origin stay on the line. The
+// body keeps the stable code and message.
+func TestOgenErrorHandlerLogsTheCSRFErrorItWasGiven(t *testing.T) {
+	records := recordLogs(t)
+	err := &ogenerrors.SecurityError{
+		Security: "NextgenSession",
+		Err:      domain.ErrAuthCSRFInvalid().WithParent(errors.New("origin mismatch")),
+	}
+	rec := httptest.NewRecorder()
+	OgenErrorHandler(t.Context(), rec, httptest.NewRequest(http.MethodPost, "/teams", nil), err)
+
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	want := domain.ErrAuthCSRFInvalid()
+	require.JSONEq(t, fmt.Sprintf(`{"code":%q,"message":%q}`, want.Code, want.Message), rec.Body.String())
+	require.Len(t, records(), 1)
+	require.Equal(t, "origin mismatch", records()[0]["error"].(map[string]any)["parent"])
+}
+
 // A security handler that cannot reach a decision (the CSRF request state is
 // missing because WithCSRFRequest is not wired) is a server fault: 500, not
 // the 401 a refused credential gets.
