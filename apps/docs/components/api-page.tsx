@@ -4,7 +4,7 @@ import { curl } from "fumadocs-openapi/requests/generators/curl";
 import { createOpenAPIPage } from "fumadocs-openapi/ui";
 
 import { cliCommand, cliSample } from "@/lib/cli-sample";
-import { codeThemes } from "@/lib/code-theme";
+import { codeOptions } from "@/lib/code-theme";
 import { sdkSample } from "@/lib/sdk-sample";
 
 // The request and response samples in the console's colours, like the pages'
@@ -13,7 +13,7 @@ import { sdkSample } from "@/lib/sdk-sample";
 // where the CLI can run it (lib/cli-sample.ts), then cURL: an empty registry
 // leaves out Fumadocs' plain HTTP in the languages Zitadel ships no SDK for.
 export const OpenAPIPage = createOpenAPIPage({
-  shikiOptions: { themes: codeThemes },
+  shikiOptions: codeOptions,
   codeUsages: createCodeUsageGeneratorRegistry(),
   generateCodeSamples: ({ operation, path, pathItem }) => [
     {

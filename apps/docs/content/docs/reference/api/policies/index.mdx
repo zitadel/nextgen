@@ -3,15 +3,10 @@ title: Policies
 description: OpenAPI operations for operation policies, such as the password policy.
 ---
 
-import { Card, Cards } from "fumadocs-ui/components/card";
-
 A policy holds the settings a project's operation is checked against, for
 example the minimum length a new password must have. A project has one policy
 per operation; each publish creates an immutable revision, and the newest one
 applies the next time the operation runs. Settings left out are off: Zitadel
 applies no defaults.
 
-<Cards>
-  <Card title="Publish a policy" href="/docs/reference/api/policies/publishPolicy" />
-  <Card title="Get a policy revision" href="/docs/reference/api/policies/getPolicyRevision" />
-</Cards>
+<Operations />

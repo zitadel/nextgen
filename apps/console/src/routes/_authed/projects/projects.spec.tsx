@@ -63,6 +63,31 @@ describe("projects screen", () => {
     expect(table.getByText(expectedDate("2026-07-08T09:00:00Z"))).toBeInTheDocument();
   });
 
+  it("suggests setup against this console's own server", async () => {
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [
+            {
+              id: "proj_1",
+              name: "River",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
+          ],
+        }),
+      ),
+    );
+    await renderProjects();
+    await screen.findByRole("heading", { name: "Projects" });
+
+    // The specs' API base is http://localhost/api, so that is the server the
+    // command names, not the CLI's hosted default.
+    expect(
+      await screen.findByText("npx @zitadel/cli@latest setup --server http://localhost"),
+    ).toBeInTheDocument();
+  });
+
   it("lists a project somebody else granted access to", async () => {
     // The person owns nothing here: the row exists only because the query
     // answers with grants rather than with the console's own project.

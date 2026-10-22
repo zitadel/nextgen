@@ -542,6 +542,25 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
         message: expect.stringContaining("is healthy"),
       });
     });
+
+    it("points at that server's log", async () => {
+      const { app } = await appUnderStartedServer();
+
+      const res = await doctorWithoutPort(app);
+
+      const data = (parseJson(res.stdout) as { data: { next_actions?: string[] } }).data;
+      expect(data.next_actions).toContainEqual(
+        expect.stringContaining(expectedPublicCliCommand("logs --follow")),
+      );
+    });
+  });
+
+  it("points at no server log where no server was started", async () => {
+    const cwd = await makeHealthyProject();
+
+    const res = await doctor(cwd);
+
+    expect(res.stdout).not.toContain("logs --follow");
   });
 
   it("fails the project-match check when secret and config disagree", async () => {

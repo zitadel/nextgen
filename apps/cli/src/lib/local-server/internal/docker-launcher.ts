@@ -15,6 +15,8 @@ import {
   type ContainerIdentity,
   type DockerRuntimeMetadata,
 } from "../runtime";
+import type { LogSink } from "../server-log";
+import { stopSignal } from "./clock";
 import { type Launched, type Launcher, type StopOutcome, launched } from "./lifecycle";
 
 export type DockerResult = {
@@ -298,11 +300,11 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
   }
 
   /**
-   * The last `tail` lines of the container's log. `docker logs` replays the
-   * container's two streams separately, and the server logs to stderr, so both
-   * are returned; reading stdout alone gave an empty log.
+   * The last `tail` lines of the container's log, or all of it. `docker logs`
+   * replays the container's two streams separately, and the server logs to
+   * stderr, so both are returned; reading stdout alone gave an empty log.
    */
-  static async readLogs(containerName: string, tail: number): Promise<string> {
+  static async readLogs(containerName: string, tail: number | "all"): Promise<string> {
     const result = await requireDocker(
       ["logs", "--tail", String(tail), containerName],
       "Read logs",
@@ -312,10 +314,41 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
   }
 
   /**
-   * Streams the container's log to the terminal until interrupted.
+   * Hands `sink` the container's log until interrupted. With a line count,
+   * Docker picks the last lines itself and they arrive as appended, with what
+   * follows them. With `"all"`, `sink` gets the whole log as it is first, for a
+   * caller that picks lines Docker cannot (those at a level). `docker logs
+   * --follow` then replays the log before it streams, so the replay is skipped,
+   * stream by stream, by the lines read the first time; only whole lines are
+   * handed over then, so a line still being written is not handed over twice.
    */
-  static async followLogs(containerName: string, tail: number): Promise<void> {
-    await streamDocker(["logs", "--tail", String(tail), "--follow", containerName]);
+  static async followLogs(
+    containerName: string,
+    tail: number | "all",
+    sink: LogSink,
+  ): Promise<void> {
+    const replayed = { stdout: 0, stderr: 0 };
+    if (tail === "all") {
+      const existing = await requireDocker(["logs", "--tail", "all", containerName], "Read logs");
+      const stdout = wholeLines(existing.stdout);
+      const stderr = wholeLines(existing.stderr);
+      sink.existing(stdout + stderr);
+      replayed.stdout = lineBreaks(stdout);
+      replayed.stderr = lineBreaks(stderr);
+    }
+    const stop = stopSignal();
+    try {
+      await streamDocker(
+        ["logs", "--tail", String(tail), "--follow", containerName],
+        {
+          stdout: afterLines(replayed.stdout, sink.appended),
+          stderr: afterLines(replayed.stderr, sink.appended),
+        },
+        stop.signal,
+      );
+    } finally {
+      stop.dispose();
+    }
   }
 
   /**
@@ -365,23 +398,66 @@ async function runDocker(
 }
 
 /**
- * Runs `docker` with its output going straight to the terminal.
+ * Runs `docker` until it ends or `signal` aborts, handing its output over as it
+ * comes. Ctrl-C reaches `docker` as well; either way, a stop is not a failure.
  */
-async function streamDocker(args: string[]): Promise<void> {
+async function streamDocker(
+  args: string[],
+  output: { stdout: (text: string) => void; stderr: (text: string) => void },
+  signal: AbortSignal,
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn("docker", args, {
-      stdio: "inherit",
+      stdio: ["ignore", "pipe", "pipe"],
       env: process.env,
     });
-    child.on("error", reject);
+    const stop = () => child.kill("SIGINT");
+    signal.addEventListener("abort", stop, { once: true });
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", output.stdout);
+    child.stderr?.on("data", output.stderr);
+    child.on("error", (error) => {
+      signal.removeEventListener("abort", stop);
+      reject(error);
+    });
     child.on("close", (code) => {
-      if (code === 0) {
+      signal.removeEventListener("abort", stop);
+      if (code === 0 || signal.aborted) {
         resolve();
       } else {
         reject(new Error(`docker ${args.join(" ")} exited with status ${code ?? 1}`));
       }
     });
   });
+}
+
+/** `text` up to and with its last line break: its whole lines. */
+function wholeLines(text: string): string {
+  return text.slice(0, text.lastIndexOf("\n") + 1);
+}
+
+function lineBreaks(text: string): number {
+  return text.split("\n").length - 1;
+}
+
+/** Passes a stream's text to `write` once its first `count` lines have gone by. */
+function afterLines(count: number, write: (text: string) => void): (text: string) => void {
+  let left = count;
+  return (text) => {
+    let start = 0;
+    while (left > 0) {
+      const lineBreak = text.indexOf("\n", start);
+      if (lineBreak === -1) {
+        return;
+      }
+      left -= 1;
+      start = lineBreak + 1;
+    }
+    if (start < text.length) {
+      write(text.slice(start));
+    }
+  };
 }
 
 /**

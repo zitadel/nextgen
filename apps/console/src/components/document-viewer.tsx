@@ -1,18 +1,10 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { stringify as stringifyYaml } from "yaml";
 
+import { CLI_APPLY, CliCommand, CliHint } from "@/components/cli-hint";
 import { CopyButton } from "@/components/ui/copy-button";
-import { InlineCode } from "@/components/ui/inline-code";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type CodeLanguage, type CodeLine, highlightCode } from "@/lib/highlight";
-
-/**
- * The command the footer tells an operator to run (decisions log D0b).
- *
- * The published CLI, invoked without installing it, from npm's `latest` tag
- * (docs/adrs/074-preview-releases-on-0x.md).
- */
-const CLI_COMMAND = "npx @zitadel/cli@latest apply";
 
 /**
  * `lineWidth: 0` disables YAML's line folding. Folding is legal and Shiki reads
@@ -95,15 +87,10 @@ export function DocumentViewer({ document, noun }: { document: unknown; noun: st
         </code>
       </pre>
 
-      {/* Inline flow, not a flex row: the design is
-          three auto-layout children with a 4px gap, which puts a space in front
-          of the full stop. Normal inline text wraps the same way and lets the
-          punctuation hug the command. */}
-      <p className="border-t border-border py-3 pr-3 pl-4 text-xs leading-4 text-muted-foreground">
-        Edit the {noun} locally, then apply your changes with{" "}
-        <InlineCode className="text-[10px]">{CLI_COMMAND}</InlineCode>. Applying creates a new
-        revision.
-      </p>
+      <CliHint>
+        Edit the {noun} locally, then apply your changes with <CliCommand>{CLI_APPLY}</CliCommand>.
+        Applying creates a new revision.
+      </CliHint>
     </div>
   );
 }

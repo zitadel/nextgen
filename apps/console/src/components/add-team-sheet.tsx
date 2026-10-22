@@ -16,15 +16,19 @@ import { useRequiredProjectScope } from "@/lib/project-scope";
  */
 export function AddTeamSheet({
   children,
+  open,
+  onOpenChange,
   onCreated,
 }: {
-  /** The trigger — the Teams toolbar's `Add` button. */
-  children: ReactNode;
-  /** Called after a successful create so the caller can refresh its list. */
-  onCreated: () => void | Promise<void>;
+  /** The trigger — the Teams toolbar's `Add` button. Without one, `open` opens it. */
+  children?: ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Called with the new team after a successful create, so the caller can refresh or open it. */
+  onCreated: (team: { id: string }) => void | Promise<void>;
 }) {
   return (
-    <FormSheet trigger={children}>
+    <FormSheet trigger={children} open={open} onOpenChange={onOpenChange}>
       {(close) => <AddTeamForm onCreated={onCreated} onClose={close} />}
     </FormSheet>
   );
@@ -34,7 +38,7 @@ function AddTeamForm({
   onCreated,
   onClose,
 }: {
-  onCreated: () => void | Promise<void>;
+  onCreated: (team: { id: string }) => void | Promise<void>;
   onClose: () => void;
 }) {
   const projectId = useRequiredProjectScope();
@@ -44,8 +48,8 @@ function AddTeamForm({
   // importantly the 409 when the name is already taken, since `name` is unique
   // within the project.
   const create = useSubmit(async () => {
-    await api.createTeam({ name: name.trim() }, { project_id: projectId });
-    await onCreated();
+    const team = await api.createTeam({ name: name.trim() }, { project_id: projectId });
+    await onCreated(team);
     onClose();
   }, "Could not create the team.");
 
