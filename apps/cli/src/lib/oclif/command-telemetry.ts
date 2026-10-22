@@ -18,6 +18,21 @@ export const CLI_COMMAND_STARTED = "cli_command_started";
 export const CLI_COMMAND_COMPLETED = "cli_command_completed";
 export const CLI_COMMAND_FAILED = "cli_command_failed";
 
+/**
+ * The properties the Vercel Web Analytics copy of a lifecycle event keeps, in
+ * priority order: the intake takes 8 (proof of concept).
+ */
+export const VERCEL_EVENT_KEYS = [
+  "command",
+  "status",
+  "reason",
+  "cli_version",
+  "os",
+  "server_kind",
+  "host_agent",
+  "is_ci",
+] as const;
+
 export const FIRST_RUN_NOTICE =
   "Zitadel CLI collects anonymous usage analytics to help improve the tool. " +
   "No personal data, project details, server URLs, or file contents are ever " +

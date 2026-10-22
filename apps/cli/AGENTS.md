@@ -38,9 +38,12 @@
 
 ## Telemetry
 
-Anonymous product analytics through Mixpanel's Node SDK (`mixpanel`).
+Anonymous product analytics through Mixpanel's Node SDK (`mixpanel`), plus a
+copy of each event to Vercel Web Analytics (`src/lib/telemetry/vercel.ts`).
 
 - Add no other analytics tool or SDK, browser SDK included.
+- The Vercel copy sends only the keys in `VERCEL_EVENT_KEYS`
+  (`src/lib/oclif/command-telemetry.ts`), at most 8; Vercel locates it by IP.
 - Send nothing that identifies a person, machine or credential: no user,
   email, name, IP, URL, project id, file path, secret or free text. Allowed
   values are enums, booleans, counts and versions.

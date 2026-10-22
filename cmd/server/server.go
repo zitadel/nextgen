@@ -34,6 +34,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
+	"github.com/zitadel/nextgen/internal/build"
 	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -45,6 +46,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/serviceping"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -423,6 +425,14 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	defer shipper.Close()
 
+	pinger := serviceping.New(cfg.ServicePing, serviceping.Facts{
+		Version:  build.Version(),
+		Dialect:  databaseDialectName(cfg),
+		OnVercel: os.Getenv("VERCEL") == "1",
+	})
+	pinger.Start()
+	defer pinger.Close()
+
 	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService)
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
@@ -662,6 +672,9 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("events.retention.enabled", true)
 	v.SetDefault("events.export.enabled", false)
 	v.SetDefault("events.export.interval", 5*time.Second)
+	v.SetDefault("service_ping.enabled", false)
+	v.SetDefault("service_ping.endpoint", serviceping.DefaultEndpoint)
+	v.SetDefault("service_ping.interval", 24*time.Hour)
 	v.SetDefault("instrumentation.service_name", "Zitadel")
 	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
 	v.SetDefault("instrumentation.log.streams", []zlog.Stream{
@@ -897,6 +910,19 @@ func buildDatabaseDialect(cfg Config) (database.Dialect, error) {
 		return nil, fmt.Errorf("build database dialect: %w", err)
 	}
 	return dialect, nil
+}
+
+// databaseDialectName names the configured dialect without connecting, for
+// the service ping; an unconfigured database is the sqlite default.
+func databaseDialectName(cfg Config) string {
+	if len(cfg.Database.Raw) == 0 {
+		return "sqlite"
+	}
+	dialect, err := cfg.Database.Build()
+	if err != nil {
+		return "unknown"
+	}
+	return dialect.Name()
 }
 
 func defaultSQLitePath(dataDir string) string {
