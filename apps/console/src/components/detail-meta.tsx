@@ -15,7 +15,7 @@ import { EYEBROW } from "./typography";
  * truncated, so a narrow screen scrolls the card rather than the page.
  *
  * `MetaValue`, not `MetaItem`: `@/components/ui/meta-item` owns that name for
- * the small uppercase annotation beside a field label.
+ * the small annotation beside a field label.
  */
 export function MetaCard({ children, className }: { children: ReactNode; className?: string }) {
   return (

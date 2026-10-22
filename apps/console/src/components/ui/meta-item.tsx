@@ -1,24 +1,20 @@
 import { cn } from "@/lib/utils";
 
 /**
- * `MetaItem` — the small uppercase annotation that sits beside a label.
+ * `MetaItem` — the small annotation that sits beside a label, e.g. `Optional`.
  *
- * One component in the design system, instanced under two names: `Optional` in
- * the `Field` label row and `MetaItem` beside a section heading. Both resolve to
- * the same inner text node, so this is deliberately a single implementation
- * rather than a copy per call site.
+ * The design system instances it as `Optional` in the `Field` label row. It is
+ * never part of `Field` itself: a call site renders it only where it asks for
+ * it, as a sibling of the label so the field's accessible name stays the label.
  *
- * Arimo Medium 10/15, `0.4px` tracking, `muted-foreground`. Uppercased in CSS
- * rather than in the string so the accessible name and any copied text stay
- * sentence case — the design's text node reads `OPTIONAL`, which renders
- * identically.
+ * Arimo Regular 12/16, normal tracking, `muted-foreground`, sentence case.
  */
 export function MetaItem({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
       data-slot="meta-item"
       className={cn(
-        "shrink-0 text-[10px] leading-[15px] font-medium tracking-[0.4px] text-muted-foreground uppercase",
+        "shrink-0 font-sans text-xs leading-4 font-normal tracking-normal text-muted-foreground",
         className,
       )}
       {...props}
