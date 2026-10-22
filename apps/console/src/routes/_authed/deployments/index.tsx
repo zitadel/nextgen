@@ -19,11 +19,11 @@ import {
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
-  ResourcePage,
   ResourceRow,
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
+import { Page } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,7 @@ function DeploymentsScreen() {
   )?.release_id;
 
   return (
-    <ResourcePage>
+    <Page>
       <ResourceTitle
         action={
           <DeploySheet onDeployed={() => router.invalidate()}>
@@ -130,7 +130,7 @@ function DeploymentsScreen() {
       </div>
 
       <LoadMore paging={paging} />
-    </ResourcePage>
+    </Page>
   );
 }
 
