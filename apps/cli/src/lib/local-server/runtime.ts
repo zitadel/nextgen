@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { isErrno, ZitadelError } from "../errors";
-import { isPortableShellWord } from "../public-cli";
+import { isPortableShellWord, isTrainVersion } from "../public-cli";
 import { parseJsonObject } from "../json";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
 
@@ -130,7 +130,7 @@ export function localServerUrl(port: number): string {
 
 export function defaultLocalServerImageForCliVersion(cliVersion: string): string {
   const normalized = cliVersion.trim().replace(/^v/, "");
-  if (/^\d+\.\d+\.\d+-alpha\.\d+$/.test(normalized)) {
+  if (isTrainVersion(normalized)) {
     return `${LOCAL_SERVER_IMAGE_NAME}:${normalized}`;
   }
   return DEFAULT_LOCAL_SERVER_IMAGE;

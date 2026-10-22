@@ -18,13 +18,13 @@ Each connection has its own callback URI, on your app's origin, ending in the co
 ## Enable Google
 
 ```sh
-npx @zitadel/cli@alpha auth-method sso enable --provider google
+npx @zitadel/cli@latest auth-method sso enable --provider google
 ```
 
 The command prompts for the client id and the client secret. In a script or an agent, pass the client id as a flag and pipe the secret in on stdin; the secret never goes in a flag:
 
 ```sh
-npx @zitadel/cli@alpha auth-method sso enable --provider google \
+npx @zitadel/cli@latest auth-method sso enable --provider google \
   --client-id 1234-abc.apps.googleusercontent.com \
   --non-interactive --json < secret.txt
 ```
@@ -40,15 +40,15 @@ Pass `--schema <name>` when the project has more than one user schema. The JSON 
   "changed": [".zitadel/schemas/default-human-user.json", ".zitadel/flows/default-login.json"],
   "client_id": { "variable": "GOOGLE_CLIENT_ID", "published": "stored" },
   "secret": { "variable": "GOOGLE_CLIENT_SECRET", "published": "stored" },
-  "next_commands": ["npx @zitadel/cli@alpha plan", "npx @zitadel/cli@alpha apply"]
+  "next_commands": ["npx @zitadel/cli@latest plan", "npx @zitadel/cli@latest apply"]
 }
 ```
 
 Then publish the change:
 
 ```sh
-npx @zitadel/cli@alpha plan
-npx @zitadel/cli@alpha apply
+npx @zitadel/cli@latest plan
+npx @zitadel/cli@latest apply
 ```
 
 Reload the app: the sign-in, registration and password steps show a "Continue with Google" button.
@@ -58,7 +58,7 @@ Reload the app: the sign-in, registration and password steps show a "Continue wi
 `--provider custom` connects any provider that publishes OIDC discovery (`<issuer>/.well-known/openid-configuration`):
 
 ```sh
-npx @zitadel/cli@alpha auth-method sso enable --provider custom \
+npx @zitadel/cli@latest auth-method sso enable --provider custom \
   --slug acme-sso --display-name 'Acme SSO' \
   --issuer https://sso.acme.example \
   --scopes 'openid profile email groups' \
@@ -77,7 +77,7 @@ The credentials are stored as `<SLUG>_CLIENT_ID` and `<SLUG>_CLIENT_SECRET`, for
 `setup` takes the same provider while it scaffolds the app, so a new app starts with social sign-in. The OAuth client must already exist; pipe its secret in on stdin:
 
 ```sh
-npx @zitadel/cli@alpha setup --server local --framework next \
+npx @zitadel/cli@latest setup --server local --framework next \
   --sso google --sso-client-id 1234-abc.apps.googleusercontent.com \
   --non-interactive --json < secret.txt
 ```
@@ -96,7 +96,7 @@ For a custom provider, use `--sso custom` with `--sso-slug`, `--sso-display-name
 The variables are the one thing `sso enable` publishes before `apply`. When a credential did not reach the project, for example because the secret was not piped in or the server refused it, `published` is `deferred` or `failed` and `next_commands` starts with the `variables set` command that stores it:
 
 ```sh
-npx @zitadel/cli@alpha variables set GOOGLE_CLIENT_SECRET --project-level --secret < secret.txt
+npx @zitadel/cli@latest variables set GOOGLE_CLIENT_SECRET --project-level --secret < secret.txt
 ```
 
 To remove a provider, run `auth-method sso disable --provider google`; a custom one is named by its slug, as in `--provider acme-sso`. Then `plan` and `apply`.
@@ -132,8 +132,8 @@ Two cases still can't reach the provider, and `sso enable` warns about both:
 When the server can't reach the provider, the widget only says "This sign-in provider is not available right now", and `zitadel logs` shows `idp.discovery_failed` with `address is denied by 'localhost'`. After changing the variable in `.env.local`, stop the server and start it again: `start` alone keeps a running server as it is.
 
 ```sh
-npx @zitadel/cli@alpha stop
-npx @zitadel/cli@alpha start
+npx @zitadel/cli@latest stop
+npx @zitadel/cli@latest start
 ```
 
 Only allow loopback on your machine. A deployed server must not reach its own network on a URL that a project can configure.

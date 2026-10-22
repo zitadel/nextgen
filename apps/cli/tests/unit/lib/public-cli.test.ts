@@ -22,15 +22,16 @@ describe("public CLI command formatting", () => {
   it.each([
     ["1.0.0-alpha.25", "1.0.0-alpha.25"],
     ["v1.0.0-alpha.25", "1.0.0-alpha.25"],
-    ["1.0.0", "latest"],
+    ["0.1.0", "0.1.0"],
+    ["1.0.0", "1.0.0"],
     ["1.0.0-beta.2", "beta"],
   ])("pins scaffolded SDKs for CLI %s at %s", (cliVersion, expected) => {
     expect(sdkVersionForCli(cliVersion)).toBe(expected);
   });
 
-  it("uses latest for stable versions", () => {
+  it("pins a release's follow-ups to its own version, whose dist-tag is latest", () => {
     expect(npmDistTagForCliVersion("0.1.0")).toBe("latest");
-    expect(publicCliCommand("start", "0.1.0")).toBe("npx @zitadel/cli@latest start");
+    expect(publicCliCommand("start", "0.1.0")).toBe("npx @zitadel/cli@0.1.0 start");
   });
 
   it("preserves command args exactly", () => {

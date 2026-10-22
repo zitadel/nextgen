@@ -716,6 +716,17 @@ func (UnimplementedHandler) GetMyUserSchema(ctx context.Context, params GetMyUse
 	return r, ht.ErrNotImplemented
 }
 
+// GetPolicyRevision implements getPolicyRevision operation.
+//
+// Reads one revision of a policy, newest or not.
+// The lookup is scoped to the project in `project_id`: a revision of another
+// project answers not found exactly as an unknown id does.
+//
+// GET /policies/revisions/{revision_id}
+func (UnimplementedHandler) GetPolicyRevision(ctx context.Context, params GetPolicyRevisionParams) (r GetPolicyRevisionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetProject implements getProject operation.
 //
 // Returns the current state of a project.
@@ -1094,6 +1105,24 @@ func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectR
 //
 // PATCH /users/{user_id}
 func (UnimplementedHandler) PatchUserByID(ctx context.Context, req *PatchUserRequest, params PatchUserByIDParams) (r PatchUserByIDRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// PublishPolicy implements publishPolicy operation.
+//
+// Publishes the project's policy for an operation as a new immutable
+// revision, creating the policy on its first publish. The newest revision
+// applies to the next time the operation runs; nothing already stored is
+// re-evaluated, so a stricter password policy applies the next time a
+// password is set.
+// `config` is checked against the operation's template: an unknown
+// operation or setting, a value of the wrong type or outside its bounds, or
+// settings that contradict each other (a `min_length` above `max_length`)
+// answer `pol.invalid`. A setting left out is off, and `{}` switches every
+// rule off; there are no defaults.
+//
+// POST /policies
+func (UnimplementedHandler) PublishPolicy(ctx context.Context, req *PublishPolicyRequest, params PublishPolicyParams) (r PublishPolicyRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

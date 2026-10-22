@@ -13,6 +13,7 @@
     "schemas",
     "branding",
     "identity-providers",
+    "policies",
     "variables",
     "releases",
     "deployments",

@@ -52,15 +52,15 @@ Every JSON envelope includes:
 ```text
 Create a new, empty local app directory with a lowercase name, such as my-app, and run these in it:
 
-1. npx @zitadel/cli@alpha doctor --non-interactive --json
-2. npx @zitadel/cli@alpha start --non-interactive --json
-3. npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
+1. npx @zitadel/cli@latest doctor --non-interactive --json
+2. npx @zitadel/cli@latest start --non-interactive --json
+3. npx @zitadel/cli@latest setup --framework next --server local --non-interactive --json
 4. npm run dev
 
 Use the available browser automation to open the generated app. Register a unique user, verify the signed-in profile state, log out, log back in with the same user, and finish on the signed-in page.
 
 To reach the management console, run
-npx @zitadel/cli@alpha console --non-interactive --json and open data.sign_in_url
+npx @zitadel/cli@latest console --non-interactive --json and open data.sign_in_url
 right away. Each link signs in the local admin once and expires after a minute, so
 get a new one per visit. The link step 2 returns usually expires before setup finishes.
 

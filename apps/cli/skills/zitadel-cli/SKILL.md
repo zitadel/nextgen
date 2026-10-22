@@ -30,12 +30,12 @@ Run the CLI with `npx`, which fetches and caches it on demand — there is nothi
 to install first:
 
 ```sh
-npx @zitadel/cli@alpha <command> --non-interactive --json
+npx @zitadel/cli@latest <command> --non-interactive --json
 ```
 
-Always pass `@alpha`: bare `npx @zitadel/cli` resolves npm's `latest` tag,
-which still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N`
-selector in agent scripts and bug reports for reproducibility.
+Use an exact version (`npx @zitadel/cli@0.1.0`) in agent scripts and bug
+reports for reproducibility. The CLI is a preview: until 1.0.0 a minor version
+can break, and its release note says so with **Breaking:**.
 The CLI requires Node.js 24+. When `setup` creates a new app it first checks the running Node.js against the `engines.node` of the framework CLI it is about to run (`@angular/cli`, `nuxi`, `create-vite`, `create-next-app`). Only the Angular CLI refuses a Node it does not accept, and that range can be newer than 24.0: if `setup` refuses with `E_VALIDATION` naming the Node versions Angular accepts, switch to one of them and run it again. The Angular CLI checks each major on its own, so only 22.22.3+ on 22, 24.15.0+ on 24 and 26.x are accepted (23 and 25 run with a warning), and Node 27 or later is refused even though the published range reads `>=26.0.0`. For the other frameworks the CLI carries on, so `setup` adds a warning to the envelope's `warnings` and continues.
 
 The app's framework must be at or above a minimum version: Next.js 15.2.3,
@@ -138,11 +138,11 @@ front avoids it. `zitadel --help` is a flat list and cheap to read, so reach for
 it first; treat the CLI's own output as authoritative over anything you remember:
 
 ```sh
-npx @zitadel/cli@alpha --help               # every command, grouped by purpose
-npx @zitadel/cli@alpha commands             # flat list of all commands
-npx @zitadel/cli@alpha <command> --help     # a command's flags, which are required, and examples
-npx @zitadel/cli@alpha resources --json     # the resource surface in one call (see below); contacts no server
-npx @zitadel/cli@alpha api ls --json        # every API operation, its parameters, body and paging; contacts no server
+npx @zitadel/cli@latest --help               # every command, grouped by purpose
+npx @zitadel/cli@latest commands             # flat list of all commands
+npx @zitadel/cli@latest <command> --help     # a command's flags, which are required, and examples
+npx @zitadel/cli@latest resources --json     # the resource surface in one call (see below); contacts no server
+npx @zitadel/cli@latest api ls --json        # every API operation, its parameters, body and paging; contacts no server
 ```
 
 `--help` groups the surface into project commands (create a project and scaffold
@@ -310,12 +310,12 @@ command's `--help` for its current flags (for example, `setup --help` lists the
 framework, sign-in preset, and profile-field options):
 
 ```sh
-npx @zitadel/cli@alpha doctor --non-interactive --json
-npx @zitadel/cli@alpha start --non-interactive --json
-npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
-npx @zitadel/cli@alpha doctor --non-interactive --json
-npx @zitadel/cli@alpha plan --non-interactive --json
-npx @zitadel/cli@alpha apply --non-interactive --json
+npx @zitadel/cli@latest doctor --non-interactive --json
+npx @zitadel/cli@latest start --non-interactive --json
+npx @zitadel/cli@latest setup --framework next --server local --non-interactive --json
+npx @zitadel/cli@latest doctor --non-interactive --json
+npx @zitadel/cli@latest plan --non-interactive --json
+npx @zitadel/cli@latest apply --non-interactive --json
 ```
 
 `setup` scaffolds into an empty directory, or patches an existing app project

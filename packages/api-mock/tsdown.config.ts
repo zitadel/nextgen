@@ -8,7 +8,6 @@ import { defineConfig } from "tsdown";
 export default defineConfig({
   entry: {
     index: "src/index.ts",
-    "openid-configuration": "src/openid-configuration.ts",
     "platform-handlers": "src/platform-handlers.ts",
     "public-dir": "src/public-dir.ts",
     server: "src/server.ts",
