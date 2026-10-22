@@ -33,12 +33,11 @@ const (
 // sets SPANNER_EMULATOR_HOST, and returns the database DSN plus a stop func
 // that clears the env var and terminates the container.
 //
-// The emulator is deliberately the only bring-up CI uses: it serialises on one
-// transaction at a time, which is what forces the aborts that keep the
-// abort-retry path honest (#788). Running these tests against a real instance
-// would hide a missing retry rather than fix it. The instance branch below is
-// therefore live code that nothing sets, kept as a fast way back if the
-// emulator turns out not to hold; see [instanceEnv]. Removal: #793.
+// CI takes the instance branch: the spanner workflow starts Spanner Omni and
+// points [instanceEnv] at it. Aborts do not depend on the engine: under the
+// spanner_integration tag the dialect installs an abort injector
+// (internal/storage/testdb/spannerabort), which drives transactions through the
+// abort-retry path (#788) on Omni, the emulator or a real instance alike.
 func SpannerDSN(ctx context.Context) (string, func(), error) {
 	if strings.TrimSpace(os.Getenv(instanceEnv)) != "" {
 		return provision(ctx)
