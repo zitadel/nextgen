@@ -530,14 +530,19 @@ func consoleBaseURL(publicBase, consolePath string) (string, error) {
 }
 
 // publicOrigin is the scheme and host of the public base, the origin the
-// console is served from. consoleBaseURL has already refused a base that is
-// not an absolute http(s) URL.
+// console is served from, as a browser sends it: without the scheme's default
+// port. consoleBaseURL has already refused a base that is not an absolute
+// http(s) URL.
 func publicOrigin(publicBase string) string {
 	base, err := url.Parse(publicBase)
 	if err != nil {
 		return publicBase
 	}
-	return base.Scheme + "://" + base.Host
+	host := base.Host
+	if (base.Scheme == "https" && base.Port() == "443") || (base.Scheme == "http" && base.Port() == "80") {
+		host = strings.TrimSuffix(host, ":"+base.Port())
+	}
+	return base.Scheme + "://" + host
 }
 
 // ----------------------------- CONFIG --------------------------------------

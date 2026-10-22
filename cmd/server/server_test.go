@@ -38,6 +38,24 @@ func TestLoadConfigReadsPostgresDatabaseEnv(t *testing.T) {
 	assert.Equal(t, "postgresql://postgres@localhost:5432/nextgen?sslmode=disable", postgresConfig)
 }
 
+func TestPublicOrigin(t *testing.T) {
+	tests := map[string]string{
+		"https://preview.zitadel.com":        "https://preview.zitadel.com",
+		"https://proxy.example.com/nextgen/": "https://proxy.example.com",
+		"https://console.example:443":        "https://console.example",
+		"http://console.example:80":          "http://console.example",
+		"http://localhost:8080":              "http://localhost:8080",
+		"https://console.example:8443":       "https://console.example:8443",
+		"http://console.example:443":         "http://console.example:443",
+		"https://[::1]:443":                  "https://[::1]",
+	}
+	for publicBase, want := range tests {
+		t.Run(publicBase, func(t *testing.T) {
+			assert.Equal(t, want, publicOrigin(publicBase))
+		})
+	}
+}
+
 func TestConsoleBaseURL(t *testing.T) {
 	tests := []struct {
 		name        string
