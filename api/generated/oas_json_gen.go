@@ -108492,6 +108492,22 @@ func (s RollbackDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelRevokedRollbackDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidRollbackDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -108567,6 +108583,9 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "rel.not_found":
 					s.Type = RelNotFoundRollbackDeploymentErrorResponse
 					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedRollbackDeploymentErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidRollbackDeploymentErrorResponse
 					found = true
@@ -108626,6 +108645,10 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case RelNotFoundRollbackDeploymentErrorResponse:
 		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedRollbackDeploymentErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidRollbackDeploymentErrorResponse:

@@ -73554,6 +73554,7 @@ type RollbackDeploymentErrorResponse struct {
 	NotImplemented      NotImplemented
 	ProjNotFound        ProjNotFound
 	RelNotFound         RelNotFound
+	RelRevoked          RelRevoked
 	ReqInvalid          ReqInvalid
 }
 
@@ -73573,6 +73574,7 @@ const (
 	NotImplementedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "not_implemented"
 	ProjNotFoundRollbackDeploymentErrorResponse        RollbackDeploymentErrorResponseType = "proj.not_found"
 	RelNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "rel.not_found"
+	RelRevokedRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.revoked"
 	ReqInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "req.invalid"
 )
 
@@ -73629,6 +73631,11 @@ func (s RollbackDeploymentErrorResponse) IsProjNotFound() bool {
 // IsRelNotFound reports whether RollbackDeploymentErrorResponse is RelNotFound.
 func (s RollbackDeploymentErrorResponse) IsRelNotFound() bool {
 	return s.Type == RelNotFoundRollbackDeploymentErrorResponse
+}
+
+// IsRelRevoked reports whether RollbackDeploymentErrorResponse is RelRevoked.
+func (s RollbackDeploymentErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedRollbackDeploymentErrorResponse
 }
 
 // IsReqInvalid reports whether RollbackDeploymentErrorResponse is ReqInvalid.
@@ -73864,6 +73871,27 @@ func (s RollbackDeploymentErrorResponse) GetRelNotFound() (v RelNotFound, ok boo
 func NewRelNotFoundRollbackDeploymentErrorResponse(v RelNotFound) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets RollbackDeploymentErrorResponse to RelRevoked.
+func (s *RollbackDeploymentErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedRollbackDeploymentErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if RollbackDeploymentErrorResponse is RelRevoked.
+func (s RollbackDeploymentErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from RelRevoked.
+func NewRelRevokedRollbackDeploymentErrorResponse(v RelRevoked) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
