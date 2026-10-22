@@ -4,7 +4,7 @@ import type { ZitadelClient } from "@zitadel/api/client";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { renderRows, renderTable } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
-import { listLiveDeployments, originMatchesPattern } from "../../lib/release";
+import { DEPLOY_ARGS, listLiveDeployments, originMatchesPattern } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
 import { shellArg } from "../../lib/shell";
 import { toVariableRows, variableCells } from "../../lib/variables";
@@ -124,15 +124,15 @@ export default class VariableResolve extends EnvironmentCommand {
   ): Promise<ZitadelError> {
     if (origin === undefined) {
       return new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project.", {
-        hint: `Deploy first with \`zitadel deploy${this.environmentSelector()}\`, then resolve its variables.`,
-        nextCommands: [this.suggest("deploy")],
+        hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then resolve its variables.`,
+        nextCommands: [this.suggest(DEPLOY_ARGS)],
       });
     }
     const origins = (await client.getProject(projectId)).origins ?? [];
     if (origins.some((entry) => entry.kind === "primary" && entry.pattern === origin)) {
       return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
-        hint: "Deploy to it first, then resolve its variables.",
-        nextCommands: [this.suggest("deploy")],
+        hint: `Deploy to it first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then resolve its variables.`,
+        nextCommands: [this.suggest(DEPLOY_ARGS)],
       });
     }
     if (

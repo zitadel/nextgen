@@ -42,6 +42,12 @@ export type VariableRow = {
   name: string;
   secret: boolean;
   value?: string | number | boolean;
+  /**
+   * What the name's preview kind holds, on the inventory the default `list`
+   * prints. Absent means the name holds no preview value — which is not the
+   * same as holding an empty one, so the two render differently (#1617).
+   */
+  preview?: { secret: boolean; value?: string | number | boolean };
 };
 
 /** One value on the wire: a bare scalar, or `{"secret": true}` for a secret. */
@@ -87,6 +93,64 @@ export function toVariableRows(values: Record<string, VariableValue>): VariableR
 
 /** Stands in for a secret's value, which the platform never discloses. */
 const SECRET_MARKER = "(secret)";
+
+/** Stands in for a kind the name holds no value for at all. */
+const NO_VALUE = "-";
+
+/**
+ * Every name on the project with the primary value it holds and the preview
+ * value beside it, sorted by name. A read without a kind answers both, so one
+ * request covers the inventory; a name is listed when either kind holds a
+ * value, so a preview-only name does not disappear (#1617).
+ */
+export function toInventoryRows(body: GetVariables200): VariableRow[] {
+  return Object.entries(body)
+    .map(([name, byKind]) => {
+      const primary =
+        byKind.primary === undefined ? undefined : toVariableRow(name, byKind.primary);
+      const preview =
+        byKind.preview === undefined ? undefined : toVariableRow(name, byKind.preview);
+      return {
+        name,
+        secret: primary?.secret ?? false,
+        ...(primary?.value === undefined ? {} : { value: primary.value }),
+        ...(preview === undefined
+          ? {}
+          : {
+              preview: {
+                secret: preview.secret,
+                ...(preview.value === undefined ? {} : { value: preview.value }),
+              },
+            }),
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * {@link variableCells} plus the preview column, for the inventory. A kind the
+ * name holds nothing for prints `-`: an empty cell would read as an empty
+ * value, and a secret prints its marker in either column.
+ */
+export function variableInventoryCells(
+  rows: ReadonlyArray<VariableRow>,
+): Array<{ name: string; value: string; preview: string }> {
+  const cell = (
+    held: { secret: boolean; value?: string | number | boolean } | undefined,
+  ): string =>
+    held === undefined
+      ? NO_VALUE
+      : held.secret
+        ? SECRET_MARKER
+        : held.value === undefined
+          ? NO_VALUE
+          : renderScalar(held.value);
+  return rows.map((row) => ({
+    name: row.name,
+    value: cell(row.value === undefined && !row.secret ? undefined : row),
+    preview: cell(row.preview),
+  }));
+}
 
 /**
  * Render a stored scalar for a terminal.

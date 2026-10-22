@@ -91,7 +91,7 @@ describe("variable set", () => {
         await app.run(["variable", "set", "FOO", "bar", "--json"]);
 
         expect(await app.projectVariables()).toEqual([
-          { name: "FOO", secret: false, value: "bar" },
+          { name: "FOO", secret: false, value: "bar", preview: { secret: false, value: "bar" } },
         ]);
       });
 
@@ -224,7 +224,12 @@ describe("variable set", () => {
         await app.setVariable("API_URL", "https://preview.acme.com", { preview: true });
 
         expect(await app.projectVariables()).toEqual([
-          { name: "API_URL", secret: false, value: "https://api.acme.com" },
+          {
+            name: "API_URL",
+            secret: false,
+            value: "https://api.acme.com",
+            preview: { secret: false, value: "https://preview.acme.com" },
+          },
         ]);
       });
     });
