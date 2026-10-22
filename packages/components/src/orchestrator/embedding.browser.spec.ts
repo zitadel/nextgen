@@ -13,6 +13,7 @@ import minimalTemplate from "@zitadel/config/defaults/branding/minimal/login.liq
 import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
 import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
 import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
+import ejectedAccountRowTemplate from "./__fixtures__/ejected-account-row.liquid";
 import type { ZitadelLogin } from "./zitadel-login.js";
 
 /**
@@ -376,6 +377,40 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     // The padded 48rem branch is live in this viewport, so this pins the
     // widget override beating the media query, not just the narrow default.
     expect(getComputedStyle(surface).padding).toBe("0px");
+  });
+
+  it("keeps an ejected template's account row inside the card for a long address", async () => {
+    // A template ejected before `<zl-account>` still draws the account as a
+    // `.zl-card-account` row; layout-chrome.css keeps its styles.
+    const address = `${"a".repeat(64)}@${"b".repeat(40)}.example`;
+    const element = await mount({
+      ...identifierStep,
+      step: {
+        ...identifierStep.step,
+        name: "password",
+        fields: [
+          {
+            name: "password",
+            type: "password",
+            text_key: "password.field.password",
+            required: true,
+            autocomplete: "current-password",
+          },
+        ],
+        identifier: { value: address, autocomplete: "username" },
+      },
+      branding: { liquid_template: ejectedAccountRowTemplate },
+    });
+    const value = await waitFor(() =>
+      element.shadowRoot?.querySelector<HTMLElement>(".zl-card-account__value"),
+    );
+    const card = element.shadowRoot?.querySelector("zl-card") as HTMLElement;
+    expect(value.textContent).toBe(address);
+    expect(getComputedStyle(value).overflowWrap).toBe("anywhere");
+    expect(value.getBoundingClientRect().right).toBeLessThanOrEqual(
+      card.getBoundingClientRect().right,
+    );
+    expect(card.getBoundingClientRect().width).toBeLessThanOrEqual(360);
   });
 
   it("widget default: does not steal focus on initial load", async () => {
