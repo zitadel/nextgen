@@ -196,7 +196,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 					Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: revisionDoc}, nil)
 			},
 			variables: func(m *servicemocks.MockVariableService) {
-				m.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").Return(nil, nil)
+				m.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").Return(nil, nil)
 			},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
@@ -209,7 +209,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 					Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: revisionDoc}, nil)
 			},
 			variables: func(m *servicemocks.MockVariableService) {
-				m.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").
+				m.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").
 					Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: "plain", IsSecret: false}}, nil)
 			},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
@@ -479,14 +479,19 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 			connections := servicemocks.NewMockIDPConnectionService(ctrl)
 			connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
 				Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: doc}, nil)
+			const keyID = "key-1"
+			ciphertext, err := testCrypter(keyID).Encrypt(`"secret-1"`)
+			require.NoError(t, err)
 			variables := servicemocks.NewMockVariableService(ctrl)
-			variables.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").
-				Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: "secret-1", IsSecret: true}}, nil)
+			variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").
+				Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: ciphertext, IsSecret: true}}, nil)
+			keys := servicemocks.NewMockKeyService(ctrl)
+			keys.EXPECT().GetCrypter(gomock.Any(), keyID, jose.A256GCM).Return(testCrypter(keyID), nil)
 			attempts := &fakeAuthAttempts{
 				consumeCheck:  &domain.SSOCallbackCheck{Pending: ssoCallbackPending()},
 				setResultErrs: tt.setResultErrs,
 			}
-			svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), variables, &http.Client{})
+			svc := service.NewFlowSSOCallback(connections, attempts, keys, variables, &http.Client{})
 
 			in := service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code", BindingNonce: "bind-1"}
 			if tt.sendIssuer {

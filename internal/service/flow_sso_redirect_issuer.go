@@ -86,10 +86,8 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 
 // resolveSSOClientID fills a `${{ NAME }}` client_id on conn. A literal
 // client_id is left as it is. A variable marked secret is refused rather than
-// decrypted: the value goes into a URL the browser sees. A sealed deployment
-// reads the set it froze; otherwise the project's live primary value. The
-// redirect issuer and the callback both resolve through this, so both read
-// the client_id the same way.
+// decrypted: the value goes into a URL the browser sees. The redirect issuer
+// and the callback both resolve through this.
 func resolveSSOClientID(ctx context.Context, variables VariableService, projectID, deploymentID string, conn *idp.Connection) error {
 	name, ok := domain.VariableReferenceName(conn.OIDC.ClientID)
 	if !ok {
@@ -106,42 +104,52 @@ func resolveSSOClientID(ctx context.Context, variables VariableService, projectI
 	return nil
 }
 
-// plainVariable is the string value of name that a browser may see. A sealed
-// deployment reads its frozen set. No deployment reads the live primary row.
-// A secret, a non-string, or a missing name returns an empty value.
-func plainVariable(ctx context.Context, variables VariableService, projectID, deploymentID, name string) (string, error) {
+// ssoVariable is the variable name names for this sign-in. A sealed
+// deployment reads the set it froze. No deployment reads the live primary row.
+func ssoVariable(ctx context.Context, variables VariableService, projectID, deploymentID, name string) (*domain.Variable, error) {
 	if deploymentID != "" {
 		set, err := variables.GetDeploymentVariables(ctx, projectID, deploymentID)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		value, secret, ok := stringFromSet(set, name)
-		if !ok || secret {
-			return "", nil
-		}
-		return value, nil
+		return set.Variables()[name], nil
 	}
 	vars, err := variables.GetVariables(ctx, domain.VariableOwner{ProjectID: projectID}, new(domain.DeploymentOriginKindPrimary), name)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if len(vars) == 1 && !vars[0].IsSecret {
-		value, _ := vars[0].Value.(string)
-		return value, nil
+	if len(vars) != 1 {
+		return nil, nil
 	}
-	return "", nil
+	return vars[0], nil
 }
 
-func stringFromSet(set *domain.VariableSet, name string) (value string, secret, ok bool) {
-	if set == nil {
-		return "", false, false
+// plainVariable is the string value of name that a browser may see. A
+// secret, a non-string, or a missing name returns an empty value.
+func plainVariable(ctx context.Context, variables VariableService, projectID, deploymentID, name string) (string, error) {
+	variable, err := ssoVariable(ctx, variables, projectID, deploymentID, name)
+	if err != nil || variable == nil || variable.IsSecret {
+		return "", err
 	}
-	variable := set.Variables()[name]
-	if variable == nil {
-		return "", false, false
+	value, _ := variable.Value.(string)
+	return value, nil
+}
+
+// secretVariable is the decrypted string of a secret variable. A missing
+// name or a plain value returns an empty string. A decrypt failure is
+// [domain.ErrFailedToDecryptVariable], as [VariableService.GetDecryptedVariables]
+// reports one.
+func secretVariable(ctx context.Context, variables VariableService, decrypter crypto.Decrypter, projectID, deploymentID, name string) (string, error) {
+	variable, err := ssoVariable(ctx, variables, projectID, deploymentID, name)
+	if err != nil || variable == nil || !variable.IsSecret {
+		return "", err
 	}
-	value, ok = variable.Value.(string)
-	return value, variable.IsSecret, ok
+	plain, err := variable.GetDecryptedValue(decrypter)
+	if err != nil {
+		return "", domain.ErrFailedToDecryptVariable(err).WithDetails(map[string]any{"name": name})
+	}
+	value, _ := plain.(string)
+	return value, nil
 }
 
 // sealedDeploymentID is the deployment the request sealed, empty when the

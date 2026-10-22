@@ -43,9 +43,7 @@ type VariableService interface {
 	// such as the SSO flow presenting a client secret to a provider.
 	GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error)
 	// GetDeploymentVariables returns the set deploymentID was frozen with.
-	// A deployment that was never frozen, does not exist, or belongs to
-	// another project returns an error that is not internal, so the sign-in
-	// step can fail instead of the request.
+	// A deployment that was never frozen returns an error that is not internal.
 	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
 	// SetVariables applies one batch whole or not at all. A nil value removes
 	// the name. With a kind, only that kind's rows are written or removed.

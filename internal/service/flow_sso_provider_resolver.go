@@ -75,7 +75,6 @@ func (r *FlowSSOProviderResolver) resolvePinned(ctx context.Context, projectID s
 }
 
 // pinnedIDPRevision is the revision the request's release pins for slug.
-// The caller has already established that the release pins a flow.
 func pinnedIDPRevision(ctx context.Context, slug string) (string, error) {
 	revisionID, ok := PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindIDP)[slug]
 	if !ok {
