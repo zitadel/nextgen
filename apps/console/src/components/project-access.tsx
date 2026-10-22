@@ -79,9 +79,7 @@ export function ProjectAccess({
   return (
     <fieldset className={`${SECTION} min-w-0`} aria-labelledby={labelId}>
       <div className={LABEL_ROW}>
-        <FieldTitle id={labelId}>
-          Projects
-        </FieldTitle>
+        <FieldTitle id={labelId}>Projects</FieldTitle>
         <MetaItem>Optional</MetaItem>
       </div>
 

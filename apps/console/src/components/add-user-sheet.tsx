@@ -232,9 +232,7 @@ function SchemaInput({
   return (
     <Field>
       <div className={LABEL_ROW}>
-        <FieldLabel htmlFor={id}>
-          {field.label}
-        </FieldLabel>
+        <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
         {/* A sibling of the label, not part of it, so the accessible name stays
             the field name; requiredness itself reaches AT via `required`. */}
         {!field.required && <MetaItem>Optional</MetaItem>}
