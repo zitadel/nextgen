@@ -13,7 +13,6 @@ content:
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid_tknid.yaml'
         - $ref: '../../../components/schemas/errors/proj-mismatch.yaml'
-        - $ref: '../../../components/schemas/errors/rel-not_found.yaml'
         - $ref: '../../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/sess-exchange_conflict.yaml'
@@ -34,7 +33,6 @@ content:
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           tkn.invalid_tknid: '../../../components/schemas/errors/tkn-invalid_tknid.yaml'
           proj.mismatch: '../../../components/schemas/errors/proj-mismatch.yaml'
-          rel.not_found: '../../../components/schemas/errors/rel-not_found.yaml'
           rel.revoked: '../../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           sess.exchange_conflict: '../../../components/schemas/errors/sess-exchange_conflict.yaml'
@@ -89,11 +87,6 @@ content:
         value:
           code: proj.mismatch
           message: 'the project named in the request is not the one the credential belongs to'
-      rel.not_found:
-        summary: rel.not_found
-        value:
-          code: rel.not_found
-          message: 'release: not found'
       rel.revoked:
         summary: rel.revoked
         value:

@@ -39580,22 +39580,6 @@ func (s ExchangeHandoffErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case RelNotFoundExchangeHandoffErrorResponse:
-		e.FieldStart("code")
-		e.Str("rel.not_found")
-		{
-			s := s.RelNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case RelRevokedExchangeHandoffErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.revoked")
@@ -39777,9 +39761,6 @@ func (s *ExchangeHandoffErrorResponse) Decode(d *jx.Decoder) error {
 				case "proj.mismatch":
 					s.Type = ProjMismatchExchangeHandoffErrorResponse
 					found = true
-				case "rel.not_found":
-					s.Type = RelNotFoundExchangeHandoffErrorResponse
-					found = true
 				case "rel.revoked":
 					s.Type = RelRevokedExchangeHandoffErrorResponse
 					found = true
@@ -39852,10 +39833,6 @@ func (s *ExchangeHandoffErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ProjMismatchExchangeHandoffErrorResponse:
 		if err := s.ProjMismatch.Decode(d); err != nil {
-			return err
-		}
-	case RelNotFoundExchangeHandoffErrorResponse:
-		if err := s.RelNotFound.Decode(d); err != nil {
 			return err
 		}
 	case RelRevokedExchangeHandoffErrorResponse:
