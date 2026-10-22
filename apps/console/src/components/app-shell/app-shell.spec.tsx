@@ -484,6 +484,80 @@ describe("project pill", () => {
     expect(screen.queryByRole("link", { name: "All projects" })).not.toBeInTheDocument();
   });
 
+  it("searches every project on the server once they run past one page", async () => {
+    const searched: string[] = [];
+    server.use(
+      http.get(MY_PROJECTS, ({ request }) => {
+        const nameContains = new URL(request.url).searchParams.get("name_contains");
+        if (nameContains === null) {
+          return HttpResponse.json({
+            projects: [
+              { id: "proj_1", name: "River" },
+              { id: "proj_2", name: "Delta" },
+            ],
+            next_page_token: "page-2",
+          });
+        }
+        searched.push(nameContains);
+        // Past the first page, where only the server can find it.
+        return HttpResponse.json({ projects: [{ id: "proj_9", name: "Zephyr" }] });
+      }),
+    );
+    renderShell(scopedPath("/teams", "proj_2"));
+
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await waitFor(() => expect(pill).toHaveTextContent("Delta"));
+    await userEvent.click(pill);
+    // The popover opens on the field, so typing searches at once.
+    const field = await screen.findByRole("searchbox", { name: "Find a project" });
+    await waitFor(() => expect(field).toHaveFocus());
+    await userEvent.keyboard("zep");
+
+    const list = within(screen.getByRole("list", { name: "Switch project" }));
+    expect(await list.findByRole("link", { name: "Zephyr" })).toHaveAttribute(
+      "href",
+      "/teams?project=proj_9&status=active",
+    );
+    expect(list.queryByRole("link", { name: "River" })).not.toBeInTheDocument();
+    // One request per pause in typing, not per keystroke.
+    expect(searched).toEqual(["zep"]);
+    // The pill names the selection, never a match.
+    expect(pill).toHaveTextContent("Delta");
+  });
+
+  it("says when a search finds nothing, and starts over when reopened", async () => {
+    server.use(
+      http.get(MY_PROJECTS, ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.has("name_contains")
+            ? { projects: [] }
+            : { projects: [{ id: "proj_1", name: "River" }], next_page_token: "page-2" },
+        ),
+      ),
+      http.get(HEALTH, () => HttpResponse.json({ status: "ok" })),
+    );
+    renderShell(scopedPath("/system", "proj_1"));
+
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await waitFor(() => expect(pill).toHaveTextContent("River"));
+    await userEvent.click(pill);
+    await userEvent.type(await screen.findByRole("searchbox", { name: "Find a project" }), "zzz");
+    const list = within(screen.getByRole("list", { name: "Switch project" }));
+    expect(await list.findByText("No matching projects")).toBeInTheDocument();
+
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument(),
+    );
+    await userEvent.click(pill);
+    expect(await screen.findByRole("searchbox", { name: "Find a project" })).toHaveValue("");
+    expect(
+      within(screen.getByRole("list", { name: "Switch project" })).getByRole("link", {
+        name: "River",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("says there are no projects instead of loading forever", async () => {
     server.use(
       http.get(MY_PROJECTS, () => HttpResponse.json({ projects: [] })),
@@ -594,6 +668,54 @@ describe("search", () => {
     await userEvent.click(await dialog.findByRole("option", { name: /Support/ }));
     expect(filter).toContainEqual({ field: "name", operation: "contains", value: "sup" });
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams/team_s"));
+  });
+
+  it("finds projects by name on the server and selects one", async () => {
+    const searched: string[] = [];
+    server.use(
+      http.get(MY_PROJECTS, ({ request }) => {
+        const nameContains = new URL(request.url).searchParams.get("name_contains");
+        if (nameContains === null) {
+          return HttpResponse.json({
+            projects: [{ id: "proj_1", name: "console-dev" }],
+            next_page_token: "page-2",
+          });
+        }
+        searched.push(nameContains);
+        // Not on the first page the palette holds: only the server finds it.
+        return HttpResponse.json({ projects: [{ id: "proj_9", name: "Zephyr" }] });
+      }),
+      // Off the first page, the pill names the selection by reading it.
+      http.get("*/api/projects/proj_9", () =>
+        HttpResponse.json({
+          id: "proj_9",
+          name: "Zephyr",
+          origins: [],
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        }),
+      ),
+    );
+    const router = renderShell(scopedPath("/users", "proj_1"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "zep");
+
+    await userEvent.click(await dialog.findByRole("option", { name: "Zephyr" }));
+    expect(searched).toEqual(["zep"]);
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_9" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent("Zephyr"),
+    );
+    // The palette names it too, though it is not on the first page.
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(
+      await within(await screen.findByRole("dialog", { name: "Go to" })).findByText(
+        "Pages in Zephyr",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("says when nothing matches", async () => {

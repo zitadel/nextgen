@@ -38,6 +38,33 @@ test("shows the bootstrapped project in the list and detail views", async ({
   await expectNoErrorBoundary(page);
 });
 
+test("searches the projects on the server", async ({ page, zitadel, seed }) => {
+  // The unit specs stub the read, so only a live server proves the search
+  // reaches it: a query parameter the server does not know is dropped without
+  // an error, and the whole list would come back instead.
+  await signIn(page, zitadel, await seed.user());
+  const { name } = await zitadel.api.getProject(zitadel.handle.projectId);
+  // A prefix, in another case: the rename spec appends to the name while it
+  // runs, and the match ignores case.
+  const needle = name.slice(0, Math.ceil(name.length / 2)).toUpperCase();
+
+  const searched = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.pathname === "/api/users/me/projects" && url.searchParams.has("name_contains");
+  });
+  await page.goto(`/projects?q=${encodeURIComponent(needle)}`);
+  expect(new URL((await searched).url()).searchParams.get("name_contains")).toBe(needle);
+  await expect(page.getByRole("table").getByRole("link")).toHaveAttribute(
+    "href",
+    new RegExp(`project=${zitadel.handle.projectId}`),
+  );
+
+  const nothing = `no-such-project-${crypto.randomUUID()}`;
+  await page.goto(`/projects?q=${nothing}`);
+  await expect(page.getByText(`No projects match “${nothing}”.`)).toBeVisible();
+  await expectNoErrorBoundary(page);
+});
+
 test("shows a seeded user in the list and detail views", async ({ page, zitadel, seed }) => {
   const user = await seed.user();
   await signIn(page, zitadel, user);
