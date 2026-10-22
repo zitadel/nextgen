@@ -104,8 +104,9 @@ describe("teams screen", () => {
   it("opens the team when the row is clicked", async () => {
     server.use(
       http.post(TEAMS_URL, () => HttpResponse.json({ teams: [team()] })),
-      // The click opens the team's page, whose loader reads the team.
+      // The click opens the team's page, whose loader reads the team and its members.
       http.get(`http://localhost/api/teams/${team().id}`, () => HttpResponse.json(team())),
+      http.post("*/api/users/query", () => HttpResponse.json({ users: [] })),
     );
     const router = await renderTeams();
 

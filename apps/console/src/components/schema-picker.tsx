@@ -1,4 +1,4 @@
-import { UserRoundCog } from "lucide-react";
+import { Braces } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -43,7 +43,7 @@ export function SchemaPicker({
           open={open}
           disabled={loading}
           className="w-full"
-          addon={<UserRoundCog className="size-4" />}
+          addon={<Braces className="size-4" />}
           onOpen={() => setOpen(true)}
         >
           {selected ? (

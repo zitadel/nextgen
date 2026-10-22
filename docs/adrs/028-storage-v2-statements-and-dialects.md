@@ -354,9 +354,9 @@ default (`dialect/sqlite`, file under `server.data_dir`) and is not a Spanner
 production peer. Postgres/Spanner integration tests bring up a **Postgres
 testcontainer** or a **Spanner emulator testcontainer** by default
 (`testdb`); override with `ZITADEL_TEST_POSTGRES_URL` /
-`ZITADEL_TEST_SPANNER_URL`, or a real Spanner instance via
-`ZITADEL_TEST_SPANNER_INSTANCE` (kept but unwired — CI is emulator-only so
-aborts stay visible, see #788; removal tracked in #793).
+`ZITADEL_TEST_SPANNER_URL`, or a Spanner instance via
+`ZITADEL_TEST_SPANNER_INSTANCE`, which CI points at Spanner Omni. Aborts stay
+visible on any engine because integration builds inject them (#788, #1011).
 
 ## Pre-merge checklist
 
