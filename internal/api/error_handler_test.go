@@ -761,8 +761,9 @@ func (h errorStubHandler) GetHealth(context.Context) (api.GetHealthRes, error) {
 
 // serveAndRecordLogs serves req the way the production chain does (WithRecover
 // around the generated server, ogen's operation id middleware, a request
-// logger that carries the request id, as WithLogging sets it) and returns the response and every record
-// logged while serving it (see recordLogs). Not parallel: it changes globals.
+// logger that carries the request id, as WithLogging sets it) and returns the
+// response and every record logged while serving it (see recordLogs). Not
+// parallel: it changes globals.
 func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenService, req *http.Request) (*httptest.ResponseRecorder, []map[string]any) {
 	t.Helper()
 	records := recordLogs(t)
