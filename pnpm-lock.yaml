@@ -1011,34 +1011,6 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/browser-playwright@4.1.11)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(jsdom@29.0.2(@noble/hashes@1.8.0))(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))
 
-  apps/mock-zitadel:
-    dependencies:
-      '@zitadel/api-mock':
-        specifier: workspace:*
-        version: link:../../packages/api-mock
-    devDependencies:
-      '@types/express':
-        specifier: 'catalog:'
-        version: 4.17.25
-      '@types/node':
-        specifier: ^24.19.1
-        version: 24.19.1
-      express:
-        specifier: 'catalog:'
-        version: 4.22.2(supports-color@10.2.2)
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.23.0(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
-      tsx:
-        specifier: 'catalog:'
-        version: 4.21.0
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.11(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/browser-playwright@4.1.11)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(jsdom@29.0.2(@noble/hashes@1.8.0))(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))
-
   apps/server:
     optionalDependencies:
       '@zitadel/server-darwin-arm64':
