@@ -2,7 +2,11 @@
 // authorization against relational authz storage (ADR 032–033 / issue #423).
 package resolver
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/zitadel/nextgen/internal/domain"
+)
 
 // Decision is the library-level outcome of a permission check (not an HTTP code).
 type Decision uint8
@@ -50,7 +54,7 @@ func (p Path) String() string {
 	case PathGrant:
 		return "grant"
 	case PathPlatformOperator:
-		return "platform_operator"
+		return domain.EventAuthorizationPathPlatformOperator
 	default:
 		return fmt.Sprintf("Path(%d)", uint8(p))
 	}

@@ -1129,10 +1129,10 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 	}
 }
 
-// A platform operator can act on every project (ADR 075 §6): the listing pages
-// all of them, in the same order and with the same cursor as the grant query,
-// and never asks the grant query.
-func TestProjectService_ListAuthorizedEveryProject(t *testing.T) {
+// A platform operator can act on every project (ADR 075 §6): ListEveryProject
+// pages all of them, in the same order and with the same cursor as the grant
+// query, and never asks the grant query.
+func TestProjectService_ListEveryProject(t *testing.T) {
 	t.Parallel()
 
 	svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
@@ -1153,10 +1153,9 @@ func TestProjectService_ListAuthorizedEveryProject(t *testing.T) {
 			}, nil
 		})
 
-	resp, err := svc.ListAuthorized(context.Background(), service.ListAuthorizedProjectsRequest{
+	resp, err := svc.ListEveryProject(context.Background(), service.ListAuthorizedProjectsRequest{
 		HomeProjectID: "proj_platform",
 		UserID:        "user_a",
-		EveryProject:  true,
 		PageToken:     "tok",
 	})
 	require.NoError(t, err)

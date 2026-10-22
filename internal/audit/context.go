@@ -17,6 +17,10 @@ type contextKey struct{}
 // would drop that copy unless AuthGate reused the parent ctx.
 type actorSlotKey struct{}
 
+// authorizationKey carries the request's authorization mark: a context value
+// of its own, beside the actor slot and for the same reason (MarkAuthorization).
+type authorizationKey struct{}
+
 // ActorContext holds server-authoritative WHO/HOW dimensions for event emission (ADR 048 §5).
 type ActorContext struct {
 	ProjectID      string
@@ -33,11 +37,6 @@ type ActorContext struct {
 	FlowID         *string
 	RequestID      *string
 	Authenticated  bool
-	// authorization is the request's authorization mark (MarkAuthorization).
-	// Every copy of the actor context, and the request's slot, shares it, so a
-	// mark set after the actor was stamped still reaches every event of the
-	// request.
-	authorization *authorizationMark
 }
 
 // authorizationMark holds the path that authorized a request when it was not
@@ -46,22 +45,23 @@ type authorizationMark struct {
 	metadata atomic.Pointer[domain.EventAuthorizationMetadata]
 }
 
-// Authorization is the path that authorized the request, or nil when nothing
-// marked it: an ordinary grant, or no authorization at all.
-func (ac ActorContext) Authorization() *domain.EventAuthorizationMetadata {
-	if ac.authorization == nil {
-		return nil
-	}
-	return ac.authorization.metadata.Load()
-}
-
 // WithActorSlot plants a mutable actor slot on ctx so net/http middleware can
-// observe AuthGate enrichment that happens inside ogen on a child context.
+// observe AuthGate enrichment that happens inside ogen on a child context. The
+// request's authorization mark goes beside it, for the same reason.
 func WithActorSlot(ctx context.Context) context.Context {
 	if _, ok := ctx.Value(actorSlotKey{}).(*ActorContext); ok {
 		return ctx
 	}
-	return context.WithValue(ctx, actorSlotKey{}, &ActorContext{authorization: &authorizationMark{}})
+	return context.WithValue(withAuthorizationMark(ctx), actorSlotKey{}, &ActorContext{})
+}
+
+// withAuthorizationMark plants the request's authorization mark, unless ctx
+// already carries one.
+func withAuthorizationMark(ctx context.Context) context.Context {
+	if _, ok := ctx.Value(authorizationKey{}).(*authorizationMark); ok {
+		return ctx
+	}
+	return context.WithValue(ctx, authorizationKey{}, &authorizationMark{})
 }
 
 func ActorSlotFromContext(ctx context.Context) (*ActorContext, bool) {
@@ -98,40 +98,32 @@ func BindPublicRequest(ctx context.Context, projectID, flowID, sessionID string)
 
 // MarkAuthorization records which path authorized the request, after the
 // security handler stamped its actor. Every event the request emits from then
-// on, Path A and Path B alike, carries it. Outside a request, with neither an
-// actor nor a slot, there is nothing to mark.
+// on, Path A and Path B alike, carries it. Outside a request no mark is
+// planted, and there is nothing to mark.
 func MarkAuthorization(ctx context.Context, authorization domain.EventAuthorizationMetadata) {
-	if mark := requestAuthorization(ctx); mark != nil {
+	if mark, ok := ctx.Value(authorizationKey{}).(*authorizationMark); ok {
 		mark.metadata.Store(&authorization)
 	}
 }
 
-// requestAuthorization is the request's authorization mark: the stamped
-// actor's, else the slot's, else nil.
-func requestAuthorization(ctx context.Context) *authorizationMark {
-	if ac, ok := ActorFromContext(ctx); ok && ac.authorization != nil {
-		return ac.authorization
-	}
-	if slot, ok := ActorSlotFromContext(ctx); ok && slot.authorization != nil {
-		return slot.authorization
+// AuthorizationFromContext is the path that authorized the request, or nil
+// when nothing marked it: an ordinary grant, or no authorization at all.
+func AuthorizationFromContext(ctx context.Context) *domain.EventAuthorizationMetadata {
+	if mark, ok := ctx.Value(authorizationKey{}).(*authorizationMark); ok {
+		return mark.metadata.Load()
 	}
 	return nil
 }
 
-// WithActorContext stores ActorContext on ctx and updates any actor slot. The
-// actor joins the request's authorization mark, or starts one, so a request
-// re-stamped mid-flight keeps its mark.
+// WithActorContext stores ActorContext on ctx and updates any actor slot. A
+// server without the request event middleware has planted no slot, and so no
+// authorization mark: stamping the actor plants one, so the authz gate can
+// still mark the request.
 func WithActorContext(ctx context.Context, ac ActorContext) context.Context {
-	if ac.authorization == nil {
-		ac.authorization = requestAuthorization(ctx)
-	}
-	if ac.authorization == nil {
-		ac.authorization = &authorizationMark{}
-	}
 	if slot, ok := ActorSlotFromContext(ctx); ok {
 		*slot = ac
 	}
-	return context.WithValue(ctx, contextKey{}, ac)
+	return context.WithValue(withAuthorizationMark(ctx), contextKey{}, ac)
 }
 
 func ActorFromContext(ctx context.Context) (ActorContext, bool) {
@@ -183,7 +175,7 @@ func FromContext(ctx context.Context, eventType domain.EventType, category domai
 	ev.SessionID = ac.SessionID
 	ev.FlowID = ac.FlowID
 	ev.RequestID = ac.RequestID
-	if authorization := ac.Authorization(); authorization != nil {
+	if authorization := AuthorizationFromContext(ctx); authorization != nil {
 		if meta, err := events.MarshalPayload(domain.EventMetadata{Authorization: authorization}); err == nil {
 			ev.Metadata = meta
 		}

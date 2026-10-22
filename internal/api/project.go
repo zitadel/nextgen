@@ -129,13 +129,18 @@ func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsP
 		markPlatformOperator(ctx, scope)
 	}
 
-	listed, err := h.projectService.ListAuthorized(ctx, service.ListAuthorizedProjectsRequest{
+	req := service.ListAuthorizedProjectsRequest{
 		HomeProjectID: self.ProjectID(),
 		UserID:        self.UserID(),
-		EveryProject:  operator,
 		Limit:         int(params.Limit.Value),
 		PageToken:     string(params.PageToken.Value),
-	})
+	}
+	var listed *service.ListProjectsResponse
+	if operator {
+		listed, err = h.projectService.ListEveryProject(ctx, req)
+	} else {
+		listed, err = h.projectService.ListAuthorized(ctx, req)
+	}
 	if err != nil {
 		// A refused session answers exactly like an anonymous one. Letting
 		// sess.token_invalid through here would tell a caller that its cookie is

@@ -171,7 +171,5 @@ func TestWithActorContextKeepsTheMark(t *testing.T) {
 	restamped := WithActorContext(ctx, ActorContext{ProjectID: "proj_customer"})
 	ev := FromContext(restamped, domain.EventTypeProjectUpdated, domain.EventCategoryEntity)
 	assert.JSONEq(t, `{"authorization":{"path":"platform_operator"}}`, string(ev.Metadata))
-	slot, ok := ActorSlotFromContext(restamped)
-	require.True(t, ok)
-	require.NotNil(t, slot.Authorization())
+	require.NotNil(t, AuthorizationFromContext(restamped))
 }

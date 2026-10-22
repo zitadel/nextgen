@@ -138,8 +138,8 @@ func (r *Resolver) CheckPath(ctx context.Context, stmts service.AuthzResolverSta
 	switch {
 	case allowed:
 		o = outcome{decision: DecisionAllow, path: PathGrant}
-	default:
-		operator, err := platformOperatorAllows(ctx, stmts, params)
+	case params.PlatformOperatorEligible():
+		operator, err := stmts.CheckPlatformOperator(ctx, params.PlatformCheckParams())
 		if err != nil {
 			return DecisionUnspecified, PathNone, err
 		}
@@ -149,45 +149,37 @@ func (r *Resolver) CheckPath(ctx context.Context, stmts service.AuthzResolverSta
 		case foothold:
 			o = outcome{decision: DecisionForbidden}
 		}
+	case foothold:
+		o = outcome{decision: DecisionForbidden}
 	}
 	r.memo[key] = o
 	return o.decision, o.path, nil
 }
 
 // PlatformOperator reports whether req's principal holds ObjectType.Relation on
-// every object through the platform operator relation (ADR 075 §3). It is the
-// question asked without a target: whether a session may search every project,
-// and which platform relations the Console shows. ProjectID is not consulted.
+// every object through the platform operator relation (ADR 075 §3), without a
+// target project: listMyProjects asks it for project.viewer to decide whether
+// the session user's projects are every project. ProjectID is not consulted;
+// a principal that cannot hold the relation is answered without a query.
 func (r *Resolver) PlatformOperator(ctx context.Context, stmts service.AuthzResolverStatements, req Request) (bool, error) {
-	switch {
-	case req.PrincipalType == "":
-		return false, fmt.Errorf("resolver: principal type is required")
-	case req.PrincipalID == "":
-		return false, fmt.Errorf("resolver: principal id is required")
-	case req.ObjectType == "":
-		return false, fmt.Errorf("resolver: object type is required")
-	case req.Relation == "":
-		return false, fmt.Errorf("resolver: relation is required")
+	if err := validateQuestion(req); err != nil {
+		return false, err
 	}
-	params := checkParams("", req)
-	if !params.PlatformOperatorEligible() {
+	if !req.PlatformOperatorEligible() {
 		return false, nil
 	}
 	catalogID, err := r.ActiveCatalogID(ctx, stmts)
 	if err != nil {
 		return false, err
 	}
-	params.CatalogID = catalogID
-	return platformOperatorAllows(ctx, stmts, params)
+	return stmts.CheckPlatformOperator(ctx, checkParams(catalogID, req).PlatformCheckParams())
 }
 
-// platformOperatorAllows asks storage for the operator path, but only for a
-// principal that can hold it: everyone else is answered without a query.
-func platformOperatorAllows(ctx context.Context, stmts service.AuthzResolverStatements, params domain.AuthzCheckParams) (bool, error) {
-	if !params.PlatformOperatorEligible() {
-		return false, nil
-	}
-	return stmts.CheckPlatformOperator(ctx, params.PlatformCheckParams())
+// PlatformOperatorEligible reports whether req's principal can hold the platform
+// operator relation at all (domain.AuthzCheckParams.PlatformOperatorEligible),
+// so a caller can skip the question before it has statements to ask with.
+func (req Request) PlatformOperatorEligible() bool {
+	return checkParams("", req).PlatformOperatorEligible()
 }
 
 // ListObjects returns resource_scope_index ids of ResourceKind the principal may see.
@@ -263,19 +255,31 @@ func (r *Resolver) ActiveCatalogID(ctx context.Context, stmts service.AuthzResol
 }
 
 func validateCheckRequest(req Request) error {
+	if err := validateQuestion(req); err != nil {
+		return err
+	}
+	switch {
+	case req.ProjectID == "":
+		return fmt.Errorf("resolver: project id is required")
+	case req.PrincipalType == domain.AuthzPrincipalTypeSKTeam && req.TeamID == "":
+		return fmt.Errorf("resolver: team id is required for sk_team")
+	default:
+		return nil
+	}
+}
+
+// validateQuestion checks what every question needs, with or without a target
+// project: who asks, and for which relation.
+func validateQuestion(req Request) error {
 	switch {
 	case req.PrincipalType == "":
 		return fmt.Errorf("resolver: principal type is required")
 	case req.PrincipalID == "":
 		return fmt.Errorf("resolver: principal id is required")
-	case req.ProjectID == "":
-		return fmt.Errorf("resolver: project id is required")
 	case req.ObjectType == "":
 		return fmt.Errorf("resolver: object type is required")
 	case req.Relation == "":
 		return fmt.Errorf("resolver: relation is required")
-	case req.PrincipalType == domain.AuthzPrincipalTypeSKTeam && req.TeamID == "":
-		return fmt.Errorf("resolver: team id is required for sk_team")
 	default:
 		return nil
 	}
