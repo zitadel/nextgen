@@ -93,7 +93,7 @@ content:
         summary: rel.revoked
         value:
           code: rel.revoked
-          message: 'release: revoked'
+          message: 'the release this attempt runs on was revoked'
       req.invalid:
         summary: req.invalid
         value:

@@ -255,7 +255,7 @@ func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *d
 		if err != nil {
 			return err
 		}
-		if entity.RevokedAt != nil {
+		if entity.Revoked() {
 			revoked = entity
 			return nil
 		}

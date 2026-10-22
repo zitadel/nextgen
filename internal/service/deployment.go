@@ -240,7 +240,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			return err
 		}
 		// TODO(#2206): a concurrent revoke of this release can land after this check.
-		if release.RevokedAt != nil {
+		if release.Revoked() {
 			return domain.ErrReleaseRevoked()
 		}
 		read, current, err := servedBy(ctx, stmts, entity)
