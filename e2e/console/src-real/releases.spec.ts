@@ -184,7 +184,7 @@ test("revokes a release once nothing serves it, and refuses while one does", asy
   await confirm.getByRole("button", { name: "Revoke release" }).click();
 
   await expect(page.getByText("Release revoked")).toBeVisible();
-  await expect(page.getByText("Revoked")).toBeVisible();
+  await expect(page.getByText("Revoked", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: `Actions for ${first.id}` })).toHaveCount(0);
   await expectNoErrorBoundary(page);
 });
