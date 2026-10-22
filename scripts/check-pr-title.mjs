@@ -66,8 +66,6 @@ const NON_SHIPPING_ROOT_FILES = new Set([
   "LICENSE",
   "devbox.json",
   "devbox.lock",
-  "go.sum",
-  "main.go",
   "moon.yml",
   "package.json",
   "pnpm-lock.yaml",
@@ -79,6 +77,12 @@ const NON_SHIPPING_ROOT_FILES = new Set([
   "vitest.shared.mjs",
   "vitest.shared.d.mts",
 ]);
+
+// The Go module's own non-shipping files, as the root files above: its
+// lockfile and the entrypoint shim. Its lint analyzers (`tools/`) run in CI
+// only, like the repository's `tools/`.
+const SERVER_MODULE = "apps/api/";
+const NON_SHIPPING_MODULE_FILES = new Set([`${SERVER_MODULE}go.sum`, `${SERVER_MODULE}main.go`]);
 
 export function parseSemanticConfig(source) {
   const types = [];
@@ -133,6 +137,10 @@ export function isNonShippingFile(file) {
 
   const [top] = path.split("/");
   if (path.includes("/") && NON_SHIPPING_TOP_LEVEL_DIRS.includes(top)) {
+    return true;
+  }
+
+  if (NON_SHIPPING_MODULE_FILES.has(path) || path.startsWith(`${SERVER_MODULE}tools/`)) {
     return true;
   }
 

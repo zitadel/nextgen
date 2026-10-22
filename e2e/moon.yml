@@ -191,7 +191,7 @@ tasks:
       - "schemas/**/*"
       - "@group(laneShared)"
       - "/scripts/render-builtin-schemas.mjs"
-      - "/api/openapi/endpoints/schemas/*.json"
+      - "/apps/api/api/openapi/endpoints/schemas/*.json"
     options:
       cache: false
       runInCI: false

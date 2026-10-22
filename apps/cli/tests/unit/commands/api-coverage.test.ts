@@ -252,7 +252,7 @@ const verbOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>
 const calledOperations = async (): Promise<ReadonlySet<string>> =>
   new Set([...(await verbOperations()).values()].flatMap((called) => [...called]));
 
-const SPEC_ENDPOINTS = join(import.meta.dirname, "../../../../../api/openapi/endpoints");
+const SPEC_ENDPOINTS = join(import.meta.dirname, "../../../../../apps/api/api/openapi/endpoints");
 
 /**
  * The command the spec names for each client operation: the `x-zitadel-cli`

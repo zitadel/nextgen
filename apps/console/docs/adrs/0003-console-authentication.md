@@ -28,7 +28,7 @@ The platform already has everything a console sign-in needs:
   (`ZitadelLogin`, …) for client-side SPAs — exactly what the console is.
 - The API authenticates `GET /sessions/me`, `DELETE /sessions/me`, and
   `GET /users/me` with that cookie
-  ([`internal/api/security.go`](../../../../internal/api/security.go)).
+  ([`internal/api/security.go`](../../../../apps/api/internal/api/security.go)).
 
 Two alternatives were considered for where the login screen lives:
 
@@ -202,4 +202,4 @@ does not change.
   [037](../../../../docs/adrs/037-token-lifecycle.md).
 - [`packages/sdk-react`](../../../../packages/sdk-react/README.md),
   [`packages/components/src/orchestrator/zitadel-login.ts`](../../../../packages/components/src/orchestrator/zitadel-login.ts),
-  [`internal/api/session.go`](../../../../internal/api/session.go).
+  [`internal/api/session.go`](../../../../apps/api/internal/api/session.go).

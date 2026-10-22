@@ -33,7 +33,7 @@ Two product constraints shape the answers:
 - The console is **embedded into the Go server under a configurable deployment
   prefix** and served as a static SPA with an `index.html` fallback for unknown
   client routes (see
-  [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)).
+  [`internal/staticui/handler.go`](../../../../apps/api/internal/staticui/handler.go)).
   Routing must survive a hard refresh on a deep link, and the client basepath
   must line up with that embed prefix.
 - That embed prefix is owned by the Vite `base`
@@ -225,7 +225,7 @@ the sidebar.
 - [`apps/console/src/router.tsx`](../../src/router.tsx),
   [`apps/console/src/main.tsx`](../../src/main.tsx),
   [`apps/console/vite.config.ts`](../../vite.config.ts).
-- [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)
+- [`internal/staticui/handler.go`](../../../../apps/api/internal/staticui/handler.go)
   — SPA fallback that makes deep links survive refresh.
 - Root [ADR 055: A Lit-only login surface, with the console on shadcn/ui](../../../../docs/adrs/055-lit-only-login-surface.md)
   — the shell is built from shadcn/ui in `src/components/ui/`, sharing only

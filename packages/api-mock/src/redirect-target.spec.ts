@@ -21,7 +21,7 @@ interface Row {
 
 const rows = JSON.parse(
   readFileSync(
-    new URL("../../../internal/httputil/testdata/redirect_targets.json", import.meta.url),
+    new URL("../../../apps/api/internal/httputil/testdata/redirect_targets.json", import.meta.url),
     "utf8",
   ),
 ) as { accepts: Row[]; refuses: Row[] };

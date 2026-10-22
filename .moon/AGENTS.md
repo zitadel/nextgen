@@ -52,11 +52,15 @@ covered without a list to maintain. Never write an `inputs` list naming a
 package's own files. The exceptions name only what lies outside the folder:
 
 - A task that reads files outside its project lists `**/*` plus that path
-  (`api:generate` reads `/api/openapi/**/*.yaml`).
-- `server` keeps its file groups because its code lives at the repo root, and
-  `bench` because `tools/bench` compiles the root module through
-  `replace github.com/zitadel/nextgen => ../..` (`tools/bench/go.mod`).
-  Anything compiled in through `//go:embed` or read by a test belongs in them.
+  (`api:generate` reads `/apps/api/api/openapi/**/*.yaml`).
+- `server` keeps its file groups because its code lives in `apps/api`, the Go
+  module, not in `apps/server`, and `bench` because `tools/bench` compiles
+  that module through `replace github.com/zitadel/nextgen => ../../apps/api`
+  (`tools/bench/go.mod`). Anything compiled in through `//go:embed` or read
+  by a test belongs in them.
+- The `server` tasks run from the workspace root and enter the module with
+  `go -C apps/api`; a script does the same through `SERVER_MODULE_DIR`
+  (`scripts/server-build.mjs`).
 - The root `workspace` project's `test` and `check-*` tasks list their files,
   because its folder is the whole repo.
 

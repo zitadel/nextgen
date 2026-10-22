@@ -1,13 +1,22 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, formatCommand, run } from "./dev-process.mjs";
-import { assertServerBuildPackage, gitInfo, serverLdflags } from "./server-build.mjs";
+import {
+  assertServerBuildPackage,
+  gitInfo,
+  serverLdflags,
+  serverModuleRoot,
+} from "./server-build.mjs";
 import { runnerCommand } from "./task-runner.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+const moduleRoot = serverModuleRoot(repoRoot);
 const args = withServerMigrateArgs(forwardedArgs());
+// Relative to the repository root, where the binary runs; the build runs in
+// the module, so it gets the absolute path.
 const out = "dist/server/nextgen-debug";
 
 // -gcflags "all=-N -l": disable compiler optimisations (-N) and inlining (-l) so the
@@ -20,9 +29,18 @@ try {
     commit: info.commit,
     date: info.date,
   });
-  const buildArgs = ["build", "-gcflags", "all=-N -l", "-ldflags", ldflags, "-o", out, "."];
+  const buildArgs = [
+    "build",
+    "-gcflags",
+    "all=-N -l",
+    "-ldflags",
+    ldflags,
+    "-o",
+    join(repoRoot, out),
+    ".",
+  ];
   if (isHelp(args)) {
-    await run("go", ["run", "-ldflags", ldflags, ".", ...helpArgs(args)], { cwd: repoRoot });
+    await run("go", ["run", "-ldflags", ldflags, ".", ...helpArgs(args)], { cwd: moduleRoot });
   } else {
     process.stderr.write(`\n[server-debug] build: ${formatCommand("go", buildArgs)}\n`);
     process.stderr.write(`[server-debug] run:   ${formatCommand(`./${out}`, args)}\n\n`);
@@ -30,7 +48,7 @@ try {
       const build = runnerCommand(["console:build", "login-ui:build"]);
       await run(build.command, build.args, { cwd: repoRoot });
     }
-    await run("go", buildArgs, { cwd: repoRoot });
+    await run("go", buildArgs, { cwd: moduleRoot });
     await runBinary(`./${out}`, args, repoRoot);
   }
 } catch (error) {

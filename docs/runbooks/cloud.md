@@ -1,7 +1,8 @@
 # Runbook: hosted cloud (Vercel + PlanetScale Postgres)
 
-> **Code:** [`apps/cloud/`](../../apps/cloud/) and the repo-root
-> [`vercel.json`](../../vercel.json)
+> **Code:** [`apps/cloud/`](../../apps/cloud/), the launcher in
+> [`apps/api/cmd/cloud-launcher/`](../../apps/api/cmd/cloud-launcher/) and the
+> repo-root [`vercel.json`](../../vercel.json)
 > **Vercel project:** `zitadel/cloud` (renamed from `nextgen-preview-cloud`).
 > Production answers at `preview.zitadel.com`, the docs' address that
 > [`skills/zitadel/SKILL.md`](../../skills/zitadel/SKILL.md) gives agents;
@@ -24,8 +25,8 @@ One Vercel deployment, six [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then migrates | every path except the console's, the storybook's, the docs' and the website's, including `/console/runtime.json` and the login UI at `/ui/login/` |
-| `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
+| `server` | Go preset, rooted at the Go module `apps/api`; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/api/cmd/cloud-launcher` without the console (`-tags noconsole`), then migrates | every path except the console's, the storybook's, the docs' and the website's, including `/console/runtime.json` and the login UI at `/ui/login/` |
+| `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `apps/api/internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `storybook` | Storybook; `turbo run build` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/components`, for the atoms its showcase renders, then `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there), and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
@@ -108,7 +109,7 @@ migrates through, because migrations hold a session advisory lock.
   URLs name its `postgres` database with a role that may create databases;
   the launcher swaps in the preview's own: one per Git branch, named
   `preview_<branch>_<hash>`
-  ([`database.go`](../../apps/cloud/launcher/database.go)). The build
+  ([`database.go`](../../apps/api/cmd/cloud-launcher/database.go)). The build
   creates it when it is missing, stamps it with the branch and the time of
   the deployment (a database comment), and migrates it; the function serves
   from it. Previews start empty and never see production data.
@@ -368,7 +369,7 @@ its suite alone. A new suite is a turbo task that
 http://localhost:3000: `vercel dev -L` over `vercel.json`, every service behind
 the deployment's own routes on one origin, the server on SQLite. No Vercel
 account, link or secret is involved, and Go need not be installed: Vercel's Go
-builder downloads the version `go.mod` names. `CLOUD_DEV_PORT` moves the port;
+builder downloads the version `apps/api/go.mod` names. `CLOUD_DEV_PORT` moves the port;
 `CLOUD_DEV_DEBUG=1` shows why a service did not start, which `vercel dev` logs
 only at debug level.
 
@@ -384,8 +385,9 @@ restart keeps its state; deleting the directory starts over.
 `--local-config`), so what it needs lives there, in fields a deployment does
 not use:
 
-- The `server` service's `entrypoint` names `apps/cloud/launcher`. In dev,
-  Vercel's Go builder builds that package and starts it on `$PORT`; a
+- The `server` service is rooted at the Go module, `apps/api`, and its
+  `entrypoint` names `cmd/cloud-launcher/main.go` there. In dev, Vercel's Go
+  builder builds that package and starts it on `$PORT`; a
   deployment runs `build.sh`, which compiles the same package, and the
   builder takes the build command's binary instead. Without
   `CLOUD_DATABASE_URL` and outside a deployment, the launcher serves from
@@ -534,7 +536,7 @@ project and imports the root admin.
   from and installs when they differ. Go would keep each rebuild's compiled
   packages for five days, so `build.sh` drops those no build used in the
   last two hours. A new Go version starts the Go caches over: when the
-  toolchain Vercel picks from `go.mod`'s `toolchain` line differs from the
+  toolchain Vercel picks from `apps/api/go.mod`'s `toolchain` line differs from the
   restored one, its Go builder downloads it and deletes
   `.vercel/cache/golang`, module cache included. The next build of each
   branch then downloads every module and compiles the server from nothing:

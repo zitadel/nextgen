@@ -9,7 +9,7 @@
     // holds the `generated-sources` lock: the server's generation rewrites
     // what it copies.
     "sync-schemas": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json"],
       "outputs": ["meta-schemas/*.json"]
     },
     "typecheck": {

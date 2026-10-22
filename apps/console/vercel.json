@@ -3,6 +3,6 @@
   "framework": null,
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "cd ../../ && moon run console:build",
-  "outputDirectory": "../../internal/staticui/console/dist",
+  "outputDirectory": "../api/internal/staticui/console/dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

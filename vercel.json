@@ -2,10 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
     "server": {
-      "root": ".",
+      "root": "apps/api",
       "framework": "go",
-      "entrypoint": "apps/cloud/launcher/main.go",
-      "buildCommand": "sh apps/cloud/build.sh"
+      "entrypoint": "cmd/cloud-launcher/main.go",
+      "buildCommand": "sh ../cloud/build.sh"
     },
     "console": {
       "root": "apps/console",
@@ -13,7 +13,7 @@
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
       "buildCommand": "CONSOLE_BASE_PATH=/console/ CONSOLE_VERCEL_INSIGHTS=1 turbo run build",
       "devCommand": "NODE_ENV=production CONSOLE_BASE_PATH=/console/ vite build --outDir node_modules/.cloud-dev && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
-      "outputDirectory": "../../internal/staticui/console/dist",
+      "outputDirectory": "../api/internal/staticui/console/dist",
       "rewrites": [
         {
           "source": "/console/:path(.*)?",

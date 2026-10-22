@@ -9,9 +9,9 @@ Examples are templates: `${PROJECT_ID}` is substituted at the point of use (see
 `objectType`, `human-user`.
 
 For the engine's capability surface, see
-[`docs/design/flowengine/capabilities.md`](../../../../../docs/design/flowengine/capabilities.md).
+[`docs/design/flowengine/capabilities.md`](../../../../../../../docs/design/flowengine/capabilities.md).
 For the shape and validation rules, see
-[`docs/design/flowengine/flow-definition-rules.md`](../../../../../docs/design/flowengine/flow-definition-rules.md).
+[`docs/design/flowengine/flow-definition-rules.md`](../../../../../../../docs/design/flowengine/flow-definition-rules.md).
 
 ## Index
 

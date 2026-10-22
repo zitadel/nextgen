@@ -43,7 +43,7 @@ framework version floors are enforced per
 3. **`zitadel apply` is terraform-shaped, not imperative** — diff, plan, apply;
    `--auto-approve` for agents.
 4. **Flow definitions are API resources** with the canonical spec under
-   [`api/openapi/components/flows/`](../../../api/openapi/components/flows/).
+   [`api/openapi/components/flows/`](../../../apps/api/api/openapi/components/flows/).
    `fields` and `actions` are **ordered arrays** whose entries carry `name`
    ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md));
    every label is a `text_key` resolved client-side via the `| t` filter.

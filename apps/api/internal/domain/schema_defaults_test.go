@@ -22,7 +22,7 @@ import (
 func TestShippedUserSchemasPassServerValidation(t *testing.T) {
 	v := newTestValidator(t)
 	roots := []string{
-		filepath.Join("..", "..", "packages", "config", "defaults"),
+		filepath.Join("..", "..", "..", "..", "packages", "config", "defaults"),
 		filepath.Join("..", "..", "api", "openapi", "endpoints", "schemas", "examples"),
 	}
 

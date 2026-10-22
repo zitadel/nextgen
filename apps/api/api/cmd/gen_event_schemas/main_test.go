@@ -33,7 +33,7 @@ func TestCatalogEventTypesMatchDomain(t *testing.T) {
 	require.True(t, ok)
 	generatorDir := filepath.Dir(filename)
 	domainEventPath := filepath.Join(generatorDir, "../../../internal/domain/event.go")
-	catalogPath := filepath.Join(generatorDir, "../../../docs/design/api/events-catalog.md")
+	catalogPath := filepath.Join(generatorDir, "../../../../../docs/design/api/events-catalog.md")
 
 	domainTypes, err := extractEventTypes(domainEventPath)
 	require.NoError(t, err)
@@ -132,7 +132,7 @@ func TestWebhookStatusesMatchCatalog(t *testing.T) {
 	t.Parallel()
 	_, filename, _, ok := runtime.Caller(0)
 	require.True(t, ok)
-	catalogPath := filepath.Join(filepath.Dir(filename), "../../../docs/design/api/events-catalog.md")
+	catalogPath := filepath.Join(filepath.Dir(filename), "../../../../../docs/design/api/events-catalog.md")
 	raw, err := os.ReadFile(catalogPath)
 	require.NoError(t, err)
 	catalog := string(raw)

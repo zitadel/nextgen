@@ -1,13 +1,14 @@
 #!/bin/sh
-# Build step of the `server` service (repo-root vercel.json, Go preset):
-# build the login UI the server embeds, compile the launcher into the
-# function binary, then migrate the deployment's database (a preview's is
-# created first; see apps/cloud/launcher/database.go).
+# Build step of the `server` service (repo-root vercel.json, Go preset,
+# rooted at the Go module apps/api): build the login UI the server embeds,
+# compile the launcher (apps/api/cmd/cloud-launcher) into the function
+# binary, then migrate the deployment's database (a preview's is created
+# first; see apps/api/cmd/cloud-launcher/database.go).
 #
 # The console is not embedded: it is a service of its own, and the launcher
 # turns the server's console off. The services build one after another in
 # one checkout, and the console service's build lands in the server's embed
-# directory (internal/staticui/console/dist), so the launcher is compiled
+# directory (apps/api/internal/staticui/console/dist), so the launcher is compiled
 # with -tags noconsole; without it, the function would carry the console
 # whenever that service built first.
 #
@@ -19,6 +20,7 @@
 # Output: $VERCEL_OUTPUT_FILE on Vercel, dist/nextgen-launcher locally.
 set -eu
 cd "$(dirname "$0")/../.."
+repo="$PWD"
 
 # The Go preset runs no installCommand, so the install the other services
 # declare in vercel.json runs here; pnpm skips it once a service built
@@ -35,15 +37,21 @@ commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknow
 ref="${VERCEL_GIT_COMMIT_REF:-}"
 date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 out="${VERCEL_OUTPUT_FILE:-dist/nextgen-launcher}"
+# Absolute, because the build runs in the module and the binary runs here.
+case "$out" in /*) ;; *) out="$repo/$out" ;; esac
 mkdir -p "$(dirname "$out")"
 
+# The -X targets name packages of the module github.com/zitadel/nextgen
+# (apps/api/go.mod); `go build` silently ignores a -X it cannot resolve.
+cd "$repo/apps/api"
 CGO_ENABLED=0 go build -trimpath -tags noconsole \
   -ldflags "-s -w \
     -X github.com/zitadel/nextgen/internal/build.version=${version}+cloud \
     -X github.com/zitadel/nextgen/internal/build.commit=${commit} \
     -X github.com/zitadel/nextgen/internal/build.date=${date} \
     -X main.buildRef=${ref}" \
-  -o "$out" ./apps/cloud/launcher
+  -o "$out" ./cmd/cloud-launcher
+cd "$repo"
 echo "built $out (version ${version}+cloud, commit ${commit})"
 
 # Go drops a build cache entry only after five days unused, and Vercel

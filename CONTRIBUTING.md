@@ -11,7 +11,7 @@ If you want to add Zitadel to your own app rather than contribute here, see the
 
 ## Prerequisites
 
-- Go version from [`go.mod`](go.mod)
+- Go version from [`apps/api/go.mod`](apps/api/go.mod)
 - Node.js from [`.nvmrc`](.nvmrc)
 - pnpm 12 from [`package.json`](package.json) (`corepack enable`)
 - [Moon](https://moonrepo.dev/moon)
@@ -56,8 +56,8 @@ node_modules automatically (`.moon/workspace.yml` sets `installDependencies: fal
 ### Starting the server from source
 
 The Go binary embeds production builds of two frontend apps:
-- `apps/console` → `internal/staticui/console/dist/`
-- `apps/login-ui` → `internal/staticui/login/dist/`
+- `apps/console` → `apps/api/internal/staticui/console/dist/`
+- `apps/login-ui` → `apps/api/internal/staticui/login/dist/`
 
 `moon run workspace:server` builds both apps before starting Go. If you have not
 changed any frontend code, skip the UI builds with `go run . server --migrate`.
@@ -415,7 +415,7 @@ If you see a raw `ABORTED` (an injected one reads
 the injection off: both hide the bug. Something on that code path stripped the
 gRPC status off the error, so Spanner's `ReadWriteTransaction` stopped
 recognising it as retryable, or a callback could not run twice. See the
-error-wrapping rules in [internal/storage/AGENTS.md](internal/storage/AGENTS.md)
+error-wrapping rules in [apps/api/internal/storage/AGENTS.md](apps/api/internal/storage/AGENTS.md)
 and #788.
 
 A stalled transaction is a different failure and has a different fix. Read-write

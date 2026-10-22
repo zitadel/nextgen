@@ -17,7 +17,7 @@ The Lit atoms (`<zl-*>`) and the orchestrators under `src/orchestrator/`
   `packages/api/orval.config.ts`.
 - `src/orchestrator/branding.ts` aliases the generated branding model;
   `attribution` is its one client extension. A new appearance key goes into
-  `api/openapi/` first.
+  `apps/api/api/openapi/` first.
 - The orchestrator calls the API through `src/orchestrator/api-client.ts`,
   configured with `configureZitadel(...)` from `@zitadel/api/config`. There is
   no `api-base` attribute.

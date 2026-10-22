@@ -82,9 +82,9 @@ describe("parseConventionalTitle", () => {
 
 describe("isNonShippingFile", () => {
   it.each([
-    "internal/domain/user.go",
-    "cmd/server/server.go",
-    "api/openapi/user.yaml",
+    "apps/api/internal/domain/user.go",
+    "apps/api/cmd/server/server.go",
+    "apps/api/api/openapi/user.yaml",
     "apps/cli/src/commands/setup.ts",
     "packages/sdk-react/src/index.ts",
     "packages/sdk-react/README.md",
@@ -120,7 +120,7 @@ describe("isNonShippingFile", () => {
     "apps/storybook/main.ts",
     "packages/api-mock/src/handlers.ts",
     "packages/components/moon.yml",
-    "internal/domain/user_test.go",
+    "apps/api/internal/domain/user_test.go",
     "packages/sdk-react/src/index.test.ts",
     // Build tooling inside a package produces what ships without shipping.
     "packages/design-tokens/scripts/build.ts",
@@ -194,7 +194,11 @@ describe("checkPrTitle", () => {
     const { checkPrTitle } = await load();
     const report = checkPrTitle({
       title: "chore: set argon2id as default password hashing algorithm",
-      files: ["cmd/server/server.go", "internal/crypto/hash.go", ".changeset/argon2id.md"],
+      files: [
+        "apps/api/cmd/server/server.go",
+        "apps/api/internal/crypto/hash.go",
+        ".changeset/argon2id.md",
+      ],
       config,
     });
 
@@ -219,8 +223,8 @@ describe("checkPrTitle", () => {
     const report = checkPrTitle({
       title: "feat: delete user",
       files: [
-        "internal/domain/user.go",
-        "internal/api/user_service.go",
+        "apps/api/internal/domain/user.go",
+        "apps/api/internal/api/user_service.go",
         ".changeset/delete-user.md",
       ],
       config,
@@ -234,7 +238,7 @@ describe("checkPrTitle", () => {
     const { checkPrTitle } = await load();
     const report = checkPrTitle({
       title: "refactor(database): migrate token repository to statements",
-      files: ["internal/storage/v2/token.go", ".changeset/token-statements.md"],
+      files: ["apps/api/internal/storage/v2/token.go", ".changeset/token-statements.md"],
       config,
     });
 
@@ -280,15 +284,17 @@ describe("checkPrTitle", () => {
     const { checkPrTitle } = await load();
 
     expect(
-      checkPrTitle({ title: "feature: add a thing", files: ["internal/x.go"], config }).errors.map(
-        (error) => error.code,
-      ),
+      checkPrTitle({
+        title: "feature: add a thing",
+        files: ["apps/api/internal/x.go"],
+        config,
+      }).errors.map((error) => error.code),
     ).toContain("unknown-type");
 
     expect(
       checkPrTitle({
         title: "feat(docs): add a thing",
-        files: ["internal/x.go"],
+        files: ["apps/api/internal/x.go"],
         config,
       }).errors.map((error) => error.code),
     ).toContain("unknown-scope");
@@ -314,7 +320,7 @@ describe("checkPrTitle", () => {
       "build(deps): clear the open Dependabot security alerts",
       "refactor: route passkey creation through UserService",
     ]) {
-      const report = checkPrTitle({ title, files: ["internal/domain/user.go"], config });
+      const report = checkPrTitle({ title, files: ["apps/api/internal/domain/user.go"], config });
       expect(report.ok).toBe(true);
       expect(report.warnings).toEqual([]);
     }

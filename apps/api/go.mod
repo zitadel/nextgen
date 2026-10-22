@@ -184,6 +184,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zitadel/logging v0.7.0 // indirect
+	github.com/zitadel/nextgen/packages/config/defaults v0.0.0
 	github.com/zitadel/schema v1.3.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -214,3 +215,5 @@ tool (
 	github.com/ogen-go/ogen/cmd/ogen
 	go.uber.org/mock/mockgen
 )
+
+replace github.com/zitadel/nextgen/packages/config/defaults => ../../packages/config/defaults

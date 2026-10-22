@@ -21,7 +21,7 @@ tasks:
     command: "corepack pnpm run generate"
     inputs:
       - "**/*"
-      - "/api/openapi/**/*.yaml"
+      - "/apps/api/api/openapi/**/*.yaml"
       # The bundle applies the repo's Redocly config.
       - "/redocly.yaml"
       # Written by the CLI's reference test from its command table.

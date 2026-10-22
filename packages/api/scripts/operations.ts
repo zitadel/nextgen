@@ -6,7 +6,7 @@ import { bundle, loadConfig } from "@redocly/openapi-core";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(packageRoot, "../..");
-const input = resolve(repoRoot, "api/openapi/openapi-spec.yaml");
+const input = resolve(repoRoot, "apps/api/api/openapi/openapi-spec.yaml");
 const output = resolve(packageRoot, "src/generated/operations.ts");
 
 const METHODS = ["get", "put", "post", "delete", "patch"] as const;

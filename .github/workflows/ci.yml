@@ -78,9 +78,9 @@ jobs:
       # returns at once.
       - name: Pull the postgres lane's image
         run: |
-          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' internal/storage/testdb/postgres.go)"
+          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' apps/api/internal/storage/testdb/postgres.go)"
           if [ -z "$image" ]; then
-            echo "::warning::internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
+            echo "::warning::apps/api/internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
             exit 0
           fi
           nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
@@ -93,10 +93,10 @@ jobs:
       # depot-* files in GOCACHE), so it cannot use them.
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: apps/api/go.mod
           cache: true
           cache-dependency-path: |
-            go.sum
+            apps/api/go.sum
             tools/bench/go.sum
             tools/oidc-mock/go.sum
 

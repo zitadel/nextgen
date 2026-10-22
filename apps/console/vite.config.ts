@@ -10,7 +10,7 @@ import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 import { baseTest } from "../../vitest.shared.mjs";
 
 const defaultConsoleBase = "/ui/console/";
-const consoleOutDir = "../../internal/staticui/console/dist";
+const consoleOutDir = "../api/internal/staticui/console/dist";
 const defaultApiBase = "/api";
 const defaultBackendUrl = "http://localhost:8080";
 
@@ -174,7 +174,7 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
 // The path the build is served under: the Go server's `/ui/console/`, unless
 // CONSOLE_BASE_PATH names another. The hosted cloud's console service sets
 // `/console/` (repo-root vercel.json) and points the server's console links
-// there (apps/cloud/launcher). Unprefixed for the same reason as the insights
+// there (apps/api/cmd/cloud-launcher). Unprefixed for the same reason as the insights
 // variable below. Anything but an absolute path fails the build.
 function consoleBase(mode: string): string {
   const name = "CONSOLE_BASE_PATH";

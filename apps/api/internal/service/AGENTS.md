@@ -22,10 +22,10 @@ A change is incomplete if it:
 
 Authority (do not duplicate payload rules or the catalog table here):
 
-- Catalog: [`docs/design/api/events-catalog.md`](../../docs/design/api/events-catalog.md)
+- Catalog: [`docs/design/api/events-catalog.md`](../../../../docs/design/api/events-catalog.md)
   (payload rules, live Path B table, Retired table, deferred list). Context:
-  [ADR 048](../../docs/adrs/048-wide-events-internal-audit-primitive.md),
-  [ADR 049](../../docs/adrs/049-events-api-retention-export.md).
+  [ADR 048](../../../../docs/adrs/048-wide-events-internal-audit-primitive.md),
+  [ADR 049](../../../../docs/adrs/049-events-api-retention-export.md).
 - Types: [`internal/domain/event.go`](../domain/event.go) `EventType`
   constants.
 - Payloads: [`internal/domain/event_payload.go`](../domain/event_payload.go).

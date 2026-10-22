@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { formatProblems, getTotals, lint, lintConfig, loadConfig } from "@redocly/openapi-core";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const spec = resolve(repoRoot, "api/openapi/openapi-spec.yaml");
+const spec = resolve(repoRoot, "apps/api/api/openapi/openapi-spec.yaml");
 
 const config = await loadConfig({ configPath: resolve(repoRoot, "redocly.yaml") });
 

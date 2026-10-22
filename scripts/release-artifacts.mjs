@@ -11,7 +11,12 @@ import {
   PUBLIC_RELEASE_PACKAGES,
   SERVER_PLATFORM_PACKAGES,
 } from "./release-manifest.mjs";
-import { assertServerBuildPackage, gitInfo, serverLdflags } from "./server-build.mjs";
+import {
+  assertServerBuildPackage,
+  gitInfo,
+  serverLdflags,
+  serverModuleRoot,
+} from "./server-build.mjs";
 
 export { PUBLIC_PACKAGE_DIRS, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
 export { gitInfo } from "./server-build.mjs";
@@ -102,7 +107,7 @@ export async function buildServerBinaries(options = {}) {
         ".",
       ],
       {
-        cwd: repoRoot,
+        cwd: serverModuleRoot(repoRoot),
         env: {
           ...baseEnv,
           CGO_ENABLED: "0",

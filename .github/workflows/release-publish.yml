@@ -9,8 +9,8 @@ on:
       - ".github/workflows/release-publish.yml"
       - "apps/**/CHANGELOG.md"
       - "apps/**/package.json"
-      - "go.mod"
-      - "go.sum"
+      - "apps/api/go.mod"
+      - "apps/api/go.sum"
       - "packages/**/CHANGELOG.md"
       - "packages/**/package.json"
       - "pnpm-lock.yaml"
@@ -108,10 +108,10 @@ jobs:
       # Depot and keep the same files in GOCACHE.
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: apps/api/go.mod
           cache: true
           cache-dependency-path: |
-            go.sum
+            apps/api/go.sum
             tools/bench/go.sum
             tools/oidc-mock/go.sum
 

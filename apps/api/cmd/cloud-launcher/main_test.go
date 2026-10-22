@@ -269,7 +269,7 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 // vercel.json mounts the console service, and builds it, at the path the
 // server's console links point to; JSON has no comments to say so.
 func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "vercel.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "vercel.json"))
 	require.NoError(t, err)
 	var config struct {
 		Services map[string]struct {
@@ -313,7 +313,7 @@ func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
 // checkout, so the function is compiled without it; a plain build would
 // carry the console whenever that service built first.
 func TestBuildScriptLeavesTheConsoleOut(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "build.sh"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "cloud", "build.sh"))
 	require.NoError(t, err)
 	var builds []string
 	for _, line := range strings.Split(string(raw), "\n") {

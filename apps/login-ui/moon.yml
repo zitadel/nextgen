@@ -19,7 +19,7 @@ tasks:
     deps:
       - "components:build"
     outputs:
-      - "/internal/staticui/login/dist/**/*"
+      - "/apps/api/internal/staticui/login/dist/**/*"
     options:
       # Replaces the inherited dist/**/* rather than adding to it.
       mergeOutputs: "replace"
@@ -29,7 +29,7 @@ tasks:
     deps:
       - "components:build-release"
     outputs:
-      - "/internal/staticui/login/dist/**/*"
+      - "/apps/api/internal/staticui/login/dist/**/*"
     options:
       cache: false
       # Release UI builds consume package release output and run from the later

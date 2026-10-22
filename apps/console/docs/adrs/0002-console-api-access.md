@@ -24,7 +24,7 @@ There are two problems with implementing that literally.
 
 The API authenticates **every** request with an OAuth2 bearer that is the
 project secret (labelled `sk_proj_...` when minted). See
-[`internal/api/security.go`](../../../../internal/api/security.go): the
+[`internal/api/security.go`](../../../../apps/api/internal/api/security.go): the
 security handler passes the bearer to the token verifier, which decrypts it
 and yields the project id. There is **no console-user session** yet — #440
 lists console authentication, RBAC, and a user menu as explicit non-goals.
@@ -38,7 +38,7 @@ project-wide credential; shipping it to every console visitor is the exact
 failure mode ADR 005 exists to prevent.
 
 The console is served **same-origin** with the API: the Go mux in
-[`cmd/server/server.go`](../../../../cmd/server/server.go) `buildHTTPMux`
+[`cmd/server/server.go`](../../../../apps/api/cmd/server/server.go) `buildHTTPMux`
 mounts the static console SPA under its configured deployment prefix and the
 API handler at `/` on the same server. That co-location is what makes a
 server-side solution cheap.
@@ -287,5 +287,5 @@ and ADR 053 amends it; cite 053, not 046, for the CSRF contract.
 - [`packages/api/src/runtime/fetch.ts`](../../../../packages/api/src/runtime/fetch.ts),
   [`packages/api/src/runtime/config.ts`](../../../../packages/api/src/runtime/config.ts),
   [`packages/api/src/runtime/api-factory.ts`](../../../../packages/api/src/runtime/api-factory.ts).
-- [`internal/api/security.go`](../../../../internal/api/security.go),
-  [`cmd/server/server.go`](../../../../cmd/server/server.go) `buildHTTPMux`.
+- [`internal/api/security.go`](../../../../apps/api/internal/api/security.go),
+  [`cmd/server/server.go`](../../../../apps/api/cmd/server/server.go) `buildHTTPMux`.

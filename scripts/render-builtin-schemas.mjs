@@ -55,7 +55,7 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 export const HOSTED_BASE = "https://zitadel.com/schemas/v1";
 
 /** The built-in schemas the server embeds, generated from the OpenAPI YAML. */
-export const SOURCE_DIR = join(ROOT, "api/openapi/endpoints/schemas");
+export const SOURCE_DIR = join(ROOT, "apps/api/api/openapi/endpoints/schemas");
 
 /** The `schemas` service's output directory (vercel.json). */
 export const DEFAULT_OUT_DIR = join(ROOT, "dist/cloud-schemas");

@@ -14,7 +14,7 @@ tasks:
     command: "corepack pnpm run sync-schemas"
     inputs:
       - "**/*"
-      - "/api/openapi/endpoints/schemas/*.json"
+      - "/apps/api/api/openapi/endpoints/schemas/*.json"
     outputs:
       - "meta-schemas/*.json"
     options:

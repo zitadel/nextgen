@@ -2,7 +2,7 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   // The k6 benchmark harness (ADR 067): a nested Go module whose tasks run in
-  // this directory. The root module is a dependency through the replace
+  // this directory. The server module (apps/api) is a dependency through the replace
   // directive, and the root packages bench imports compile in the JSON
   // meta-schemas and the config defaults through //go:embed.
   "tasks": {
@@ -10,7 +10,7 @@
     "format": {
       "inputs": ["**/*.go"]
     },
-    // Compiles the root module's generated Go (api/generated, the enumer and
+    // Compiles the server module's generated Go (api/generated, the enumer and
     // mock files) through the replace directive, which the server's
     // generation rewrites mid-graph; the edge keeps vet behind it, as the
     // server's own vet is. build and test are ordered through vet.
@@ -19,10 +19,10 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
+        "$TURBO_ROOT$/apps/api/**/*.go",
+        "$TURBO_ROOT$/apps/api/go.mod",
+        "$TURBO_ROOT$/apps/api/go.sum",
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**"
       ]
     },
@@ -35,10 +35,10 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
+        "$TURBO_ROOT$/apps/api/**/*.go",
+        "$TURBO_ROOT$/apps/api/go.mod",
+        "$TURBO_ROOT$/apps/api/go.sum",
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**"
       ],
       "outputs": ["dist/k6"]
@@ -48,10 +48,10 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
+        "$TURBO_ROOT$/apps/api/**/*.go",
+        "$TURBO_ROOT$/apps/api/go.mod",
+        "$TURBO_ROOT$/apps/api/go.sum",
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**"
       ]
     },

@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { runCapture } from "./dev-process.mjs";
+import { serverModuleRoot } from "./server-build.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const required = [];
@@ -66,20 +67,22 @@ function checkNodeModules() {
 }
 
 async function checkGo() {
-  const expected = readText("go.mod").match(/^go\s+(\d+\.\d+)/m)?.[1];
+  const expected = readText("apps/api/go.mod").match(/^go\s+(\d+\.\d+)/m)?.[1];
   try {
-    const { stdout } = await runCapture("go", ["version"], { cwd: repoRoot });
+    // In the module, so a GOTOOLCHAIN=auto switch to apps/api/go.mod's
+    // toolchain is what gets reported.
+    const { stdout } = await runCapture("go", ["version"], { cwd: serverModuleRoot(repoRoot) });
     const actual = stdout.match(/go(\d+\.\d+(?:\.\d+)?)/)?.[1] ?? stdout.trim();
     if (!expected || actual.startsWith(expected)) {
       pass(`Go ${actual}`);
       return;
     }
     fail(
-      `Go ${actual} does not match go.mod (${expected})`,
+      `Go ${actual} does not match apps/api/go.mod (${expected})`,
       `Install Go ${expected} and make it first on PATH`,
     );
   } catch {
-    fail("Go is not available", "Install the Go version from go.mod");
+    fail("Go is not available", "Install the Go version from apps/api/go.mod");
   }
 }
 

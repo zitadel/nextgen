@@ -107,7 +107,7 @@ function validFlowDefinitionBody(): Record<string, unknown> {
     name: "login-flow",
     status: "active",
     user_schema:
-      "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml",
+      "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/apps/api/api/openapi/endpoints/schemas/user-schema.yaml",
     // Per `flow-definition.yaml`, `purposes` is an object mapping each
     // purpose name to its entry-point step (must match a `name` in `steps`).
     // The shape must satisfy the definition-time validator the mock now

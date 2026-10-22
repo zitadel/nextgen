@@ -19,7 +19,7 @@ the one-database rule `stmttest` runs under.
 
 Resource PKs are dialect-owned `prefix_<opaque>` values; the prefix registry
 and the rules for a new prefix are in
-[ADR 047](../../docs/adrs/047-dialect-id-generation.md).
+[ADR 047](../../../../docs/adrs/047-dialect-id-generation.md).
 
 - Create paths assign an empty ID with the dialect's `Ensure` /
   `ensureManagedID` before INSERT. Never invent IDs in domain, service or
@@ -68,7 +68,7 @@ built with, a pool client or an open transaction.
 
 [`dialect/authz/`](dialect/authz/) holds the dialect-independent authz helpers
 (ADRs 032–034; design in
-[`permission-storage.md`](../../docs/design/api/permission-storage.md)); the
+[`permission-storage.md`](../../../../docs/design/api/permission-storage.md)); the
 compiler and validator are in [`internal/authz/`](../authz/).
 
 - A lifecycle path that touches users or team membership goes through the

@@ -23,7 +23,7 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/apps/server/bin/**",
-        "$TURBO_ROOT$/api/openapi/endpoints/**/methods.yaml"
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/**/methods.yaml"
       ]
     },
     // It asks the npm advisory database, whose answer changes when an

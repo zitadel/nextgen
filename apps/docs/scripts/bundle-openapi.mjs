@@ -6,7 +6,7 @@ import { bundle, formatProblems, getTotals, loadConfig, parseYaml } from "@redoc
 
 const docsRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(docsRoot, "../..");
-const specRoot = resolve(repoRoot, "api/openapi");
+const specRoot = resolve(repoRoot, "apps/api/api/openapi");
 const input = resolve(specRoot, "openapi-spec.yaml");
 const outputDir = resolve(docsRoot, ".generated");
 

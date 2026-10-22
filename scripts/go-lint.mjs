@@ -19,15 +19,17 @@
 import { fileURLToPath } from "node:url";
 
 import { isDirectRun, run } from "./dev-process.mjs";
+import { serverModuleRoot } from "./server-build.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+const moduleRoot = serverModuleRoot(repoRoot);
 const INTEGRATION_TAGS = ["postgres_integration", "spanner_integration", "sqlite_integration"];
 
 export async function main() {
   const analyzers = ["run", "./tools/analyzers/cmd/analyzers", "./..."];
-  await run("go", analyzers, { cwd: repoRoot });
+  await run("go", analyzers, { cwd: moduleRoot });
   for (const tag of INTEGRATION_TAGS) {
-    await run("go", analyzers, { cwd: repoRoot, env: { ...process.env, GOFLAGS: `-tags=${tag}` } });
+    await run("go", analyzers, { cwd: moduleRoot, env: { ...process.env, GOFLAGS: `-tags=${tag}` } });
   }
   await run(
     "corepack",

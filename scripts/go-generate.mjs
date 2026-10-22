@@ -45,8 +45,10 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectRun, mapWithConcurrency, run, runCapture } from "./dev-process.mjs";
+import { serverModuleRoot } from "./server-build.mjs";
 
-const ROOT = fileURLToPath(new URL("..", import.meta.url));
+// The Go module; every directive the server generates lives below it.
+const ROOT = serverModuleRoot(fileURLToPath(new URL("..", import.meta.url)));
 
 // Never hold Go sources, and walking them dwarfs the rest of discovery.
 // `.claude` holds agent worktrees, `.go` a local module cache and `vendor` a
@@ -177,8 +179,8 @@ async function runPhase(dirs, phase, log) {
 }
 
 /**
- * Every directory holding a `//go:generate` directive, repo-relative, mapped to
- * the directives it holds.
+ * Every directory holding a `//go:generate` directive, module-relative, mapped
+ * to the directives it holds.
  *
  * Each is generated with `go generate .` rather than `./...`, so a directory
  * whose subdirectories also hold directives (`internal/instrumentation` over

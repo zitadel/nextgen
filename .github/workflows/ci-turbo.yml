@@ -91,9 +91,9 @@ jobs:
       # As in ci.yml: the postgres lane's image, pulled while the job installs.
       - name: Pull the postgres lane's image
         run: |
-          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' internal/storage/testdb/postgres.go)"
+          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' apps/api/internal/storage/testdb/postgres.go)"
           if [ -z "$image" ]; then
-            echo "::warning::internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
+            echo "::warning::apps/api/internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
             exit 0
           fi
           nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
@@ -111,7 +111,7 @@ jobs:
       - uses: actions/setup-go@v6
         id: setup-go
         with:
-          go-version-file: go.mod
+          go-version-file: apps/api/go.mod
           cache: false
 
       - name: Cache Go modules and builds
@@ -120,7 +120,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}
+          key: go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('apps/api/go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}
           restore-keys: |
             go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-
 

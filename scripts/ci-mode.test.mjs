@@ -323,7 +323,7 @@ function journeys(gates) {
 
 test("mode: changeset/version files only is version-only", () => {
   assert.equal(computeMode([".changeset/x.md", "apps/server/package.json"]), "version-only");
-  assert.equal(computeMode([".changeset/x.md", "internal/a.go"]), "full");
+  assert.equal(computeMode([".changeset/x.md", "apps/api/internal/a.go"]), "full");
   assert.equal(computeMode([]), "full");
 });
 
@@ -350,7 +350,7 @@ test("docs-only change gates everything off", () => {
 test("go change runs everything but the mock lanes, and the journey matrix collapses to one framework", () => {
   const { gates, matrix } = resolveGates({
     mode: "full",
-    files: ["internal/a.go"],
+    files: ["apps/api/internal/a.go"],
     targets: GO_CLASS,
   });
   // The mock lanes run against api-mock, never the server.
@@ -539,7 +539,7 @@ test("the e2e step follows e2e:all", () => {
     ["e2e/console/src-real/console-real.spec.ts", CONSOLE_SPEC_CLASS, true],
     ["packages/sdk-vue/src/index.ts", SDK_VUE_CLASS, true],
     ["apps/demo-next/src/app/admin/page.tsx", DEMO_NEXT_CLASS, true],
-    ["internal/a.go", GO_CLASS, true],
+    ["apps/api/internal/a.go", GO_CLASS, true],
     ["docs/adrs/001-server-cli-cobra-viper.md", DOCS_CLASS, false],
   ]) {
     const { gates, reason } = resolveGates({ mode: "full", files: [file], targets });
@@ -575,7 +575,7 @@ test("an empty diff forces a full run", () => {
 test("a failed affected query fails open", () => {
   const { gates, reason } = resolveGates({
     mode: "full",
-    files: ["internal/a.go"],
+    files: ["apps/api/internal/a.go"],
     targets: null,
   });
   assert.ok(allTrue(gates));
@@ -680,12 +680,12 @@ function turboGraph() {
       task(
         "@zitadel/api#generate",
         "packages/api",
-        ["../../api/openapi/openapi-spec.yaml"],
+        ["../../apps/api/api/openapi/openapi-spec.yaml"],
         ["@zitadel/api#build"],
       ),
       task("@zitadel/api#build", "packages/api", ["src/index.ts"], ["@zitadel/console#build"]),
       task("@zitadel/console#build", "apps/console", ["src/main.tsx"], ["@zitadel/server#test"]),
-      task("@zitadel/server#test", "apps/server", ["../../internal/server.go"], []),
+      task("@zitadel/server#test", "apps/server", ["../../apps/api/internal/server.go"], []),
       task("@zitadel/testing#test:integration", "packages/testing", ["src/kit.ts"], []),
       task("@zitadel/e2e#console-real", "e2e", ["console/src-real/console-real.spec.ts"], []),
       task("//#check-adrs", "", ["docs/adrs/001.md"], []),
@@ -699,13 +699,13 @@ test("affectedTurboTargets walks dependents of the tasks whose inputs changed, n
     "console:build",
     "server:test",
   ]);
-  assert.deepEqual(affectedTurboTargets(turboGraph(), ["internal/server.go"]), ["server:test"]);
-  assert.deepEqual(affectedTurboTargets(turboGraph(), ["api/openapi/openapi-spec.yaml"]).sort(), [
-    "api:build",
-    "api:generate",
-    "console:build",
+  assert.deepEqual(affectedTurboTargets(turboGraph(), ["apps/api/internal/server.go"]), [
     "server:test",
   ]);
+  assert.deepEqual(
+    affectedTurboTargets(turboGraph(), ["apps/api/api/openapi/openapi-spec.yaml"]).sort(),
+    ["api:build", "api:generate", "console:build", "server:test"],
+  );
 });
 
 test("affectedTurboTargets maps root tasks, colon scripts and packages without a script", () => {

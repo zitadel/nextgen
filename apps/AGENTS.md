@@ -8,8 +8,8 @@ Conventions shared by the deployable apps.
   [`.gitignore`](../.gitignore) covers. Never introduce another output name
   (`storybook-static`, `build`, `out`).
 - The exceptions, each dictated by where something else reads the output:
-  - `console` builds into `internal/staticui/console/dist`, the tree the Go
-    server embeds ([`embed.go`](../internal/staticui/console/embed.go)). The
+  - `console` builds into `api/internal/staticui/console/dist`, the tree the
+    Go server embeds ([`embed.go`](api/internal/staticui/console/embed.go)). The
     cloud's `server` service compiles with `-tags noconsole`
     ([`cloud/build.sh`](cloud/build.sh)) so it does not embed it as well.
   - `docs` and `website` are Next.js: Vercel's Next.js preset reads `.next/`,

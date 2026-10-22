@@ -14,10 +14,10 @@ conflict.
 
 | Path | What it is | Rules |
 | --- | --- | --- |
-| `main.go`, `cmd/`, `internal/` | the Go server | [internal](internal/AGENTS.md), [storage](internal/storage/AGENTS.md), [service](internal/service/AGENTS.md) |
-| `api/openapi/` | OpenAPI source of the wire contract | [openapi](api/openapi/AGENTS.md) |
+| `apps/api/` | the Go server module `github.com/zitadel/nextgen`: `main.go`, `cmd/`, `internal/`, `api/` | [internal](apps/api/internal/AGENTS.md), [storage](apps/api/internal/storage/AGENTS.md), [service](apps/api/internal/service/AGENTS.md) |
+| `apps/api/api/openapi/` | OpenAPI source of the wire contract | [openapi](apps/api/api/openapi/AGENTS.md) |
 | `apps/` | deployable apps | [apps](apps/AGENTS.md) |
-| `apps/server/`, `apps/server-*/` | the Go `server:*` tasks; the `@zitadel/server` npm binaries | — |
+| `apps/server/`, `apps/server-*/` | the Go `server:*` tasks, run against `apps/api`; the `@zitadel/server` npm binaries | — |
 | `apps/cli/` | the `zitadel` CLI | [cli](apps/cli/AGENTS.md), [tests](apps/cli/tests/AGENTS.md), [local server](apps/cli/src/lib/local-server/AGENTS.md) |
 | `apps/console/`, `apps/login-ui/` | the SPAs the server embeds | [console](apps/console/AGENTS.md) |
 | `apps/docs/`, `apps/website/` | the docs site; the hosted cloud's front page | [docs](apps/docs/AGENTS.md), [website](apps/website/AGENTS.md) |
@@ -69,12 +69,12 @@ consumer-agent contract is the CLI's
   - CI's `server:check-generate-pruned` fails on drift and on generated files
     nothing generates any more.
   - Do not reintroduce a scheduler-side bootstrap pass for `go generate`;
-    `api/cmd/gen_openapi_errors` breaks the cycle itself.
+    `apps/api/api/cmd/gen_openapi_errors` breaks the cycle itself.
   - Keep `mockgen` directives in the mock packages, not beside the interfaces.
 - **Resource IDs**: never write ULID/UUID helpers; mint them as
-  [storage](internal/storage/AGENTS.md) says ([ADR 047](docs/adrs/047-dialect-id-generation.md)).
+  [storage](apps/api/internal/storage/AGENTS.md) says ([ADR 047](docs/adrs/047-dialect-id-generation.md)).
 - **Wire casing**: fields, enum values and parameters are `snake_case`;
-  `server:openapi` lints the spec ([openapi](api/openapi/AGENTS.md)).
+  `server:openapi` lints the spec ([openapi](apps/api/api/openapi/AGENTS.md)).
 - **CLI contract**: keep `--json` output one parseable envelope on stdout;
   update [SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md) with every behavior change.
 - **UI surface**: decide whether a component is console or login UI before

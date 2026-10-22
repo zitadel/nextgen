@@ -2,13 +2,13 @@
 
 **Status:** Shipped. **Parent:** [`README.md`](README.md). **Scope:** how the login component reads the branding object. Storage and the admin API are out of scope here.
 
-**The contract is the OpenAPI source, not this file.** [`api/openapi/components/flows/branding.yaml`](../../../api/openapi/components/flows/branding.yaml) and the `branding-*.yaml` files beside it define every field, its accepted forms, and its limits. This note covers what the contract cannot say: how the fields reach the widget and what the component does with a payload at paint time.
+**The contract is the OpenAPI source, not this file.** [`api/openapi/components/flows/branding.yaml`](../../../apps/api/api/openapi/components/flows/branding.yaml) and the `branding-*.yaml` files beside it define every field, its accepted forms, and its limits. This note covers what the contract cannot say: how the fields reach the widget and what the component does with a payload at paint time.
 
 ## One shape, three places
 
 The same object is:
 
-- the request body of `POST /branding`, which publishes it as a new immutable revision ([`api/openapi/endpoints/branding/`](../../../api/openapi/endpoints/branding/));
+- the request body of `POST /branding`, which publishes it as a new immutable revision ([`api/openapi/endpoints/branding/`](../../../apps/api/api/openapi/endpoints/branding/));
 - a read-only projection on flow responses, carrying the project's latest revision and falling back to the maintained defaults;
 - the local `.zitadel/branding/` descriptor that `zitadel apply` publishes ([`templates.md`](templates.md) § Authoring workflow).
 
@@ -20,13 +20,13 @@ Every field is optional. An omitted key takes the maintained default, so a revis
 
 | Field | What it is | Contract |
 | --- | --- | --- |
-| `layout` | `centered` \| `split`. The component validates it and hands it to the template as `branding.layout`. The bundled default template does not read it, so it is not an appearance control. | [`branding.yaml`](../../../api/openapi/components/flows/branding.yaml) |
-| `liquid_template` | LiquidJS template for the step. Structure only, no `<style>`. | [`branding.yaml`](../../../api/openapi/components/flows/branding.yaml), [`templates.md`](templates.md), [`validator.md`](validator.md) |
-| `logo_url` | Single-mark fallback, used only when neither theme side names a mark. | [`branding.yaml`](../../../api/openapi/components/flows/branding.yaml) |
-| `hero_url` | Hero image, for templates that reference it: revisions published from the split and hero designs. The bundled default template does not use it. | [`branding.yaml`](../../../api/openapi/components/flows/branding.yaml) |
-| `theme` | `mode`, plus the `light` and `dark` sides, each with its own `logo_url` and `palette`. | [`branding-theme.yaml`](../../../api/openapi/components/flows/branding-theme.yaml), [`branding-theme-side.yaml`](../../../api/openapi/components/flows/branding-theme-side.yaml), [`branding-palette.yaml`](../../../api/openapi/components/flows/branding-palette.yaml), [`branding-color.yaml`](../../../api/openapi/components/flows/branding-color.yaml) |
-| `typography` | `font_family`, `font_url`, `scale`. One face covers body and headings. | [`branding-typography.yaml`](../../../api/openapi/components/flows/branding-typography.yaml) |
-| `shape` | `radius` (preset or integer pixels), `density`, `logo_scale`. Shared across theme sides. | [`branding-shape.yaml`](../../../api/openapi/components/flows/branding-shape.yaml) |
+| `layout` | `centered` \| `split`. The component validates it and hands it to the template as `branding.layout`. The bundled default template does not read it, so it is not an appearance control. | [`branding.yaml`](../../../apps/api/api/openapi/components/flows/branding.yaml) |
+| `liquid_template` | LiquidJS template for the step. Structure only, no `<style>`. | [`branding.yaml`](../../../apps/api/api/openapi/components/flows/branding.yaml), [`templates.md`](templates.md), [`validator.md`](validator.md) |
+| `logo_url` | Single-mark fallback, used only when neither theme side names a mark. | [`branding.yaml`](../../../apps/api/api/openapi/components/flows/branding.yaml) |
+| `hero_url` | Hero image, for templates that reference it: revisions published from the split and hero designs. The bundled default template does not use it. | [`branding.yaml`](../../../apps/api/api/openapi/components/flows/branding.yaml) |
+| `theme` | `mode`, plus the `light` and `dark` sides, each with its own `logo_url` and `palette`. | [`branding-theme.yaml`](../../../apps/api/api/openapi/components/flows/branding-theme.yaml), [`branding-theme-side.yaml`](../../../apps/api/api/openapi/components/flows/branding-theme-side.yaml), [`branding-palette.yaml`](../../../apps/api/api/openapi/components/flows/branding-palette.yaml), [`branding-color.yaml`](../../../apps/api/api/openapi/components/flows/branding-color.yaml) |
+| `typography` | `font_family`, `font_url`, `scale`. One face covers body and headings. | [`branding-typography.yaml`](../../../apps/api/api/openapi/components/flows/branding-typography.yaml) |
+| `shape` | `radius` (preset or integer pixels), `density`, `logo_scale`. Shared across theme sides. | [`branding-shape.yaml`](../../../apps/api/api/openapi/components/flows/branding-shape.yaml) |
 
 The appearance blocks (`theme`, `typography`, `shape`) are wire fields. The component re-exports their types from the generated API model (`packages/components/src/orchestrator/branding.ts`) rather than declaring its own. The component's type adds one client-side block, `attribution`, which the contract does not carry. Nothing sets it today: a revision cannot store it and the element has no property for it, so the "Secured with Zitadel" mark always renders. No licence check exists.
 
@@ -50,7 +50,7 @@ Shape validation cannot tell a live asset from a dead one, and a well-formed URL
 
 ## No custom CSS
 
-The object carries no CSS field. The [override ladder](override-ladder.md) covers CSS customization (tokens, host inline styles, `::part()`, eject), which avoids sandboxing arbitrary CSS and a schema field to maintain. Palette and font values are written into a stylesheet, which is why the contract pins their grammar ([`branding-color.yaml`](../../../api/openapi/components/flows/branding-color.yaml), [`branding-typography.yaml`](../../../api/openapi/components/flows/branding-typography.yaml)).
+The object carries no CSS field. The [override ladder](override-ladder.md) covers CSS customization (tokens, host inline styles, `::part()`, eject), which avoids sandboxing arbitrary CSS and a schema field to maintain. Palette and font values are written into a stylesheet, which is why the contract pins their grammar ([`branding-color.yaml`](../../../apps/api/api/openapi/components/flows/branding-color.yaml), [`branding-typography.yaml`](../../../apps/api/api/openapi/components/flows/branding-typography.yaml)).
 
 ## Shape invariants enforced by the component
 

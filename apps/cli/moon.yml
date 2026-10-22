@@ -50,7 +50,7 @@ tasks:
       - "/apps/server/bin/**/*"
       # The spec files whose `x-zitadel-cli` names the api-coverage test checks
       # against the commands.
-      - "/api/openapi/endpoints/**/methods.yaml"
+      - "/apps/api/api/openapi/endpoints/**/methods.yaml"
     options:
       # The built oclif commands import @zitadel/{api,config,sdk-next} from
       # those packages' dist/ at runtime. Their build-release tasks rewrite

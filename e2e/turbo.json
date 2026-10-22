@@ -71,7 +71,7 @@
         "package.json",
         "playwright.shared.ts",
         "$TURBO_ROOT$/scripts/render-builtin-schemas.mjs",
-        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json"
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json"
       ],
       "cache": false,
       "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]

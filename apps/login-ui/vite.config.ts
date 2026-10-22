@@ -5,7 +5,7 @@ import { defineConfig, loadEnv } from "vite";
 import { baseTest } from "../../vitest.shared.mjs";
 
 const uiBase = "/ui/login/";
-const loginOutDir = "../../internal/staticui/login/dist";
+const loginOutDir = "../api/internal/staticui/login/dist";
 const defaultDevProxyPath = "/__nextgen";
 const defaultBackendUrl = "http://localhost:8080";
 

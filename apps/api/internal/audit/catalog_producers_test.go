@@ -65,7 +65,7 @@ func TestCatalogPathBTypesHaveProducers(t *testing.T) {
 	t.Parallel()
 	_, filename, _, ok := runtime.Caller(0)
 	require.True(t, ok)
-	root := filepath.Clean(filepath.Join(filepath.Dir(filename), "../.."))
+	root := filepath.Clean(filepath.Join(filepath.Dir(filename), "../../../.."))
 	catalogPath := filepath.Join(root, "docs/design/api/events-catalog.md")
 	raw, err := os.ReadFile(catalogPath)
 	require.NoError(t, err)

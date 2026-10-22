@@ -3,22 +3,29 @@ language: "go"
 layer: "application"
 stack: "backend"
 
+# The Go module lives in apps/api (go.mod, main.go, cmd/, internal/, api/),
+# not in this project folder: this project owns the tasks and the npm
+# launcher. Every task runs from the workspace root, so the inputs name the
+# module's files by absolute path and the `go` commands enter it with
+# `go -C apps/api`; the scripts resolve the same directory themselves
+# (SERVER_MODULE_DIR in scripts/server-build.mjs).
+
 fileGroups:
   serverInputs:
-    - "/**/*.go"
+    - "/apps/api/**/*.go"
     # Embedded goose migrations (//go:embed sql/*.sql); without these Moon can
     # cache-hit test/build after schema-only changes while Go would rebuild.
-    - "/**/*.sql"
-    - "/go.mod"
-    - "/go.sum"
-    - "/api/**/*.yaml"
-    - "/api/**/*.json"
+    - "/apps/api/**/*.sql"
+    - "/apps/api/go.mod"
+    - "/apps/api/go.sum"
+    - "/apps/api/api/**/*.yaml"
+    - "/apps/api/api/**/*.json"
     # Also compiled in through //go:embed or read by tests: the config defaults
     # (incl. presets), the integration-test fixtures and the events catalog.
     - "/packages/config/defaults/**/*"
-    - "/internal/**/*.json"
+    - "/apps/api/internal/**/*.json"
     - "/docs/design/api/events-catalog.md"
-    - "/api/.ogen.yaml"
+    - "/apps/api/api/.ogen.yaml"
     - "/scripts/check-go-generate.mjs"
     - "/scripts/generate-meta-schemas.ts"
     - "moon.yml"
@@ -64,15 +71,15 @@ tasks:
     # Mirrored by GENERATED_GLOBS in scripts/generated-outputs.mjs, which is
     # what `clean-generated` deletes. Change both together.
     outputs:
-      - "/api/generated/**"
-      - "/api/openapi/components/schemas/errors/**"
-      - "/api/openapi/endpoints/**/*-error-response.yaml"
-      - "/api/openapi/endpoints/events/event.yaml"
-      - "/api/openapi/endpoints/events/types/*.yaml"
-      - "/api/openapi/endpoints/events/webhooks/*.yaml"
-      - "/api/openapi/endpoints/schemas/*.json"
-      - "/internal/**/*_enumer.go"
-      - "/internal/**/*.mock.go"
+      - "/apps/api/api/generated/**"
+      - "/apps/api/api/openapi/components/schemas/errors/**"
+      - "/apps/api/api/openapi/endpoints/**/*-error-response.yaml"
+      - "/apps/api/api/openapi/endpoints/events/event.yaml"
+      - "/apps/api/api/openapi/endpoints/events/types/*.yaml"
+      - "/apps/api/api/openapi/endpoints/events/webhooks/*.yaml"
+      - "/apps/api/api/openapi/endpoints/schemas/*.json"
+      - "/apps/api/internal/**/*_enumer.go"
+      - "/apps/api/internal/**/*.mock.go"
     options:
       runFromWorkspaceRoot: true
       # Generation rewrites files other projects read mid-graph: the JSON
@@ -128,7 +135,7 @@ tasks:
       mutex: "generated-sources"
 
   vet:
-    command: "go vet ./..."
+    command: "go -C apps/api vet ./..."
     deps:
       - "check-generate"
       # Same embed race as test/build: go vet compiles //go:embed all:dist while
@@ -145,7 +152,7 @@ tasks:
   # egresslint, which enforces the single egress-client invariant (ADR 061):
   # outbound HTTP or TCP clients may only be built in internal/httputil, and
   # any other site needs an //egress:allow <reason> directive. Further
-  # analyzers join the same binary (tools/analyzers/cmd/analyzers).
+  # analyzers join the same binary (apps/api/tools/analyzers/cmd/analyzers).
   #
   # Runs once per build configuration: the default set, then each integration
   # tag on its own, because the tagged files are invisible to the default run
@@ -153,9 +160,9 @@ tasks:
   lint:
     script: |
       set -e
-      go run ./tools/analyzers/cmd/analyzers ./...
+      go -C apps/api run ./tools/analyzers/cmd/analyzers ./...
       for tag in postgres_integration spanner_integration sqlite_integration; do
-        GOFLAGS="-tags=$tag" go run ./tools/analyzers/cmd/analyzers ./...
+        GOFLAGS="-tags=$tag" go -C apps/api run ./tools/analyzers/cmd/analyzers ./...
       done
       # This is a Go project, so it inherits no Biome lint task, but it owns a
       # JavaScript launcher (bin/zitadel-server.js). Lint it here so a change to
@@ -176,6 +183,8 @@ tasks:
   test:
     command: "go"
     args:
+      - "-C"
+      - "apps/api"
       - "test"
       - "-v"
       - "-timeout"
@@ -193,7 +202,7 @@ tasks:
       - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
-      # Read by the cloud launcher's tests (apps/cloud/launcher), which hold
+      # Read by the cloud launcher's tests (apps/api/cmd/cloud-launcher), which hold
       # the deployment's configuration together. Scoped to test: nothing the
       # server compiles reads them.
       - "/vercel.json"
@@ -217,6 +226,8 @@ tasks:
     # just as invisible to moon's hash as it is to go's.
     command: "go"
     args:
+      - "-C"
+      - "apps/api"
       - "test"
       - "-v"
       - "-count=1"
@@ -270,6 +281,8 @@ tasks:
     # container, so a local run starts three at once.
     command: "go"
     args:
+      - "-C"
+      - "apps/api"
       - "test"
       - "-v"
       - "-count=1"
@@ -324,6 +337,8 @@ tasks:
     # "ok" is no more trustworthy here than on the other two lanes.
     command: "go"
     args:
+      - "-C"
+      - "apps/api"
       - "test"
       - "-v"
       - "-count=1"
@@ -355,7 +370,7 @@ tasks:
     deps:
       - "check-generate"
       # The binary embeds both UI dists (//go:embed all:dist in
-      # internal/staticui/*/embed.go). These deps order the UI builds before
+      # apps/api/internal/staticui/*/embed.go). These deps order the UI builds before
       # the Go compile, so a batched invocation can never embed a half-written
       # dist.
       - "console:build"
@@ -367,7 +382,7 @@ tasks:
       # binary. Scoped to build rather than serverInputs: only the binary
       # artifact depends on dist content — test/vet/format must not re-run on
       # UI-only changes.
-      - "/internal/staticui/**"
+      - "/apps/api/internal/staticui/**"
       # Same scoping argument: the build script and its process helper decide
       # what this task produces, but nothing about how the Go sources lint or
       # test. dev-process.mjs is listed because server-build.mjs imports it —
