@@ -28,9 +28,9 @@
  * Within a package `go generate` keeps directives in file order, which is what
  * keeps api's own chain (error schemas -> openapi errors -> ogen) intact.
  *
- * That chain closes a cycle on a pruned tree — the analysis needs the client
+ * That chain closes a cycle on a pruned tree — the analysis needs the stubs
  * ogen writes at the end of it — which `api/cmd/gen_openapi_errors` breaks from
- * the inside, by generating a bootstrap client for itself. Nothing about it is
+ * the inside, by generating a bootstrap pass of them for itself. Nothing about it is
  * this runner's business; bare `go generate ./...` gets the same treatment.
  *
  * Today the mockgen race would be benign — enumer writes via a same-directory

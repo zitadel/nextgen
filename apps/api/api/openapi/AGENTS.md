@@ -6,9 +6,11 @@ bundling, the ogen `oneOf`-null workaround and pagination how-tos are in
 
 ## The generate loop
 
-- Never hand-edit `api/generated/` (ogen) or `packages/api/src/generated/`
-  (orval). Change the spec, then run `moon run server:generate`; CI checks the
-  committed output with `server:check-generate`.
+- Never hand-edit the ogen output, the server stubs in
+  `apps/api/internal/api/generated/` and the public client in
+  `packages/go/api/*_gen.go`, or orval's `packages/api/src/generated/`. Change
+  the spec, then run `moon run server:generate`; CI checks the committed output
+  with `server:check-generate`.
 - Lint the spec with `moon run server:openapi` (Redocly with the repo's
   [`redocly.yaml`](../../../../redocly.yaml)).
 

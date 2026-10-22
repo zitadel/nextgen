@@ -12,7 +12,7 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
-	oasapi "github.com/zitadel/nextgen/api/generated"
+	oasapi "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 )
 

@@ -27,17 +27,16 @@ Extensions:
 Ogen is tracked as a [Go tool dependency](https://go.dev/blog/tools) in `go.mod`.
 It is installed automatically when running `go tool ogen` or `go generate`.
 
-#### Generate server
+#### Generate the server stubs and the client
 
 ```shell
-go tool ogen --target ../generated --clean openapi-spec.yaml
+moon run server:generate
 ```
 
-or using `go generate`
-
-```shell
-go generate ./...
-```
+It runs every directive of `apps/api/api/generate.go`: the server stubs into
+`apps/api/internal/api/generated` (`.ogen.yaml`) and the public client into
+`packages/go/api` (`.ogen-client.yaml`), after the error and event schemas
+they depend on.
 
 ## API Design Conventions
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	apigen "github.com/zitadel/nextgen/api/generated"
+	apigen "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
