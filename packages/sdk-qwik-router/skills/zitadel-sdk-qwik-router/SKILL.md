@@ -28,9 +28,9 @@ adjusting a scaffolded wiring.
 ## Install
 
 ```bash
-pnpm add -D @zitadel/sdk-qwik-router@alpha
+pnpm add -D @zitadel/sdk-qwik-router@latest
 # the login/logout/session widgets are a separate package:
-pnpm add -D @zitadel/sdk-qwik@alpha
+pnpm add -D @zitadel/sdk-qwik@latest
 ```
 
 Install both as **dev dependencies**: Qwik bundles `devDependencies` into the

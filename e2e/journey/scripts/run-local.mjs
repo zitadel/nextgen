@@ -135,7 +135,7 @@ try {
   registryProcess = localRegistry.registry;
 
   if (options.runtime === "docker" && !localRuntimeImage) {
-    log("building local runtime image for npx @zitadel/cli@alpha start");
+    log("building local runtime image for npx @zitadel/cli@latest start");
     localRuntimeImage = await timePhase(sharedPhases, "image", buildJourneyRuntimeImage);
   }
 
@@ -624,7 +624,7 @@ async function runTestkitJourney(context) {
           "--save-dev",
           "--no-audit",
           "--no-fund",
-          "@zitadel/testing@alpha",
+          "@zitadel/testing@latest",
           `@playwright/test@${playwrightVersion}`,
         ],
         { cwd: context.appDir, env: scrubRepoOverrides(npxEnv(context)) },
@@ -1106,7 +1106,7 @@ async function handleSignal(signal) {
 function cliArgs(context, args) {
   return [
     "--yes",
-    `${cliPackage}@alpha`,
+    `${cliPackage}@latest`,
     ...args,
     "--cwd",
     context.appDir,

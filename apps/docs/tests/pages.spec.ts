@@ -227,7 +227,7 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
     // call without one with `zitadel api` (lib/cli-sample.ts).
     const named = /"x-zitadel-cli": "([^"]+)"/.exec(markdown)?.[1];
     const command = named ?? apiCommand(operationOf(markdown));
-    if (command && !markdown.includes(`npx @zitadel/cli@alpha ${command}`)) {
+    if (command && !markdown.includes(`npx @zitadel/cli@latest ${command}`)) {
       return `${markdownUrl(url)}: no \`${command}\` command`;
     }
     if (named) {
@@ -289,7 +289,7 @@ test("every CLI command shows its usage, in tables whose rows keep their cells",
     const words = cliReferencePage.exec(url)?.[1];
     if (words && !cliOwnPages.has(words)) {
       commands++;
-      const usage = `## Usage\n\n\`\`\`sh\nnpx @zitadel/cli@alpha ${words.split("/").join(" ")} `;
+      const usage = `## Usage\n\n\`\`\`sh\nnpx @zitadel/cli@latest ${words.split("/").join(" ")} `;
       if (!markdown.includes(usage)) return `${markdownUrl(url)}: no usage of its command`;
     }
     // A row has as many cells as its table's header, the row that opens it.
