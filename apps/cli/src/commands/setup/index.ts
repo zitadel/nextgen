@@ -1154,7 +1154,7 @@ function dryRunProject(issuer: string): CreateProject201 {
     name: "dry-run",
     project_secret: "sk_proj_dry_run_full",
     preview_secret: "sk_proj_dry_run_preview",
-    origins: [{ pattern: issuer, kind: "preview" }],
+    origins: [{ pattern: issuer, kind: "primary" }],
     created_at: "2026-04-21T14:03:11.000Z",
   };
 }
@@ -1590,11 +1590,13 @@ async function createProjectWithLocalHint(
   retry: SetupRetryOptions,
 ): Promise<CreateProject201> {
   try {
-    // Register the app's own origin so the backend's origin check allows the
-    // requests the dev proxy forwards from it.
+    // Register the app's own origin as primary: only a primary pattern admits
+    // the requests the dev proxy forwards from it, and a deploy goes to the
+    // project's primary origins. A preview pattern is for the URLs a
+    // pull-request build deploys to, which this is not.
     return await client.createProject({
       name: projectName,
-      origins: [{ pattern: issuer, kind: "preview" }],
+      origins: [{ pattern: issuer, kind: "primary" }],
       seed_defaults: false,
     });
   } catch (error) {

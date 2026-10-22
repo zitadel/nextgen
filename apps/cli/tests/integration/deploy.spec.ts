@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { aSetUpApp, SETUP_ORIGIN } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -44,7 +44,7 @@ describe("deploy", () => {
         const data = await app.deployData();
 
         expect(data.content_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
-        expect(data.origins).toEqual(["https://app.acme.com"]);
+        expect(data.origins).toEqual([SETUP_ORIGIN.pattern, "https://app.acme.com"]);
       });
 
       it("re-deploys the same release when nothing changed", async () => {
@@ -77,6 +77,7 @@ describe("deploy", () => {
 
       it("fails when the project has no primary origin", async () => {
         const app = await aSetUpApp();
+        await app.removeOrigin(SETUP_ORIGIN.pattern);
 
         const result = await app.deploy();
 
@@ -85,6 +86,7 @@ describe("deploy", () => {
 
       it("checks for a primary origin before syncing IdP connections", async () => {
         const app = await aSetUpApp();
+        await app.removeOrigin(SETUP_ORIGIN.pattern);
         // A connection the IdP step would create — were it reached. The project
         // has no primary origin, so the deploy must fail before the IdP step
         // writes anything, leaving no connection behind.
