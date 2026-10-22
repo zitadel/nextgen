@@ -4013,6 +4013,148 @@ func decodeGetMyUserSchemaParams(args [0]string, argsEscaped bool, r *http.Reque
 	return params, nil
 }
 
+// GetPolicyRevisionParams is parameters of getPolicyRevision operation.
+type GetPolicyRevisionParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+	// The identifier of the policy revision.
+	RevisionID PolicyRevisionID
+}
+
+func unpackGetPolicyRevisionParams(packed middleware.Parameters) (params GetPolicyRevisionParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "revision_id",
+			In:   "path",
+		}
+		params.RevisionID = packed[key].(PolicyRevisionID)
+	}
+	return params
+}
+
+func decodeGetPolicyRevisionParams(args [1]string, argsEscaped bool, r *http.Request) (params GetPolicyRevisionParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode path: revision_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "revision_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotRevisionIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotRevisionIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.RevisionID = PolicyRevisionID(paramsDotRevisionIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.RevisionID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "revision_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // GetProjectParams is parameters of getProject operation.
 type GetProjectParams struct {
 	// The unique identifier of the project.
@@ -10482,6 +10624,79 @@ func decodePatchUserByIDParams(args [1]string, argsEscaped bool, r *http.Request
 		return params, &ogenerrors.DecodeParamError{
 			Name: "user_id",
 			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// PublishPolicyParams is parameters of publishPolicy operation.
+type PublishPolicyParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+}
+
+func unpackPublishPolicyParams(packed middleware.Parameters) (params PublishPolicyParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	return params
+}
+
+func decodePublishPolicyParams(args [0]string, argsEscaped bool, r *http.Request) (params PublishPolicyParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
 			Err:  err,
 		}
 	}

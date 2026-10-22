@@ -10,6 +10,28 @@ const PrefixPolicy ResourcePrefix = "pol"
 // id of one immutable revision.
 const PrefixPolicyRevision ResourcePrefix = "polrev"
 
+func ErrPolicyNotFound() Error {
+	return newError(PrefixPolicy.ErrorCodePrefix("not_found"), "policy: not found", nil, nil)
+}
+
+// ErrPolicyInvalid rejects an instance that does not fit its operation's
+// template: an unknown operation or setting, a value of the wrong type or out
+// of bounds, or a failed config rule. details names what failed.
+func ErrPolicyInvalid(details any, parent error) Error {
+	return newError(PrefixPolicy.ErrorCodePrefix("invalid"), "policy: invalid", details, parent)
+}
+
+func ErrPolicyPermissionDenied() Error {
+	return newError(PrefixPolicy.ErrorCodePrefix("permission_denied"), "policy: the caller's project role does not allow this operation", nil, nil)
+}
+
+// ErrPolicyRevisionConflict reports that another revision of the same policy
+// was published at the same instant, or that a concurrent first publish of
+// the operation won. Retrying publishes on top of it.
+func ErrPolicyRevisionConflict() Error {
+	return newError(PrefixPolicy.ErrorCodePrefix("revision_conflict"), "policy: another revision of the same policy was published at the same instant; retry", nil, nil)
+}
+
 // Policy is one revision of a project's policy instance for one operation
 // (ADR 066). ID is shared by every revision of the operation's policy in the
 // project; RevisionID names this revision. Config is the instance's settings

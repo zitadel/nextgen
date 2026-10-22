@@ -261,14 +261,15 @@ from the context, so the other paths, which have no history to compare with
 or must not learn it, pass it without a hash being verified. The write checks
 that the password it replaces is still the one the history was compared
 with, and fails with `user.conflict` when another change landed in between.
-Instances are resolved through `service.PolicyResolver`. Until instances can be stored
-(the policy resource), it resolves none, so no project has a policy and the
-gate applies only the server's own length cap; registration and SSO sign-up
+Instances are published with `POST /policies` and resolved through
+`service.PolicyResolver`, which `service.PolicyService.ResolvePolicy`
+implements: the newest stored revision of the project's policy for the
+operation, and no policy when the project published none, in which case the
+gate applies only the server's own length cap. Registration and SSO sign-up
 also keep the flow field's own minimum of 8 until the field reads the policy
-([#1449](https://github.com/zitadel/nextgen/issues/1449)). Once they can, it returns the newest
-stored revision of the project's instance for the operation; that in turn is
-a stand-in: ADR 035 says an environment sees only what its active release
-pins, so resolution moves to the release's pinned policy revision once
+([#1449](https://github.com/zitadel/nextgen/issues/1449)). The newest stored
+revision is a stand-in: ADR 035 says an environment sees only what its active
+release pins, so resolution moves to the release's pinned policy revision once
 release-pinned reads exist (scope table in
 [`docs/design/policies/`](../design/policies/README.md)). The
 [catalog index](../design/policies/catalog.md) names the functions.
@@ -481,9 +482,15 @@ no `name`. When scoped instances land, with an audience model such as the
 one proposed in [#1264](https://github.com/zitadel/nextgen/pull/1264), the
 handle grows the audience key next to the operation, still derived from the document, so a
 project default and a team override of the same operation are two resources
-without a naming field to keep in step with the audience. The resource slice
-copies branding (create-only, versioned, project-owned), not the user schema
-(URL identity and `$ref` handling a policy does not need). Templates are not
+without a naming field to keep in step with the audience. The resource follows
+ADR 063 like identity provider connections: a `policies` row per operation per
+project carries the fixed `id` (`pol_`), a `policy_revisions` row per publish
+carries the `revision_id` (`polrev_`) and the config, and the newest revision
+is the one with the greatest `created_at`. It has no URL identity or `$ref`
+handling, which a policy does not need. Today the API publishes
+(`POST /policies`) and reads one revision
+(`GET /policies/revisions/{revision_id}`); the other ADR 063 reads (the
+list, the read by `id`, the revisions of one policy) follow. Templates are not
 release content: they ship with the server, and a release records the catalog
 version it was validated against. Release validation runs the same check as
 publishing (`policy.Engine.ValidateInstance`: known operation and settings,
