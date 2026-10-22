@@ -20,8 +20,9 @@
       - action: the step's `back`, which returns to the step that collected the
         identifier. A step with its own way out to sign-in (the SSO conflict
         step's `sign_in`) keeps only that one, so its chip is static.
-      - avatar: generated from what was typed. Left off the sign-up steps,
-        where no account exists yet.
+      - avatar: generated from what was typed. Left off where the password
+        field asks for a new password (the engine marks it `new-password`
+        under the register purpose), since no account exists yet.
     {% endcomment %}
     {% if identifier and identifier.value != blank %}
       {% assign change_account = actions | where: "kind", "back" | first %}
@@ -30,7 +31,7 @@
         data-testid="zitadel-account"
         identifier="{{ identifier.value }}"
         {% if change_account and sign_in_action == nil %}action="{{ change_account.name }}" label="{{ 'action.use_another_account' | t }}"{% endif %}
-        {% unless step.name contains "register" %}avatar{% endunless %}
+        {% unless password_field.autocomplete == "new-password" %}avatar{% endunless %}
       ></zl-account>
     {% endif %}
 

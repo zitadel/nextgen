@@ -103,22 +103,33 @@ function renderDesign(design: string): string {
  * template decides what it shows: on the sign-in password step the avatar and
  * the way back to change the account; on sign-up the way back without the
  * avatar, since no account exists yet; on the SSO conflict step, which has its
- * own way out (`sign_in`), the avatar alone.
+ * own way out (`sign_in`), the avatar alone. Sign-up is read from the engine's
+ * purpose, which marks the password field `new-password`, not from step names.
  */
 describe("account chip", () => {
   const passwordStep = {
     ...context,
     step: { name: "password", texts: { title_key: "identifier.title" } },
-    fields: [{ name: "password", type: "password", text_key: "identifier.field.email" }],
+    fields: [
+      {
+        name: "password",
+        type: "password",
+        text_key: "identifier.field.email",
+        autocomplete: "current-password",
+      },
+    ],
     actions: [
       { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
       { name: "back", kind: "back", text_key: "action.back" },
     ],
     identifier: { value: "Maya@Example.com" },
   };
+  // A custom flow's name for its sign-up password step: only the purpose says
+  // it is one.
   const signUpStep = {
     ...passwordStep,
-    step: { name: "register-password", texts: { title_key: "identifier.title" } },
+    step: { name: "choose-secret", texts: { title_key: "identifier.title" } },
+    fields: [{ ...passwordStep.fields[0], autocomplete: "new-password" }],
   };
   const conflictStep = {
     ...passwordStep,
