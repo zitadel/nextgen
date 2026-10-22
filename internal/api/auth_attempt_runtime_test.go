@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -121,4 +122,55 @@ func TestWithSealedRuntime_EmptyIsNoop(t *testing.T) {
 	ctx, err := h.withSealedRuntime(t.Context(), "proj_1", "", "")
 	require.NoError(t, err)
 	require.Nil(t, service.RuntimeResolutionFromContext(ctx))
+}
+
+func TestWithSealedRuntime_PropagatesDeploymentLookupError(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	releases := servicemocks.NewMockReleaseService(ctrl)
+	releases.EXPECT().Get(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
+		ProjectID: "proj_1",
+		ID:        "rel_1",
+	}, nil)
+
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	lookupErr := errors.New("deployment lookup failed")
+	stmts.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_1").Return(nil, lookupErr)
+
+	h := Handler{
+		releaseService: releases,
+		pool:           service.NewPool(pool),
+	}
+	_, err := h.withSealedRuntime(t.Context(), "proj_1", "dep_1", "rel_1")
+	require.ErrorIs(t, err, lookupErr)
+}
+
+func TestWithSealedRuntime_AttachesDeployment(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	releases := servicemocks.NewMockReleaseService(ctrl)
+	releases.EXPECT().Get(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
+		ProjectID: "proj_1",
+		ID:        "rel_1",
+	}, nil)
+
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	dep := &domain.Deployment{ProjectID: "proj_1", ID: "dep_1", ReleaseID: "rel_1"}
+	stmts.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_1").Return(dep, nil)
+
+	h := Handler{
+		releaseService: releases,
+		pool:           service.NewPool(pool),
+	}
+	ctx, err := h.withSealedRuntime(t.Context(), "proj_1", "dep_1", "rel_1")
+	require.NoError(t, err)
+	resolution := service.RuntimeResolutionFromContext(ctx)
+	require.NotNil(t, resolution)
+	require.Equal(t, dep, resolution.Deployment)
 }
