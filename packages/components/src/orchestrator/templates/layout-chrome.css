@@ -140,17 +140,17 @@ img[data-zl-asset-broken] {
   color: var(--zl-muted-foreground);
 }
 
-/* The two groups the card body holds. The card spaces them 28px apart; each
-   packs its own members tighter. Explicit wrappers rather than sibling
+/* The two groups the card body holds. The card spaces them 20px apart, and
+   the fields within a group the same. Explicit wrappers rather than sibling
    selectors, so an ejected template composes them on purpose. */
 .zl-field-group {
   display: flex;
   flex-direction: column;
-  gap: var(--zl-spacing-7);
+  gap: var(--zl-spacing-5);
 }
 /* A step can declare no fields at all — the passkey upsell is title, copy and
    two buttons. The wrapper still renders, and an empty flex item would keep
-   claiming the card's 28px gap. `:has(*)` rather than `:empty` because Liquid
+   claiming the card's 20px gap. `:has(*)` rather than `:empty` because Liquid
    leaves whitespace text nodes behind, which `:empty` counts. */
 .zl-field-group:not(:has(*)) {
   display: none;
