@@ -361,7 +361,7 @@ replaces a file at a path setup writes, but not the app's root component or
 request boundary at another path.
 
 The app may also live in a subdirectory of the one `start` ran in: `setup`,
-`console`, `--server local` and `doctor` read `.zitadel/local/` from the working
+`console`, `logs`, `--server local` and `doctor` read `.zitadel/local/` from the working
 directory or the nearest parent that has it (up to the home directory), so
 `mkdir my-app && cd my-app` after `start` works too. `doctor` checks that
 server and its port, but runs its project checks in the working directory, so run
@@ -369,7 +369,7 @@ it from the app. When that server is unhealthy it suggests `start` and
 `reset --force` with `--cwd` set to the directory that holds it (when that path needs
 shell quoting the commands are left out, the hint names the directory, and
 `doctor --json` returns the argument lists in `details.suggested_args` to run as they are). `stop`,
-`reset`, `logs` and `status` read only the working directory's
+`reset` and `status` read only the working directory's
 `.zitadel/local/`, so run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
 local admin's team and ends `data.next_commands` with `console`; when it finds
@@ -387,6 +387,14 @@ After `setup`, follow `data.next_commands` to start the app. Prove the generated
 auth flow in a visible browser by registering a unique user, logging out, logging
 back in with the same email/password, and ending on the signed-in profile page.
 Do not treat a rendered login or registration form as completion.
+
+When a step against the local server fails without saying why (the login says a
+sign-in provider "is not available right now", or a request returns 500), the
+server logged the cause. Read it with `logs --level warn --json`: `data.logs`
+holds the warnings and errors, and `--tail` counts only those lines. `logs
+--follow` streams the log for a person at a terminal, with warnings yellow and
+errors red; it refuses `--json`. `start`, and `doctor` when it finds the server
+running, name it in `data.next_actions`.
 
 To move a set-up app to another dev port (the dev server exits with
 `EADDRINUSE`, or another app needs the port), run `setup --dev-port <port>` in

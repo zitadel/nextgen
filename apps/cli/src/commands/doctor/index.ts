@@ -7,6 +7,7 @@ import { createZitadelClient } from "../../lib/api-client";
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
 import { type Environment, resolveEnvironment } from "../../lib/environment";
 import { ZitadelError } from "../../lib/errors";
+import { serverLogAction } from "../../lib/journey-guidance";
 import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
@@ -197,6 +198,15 @@ export default class Doctor extends BaseCommand {
         ? environmentSelectorSuffix({ cwd: cwdFlag, server: projectServer })
         : undefined;
     const warningAdvice = advisoryForWarnings(warnings, this.meta.cliVersion, claimSelector);
+    // A server that is running is one a sign-in or a request can fail
+    // against, and its log is where the reason is.
+    const serving =
+      existingRuntime !== undefined &&
+      runtimeChecks.find((check) => check.name === "runtime")?.status === "pass";
+    const nextActions = [
+      ...(warningAdvice?.nextActions ?? []),
+      ...(serving ? [serverLogAction(this.meta.cliVersion)] : []),
+    ];
     this.recordTelemetry({
       runtime: runtimeBackend,
       checks_total: checks.length,
@@ -219,12 +229,8 @@ export default class Doctor extends BaseCommand {
         lifecycle: hasConfig ? "configured" : "not-configured",
       },
       checks,
-      ...(warningAdvice
-        ? {
-            next_actions: warningAdvice.nextActions,
-            ...nextCommandsData(warningAdvice.nextCommands),
-          }
-        : {}),
+      ...(nextActions.length > 0 ? { next_actions: nextActions } : {}),
+      ...(warningAdvice ? nextCommandsData(warningAdvice.nextCommands) : {}),
     };
 
     if (failed.length > 0) {

@@ -47,3 +47,17 @@ function namedFields(body: Record<string, unknown>): string[] {
     .filter((field): field is string => typeof field === "string" && field !== "")
     .map((field) => field.replace(/^attributes\./, ""));
 }
+
+/**
+ * The read's answer, or `null` when it is refused (403): for a read that is
+ * chrome on its screen, where a refusal costs that part rather than the page.
+ * Any other failure still throws.
+ */
+export async function nullOnForbidden<T>(read: Promise<T>): Promise<T | null> {
+  try {
+    return await read;
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.status === 403) return null;
+    throw cause;
+  }
+}
