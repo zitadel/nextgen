@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -18,22 +19,35 @@ type userSchemaStatements interface {
 	ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error)
 }
 
-// resolveUserSchema returns the project's newest revision of the user schema
-// ref names: an objectType, or a schema id (`$id` URL or minted sch_ id) that
-// stands for its objectType. A `$id` under one of the built-in bases resolves
-// under every base bases knows (domain.BuiltinSchemaBases).
+// resolveUserSchema returns the user schema revision ref names. ref is an
+// objectType, or a schema id (`$id` URL or minted sch_ id) that stands for
+// its objectType. A `$id` under one of the built-in bases resolves under
+// every base bases knows (domain.BuiltinSchemaBases).
 //
-// TODO(#536): interim. Latest-wins holds only until the revision is resolved
-// from the release the request runs under; only this lookup changes then.
+// When the request's release pins a flow definition, the revision is the one
+// that release pins for the handle. Otherwise it is the project's newest
+// revision. A handle that release's closure required and does not pin is an
+// internal error. Saving a flow definition calls this with no release on the
+// context, so it still checks the newest revision.
 func resolveUserSchema(ctx context.Context, stmts userSchemaStatements, bases domain.BuiltinSchemaBases, projectID, ref string) (*domain.JSONSchema, error) {
-	handle := ref
-	if isUserSchemaID(ref) {
-		objectType, err := schemaObjectType(bases.GetJSONSchema(ctx, stmts, projectID, ref))
-		if err != nil {
-			return nil, err
-		}
-		handle = objectType
+	handle, err := userSchemaHandle(ctx, stmts, bases, projectID, ref)
+	if err != nil {
+		return nil, err
 	}
+	if ReleasePinsFlow(ctx) {
+		return pinnedUserSchema(ctx, stmts, projectID, handle)
+	}
+	return newestUserSchema(ctx, stmts, projectID, handle)
+}
+
+func userSchemaHandle(ctx context.Context, stmts userSchemaStatements, bases domain.BuiltinSchemaBases, projectID, ref string) (string, error) {
+	if !isUserSchemaID(ref) {
+		return ref, nil
+	}
+	return schemaObjectType(bases.GetJSONSchema(ctx, stmts, projectID, ref))
+}
+
+func newestUserSchema(ctx context.Context, stmts userSchemaStatements, projectID, handle string) (*domain.JSONSchema, error) {
 	result, err := stmts.ListJSONSchemas(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.JSONSchemaField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
@@ -48,6 +62,21 @@ func resolveUserSchema(ctx context.Context, stmts userSchemaStatements, bases do
 		return nil, domain.ErrJSONSchemaNotFound()
 	}
 	return result.Items[0], nil
+}
+
+func pinnedUserSchema(ctx context.Context, stmts userSchemaStatements, projectID, handle string) (*domain.JSONSchema, error) {
+	revisionID, ok := PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindSchema)[handle]
+	if !ok {
+		return nil, domain.ErrInternal(nil).WithMessage(fmt.Sprintf("release does not pin user schema %q", handle))
+	}
+	schema, err := stmts.GetJSONSchemaByID(ctx, projectID, revisionID)
+	if _, missing := errors.AsType[*database.NoRowFoundError](err); missing {
+		return nil, domain.ErrInternal(err).WithMessage(fmt.Sprintf("release pins a missing user schema %q", handle))
+	}
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")
+	}
+	return schema, nil
 }
 
 // userSchemaObjectType returns the objectType the schema id (`$id` URL or
@@ -72,7 +101,7 @@ func schemaObjectType(schema *domain.JSONSchema, err error) (string, error) {
 
 // sameUserSchema reports whether a user's schema id and a flow's schema id are
 // revisions of one user schema. A user keeps the revision it was created under
-// (users.schema_url) while a flow runs against the newest one, and every
+// (users.schema_url) while a flow runs against the revision it resolved, and every
 // republish mints a new id, so comparing the ids directly would treat each
 // existing user as a user of another schema once the schema changes (#1507:
 // users on older revisions keep signing in). Equal ids need no read.

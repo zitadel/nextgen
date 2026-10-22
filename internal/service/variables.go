@@ -42,6 +42,11 @@ type VariableService interface {
 	// clear. It exists for server-side consumers that use the value itself,
 	// such as the SSO flow presenting a client secret to a provider.
 	GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error)
+	// GetDeploymentVariables returns the set deploymentID was frozen with.
+	// A deployment that was never frozen, does not exist, or belongs to
+	// another project returns an error that is not internal, so the sign-in
+	// step can fail instead of the request.
+	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
 	// SetVariables applies one batch whole or not at all. A nil value removes
 	// the name. With a kind, only that kind's rows are written or removed.
 	// Without one, a plain value is written for both kinds, a secret for
@@ -151,6 +156,24 @@ func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domai
 		})
 	}
 	return decrypted, nil
+}
+
+// errNoFrozenVariables is a sealed deployment whose create did not freeze a
+// set. SSO fails the step on it: there is no live value to fall back to.
+var errNoFrozenVariables = errors.New("deployment has no frozen variables")
+
+func (s *variableService) GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (_ *domain.VariableSet, err error) {
+	ctx, end := startSpan(ctx, "VariableService.GetDeploymentVariables")
+	defer end(&err)
+
+	set, err := s.v2Pool.Statements().GetDeploymentVariables(ctx, projectID, deploymentID)
+	if err != nil {
+		if isNoRowFound(err) {
+			return nil, errNoFrozenVariables
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the deployment's variables")
+	}
+	return set, nil
 }
 
 // variableRemoval addresses one row a batch removes.
