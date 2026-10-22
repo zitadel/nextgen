@@ -1,27 +1,23 @@
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
-import { Braces, User } from "lucide-react";
+import { GitCommitHorizontal, User } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useId, useMemo, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
-import {
-  DETAIL_BODY,
-  DETAIL_CARD,
-  DetailHeader,
-  DetailSection,
-  PanelTitle,
-} from "@/components/detail-page";
+import { DETAIL_BODY, DETAIL_CARD, DetailHeader, DetailSection } from "@/components/detail-page";
 import { FormError } from "@/components/form-error";
 import { Page } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { MetaItem } from "@/components/ui/meta-item";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSubmit } from "@/hooks/use-submit";
 import { formatDate, formatDateTime } from "@/lib/date";
 import {
@@ -52,7 +48,6 @@ import { userAttributes, userIdentity, userIdentitySecondary, userMetadata } fro
  * and recorded here:
  *
  *   - **Last login** in the header card: no such field anywhere on the user
- *   - the **`v1 · live`** schema badge: schema versioning is #445
  *   - **unlinking** a provider account: links are written only by a sign-in
  *
  * The design's "Project permissions" block is not pending — it has been removed
@@ -104,16 +99,28 @@ export const Route = createFileRoute("/_authed/users/$userId")({
 
 // Long utility strings live as named constants so Tailwind's scanner sees the
 // full literal (it never sees a concatenated fragment).
-// 18px between columns, 16px between rows of fields.
-const GRID = "grid gap-x-4.5 gap-y-4 sm:grid-cols-2";
+// The design's label column on a wide row, for the fields and for the card's
+// title, so the revision box starts where the inputs do: 203px plus the row's
+// 12px gap is the design's 215px. The `!` beats the responsive Field's own
+// `flex-auto` on its label.
+const LABEL_COLUMN = "@md/field-group:flex-[0_0_203px]!";
+// The design's inputs are 360px wide rather than stretched across the row.
+const INPUT_WIDTH = "max-w-90";
+// The design's field label is the body face at 14/21, regular weight, where
+// `FieldLabel` defaults to the display face.
+const FIELD_LABEL = "text-foreground font-sans leading-normal";
+// The divider sits inside the body padding rather than spanning the card, and
+// `w-full` is applied by an orientation variant that out-specifies a plain
+// utility — so the override has to carry the same variant.
+const PANEL_RULE = "mx-6 w-auto data-[orientation=horizontal]:w-auto";
 // An authentication row: a muted label, its value on the right. 4px block
 // padding, and 18px to the rule between rows (the list's `gap-4.5`).
 const ROW = "flex items-center justify-between gap-4 py-1";
 const ROW_LABEL = "text-muted-foreground min-w-0 truncate text-sm font-medium";
 const ROW_VALUE = "text-foreground shrink-0 text-sm";
-// `schemaProperties` type labels a text or number input can write; "—" is an
-// untyped property, which accepts a string.
-const TEXT_WRITABLE_TYPES = new Set(["String", "Number", "Integer", "—"]);
+// `schemaProperties` type labels a text or number input or a switch can write;
+// "—" is an untyped property, which accepts a string.
+const WRITABLE_TYPES = new Set(["String", "Number", "Integer", "Boolean", "—"]);
 
 function UserDetail() {
   const { user, schema, passkeys, identityLinks, idps, passwordSetAt } = Route.useLoaderData();
@@ -124,7 +131,7 @@ function UserDetail() {
   const name = userIdentity(user) ?? userId;
   const secondary = userIdentitySecondary(user);
   const metadata = userMetadata(user);
-  const schemaName = schema ? schemaDisplayName(schema, "Unknown") : "Unknown";
+  const [tab, setTab] = useState("overview");
 
   return (
     <Page>
@@ -148,17 +155,24 @@ function UserDetail() {
         }
       />
 
-      <Tabs defaultValue="overview" className={`${DETAIL_BODY} gap-6`}>
+      <Tabs value={tab} onValueChange={setTab} className={`${DETAIL_BODY} gap-6`}>
         <TabsList aria-label="User detail sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="authentication">Authentication</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="flex flex-col gap-6">
+        {/* Kept mounted, and hidden while another tab is open, so the profile
+            draft survives a look at Authentication. */}
+        <TabsContent
+          value="overview"
+          forceMount
+          hidden={tab !== "overview"}
+          className="flex flex-col gap-6"
+        >
           <ProfileCard
             userId={userId}
             schema={schema}
-            schemaName={schemaName}
+            schemaId={field(user, "schema")}
             attributes={attributes}
             onSaved={() => router.invalidate()}
           />
@@ -298,38 +312,56 @@ function identityLinkRows(
 function ProfileCard({
   userId,
   schema,
-  schemaName,
+  schemaId,
   attributes,
   onSaved,
 }: {
   userId: string;
   schema: UserSchema | undefined;
-  schemaName: string;
+  schemaId: string | undefined;
   attributes: Record<string, unknown>;
   onSaved: () => Promise<void>;
 }) {
   const fields = useMemo(() => (schema ? schemaFields(schema) : []), [schema]);
-  // A text input writes a string, or through `number` a number, so only a
-  // property of exactly one of those types (or none) is editable. Anything
-  // else — a boolean, an array, a union such as `["boolean", "null"]` — stays
-  // read-only rather than storing `"true"` where the schema wants `true`.
+  // A text input writes a string, or through `number` a number, and a switch
+  // a boolean, so only a property of exactly one of those types (or none) is
+  // editable. Anything else (an array, a union such as `["boolean", "null"]`)
+  // stays read-only rather than storing `"true"` where the schema wants
+  // `true`. So does a boolean stored as something else (`"yes"` from before a
+  // type change): the switch would show it as off, and a toggle overwrite it.
   const readOnlyKeys = useMemo(
     () =>
-      new Set(
-        (schema ? schemaProperties(schema) : [])
-          .filter((property) => !TEXT_WRITABLE_TYPES.has(property.type))
+      new Set([
+        ...(schema ? schemaProperties(schema) : [])
+          .filter((property) => !WRITABLE_TYPES.has(property.type))
           .map((property) => property.key),
-      ),
-    [schema],
+        ...fields
+          .filter(
+            (entry) =>
+              entry.inputType === "boolean" &&
+              attributes[entry.key] != null &&
+              typeof attributes[entry.key] !== "boolean",
+          )
+          .map((entry) => entry.key),
+      ]),
+    [schema, fields, attributes],
   );
   const stored = useMemo(
     () =>
       Object.fromEntries(
-        fields.map((entry) => [entry.key, displayValue(attributes, entry.key) ?? ""]),
+        fields.map((entry) => [
+          entry.key,
+          // The switch shows an absent boolean as off, so off again is no change.
+          displayValue(attributes, entry.key) ??
+            (entry.inputType === "boolean" && attributes[entry.key] == null ? "false" : ""),
+        ]),
       ),
     [fields, attributes],
   );
   const [values, setValues] = useState(stored);
+  // An input that cannot read what it shows (a partly cleared date reports
+  // `""` with `validity.badInput`); saving would delete the stored value.
+  const [unreadable, setUnreadable] = useState<Record<string, boolean>>({});
   const save = useSubmit(async () => {
     await api.patchUserByID(userId, { attributes: patchOf(fields, stored, values) });
     await onSaved();
@@ -338,72 +370,99 @@ function ProfileCard({
 
   useEffect(() => {
     setValues(stored);
+    setUnreadable({});
     clearError();
   }, [stored, clearError]);
 
   const dirty = fields.some((entry) => values[entry.key] !== stored[entry.key]);
-  const missingRequired = fields.some(
+  const missing = fields.filter(
     (entry) => entry.required && !readOnlyKeys.has(entry.key) && !values[entry.key]?.trim(),
   );
 
   return (
     <Card className={DETAIL_CARD}>
-      <CardContent className="flex flex-col gap-4 px-6 py-5">
-        {/* The User schemas glyph (`Braces`), beside the schema the user follows. The
-            design drops the "User schema" eyebrow, so the hover says what the
-            name is; the trigger is focusable so a keyboard reaches it too. */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            {/* biome-ignore lint/a11y/noNoninteractiveTabindex: a tooltip's trigger has to take focus for the hint to reach keyboard users */}
-            <div className="w-fit rounded-md" tabIndex={0}>
-              <PanelTitle as="h2" icon={Braces} title={schemaName} />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>User schema</TooltipContent>
-        </Tooltip>
-        <Separator />
-        {fields.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            This user&rsquo;s schema could not be read, so its attributes cannot be labelled.
-          </p>
-        ) : (
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void save.run();
-            }}
+      {/* The row wraps rather than truncate the id, and the box grows past its
+          24px when the id breaks across lines. It is a `field-group` container
+          with the fields' inset and gap, so the title takes the label column
+          at the fields' breakpoint. */}
+      <div className="@container/field-group flex flex-wrap items-center gap-x-3 gap-y-2 px-6 pt-5 pb-4">
+        <h2 className={`text-foreground font-serif text-base leading-5 ${LABEL_COLUMN}`}>
+          User schema
+        </h2>
+        {schema && schemaId && (
+          <Button
+            asChild
+            variant="secondary"
+            size="xs"
+            className="h-auto min-h-6 max-w-full flex-wrap justify-start py-0.5 whitespace-normal has-[>svg]:px-2"
           >
-            <div className={GRID}>
-              {fields.map((entry) => (
-                <ProfileField
-                  key={entry.key}
-                  entry={entry}
-                  value={values[entry.key] ?? ""}
-                  readOnly={readOnlyKeys.has(entry.key)}
-                  onChange={(value) => setValues((current) => ({ ...current, [entry.key]: value }))}
-                />
-              ))}
-            </div>
-            <FormError message={save.error} />
-            <div className="flex justify-end">
-              {/* Secondary, small: the resting Save is the secondary fill, which
-                  `disabled:opacity-50` dims — as `RenameCard`'s. Full width on
-                  a phone, as the design's mobile frame draws it. */}
-              <Button
-                type="submit"
-                variant="secondary"
-                size="sm"
-                className="gap-1 px-2.5 text-xs max-sm:w-full"
-                disabled={!dirty || missingRequired}
-                loading={save.pending}
+            <Link to="/schemas/$schemaId" params={{ schemaId }}>
+              {/* The space separates name and id in the link's accessible name. */}
+              {schemaDisplayName(schema, schemaId)}{" "}
+              <GitCommitHorizontal className="size-4" strokeWidth={1.5} aria-hidden />
+              <Badge
+                variant="ghost"
+                className="h-auto min-h-5 min-w-0 shrink overflow-visible py-0 font-mono font-normal break-all whitespace-normal"
               >
-                Save
-              </Button>
-            </div>
-          </form>
+                {schemaId}
+              </Badge>
+            </Link>
+          </Button>
         )}
-      </CardContent>
+      </div>
+      <Separator className={PANEL_RULE} />
+      {fields.length === 0 ? (
+        <p className="text-muted-foreground px-6 pt-4 pb-5 text-sm">
+          {schema
+            ? "This schema defines no attributes that can be shown."
+            : "This user’s schema could not be read, so its attributes cannot be labelled."}
+        </p>
+      ) : (
+        <form
+          className="flex flex-col gap-4 px-6 pt-4 pb-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void save.run();
+          }}
+        >
+          <FieldGroup className="gap-4">
+            {fields.map((entry) => (
+              <ProfileField
+                key={entry.key}
+                entry={entry}
+                value={values[entry.key] ?? ""}
+                readOnly={readOnlyKeys.has(entry.key)}
+                // The reload after a save resets the draft, so an edit made
+                // meanwhile would be lost.
+                disabled={save.pending}
+                missing={missing.includes(entry)}
+                // Marked, since it is the only reason on screen why Save is off.
+                unreadable={unreadable[entry.key] ?? false}
+                onBadInput={(badInput) =>
+                  setUnreadable((current) => ({ ...current, [entry.key]: badInput }))
+                }
+                onChange={(value) => setValues((current) => ({ ...current, [entry.key]: value }))}
+              />
+            ))}
+          </FieldGroup>
+          <FormError message={save.error} />
+          <div className="flex justify-end">
+            {/* Secondary, small: the resting Save is the secondary fill, which
+                `disabled:opacity-50` dims — as `RenameCard`'s. Full width on
+                a phone, as the design's mobile frame draws it. */}
+            <Button
+              type="submit"
+              variant="secondary"
+              size="sm"
+              className="gap-1 px-2.5 text-xs max-sm:w-full"
+              disabled={!dirty || missing.length > 0 || Object.values(unreadable).some(Boolean)}
+              loading={save.pending}
+            >
+              Save
+            </Button>
+          </div>
+        </form>
+      )}
     </Card>
   );
 }
@@ -426,35 +485,83 @@ function patchOf(
   return patch;
 }
 
-/** One attribute of the profile. */
+/** One attribute of the profile, as a switch for a boolean. */
 function ProfileField({
   entry,
   value,
   readOnly,
+  disabled,
+  missing,
+  unreadable,
+  onBadInput,
   onChange,
 }: {
   entry: SchemaField;
   value: string;
   readOnly: boolean;
+  disabled: boolean;
+  /** A required value the draft has emptied. */
+  missing: boolean;
+  unreadable: boolean;
+  /**
+   * Whether the input shows something its `value` cannot express. Read on
+   * every native `input` event: `onChange` skips one that leaves the value
+   * as it was, such as the last step of clearing a partial date.
+   */
+  onBadInput: (badInput: boolean) => void;
   onChange: (value: string) => void;
 }) {
   const id = useId();
+  const errorId = `${id}-error`;
 
   return (
-    <Field>
-      <FieldLabel htmlFor={id} className="text-foreground">
-        {entry.label}
-      </FieldLabel>
-      <Input
-        id={id}
-        name={entry.key}
-        {...inputAttributes(entry)}
-        value={value}
-        readOnly={readOnly}
-        required={entry.required}
-        placeholder={entry.placeholder}
-        onChange={(event) => onChange(event.target.value)}
-      />
+    <Field orientation="responsive">
+      {/* As in the add-user sheet: the marker is a sibling of the label, not
+          part of it, so the accessible name stays the field name. */}
+      <div className={`flex items-center gap-2 ${LABEL_COLUMN}`}>
+        <FieldLabel htmlFor={id} className={FIELD_LABEL}>
+          {entry.label}
+        </FieldLabel>
+        {!entry.required && <MetaItem>Optional</MetaItem>}
+      </div>
+      <FieldContent>
+        {entry.inputType === "boolean" ? (
+          <div className="flex items-center gap-2">
+            {/* A switch cannot be read-only, so a locked value disables it. */}
+            <Switch
+              id={id}
+              checked={value === "true"}
+              onCheckedChange={(checked) => onChange(String(checked))}
+              required={entry.required}
+              disabled={disabled || readOnly}
+            />
+            {/* The switch reports its own state, so Yes/No is for the eye. A
+                locked value shows as stored instead, which the switch cannot
+                report. */}
+            <span className="text-foreground text-sm font-medium" aria-hidden={!readOnly}>
+              {readOnly ? value : value === "true" ? "Yes" : "No"}
+            </span>
+          </div>
+        ) : (
+          <Input
+            id={id}
+            name={entry.key}
+            {...inputAttributes(entry)}
+            value={value}
+            readOnly={readOnly}
+            disabled={disabled}
+            required={entry.required}
+            placeholder={entry.placeholder}
+            aria-invalid={missing || unreadable || undefined}
+            // `aria-invalid` says the field is wrong; this says why.
+            aria-describedby={missing ? errorId : undefined}
+            className={INPUT_WIDTH}
+            onChange={(event) => onChange(event.target.value)}
+            onInput={(event) => onBadInput(event.currentTarget.validity.badInput)}
+          />
+        )}
+        {missing && <FieldError id={errorId}>This field is required.</FieldError>}
+      </FieldContent>
     </Field>
   );
 }

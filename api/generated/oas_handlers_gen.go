@@ -882,7 +882,12 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 // An attempt is an ephemeral (15-minute TTL) state machine that drives a single authentication round.
 // It accepts factor challenges, verifies proofs, and completes into a session or handoff token.
 // Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
-// also include session_id to add factors to an existing session.
+// also include session_id and that session's session_token to add factors to an existing session.
+// The project comes from the project secret. A body `project_id` that disagrees
+// answers `403` with `proj.mismatch`. The attempt resolves a deployment the
+// same way as other runtime operations and seals it; with no browser `Origin`
+// and nothing deployed to the resolved target the response is `409` with
+// `rel.not_deployed`. A revoked release answers `409` with `rel.revoked`.
 //
 // POST /auth_attempts
 func (s *Server) handleCreateAuthAttemptRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -1505,7 +1510,19 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 //
 // Resolves a flow definition based on purpose + audience context and returns
 // the first capability step. Creates a new session implicitly unless
-// `session_id` is provided (for step-up / reauth on an existing session).
+// `session_id` is provided, together with that session's `session_token`
+// (for step-up / reauth on an existing session).
+// The browser `Origin` header selects which deployment serves this attempt:
+// the gate admits the origin against the project's origin patterns and live
+// previews, the newest deployment to that exact origin is the target, and
+// that deployment's release supplies flow definitions, user schemas and
+// branding. The resolved deployment is sealed into the `_zflow` cookie so
+// later steps keep the same configuration. An origin that matches no pattern
+// answers `403` with `proj.origin_not_allowed`; one that matches a preview
+// pattern with no live preview answers `403` with `proj.preview_not_live`;
+// nothing deployed to the target answers `409` with `rel.not_deployed`; a
+// revoked release answers `409` with `rel.revoked`. A request with no
+// `Origin` passes the gate and still needs a deployment target.
 // The response contains an `id` field — the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -1585,6 +1602,16 @@ func (s *Server) handleCreateFlowRequest(args [0]string, argsEscaped bool, w htt
 			ID:   "createFlow",
 		}
 	)
+	params, err := decodeCreateFlowParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 	request, rawBody, close, err := s.decodeCreateFlowRequest(r)
@@ -1612,13 +1639,18 @@ func (s *Server) handleCreateFlowRequest(args [0]string, argsEscaped bool, w htt
 			OperationID:      "createFlow",
 			Body:             request,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "Origin",
+					In:   "header",
+				}: params.Origin,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = *CreateFlowRequest
-			Params   = struct{}
+			Params   = CreateFlowParams
 			Response = CreateFlowRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -1628,14 +1660,14 @@ func (s *Server) handleCreateFlowRequest(args [0]string, argsEscaped bool, w htt
 		](
 			m,
 			mreq,
-			nil,
+			unpackCreateFlowParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.CreateFlow(ctx, request)
+				response, err = s.h.CreateFlow(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.CreateFlow(ctx, request)
+		response, err = s.h.CreateFlow(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -2093,7 +2125,9 @@ func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w ht
 // The handoff token is:
 // - Single-use (atomic exchange, no retry)
 // - Audience-bound (requires matching project key for exchange)
-// - Idempotency-safe within a 5-minute window (see conventions).
+// - Idempotency-safe within a 5-minute window (see conventions)
+// Reuses the deployment sealed when the attempt was created. If that release
+// was revoked since, the response is `409` with `rel.revoked`.
 //
 // POST /auth_attempts/{attempt_id}/handoff
 func (s *Server) handleCreateHandoffRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -4570,6 +4604,12 @@ func (s *Server) handleDeleteVariableRequest(args [1]string, argsEscaped bool, w
 // The `session_token` supersedes any previously issued `session_token` for the same session.
 // Clients must replace their stored token at this point.
 // Requires a project service key (OAuth2 client credentials).
+// The project comes from the project secret. A query `project_id` that
+// disagrees answers `403` with `proj.mismatch`. The exchange resolves a
+// deployment the same way as other runtime operations; with no browser
+// `Origin` and nothing deployed to the resolved target the response is
+// `409` with `rel.not_deployed`. A revoked release answers `409` with
+// `rel.revoked`.
 //
 // POST /sessions/exchange
 func (s *Server) handleExchangeHandoffRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -4991,6 +5031,8 @@ func (s *Server) handleFinishUserPasskeyRegistrationRequest(args [2]string, args
 // challenges issued so far, and any errors preventing progress.
 // Use this for polling during long-running factor verifications (e.g., waiting for
 // a federated IdP callback or a device flow).
+// Reuses the deployment sealed when the attempt was created. If that release
+// was revoked since, the response is `409` with `rel.revoked`.
 //
 // GET /auth_attempts/{attempt_id}
 func (s *Server) handleGetAuthAttemptRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -6521,6 +6563,9 @@ func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool
 //
 // Returns the current capability step without advancing the state machine.
 // Useful for page reloads or re-rendering after a network error.
+// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+// re-resolve from `Origin`. If that release was revoked since the attempt
+// started, the response is `409` with `rel.revoked`.
 //
 // GET /flow/{id}
 func (s *Server) handleGetFlowStepRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -10655,6 +10700,8 @@ func (s *Server) handleInitClaimRequest(args [1]string, argsEscaped bool, w http
 // (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
 // including method, metadata, and any UI hints. The client then verifies the proof
 // by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+// Reuses the deployment sealed when the attempt was created. If that release
+// was revoked since, the response is `409` with `rel.revoked`.
 //
 // POST /auth_attempts/{attempt_id}/challenges
 func (s *Server) handleIssueChallengeRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -17460,6 +17507,9 @@ func (s *Server) handleSetUserPasswordRequest(args [1]string, argsEscaped bool, 
 // from the project's variables. A provider the engine cannot start a
 // sign-in with, including a reference with no variable behind it,
 // re-renders the step with `error.sso_unavailable`.
+// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+// re-resolve from `Origin`. If that release was revoked since the attempt
+// started, the response is `409` with `rel.revoked`.
 //
 // POST /flow/{id}/submit
 func (s *Server) handleSubmitFlowStepRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -18073,6 +18123,8 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 // - `recovery_code` method: { recovery_code: "…" }
 // On successful verification, the factor is written to the auth attempt.
 // The attempt moves to the next pending challenge or completes if all required factors are verified.
+// Reuses the deployment sealed when the attempt was created. If that release
+// was revoked since, the response is `409` with `rel.revoked`.
 //
 // POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

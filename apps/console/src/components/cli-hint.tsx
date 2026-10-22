@@ -4,10 +4,10 @@ import { InlineCode } from "@/components/ui/inline-code";
 
 /**
  * The CLI the footers tell an operator to run (decisions log D0b): the
- * published package, invoked without installing it. The repo is in changesets
- * prerelease mode on the `alpha` dist-tag, which is the tag the design names.
+ * published package, invoked without installing it, from npm's `latest` tag
+ * (docs/adrs/074-preview-releases-on-0x.md).
  */
-const CLI = "npx @zitadel/cli@alpha";
+const CLI = "npx @zitadel/cli@latest";
 
 /** `apply`: writes the local definitions to the project. */
 export const CLI_APPLY = `${CLI} apply`;

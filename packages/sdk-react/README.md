@@ -5,7 +5,7 @@ React components for the Zitadel auth UI, for client-side SPAs.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-react@alpha
+pnpm add @zitadel/sdk-react@latest
 ```
 
 ## Requirements

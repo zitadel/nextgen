@@ -583,7 +583,15 @@ func TestSetUserPassword(t *testing.T) {
 
 		t.Run("longer than 64 characters", func(t *testing.T) {
 			t.Parallel()
-			badRequest(t, strings.Repeat("a", domain.MaxPasswordLength+1), domain.ErrUserPasswordTooLong().Code)
+			// The server's cap is reported in the password policy's shape,
+			// as a max_length violation, whether or not a policy exists.
+			params, _ := createUser(t, "testsetuserpassword.toolong@example.com")
+			resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: strings.Repeat("a", domain.MaxPasswordLength+1)}, params)
+			assert.NoError(t, err)
+			require.IsType(t, &api.SetUserPasswordBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			body := resp.(*api.SetUserPasswordBadRequest)
+			assert.Equal(t, domain.ErrUserPasswordPolicyViolation(nil).Code, string(body.Code))
+			assert.JSONEq(t, `{"violations":{"max_length":64}}`, string(body.Details.Value["details"]))
 		})
 
 		t.Run("empty", func(t *testing.T) {

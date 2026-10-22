@@ -18,12 +18,12 @@ function cliDefaultServer(): string {
 
 describe("cliSetup", () => {
   it("leaves the server out when it is the CLI's own default", () => {
-    expect(cliSetup(cliDefaultServer())).toBe("npx @zitadel/cli@alpha setup");
+    expect(cliSetup(cliDefaultServer())).toBe("npx @zitadel/cli@latest setup");
   });
 
   it("names any other server, a local one included", () => {
     expect(cliSetup("http://localhost:8080")).toBe(
-      "npx @zitadel/cli@alpha setup --server http://localhost:8080",
+      "npx @zitadel/cli@latest setup --server http://localhost:8080",
     );
   });
 });

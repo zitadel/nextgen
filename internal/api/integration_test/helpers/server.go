@@ -99,6 +99,8 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 
 	if h.handler.value == nil {
 		platform := h.EnsurePlatformProject(t)
+		db := h.EnsureServiceDB(t)
+		releaseService := h.EnsureReleaseService(t)
 		h.handler.value = api.NewHandler(
 			h.EnsureFlowService(t),
 			h.EnsureAuthAttemptService(t),
@@ -113,18 +115,18 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			h.EnsureFlowDefinitionService(t),
 			h.EnsureTeamService(t),
 			h.EnsureBrandingService(t),
-			h.EnsureReleaseService(t),
+			releaseService,
 			h.EnsureDeploymentService(t),
 			h.EnsureIDPConnectionService(t),
 			h.EnsureEventService(t),
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),
-			service.NewClaimService(h.EnsureServiceDB(t), "https://console.invalid/ui/console", platform.ID),
-			service.NewGrantService(h.EnsureServiceDB(t), service.StatementsUserRefResolver{Pool: h.EnsureServiceDB(t)}, platform.ID),
-			service.NewVariableService(h.EnsureServiceDB(t), h.EnsureKeyService(t)),
-			h.EnsureServiceDB(t),
+			service.NewClaimService(db, "https://console.invalid/ui/console", platform.ID),
+			service.NewGrantService(db, service.StatementsUserRefResolver{Pool: db}, platform.ID),
+			service.NewVariableService(db, h.EnsureKeyService(t)),
+			db,
 			platform.ID,
-		).WithBuiltinSchemaBases(BuiltinSchemaBases())
+		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService))
 	}
 	return h.handler.value
 }

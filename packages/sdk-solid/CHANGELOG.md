@@ -1,5 +1,15 @@
 # @zitadel/sdk-solid
 
+## 0.1.0
+
+### Patch Changes
+
+- [#2178](https://github.com/zitadel/nextgen/pull/2178) [`3b206b2`](https://github.com/zitadel/nextgen/commit/3b206b2453cabf4da6840396f2be0e96b4ede8fa) Thanks [@mridang](https://github.com/mridang)! - The widgets now wait for their listeners before they navigate. The detail of `zitadel-flow-redirect`, `zitadel-flow-complete` and `zitadel-signout` carries a `waitUntil(promise)` function; the widget navigates once every promise a listener passed has settled, or after two seconds, and at once when none was passed. The React, Solid, Svelte and Qwik wrappers forward each callback's returned promise to `waitUntil`, so an async or lazily loaded handler runs before the page unloads; the Vue and Angular wrappers expose `waitUntil` on the event detail for a handler to call itself.
+- Updated dependencies [[`114c32c`](https://github.com/zitadel/nextgen/commit/114c32c4a86f7b05794528b889faad159d59bf3f), [`5680eb7`](https://github.com/zitadel/nextgen/commit/5680eb76a273b722456d567f94554e828bcf55e9), [`17523dc`](https://github.com/zitadel/nextgen/commit/17523dcf8e55d9d8a07f27a05c6597749f81ef9b), [`8ef9c49`](https://github.com/zitadel/nextgen/commit/8ef9c495c97188893fd8b879c524ce8e097fa52b), [`dedd93b`](https://github.com/zitadel/nextgen/commit/dedd93ba07e58108771019e70466e858b504c374), [`1653960`](https://github.com/zitadel/nextgen/commit/16539605bbdeadbcf4d8ac2bbfa7e3e16b1af557), [`e3cd8f8`](https://github.com/zitadel/nextgen/commit/e3cd8f81111f3298b5635e31ab3c63a2ce293707), [`be96308`](https://github.com/zitadel/nextgen/commit/be96308eec43f3ffe04a62fd414a18ea2b1ccb21), [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1), [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1), [`831cb81`](https://github.com/zitadel/nextgen/commit/831cb81978e65f1b5d41b41330c31e9c43fd2030), [`3b206b2`](https://github.com/zitadel/nextgen/commit/3b206b2453cabf4da6840396f2be0e96b4ede8fa)]:
+  - @zitadel/api@0.1.0
+  - @zitadel/components@0.1.0
+  - @zitadel/sdk-core@0.1.0
+
 ## 1.0.0-alpha.28
 
 ### Minor Changes

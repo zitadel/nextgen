@@ -1,12 +1,11 @@
 "use client";
 
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
-import { BUMP_LABELS, type Choice, type Component, type Facet, matches } from "./filter";
-import type { Bump } from "./releases";
+import { type Choice, type Component, type Facet, KIND_LABELS, type Kind, matches } from "./filter";
 
 type Filter = {
   components: Component[];
-  bumps: Bump[];
+  kinds: Kind[];
   /** Every change on the page, for the buttons' counts. */
   facets: Facet[];
   choice: Choice;
@@ -15,25 +14,25 @@ type Filter = {
 
 const FilterContext = createContext<Filter>({
   components: [],
-  bumps: [],
+  kinds: [],
   facets: [],
   choice: {},
   choose: () => {},
 });
 
 // The query that holds the choice, so a filtered page can be shared:
-// /changelog?component=cli&change=minor.
+// /changelog?component=cli&change=breaking.
 const COMPONENT_PARAM = "component";
-const BUMP_PARAM = "change";
+const KIND_PARAM = "change";
 
 /**
- * The changelog's filters, by component and by bump. The page is static and
+ * The changelog's filters, by component and by kind. The page is static and
  * holds every change; once it runs, the filters hide what does not match the
  * choice. The choice comes from the query and goes back into it.
  */
 export function ChangelogFilter({
   components,
-  bumps,
+  kinds,
   facets,
   children,
 }: Omit<Filter, "choice" | "choose"> & { children: ReactNode }) {
@@ -43,15 +42,15 @@ export function ChangelogFilter({
   useEffect(() => {
     const query = new URLSearchParams(location.search);
     const component = components.find(({ id }) => id === query.get(COMPONENT_PARAM))?.id;
-    const bump = bumps.find((candidate) => candidate === query.get(BUMP_PARAM));
-    if (component || bump) {
-      setChoice({ component, bump });
+    const kind = kinds.find((candidate) => candidate === query.get(KIND_PARAM));
+    if (component || kind) {
+      setChoice({ component, kind });
       setFromQuery(true);
     }
-  }, [components, bumps]);
+  }, [components, kinds]);
 
-  // The browser scrolls to a linked release (#v1.0.0-alpha.25) before the
-  // query's filters hide the changes above it: back to the release, then.
+  // The browser scrolls to a linked release (#v0.1.0) before the query's
+  // filters hide the changes above it: back to the release, then.
   useEffect(() => {
     if (!fromQuery || !location.hash) return;
     document
@@ -62,7 +61,7 @@ export function ChangelogFilter({
   const choose = (next: Choice) => {
     setChoice(next);
     const url = new URL(location.href);
-    const params = { [COMPONENT_PARAM]: next.component, [BUMP_PARAM]: next.bump };
+    const params = { [COMPONENT_PARAM]: next.component, [KIND_PARAM]: next.kind };
     for (const [param, value] of Object.entries(params)) {
       if (value) {
         url.searchParams.set(param, value);
@@ -74,16 +73,16 @@ export function ChangelogFilter({
   };
 
   return (
-    <FilterContext value={{ components, bumps, facets, choice, choose }}>{children}</FilterContext>
+    <FilterContext value={{ components, kinds, facets, choice, choose }}>{children}</FilterContext>
   );
 }
 
 /**
- * The filters' buttons: all, then each component or bump with how many
+ * The filters' buttons: all, then each component or kind with how many
  * changes it would show, given the other filter's choice.
  */
 export function FilterButtons({ note }: { note?: ReactNode }) {
-  const { components, bumps, facets, choice, choose } = useContext(FilterContext);
+  const { components, kinds, facets, choice, choose } = useContext(FilterContext);
   const count = (candidate: Choice) => facets.filter((facet) => matches(facet, candidate)).length;
   return (
     <div className="flex flex-col gap-6">
@@ -106,17 +105,17 @@ export function FilterButtons({ note }: { note?: ReactNode }) {
         ))}
       </FilterGroup>
       <FilterGroup legend="Change">
-        <FilterButton pressed={!choice.bump} onClick={() => choose({ ...choice, bump: undefined })}>
+        <FilterButton pressed={!choice.kind} onClick={() => choose({ ...choice, kind: undefined })}>
           All
         </FilterButton>
-        {bumps.map((bump) => (
+        {kinds.map((kind) => (
           <FilterButton
-            key={bump}
-            pressed={choice.bump === bump}
-            onClick={() => choose({ ...choice, bump })}
+            key={kind}
+            pressed={choice.kind === kind}
+            onClick={() => choose({ ...choice, kind })}
           >
-            {BUMP_LABELS[bump]}
-            <span className="font-mono opacity-60">{count({ ...choice, bump })}</span>
+            {KIND_LABELS[kind]}
+            <span className="font-mono opacity-60">{count({ ...choice, kind })}</span>
           </FilterButton>
         ))}
       </FilterGroup>
@@ -177,7 +176,7 @@ export function Filtered({ facets, children }: { facets: Facet[]; children: Reac
 export function ChangeCount({ facets }: { facets: Facet[] }) {
   const { choice } = useContext(FilterContext);
   const noun = facets.length === 1 ? "change" : "changes";
-  if (!choice.component && !choice.bump) return `${facets.length} ${noun}`;
+  if (!choice.component && !choice.kind) return `${facets.length} ${noun}`;
   const shown = facets.filter((facet) => matches(facet, choice)).length;
   return `${shown} of ${facets.length} ${noun}`;
 }
@@ -185,13 +184,13 @@ export function ChangeCount({ facets }: { facets: Facet[] }) {
 /** Says so when none of a release's changes match the choice. */
 export function NoneFiltered({ facets }: { facets: Facet[] }) {
   const { components, choice } = useContext(FilterContext);
-  if (!choice.component && !choice.bump) return null;
+  if (!choice.component && !choice.kind) return null;
   if (facets.some((facet) => matches(facet, choice))) return null;
   const component = components.find(({ id }) => id === choice.component);
-  const bump = choice.bump ? `${BUMP_LABELS[choice.bump].toLowerCase()} ` : "";
+  const kind = choice.kind ? `${KIND_LABELS[choice.kind].toLowerCase()} ` : "";
   return (
     <p className="text-sm text-text-muted leading-6">
-      No {bump}change{component ? ` to ${component.label}` : ""} in this release.
+      No {kind}change{component ? ` to ${component.label}` : ""} in this release.
     </p>
   );
 }

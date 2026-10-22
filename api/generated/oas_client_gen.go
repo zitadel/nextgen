@@ -93,7 +93,12 @@ type Invoker interface {
 	// An attempt is an ephemeral (15-minute TTL) state machine that drives a single authentication round.
 	// It accepts factor challenges, verifies proofs, and completes into a session or handoff token.
 	// Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
-	// also include session_id to add factors to an existing session.
+	// also include session_id and that session's session_token to add factors to an existing session.
+	// The project comes from the project secret. A body `project_id` that disagrees
+	// answers `403` with `proj.mismatch`. The attempt resolves a deployment the
+	// same way as other runtime operations and seals it; with no browser `Origin`
+	// and nothing deployed to the resolved target the response is `409` with
+	// `rel.not_deployed`. A revoked release answers `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts
 	CreateAuthAttempt(ctx context.Context, request *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error)
@@ -143,7 +148,19 @@ type Invoker interface {
 	//
 	// Resolves a flow definition based on purpose + audience context and returns
 	// the first capability step. Creates a new session implicitly unless
-	// `session_id` is provided (for step-up / reauth on an existing session).
+	// `session_id` is provided, together with that session's `session_token`
+	// (for step-up / reauth on an existing session).
+	// The browser `Origin` header selects which deployment serves this attempt:
+	// the gate admits the origin against the project's origin patterns and live
+	// previews, the newest deployment to that exact origin is the target, and
+	// that deployment's release supplies flow definitions, user schemas and
+	// branding. The resolved deployment is sealed into the `_zflow` cookie so
+	// later steps keep the same configuration. An origin that matches no pattern
+	// answers `403` with `proj.origin_not_allowed`; one that matches a preview
+	// pattern with no live preview answers `403` with `proj.preview_not_live`;
+	// nothing deployed to the target answers `409` with `rel.not_deployed`; a
+	// revoked release answers `409` with `rel.revoked`. A request with no
+	// `Origin` passes the gate and still needs a deployment target.
 	// The response contains an `id` field — the flow handle. Use it as the path
 	// parameter for all subsequent `/flow/{id}/submit` calls.
 	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -152,7 +169,7 @@ type Invoker interface {
 	// cookie. The browser sends it automatically on subsequent requests.
 	//
 	// POST /flow
-	CreateFlow(ctx context.Context, request *CreateFlowRequest) (CreateFlowRes, error)
+	CreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error)
 	// CreateFlowDefinition invokes createFlowDefinition operation.
 	//
 	// Publishes a new flow definition revision.
@@ -199,7 +216,9 @@ type Invoker interface {
 	// The handoff token is:
 	// - Single-use (atomic exchange, no retry)
 	// - Audience-bound (requires matching project key for exchange)
-	// - Idempotency-safe within a 5-minute window (see conventions).
+	// - Idempotency-safe within a 5-minute window (see conventions)
+	// Reuses the deployment sealed when the attempt was created. If that release
+	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
@@ -377,6 +396,12 @@ type Invoker interface {
 	// The `session_token` supersedes any previously issued `session_token` for the same session.
 	// Clients must replace their stored token at this point.
 	// Requires a project service key (OAuth2 client credentials).
+	// The project comes from the project secret. A query `project_id` that
+	// disagrees answers `403` with `proj.mismatch`. The exchange resolves a
+	// deployment the same way as other runtime operations; with no browser
+	// `Origin` and nothing deployed to the resolved target the response is
+	// `409` with `rel.not_deployed`. A revoked release answers `409` with
+	// `rel.revoked`.
 	//
 	// POST /sessions/exchange
 	ExchangeHandoff(ctx context.Context, request *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error)
@@ -398,6 +423,8 @@ type Invoker interface {
 	// challenges issued so far, and any errors preventing progress.
 	// Use this for polling during long-running factor verifications (e.g., waiting for
 	// a federated IdP callback or a device flow).
+	// Reuses the deployment sealed when the attempt was created. If that release
+	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// GET /auth_attempts/{attempt_id}
 	GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error)
@@ -468,6 +495,9 @@ type Invoker interface {
 	//
 	// Returns the current capability step without advancing the state machine.
 	// Useful for page reloads or re-rendering after a network error.
+	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+	// re-resolve from `Origin`. If that release was revoked since the attempt
+	// started, the response is `409` with `rel.revoked`.
 	//
 	// GET /flow/{id}
 	GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error)
@@ -679,6 +709,8 @@ type Invoker interface {
 	// (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
 	// including method, metadata, and any UI hints. The client then verifies the proof
 	// by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+	// Reuses the deployment sealed when the attempt was created. If that release
+	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	IssueChallenge(ctx context.Context, request *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
@@ -1057,6 +1089,9 @@ type Invoker interface {
 	// from the project's variables. A provider the engine cannot start a
 	// sign-in with, including a reference with no variable behind it,
 	// re-renders the step with `error.sso_unavailable`.
+	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+	// re-resolve from `Origin`. If that release was revoked since the attempt
+	// started, the response is `409` with `rel.revoked`.
 	//
 	// POST /flow/{id}/submit
 	SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
@@ -1096,6 +1131,8 @@ type Invoker interface {
 	// - `recovery_code` method: { recovery_code: "…" }
 	// On successful verification, the factor is written to the auth attempt.
 	// The attempt moves to the next pending challenge or completes if all required factors are verified.
+	// Reuses the deployment sealed when the attempt was created. If that release
+	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 	VerifyChallengeProof(ctx context.Context, request *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error)
@@ -1746,7 +1783,12 @@ func (c *Client) sendCompleteClaim(ctx context.Context, request *CompleteClaimRe
 // An attempt is an ephemeral (15-minute TTL) state machine that drives a single authentication round.
 // It accepts factor challenges, verifies proofs, and completes into a session or handoff token.
 // Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
-// also include session_id to add factors to an existing session.
+// also include session_id and that session's session_token to add factors to an existing session.
+// The project comes from the project secret. A body `project_id` that disagrees
+// answers `403` with `proj.mismatch`. The attempt resolves a deployment the
+// same way as other runtime operations and seals it; with no browser `Origin`
+// and nothing deployed to the resolved target the response is `409` with
+// `rel.not_deployed`. A revoked release answers `409` with `rel.revoked`.
 //
 // POST /auth_attempts
 func (c *Client) CreateAuthAttempt(ctx context.Context, request *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error) {
@@ -2177,7 +2219,19 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 //
 // Resolves a flow definition based on purpose + audience context and returns
 // the first capability step. Creates a new session implicitly unless
-// `session_id` is provided (for step-up / reauth on an existing session).
+// `session_id` is provided, together with that session's `session_token`
+// (for step-up / reauth on an existing session).
+// The browser `Origin` header selects which deployment serves this attempt:
+// the gate admits the origin against the project's origin patterns and live
+// previews, the newest deployment to that exact origin is the target, and
+// that deployment's release supplies flow definitions, user schemas and
+// branding. The resolved deployment is sealed into the `_zflow` cookie so
+// later steps keep the same configuration. An origin that matches no pattern
+// answers `403` with `proj.origin_not_allowed`; one that matches a preview
+// pattern with no live preview answers `403` with `proj.preview_not_live`;
+// nothing deployed to the target answers `409` with `rel.not_deployed`; a
+// revoked release answers `409` with `rel.revoked`. A request with no
+// `Origin` passes the gate and still needs a deployment target.
 // The response contains an `id` field — the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -2186,12 +2240,12 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 // cookie. The browser sends it automatically on subsequent requests.
 //
 // POST /flow
-func (c *Client) CreateFlow(ctx context.Context, request *CreateFlowRequest) (CreateFlowRes, error) {
-	res, err := c.sendCreateFlow(ctx, request)
+func (c *Client) CreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error) {
+	res, err := c.sendCreateFlow(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest) (res CreateFlowRes, err error) {
+func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (res CreateFlowRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -2248,6 +2302,23 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest)
 	}
 	if err := encodeCreateFlowRequest(request, r); err != nil {
 		return res, errors.Wrap(err, "encode request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "Origin",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Origin.Get(); ok {
+				return e.EncodeValue(conv.URLToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
 	}
 
 	stage = "SendRequest"
@@ -2572,7 +2643,9 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 // The handoff token is:
 // - Single-use (atomic exchange, no retry)
 // - Audience-bound (requires matching project key for exchange)
-// - Idempotency-safe within a 5-minute window (see conventions).
+// - Idempotency-safe within a 5-minute window (see conventions)
+// Reuses the deployment sealed when the attempt was created. If that release
+// was revoked since, the response is `409` with `rel.revoked`.
 //
 // POST /auth_attempts/{attempt_id}/handoff
 func (c *Client) CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error) {
@@ -4385,6 +4458,12 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 // The `session_token` supersedes any previously issued `session_token` for the same session.
 // Clients must replace their stored token at this point.
 // Requires a project service key (OAuth2 client credentials).
+// The project comes from the project secret. A query `project_id` that
+// disagrees answers `403` with `proj.mismatch`. The exchange resolves a
+// deployment the same way as other runtime operations; with no browser
+// `Origin` and nothing deployed to the resolved target the response is
+// `409` with `rel.not_deployed`. A revoked release answers `409` with
+// `rel.revoked`.
 //
 // POST /sessions/exchange
 func (c *Client) ExchangeHandoff(ctx context.Context, request *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error) {
@@ -4692,6 +4771,8 @@ func (c *Client) sendFinishUserPasskeyRegistration(ctx context.Context, request 
 // challenges issued so far, and any errors preventing progress.
 // Use this for polling during long-running factor verifications (e.g., waiting for
 // a federated IdP callback or a device flow).
+// Reuses the deployment sealed when the attempt was created. If that release
+// was revoked since, the response is `409` with `rel.revoked`.
 //
 // GET /auth_attempts/{attempt_id}
 func (c *Client) GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error) {
@@ -5828,6 +5909,9 @@ func (c *Client) sendGetFlowDefinition(ctx context.Context, params GetFlowDefini
 //
 // Returns the current capability step without advancing the state machine.
 // Useful for page reloads or re-rendering after a network error.
+// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+// re-resolve from `Origin`. If that release was revoked since the attempt
+// started, the response is `409` with `rel.revoked`.
 //
 // GET /flow/{id}
 func (c *Client) GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error) {
@@ -8863,6 +8947,8 @@ func (c *Client) sendInitClaim(ctx context.Context, params InitClaimParams) (res
 // (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
 // including method, metadata, and any UI hints. The client then verifies the proof
 // by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+// Reuses the deployment sealed when the attempt was created. If that release
+// was revoked since, the response is `409` with `rel.revoked`.
 //
 // POST /auth_attempts/{attempt_id}/challenges
 func (c *Client) IssueChallenge(ctx context.Context, request *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error) {
@@ -14560,6 +14646,9 @@ func (c *Client) sendSetUserPassword(ctx context.Context, request *SetUserPasswo
 // from the project's variables. A provider the engine cannot start a
 // sign-in with, including a reference with no variable behind it,
 // re-renders the step with `error.sso_unavailable`.
+// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+// re-resolve from `Origin`. If that release was revoked since the attempt
+// started, the response is `409` with `rel.revoked`.
 //
 // POST /flow/{id}/submit
 func (c *Client) SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error) {
@@ -15028,6 +15117,8 @@ func (c *Client) sendUpdateVariables(ctx context.Context, request UpdateVariable
 // - `recovery_code` method: { recovery_code: "…" }
 // On successful verification, the factor is written to the auth attempt.
 // The attempt moves to the next pending challenge or completes if all required factors are verified.
+// Reuses the deployment sealed when the attempt was created. If that release
+// was revoked since, the response is `409` with `rel.revoked`.
 //
 // POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 func (c *Client) VerifyChallengeProof(ctx context.Context, request *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error) {

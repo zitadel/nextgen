@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
@@ -98,6 +98,48 @@ async function renderDetail(project?: string) {
   return router;
 }
 
+/** Serves `sch_business` with the given properties and required keys. */
+function stubSchema(properties: Record<string, unknown>, required: string[] = ["email"]) {
+  server.use(
+    http.get(`${SCHEMAS_URL}/sch_business`, () =>
+      HttpResponse.json({
+        id: "sch_business",
+        schema: { title: "Business", required, properties },
+      }),
+    ),
+  );
+}
+
+/**
+ * One native `input` event on a date field, as a browser fires it per edit.
+ * jsdom has no date widget, so `validity.badInput` (the field shows a partial
+ * date its `value` cannot express) is stubbed.
+ */
+function inputDate(input: HTMLElement, value: string, badInput: boolean) {
+  Object.defineProperty(input, "validity", { configurable: true, value: { badInput } });
+  fireEvent.input(input, { target: { value } });
+}
+
+/**
+ * Waits until a save and the reload after it are done (the fields unlock), so
+ * no request is left in flight for MSW to report in a later test.
+ */
+async function waitForSaveToSettle(label: string) {
+  await waitFor(() => expect(screen.getByLabelText(label)).toBeEnabled());
+}
+
+/** Accepts every `PATCH /users/{id}` and records its body. */
+function capturePatches(): unknown[] {
+  const bodies: unknown[] = [];
+  server.use(
+    http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+      bodies.push(await request.json());
+      return HttpResponse.json({ id: USER_ID });
+    }),
+  );
+  return bodies;
+}
+
 describe("user detail", () => {
   it("builds the profile from the user's own schema", async () => {
     stub();
@@ -110,14 +152,98 @@ describe("user detail", () => {
     expect(screen.getByLabelText("Email")).toHaveValue("maya@acme.com");
   });
 
-  it("says on hover and focus that the card's title is the user's schema", async () => {
+  it("links the user's schema revision to its schema page", async () => {
     stub();
     await renderDetail();
 
-    const title = await screen.findByRole("heading", { name: "Business" });
-    const trigger = title.closest<HTMLElement>("[data-slot=tooltip-trigger]");
-    act(() => trigger?.focus());
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("User schema");
+    const panel = within(await screen.findByRole("tabpanel"));
+    const link = await panel.findByRole("link", { name: "Business sch_business" });
+    // The `_authed` layout retains the selected project across navigation.
+    expect(link).toHaveAttribute("href", scopedPath("/schemas/sch_business"));
+  });
+
+  it("shows a URI schema id verbatim and links to it encoded", async () => {
+    // The seeded default schema's id is its `$id` URL, not an `sch_*` id.
+    const uri = "https://server.test/schemas/user.json";
+    stub({
+      user: {
+        id: USER_ID,
+        schema: uri,
+        identifier: "maya@acme.com",
+        identifier_property: "email",
+        attributes: { email: "maya@acme.com" },
+      },
+    });
+    server.use(
+      http.get(`${SCHEMAS_URL}/:schemaId`, () =>
+        HttpResponse.json({ id: uri, schema: { ...BUSINESS, title: "Default" } }),
+      ),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    const link = await panel.findByRole("link", { name: `Default ${uri}` });
+    expect(link).toHaveAttribute("href", scopedPath(`/schemas/${encodeURIComponent(uri)}`));
+  });
+
+  it("names an untitled schema by its id in the revision link", async () => {
+    stub();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({ id: "sch_business", schema: { ...BUSINESS, title: undefined } }),
+      ),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    expect(await panel.findByRole("link", { name: "sch_business sch_business" })).toBeVisible();
+  });
+
+  it("renders no revision link when the schema cannot be read", async () => {
+    stub();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () => new HttpResponse(null, { status: 403 })),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    expect(await panel.findByText(/This user’s schema could not be read/)).toBeInTheDocument();
+    expect(panel.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("says a readable schema has no attributes to show, rather than that it failed", async () => {
+    stub();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({ id: "sch_business", schema: { title: "Business", properties: {} } }),
+      ),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    expect(
+      await panel.findByText("This schema defines no attributes that can be shown."),
+    ).toBeInTheDocument();
+    expect(panel.queryByText(/could not be read/)).not.toBeInTheDocument();
+  });
+
+  it("does not rank the revision as latest or outdated", async () => {
+    // A user's revision is shown as a fact; no marker says how it compares.
+    stub();
+    await renderDetail();
+    const panel = await screen.findByRole("tabpanel");
+    await within(panel).findByRole("link", { name: "Business sch_business" });
+
+    expect(panel).not.toHaveTextContent(/latest|outdated/i);
+  });
+
+  it("titles the profile card as the user's schema", async () => {
+    // The design names the card "User schema"; the schema's own name is the
+    // revision link beside it. The detail header owns the `h1`.
+    stub();
+    await renderDetail();
+
+    expect(await screen.findByRole("heading", { level: 2, name: "User schema" })).toBeVisible();
   });
 
   it("reads the user's schema in the selected project", async () => {
@@ -177,16 +303,62 @@ describe("user detail", () => {
     );
     await renderDetail();
 
-    // An integer property edits through a number input.
-    expect(await screen.findByLabelText("Headcount")).toHaveValue(42);
-    // `step="any"`: a fraction must not fail the input's own validation.
-    expect(screen.getByLabelText("Headcount")).toHaveAttribute("step", "any");
-    // `false` is a value, not an absence — it must not render as empty. No text
-    // control writes a boolean, so it stays read-only.
-    expect(screen.getByLabelText("Verified")).toHaveValue("false");
-    expect(screen.getByLabelText("Verified")).toHaveAttribute("readonly");
-    // A union is no different: a text input would write `"true"`.
+    // An integer property edits as text, which `attributeValue` parses.
+    expect(await screen.findByLabelText("Headcount")).toHaveValue("42");
+    // `false` is a value, not an absence: a switch shows it as off, and editable.
+    const verified = screen.getByRole("switch", { name: "Verified" });
+    expect(verified).not.toBeChecked();
+    expect(verified).toBeEnabled();
+    // A union stays read-only text: a text input would write `"true"`.
     expect(screen.getByLabelText("Active")).toHaveAttribute("readonly");
+  });
+
+  it("sends a changed number typed as its schema declares", async () => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", headcount: 42 } },
+    });
+    stubSchema({ email: { type: "string" }, headcount: { type: "integer", title: "Headcount" } });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const headcount = await screen.findByLabelText("Headcount");
+    await userEvent.clear(headcount);
+    await userEvent.type(headcount, "43");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { headcount: 43 } }]));
+  });
+
+  it.each([
+    ["hex, which `Number` would read as 16", "0x10"],
+    ["a whole number past 2^53, which `Number` would round", "9007199254740993"],
+    ["a number that does not parse, rather than deleting it", "4e"],
+  ])("sends %s as typed", async (_, typed) => {
+    // The server's message then says what is wrong with it.
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", headcount: 42 } },
+    });
+    stubSchema({ email: { type: "string" }, headcount: { type: "integer", title: "Headcount" } });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const headcount = await screen.findByLabelText("Headcount");
+    await userEvent.clear(headcount);
+    await userEvent.type(headcount, typed);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { headcount: typed } }]));
+  });
+
+  it("marks optional attributes beside their label, as the add-user sheet does", async () => {
+    stub();
+    await renderDetail();
+    await screen.findByLabelText("Company name");
+
+    // `companyName` is optional, `email` required and unmarked.
+    const markers = screen.getAllByText("Optional");
+    expect(markers).toHaveLength(1);
+    expect(markers[0]?.parentElement).toHaveTextContent("Company name");
   });
 
   it("saves only the changed attributes, and keeps Save disabled until one changes", async () => {
@@ -235,6 +407,213 @@ describe("user detail", () => {
     await userEvent.clear(screen.getByLabelText("Company name"));
     await userEvent.click(save);
     await waitFor(() => expect(bodies).toEqual([{ attributes: { companyName: null } }]));
+  });
+
+  it("keeps a date out of the patch while its input reports it unreadable", async () => {
+    // A partly cleared date input reports `""` with `validity.badInput`, while
+    // the screen still shows part of the date. Read as emptied, saving any
+    // change would delete the stored date.
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", companyName: "Acme", founded: "2020-01-02" },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      companyName: { type: "string", title: "Company name" },
+      founded: { type: "string", format: "date", title: "Founded" },
+    });
+    await renderDetail();
+
+    const founded = await screen.findByLabelText("Founded");
+    const save = screen.getByRole("button", { name: "Save" });
+    inputDate(founded, "", true);
+    await userEvent.type(screen.getByLabelText("Company name"), " Inc");
+    expect(save).toBeDisabled();
+    expect(founded).toHaveAttribute("aria-invalid", "true");
+
+    // Readable again: the other change can be saved.
+    inputDate(founded, "2020-01-02", false);
+    expect(save).toBeEnabled();
+  });
+
+  it("deletes a date cleared in steps, though its value stayed empty", async () => {
+    // Clearing the rest of a partly cleared date fires `input` with the same
+    // `""`, so React reports no change; the date must still read as emptied.
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", founded: "2020-01-02" },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      founded: { type: "string", format: "date", title: "Founded" },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const founded = await screen.findByLabelText("Founded");
+    inputDate(founded, "", true);
+    inputDate(founded, "", false);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { founded: null } }]));
+  });
+
+  it("says a required field is required once it is emptied", async () => {
+    stub();
+    await renderDetail();
+
+    const email = await screen.findByLabelText("Email");
+    // Nothing is marked before an edit.
+    expect(screen.queryByText("This field is required.")).not.toBeInTheDocument();
+    expect(email).not.toHaveAttribute("aria-invalid");
+
+    await userEvent.clear(email);
+    expect(screen.getByText("This field is required.")).toBeInTheDocument();
+    expect(email).toHaveAttribute("aria-invalid", "true");
+    expect(email).toHaveAccessibleDescription("This field is required.");
+
+    await userEvent.type(email, "m@a.co");
+    expect(screen.queryByText("This field is required.")).not.toBeInTheDocument();
+    expect(email).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("renders a boolean attribute as a switch named by its label", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", verified: true },
+      },
+    });
+    stubSchema(
+      {
+        email: { type: "string" },
+        verified: { type: "boolean", title: "Verified" },
+        vip: { type: "boolean", title: "VIP" },
+      },
+      ["email", "verified"],
+    );
+    await renderDetail();
+
+    // The Yes/No text is hidden from screen readers, because the switch
+    // reports its own state; so it is checked beside each switch.
+    const verified = await screen.findByRole("switch", { name: "Verified" });
+    expect(verified).toBeChecked();
+    expect(verified).toHaveAttribute("aria-required", "true");
+    expect(within(verified.parentElement as HTMLElement).getByText("Yes")).toBeInTheDocument();
+    // An absent value shows as off.
+    const vip = screen.getByRole("switch", { name: "VIP" });
+    expect(vip).not.toBeChecked();
+    expect(vip).toHaveAttribute("aria-required", "false");
+    expect(within(vip.parentElement as HTMLElement).getByText("No")).toBeInTheDocument();
+  });
+
+  it("locks a boolean whose stored value is not a boolean, and shows it as stored", async () => {
+    // Shown as off, a stored "yes" would read as No and be overwritten by a
+    // toggle the user meant as a correction.
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", verified: "yes" },
+      },
+    });
+    stubSchema({ email: { type: "string" }, verified: { type: "boolean", title: "Verified" } });
+    await renderDetail();
+
+    const verified = await screen.findByRole("switch", { name: "Verified" });
+    expect(verified).toBeDisabled();
+    const text = within(verified.parentElement as HTMLElement);
+    expect(text.getByText("yes")).toBeInTheDocument();
+    expect(text.queryByText("No")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["a stored true", { verified: true }, false],
+    ["an absent value", {}, true],
+  ])("sends %s toggled as a JSON boolean, and only that key", async (_, stored, sent) => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", ...stored } },
+    });
+    stubSchema({ email: { type: "string" }, verified: { type: "boolean", title: "Verified" } });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("switch", { name: "Verified" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { verified: sent } }]));
+  });
+
+  it("counts a switch toggled back to what it showed as no change", async () => {
+    // Absent shows as off, so off again is not a change to `false`.
+    stub({ user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co" } } });
+    stubSchema({ email: { type: "string" }, verified: { type: "boolean", title: "Verified" } });
+    await renderDetail();
+
+    const verified = await screen.findByRole("switch", { name: "Verified" });
+    await userEvent.click(verified);
+    await userEvent.click(verified);
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  it("keeps the draft while another tab is open", async () => {
+    stub();
+    await renderDetail();
+
+    await userEvent.type(await screen.findByLabelText("Company name"), " Inc");
+    await userEvent.click(screen.getByRole("tab", { name: "Authentication" }));
+    // Hidden, not unmounted, and out of the accessibility tree.
+    expect(screen.getByLabelText("Company name")).not.toBeVisible();
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    await userEvent.click(screen.getByRole("tab", { name: "Overview" }));
+
+    expect(screen.getByLabelText("Company name")).toHaveValue("Acme Inc");
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
+  it("locks the fields while a save is in flight", async () => {
+    // A reload follows the save and resets the draft, so typing meanwhile
+    // would be lost.
+    stub();
+    stubSchema({
+      ...BUSINESS.properties,
+      verified: { type: "boolean", title: "Verified" },
+    });
+    let release: () => void = () => undefined;
+    let reached: () => void = () => undefined;
+    const handled = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    server.use(
+      http.patch(`${USERS_URL}/${USER_ID}`, async () => {
+        const held = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        reached();
+        await held;
+        return HttpResponse.json({ id: USER_ID });
+      }),
+    );
+    await renderDetail();
+
+    const company = await screen.findByLabelText("Company name");
+    await userEvent.type(company, " Inc");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(company).toBeDisabled());
+    expect(screen.getByRole("switch", { name: "Verified" })).toBeDisabled();
+    // The handler holds `release` only once the request reaches it.
+    await handled;
+    release();
+    await waitForSaveToSettle("Company name");
+    expect(screen.getByRole("switch", { name: "Verified" })).toBeEnabled();
   });
 
   it("shows the status and created date the server stamped", async () => {

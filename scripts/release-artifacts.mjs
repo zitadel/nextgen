@@ -216,19 +216,17 @@ export async function createArchives(options = {}) {
 
 export async function packPublicPackages(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
-  const version = options.version ?? (await readServerRelease(repoRoot)).version;
-  const outDir = options.outDir ?? releaseDir(repoRoot, version);
   // The packs run side by side, so none may write to this process's stdout
   // (see runReplayed); each pack's output arrives in one piece once it is done.
   const runFn = options.run ?? runReplayed;
-  const tarballsDir = join(outDir, "npm");
+  const tarballsDir = options.tarballsDir ?? (await defaultTarballsDir(repoRoot, options));
   await rm(tarballsDir, { recursive: true, force: true });
   await mkdir(tarballsDir, { recursive: true });
 
   // Packs are independent (distinct package dirs, distinct tarball names in a
   // shared destination); cap concurrency so the cli prepack rebuild and the
   // larger packages do not stampede the runner.
-  await mapWithConcurrency(PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
+  await mapWithConcurrency(options.dirs ?? PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
     const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
     await assertPublishDirectoryReady({ repoRoot, dir, manifest });
     await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
@@ -238,6 +236,11 @@ export async function packPublicPackages(options = {}) {
   });
 
   return tarballsDir;
+}
+
+async function defaultTarballsDir(repoRoot, options) {
+  const version = options.version ?? (await readServerRelease(repoRoot)).version;
+  return join(options.outDir ?? releaseDir(repoRoot, version), "npm");
 }
 
 async function assertPublishDirectoryReady({ repoRoot, dir, manifest }) {
@@ -312,21 +315,11 @@ export async function buildContainerImage(options = {}) {
   return { args, contextDir, tags };
 }
 
-// Temporary: while the repo is pre-GA every release is a prerelease, so the
-// rule below ("only stable moves `:latest`") leaves `:latest` pinned to a build
-// that predates the alpha train. Anyone following the documented Docker quick
-// start — `docs/operations/env.example` defaults `NEXTGEN_IMAGE` to `:latest` —
-// gets that stale image rather than the alpha they expect.
-//
-// Until the first stable release, point `:latest` at the alpha train too. Flip
-// this back to `false` when leaving prerelease mode (`changeset pre exit`, see
-// `.changeset/README.md`), so a later alpha can never overwrite a stable
-// `:latest`.
-export const TAG_PRERELEASE_AS_LATEST = true;
-
+// Only a release moves `:latest`, so a prerelease never replaces the image the
+// Docker quick start runs (`docs/operations/env.example`).
 export function containerTags({ image = SERVER_IMAGE, version, prerelease }) {
   const tags = [`${image}:${version}`];
-  if (!prerelease || TAG_PRERELEASE_AS_LATEST) {
+  if (!prerelease) {
     tags.push(`${image}:latest`);
   }
   return tags;

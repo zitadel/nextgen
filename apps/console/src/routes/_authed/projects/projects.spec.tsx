@@ -84,7 +84,7 @@ describe("projects screen", () => {
     // The specs' API base is http://localhost/api, so that is the server the
     // command names, not the CLI's hosted default.
     expect(
-      await screen.findByText("npx @zitadel/cli@alpha setup --server http://localhost"),
+      await screen.findByText("npx @zitadel/cli@latest setup --server http://localhost"),
     ).toBeInTheDocument();
   });
 

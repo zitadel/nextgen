@@ -123,14 +123,19 @@ properties:
         credential-shaped control, and a hidden-typed input is easy to
         skip.
 
-      It is not display text: do not render it as a greeting or a label.
-      `texts.description_key` is the place for that.
+      The client may also show it as the account being signed in to, next
+      to a way to change it (the step's `back` action, which returns to
+      the step that collects the identifier). Do not build other text from
+      it; `texts.description_key` is the place for that.
     properties:
       value:
         type: string
         description: |
           The identifier the user supplied. Use it as the input's
-          `value`, verbatim.
+          `value`, verbatim. After an identity provider's sign-in
+          collided with an existing account, it is the address that
+          provider verified; an address the provider did not verify is
+          not sent unless the user typed it.
         example: alice@acme.com
       autocomplete:
         type: string

@@ -336,6 +336,12 @@ export class ZitadelLogin extends ZitadelSurface {
 
   @state() private accessor startupError: string | null = null;
 
+  /**
+   * The action of the submit in flight, so only the control that started it
+   * shows progress. Set and cleared with `loading`, which is what re-renders.
+   */
+  private pendingAction: string | null = null;
+
   @state() private accessor formValues: Record<string, string> = {};
 
   /**
@@ -1125,11 +1131,13 @@ export class ZitadelLogin extends ZitadelSurface {
       // reconnect `<zl-passkey>` and start a second WebAuthn ceremony. A
       // preview renders none at all: the atom starts its ceremony on connect.
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
+      identifier: step.identifier ?? null,
       messages: [],
       identity: this.deriveIdentity(),
       errors,
       branding: this.brandingForTemplate(),
       loading: this.loading,
+      pending_action: this.pendingAction,
     };
 
     let raw: string;
@@ -1530,6 +1538,7 @@ export class ZitadelLogin extends ZitadelSurface {
     // this one check keeps a preview from ever writing to the flow.
     if (!this.response || this.loading || this.preview) return;
     const { id, session_token } = this.response;
+    this.pendingAction = action ?? "submit";
     this.loading = true;
     try {
       // Only send field values the current step defines. `formValues` carries
@@ -1556,6 +1565,7 @@ export class ZitadelLogin extends ZitadelSurface {
       if (await this.restartIfRequired(error)) return;
       this.handleTransportError(error);
     } finally {
+      this.pendingAction = null;
       this.loading = false;
     }
     // Preview switched on while this submit was in flight: show the step it
