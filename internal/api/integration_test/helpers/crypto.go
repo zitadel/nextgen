@@ -50,20 +50,37 @@ func (h *Harness) EnsureProjectHashers(t testing.TB) service.ProjectHasherResolv
 	return service.NewProjectHasherResolver(h.EnsureServiceDB(t), h.EnsureHasherFactory(t))
 }
 
+// EnsurePolicyService is the operation policy service the server wires: the
+// embedded policy catalog over the harness database.
+func (h *Harness) EnsurePolicyService(t testing.TB) *service.PolicyService {
+	t.Helper()
+	db := h.EnsureServiceDB(t)
+	h.policyService.mutex.Lock()
+	defer h.policyService.mutex.Unlock()
+
+	if h.policyService.value == nil {
+		engine, err := policy.New()
+		require.NoError(t, err)
+		h.policyService.value = service.NewPolicyService(db, engine)
+	}
+	return h.policyService.value
+}
+
 // EnsurePasswordPolicy is the password gate the server wires: the embedded
-// policy catalog, no project instance yet (NoPolicyResolver), and the
-// deployment's default verifier for history checks.
+// policy catalog, the project's published instance resolved through the
+// policy service, and the deployment's default verifier for history checks.
 func (h *Harness) EnsurePasswordPolicy(t testing.TB) *service.PasswordPolicy {
 	t.Helper()
 	hasherFactory := h.EnsureHasherFactory(t)
 	db := h.EnsureServiceDB(t)
+	policies := h.EnsurePolicyService(t)
 	h.passwordPolicy.mutex.Lock()
 	defer h.passwordPolicy.mutex.Unlock()
 
 	if h.passwordPolicy.value == nil {
 		engine, err := policy.New()
 		require.NoError(t, err)
-		h.passwordPolicy.value, err = service.NewPasswordPolicy(engine, service.NoPolicyResolver{}, hasherFactory.Default(), db)
+		h.passwordPolicy.value, err = service.NewPasswordPolicy(engine, policies, hasherFactory.Default(), db)
 		require.NoError(t, err)
 	}
 	return h.passwordPolicy.value

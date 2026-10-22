@@ -206,6 +206,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetIdpRevisionByIdOperation: []string{
 		"idp.read",
 	},
+	GetPolicyRevisionOperation: []string{
+		"policy.read",
+	},
 	GetProjectOperation: []string{
 		"project.write",
 	},
@@ -278,6 +281,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	PatchUserByIDOperation: []string{
 		"user.write",
+	},
+	PublishPolicyOperation: []string{
+		"policy.write",
 	},
 	QueryGrantsOperation: []string{
 		"project.read",

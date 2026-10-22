@@ -23,6 +23,7 @@ type Handler struct {
 	flowDefinitionService service.FlowDefinitionService
 	teamService           *service.TeamService
 	brandingService       *service.BrandingService
+	policyService         *service.PolicyService
 	releaseService        service.ReleaseService
 	deploymentService     *service.DeploymentService
 	idpConnectionService  service.IDPConnectionService
@@ -32,6 +33,7 @@ type Handler struct {
 	claimService          service.ClaimService
 	grantService          *service.GrantService
 	variableService       service.VariableService
+	runtime               *service.RuntimeResolver
 	pool                  *service.DB
 
 	// platformProjectID is the configured platform.project_id pin (ADR 046 §2).
@@ -91,6 +93,14 @@ func NewHandler(
 		pool:                  pool,
 		platformProjectID:     platformProjectID,
 	}
+}
+
+// WithRuntimeResolver wires origin-based release resolution for public
+// runtime operations. Optional so existing tests that do not exercise
+// deployments keep compiling without a resolver.
+func (h *Handler) WithRuntimeResolver(runtime *service.RuntimeResolver) *Handler {
+	h.runtime = runtime
+	return h
 }
 
 // WithPersonalTeamEnsurer wires the session-exchange self-heal for platform

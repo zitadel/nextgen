@@ -5,7 +5,7 @@ SvelteKit handle hook and helpers for Zitadel.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-sveltekit@alpha
+pnpm add @zitadel/sdk-sveltekit@latest
 ```
 
 ## Requirements
@@ -118,7 +118,7 @@ Install the Svelte component library and render its `ZitadelLogin` component.
 `@zitadel/sdk-sveltekit` is server-only; the widget comes from `@zitadel/sdk-svelte`:
 
 ```bash
-pnpm add @zitadel/sdk-svelte@alpha
+pnpm add @zitadel/sdk-svelte@latest
 ```
 
 ```svelte

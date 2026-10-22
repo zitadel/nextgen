@@ -21,6 +21,15 @@ deprecated), and a test keeps the generator's statuses in step with them.
 **Naming:** dot-separated segments (`auth.factor.password.set`). Per-resource
 types — no generic admin.config.pushed bucket.
 
+**`user.*` versus `auth.*`:** `user.*` is the user as a record (created,
+updated, deleted). A user's credentials and sign-ins are not: they live under
+`auth.*` and `session.*`. Setting a password is `auth.factor.password.set`,
+not a `user.*` event, and enrolling a passkey is
+`auth.factor.passkey.enrolled`. A consumer syncing user records filters on
+`user.*` without receiving sign-in or credential traffic; a security consumer
+gets every credential change from `auth.factor.*`. A credential event names
+its user in the payload's `user_id`.
+
 **Compound transactions:** emit one Path B event per semantic mutation in the
 same TX (shared `request_id`).
 
@@ -59,6 +68,7 @@ same TX (shared `request_id`).
 | **Team** | `name` | — |
 | **Flow definition** | `name`, `status`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
 | **Branding** | `layout`, `logo_url`, `font_url`, `hero_url` | `liquid_template` |
+| **Policy** | `operation`, `revision_id`, `config` (the instance's settings) | — |
 | **Schema** | `kind`, `object_type` | Schema document body |
 | **IdP connection** | `slug`, `protocol`, `template`, `display_name`, `revision_id` | Connection document body, `client_secret` |
 | **IdP identity link** | `connection_id`, `user_id` | Provider subject, claims, tokens |
@@ -142,6 +152,8 @@ tracked below.
 | Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `status`, `user_schema`, `purposes`, `audience` |
 | JSON schema create | `schema.created` | `admin` | `json_schema` | `kind`, `object_type` |
 | Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |
+| PolicyService publish (first revision of an operation's policy) | `policy.created` | `admin` | `policy` | `operation`, `revision_id`, `config` |
+| PolicyService publish (later revision) | `policy.updated` | `admin` | `policy` | `operation`, `revision_id`, `config` |
 | ReleaseService create | `release.created` | `admin` | `release` | `content_hash`, `message`, `git_sha`, `git_dirty`, `pointers` |
 | IDPConnectionService create (new slug) | `idp.created` | `admin` | `idp_connection` | `slug`, `protocol`, `template`, `display_name`, `revision_id` |
 | IDPConnectionService revise (existing slug) | `idp.updated` | `admin` | `idp_connection` | `revision_id`; delta: `display_name`, `template` (when changed) |

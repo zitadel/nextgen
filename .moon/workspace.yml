@@ -12,7 +12,6 @@ projects:
     demo-next: "apps/demo-next"
     demo-nuxt: "apps/demo-nuxt"
     login-ui: "apps/login-ui"
-    mock-zitadel: "apps/mock-zitadel"
     api: "packages/api"
     api-mock: "packages/api-mock"
     config: "packages/config"

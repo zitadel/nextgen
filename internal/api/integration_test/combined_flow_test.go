@@ -43,7 +43,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
@@ -219,7 +219,7 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	regResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	regHeaders := regResp.(*api.FlowResponseHeaders)
 	regID := regHeaders.Response.ID
@@ -240,7 +240,7 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	loginResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	loginHeaders := loginResp.(*api.FlowResponseHeaders)
 	flowID := loginHeaders.Response.ID
@@ -342,7 +342,7 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	regResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	regHeaders := regResp.(*api.FlowResponseHeaders)
 	regID := regHeaders.Response.ID
@@ -363,7 +363,7 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	loginResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	loginHeaders := loginResp.(*api.FlowResponseHeaders)
 	flowID := loginHeaders.Response.ID

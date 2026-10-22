@@ -1,6 +1,9 @@
 package domain
 
-import "cmp"
+import (
+	"cmp"
+	"encoding/json"
+)
 
 // Typed event payloads (deny-by-default allowlists). Keep in sync with
 // docs/design/api/events-catalog.md and OpenAPI Event discriminator schemas.
@@ -196,6 +199,16 @@ type BrandingPayload struct {
 
 // BrandingCreatedPayload is an alias for branding.created.
 type BrandingCreatedPayload = BrandingPayload
+
+// PolicyPayload records a published policy revision for policy.created (the
+// first publish of an operation) and policy.updated (every later one). The
+// policy id is the event's entity_id. Config holds the instance's settings,
+// which are configuration values, never user data.
+type PolicyPayload struct {
+	Operation  string          `json:"operation"`
+	RevisionID string          `json:"revision_id"`
+	Config     json.RawMessage `json:"config"`
+}
 
 // ReleasePayload records what a release pinned, so the audit stream answers
 // "what changed" without a join back to the releases table. ContentHash

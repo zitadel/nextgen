@@ -118,6 +118,18 @@ var brandingAccess = resourceAccess{
 	denied:    domain.ErrBrandingPermissionDenied,
 }
 
+// policyAccess gates operation policies (ADR 066). Publish and the revision
+// read are project-scoped like releases: both carry a project_id and filter by
+// it, so no route resolves a path id through RSI.
+var policyAccess = resourceAccess{
+	kind:     domain.ResourceKindPolicy,
+	readMiss: domain.ErrPolicyNotFound,
+	writeMiss: func() domain.Error {
+		return domain.ErrPolicyInvalid(nil, nil).WithMessage("policy: invalid: project does not exist")
+	},
+	denied: domain.ErrPolicyPermissionDenied,
+}
+
 // variableAccess gates the project's variables and secrets (ADR 062). Like
 // grants and events, a variable has no minted id and no resource_scope_index
 // row — it is addressed by name under the project_id the request carries — so

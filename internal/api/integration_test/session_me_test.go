@@ -71,12 +71,14 @@ func TestGetMySession_Identity(t *testing.T) {
 		Attributes: attrs,
 	}))
 
-	// A completed attempt with a verified user factor, handed off — the state
-	// the flow engine leaves behind when a login flow reaches its terminal step.
+	// A completed attempt with verified user + password factors, handed off —
+	// the state the flow engine leaves behind when a login flow reaches its
+	// terminal step. A credential-class factor is required: the bare user
+	// factor never completes an attempt (see domain.AuthAttempt.IsCompleted).
 	attempt := &domain.AuthAttempt{
 		ProjectID:      project.ID,
-		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
-		Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
+		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser, domain.AuthCheckTypePassword},
+		Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}, &domain.AuthFactorPassword{}},
 	}
 	stmts := harness.EnsureServiceDB(t)
 	require.NoError(t, stmts.Statements().CreateAuthAttempt(t.Context(), attempt))
@@ -153,7 +155,8 @@ func TestGetMySession_ExpiredSessionIsSignedOut(t *testing.T) {
 	projectSecret, err := harness.EnsureTokenService(t).GenerateJWE(t.Context(), project.Token())
 	require.NoError(t, err)
 
-	attempt := &domain.AuthAttempt{ProjectID: project.ID}
+	// Completed by a verified password; no user, so the session has none.
+	attempt := &domain.AuthAttempt{ProjectID: project.ID, Checks: []domain.AuthCheck{&domain.AuthFactorPassword{}}}
 	stmts := harness.EnsureServiceDB(t)
 	require.NoError(t, stmts.Statements().CreateAuthAttempt(t.Context(), attempt))
 	const plainToken = "handoff_expired_session_me_test"
@@ -231,7 +234,8 @@ func TestMySession_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	projectSecret, err := harness.EnsureTokenService(t).GenerateJWE(t.Context(), project.Token())
 	require.NoError(t, err)
 
-	attempt := &domain.AuthAttempt{ProjectID: project.ID}
+	// Completed by a verified password; no user, so the session has none.
+	attempt := &domain.AuthAttempt{ProjectID: project.ID, Checks: []domain.AuthCheck{&domain.AuthFactorPassword{}}}
 	stmts := harness.EnsureServiceDB(t)
 	require.NoError(t, stmts.Statements().CreateAuthAttempt(t.Context(), attempt))
 	const plainToken = "handoff_session_me_project_test"

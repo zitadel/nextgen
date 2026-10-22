@@ -1,15 +1,26 @@
-import { BUMPS, type Bump, type Change, type Release } from "./releases";
+import type { Change, Release } from "./releases";
 
 // What the changelog filters by: the components a change touches, read from
-// its packages, and its bump, the release notes' Major / Minor / Patch
-// Changes. A bump is no type (features ship as patches, fixes as minors), so
-// the filter names bumps as the release notes do.
+// its packages, and its kind. A breaking change is a major, or a change with a
+// paragraph that starts with **Breaking:**, the way one ships as a minor before
+// 1.0.0 (docs/adrs/074-preview-releases-on-0x.md). Any other change goes by its
+// bump, the release notes' Minor / Patch Changes. A bump is no type (features
+// ship as patches, fixes as minors), so the filter names bumps as the release
+// notes do.
 
-export const BUMP_LABELS: Record<Bump, string> = {
-  major: "Major",
+/** The kinds of change, in the order the page lists them. */
+export const KINDS = ["breaking", "minor", "patch"] as const;
+export type Kind = (typeof KINDS)[number];
+
+export const KIND_LABELS: Record<Kind, string> = {
+  breaking: "Breaking",
   minor: "Minor",
   patch: "Patch",
 };
+
+export function kindOf(change: Pick<Change, "bump" | "markedBreaking">): Kind {
+  return change.bump === "major" || change.markedBreaking ? "breaking" : change.bump;
+}
 
 /** A package, or the SDKs, one package each. */
 export type Component = { id: string; label: string };
@@ -49,32 +60,32 @@ export function componentsIn(releases: Release[]): Component[] {
   return [...found.values()].sort((a, b) => rank(a.id) - rank(b.id) || a.id.localeCompare(b.id));
 }
 
-/** The bumps the releases' changes have, the highest first. */
-export function bumpsIn(releases: Release[]): Bump[] {
-  return BUMPS.filter((bump) =>
-    releases.some((release) => release.changes.some((change) => change.bump === bump)),
+/** The kinds the releases' changes have, in the page's order. */
+export function kindsIn(releases: Release[]): Kind[] {
+  return KINDS.filter((kind) =>
+    releases.some((release) => release.changes.some((change) => kindOf(change) === kind)),
   );
 }
 
 /**
  * What the filter reads of an entry: the components it touches and, for a
- * change, its bump. A pointer to a package's left-out changes has no bump.
+ * change, its kind. A pointer to a package's left-out changes has no kind.
  */
-export type Facet = { components: string[]; bump?: Bump };
+export type Facet = { components: string[]; kind?: Kind };
 
-export function facetOf(change: Pick<Change, "packages" | "bump">): Facet {
+export function facetOf(change: Pick<Change, "packages" | "bump" | "markedBreaking">): Facet {
   return {
     components: [...new Set(change.packages.map((pkg) => componentOf(pkg).id))],
-    bump: change.bump,
+    kind: kindOf(change),
   };
 }
 
-/** The filter's choice: a component, a bump, both or neither. */
-export type Choice = { component?: string; bump?: Bump };
+/** The filter's choice: a component, a kind, both or neither. */
+export type Choice = { component?: string; kind?: Kind };
 
 export function matches(facet: Facet, choice: Choice): boolean {
   return (
     (!choice.component || facet.components.includes(choice.component)) &&
-    (!choice.bump || !facet.bump || facet.bump === choice.bump)
+    (!choice.kind || !facet.kind || facet.kind === choice.kind)
   );
 }

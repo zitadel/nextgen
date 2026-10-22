@@ -56,7 +56,7 @@ const CALL_TIMEOUT_MS = Number(process.env.CALL_TIMEOUT_MS || 7 * 60 * 1000);
 const cfg = JSON.parse(readFileSync("/harness/journey.config.json", "utf8"));
 // The CLI used for outcome assertions — the same package/tag the agent drives,
 // pointed at the live instance in /work (it reads the server + creds from there).
-const CLI_SPEC = process.env.CLI_SPEC || cfg.cliSpec || "@zitadel/cli@alpha";
+const CLI_SPEC = process.env.CLI_SPEC || cfg.cliSpec || "@zitadel/cli@latest";
 
 const DONE = "DONE";
 

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 /**
- * Unfolds the release a link points at (`/changelog#v1.0.0-alpha.25`): the
+ * Unfolds the release a link points at (`/changelog#v0.1.0`): the
  * page folds every release but the newest (page.tsx).
  */
 export function OpenLinkedRelease() {
