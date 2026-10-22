@@ -276,7 +276,9 @@ scoped SQL query against data we already own.
    explanation fields.
 5. Staff/support access, cross-project human identity, and the break-glass
    escape hatch are tracked by [issue #333](https://github.com/zitadel/nextgen/issues/333)
-   and intentionally out of scope here.
+   and intentionally out of scope here. Cross-project principals are
+   [ADR 053](053-cross-project-principals.md); deployment-wide operators are
+   [ADR 075](075-platform-operators.md).
 6. Define how system-catalog schema customization (beyond the shipped
    default) would work — using the primitives and pipeline from
    [ADR 032 §2](032-permission-catalogs.md#2-openfga-parser-and-profile-compiler) —
