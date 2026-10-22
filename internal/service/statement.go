@@ -198,12 +198,22 @@ type PolicyStatements interface {
 	// called inside a transaction. An unknown id returns
 	// *database.NoRowFoundError.
 	LockPolicy(ctx context.Context, projectID, id string) error
-	// GetPolicy returns the policy of operation in the project at its newest
-	// revision, or *database.NoRowFoundError when the project has none.
-	GetPolicy(ctx context.Context, projectID, operation string) (*domain.Policy, error)
+	// GetPolicy returns the one policy filter selects at its newest revision
+	// (policystore.ByOperation, policystore.ByID), or
+	// *database.NoRowFoundError.
+	GetPolicy(ctx context.Context, filter database.Filter[domain.PolicyField]) (*domain.Policy, error)
 	// GetPolicyRevision returns the policy at the given revision, newest or
-	// not, or *database.NoRowFoundError.
+	// not, or *database.NoRowFoundError. It stays apart from GetPolicy, which
+	// only ever reads newest revisions: a pinned revision must reach a
+	// superseded one.
 	GetPolicyRevision(ctx context.Context, projectID, revisionID string) (*domain.Policy, error)
+	// ListPolicies returns each policy the options select at its newest
+	// revision, first published first unless the options order otherwise.
+	ListPolicies(ctx context.Context, opts *database.ListOptions[domain.PolicyField]) (*database.ListResult[*domain.Policy], error)
+	// ListPolicyRevisions pages one policy's revisions, superseded ones
+	// included, newest first unless the page orders otherwise. An unknown
+	// policy lists nothing.
+	ListPolicyRevisions(ctx context.Context, projectID, policyID string, page database.Page[domain.PolicyField]) (*database.ListResult[*domain.Policy], error)
 }
 
 // IDPConnectionStatements persists identity provider connections and their

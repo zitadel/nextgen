@@ -19,6 +19,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/idpconnection"
+	"github.com/zitadel/nextgen/internal/storage/policystore"
 	"github.com/zitadel/nextgen/internal/storage/release"
 )
 
@@ -92,6 +93,8 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("user_passkeys", func(t *testing.T) { battleUserPasskeys(t, d) })
 		t.Run("user_recovery_codes", func(t *testing.T) { battleUserRecoveryCodes(t, d) })
 		t.Run("origins", func(t *testing.T) { battleOrigins(t, d) })
+		t.Run("policies", func(t *testing.T) { battlePolicies(t, d) })
+		t.Run("policy_revisions", func(t *testing.T) { battlePolicyRevisions(t, d) })
 	})
 }
 
@@ -819,4 +822,54 @@ func battleIDPIdentityLinks(t *testing.T, d dialect) {
 			Filter: filter, Pagination: page,
 		})
 	}, func(link *domain.IDPIdentityLink) string { return link.ID }, 2)
+}
+
+// battlePolicies drains a project's policies in the service's order, first
+// publish then id; each one is revised once so the drain also pins that a
+// policy pages as one row.
+func battlePolicies(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	policies := make([]*domain.Policy, 0, 5)
+	for i := range 5 {
+		entity := createPolicy(t, d.stmts, projectID, "battle."+string(rune('a'+i)), `{}`)
+		revisePolicy(t, d, entity, `{"n":1}`)
+		policies = append(policies, entity)
+	}
+	slices.SortFunc(policies, func(a, b *domain.Policy) int {
+		if c := a.CreatedAt.Compare(b.CreatedAt); c != 0 {
+			return c
+		}
+		return strings.Compare(a.ID, b.ID)
+	})
+	want := make([]string, len(policies))
+	for i, p := range policies {
+		want[i] = p.ID
+	}
+
+	filter := database.Equal(database.Col(domain.PolicyFieldProjectID), projectID)
+	drainIncarnation(t, want, policystore.FirstPublishedFirst(), func(page database.Page[domain.PolicyField]) (*database.ListResult[*domain.Policy], error) {
+		return d.stmts.ListPolicies(unfilteredListCtx(t), &database.ListOptions[domain.PolicyField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(p *domain.Policy) string { return p.ID }, 2)
+}
+
+// battlePolicyRevisions drains one policy's revisions; the drain walks both
+// directions, so it reuses the newest-first key and only flips the direction.
+func battlePolicyRevisions(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	entity := createPolicy(t, d.stmts, projectID, testPolicyOperation, `{}`)
+	want := []string{entity.RevisionID}
+	for i := range 4 {
+		revisePolicy(t, d, entity, `{"n":`+string(rune('1'+i))+`}`)
+		want = append(want, entity.RevisionID)
+	}
+
+	orderAsc := policystore.NewestRevisionFirst()
+	orderAsc.Direction = database.OrderAsc
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.PolicyField]) (*database.ListResult[*domain.Policy], error) {
+		return d.stmts.ListPolicyRevisions(unfilteredListCtx(t), projectID, entity.ID, page)
+	}, func(p *domain.Policy) string { return p.RevisionID }, 2)
 }

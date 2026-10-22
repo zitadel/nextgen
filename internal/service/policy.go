@@ -11,6 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/policystore"
 )
 
 // PublishPolicyInput is one publish of a project's policy for an operation:
@@ -75,7 +76,7 @@ func (s *PolicyService) Publish(ctx context.Context, in PublishPolicyInput) (_ *
 		entity = &domain.Policy{ProjectID: in.ProjectID, Operation: in.Operation, Config: raw}
 		eventType := domain.EventTypePolicyCreated
 		stmts := tx.Statements()
-		current, err := stmts.GetPolicy(ctx, in.ProjectID, in.Operation)
+		current, err := stmts.GetPolicy(ctx, policystore.ByOperation(in.ProjectID, in.Operation))
 		switch {
 		case err == nil:
 			// The lock serializes publishes of one operation, so this
@@ -155,7 +156,7 @@ func (s *PolicyService) ResolvePolicy(ctx context.Context, projectID, operation 
 	ctx, end := startSpan(ctx, "PolicyService.ResolvePolicy")
 	defer end(&err)
 
-	entity, err := s.v2Pool.Statements().GetPolicy(ctx, projectID, operation)
+	entity, err := s.v2Pool.Statements().GetPolicy(ctx, policystore.ByOperation(projectID, operation))
 	if err != nil {
 		if isNoRowFound(err) {
 			return nil, nil
