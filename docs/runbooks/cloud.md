@@ -167,8 +167,10 @@ the user exists, so the password 1Password holds stays valid. Every preview
 database starts empty and imports the preview root admin on its first start:
 one login opens every preview.
 
-The launcher names the root admin the deployment's platform operator, who
-administers every project ([ADR 075](../adrs/075-platform-operators.md)).
+The launcher names the root admin (the document's `header.id`) the
+deployment's platform operator, who administers every project
+([ADR 075](../adrs/075-platform-operators.md)), and refuses to start with a
+document that names no user id.
 To name others, such as support staff, set `NEXTGEN_PLATFORM_OPERATORS` to
 their platform-project user ids, comma-separated and the root admin included;
 the server grants and revokes to match at its next start.

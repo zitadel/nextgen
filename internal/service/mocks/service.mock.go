@@ -15158,6 +15158,45 @@ func (c *MockProjectServiceListAuthorizedCall) DoAndReturn(f func(context.Contex
 	return c
 }
 
+// ListEveryProject mocks base method.
+func (m *MockProjectService) ListEveryProject(ctx context.Context, req service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEveryProject", ctx, req)
+	ret0, _ := ret[0].(*service.ListProjectsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEveryProject indicates an expected call of ListEveryProject.
+func (mr *MockProjectServiceMockRecorder) ListEveryProject(ctx, req any) *MockProjectServiceListEveryProjectCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEveryProject", reflect.TypeOf((*MockProjectService)(nil).ListEveryProject), ctx, req)
+	return &MockProjectServiceListEveryProjectCall{Call: call}
+}
+
+// MockProjectServiceListEveryProjectCall wrap *gomock.Call
+type MockProjectServiceListEveryProjectCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockProjectServiceListEveryProjectCall) Return(arg0 *service.ListProjectsResponse, arg1 error) *MockProjectServiceListEveryProjectCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockProjectServiceListEveryProjectCall) Do(f func(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error)) *MockProjectServiceListEveryProjectCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockProjectServiceListEveryProjectCall) DoAndReturn(f func(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error)) *MockProjectServiceListEveryProjectCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // RemoveOrigin mocks base method.
 func (m *MockProjectService) RemoveOrigin(ctx context.Context, projectID, pattern string) error {
 	m.ctrl.T.Helper()

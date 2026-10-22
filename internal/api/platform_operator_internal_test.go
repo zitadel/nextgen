@@ -127,9 +127,7 @@ func TestCheckProjectAccess_PlatformOperator(t *testing.T) {
 		ctx := request(t, operatorScope)
 
 		require.NoError(t, requireProjectAccess(ctx, stmts, "proj_customer", projectAccess, opRead))
-		slot, ok := audit.ActorSlotFromContext(ctx)
-		require.True(t, ok)
-		assert.Nil(t, slot.Authorization())
+		assert.Nil(t, audit.AuthorizationFromContext(ctx))
 	})
 
 	t.Run("anyone else keeps the ordinary miss", func(t *testing.T) {
@@ -139,9 +137,7 @@ func TestCheckProjectAccess_PlatformOperator(t *testing.T) {
 
 		err := requireProjectAccess(ctx, stmts, "proj_customer", projectAccess, opRead)
 		assertDomainCode(t, err, domain.ErrProjectNotFound().Code)
-		slot, ok := audit.ActorSlotFromContext(ctx)
-		require.True(t, ok)
-		assert.Nil(t, slot.Authorization())
+		assert.Nil(t, audit.AuthorizationFromContext(ctx))
 	})
 
 	t.Run("a session homed elsewhere never reaches the operator path", func(t *testing.T) {
@@ -196,17 +192,16 @@ func TestListMyProjects_PlatformOperator(t *testing.T) {
 	}
 	listsEveryProject := func(t *testing.T, projects *servicemocks.MockProjectService, every bool) {
 		t.Helper()
-		projects.EXPECT().ListAuthorized(gomock.Any(), gomock.Any()).DoAndReturn(
-			func(_ context.Context, req service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
-				assert.Equal(t, every, req.EveryProject)
-				return &service.ListProjectsResponse{Projects: []*domain.Project{{ID: "proj_a"}}}, nil
-			})
+		page := &service.ListProjectsResponse{Projects: []*domain.Project{{ID: "proj_a"}}}
+		if every {
+			projects.EXPECT().ListEveryProject(gomock.Any(), gomock.Any()).Return(page, nil)
+			return
+		}
+		projects.EXPECT().ListAuthorized(gomock.Any(), gomock.Any()).Return(page, nil)
 	}
 	marked := func(t *testing.T, ctx context.Context) bool {
 		t.Helper()
-		slot, ok := audit.ActorSlotFromContext(ctx)
-		require.True(t, ok)
-		return slot.Authorization() != nil
+		return audit.AuthorizationFromContext(ctx) != nil
 	}
 
 	t.Run("an operator's projects are every project, and the request is marked", func(t *testing.T) {
@@ -258,12 +253,15 @@ func TestListMyProjects_PlatformOperator(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			h, projects := operatorHandler(t, new(tc.operator))
-			projects.EXPECT().ListAuthorized(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(_ context.Context, req service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
-					assert.Equal(t, tc.operator, req.EveryProject)
-					assert.Equal(t, "acme", req.NameContains)
-					return &service.ListProjectsResponse{}, nil
-				})
+			searched := func(_ context.Context, req service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
+				assert.Equal(t, "acme", req.NameContains)
+				return &service.ListProjectsResponse{}, nil
+			}
+			if tc.operator {
+				projects.EXPECT().ListEveryProject(gomock.Any(), gomock.Any()).DoAndReturn(searched)
+			} else {
+				projects.EXPECT().ListAuthorized(gomock.Any(), gomock.Any()).DoAndReturn(searched)
+			}
 
 			_, err := h.ListMyProjects(session(t, operatorScope), api.ListMyProjectsParams{
 				NameContains: api.NewOptString("acme"),

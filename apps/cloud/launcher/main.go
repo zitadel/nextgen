@@ -49,6 +49,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/cmd/server"
+	"github.com/zitadel/nextgen/internal/bootstrap/users"
 )
 
 const (
@@ -184,6 +185,9 @@ type serving struct {
 	database string
 	// admin is the bootstrap admin document, nil when none is configured.
 	admin []byte
+	// adminID is the user id admin names, the deployment's platform operator
+	// unless NEXTGEN_PLATFORM_OPERATORS says otherwise (ADR 075).
+	adminID string
 }
 
 func parseServing(env string) (*serving, error) {
@@ -247,7 +251,17 @@ func parseServing(env string) (*serving, error) {
 		if !strings.Contains(string(doc), `"header"`) || !strings.Contains(string(doc), `"authenticators"`) {
 			return nil, errors.New("BOOTSTRAP_ADMIN_USER_JSON_B64 does not decode to a bootstrap user document")
 		}
+		var admin users.Document
+		if err := json.Unmarshal(doc, &admin); err != nil {
+			return nil, fmt.Errorf("BOOTSTRAP_ADMIN_USER_JSON_B64 does not decode to a bootstrap user document: %w", err)
+		}
+		// The server's import refuses a document without one too; refusing it
+		// here keeps the cloud from starting without its platform operator.
+		if admin.Header.ID == "" {
+			return nil, errors.New("BOOTSTRAP_ADMIN_USER_JSON_B64 names no user id (header.id)")
+		}
 		s.admin = doc
+		s.adminID = admin.Header.ID
 	}
 	return s, nil
 }
@@ -336,30 +350,13 @@ func prepareServer(extra []string) ([]string, error) {
 		"NEXTGEN_SERVER_PUBLIC_BASE":         publicBase(env),
 		// The bootstrap admin administers every project (ADR 075), unless
 		// the deployment names its platform operators itself.
-		"NEXTGEN_PLATFORM_OPERATORS": bootstrapAdminID(s.admin),
+		"NEXTGEN_PLATFORM_OPERATORS": s.adminID,
 	} {
 		if err := setDefault(key, value); err != nil {
 			return nil, err
 		}
 	}
 	return append(args, extra...), nil
-}
-
-// bootstrapAdminID is the user id the bootstrap admin document declares, or
-// empty when there is no document or it names no id.
-func bootstrapAdminID(doc []byte) string {
-	if doc == nil {
-		return ""
-	}
-	var parsed struct {
-		Header struct {
-			ID string `json:"id"`
-		} `json:"header"`
-	}
-	if err := json.Unmarshal(doc, &parsed); err != nil {
-		return ""
-	}
-	return parsed.Header.ID
 }
 
 // withParams adds each parameter the URL does not set yet. The server also

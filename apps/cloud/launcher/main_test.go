@@ -361,7 +361,7 @@ func TestPublicBase(t *testing.T) {
 func TestPrepareServerRendersTheBootstrapAdminDocument(t *testing.T) {
 	dataDir := t.TempDir()
 	setLauncherEnv(t, dataDir)
-	doc := `{"header":{"version":1},"authenticators":[]}`
+	doc := `{"header":{"version":1,"id":"user_platformadmin"},"authenticators":{}}`
 	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(doc)))
 
 	args, err := prepareServer([]string{"--disable-master-key-generation"})
@@ -377,7 +377,7 @@ func TestPrepareServerRendersTheBootstrapAdminDocument(t *testing.T) {
 
 func TestPrepareServerMakesTheBootstrapAdminAnOperator(t *testing.T) {
 	setLauncherEnv(t, t.TempDir())
-	doc := `{"header":{"version":1,"project_id":"proj_platform","id":"user_platformadmin"},"authenticators":[]}`
+	doc := `{"header":{"version":1,"project_id":"proj_platform","id":"user_platformadmin"},"authenticators":{}}`
 	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(doc)))
 
 	_, err := prepareServer(nil)
@@ -387,7 +387,7 @@ func TestPrepareServerMakesTheBootstrapAdminAnOperator(t *testing.T) {
 
 func TestPrepareServerKeepsConfiguredOperators(t *testing.T) {
 	setLauncherEnv(t, t.TempDir())
-	doc := `{"header":{"version":1,"id":"user_platformadmin"},"authenticators":[]}`
+	doc := `{"header":{"version":1,"id":"user_platformadmin"},"authenticators":{}}`
 	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(doc)))
 	t.Setenv("NEXTGEN_PLATFORM_OPERATORS", "user_support")
 
@@ -482,6 +482,16 @@ func TestPrepareServerRefusesBadInput(t *testing.T) {
 			t.Setenv("CLOUD_DATABASE_URL", pooledURL)
 			_, err := prepareServer(nil)
 			assert.ErrorContains(t, err, "needs its Git branch")
+		},
+		"a bootstrap admin document without a user id, which would start the cloud without an operator": func(t *testing.T) {
+			t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(`{"header":{"version":1},"authenticators":{}}`)))
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "names no user id")
+		},
+		"a bootstrap admin document that does not decode": func(t *testing.T) {
+			t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(`{"header":"x","authenticators":{}}`)))
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "does not decode to a bootstrap user document")
 		},
 		"a database URL that is not a postgres URL": func(t *testing.T) {
 			t.Setenv("CLOUD_DATABASE_URL", "host=db user=u")

@@ -439,30 +439,31 @@ func checkProjectAccess(ctx context.Context, r *resolver.Resolver, stmts service
 // operator relation, not a grant on the project, authorized it (ADR 075 §5).
 func markPlatformOperator(ctx context.Context, scope ScopeContext) {
 	audit.MarkAuthorization(ctx, domain.EventAuthorizationMetadata{
-		Path:               domain.EventAuthorizationPathPlatformOperator,
+		Path:               resolver.PathPlatformOperator.String(),
 		ActorHomeProjectID: scope.ProjectID,
 	})
 }
 
 // platformOperator reports whether the credential is a platform operator, who
-// can read every project (ADR 075 §3), which is the question listMyProjects
-// asks without a target project. Only a session of a user homed in the platform
-// project can be one; everyone else is answered without a query.
+// can read every project (ADR 075 §3): the question listMyProjects asks without
+// a target project.
 func (h *Handler) platformOperator(ctx context.Context, scope ScopeContext) (bool, error) {
-	if scope.PlatformProjectID == "" || scope.PrincipalType != domain.AuthzPrincipalTypeUser {
-		return false, nil
-	}
-	if h == nil || h.pool == nil {
-		return false, domain.ErrInternal(errors.New("authz statements not configured"))
-	}
-	ok, err := resolver.New().PlatformOperator(ctx, h.pool.Statements(), resolver.Request{
+	req := resolver.Request{
 		PrincipalType:     scope.PrincipalType,
 		PrincipalID:       scope.PrincipalID,
 		HomeProjectID:     scope.ProjectID,
 		PlatformProjectID: scope.PlatformProjectID,
 		ObjectType:        "project",
 		Relation:          projectRelation(opRead),
-	})
+	}
+	// Before the statements are needed: most sessions cannot be operators.
+	if !req.PlatformOperatorEligible() {
+		return false, nil
+	}
+	if h == nil || h.pool == nil {
+		return false, domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	ok, err := resolver.New().PlatformOperator(ctx, h.pool.Statements(), req)
 	if err != nil {
 		return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}

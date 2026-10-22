@@ -81,12 +81,15 @@ func (g *Graph) OracleList(projectID, principalHomeProjectID string, principalTy
 }
 
 // OracleListParams applies OracleList, widened to every row of the kind for a
-// platform operator (ADR 075 §3), then the sk_team_ team constraint.
+// platform operator (ADR 075 §3), then the sk_team_ team constraint, which the
+// SQL applies to both halves of the list predicate.
 func (g *Graph) OracleListParams(p domain.AuthzListObjectsParams) []string {
+	var ids []string
 	if p.PlatformOperatorEligible() && g.OraclePlatformOperator(p.PlatformCheckParams()) {
-		return g.resourceIDs(p.ProjectID, p.ResourceKind)
+		ids = g.resourceIDs(p.ProjectID, p.ResourceKind)
+	} else {
+		ids = g.OracleList(p.ProjectID, p.HomeProjectID(), p.PrincipalType, p.PrincipalID, p.ResourceKind, p.ObjectType, p.Relation)
 	}
-	ids := g.OracleList(p.ProjectID, p.HomeProjectID(), p.PrincipalType, p.PrincipalID, p.ResourceKind, p.ObjectType, p.Relation)
 	if p.ConstraintTeamID == "" {
 		return ids
 	}

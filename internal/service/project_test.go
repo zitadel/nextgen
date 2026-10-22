@@ -1141,10 +1141,10 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 	}
 }
 
-// A platform operator can act on every project (ADR 075 §6): the listing pages
-// all of them, in the same order and with the same cursor as the grant query,
-// and never asks the grant query.
-func TestProjectService_ListAuthorizedEveryProject(t *testing.T) {
+// A platform operator can act on every project (ADR 075 §6): ListEveryProject
+// pages all of them, in the same order and with the same cursor as the grant
+// query, and never asks the grant query.
+func TestProjectService_ListEveryProject(t *testing.T) {
 	t.Parallel()
 
 	svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
@@ -1165,10 +1165,9 @@ func TestProjectService_ListAuthorizedEveryProject(t *testing.T) {
 			}, nil
 		})
 
-	resp, err := svc.ListAuthorized(context.Background(), service.ListAuthorizedProjectsRequest{
+	resp, err := svc.ListEveryProject(context.Background(), service.ListAuthorizedProjectsRequest{
 		HomeProjectID: "proj_platform",
 		UserID:        "user_a",
-		EveryProject:  true,
 		PageToken:     "tok",
 	})
 	require.NoError(t, err)
@@ -1178,7 +1177,7 @@ func TestProjectService_ListAuthorizedEveryProject(t *testing.T) {
 
 // An operator searches like anyone (ADR 075 §6): the name filter that narrows
 // the grant query narrows the listing of every project the same way.
-func TestProjectService_ListAuthorizedEveryProjectByName(t *testing.T) {
+func TestProjectService_ListEveryProjectByName(t *testing.T) {
 	t.Parallel()
 
 	svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
@@ -1193,10 +1192,9 @@ func TestProjectService_ListAuthorizedEveryProjectByName(t *testing.T) {
 			return &database.ListResult[*domain.Project]{Items: []*domain.Project{{ID: "proj_a"}}}, nil
 		})
 
-	resp, err := svc.ListAuthorized(context.Background(), service.ListAuthorizedProjectsRequest{
+	resp, err := svc.ListEveryProject(context.Background(), service.ListAuthorizedProjectsRequest{
 		HomeProjectID: "proj_platform",
 		UserID:        "user_a",
-		EveryProject:  true,
 		NameContains:  "acme",
 	})
 	require.NoError(t, err)
