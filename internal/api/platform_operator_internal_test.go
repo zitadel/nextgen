@@ -110,6 +110,17 @@ func TestCheckProjectAccess_PlatformOperator(t *testing.T) {
 		assert.JSONEq(t, `{"authorization":{"path":"platform_operator","actor_home_project_id":"proj_platform"}}`, string(ev.Metadata))
 	})
 
+	t.Run("the mark reaches events without the request middleware's slot", func(t *testing.T) {
+		t.Parallel()
+		stmts := stubAuthzStmts{allowCheck: new(false), foothold: new(false), operator: true}
+		// The security handler stamps the actor; no request middleware ran.
+		ctx := WithScopeContext(audit.WithActorContext(t.Context(), audit.ActorContext{ProjectID: testPlatformProject}), operatorScope)
+
+		require.NoError(t, requireProjectAccess(ctx, stmts, "proj_customer", projectAccess, opWrite))
+		ev := audit.FromContext(ctx, domain.EventTypeProjectUpdated, domain.EventCategoryEntity)
+		assert.JSONEq(t, `{"authorization":{"path":"platform_operator","actor_home_project_id":"proj_platform"}}`, string(ev.Metadata))
+	})
+
 	t.Run("a grant is not marked", func(t *testing.T) {
 		t.Parallel()
 		stmts := stubAuthzStmts{allowCheck: new(true), foothold: new(true), operator: true}
@@ -118,7 +129,7 @@ func TestCheckProjectAccess_PlatformOperator(t *testing.T) {
 		require.NoError(t, requireProjectAccess(ctx, stmts, "proj_customer", projectAccess, opRead))
 		slot, ok := audit.ActorSlotFromContext(ctx)
 		require.True(t, ok)
-		assert.Nil(t, slot.Authorization)
+		assert.Nil(t, slot.Authorization())
 	})
 
 	t.Run("anyone else keeps the ordinary miss", func(t *testing.T) {
@@ -130,7 +141,7 @@ func TestCheckProjectAccess_PlatformOperator(t *testing.T) {
 		assertDomainCode(t, err, domain.ErrProjectNotFound().Code)
 		slot, ok := audit.ActorSlotFromContext(ctx)
 		require.True(t, ok)
-		assert.Nil(t, slot.Authorization)
+		assert.Nil(t, slot.Authorization())
 	})
 
 	t.Run("a session homed elsewhere never reaches the operator path", func(t *testing.T) {
@@ -195,7 +206,7 @@ func TestListMyProjects_PlatformOperator(t *testing.T) {
 		t.Helper()
 		slot, ok := audit.ActorSlotFromContext(ctx)
 		require.True(t, ok)
-		return slot.Authorization != nil
+		return slot.Authorization() != nil
 	}
 
 	t.Run("an operator's projects are every project, and the request is marked", func(t *testing.T) {

@@ -146,3 +146,32 @@ func TestMarkAuthorizationWithoutASlotIsANoOp(t *testing.T) {
 	MarkAuthorization(t.Context(), domain.EventAuthorizationMetadata{Path: domain.EventAuthorizationPathPlatformOperator})
 	assert.JSONEq(t, `{}`, string(FromContext(t.Context(), domain.EventTypeAuthzGranted, domain.EventCategoryAdmin).Metadata))
 }
+
+// TestMarkAuthorizationReachesPathBWithoutASlot: a server without the request
+// event middleware plants no slot. The mark still reaches the request's Path B
+// events through the actor the security handler stamped.
+func TestMarkAuthorizationReachesPathBWithoutASlot(t *testing.T) {
+	actor := "user_op"
+	ctx := WithActorContext(t.Context(), ActorContext{ProjectID: "proj_platform", ActorID: &actor})
+
+	MarkAuthorization(ctx, domain.EventAuthorizationMetadata{
+		Path:               domain.EventAuthorizationPathPlatformOperator,
+		ActorHomeProjectID: "proj_platform",
+	})
+	ev := FromContext(ctx, domain.EventTypeProjectUpdated, domain.EventCategoryEntity)
+	assert.JSONEq(t, `{"authorization":{"path":"platform_operator","actor_home_project_id":"proj_platform"}}`, string(ev.Metadata))
+}
+
+// TestWithActorContextKeepsTheMark: re-stamping the actor mid-request keeps
+// the mark the request already carries.
+func TestWithActorContextKeepsTheMark(t *testing.T) {
+	ctx := WithActorContext(WithActorSlot(t.Context()), ActorContext{ProjectID: "proj_platform"})
+	MarkAuthorization(ctx, domain.EventAuthorizationMetadata{Path: domain.EventAuthorizationPathPlatformOperator})
+
+	restamped := WithActorContext(ctx, ActorContext{ProjectID: "proj_customer"})
+	ev := FromContext(restamped, domain.EventTypeProjectUpdated, domain.EventCategoryEntity)
+	assert.JSONEq(t, `{"authorization":{"path":"platform_operator"}}`, string(ev.Metadata))
+	slot, ok := ActorSlotFromContext(restamped)
+	require.True(t, ok)
+	require.NotNil(t, slot.Authorization())
+}

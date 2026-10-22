@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"encoding/json"
+	"sync/atomic"
 
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -32,10 +33,26 @@ type ActorContext struct {
 	FlowID         *string
 	RequestID      *string
 	Authenticated  bool
-	// Authorization records the path that authorized the request when it was
-	// not a grant on the protected project (ADR 053 §8, ADR 075 §5). Every
-	// event the request emits carries it in metadata.authorization.
-	Authorization *domain.EventAuthorizationMetadata
+	// authorization is the request's authorization mark (MarkAuthorization).
+	// Every copy of the actor context, and the request's slot, shares it, so a
+	// mark set after the actor was stamped still reaches every event of the
+	// request.
+	authorization *authorizationMark
+}
+
+// authorizationMark holds the path that authorized a request when it was not
+// a grant on the protected project (ADR 053 §8, ADR 075 §5).
+type authorizationMark struct {
+	metadata atomic.Pointer[domain.EventAuthorizationMetadata]
+}
+
+// Authorization is the path that authorized the request, or nil when nothing
+// marked it: an ordinary grant, or no authorization at all.
+func (ac ActorContext) Authorization() *domain.EventAuthorizationMetadata {
+	if ac.authorization == nil {
+		return nil
+	}
+	return ac.authorization.metadata.Load()
 }
 
 // WithActorSlot plants a mutable actor slot on ctx so net/http middleware can
@@ -44,7 +61,7 @@ func WithActorSlot(ctx context.Context) context.Context {
 	if _, ok := ctx.Value(actorSlotKey{}).(*ActorContext); ok {
 		return ctx
 	}
-	return context.WithValue(ctx, actorSlotKey{}, &ActorContext{})
+	return context.WithValue(ctx, actorSlotKey{}, &ActorContext{authorization: &authorizationMark{}})
 }
 
 func ActorSlotFromContext(ctx context.Context) (*ActorContext, bool) {
@@ -79,18 +96,38 @@ func BindPublicRequest(ctx context.Context, projectID, flowID, sessionID string)
 	}
 }
 
-// MarkAuthorization records on the request's actor slot which path authorized
-// it, after the security handler stamped the actor. Path A reads the slot
-// directly; Path B events pick it up through actorFromContext. Without a slot
-// (a call outside an HTTP request) there is no request to mark.
+// MarkAuthorization records which path authorized the request, after the
+// security handler stamped its actor. Every event the request emits from then
+// on, Path A and Path B alike, carries it. Outside a request, with neither an
+// actor nor a slot, there is nothing to mark.
 func MarkAuthorization(ctx context.Context, authorization domain.EventAuthorizationMetadata) {
-	if slot, ok := ActorSlotFromContext(ctx); ok {
-		slot.Authorization = &authorization
+	if mark := requestAuthorization(ctx); mark != nil {
+		mark.metadata.Store(&authorization)
 	}
 }
 
-// WithActorContext stores ActorContext on ctx and updates any actor slot.
+// requestAuthorization is the request's authorization mark: the stamped
+// actor's, else the slot's, else nil.
+func requestAuthorization(ctx context.Context) *authorizationMark {
+	if ac, ok := ActorFromContext(ctx); ok && ac.authorization != nil {
+		return ac.authorization
+	}
+	if slot, ok := ActorSlotFromContext(ctx); ok && slot.authorization != nil {
+		return slot.authorization
+	}
+	return nil
+}
+
+// WithActorContext stores ActorContext on ctx and updates any actor slot. The
+// actor joins the request's authorization mark, or starts one, so a request
+// re-stamped mid-flight keeps its mark.
 func WithActorContext(ctx context.Context, ac ActorContext) context.Context {
+	if ac.authorization == nil {
+		ac.authorization = requestAuthorization(ctx)
+	}
+	if ac.authorization == nil {
+		ac.authorization = &authorizationMark{}
+	}
 	if slot, ok := ActorSlotFromContext(ctx); ok {
 		*slot = ac
 	}
@@ -108,16 +145,10 @@ func ActorFromContext(ctx context.Context) (ActorContext, bool) {
 // actor was stamped yet (POST /projects in-TX emits).
 func actorFromContext(ctx context.Context) ActorContext {
 	var ac ActorContext
-	slot, hasSlot := ActorSlotFromContext(ctx)
 	if v, ok := ActorFromContext(ctx); ok {
 		ac = v
-	} else if hasSlot && slot != nil {
+	} else if slot, ok := ActorSlotFromContext(ctx); ok && slot != nil {
 		ac = *slot
-	}
-	// The authz gate marks the slot after the value actor was stamped, so a
-	// mark only the slot carries still belongs to this request.
-	if ac.Authorization == nil && hasSlot && slot != nil {
-		ac.Authorization = slot.Authorization
 	}
 	if ac.RequestID == nil {
 		if reqID, ok := middleware.GetRequestIDContext(ctx); ok && reqID != "" {
@@ -152,8 +183,8 @@ func FromContext(ctx context.Context, eventType domain.EventType, category domai
 	ev.SessionID = ac.SessionID
 	ev.FlowID = ac.FlowID
 	ev.RequestID = ac.RequestID
-	if ac.Authorization != nil {
-		if meta, err := events.MarshalPayload(domain.EventMetadata{Authorization: ac.Authorization}); err == nil {
+	if authorization := ac.Authorization(); authorization != nil {
+		if meta, err := events.MarshalPayload(domain.EventMetadata{Authorization: authorization}); err == nil {
 			ev.Metadata = meta
 		}
 	}
