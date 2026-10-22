@@ -291,20 +291,9 @@ func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, h
 		compiler.WriteString(" WHERE id IN (")
 		authz.WriteAuthorizedProjectIDs(&compiler, spannerAuthzEnv(), homeProjectID, userID)
 		compiler.WriteString(")")
-		filter := opts.Filter
-		keyset, err := cursorFilter(opts.Pagination, projectSchema)
-		if err != nil {
+		if err := compileWhereRest(&compiler, opts, projectSchema); err != nil {
 			return nil, err
 		}
-		if keyset != nil {
-			filter = database.And(filter, keyset)
-		}
-		if filter != nil {
-			compiler.WriteString(" AND ")
-			compileFilter(&compiler, filter, projectSchema)
-		}
-		compileOrderBy(&compiler, opts.Pagination.OrderBy, projectSchema)
-		compileLimit(&compiler, opts.Pagination.Limit)
 
 		scan := newProjectStatements(s.db).scanProject
 		var projects []*domain.Project
