@@ -83,7 +83,10 @@
       },
       "auth-method:sso": {
         "description": "Add or remove identity providers."
-      }
+
+      },
+      "origin": {
+        "description": "Manage the origin patterns the project admits."      }
     }
   },
   "type": "module",

@@ -83,6 +83,18 @@ export interface ProjectVariable {
   readonly secret?: boolean;
 }
 
+export interface ProjectOrigin {
+  readonly pattern: string;
+  readonly kind: string;
+}
+
+/**
+ * The origin `zitadel setup` registers for the app it scaffolds: the development
+ * server, as a primary pattern, because only a primary one admits the app's own
+ * requests. A fresh project already holds it.
+ */
+export const SETUP_ORIGIN: ProjectOrigin = { pattern: "http://localhost:3000", kind: "primary" };
+
 export interface RegisteredIdp {
   readonly id: string;
   readonly slug: string;
@@ -639,6 +651,33 @@ export class ScaffoldedApp {
 
   getVariable(name: string): Promise<CliResult> {
     return this.cli(["variables", "get", name, "--project-level", "--json"]);
+  }
+
+  /** Adds one origin pattern to the project. */
+  addOrigin(pattern: string, kind: "primary" | "preview"): Promise<CliResult> {
+    return this.cli(["origin", "add", pattern, "--kind", kind, "--json"]);
+  }
+
+  /** Removes one origin pattern, non-interactively. */
+  removeOrigin(pattern: string): Promise<CliResult> {
+    return this.cli(["origin", "rm", pattern, "--force", "--json"]);
+  }
+
+  /**
+   * Removes every origin the project holds, `setup`'s own included, so a spec
+   * starts from the empty list, which admits any origin.
+   */
+  async clearOrigins(): Promise<void> {
+    for (const { pattern } of await this.projectOrigins()) {
+      expect(await this.removeOrigin(pattern), `removing ${pattern}`).toSucceed();
+    }
+  }
+
+  /** The origin patterns the project admits, read back through `origin list`. */
+  async projectOrigins(): Promise<ProjectOrigin[]> {
+    const result = await this.cli(["origin", "list", "--json"]);
+    expect(result, "origin list should have succeeded").toSucceed();
+    return this.envelopeOf<{ items: ProjectOrigin[] }>(result).data.items;
   }
 
   deleteVariable(name: string): Promise<CliResult> {
