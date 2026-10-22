@@ -90,7 +90,7 @@ describe("connection checks", () => {
     });
 
     await expect(validateConnections(ctx(cwd, {}))).rejects.toMatchObject({
-      hint: expect.stringContaining("variables set NAME --project-level --secret --env staging"),
+      hint: expect.stringContaining("variable set NAME --secret --env staging"),
     });
   });
 
@@ -151,7 +151,7 @@ describe("connection checks", () => {
     const cwd = project({ "google.json": googleBody() });
 
     await expect(validateConnections(ctx(cwd, {}, {}))).rejects.toMatchObject({
-      nextCommands: ["variables set GOOGLE_CLIENT_SECRET --project-level --secret --env staging"],
+      nextCommands: ["variable set GOOGLE_CLIENT_SECRET --secret --env staging"],
     });
   });
 

@@ -101,7 +101,7 @@ Dimensions each command records:
 - **deploy** — `resources` (how many the bundle pinned) and `origin_count` (how many origins it went live on). Counts only; never a handle, a digest, or an origin.
 - **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (check names, never messages).
 - **start** — `runtime` (`binary` / `docker`).
-- **variables** — `is_secret`, `variable_count`. Never the variable's name or value.
+- **variable** — `is_secret`, `variable_count`. Never the variable's name or value.
 - **api** — `operation` (an `operationId` of the spec, never a path, an id or a field), `is_paginated`.
 - **any command that connects to a project** (`EnvironmentCommand.connect`, so every one but `setup`, `doctor` and the local-server commands) — `credential` (`project` / `preview`), `has_env_file` (whether `--env-file` was given). Deliberately *not* recorded: the environment's name, the env file's path, the server, the project id, or any resolved value — every one of them is a name, a URL, an id or a secret.
 - **claim** — `claim_outcome` (`completed` / `already_claimed` / `expired` / `window_expired` / `timeout` / `dry_run`), `poll_count`, `browser_opened`. Never an id or a URL.

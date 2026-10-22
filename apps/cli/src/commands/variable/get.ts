@@ -1,41 +1,61 @@
-import { CommandGroups, type JsonEnvelope, nonBlankArg, OwnerCommand } from "../../lib/oclif";
+import { Flags } from "@oclif/core";
+
 import { ZitadelError } from "../../lib/errors";
+import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { renderDetail } from "../../lib/oclif/crud/table";
-import { assertVariableName, toVariableRow, variableCells } from "../../lib/variables";
+import {
+  assertVariableName,
+  toVariableRow,
+  variableCells,
+  variableReadScope,
+} from "../../lib/variables";
 
 /**
- * The `variables get` topic command — read one variable by name at the project
- * level.
+ * `zitadel variable get NAME` — read one variable by name from the project.
  *
  * A name the project has not entered answers `var.not_found`. A secret is found
- * but not disclosed, so the answer says it is held and nothing more.
+ * but not disclosed, so the answer says it is held and nothing more. Without
+ * `--preview` it reads the primary value; with it, the preview value. A name with
+ * no value of the kind asked for is a miss.
  */
-export default class VariablesGet extends OwnerCommand {
+export default class VariableGet extends EnvironmentCommand {
   static override description = "Get one variable from the project.";
   static override group = CommandGroups.configuration;
   static override examples = [
-    "<%= config.bin %> variables get GOOGLE_CLIENT_ID --project-level",
-    "<%= config.bin %> variables get GOOGLE_CLIENT_ID --project-level --json",
+    "<%= config.bin %> variable get GOOGLE_CLIENT_ID",
+    "<%= config.bin %> variable get API_URL --preview",
+    "<%= config.bin %> variable get GOOGLE_CLIENT_ID --json",
   ];
   static override args = {
     name: nonBlankArg({ required: true, description: "Variable name to read." }),
   };
+  static override flags = {
+    preview: Flags.boolean({
+      default: false,
+      description: "Read the preview value instead of the primary one.",
+    }),
+  };
 
   async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(VariablesGet);
+    const { args, flags } = await this.parse(VariableGet);
     await this.toMeta(flags);
     const name = args.name;
 
     assertVariableName(name);
-    const { client, scope } = await this.connect();
+    const { client, projectId } = await this.connect();
+    const scope = variableReadScope(projectId, flags.preview);
 
     // The single-name endpoint answers in the same two forms the collection
     // does, so the row projection is shared rather than duplicated.
-    const { primary } = await client.getVariable(name, { ...scope, kind: "primary" });
-    if (primary === undefined) {
-      throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no primary value.`);
+    const value = (await client.getVariable(name, scope))[scope.kind];
+    if (value === undefined) {
+      throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no ${scope.kind} value.`, {
+        hint: flags.preview
+          ? "A name has a preview value only once one is set with `--preview`."
+          : "Set one with `variable set`.",
+      });
     }
-    const row = toVariableRow(name, primary);
+    const row = toVariableRow(name, value);
     this.recordTelemetry({ is_secret: row.secret });
 
     const data = row;
