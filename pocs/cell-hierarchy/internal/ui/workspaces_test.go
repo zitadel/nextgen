@@ -202,20 +202,29 @@ func TestAddChildSiteFloatAndLookupWalk(t *testing.T) {
 		t.Fatalf("create user: %s", rec.Body.String())
 	}
 
+	// Float to parent is async on the cell — poll until visible.
 	var parentRaw struct {
 		Lookup []lookupRow `json:"lookup"`
 	}
-	if err := app.Peer.DoRaw(ctx, http.MethodGet, cell.NormalizeURL(euURL)+"/v1/projects/acme", nil, "", &parentRaw); err != nil {
-		t.Fatal(err)
-	}
 	floated := false
-	for _, e := range parentRaw.Lookup {
-		if e.Key == "joe@example.com" && e.HomeProjectID == "acme-us2" {
-			floated = true
-			if e.Source != "child" {
-				t.Fatalf("provenance source=%s want child", e.Source)
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := app.Peer.DoRaw(ctx, http.MethodGet, cell.NormalizeURL(euURL)+"/v1/projects/acme", nil, "", &parentRaw); err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range parentRaw.Lookup {
+			if e.Key == "joe@example.com" && e.HomeProjectID == "acme-us2" {
+				floated = true
+				if e.Source != "child" {
+					t.Fatalf("provenance source=%s want child", e.Source)
+				}
+				break
 			}
 		}
+		if floated {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
 	}
 	if !floated {
 		t.Fatalf("expected floated key on parent acme: %+v", parentRaw.Lookup)

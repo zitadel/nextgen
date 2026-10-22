@@ -143,7 +143,8 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var trace []TraceHop
-	// Tombstone local user-subject tuples (e.g. group:A#member@joe) so expand ignores them.
+	// Local cleanup stays in-request; remote fan-out / parent tombstone float is the
+	// cell's job and runs async so UI→cell delete returns quickly.
 	start := time.Now()
 	nLocal, err := s.Store.TombstoneLocalUserTuples(key, now)
 	trace = append(trace, TraceHop{
@@ -157,37 +158,38 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		}(),
 	})
 
+	_ = s.Store.UpsertLookupTombstone(key, projectID, meta.URL, now)
+	trace = append(trace, TraceHop{
+		Cell: meta.URL, Method: "local lookup tombstone", Result: "ok",
+	})
+
 	interests, err := s.Store.ListInterestsForPrincipal(projectID, key)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	pushTrace := s.fanOutLifecycle(r.Context(), meta.URL, LifecycleEventRequest{
-		Type:          EventUserDeleted,
-		PrincipalKey:  key,
-		HomeProjectID: projectID,
-		HomeCellURL:   meta.URL,
-		Epoch:         u.Epoch,
-	}, interests)
-	trace = append(trace, pushTrace...)
-
-	// Tombstone local lookup + float tombstone up ancestors.
-	_ = s.Store.UpsertLookupTombstone(key, projectID, meta.URL, now)
-	tombTrace, _ := s.floatLookupTombstone(r.Context(), p, key, meta.URL)
-	trace = append(trace, tombTrace...)
-
-	start = time.Now()
-	nInt, err := s.Store.DeleteInterestsForPrincipal(projectID, key)
 	trace = append(trace, TraceHop{
-		Cell: meta.URL, Method: "unregister interests",
-		Ms: time.Since(start).Milliseconds(),
-		Result: func() string {
-			if err != nil {
-				return "error: " + err.Error()
-			}
-			return "removed=" + itoa64(nInt)
-		}(),
+		Cell: meta.URL, Method: "remote cleanup",
+		Result: "started_async subscribers=" + itoa64(int64(len(interests))),
 	})
+
+	home := p
+	homeCell := meta.URL
+	homeProject := projectID
+	epoch := u.Epoch
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		defer cancel()
+		_ = s.fanOutLifecycle(ctx, homeCell, LifecycleEventRequest{
+			Type:          EventUserDeleted,
+			PrincipalKey:  key,
+			HomeProjectID: homeProject,
+			HomeCellURL:   homeCell,
+			Epoch:         epoch,
+		}, interests)
+		_, _ = s.floatLookupTombstone(ctx, home, key, homeCell)
+		_, _ = s.Store.DeleteInterestsForPrincipal(homeProject, key)
+	}()
 
 	writeJSON(w, http.StatusOK, DeleteUserResponse{User: userView(u), Trace: trace})
 }

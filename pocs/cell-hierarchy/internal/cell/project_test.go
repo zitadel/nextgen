@@ -32,7 +32,7 @@ func TestFloatUpCreatesAncestorRows(t *testing.T) {
 	}
 
 	assertLookupHit(t, eu1URL, "acme-fra", "joe@example.com")
-	assertLookupHit(t, platformURL, "platform", "joe@example.com")
+	waitLookupHit(t, platformURL, "platform", "joe@example.com")
 }
 
 func TestLookupFromSiblingFindsJoeAfterFloat(t *testing.T) {
@@ -70,6 +70,8 @@ func TestLookupFromSiblingFindsJoeAfterFloat(t *testing.T) {
 		body, _ := io.ReadAll(created.Body)
 		t.Fatalf("create status=%d body=%s", created.StatusCode, body)
 	}
+
+	waitLookupHit(t, platformURL, "platform", "joe@example.com")
 
 	hit := postJSON(t, us1, "/v1/lookup/walk", map[string]any{
 		"project_id": "acme-iowa",
@@ -126,14 +128,25 @@ func TestLookupMissWhenEntryAbsentAndConflictOnDuplicate(t *testing.T) {
 		body, _ := io.ReadAll(a.Body)
 		t.Fatalf("alice status=%d body=%s", a.StatusCode, body)
 	}
+	waitLookupHit(t, platformURL, "platform", "alice@example.com")
 
-	b := postJSON(t, eu2, "/v1/projects/acme-lis/users", map[string]any{"email": "alice@example.com"})
+	// Create returns after the local write; cross-cell uniqueness is enforced when
+	// the async (or explicit) float hits the shared parent.
+	b := postJSON(t, eu2, "/v1/projects/acme-lis/users", map[string]any{
+		"email": "alice@example.com", "defer_float": true,
+	})
 	defer b.Body.Close()
-	if b.StatusCode != http.StatusConflict {
+	if b.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(b.Body)
-		t.Fatalf("duplicate status=%d body=%s want conflict", b.StatusCode, body)
+		t.Fatalf("duplicate local create status=%d body=%s want 201", b.StatusCode, body)
 	}
-	assertError(t, b, "lookup_conflict")
+	floated := postJSON(t, eu2, "/v1/projects/acme-lis/float", map[string]any{"key": "alice@example.com"})
+	defer floated.Body.Close()
+	if floated.StatusCode != http.StatusConflict {
+		body, _ := io.ReadAll(floated.Body)
+		t.Fatalf("float conflict status=%d body=%s want conflict", floated.StatusCode, body)
+	}
+	assertError(t, floated, "lookup_conflict")
 }
 
 func TestLookupNeverCallsChildren(t *testing.T) {
@@ -272,10 +285,17 @@ func TestFloatDelayHook(t *testing.T) {
 		t.Fatalf("status=%d body=%s", res.StatusCode, body)
 	}
 	elapsed := time.Since(start)
-	if elapsed < 80*time.Millisecond {
-		t.Fatalf("expected float delay, elapsed=%s", elapsed)
+	if elapsed >= 80*time.Millisecond {
+		t.Fatalf("create should return before async float delay, elapsed=%s", elapsed)
 	}
-	assertLookupHit(t, platformURL, "platform", "delayed@example.com")
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if lookupHit(t, platformURL, "platform", "delayed@example.com") {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("expected async float to reach platform")
 }
 
 func createProject(t *testing.T, ts *httptest.Server, id string, isParent, lookup bool) {
@@ -303,21 +323,40 @@ func attachProject(t *testing.T, ts *httptest.Server, id, parentID, parentCellUR
 	}
 }
 
-func assertLookupHit(t *testing.T, cellURL, projectID, key string) {
+func lookupHit(t *testing.T, cellURL, projectID, key string) bool {
 	t.Helper()
 	b, _ := json.Marshal(map[string]any{"project_id": projectID, "key": key})
 	res, err := http.Post(cellURL+"/v1/lookup", "application/json", bytes.NewReader(b))
 	if err != nil {
-		t.Fatal(err)
+		return false
 	}
 	defer res.Body.Close()
 	var body struct {
 		Hit bool `json:"hit"`
 	}
-	decode(t, res, &body)
-	if !body.Hit {
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		return false
+	}
+	return body.Hit
+}
+
+func assertLookupHit(t *testing.T, cellURL, projectID, key string) {
+	t.Helper()
+	if !lookupHit(t, cellURL, projectID, key) {
 		t.Fatalf("expected hit for %s on %s/%s", key, cellURL, projectID)
 	}
+}
+
+func waitLookupHit(t *testing.T, cellURL, projectID, key string) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if lookupHit(t, cellURL, projectID, key) {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for hit %s on %s/%s", key, cellURL, projectID)
 }
 
 func mustOpenStore(t *testing.T, url, label string, isParent bool) *cell.Store {

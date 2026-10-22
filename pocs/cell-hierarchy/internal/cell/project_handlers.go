@@ -444,17 +444,22 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		Ms:     time.Since(start).Milliseconds(),
 		Result: "local",
 	}}
-	if !req.DeferFloat {
-		hops, err := s.floatLookup(r.Context(), p, key, meta.URL)
-		trace = append(trace, hops...)
-		if err != nil {
-			writeJSON(w, http.StatusConflict, map[string]any{
-				"error": err.Error(),
-				"user":  userView(u),
-				"trace": trace,
-			})
-			return
-		}
+	// Return after the local write. Parent float is the cell's background job so
+	// UI→cell create stays a few ms; WAN delay only applies on cell→cell pushes.
+	if !req.DeferFloat && (p.ParentProjectID != "" && p.ParentCellURL != "") {
+		trace = append(trace, TraceHop{
+			Cell: meta.URL, Method: "float lookup", Result: "started_async",
+		})
+		home := p
+		homeCell := meta.URL
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+			defer cancel()
+			_, _ = s.floatLookup(ctx, home, key, homeCell)
+		}()
+	} else if !req.DeferFloat {
+		// Root site: nothing to float; mark pushed for consistency.
+		_ = s.Store.MarkLookupPushed(key, s.Now())
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"user":  userView(u),
@@ -556,20 +561,16 @@ func (s *Server) floatLookup(ctx context.Context, home Project, key, homeCellURL
 		hop.Result = "visible@" + parentProj.ID
 		trace = append(trace, hop)
 
-		// Continue from parent project (may live on another cell).
-		next, err := s.Peer.GetProject(ctx, cur.ParentCellURL, cur.ParentProjectID)
-		if err != nil {
-			return trace, err
-		}
+		// Continue from parent project (already fetched — no second GetProject hop).
 		cur = Project{
-			ID:              next.ID,
-			Name:            next.Name,
-			IsParent:        next.IsParent,
-			LookupEnabled:   next.LookupEnabled,
-			WorkspaceID:     next.WorkspaceID,
-			CustomerTeamID:  next.CustomerTeamID,
-			ParentProjectID: next.ParentProjectID,
-			ParentCellURL:   next.ParentCellURL,
+			ID:              parentProj.ID,
+			Name:            parentProj.Name,
+			IsParent:        parentProj.IsParent,
+			LookupEnabled:   parentProj.LookupEnabled,
+			WorkspaceID:     parentProj.WorkspaceID,
+			CustomerTeamID:  parentProj.CustomerTeamID,
+			ParentProjectID: parentProj.ParentProjectID,
+			ParentCellURL:   parentProj.ParentCellURL,
 		}
 	}
 	_ = s.Store.MarkLookupPushed(key, s.Now())

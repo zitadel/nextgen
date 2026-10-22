@@ -66,6 +66,8 @@ Cells `/` contacts **only the platform cell** (`GetMe` + `/v1/children`). Leaf c
 - **UI → cell** calls are never artificially delayed. The console PeerClient keeps `ApplyPairDelays=false`.
 - **Cell → cell** hops (lookup walk up parents, float-up) use the pairwise WAN matrix after `/v1/admin/delays` broadcast.
 - Project APIs resolve the host via an in-memory `project → cell` cache (and workspace registry hints) so `GET /api/v1/projects/{id}` is one cell call, not a scan of every cell.
+- **Create user** writes local lookup then returns; parent float-up runs async on the home cell (WAN delay does not block the API).
+- **Delete user** tombstones local tuples/lookup in-request; interest fan-out + parent tombstone float run async on the home cell (not in the UI).
 
 ## Pairwise delays (fixed)
 

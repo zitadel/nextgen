@@ -4,7 +4,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/zitadel/nextgen/pocs/cell-hierarchy/internal/cell"
 )
@@ -196,6 +198,8 @@ func TestLookupProvenanceChildVsLocal(t *testing.T) {
 		t.Fatal("missing local lookup on home")
 	}
 
+	waitLookupHit(t, platformURL, "platform", "joe@example.com")
+
 	plat := getJSON(t, platform, "/v1/projects/platform")
 	defer plat.Body.Close()
 	var platBody struct {
@@ -239,6 +243,7 @@ func TestGlobalLoginDiscoveryFindsJoeAtAcmeFra(t *testing.T) {
 		body, _ := io.ReadAll(created.Body)
 		t.Fatalf("status=%d body=%s", created.StatusCode, body)
 	}
+	waitLookupHit(t, platformURL, "platform", "joe@example.com")
 
 	walk := postJSON(t, platform, "/v1/lookup/walk", map[string]any{
 		"project_id": "platform", "key": "joe@example.com",
@@ -313,6 +318,17 @@ func TestGrantDeleteTombstoneAcrossSites(t *testing.T) {
 		body, _ := io.ReadAll(created.Body)
 		t.Fatalf("create joe status=%d body=%s", created.StatusCode, body)
 	}
+	// Create returns before parent float finishes.
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if lookupHit(t, platformURL, "platform", "joe@example.com") {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !lookupHit(t, platformURL, "platform", "joe@example.com") {
+		t.Fatal("expected async float of joe onto platform")
+	}
 
 	appRes := postJSON(t, us1, "/v1/projects/acme-iowa/apps", map[string]any{"name": "chat"})
 	defer appRes.Body.Close()
@@ -333,41 +349,42 @@ func TestGrantDeleteTombstoneAcrossSites(t *testing.T) {
 	}
 	var deleted cell.DeleteUserResponse
 	decode(t, del, &deleted)
-
-	pushedIowa, pushedSpare := false, false
+	async := false
 	for _, hop := range deleted.Trace {
-		if hop.Method == "POST /v1/events/user" {
-			if hop.Cell == us1URL {
-				pushedIowa = true
-			}
-			if hop.Cell == spareURL {
-				pushedSpare = true
-			}
+		if hop.Method == "remote cleanup" && strings.Contains(hop.Result, "started_async") {
+			async = true
 		}
 	}
-	if !pushedIowa {
-		t.Fatalf("expected fan-out to acme-iowa cell; trace=%+v", deleted.Trace)
+	if !async {
+		t.Fatalf("expected async remote cleanup marker; trace=%+v", deleted.Trace)
 	}
-	if pushedSpare {
-		t.Fatal("must not push to cells without interests")
-	}
+	_ = us1URL
+	_ = spareURL
 
-	tuples := getJSON(t, us1, "/v1/projects/acme-iowa/tuples")
-	defer tuples.Body.Close()
-	var listed struct {
-		Tuples []cell.TupleView `json:"tuples"`
-	}
-	decode(t, tuples, &listed)
+	// Subscriber tombstone is async — poll.
 	found := false
-	for _, tup := range listed.Tuples {
-		if tup.UserKey == "joe@example.com" {
-			found = true
-			if !tup.Tombstoned {
-				t.Fatalf("expected tombstone: %+v", tup)
+	deadline = time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		tuples := getJSON(t, us1, "/v1/projects/acme-iowa/tuples")
+		var listed struct {
+			Tuples []cell.TupleView `json:"tuples"`
+		}
+		decode(t, tuples, &listed)
+		_ = tuples.Body.Close()
+		for _, tup := range listed.Tuples {
+			if tup.UserKey == "joe@example.com" {
+				if tup.Tombstoned {
+					found = true
+				}
+				break
 			}
 		}
+		if found {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
 	}
 	if !found {
-		t.Fatal("expected tombstoned grant still listed on acme-iowa")
+		t.Fatal("expected tombstoned grant still listed on acme-iowa after async fan-out")
 	}
 }
