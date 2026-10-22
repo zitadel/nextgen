@@ -54,6 +54,8 @@ func inTransaction(id []byte) *spannerpb.TransactionSelector {
 func TestDecide(t *testing.T) {
 	t.Parallel()
 
+	// Every ExecuteSqlRequest carries a seqno, as the client numbers each
+	// statement: only the SQL tells a write from a read.
 	tests := []struct {
 		name         string
 		method       string
@@ -64,28 +66,44 @@ func TestDecide(t *testing.T) {
 		{
 			name:      "a query that begins a read-write transaction",
 			method:    "ExecuteStreamingSql",
-			req:       &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: beginReadWrite(), Sql: "SELECT 1"},
+			req:       &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: beginReadWrite(), Sql: "SELECT 1", Seqno: 1},
 			wantAbort: true,
 		},
 		{
 			name:   "a query that begins a read-only transaction",
 			method: "ExecuteStreamingSql",
-			req:    &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: beginReadOnly(), Sql: "SELECT 1"},
+			req:    &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: beginReadOnly(), Sql: "SELECT 1", Seqno: 1},
 		},
 		{
 			name:   "a single-use query",
 			method: "ExecuteStreamingSql",
-			req:    &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: singleUse(), Sql: "SELECT 1"},
+			req:    &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: singleUse(), Sql: "SELECT 1", Seqno: 1},
 		},
 		{
 			name:   "a query later in a transaction",
 			method: "ExecuteStreamingSql",
-			req:    &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: inTransaction(testTx), Sql: "SELECT 1"},
+			req:    &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: inTransaction(testTx), Sql: "SELECT 1", Seqno: 2},
 		},
 		{
 			name:         "DML later in a transaction",
 			method:       "ExecuteSql",
-			req:          &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: inTransaction(testTx), Sql: "UPDATE t SET a = 1", Seqno: 1},
+			req:          &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: inTransaction(testTx), Sql: "UPDATE t SET a = 1", Seqno: 2},
+			wantAbort:    true,
+			wantRollback: testTx,
+		},
+		{
+			name:   "DML that returns rows, on the streaming call",
+			method: "ExecuteStreamingSql",
+			req: &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: inTransaction(testTx),
+				Sql: "UPDATE t SET a = 1 THEN RETURN a", Seqno: 2},
+			wantAbort:    true,
+			wantRollback: testTx,
+		},
+		{
+			name:   "DML behind a comment and a statement hint",
+			method: "ExecuteSql",
+			req: &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: inTransaction(testTx),
+				Sql: "-- prune\n@{LOCK_SCANNED_RANGES=exclusive} DELETE FROM t WHERE a = 1", Seqno: 2},
 			wantAbort:    true,
 			wantRollback: testTx,
 		},
@@ -156,13 +174,37 @@ func TestDecide(t *testing.T) {
 	}
 }
 
+func TestIsDML(t *testing.T) {
+	t.Parallel()
+
+	for sql, want := range map[string]bool{
+		"UPDATE t SET a = 1":                        true,
+		"  update t set a = 1":                      true,
+		"INSERT OR UPDATE INTO t (a) VALUES (1)":    true,
+		"DELETE FROM t WHERE a = 1":                 true,
+		"UPDATE t SET a = 1 THEN RETURN a":          true,
+		"-- prune\nDELETE FROM t":                   true,
+		"# prune\nDELETE FROM t":                    true,
+		"/* prune */ DELETE FROM t":                 true,
+		"@{LOCK_SCANNED_RANGES=exclusive} UPDATE t": true,
+		"SELECT a FROM t":                           false,
+		"SELECT updated_at FROM t":                  false,
+		"WITH x AS (SELECT 1 AS a) SELECT a FROM x": false,
+		"UPDATED t":       false,
+		"/* never closed": false,
+		"":                false,
+	} {
+		assert.Equal(t, want, isDML(sql), "%q", sql)
+	}
+}
+
 func TestDecideAtRateZeroAbortsNothing(t *testing.T) {
 	t.Parallel()
 
 	in := New(0, 1)
 	for method, req := range map[string]any{
 		"ExecuteStreamingSql": &spannerpb.ExecuteSqlRequest{Transaction: beginReadWrite()},
-		"ExecuteSql":          &spannerpb.ExecuteSqlRequest{Transaction: inTransaction(testTx), Seqno: 1},
+		"ExecuteSql":          &spannerpb.ExecuteSqlRequest{Transaction: inTransaction(testTx), Sql: "UPDATE t SET a = 1", Seqno: 1},
 		"Commit":              &spannerpb.CommitRequest{Transaction: &spannerpb.CommitRequest_TransactionId{TransactionId: testTx}},
 	} {
 		assert.NoError(t, in.decide(service+method, req).err, method)

@@ -163,8 +163,6 @@ func TestBoundRetry(t *testing.T) {
 
 		deadline, ok := ctx.Deadline()
 		require.True(t, ok, "an unbounded conflict loop would spin forever")
-		// The same bound under -tags spanner_integration, where
-		// SPANNER_EMULATOR_HOST is set: tests run under the production budget.
 		assert.WithinDuration(t, time.Now().Add(maxRetryDuration), deadline, time.Second)
 	})
 

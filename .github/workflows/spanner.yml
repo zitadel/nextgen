@@ -69,27 +69,22 @@ jobs:
 
       # Host networking, because Omni hands clients its own addresses and they
       # must be reachable from the runner. Pinned by digest: an Omni upgrade
-      # moves every timing this lane reports.
+      # moves every timing this lane reports. The log tail step below shows
+      # Omni's output if it never gets ready.
       - name: Start Spanner Omni
         run: |
           docker run -d --name omni --network host \
             "us-docker.pkg.dev/spanner-omni/images/spanner-omni:2026.r4-lts@sha256:9dcfd3d25f25fb608436c98678311197e15fb3ab25f354f721d10ed2b1208939" \
             start-single-server
-          for i in $(seq 1 90); do
-            if docker logs omni 2>&1 | grep -q 'Spanner is ready'; then
-              echo "Spanner Omni ready after ~$((i * 2))s"
-              exit 0
-            fi
-            sleep 2
-          done
-          docker logs omni 2>&1 | tail -30
-          echo "::error::Spanner Omni was not ready after 180s"
-          exit 1
+          timeout 180 sh -c 'until docker logs omni 2>&1 | grep -q "Spanner is ready"; do sleep 2; done' \
+            || { echo "::error::Spanner Omni was not ready after 180s"; exit 1; }
 
       # ZITADEL_TEST_SPANNER_INSTANCE makes every package provision its own
-      # database on the Omni instance instead of starting an emulator, and
-      # SPANNER_EMULATOR_HOST is the Go client's switch for a plaintext endpoint
-      # without credentials, which Omni's Developer edition serves.
+      # database on the Omni instance instead of starting an emulator.
+      # SPANNER_EMULATOR_HOST keeps its name although nothing here is an
+      # emulator: it is the Go client library's own variable, the only one that
+      # points it at a plaintext endpoint without credentials, which Omni's
+      # Developer edition serves.
       # The task is `runInCI: "skip"` so that ci.yml's `moon ci` leaves it out;
       # in CI `moon run` refuses such a task, `moon exec --ignore-ci-checks`
       # runs it (and its UI build deps).

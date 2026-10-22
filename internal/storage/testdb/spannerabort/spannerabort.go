@@ -13,7 +13,8 @@
 //     transaction it picks is aborted at one of its first few writes, or at its
 //     commit if it ends sooner, after a rollback on the server, as a real abort
 //     ends it. It is never aborted twice, so a long transaction is no less
-//     likely to commit than a short one.
+//     likely to commit than a short one. A write is an INSERT, UPDATE or DELETE
+//     statement, or a batch of them.
 //
 // Reads later in a transaction, single-use reads and single-use commits are
 // never aborted: their requests do not say whether a read-write transaction is
@@ -27,6 +28,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"cloud.google.com/go/spanner/apiv1/spannerpb"
 	"google.golang.org/grpc" //egress:allow test-only interceptors on a Spanner client's own connection; nothing here dials
@@ -110,8 +112,7 @@ func (in *Injector) decide(method string, req any) verdict {
 		in.forget(r.GetTransactionId())
 		return verdict{}
 	case *spannerpb.ExecuteSqlRequest:
-		// A read-write transaction numbers its DML; a query carries no seqno.
-		sel, session, sql, write = r.GetTransaction(), r.GetSession(), r.GetSql(), r.GetSeqno() != 0
+		sel, session, sql, write = r.GetTransaction(), r.GetSession(), r.GetSql(), isDML(r.GetSql())
 	case *spannerpb.ExecuteBatchDmlRequest:
 		sel, session, write = r.GetTransaction(), r.GetSession(), true
 		if statements := r.GetStatements(); len(statements) > 0 {
@@ -160,25 +161,16 @@ func (in *Injector) abortInTransaction(id []byte, commit bool) bool {
 		delete(in.plan, key)
 		return left != spared
 	}
-	switch left {
-	case spared:
-		in.plan[key] = spared
-		return false
-	case 1:
-		in.plan[key] = spared
-		return true
-	default:
+	in.plan[key] = spared
+	if left > 1 {
 		in.plan[key] = left - 1
-		return false
 	}
+	return left == 1
 }
 
 // forget drops what the injector knows about a transaction the client rolled
 // back itself.
 func (in *Injector) forget(id []byte) {
-	if id == nil {
-		return
-	}
 	in.mu.Lock()
 	defer in.mu.Unlock()
 	delete(in.plan, string(id))
@@ -186,7 +178,42 @@ func (in *Injector) forget(id []byte) {
 
 // roll draws once from the generator. Callers hold mu.
 func (in *Injector) roll() bool {
-	return in.rate > 0 && in.rng.Float64() < in.rate
+	return in.rng.Float64() < in.rate
+}
+
+// isDML reports whether sql writes: an INSERT, UPDATE or DELETE, after any
+// leading comments and statement hints. The request's seqno cannot tell, as
+// the client numbers every statement, queries and read-only ones included.
+func isDML(sql string) bool {
+	for {
+		sql = strings.TrimLeftFunc(sql, unicode.IsSpace)
+		end := ""
+		switch {
+		case strings.HasPrefix(sql, "--"), strings.HasPrefix(sql, "#"):
+			end = "\n"
+		case strings.HasPrefix(sql, "/*"):
+			end = "*/"
+		case strings.HasPrefix(sql, "@{"):
+			end = "}"
+		}
+		if end == "" {
+			break
+		}
+		_, rest, found := strings.Cut(sql, end)
+		if !found {
+			return false
+		}
+		sql = rest
+	}
+	word := sql
+	if i := strings.IndexFunc(sql, func(r rune) bool { return !unicode.IsLetter(r) }); i >= 0 {
+		word = sql[:i]
+	}
+	switch strings.ToUpper(word) {
+	case "INSERT", "UPDATE", "DELETE":
+		return true
+	}
+	return false
 }
 
 func (in *Injector) status(call, sql string) error {
