@@ -346,6 +346,10 @@ The Spanner emulator suite (`moon run server:test-spanner`) is not part of
 demand, and is not a required check. To run it against a branch, use
 `gh workflow run spanner.yml --ref <branch>`, or run the Moon task locally.
 
+The PR title check is not part of `full-pr` either. It runs in the separate
+`pr-title` workflow, which a title edit starts on its own; see
+[Title format](#title-format).
+
 **Version-only mode** (Changesets version PRs) runs `release:version`, the
 publish preflight's npm check (`node scripts/release.mjs check-npm`: npm must
 already know every public package the version publishes), `release:pack`, and
@@ -653,6 +657,12 @@ Check a title before opening the PR:
 ```bash
 node scripts/check-pr-title.mjs --title "fix(login): keep the passkey prompt after a failed attempt"
 ```
+
+CI runs the same check in the `pr-title` workflow
+([`.github/workflows/pr-title.yml`](.github/workflows/pr-title.yml)) on every
+push to the PR and every edit of it, against the title the PR has at that
+moment. To fix a rejected title, rename the PR: that reruns the check, with no
+push and no `full-pr` run.
 
 ### Description
 
