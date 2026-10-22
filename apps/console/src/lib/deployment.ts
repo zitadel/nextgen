@@ -97,6 +97,16 @@ export async function listPrimaryOrigins(projectId: string): Promise<string[]> {
 }
 
 /**
+ * The release the primary origins serve now, if any. Deploying it to them
+ * again changes nothing, so the Deploy release drawer leaves it out.
+ */
+export async function livePrimaryReleaseId(projectId: string): Promise<string | undefined> {
+  const live = await listAllDeployments({ project_id: projectId, live: true });
+  return live.find((deployment) => deployment.kind === "primary" && deployment.status === "live")
+    ?.release_id;
+}
+
+/**
  * Makes a release live on every primary origin, with the message on the
  * record. When the origins already serve the release with the same values
  * the server writes nothing and answers with the deployment that is live.

@@ -3,7 +3,6 @@ import { Layers3, Link as LinkIcon, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { DeploySheet } from "@/components/deploy-sheet";
-import { NoticeDialog } from "@/components/notice-dialog";
 import { RollbackSheet } from "@/components/rollback-sheet";
 
 import {
@@ -149,14 +148,13 @@ function DeploymentRowItem({
   const params = { releaseId: deployment.release_id };
   const [redeployOpen, setRedeployOpen] = useState(false);
   const [rollbackOpen, setRollbackOpen] = useState(false);
-  const [blockedOpen, setBlockedOpen] = useState(false);
   // The drawer deploys to the primary origins; a preview row's redeploy
   // waits on its Preview card. A revoked release cannot go live again.
   const redeploy = deployment.kind === "primary" && !releaseRevoked(deployment);
   // Previews are deployed to again rather than rolled back; a revoked release
   // cannot go live again; and an earlier deployment of the live release would
-  // change nothing. None of those rows offers it. The live row does, to say
-  // why it cannot.
+  // change nothing. None of those rows offers it. A superseded row rolls back
+  // to itself; the live row opens the choice of what to go back to.
   const rollback =
     deployment.kind === "primary" &&
     !releaseRevoked(deployment) &&
@@ -203,16 +201,8 @@ function DeploymentRowItem({
           {redeploy && (
             <DropdownMenuItem onSelect={() => setRedeployOpen(true)}>Redeploy</DropdownMenuItem>
           )}
-          {/* The live row has nothing to go back to, and says so rather than
-              opening a drawer with the choice missing. */}
           {rollback && (
-            <DropdownMenuItem
-              onSelect={() =>
-                deployment.status === "live" ? setBlockedOpen(true) : setRollbackOpen(true)
-              }
-            >
-              Rollback
-            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setRollbackOpen(true)}>Rollback</DropdownMenuItem>
           )}
         </RowMenu>
         {/* Outside the menu and opened by state, so the menu closes on select
@@ -225,16 +215,10 @@ function DeploymentRowItem({
           onDeployed={onChanged}
         />
         <RollbackSheet
-          deploymentId={deployment.id}
+          deploymentId={deployment.status === "live" ? undefined : deployment.id}
           open={rollbackOpen}
           onOpenChange={setRollbackOpen}
           onRolledBack={onChanged}
-        />
-        <NoticeDialog
-          open={blockedOpen}
-          onOpenChange={setBlockedOpen}
-          title="Deployment cannot be rolled back"
-          description="Only superseded deployments can be rolled back."
         />
       </TableCell>
     </ResourceRow>

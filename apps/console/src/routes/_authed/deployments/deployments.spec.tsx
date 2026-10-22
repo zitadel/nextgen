@@ -187,7 +187,8 @@ describe("new deployment", () => {
   ];
 
   it("deploys a picked release to the primary origins and lists the record", async () => {
-    const history: unknown[] = [];
+    // `rel_3` is live on the primary origins: deploying it again changes nothing.
+    const history: unknown[] = [deployment("dep_live", { release_id: "rel_3" })];
     let posted: { projectId: string | null; body: unknown } | undefined;
     serveDeployments(history);
     serveProject(ORIGINS);
@@ -195,6 +196,7 @@ describe("new deployment", () => {
       http.get(RELEASES_URL, () =>
         HttpResponse.json({
           releases: [
+            releaseSummary("rel_3"),
             releaseSummary("rel_2"),
             releaseSummary("rel_1", { revoked_at: "2026-10-01T00:00:00Z" }),
           ],
@@ -225,10 +227,11 @@ describe("new deployment", () => {
     const submit = inDrawer.getByRole("button", { name: "Deploy release" });
     expect(submit).toBeDisabled();
 
-    // The picker hides the revoked release.
+    // The picker hides the revoked release and the one the origins serve.
     await userEvent.click(inDrawer.getByRole("combobox", { name: "Release" }));
     const listbox = await screen.findByRole("listbox");
     expect(within(listbox).queryByRole("option", { name: "rel_1" })).not.toBeInTheDocument();
+    expect(within(listbox).queryByRole("option", { name: "rel_3" })).not.toBeInTheDocument();
     await userEvent.click(within(listbox).getByRole("option", { name: "rel_2" }));
     await userEvent.type(inDrawer.getByLabelText("Message"), "Ship it");
     await userEvent.click(submit);
@@ -241,6 +244,23 @@ describe("new deployment", () => {
     // The drawer closes and the list reads again, so the record is a row.
     expect(screen.queryByRole("dialog", { name: "Deploy release" })).not.toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "rel_2" })).toBeInTheDocument();
+  });
+
+  it("says so when every release is already live", async () => {
+    serveDeployments([deployment("dep_live", { release_id: "rel_2" })]);
+    serveProject(ORIGINS);
+    server.use(
+      http.get(RELEASES_URL, () => HttpResponse.json({ releases: [releaseSummary("rel_2")] })),
+    );
+    await renderAt("/deployments");
+
+    await userEvent.click(await screen.findByRole("button", { name: "New deployment" }));
+    const drawer = await screen.findByRole("dialog", { name: "Deploy release" });
+    expect(
+      await within(drawer).findByText("Every release is already deployed to the primary origins."),
+    ).toBeInTheDocument();
+    expect(within(drawer).getByRole("combobox", { name: "Release" })).toBeDisabled();
+    expect(within(drawer).getByRole("button", { name: "Deploy release" })).toBeDisabled();
   });
 
   it("will not deploy to a project with no primary origin", async () => {
@@ -347,19 +367,18 @@ describe("rollback from a row", () => {
     expect(rows[1]).toHaveTextContent("rel_1");
   });
 
-  it("says a live deployment cannot be rolled back", async () => {
-    serveDeployments([deployment("dep_live")]);
+  it("opens the choice of what to go back to from the live row", async () => {
+    serveDeployments([
+      deployment("dep_live", { release_id: "rel_2" }),
+      deployment("dep_old", { status: "inactive" }),
+    ]);
     await renderAt("/deployments");
 
     await pick("dep_live", "Rollback");
-    const dialog = await screen.findByRole("alertdialog", {
-      name: "Deployment cannot be rolled back",
-    });
-    expect(
-      within(dialog).getByText("Only superseded deployments can be rolled back."),
-    ).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole("button", { name: "Close" }));
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    const drawer = await screen.findByRole("dialog", { name: "Rollback deployment" });
+    const inDrawer = within(drawer);
+    expect(await inDrawer.findByRole("radio", { name: "dep_old" })).not.toBeChecked();
+    expect(inDrawer.getByRole("button", { name: "Rollback deployment" })).toBeDisabled();
   });
 
   it("offers no rollback on a preview or on a revoked release", async () => {

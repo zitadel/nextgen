@@ -25,7 +25,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useSubmit } from "@/hooks/use-submit";
 import { describeError } from "@/lib/api-error";
-import { deployToPrimary, listPrimaryOrigins } from "@/lib/deployment";
+import { deployToPrimary, listPrimaryOrigins, livePrimaryReleaseId } from "@/lib/deployment";
 import { useRequiredProjectScope } from "@/lib/project-scope";
 import { listDeployableReleases, type ReleaseSummary } from "@/lib/release";
 
@@ -76,8 +76,10 @@ const COPY: Record<DeployIntent, { title: string; submit: string; done: string }
  *
  * Opened from a release's header the release is that one. Opened from the
  * Deployments directory's **New deployment** the operator picks one of the
- * project's releases that is not revoked. **Redeploy**, from either menu, is
- * the same drawer for the release in hand with its own copy.
+ * project's releases that is not revoked and not already live on the primary
+ * origins, since deploying that one again changes nothing; with none left
+ * the picker says so. **Redeploy**, from either menu, is the same drawer for
+ * the release in hand with its own copy.
  *
  * Where it goes is the project's primary origins, which is what
  * `POST /deployments` resolves `primary` to; the card lists them so the
@@ -144,13 +146,14 @@ function DeployForm({
     void (async () => {
       try {
         // The releases are read only when there is a choice to make.
-        const [primary, options] = await Promise.all([
+        const [primary, options, liveId] = await Promise.all([
           listPrimaryOrigins(projectId),
           release ? undefined : listDeployableReleases(projectId),
+          release ? undefined : livePrimaryReleaseId(projectId),
         ]);
         if (cancelled) return;
         setOrigins(primary);
-        if (options) setReleases(options);
+        if (options) setReleases(options.filter((option) => option.id !== liveId));
       } catch (cause) {
         if (!cancelled) setLoadError(describeError(cause, "Could not load the project."));
       }
@@ -162,6 +165,7 @@ function DeployForm({
 
   const options = release ? [release] : (releases ?? []);
   const loading = origins === undefined || (!release && releases === undefined);
+  const nothingToDeploy = !release && releases !== undefined && releases.length === 0;
 
   const deploy = useSubmit(async () => {
     await deployToPrimary(projectId, releaseId, message.trim() || undefined);
@@ -187,14 +191,22 @@ function DeployForm({
           <Select
             value={releaseId}
             onValueChange={setReleaseId}
-            disabled={release !== undefined || releases === undefined}
+            disabled={release !== undefined || releases === undefined || nothingToDeploy}
           >
             {/* The trigger spaces its children out; the value takes the room
                 between the glyph and the chevron so the text starts at the
                 glyph. Set from the trigger: the value drops its own `className`. */}
             <SelectTrigger id={releaseFieldId} className={RELEASE_TRIGGER}>
               <Layers3 aria-hidden />
-              <SelectValue placeholder={loading ? "Loading releases…" : "Select release"} />
+              <SelectValue
+                placeholder={
+                  loading
+                    ? "Loading releases…"
+                    : nothingToDeploy
+                      ? "No release to deploy"
+                      : "Select release"
+                }
+              />
             </SelectTrigger>
             <SelectContent>
               {options.map((option) => (
@@ -204,6 +216,11 @@ function DeployForm({
               ))}
             </SelectContent>
           </Select>
+          {nothingToDeploy && (
+            <p className="text-xs leading-4 text-muted-foreground">
+              Every release is already deployed to the primary origins.
+            </p>
+          )}
         </Field>
 
         <Separator />

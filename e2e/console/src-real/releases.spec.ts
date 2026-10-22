@@ -92,7 +92,9 @@ test("deploys a release to the primary origins from the directory", async ({
   seed,
 }) => {
   await signIn(page, zitadel, await seed.user());
-  const release = await createRelease(zitadel, `e2e deploy ${Date.now()}`);
+  // Distinct: the drawer leaves out the release the origins already serve,
+  // and the pointer-set release above is live by now.
+  const release = await createDistinctRelease(zitadel, `e2e deploy ${Date.now()}`);
   const origin = `https://${Date.now()}.deploy.acme.test`;
   await addPrimaryOrigin(zitadel, origin);
 
