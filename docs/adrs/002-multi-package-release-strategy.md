@@ -93,7 +93,7 @@ Trade-offs:
 
 ## Follow-up
 
-- Decide when to exit Changesets prerelease mode and publish stable `latest`
-  npm packages.
+- Exit Changesets prerelease mode and publish to npm's `latest`: decided in
+  [ADR 074](074-preview-releases-on-0x.md).
 - Add signing and provenance for server archives and containers.
 - Decide when the fixed alpha group can split into independent package releases.

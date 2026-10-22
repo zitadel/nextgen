@@ -5,7 +5,7 @@ Next.js middleware and helpers for Nextgen Auth.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-next@alpha
+pnpm add @zitadel/sdk-next@latest
 ```
 
 Requires Next.js 15.2.3 or later. Earlier 15.x releases skip middleware for a

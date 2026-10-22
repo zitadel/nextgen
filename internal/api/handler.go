@@ -25,6 +25,7 @@ type Handler struct {
 	flowDefinitionService service.FlowDefinitionService
 	teamService           *service.TeamService
 	brandingService       *service.BrandingService
+	policyService         *service.PolicyService
 	releaseService        service.ReleaseService
 	deploymentService     *service.DeploymentService
 	idpConnectionService  service.IDPConnectionService

@@ -9,7 +9,7 @@ import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 /**
  * Verifies that exactly-pinned `@zitadel/*` dependencies match this CLI's own
  * version. The packages publish as one lockstep train, and the scaffold pins
- * the SDK at the CLI's version — but the CLI floats (`npx @zitadel/cli@alpha`)
+ * the SDK at the CLI's version — but the CLI floats (`npx @zitadel/cli@latest`)
  * while the app's pin stays put, so a newer CLI can restore files or write
  * guidance that references SDK entry points the older pinned SDK does not
  * ship (e.g. a subpath export added a train later). A mismatch therefore

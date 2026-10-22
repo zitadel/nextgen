@@ -195,7 +195,7 @@ describe("NextPatcher.plan", () => {
   });
 
   it.each([
-    ["1.2.0", "latest"],
+    ["1.2.0", "1.2.0"],
     ["2.0.0-beta.3", "beta"],
   ])("pins the SDK for CLI %s at %s", (cliVersion, expected) => {
     const plan = new NextPatcher().plan({ ...ctxFor("app"), cliVersion });
