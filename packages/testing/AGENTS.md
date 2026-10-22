@@ -32,9 +32,6 @@ upward.
 - Every observable change needs a changeset. The kit is shipped product: a
   new capability is `feat` and a repair `fix`, never `test:`
   ([`.changeset/README.md`](../../.changeset/README.md)).
-- Releases land on the `alpha` dist-tag while changesets is in pre mode, and
-  `latest` stays at the `0.0.0` placeholder on purpose. Never "fix" or flag
-  it.
 - Never edit versions or dist-tags or publish by hand: the train owns them.
 - Keep `LICENSE`, `publishConfig.access` and the `license` field, and the
   package in [`LICENSING.md`](../../LICENSING.md)'s MIT exceptions.

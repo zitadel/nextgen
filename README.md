@@ -24,15 +24,15 @@ and release workflows. Agent-facing workspace rules live in
 
 ### I am adding Zitadel to my app
 
-| I want to...                                         | Run                                           |
-| ---------------------------------------------------- | --------------------------------------------- |
-| Check local runtime prerequisites                    | `npx @zitadel/cli@alpha doctor`               |
-| Start local Zitadel                                  | `npx @zitadel/cli@alpha start`                |
-| Add auth to my app                                   | `npx @zitadel/cli@alpha setup --server local` |
-| Open the local console, signed in as the local admin | `npx @zitadel/cli@alpha console`              |
-| Check generated app files                            | `npx @zitadel/cli@alpha doctor`               |
-| Stop local Zitadel, keeping data                     | `npx @zitadel/cli@alpha stop`                 |
-| Delete local Zitadel data                            | `npx @zitadel/cli@alpha reset --force`        |
+| I want to...                                         | Run                                            |
+| ---------------------------------------------------- | ---------------------------------------------- |
+| Check local runtime prerequisites                    | `npx @zitadel/cli@latest doctor`               |
+| Start local Zitadel                                  | `npx @zitadel/cli@latest start`                |
+| Add auth to my app                                   | `npx @zitadel/cli@latest setup --server local` |
+| Open the local console, signed in as the local admin | `npx @zitadel/cli@latest console`              |
+| Check generated app files                            | `npx @zitadel/cli@latest doctor`               |
+| Stop local Zitadel, keeping data                     | `npx @zitadel/cli@latest stop`                 |
+| Delete local Zitadel data                            | `npx @zitadel/cli@latest reset --force`        |
 
 The published `zitadel` runtime commands run the released local runtime through
 the `@zitadel/server` npm binary by default and do not require Docker, Go, Moon,
@@ -65,7 +65,7 @@ top-level router skill is installed. The CLI skill also ships inside the
 ```sh
 mkdir myapp
 cd myapp
-npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@latest doctor
 ```
 
 Pick a server before running `setup`. It cannot be changed on this app
@@ -75,8 +75,8 @@ Zitadel Cloud instance if you want the project to belong to your team there.
 ### Local
 
 ```sh
-npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --server local
+npx @zitadel/cli@latest start
+npx @zitadel/cli@latest setup --server local
 npm run dev
 ```
 
@@ -94,7 +94,7 @@ project simply has no owning team.
 Any time you need the console again, print a fresh link:
 
 ```sh
-npx @zitadel/cli@alpha console
+npx @zitadel/cli@latest console
 ```
 
 The console shows your project and lets you add colleagues as project admins
@@ -113,7 +113,7 @@ its metadata and data under `.zitadel/local/`; `stop` preserves that data and
 ### Zitadel Cloud
 
 ```sh
-npx @zitadel/cli@alpha setup --server https://preview.zitadel.com
+npx @zitadel/cli@latest setup --server https://preview.zitadel.com
 npm run dev
 ```
 
@@ -122,7 +122,7 @@ and `console` do not apply there. Once the app is up, attach the project to
 your team:
 
 ```sh
-npx @zitadel/cli@alpha claim
+npx @zitadel/cli@latest claim
 ```
 
 This opens a browser so you can sign in with your own Zitadel account (not
@@ -175,7 +175,9 @@ search, and publishes LLM-friendly text at `/docs/llms.txt`,
 
 This repository is pre-release. The Go `server` command serves the OpenAPI
 surface and embeds the console and login UIs at `/ui/console/` and `/ui/login/`.
-CI produces installable snapshots for review, not official releases.
+Releases are `0.x` previews on npm's `latest` tag, and until 1.0.0 a minor
+release can carry a breaking change
+([ADR 074](docs/adrs/074-preview-releases-on-0x.md)).
 
 For product direction and the four pillars, see [VISION.md](VISION.md).
 
@@ -192,7 +194,7 @@ step list is in [CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
 
 Moon builds the artifacts (Go binaries, containers, archives) and the draft
 GitHub Release; Changesets owns versions, npm publishing, and release notes,
-with the public packages on one fixed alpha train. Build a local snapshot with
+with the public packages on one fixed release train. Build a local snapshot with
 `moon run release:snapshot` (more in [CONTRIBUTING.md](CONTRIBUTING.md)). To
 cut or recover a release, follow the
 [release runbook](docs/runbooks/manual-release.md); for when to add a

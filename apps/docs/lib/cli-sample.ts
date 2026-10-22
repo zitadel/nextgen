@@ -14,7 +14,7 @@ import { authentication, operationParameters, pathParameterNames } from "./sdk-s
 // never appears. The path parameter is the command's positional, a write's
 // body goes in `--data`, and a list's query becomes its flags.
 
-export const cli = "npx @zitadel/cli@alpha";
+export const cli = "npx @zitadel/cli@latest";
 
 /** What the CLI needs before it runs a resource command. */
 const context = "# Run where `zitadel setup` wrote .zitadel/secret.";

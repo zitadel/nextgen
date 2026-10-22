@@ -5,10 +5,10 @@ Test-kit for **seeded ephemeral local Zitadel instances**: boot the real server
 project with the default login flow, and mint password users that can complete
 the real login journey immediately.
 
-> **Status: alpha.** Published to npm on the shared release train — the kit
+> **Status: preview.** Published to npm on the shared release train — the kit
 > carries the same version as `@zitadel/cli` and the SDKs, the train publishes
-> under the `alpha` dist-tag (install with `@alpha`), and APIs can still move
-> between alphas. macOS/Linux (see [Known limitations](#known-limitations)).
+> to npm's `latest` tag, and until 1.0.0 a minor version can change its API
+> (its release note marks it **Breaking:**). macOS/Linux (see [Known limitations](#known-limitations)).
 
 ## Why
 
@@ -21,7 +21,7 @@ through the registration UI, serialized per suite. This kit fills the middle:
 ## Quick start (Playwright)
 
 ```sh
-npm i -D @zitadel/testing@alpha @playwright/test
+npm i -D @zitadel/testing@latest @playwright/test
 ```
 
 The kit drives the `zitadel` CLI, which resolves the published
@@ -383,7 +383,7 @@ on top, in intended order:
   customer would in CI, and the kit ships on the release train (release
   manifest + changeset `fixed` group), versioned in lockstep with
   `@zitadel/cli`. Remaining: the Windows decision for the local binary
-  runtime and the stability commitment when the train leaves alpha.
+  runtime and the stability commitment when the train reaches 1.0.0.
 
 Parked until server support exists: passkey *seeding* (pre-registered WebAuthn
 credentials) — UI-driven passkey ceremonies are covered today by

@@ -6,9 +6,18 @@ export function npmDistTagForCliVersion(cliVersion: string): string {
   return match?.[1] ?? "latest";
 }
 
+/**
+ * Whether a version is one the release train publishes: a release (`0.1.0`) or
+ * an alpha prerelease (`1.0.0-alpha.25`). Any other prerelease (`1.0.0-beta.2`,
+ * `0.0.0-test`) has only its dist-tag to point at.
+ */
+export function isTrainVersion(version: string): boolean {
+  return /^\d+\.\d+\.\d+(-alpha\.\d+)?$/.test(version.trim().replace(/^v/, ""));
+}
+
 export function npmSelectorForCliVersion(cliVersion: string): string {
   const normalized = cliVersion.trim().replace(/^v/, "");
-  if (/^\d+\.\d+\.\d+-alpha\.\d+$/.test(normalized)) {
+  if (isTrainVersion(normalized)) {
     return normalized;
   }
   return npmDistTagForCliVersion(normalized);
@@ -16,8 +25,8 @@ export function npmSelectorForCliVersion(cliVersion: string): string {
 
 /**
  * The version a scaffold writes for the `@zitadel/*` packages it adds: the
- * CLI's own exact version on an alpha train, else its dist-tag (`latest` for a
- * stable CLI). The packages publish as one lockstep train, so the exact pin
+ * CLI's own exact version on the train, else its dist-tag (`beta` for
+ * `1.0.0-beta.2`). The packages publish as one lockstep train, so the exact pin
  * keeps the app on the SDK that matches the files this CLI wrote, and lets
  * doctor's `dependency-version` check compare it against the CLI.
  */

@@ -94,6 +94,11 @@ type Invoker interface {
 	// It accepts factor challenges, verifies proofs, and completes into a session or handoff token.
 	// Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
 	// also include session_id and that session's session_token to add factors to an existing session.
+	// The project comes from the project secret. A body `project_id` that disagrees
+	// answers `403` with `proj.mismatch`. The attempt resolves a deployment the
+	// same way as other runtime operations and seals it; with no browser `Origin`
+	// and nothing deployed to the resolved target the response is `409` with
+	// `rel.not_deployed`. A revoked release answers `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts
 	CreateAuthAttempt(ctx context.Context, request *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error)
@@ -145,6 +150,17 @@ type Invoker interface {
 	// the first capability step. Creates a new session implicitly unless
 	// `session_id` is provided, together with that session's `session_token`
 	// (for step-up / reauth on an existing session).
+	// The browser `Origin` header selects which deployment serves this attempt:
+	// the gate admits the origin against the project's origin patterns and live
+	// previews, the newest deployment to that exact origin is the target, and
+	// that deployment's release supplies flow definitions, user schemas and
+	// branding. The resolved deployment is sealed into the `_zflow` cookie so
+	// later steps keep the same configuration. An origin that matches no pattern
+	// answers `403` with `proj.origin_not_allowed`; one that matches a preview
+	// pattern with no live preview answers `403` with `proj.preview_not_live`;
+	// nothing deployed to the target answers `409` with `rel.not_deployed`; a
+	// revoked release answers `409` with `rel.revoked`. A request with no
+	// `Origin` passes the gate and still needs a deployment target.
 	// The response contains an `id` field — the flow handle. Use it as the path
 	// parameter for all subsequent `/flow/{id}/submit` calls.
 	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -153,7 +169,7 @@ type Invoker interface {
 	// cookie. The browser sends it automatically on subsequent requests.
 	//
 	// POST /flow
-	CreateFlow(ctx context.Context, request *CreateFlowRequest) (CreateFlowRes, error)
+	CreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error)
 	// CreateFlowDefinition invokes createFlowDefinition operation.
 	//
 	// Publishes a new flow definition revision.
@@ -200,7 +216,9 @@ type Invoker interface {
 	// The handoff token is:
 	// - Single-use (atomic exchange, no retry)
 	// - Audience-bound (requires matching project key for exchange)
-	// - Idempotency-safe within a 5-minute window (see conventions).
+	// - Idempotency-safe within a 5-minute window (see conventions)
+	// Reuses the deployment sealed when the attempt was created. If that release
+	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
@@ -378,6 +396,12 @@ type Invoker interface {
 	// The `session_token` supersedes any previously issued `session_token` for the same session.
 	// Clients must replace their stored token at this point.
 	// Requires a project service key (OAuth2 client credentials).
+	// The project comes from the project secret. A query `project_id` that
+	// disagrees answers `403` with `proj.mismatch`. The exchange resolves a
+	// deployment the same way as other runtime operations; with no browser
+	// `Origin` and nothing deployed to the resolved target the response is
+	// `409` with `rel.not_deployed`. A revoked release answers `409` with
+	// `rel.revoked`.
 	//
 	// POST /sessions/exchange
 	ExchangeHandoff(ctx context.Context, request *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error)
@@ -399,6 +423,8 @@ type Invoker interface {
 	// challenges issued so far, and any errors preventing progress.
 	// Use this for polling during long-running factor verifications (e.g., waiting for
 	// a federated IdP callback or a device flow).
+	// Reuses the deployment sealed when the attempt was created. If that release
+	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// GET /auth_attempts/{attempt_id}
 	GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error)
@@ -469,6 +495,9 @@ type Invoker interface {
 	//
 	// Returns the current capability step without advancing the state machine.
 	// Useful for page reloads or re-rendering after a network error.
+	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+	// re-resolve from `Origin`. If that release was revoked since the attempt
+	// started, the response is `409` with `rel.revoked`.
 	//
 	// GET /flow/{id}
 	GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error)
@@ -573,6 +602,14 @@ type Invoker interface {
 	//
 	// GET /users/me/schema
 	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
+	// GetPolicyRevision invokes getPolicyRevision operation.
+	//
+	// Reads one revision of a policy, newest or not.
+	// The lookup is scoped to the project in `project_id`: a revision of another
+	// project answers not found exactly as an unknown id does.
+	//
+	// GET /policies/revisions/{revision_id}
+	GetPolicyRevision(ctx context.Context, params GetPolicyRevisionParams) (GetPolicyRevisionRes, error)
 	// GetProject invokes getProject operation.
 	//
 	// Returns the current state of a project.
@@ -680,6 +717,8 @@ type Invoker interface {
 	// (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
 	// including method, metadata, and any UI hints. The client then verifies the proof
 	// by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+	// Reuses the deployment sealed when the attempt was created. If that release
+	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	IssueChallenge(ctx context.Context, request *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
@@ -862,6 +901,21 @@ type Invoker interface {
 	//
 	// PATCH /users/{user_id}
 	PatchUserByID(ctx context.Context, request *PatchUserRequest, params PatchUserByIDParams) (PatchUserByIDRes, error)
+	// PublishPolicy invokes publishPolicy operation.
+	//
+	// Publishes the project's policy for an operation as a new immutable
+	// revision, creating the policy on its first publish. The newest revision
+	// applies to the next time the operation runs; nothing already stored is
+	// re-evaluated, so a stricter password policy applies the next time a
+	// password is set.
+	// `config` is checked against the operation's template: an unknown
+	// operation or setting, a value of the wrong type or outside its bounds, or
+	// settings that contradict each other (a `min_length` above `max_length`)
+	// answer `pol.invalid`. A setting left out is off, and `{}` switches every
+	// rule off; there are no defaults.
+	//
+	// POST /policies
+	PublishPolicy(ctx context.Context, request *PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error)
 	// QueryGrants invokes queryGrants operation.
 	//
 	// Returns the collaboration grants of a project, paginated with a cursor.
@@ -1058,6 +1112,9 @@ type Invoker interface {
 	// from the project's variables. A provider the engine cannot start a
 	// sign-in with, including a reference with no variable behind it,
 	// re-renders the step with `error.sso_unavailable`.
+	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+	// re-resolve from `Origin`. If that release was revoked since the attempt
+	// started, the response is `409` with `rel.revoked`.
 	//
 	// POST /flow/{id}/submit
 	SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
@@ -1097,6 +1154,8 @@ type Invoker interface {
 	// - `recovery_code` method: { recovery_code: "…" }
 	// On successful verification, the factor is written to the auth attempt.
 	// The attempt moves to the next pending challenge or completes if all required factors are verified.
+	// Reuses the deployment sealed when the attempt was created. If that release
+	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 	VerifyChallengeProof(ctx context.Context, request *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error)
@@ -1748,6 +1807,11 @@ func (c *Client) sendCompleteClaim(ctx context.Context, request *CompleteClaimRe
 // It accepts factor challenges, verifies proofs, and completes into a session or handoff token.
 // Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
 // also include session_id and that session's session_token to add factors to an existing session.
+// The project comes from the project secret. A body `project_id` that disagrees
+// answers `403` with `proj.mismatch`. The attempt resolves a deployment the
+// same way as other runtime operations and seals it; with no browser `Origin`
+// and nothing deployed to the resolved target the response is `409` with
+// `rel.not_deployed`. A revoked release answers `409` with `rel.revoked`.
 //
 // POST /auth_attempts
 func (c *Client) CreateAuthAttempt(ctx context.Context, request *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error) {
@@ -2180,6 +2244,17 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 // the first capability step. Creates a new session implicitly unless
 // `session_id` is provided, together with that session's `session_token`
 // (for step-up / reauth on an existing session).
+// The browser `Origin` header selects which deployment serves this attempt:
+// the gate admits the origin against the project's origin patterns and live
+// previews, the newest deployment to that exact origin is the target, and
+// that deployment's release supplies flow definitions, user schemas and
+// branding. The resolved deployment is sealed into the `_zflow` cookie so
+// later steps keep the same configuration. An origin that matches no pattern
+// answers `403` with `proj.origin_not_allowed`; one that matches a preview
+// pattern with no live preview answers `403` with `proj.preview_not_live`;
+// nothing deployed to the target answers `409` with `rel.not_deployed`; a
+// revoked release answers `409` with `rel.revoked`. A request with no
+// `Origin` passes the gate and still needs a deployment target.
 // The response contains an `id` field — the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -2188,12 +2263,12 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 // cookie. The browser sends it automatically on subsequent requests.
 //
 // POST /flow
-func (c *Client) CreateFlow(ctx context.Context, request *CreateFlowRequest) (CreateFlowRes, error) {
-	res, err := c.sendCreateFlow(ctx, request)
+func (c *Client) CreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error) {
+	res, err := c.sendCreateFlow(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest) (res CreateFlowRes, err error) {
+func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (res CreateFlowRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -2250,6 +2325,23 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest)
 	}
 	if err := encodeCreateFlowRequest(request, r); err != nil {
 		return res, errors.Wrap(err, "encode request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "Origin",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Origin.Get(); ok {
+				return e.EncodeValue(conv.URLToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
 	}
 
 	stage = "SendRequest"
@@ -2574,7 +2666,9 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 // The handoff token is:
 // - Single-use (atomic exchange, no retry)
 // - Audience-bound (requires matching project key for exchange)
-// - Idempotency-safe within a 5-minute window (see conventions).
+// - Idempotency-safe within a 5-minute window (see conventions)
+// Reuses the deployment sealed when the attempt was created. If that release
+// was revoked since, the response is `409` with `rel.revoked`.
 //
 // POST /auth_attempts/{attempt_id}/handoff
 func (c *Client) CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error) {
@@ -4387,6 +4481,12 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 // The `session_token` supersedes any previously issued `session_token` for the same session.
 // Clients must replace their stored token at this point.
 // Requires a project service key (OAuth2 client credentials).
+// The project comes from the project secret. A query `project_id` that
+// disagrees answers `403` with `proj.mismatch`. The exchange resolves a
+// deployment the same way as other runtime operations; with no browser
+// `Origin` and nothing deployed to the resolved target the response is
+// `409` with `rel.not_deployed`. A revoked release answers `409` with
+// `rel.revoked`.
 //
 // POST /sessions/exchange
 func (c *Client) ExchangeHandoff(ctx context.Context, request *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error) {
@@ -4694,6 +4794,8 @@ func (c *Client) sendFinishUserPasskeyRegistration(ctx context.Context, request 
 // challenges issued so far, and any errors preventing progress.
 // Use this for polling during long-running factor verifications (e.g., waiting for
 // a federated IdP callback or a device flow).
+// Reuses the deployment sealed when the attempt was created. If that release
+// was revoked since, the response is `409` with `rel.revoked`.
 //
 // GET /auth_attempts/{attempt_id}
 func (c *Client) GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error) {
@@ -5830,6 +5932,9 @@ func (c *Client) sendGetFlowDefinition(ctx context.Context, params GetFlowDefini
 //
 // Returns the current capability step without advancing the state machine.
 // Useful for page reloads or re-rendering after a network error.
+// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+// re-resolve from `Origin`. If that release was revoked since the attempt
+// started, the response is `409` with `rel.revoked`.
 //
 // GET /flow/{id}
 func (c *Client) GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error) {
@@ -7260,6 +7365,157 @@ func (c *Client) sendGetMyUserSchema(ctx context.Context, params GetMyUserSchema
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMyUserSchemaResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetPolicyRevision invokes getPolicyRevision operation.
+//
+// Reads one revision of a policy, newest or not.
+// The lookup is scoped to the project in `project_id`: a revision of another
+// project answers not found exactly as an unknown id does.
+//
+// GET /policies/revisions/{revision_id}
+func (c *Client) GetPolicyRevision(ctx context.Context, params GetPolicyRevisionParams) (GetPolicyRevisionRes, error) {
+	res, err := c.sendGetPolicyRevision(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetPolicyRevision(ctx context.Context, params GetPolicyRevisionParams) (res GetPolicyRevisionRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getPolicyRevision"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/policies/revisions/{revision_id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetPolicyRevisionOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/policies/revisions/"
+	{
+		// Encode "revision_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "revision_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.RevisionID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetPolicyRevisionOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetPolicyRevisionResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -8865,6 +9121,8 @@ func (c *Client) sendInitClaim(ctx context.Context, params InitClaimParams) (res
 // (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
 // including method, metadata, and any UI hints. The client then verifies the proof
 // by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+// Reuses the deployment sealed when the attempt was created. If that release
+// was revoked since, the response is `409` with `rel.revoked`.
 //
 // POST /auth_attempts/{attempt_id}/challenges
 func (c *Client) IssueChallenge(ctx context.Context, request *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error) {
@@ -12591,6 +12849,146 @@ func (c *Client) sendPatchUserByID(ctx context.Context, request *PatchUserReques
 	return result, nil
 }
 
+// PublishPolicy invokes publishPolicy operation.
+//
+// Publishes the project's policy for an operation as a new immutable
+// revision, creating the policy on its first publish. The newest revision
+// applies to the next time the operation runs; nothing already stored is
+// re-evaluated, so a stricter password policy applies the next time a
+// password is set.
+// `config` is checked against the operation's template: an unknown
+// operation or setting, a value of the wrong type or outside its bounds, or
+// settings that contradict each other (a `min_length` above `max_length`)
+// answer `pol.invalid`. A setting left out is off, and `{}` switches every
+// rule off; there are no defaults.
+//
+// POST /policies
+func (c *Client) PublishPolicy(ctx context.Context, request *PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error) {
+	res, err := c.sendPublishPolicy(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendPublishPolicy(ctx context.Context, request *PublishPolicyRequest, params PublishPolicyParams) (res PublishPolicyRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("publishPolicy"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/policies"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, PublishPolicyOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/policies"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodePublishPolicyRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, PublishPolicyOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodePublishPolicyResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // QueryGrants invokes queryGrants operation.
 //
 // Returns the collaboration grants of a project, paginated with a cursor.
@@ -14562,6 +14960,9 @@ func (c *Client) sendSetUserPassword(ctx context.Context, request *SetUserPasswo
 // from the project's variables. A provider the engine cannot start a
 // sign-in with, including a reference with no variable behind it,
 // re-renders the step with `error.sso_unavailable`.
+// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+// re-resolve from `Origin`. If that release was revoked since the attempt
+// started, the response is `409` with `rel.revoked`.
 //
 // POST /flow/{id}/submit
 func (c *Client) SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error) {
@@ -15030,6 +15431,8 @@ func (c *Client) sendUpdateVariables(ctx context.Context, request UpdateVariable
 // - `recovery_code` method: { recovery_code: "…" }
 // On successful verification, the factor is written to the auth attempt.
 // The attempt moves to the next pending challenge or completes if all required factors are verified.
+// Reuses the deployment sealed when the attempt was created. If that release
+// was revoked since, the response is `409` with `rel.revoked`.
 //
 // POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 func (c *Client) VerifyChallengeProof(ctx context.Context, request *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error) {
