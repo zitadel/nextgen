@@ -6,11 +6,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/errreport"
 )
 
-// A panicking handler answers the standard internal error and logs its stack
-// once, at Error.
+// A panicking handler answers the standard internal error and is logged as
+// one API error at Error, with the panic's stack even when stack capture is
+// off.
 func TestWithRecoverAnswersPanicWithInternalError(t *testing.T) {
+	errreport.EnableStack(false)
 	rec, records := serveAndRecordLogs(t, errorStubHandler{panicValue: "boom"}, nil,
 		httptest.NewRequest(http.MethodGet, "/healthz", nil))
 
@@ -20,11 +23,30 @@ func TestWithRecoverAnswersPanicWithInternalError(t *testing.T) {
 	require.Len(t, records, 1)
 	record := records[0]
 	require.Equal(t, "ERROR", record["level"])
-	require.Equal(t, "handler panicked", record["msg"])
-	require.Equal(t, "boom", record["panic"])
-	require.NotEmpty(t, record["stack"])
+	require.Equal(t, "api error", record["msg"])
+	require.EqualValues(t, http.StatusInternalServerError, record["status"])
 	require.Equal(t, "getHealth", record["operation_id"])
 	require.Equal(t, "req_1", record["request_id"])
+	logged := record["error"].(map[string]any)
+	require.Equal(t, "internal", logged["code"])
+	require.Contains(t, logged["parent"], "panic: boom")
+	require.NotEmpty(t, logged["stackTrace"])
+}
+
+// A panic after the response started cannot be answered any more: the
+// connection is aborted, so the client never takes the truncated response
+// for a success.
+func TestWithRecoverAbortsAStartedResponse(t *testing.T) {
+	records := recordLogs(t)
+	h := WithRecover(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		panic("boom")
+	}))
+
+	require.PanicsWithValue(t, http.ErrAbortHandler, func() {
+		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+	})
+	require.Len(t, records(), 1)
 }
 
 // A flushed response has started: a later panic must not write a second

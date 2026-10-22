@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -24,9 +25,11 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog/extractors"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
+	"github.com/zitadel/sloggcp"
 	"go.uber.org/mock/gomock"
 )
 
@@ -726,20 +729,10 @@ func (h errorStubHandler) GetHealth(context.Context) (api.GetHealthRes, error) {
 // serveAndRecordLogs serves req the way the production chain does (WithRecover
 // around the generated server, ogen's operation id middleware, a request
 // logger that adds the request id) and returns the response and every record
-// logged while serving it. slog.Default writes to the same records, so a line
-// logged past the request logger counts too. Location and stack capture are
-// on. Not parallel: it changes globals.
+// logged while serving it (see recordLogs). Not parallel: it changes globals.
 func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenService, req *http.Request) (*httptest.ResponseRecorder, []map[string]any) {
 	t.Helper()
-	enableErrorOrigins(t)
-	defaultLogger := slog.Default()
-	t.Cleanup(func() { slog.SetDefault(defaultLogger) })
-
-	var logs bytes.Buffer
-	logger := slog.New(slogctx.NewHandler(slog.NewJSONHandler(&logs, nil), &slogctx.HandlerOptions{
-		Prependers: []slogctx.AttrExtractor{extractors.ExtractRequestID},
-	}))
-	slog.SetDefault(logger)
+	records := recordLogs(t)
 
 	srv, err := api.NewServer(h, NewSecurityHandler(tokenService),
 		api.WithErrorHandler(OgenErrorHandler),
@@ -751,14 +744,32 @@ func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenS
 	ctx = middleware.WithOperationIDContext(ctx, "")
 	rec := httptest.NewRecorder()
 	WithRecover(srv).ServeHTTP(rec, req.WithContext(ctx))
+	return rec, records()
+}
 
-	var records []map[string]any
-	for line := range bytes.Lines(logs.Bytes()) {
-		var record map[string]any
-		require.NoError(t, json.Unmarshal(line, &record))
-		records = append(records, record)
+// recordLogs points slog.Default, which every logger lookup without a request
+// logger falls back to, at a JSON recorder that adds the request id, and
+// returns a function reading back every record logged so far. Not parallel:
+// it changes globals.
+func recordLogs(t *testing.T) func() []map[string]any {
+	t.Helper()
+	defaultLogger := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(defaultLogger) })
+
+	var logs bytes.Buffer
+	slog.SetDefault(slog.New(slogctx.NewHandler(slog.NewJSONHandler(&logs, nil), &slogctx.HandlerOptions{
+		Prependers: []slogctx.AttrExtractor{extractors.ExtractRequestID},
+	})))
+
+	return func() []map[string]any {
+		var records []map[string]any
+		for line := range bytes.Lines(logs.Bytes()) {
+			var record map[string]any
+			require.NoError(t, json.Unmarshal(line, &record))
+			records = append(records, record)
+		}
+		return records
 	}
-	return rec, records
 }
 
 // enableErrorOrigins turns on location and stack capture for the errors the
@@ -776,6 +787,7 @@ func enableErrorOrigins(t *testing.T) {
 // A handler error answered with a 5xx is logged once, at Error, with the
 // request and operation it failed and where it was raised.
 func TestOgenErrorHandlerLogsServerFaultOnce(t *testing.T) {
+	enableErrorOrigins(t)
 	rec, records := serveAndRecordLogs(t, errorStubHandler{err: errors.New("disk on fire")}, nil,
 		httptest.NewRequest(http.MethodGet, "/healthz", nil))
 
@@ -882,20 +894,22 @@ func TestOgenErrorHandlerLogsSecurityInternalErrorOnce(t *testing.T) {
 }
 
 // A request the client gave up on is logged at Warn, not as a server fault,
-// though it still answers 500. A cancel the server caused itself stays an
-// Error. Only the Error line carries the location and stack.
+// though it still answers 500, whatever error its going away caused. A
+// canceled error on a live request stays an Error. Only the Error line
+// carries the location and stack.
 func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
+		cause     error
 		canceled  bool
 		wantLevel string
 	}{
-		{"request canceled", true, "WARN"},
-		{"request alive", false, "ERROR"},
+		{"client gone while the body is written", fmt.Errorf("write response: %w", &net.OpError{Op: "write", Net: "tcp", Err: errors.New("broken pipe")}), true, "WARN"},
+		{"canceled error on a live request", fmt.Errorf("query projects: %w", context.Canceled), false, "ERROR"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			enableErrorOrigins(t)
-			err := domain.ErrInternal(fmt.Errorf("query projects: %w", context.Canceled))
+			err := domain.ErrInternal(tc.cause)
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			if tc.canceled {
@@ -909,10 +923,52 @@ func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
 			require.Equal(t, tc.wantLevel, records[0]["level"])
 			require.EqualValues(t, http.StatusInternalServerError, records[0]["status"])
 			if tc.canceled {
-				requireBriefError(t, records[0], err.Code, err.Message, "query projects: context canceled")
+				requireBriefError(t, records[0], err.Code, err.Message, "broken pipe")
 			} else {
 				require.Contains(t, records[0]["error"], "stackTrace")
 			}
 		})
 	}
 }
+
+// In GCP error reporting mode the handler builds a report from any `error`
+// attribute and reads the error through its interfaces, so a line below Error
+// level must carry the error itself, never the brief group.
+func TestLogAPIErrorKeepsTheErrorInGCPMode(t *testing.T) {
+	errreport.GCPReporting(true)
+	t.Cleanup(func() { errreport.GCPReporting(false) })
+	var records []slog.Record
+	ctx := zlog.WithLoggingContext(t.Context(), slog.New(recordingHandler{records: &records}))
+	err := domain.ErrProjectNotFound().WithParent(errors.New("no rows in result set"))
+
+	logAPIError(ctx, http.StatusNotFound, err)
+
+	require.Len(t, records, 1)
+	var logged slog.Value
+	records[0].Attrs(func(a slog.Attr) bool {
+		if a.Key == zlog.ErrorAttributeKey {
+			logged = a.Value
+		}
+		return true
+	})
+	require.IsType(t, domain.Error{}, logged.Any(), "the error itself, not a group")
+
+	var out bytes.Buffer
+	require.NoError(t, sloggcp.NewErrorReportingHandler(&out, nil).Handle(ctx, records[0]))
+	require.NotContains(t, out.String(), "unsupported type")
+}
+
+// recordingHandler keeps every record as logged, before any handler
+// resolves its values.
+type recordingHandler struct{ records *[]slog.Record }
+
+func (h recordingHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h recordingHandler) Handle(_ context.Context, r slog.Record) error {
+	*h.records = append(*h.records, r.Clone())
+	return nil
+}
+
+func (h recordingHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+
+func (h recordingHandler) WithGroup(string) slog.Handler { return h }

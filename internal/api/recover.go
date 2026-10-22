@@ -1,17 +1,17 @@
 package api
 
 import (
-	"log/slog"
+	"fmt"
 	"net/http"
 	"runtime/debug"
 
-	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
 // WithRecover turns a handler panic into the standard internal error
-// response and one Error log line with the stack. http.ErrAbortHandler is
+// response and one API error line with the panic's stack. A panic after the
+// response started aborts the connection instead, so the client does not
+// take a truncated response for a success. http.ErrAbortHandler is
 // re-panicked, as net/http expects.
 func WithRecover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -24,22 +24,28 @@ func WithRecover(next http.Handler) http.Handler {
 			if p == http.ErrAbortHandler {
 				panic(p)
 			}
-			ctx := r.Context()
-			operationID, _ := middleware.GetOperationIDContext(ctx)
-			// The stack is always attached: a panic is a bug, whatever the
-			// error stack trace setting says.
-			zlog.Error(ctx, "handler panicked",
-				slog.Any("panic", p),
-				slog.String("stack", string(debug.Stack())),
-				slog.String("operation_id", operationID),
-			)
-			if !tw.wroteHeader {
-				writeErrorDetails(w, http.StatusInternalServerError, domainErrorDetails(domain.ErrInternal(nil)))
+			// The domain error takes the panic's stack from its parent,
+			// whatever the stack trace setting says: a panic is a bug.
+			logAPIError(r.Context(), http.StatusInternalServerError,
+				domain.ErrInternal(panicError{value: p, stack: debug.Stack()}))
+			if tw.wroteHeader {
+				panic(http.ErrAbortHandler)
 			}
+			writeErrorDetails(w, http.StatusInternalServerError, domainErrorDetails(domain.ErrInternal(nil)))
 		}()
 		next.ServeHTTP(tw, r)
 	})
 }
+
+// panicError carries a recovered panic and the stack where it happened.
+type panicError struct {
+	value any
+	stack []byte
+}
+
+func (e panicError) Error() string { return fmt.Sprintf("panic: %v", e.value) }
+
+func (e panicError) StackTrace() ([]byte, bool) { return e.stack, true }
 
 // headerTrackingWriter records whether the response has started, after which
 // a panic can no longer be answered with an error body.

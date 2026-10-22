@@ -16,6 +16,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
@@ -259,13 +260,17 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 func logAPIError(ctx context.Context, status int, err domain.Error) {
 	level := slog.LevelInfo
 	switch {
-	case status >= http.StatusInternalServerError && errors.Is(err, context.Canceled) && ctx.Err() != nil:
-		level = slog.LevelWarn // the client went away, not a server fault
+	// The request context is done only when the client went away: nothing
+	// server-side cancels it.
+	case status >= http.StatusInternalServerError && ctx.Err() != nil:
+		level = slog.LevelWarn
 	case status >= http.StatusInternalServerError:
 		level = slog.LevelError
 	}
+	// GCP error reporting reads the error itself and drops location and stack
+	// from its LogValue; a group there would become a broken report.
 	logged := slog.Attr{Key: zlog.ErrorAttributeKey, Value: err.BriefLogValue()}
-	if level == slog.LevelError {
+	if level == slog.LevelError || errreport.GCPReportingEnabled() {
 		logged = slog.Any(zlog.ErrorAttributeKey, err)
 	}
 	operationID, _ := middleware.GetOperationIDContext(ctx)
