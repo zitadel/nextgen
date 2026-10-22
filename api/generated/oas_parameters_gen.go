@@ -8275,6 +8275,12 @@ type ListMyProjectsParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
+	// Narrows the list to the projects whose name contains this text,
+	// ignoring case, as `contains` matches text in a query endpoint's
+	// filter. Send the same value with every `page_token` the search
+	// returns: a token continues the list it came from. An empty value
+	// lists every project, as leaving it out does.
+	NameContains OptString `json:",omitempty,omitzero"`
 	// The project the caller signs its users in to. The cookie's session is used
 	// only when it belongs to this project; a session of any other project answers
 	// `403` with `sess.project_mismatch`.
@@ -8305,6 +8311,15 @@ func unpackListMyProjectsParams(packed middleware.Parameters) (params ListMyProj
 		}
 		if v, ok := packed[key]; ok {
 			params.PageToken = v.(OptPageToken)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "name_contains",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.NameContains = v.(OptString)
 		}
 	}
 	{
@@ -8433,6 +8448,47 @@ func decodeListMyProjectsParams(args [0]string, argsEscaped bool, r *http.Reques
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "page_token",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: name_contains.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "name_contains",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotNameContainsVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotNameContainsVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.NameContains.SetTo(paramsDotNameContainsVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "name_contains",
 			In:   "query",
 			Err:  err,
 		}

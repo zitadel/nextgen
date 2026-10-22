@@ -591,6 +591,11 @@ type ListAuthorizedProjectsRequest struct {
 	// sets it after asking the resolver. Order and paging stay the same, so a
 	// page token from one listing continues the other.
 	EveryProject bool
+	// NameContains narrows either listing to the projects whose name contains
+	// it, ignoring case. The storage statement applies it together with the
+	// authorization, so a search reaches every project the user can act on.
+	// Empty lists them all.
+	NameContains string
 	Limit        int
 	PageToken    string
 }
@@ -612,19 +617,24 @@ func (s *projectService) ListAuthorized(ctx context.Context, req ListAuthorizedP
 		return nil, err
 	}
 
-	page := database.Page[domain.ProjectField]{
-		Limit: uint32(normalizeLimit(req.Limit)),
-		OrderBy: database.OrderBy[domain.ProjectField]{
-			Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
-			Direction: database.OrderAsc,
+	opts := &database.ListOptions[domain.ProjectField]{
+		Pagination: database.Page[domain.ProjectField]{
+			Limit: uint32(normalizeLimit(req.Limit)),
+			OrderBy: database.OrderBy[domain.ProjectField]{
+				Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
+				Direction: database.OrderAsc,
+			},
+			Cursor: []byte(req.PageToken),
 		},
-		Cursor: []byte(req.PageToken),
+	}
+	if req.NameContains != "" {
+		opts.Filter = database.StringContainsFold(database.Col(domain.ProjectFieldName), req.NameContains)
 	}
 	var result *database.ListResult[*domain.Project]
 	if req.EveryProject {
-		result, err = s.v2Pool.Statements().ListProjects(ctx, &database.ListOptions[domain.ProjectField]{Pagination: page})
+		result, err = s.v2Pool.Statements().ListProjects(ctx, opts)
 	} else {
-		result, err = s.v2Pool.Statements().ListAuthorizedProjects(ctx, req.HomeProjectID, req.UserID, page)
+		result, err = s.v2Pool.Statements().ListAuthorizedProjects(ctx, req.HomeProjectID, req.UserID, opts)
 	}
 	if err != nil {
 		return nil, mapListError(err, "failed to list authorized projects")

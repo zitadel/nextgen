@@ -113,8 +113,8 @@ func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsReque
 // on". There is no requireProjectAccess here on purpose: the query is itself the
 // authorization, so a caller with no grants gets an empty page rather than a 403.
 // A platform operator can act on every project of the deployment, so the answer
-// is all of them, listed like anyone's (ADR 075 §6). The session is held to
-// project_id when the caller names one (requireSelf).
+// is all of them, listed and searched like anyone's (ADR 075 §6). The session
+// is held to project_id when the caller names one (requireSelf).
 func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsParams) (api.ListMyProjectsRes, error) {
 	self, err := requireSelf(ctx, params.ProjectID)
 	if err != nil {
@@ -133,6 +133,7 @@ func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsP
 		HomeProjectID: self.ProjectID(),
 		UserID:        self.UserID(),
 		EveryProject:  operator,
+		NameContains:  params.NameContains.Value,
 		Limit:         int(params.Limit.Value),
 		PageToken:     string(params.PageToken.Value),
 	})

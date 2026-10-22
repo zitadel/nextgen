@@ -270,25 +270,28 @@ func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, af
 }
 
 // ListAuthorizedProjects implements [service.AuthzAssignmentStatements].
-func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
-	projects, nextCursor, err := pagination.Page(page, projectSchema, func(limit uint32) ([]*domain.Project, error) {
-		page := page
-		page.Limit = limit
+func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+	projects, nextCursor, err := pagination.Page(opts.Pagination, projectSchema, func(limit uint32) ([]*domain.Project, error) {
+		opts := opts.WithLimit(limit)
 		var compiler statementCompiler
 		compiler.WriteString(projectQuery)
 		compiler.WriteString(" WHERE id IN (")
 		authz.WriteAuthorizedProjectIDs(&compiler, sqliteAuthzEnv(), homeProjectID, userID)
 		compiler.WriteString(")")
-		keyset, err := cursorFilter(page, projectSchema)
+		filter := opts.Filter
+		keyset, err := cursorFilter(opts.Pagination, projectSchema)
 		if err != nil {
 			return nil, err
 		}
 		if keyset != nil {
-			compiler.WriteString(" AND ")
-			compileFilter(&compiler, keyset, projectSchema)
+			filter = database.And(filter, keyset)
 		}
-		compileOrderBy(&compiler, page.OrderBy, projectSchema)
-		compileLimit(&compiler, page.Limit)
+		if filter != nil {
+			compiler.WriteString(" AND ")
+			compileFilter(&compiler, filter, projectSchema)
+		}
+		compileOrderBy(&compiler, opts.Pagination.OrderBy, projectSchema)
+		compileLimit(&compiler, opts.Pagination.Limit)
 
 		rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
 		if err != nil {

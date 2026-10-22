@@ -766,9 +766,11 @@ type AuthzAssignmentStatements interface {
 	//     the tupleset team, so nothing names the user on the project at all.
 	//
 	// Every route is evaluated on the active system catalog, mirroring
-	// CheckAuthz. page.OrderBy carries the sort columns; a cursor issued for a
-	// different OrderBy is rejected.
-	ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
+	// CheckAuthz. opts.Filter narrows the set (a name search) and is ANDed
+	// with that predicate in the same statement, so paging walks only the
+	// matches (ADR 053 §6). opts.Pagination.OrderBy carries the sort columns;
+	// a cursor issued for a different OrderBy is rejected.
+	ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 }
 
 // AuthzMembershipEdgeStatements persists the authz projection of set membership.
