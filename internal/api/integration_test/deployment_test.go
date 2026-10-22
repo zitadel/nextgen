@@ -321,11 +321,16 @@ func TestRollbackDeployment(t *testing.T) {
 	})
 
 	t.Run("a project with no primary origin", func(t *testing.T) {
-		for _, origin := range []string{"https://acme.com", appOrigin, wwwOrigin} {
-			require.NoError(t, harness.EnsureProjectService(t).RemoveOrigin(t.Context(), fixture.project, origin))
-		}
-		resp := fixture.rollback(t, first.ID, api.RollbackDeploymentRequest{})
-		assertAuthzError(t, resp, domain.ErrDeploymentInvalid().Code)
+		alone := deploymentFixture{releaseFixture: newReleaseFixture(t)}
+		alone.addOrigin(t, domain.Origin{Pattern: appOrigin, Kind: domain.OriginKindPrimary})
+		created := alone.create(t, &api.CreateReleaseRequest{Pointers: alone.pointers()})
+		require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
+		resp := alone.deploy(t, created.(*api.CreateReleaseCreated).ID)
+		require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		require.NoError(t, harness.EnsureProjectService(t).RemoveOrigin(t.Context(), alone.project, appOrigin))
+
+		rollback := alone.rollback(t, resp.(*api.CreateDeploymentCreated).ID, api.RollbackDeploymentRequest{})
+		assertAuthzError(t, rollback, domain.ErrDeploymentInvalid().Code)
 	})
 }
 

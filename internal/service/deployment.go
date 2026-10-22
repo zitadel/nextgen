@@ -173,8 +173,6 @@ func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeployme
 	if previous.OriginKind != domain.DeploymentOriginKindPrimary {
 		return nil, domain.ErrDeploymentInvalid().WithMessage("a deployment to preview URLs cannot be rolled back")
 	}
-	// TODO(#2207): refuse a revoked release with rel.revoked.
-	// TODO(#1781): re-apply the variable set the deployment froze.
 	return s.Deploy(ctx, DeployInput{
 		ProjectID:            input.ProjectID,
 		ReleaseID:            previous.ReleaseID,
@@ -262,7 +260,8 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
-		// TODO(#1781): freeze the deployment's variables here, in this transaction.
+		// TODO(#1781): resolve the variable set before DeploymentsEqual, from
+		// RollbackTo's frozen set or else the current values, and link it here.
 		if written.OriginKind == domain.DeploymentOriginKindPreview {
 			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
 				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {
