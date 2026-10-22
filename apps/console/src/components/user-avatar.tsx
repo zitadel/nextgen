@@ -48,12 +48,15 @@ export function avatarVars(seed: string): CSSProperties {
 }
 
 /**
- * What a person's avatar is generated from: their user id, so it survives a
- * changed email and is the same on every screen. The identifier stands in
- * only where no id is known.
+ * What a person's avatar is generated from: their identifier, trimmed and
+ * lowercased, because that is all the login widget can know. Its password
+ * step echoes what the visitor typed whether or not the account exists, so a
+ * gradient from that string leaks nothing, where a user id would confirm the
+ * account and expose an internal id. The cost: a changed email changes the
+ * avatar. The user id stands in only where no identifier is known.
  */
 export function avatarSeed(user: { userId?: string; identifier?: string } | undefined): string {
-  return user?.userId ?? user?.identifier ?? "";
+  return user?.identifier?.trim().toLowerCase() || user?.userId || "";
 }
 
 /** How much faster the gradient moves while the avatar's host is hovered. */
@@ -67,9 +70,9 @@ function setRate(element: HTMLElement | null, rate: number) {
 }
 
 /**
- * A person's avatar: a gradient generated from their user id rather than a
- * picture. The id, not the email, seeds it, so it survives a changed email.
- * A picture can replace it once users can upload one.
+ * A person's avatar: a gradient generated from their identifier
+ * (`avatarSeed`) rather than a picture, the same one the login shows. A
+ * picture can replace it once users can upload one.
  *
  * Its gradient's direction wanders, unless the person asked for reduced
  * motion. With `fast` it moves `FAST` times quicker: the playback rate

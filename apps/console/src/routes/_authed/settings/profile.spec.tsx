@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { avatarVars } from "@/components/user-avatar";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -197,6 +198,18 @@ describe("settings profile, generated from the schema", () => {
     expect(await screen.findByLabelText("Identifier")).toHaveValue("maya@example.com");
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+  });
+
+  it("generates the avatar from the identifier, as the footer and the login do", async () => {
+    server.use(http.get(ME_URL, () => HttpResponse.json(me({ identifier: "Maya@Example.com" }))));
+    await renderAt("/settings/profile");
+
+    await screen.findByLabelText("Email");
+    const avatars = document.querySelectorAll<HTMLElement>(".user-avatar");
+    const profile = avatars[avatars.length - 1];
+    const vars = avatarVars("maya@example.com") as Record<string, string>;
+    expect(profile?.style.getPropertyValue("--avatar-from")).toBe(vars["--avatar-from"]);
+    expect(profile?.style.getPropertyValue("--avatar-base")).toBe(vars["--avatar-base"]);
   });
 
   it("shows a boolean read-only, and saves a name beside a required one", async () => {

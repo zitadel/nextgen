@@ -135,7 +135,7 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             onPointerEnter={() => setHovered(true)}
             onPointerLeave={() => setHovered(false)}
           >
-            {/* 24px in the footer row, generated from the user id. */}
+            {/* 24px in the footer row, generated from the identifier. */}
             <UserAvatar seed={seed} fast={hovered || open} />
             {/* Hidden on the rail, so the avatar alone is what centres. */}
             <span className="flex min-w-0 flex-1 flex-col gap-1 group-data-[collapsible=icon]:hidden">

@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UserAvatar, avatarVars } from "./user-avatar";
+import { UserAvatar, avatarSeed, avatarVars } from "./user-avatar";
 
 const avatarGradient = (seed: string) => JSON.stringify(avatarVars(seed));
 
@@ -23,6 +23,20 @@ describe("avatarVars", () => {
       Array.from({ length: 50 }, (_, index) => avatarGradient(`user_${index}`)),
     );
     expect(gradients.size).toBeGreaterThan(45);
+  });
+});
+
+describe("avatarSeed", () => {
+  it("seeds from the identifier as typed at sign-in, whatever its case or spacing", () => {
+    expect(avatarSeed({ identifier: "  Maya@Example.com ", userId: "user_1" })).toBe(
+      "maya@example.com",
+    );
+  });
+
+  it("falls back to the user id only when there is no identifier", () => {
+    expect(avatarSeed({ userId: "user_1" })).toBe("user_1");
+    expect(avatarSeed({ identifier: "  ", userId: "user_1" })).toBe("user_1");
+    expect(avatarSeed(undefined)).toBe("");
   });
 });
 
