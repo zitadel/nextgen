@@ -1,7 +1,7 @@
 {
   "description": "Common questions a developer asks the zitadel CLI, run as one stateful journey against a single project. Each stage is a fresh agent task sharing the project and server the earlier stages built. The agent drives the CLI non-interactively, but may converse with the user: a stage with a `user` persona is run as a multi-turn conversation where a simulated user answers the agent's questions from that persona. Each stage grades on OUTCOME: after the agent's turn, the harness runs the stage's `assert` list against the live local instance (read commands, `--json`) and the stage passes only if every assertion holds. `grade` is a fallback for stages that have no server-assertable outcome.",
   "configs": ["with-skill", "baseline"],
-  "cliSpec": "@zitadel/cli@alpha",
+  "cliSpec": "@zitadel/cli@latest",
   "stages": [
     {
       "id": 1,

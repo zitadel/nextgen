@@ -1,5 +1,33 @@
 # @zitadel/components
 
+## 0.1.0
+
+### Minor Changes
+
+- [#2155](https://github.com/zitadel/nextgen/pull/2155) [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1) Thanks [@fforootd](https://github.com/fforootd)! - The password step of `<zitadel-login>` now shows the account it signs in to, with a "Use another account" link that goes back to the step where the email was typed. Templates ejected with `zitadel branding eject` before this release keep their markup; eject again to get the account row.
+
+### Patch Changes
+
+- [#2199](https://github.com/zitadel/nextgen/pull/2199) [`5680eb7`](https://github.com/zitadel/nextgen/commit/5680eb76a273b722456d567f94554e828bcf55e9) Thanks [@mridang](https://github.com/mridang)! - Generate and publish a `custom-elements.json` manifest describing every
+  `zitadel-*` and `zl-*` element's attributes and events, exposed through the
+  package's `customElements` field so editors and framework tooling can discover
+  the elements' surface.
+
+- [#2090](https://github.com/zitadel/nextgen/pull/2090) [`e3cd8f8`](https://github.com/zitadel/nextgen/commit/e3cd8f81111f3298b5635e31ab3c63a2ce293707) Thanks [@mridang](https://github.com/mridang)! - `<zitadel-login>` no longer dispatches `zitadel-flow-input` for a password or one-time-code field, so wiring `onFlowInput` to logging or analytics cannot capture what a visitor types there. Other fields dispatch as before. The atoms' internal `zl-input`, `zl-change` and `zl-passkey-result` events are no longer composed, so they stay inside the widget.
+
+- [#2175](https://github.com/zitadel/nextgen/pull/2175) [`be96308`](https://github.com/zitadel/nextgen/commit/be96308eec43f3ffe04a62fd414a18ea2b1ccb21) Thanks [@fforootd](https://github.com/fforootd)! - `<zitadel-login>` now falls back to your `en` entries in `locales` for any text
+  the visitor's language has none for. A step you labelled only in English reads
+  in English for every visitor instead of showing raw keys, and visitors in a
+  language without built-in texts, such as French, see the English texts you
+  changed. Built-in German and Italian translations still win over your English;
+  add `de` or `it` entries to change those.
+
+- [#2155](https://github.com/zitadel/nextgen/pull/2155) [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1) Thanks [@fforootd](https://github.com/fforootd)! - `<zitadel-login>` shows a spinner only on the button that was used: following the "Sign up" or "Sign in" link no longer spins the "Continue" button, and a secondary button such as "Use a passkey" now shows its own progress.
+
+- [#2178](https://github.com/zitadel/nextgen/pull/2178) [`3b206b2`](https://github.com/zitadel/nextgen/commit/3b206b2453cabf4da6840396f2be0e96b4ede8fa) Thanks [@mridang](https://github.com/mridang)! - The widgets now wait for their listeners before they navigate. The detail of `zitadel-flow-redirect`, `zitadel-flow-complete` and `zitadel-signout` carries a `waitUntil(promise)` function; the widget navigates once every promise a listener passed has settled, or after two seconds, and at once when none was passed. The React, Solid, Svelte and Qwik wrappers forward each callback's returned promise to `waitUntil`, so an async or lazily loaded handler runs before the page unloads; the Vue and Angular wrappers expose `waitUntil` on the event detail for a handler to call itself.
+- Updated dependencies [[`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1), [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1)]:
+  - @zitadel/config@0.1.0
+
 ## 1.0.0-alpha.28
 
 ### Minor Changes

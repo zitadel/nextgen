@@ -1,5 +1,0 @@
----
-"@zitadel/cli": patch
----
-
-`setup` now checks the running Node against the `engines.node` of the framework CLI before it creates a new app, for every framework, with one shared check that each scaffolder configures. The range is asked of npm for the exact CLI that setup runs, gives up after 5 seconds and then uses a built-in range, so an unreachable registry no longer holds `setup` up. For Angular it refuses a Node the Angular CLI would refuse, with a message that names the Node versions Angular needs (for Angular 22, `^22.22.3 || ^24.15.0 || >=26.0.0`, which the Angular CLI applies one major at a time, so only 22.x, 24.x and 26.x at or above those versions are accepted and Node 27 is refused), and only warns on Node 23 and 25, which the Angular CLI runs on with a warning; previously the refusal surfaced only as a generic "exited with status 3" error. Next.js, Nuxt, React, Vue, Solid, Svelte and Qwik never refuse, because their CLIs carry on or only warn on an unsupported Node, but `setup` now adds a warning to the envelope's `warnings` when the Node is outside the range.

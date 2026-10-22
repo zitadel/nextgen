@@ -5,7 +5,7 @@ TanStack Start request middleware and helpers for Zitadel.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-tanstack-start@alpha
+pnpm add @zitadel/sdk-tanstack-start@latest
 ```
 
 ## Requirements

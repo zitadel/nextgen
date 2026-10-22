@@ -245,6 +245,10 @@ type GetMyUserSchemaRes interface {
 	getMyUserSchemaRes()
 }
 
+type GetPolicyRevisionRes interface {
+	getPolicyRevisionRes()
+}
+
 type GetProjectRes interface {
 	getProjectRes()
 }
@@ -385,6 +389,14 @@ type PatchUserByIDRes interface {
 	patchUserByIDRes()
 }
 
+type PolicyCreatedRes interface {
+	policyCreatedRes()
+}
+
+type PolicyUpdatedRes interface {
+	policyUpdatedRes()
+}
+
 type ProjectCreatedRes interface {
 	projectCreatedRes()
 }
@@ -395,6 +407,10 @@ type ProjectDeletedRes interface {
 
 type ProjectUpdatedRes interface {
 	projectUpdatedRes()
+}
+
+type PublishPolicyRes interface {
+	publishPolicyRes()
 }
 
 type QueryGrantsRes interface {

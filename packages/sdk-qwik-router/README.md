@@ -11,7 +11,7 @@ Qwik Router request handler and helpers for Zitadel.
 ## Installation
 
 ```bash
-pnpm add -D @zitadel/sdk-qwik-router@alpha
+pnpm add -D @zitadel/sdk-qwik-router@latest
 ```
 
 Install it as a dev dependency: Qwik bundles `devDependencies` into the server
@@ -110,7 +110,7 @@ Install the Qwik component library and render its `ZitadelLogin` component.
 Qwik bundles ecosystem packages, so install it as a dev dependency:
 
 ```bash
-pnpm add -D @zitadel/sdk-qwik@alpha
+pnpm add -D @zitadel/sdk-qwik@latest
 ```
 
 ```tsx

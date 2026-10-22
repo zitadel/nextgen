@@ -259,6 +259,16 @@ func (b *Bound) Operation() string {
 	return b.ct.Operation
 }
 
+// Settings returns a copy of the instance's settings in their canonical types
+// (int64, bool, string), as the rules see them: what a publish stores, so a
+// number written as 12.0 or 1.2e1 is stored as 12. Nil for an unbound value.
+func (b *Bound) Settings() map[string]any {
+	if !b.bound() {
+		return nil
+	}
+	return maps.Clone(b.values)
+}
+
 // Active reports whether a rule is switched on. A context builder asks it
 // before deriving an expensive field only that rule reads. A rule the
 // template does not have is an error rather than "off": a misspelled name

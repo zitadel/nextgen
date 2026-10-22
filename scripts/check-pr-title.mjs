@@ -44,12 +44,7 @@ const NON_SHIPPING_TOP_LEVEL_DIRS = [
 // mocks, demos, and the docs site. (`packages/testing` left this list when it
 // joined the release train in #692 — the manifest-derived PUBLISHED_ROOTS
 // covers it now.)
-const NON_SHIPPING_WORKSPACES = [
-  "apps/docs/",
-  "apps/mock-zitadel/",
-  "apps/storybook/",
-  "packages/api-mock/",
-];
+const NON_SHIPPING_WORKSPACES = ["apps/docs/", "apps/storybook/", "packages/api-mock/"];
 
 // Repo-meta markdown, wherever it sits. Every other `.md` is treated as shipping
 // on purpose: `packages/config/defaults/README-*.md` and the CLI's framework
@@ -194,7 +189,6 @@ export function suggestType(files) {
         path.includes("/testdata/") ||
         /^(?:e2e|apps\/[^/]*-e2e)\//.test(path) ||
         /^apps\/demo-[^/]+\//.test(path) ||
-        path.startsWith("apps/mock-zitadel/") ||
         path.startsWith("packages/api-mock/"),
     )
   ) {

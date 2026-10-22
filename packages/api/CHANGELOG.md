@@ -1,5 +1,23 @@
 # @zitadel/api
 
+## 0.1.0
+
+### Minor Changes
+
+- [#2187](https://github.com/zitadel/nextgen/pull/2187) [`114c32c`](https://github.com/zitadel/nextgen/commit/114c32c4a86f7b05794528b889faad159d59bf3f) Thanks [@fforootd](https://github.com/fforootd)! - Add `zitadel api`, which calls any operation of the Zitadel API with your project's server and secret, including the ones no command covers yet. Name an operation by its `operationId` (`zitadel api queryUsers`) or its path (`zitadel api /users/query`), set query parameters and body fields with `-F name=value`, typed by the operation's schema, pass a whole body with `--input`, follow every page with `--paginate`, and preview the request as cURL with `--dry-run`. `zitadel api ls` lists the operations, and `--json` returns the response body as `data`. `@zitadel/api` exports the operations as data from `@zitadel/api/generated/operations`: each one's method, path, parameters, authentication and paging.
+
+- [#1884](https://github.com/zitadel/nextgen/pull/1884) [`8ef9c49`](https://github.com/zitadel/nextgen/commit/8ef9c495c97188893fd8b879c524ce8e097fa52b) Thanks [@vitorbari](https://github.com/vitorbari)! - `GET /deployments/{deployment_id}` reads one deployment and `GET /deployments` lists them newest first, each with its `kind` and `status`. `origin` narrows the list to one origin, `live=true` lists what is served now, and `expand=release` embeds the release each deployment made live.
+
+- [#1883](https://github.com/zitadel/nextgen/pull/1883) [`dedd93b`](https://github.com/zitadel/nextgen/commit/dedd93ba07e58108771019e70466e858b504c374) Thanks [@vitorbari](https://github.com/vitorbari)! - Releases can now be deployed to a project's primary origins with `POST /deployments` and `targets: ["primary"]`, which covers every primary origin. Deploying the release that is already live answers `200` and writes nothing, and `expected_deployment_id` guards against racing another deploy with `409` `dep.conflict`.
+
+- [#1886](https://github.com/zitadel/nextgen/pull/1886) [`1653960`](https://github.com/zitadel/nextgen/commit/16539605bbdeadbcf4d8ac2bbfa7e3e16b1af557) Thanks [@peintnermax](https://github.com/peintnermax)! - `GET /users/{user_id}/password` reports when the user's current password was set (`set_at`), and leaves it out when the user has none. It never returns the password or its hash. It takes `user.read`, or a Console session with access to the user's project, and the generated client gains `getUserPasswordState`.
+
+- [#2202](https://github.com/zitadel/nextgen/pull/2202) [`831cb81`](https://github.com/zitadel/nextgen/commit/831cb81978e65f1b5d41b41330c31e9c43fd2030) Thanks [@peintnermax](https://github.com/peintnermax)! - Add `GET /users/me/passkeys`, `GET /users/me/identity_links` and `GET /users/me/password`: the signed-in user's own passkeys, linked identity provider accounts and password state, readable with the session alone. Like the other `/users/me` reads they take an optional `project_id`, and refuse a session of another project with `403 sess.project_mismatch`. The `@zitadel/api` client gains `listMyPasskeys()`, `listMyIdentityLinks()` and `getMyPasswordState()`.
+
+### Patch Changes
+
+- [#2188](https://github.com/zitadel/nextgen/pull/2188) [`17523dc`](https://github.com/zitadel/nextgen/commit/17523dcf8e55d9d8a07f27a05c6597749f81ef9b) Thanks [@fforootd](https://github.com/fforootd)! - Declare the error codes that the branding, event, team, project-claim and health operations return. Their error response described only the generic `{ code, message }` shape, so the OpenAPI document and the API reference did not list which codes these 17 operations can send. Each now names its codes, like every other operation, and the `@zitadel/api` client gains a code-discriminated `<Operation>Default` type for each (for example `GetTeamDefault`) to branch on.
+
 ## 1.0.0-alpha.28
 
 ### Minor Changes

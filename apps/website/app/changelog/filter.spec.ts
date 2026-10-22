@@ -1,15 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import { bumpsIn, componentOf, componentsIn, facetOf, matches } from "./filter";
+import { componentOf, componentsIn, facetOf, kindOf, kindsIn, matches } from "./filter";
 import type { Change, Release } from "./releases";
 
-function release(changes: Pick<Change, "packages" | "bump">[]): Release {
+function release(
+  changes: (Pick<Change, "packages" | "bump"> & Partial<Pick<Change, "markedBreaking">>)[],
+): Release {
   return {
-    tag: "v1.0.0-alpha.28",
-    url: "https://github.com/zitadel/nextgen/releases/tag/v1.0.0-alpha.28",
+    tag: "v0.1.0",
+    url: "https://github.com/zitadel/nextgen/releases/tag/v0.1.0",
     publishedAt: "2026-10-20T20:15:04Z",
     notes: "",
-    changes: changes.map((change) => ({ summary: "A change.", authors: [], ...change })),
+    changes: changes.map((change) => ({
+      summary: "A change.",
+      authors: [],
+      markedBreaking: false,
+      ...change,
+    })),
     notices: [],
   };
 }
@@ -53,34 +60,53 @@ describe("components", () => {
     ]);
   });
 
-  it("lists only the bumps the releases have, the highest first", () => {
+  it("lists only the kinds the releases have, breaking first", () => {
     const releases = [
       release([{ packages: ["@zitadel/cli"], bump: "patch" }]),
-      release([{ packages: ["@zitadel/cli"], bump: "major" }]),
+      release([{ packages: ["@zitadel/cli"], bump: "minor", markedBreaking: true }]),
     ];
 
-    expect(bumpsIn(releases)).toEqual(["major", "patch"]);
+    expect(kindsIn(releases)).toEqual(["breaking", "patch"]);
+  });
+});
+
+describe("kindOf", () => {
+  it.each([
+    ["major", false, "breaking"],
+    ["minor", true, "breaking"],
+    ["minor", false, "minor"],
+    ["patch", false, "patch"],
+  ] as const)("takes a %s change marked breaking: %s as %s", (bump, markedBreaking, kind) => {
+    expect(kindOf({ bump, markedBreaking })).toBe(kind);
   });
 });
 
 describe("matches", () => {
-  const sdkPatch = facetOf({ packages: ["@zitadel/sdk-next", "@zitadel/sdk-nuxt"], bump: "patch" });
-  const cliMinor = facetOf({ packages: ["@zitadel/cli", "@zitadel/server"], bump: "minor" });
-  // The pointer to a package's left-out changes, which have every bump.
+  const sdkPatch = facetOf({
+    packages: ["@zitadel/sdk-next", "@zitadel/sdk-nuxt"],
+    bump: "patch",
+    markedBreaking: false,
+  });
+  const cliBreaking = facetOf({
+    packages: ["@zitadel/cli", "@zitadel/server"],
+    bump: "minor",
+    markedBreaking: true,
+  });
+  // The pointer to a package's left-out changes, which have every kind.
   const leftOut = { components: ["server"] };
 
-  it("reads a change's components once each, and its bump", () => {
-    expect(sdkPatch).toEqual({ components: ["sdks"], bump: "patch" });
+  it("reads a change's components once each, and its kind", () => {
+    expect(sdkPatch).toEqual({ components: ["sdks"], kind: "patch" });
   });
 
-  it("shows what touches the chosen component and has the chosen bump", () => {
+  it("shows what touches the chosen component and has the chosen kind", () => {
     const shown = (choice: Parameters<typeof matches>[1]) =>
-      [sdkPatch, cliMinor, leftOut].filter((facet) => matches(facet, choice));
+      [sdkPatch, cliBreaking, leftOut].filter((facet) => matches(facet, choice));
 
-    expect(shown({})).toEqual([sdkPatch, cliMinor, leftOut]);
-    expect(shown({ component: "server" })).toEqual([cliMinor, leftOut]);
-    expect(shown({ bump: "patch" })).toEqual([sdkPatch, leftOut]);
-    expect(shown({ component: "server", bump: "patch" })).toEqual([leftOut]);
-    expect(shown({ component: "sdks", bump: "minor" })).toEqual([]);
+    expect(shown({})).toEqual([sdkPatch, cliBreaking, leftOut]);
+    expect(shown({ component: "server" })).toEqual([cliBreaking, leftOut]);
+    expect(shown({ kind: "breaking" })).toEqual([cliBreaking, leftOut]);
+    expect(shown({ component: "server", kind: "patch" })).toEqual([leftOut]);
+    expect(shown({ component: "sdks", kind: "breaking" })).toEqual([]);
   });
 });
