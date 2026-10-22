@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"runtime/debug"
@@ -24,10 +25,13 @@ func WithRecover(next http.Handler) http.Handler {
 			if p == http.ErrAbortHandler {
 				panic(p)
 			}
+			// A panic is a bug whoever is still listening: without the
+			// request's cancel it logs at Error even after the client left.
 			// The domain error takes the panic's stack from its parent,
-			// whatever the stack trace setting says: a panic is a bug.
-			logAPIError(r.Context(), http.StatusInternalServerError,
-				domain.ErrInternal(panicError{value: p, stack: debug.Stack()}))
+			// whatever the stack trace setting says, and the panic names it.
+			pe := panicError{value: p, stack: debug.Stack()}
+			logAPIError(context.WithoutCancel(r.Context()), http.StatusInternalServerError,
+				domain.ErrInternal(pe).WithMessage(pe.Error()))
 			if tw.wroteHeader {
 				panic(http.ErrAbortHandler)
 			}

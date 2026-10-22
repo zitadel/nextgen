@@ -895,8 +895,9 @@ func TestOgenErrorHandlerLogsSecurityInternalErrorOnce(t *testing.T) {
 
 // A request the client gave up on is logged at Warn, not as a server fault,
 // though it still answers 500, whatever error its going away caused. A
-// canceled error on a live request stays an Error. Only the Error line
-// carries the location and stack.
+// canceled error on a live request stays an Error, and so does a request
+// net/http ended at the server's write deadline. Only the Error line carries
+// the location and stack.
 func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -906,6 +907,7 @@ func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
 	}{
 		{"client gone while the body is written", fmt.Errorf("write response: %w", &net.OpError{Op: "write", Net: "tcp", Err: errors.New("broken pipe")}), true, "WARN"},
 		{"canceled error on a live request", fmt.Errorf("query projects: %w", context.Canceled), false, "ERROR"},
+		{"server write deadline", fmt.Errorf("write response: %w", &net.OpError{Op: "write", Net: "tcp", Err: os.ErrDeadlineExceeded}), true, "ERROR"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			enableErrorOrigins(t)
@@ -922,7 +924,7 @@ func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
 			require.Len(t, records, 1)
 			require.Equal(t, tc.wantLevel, records[0]["level"])
 			require.EqualValues(t, http.StatusInternalServerError, records[0]["status"])
-			if tc.canceled {
+			if tc.wantLevel == "WARN" {
 				requireBriefError(t, records[0], err.Code, err.Message, "broken pipe")
 			} else {
 				require.Contains(t, records[0]["error"], "stackTrace")
@@ -931,31 +933,66 @@ func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
 	}
 }
 
-// In GCP error reporting mode the handler builds a report from any `error`
-// attribute and reads the error through its interfaces, so a line below Error
-// level must carry the error itself, never the brief group.
-func TestLogAPIErrorKeepsTheErrorInGCPMode(t *testing.T) {
-	errreport.GCPReporting(true)
-	t.Cleanup(func() { errreport.GCPReporting(false) })
+// A line below Error level carries no location or stack in any mode. A text
+// or JSON handler reads the error through its log value; GCP error reporting
+// builds a report from any `error` attribute and reads the location and stack
+// through the error's interfaces, at every level. A 5xx keeps both.
+func TestLogAPIErrorBriefLinesCarryNoStackInGCPMode(t *testing.T) {
+	enableErrorOrigins(t)
+	notFound := domain.ErrProjectNotFound().WithParent(errors.New("no rows in result set"))
+	internal := domain.ErrInternal(errors.New("disk on fire"))
+
+	t.Run("plain mode", func(t *testing.T) {
+		logged := loggedErrorValue(t, logAPIErrorRecord(t, http.StatusNotFound, notFound)).Resolve()
+		require.Equal(t, slog.KindGroup, logged.Kind())
+		var keys []string
+		for _, attr := range logged.Group() {
+			keys = append(keys, attr.Key)
+		}
+		require.ElementsMatch(t, []string{"code", "message", "parent"}, keys)
+	})
+
+	t.Run("gcp mode", func(t *testing.T) {
+		errreport.GCPReporting(true)
+		t.Cleanup(func() { errreport.GCPReporting(false) })
+
+		brief := gcpReport(t, logAPIErrorRecord(t, http.StatusNotFound, notFound))
+		require.Contains(t, brief, notFound.Message)
+		require.NotContains(t, brief, "goroutine")
+		require.NotContains(t, brief, "unsupported type")
+
+		require.Contains(t, gcpReport(t, logAPIErrorRecord(t, http.StatusInternalServerError, internal)), "goroutine")
+	})
+}
+
+// logAPIErrorRecord returns the record logAPIError writes, before any handler
+// resolves its values.
+func logAPIErrorRecord(t *testing.T, status int, err domain.Error) slog.Record {
+	t.Helper()
 	var records []slog.Record
-	ctx := zlog.WithLoggingContext(t.Context(), slog.New(recordingHandler{records: &records}))
-	err := domain.ErrProjectNotFound().WithParent(errors.New("no rows in result set"))
-
-	logAPIError(ctx, http.StatusNotFound, err)
-
+	logAPIError(zlog.WithLoggingContext(t.Context(), slog.New(recordingHandler{records: &records})), status, err)
 	require.Len(t, records, 1)
+	return records[0]
+}
+
+func loggedErrorValue(t *testing.T, record slog.Record) slog.Value {
+	t.Helper()
 	var logged slog.Value
-	records[0].Attrs(func(a slog.Attr) bool {
+	record.Attrs(func(a slog.Attr) bool {
 		if a.Key == zlog.ErrorAttributeKey {
 			logged = a.Value
 		}
 		return true
 	})
-	require.IsType(t, domain.Error{}, logged.Any(), "the error itself, not a group")
+	return logged
+}
 
+// gcpReport is what the GCP error reporting handler writes for record.
+func gcpReport(t *testing.T, record slog.Record) string {
+	t.Helper()
 	var out bytes.Buffer
-	require.NoError(t, sloggcp.NewErrorReportingHandler(&out, nil).Handle(ctx, records[0]))
-	require.NotContains(t, out.String(), "unsupported type")
+	require.NoError(t, sloggcp.NewErrorReportingHandler(&out, nil).Handle(t.Context(), record))
+	return out.String()
 }
 
 // recordingHandler keeps every record as logged, before any handler

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -29,8 +30,21 @@ func TestWithRecoverAnswersPanicWithInternalError(t *testing.T) {
 	require.Equal(t, "req_1", record["request_id"])
 	logged := record["error"].(map[string]any)
 	require.Equal(t, "internal", logged["code"])
+	require.Equal(t, "panic: boom", logged["message"], "the panic names the report")
 	require.Contains(t, logged["parent"], "panic: boom")
 	require.NotEmpty(t, logged["stackTrace"])
+}
+
+// A panic is a bug whoever is still listening: a client that already left
+// does not turn it into a Warn.
+func TestWithRecoverLogsPanicAtErrorAfterTheClientLeft(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, records := serveAndRecordLogs(t, errorStubHandler{panicValue: "boom"}, nil,
+		httptest.NewRequestWithContext(ctx, http.MethodGet, "/healthz", nil))
+
+	require.Len(t, records, 1)
+	require.Equal(t, "ERROR", records[0]["level"])
 }
 
 // A panic after the response started cannot be answered any more: the

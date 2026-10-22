@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"sync/atomic"
 
@@ -16,7 +17,6 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
@@ -260,24 +260,22 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 func logAPIError(ctx context.Context, status int, err domain.Error) {
 	level := slog.LevelInfo
 	switch {
-	// The request context is done only when the client went away: nothing
-	// server-side cancels it.
-	case status >= http.StatusInternalServerError && ctx.Err() != nil:
+	// The request context is done when the client left, or when net/http hit
+	// the server's write deadline, which the deadline error tells apart.
+	case status >= http.StatusInternalServerError && ctx.Err() != nil && !errors.Is(err, os.ErrDeadlineExceeded):
 		level = slog.LevelWarn
 	case status >= http.StatusInternalServerError:
 		level = slog.LevelError
 	}
-	// GCP error reporting reads the error itself and drops location and stack
-	// from its LogValue; a group there would become a broken report.
-	logged := slog.Attr{Key: zlog.ErrorAttributeKey, Value: err.BriefLogValue()}
-	if level == slog.LevelError || errreport.GCPReportingEnabled() {
-		logged = slog.Any(zlog.ErrorAttributeKey, err)
+	var logged error = err
+	if level < slog.LevelError {
+		logged = err.Brief()
 	}
 	operationID, _ := middleware.GetOperationIDContext(ctx)
 	zlog.Log(ctx, level, "api error",
 		slog.Int("status", status),
 		slog.String("operation_id", operationID),
-		logged,
+		slog.Any(zlog.ErrorAttributeKey, logged),
 	)
 }
 
