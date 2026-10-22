@@ -174,7 +174,7 @@ var webhookByEventType = map[string]webhookDoc{
 		"payload holds the new revision and its settings."},
 
 	"release.created": {description: "A release was created."},
-	"release.revoked": {description: "A release was revoked.", status: statusContracted},
+	"release.revoked": {description: "A release was revoked."},
 
 	"idp.created": {description: "An identity provider connection was created."},
 	"idp.updated": {description: "An identity provider connection was revised. The payload holds the new " +
