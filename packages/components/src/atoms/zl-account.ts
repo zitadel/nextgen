@@ -18,7 +18,8 @@ import "./zl-icon.js";
  *
  *   height      36px (`--zl-spacing-9`), the height of a field
  *   padding     6px start beside the avatar, 12px without it; 12px end
- *   radius      full
+ *   radius      `--zl-radius-md` × 2.25: a pill by default, following the
+ *               brand's radius (square with `none`)
  *   gap         8px
  *   border      1px `--zl-border`; `--zl-accent` behind it on hover
  *   font        `--zl-text-sm-*`, the identifier at `--zl-font-weight-medium`
