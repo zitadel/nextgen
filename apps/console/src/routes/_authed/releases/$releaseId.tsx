@@ -7,7 +7,7 @@ import { DeploySheet } from "@/components/deploy-sheet";
 import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
 import { CARD_HEADING, DetailPanel, DetailSection, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
-import { DETAIL_PANEL_PAGE } from "@/components/layout";
+import { Page } from "@/components/layout";
 import { ReleaseDeployments } from "@/components/release-deployments";
 import { ReleaseStatusBadge } from "@/components/release-status-badge";
 import { RevokeReleaseDialog } from "@/components/revoke-release-dialog";
@@ -76,55 +76,57 @@ function ReleaseDetail() {
   const router = useRouter();
 
   return (
-    <div className={`${DETAIL_PANEL_PAGE} flex flex-col gap-6`}>
-      <DetailPanel>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          {/* Stacks below `sm`, as the mobile frame puts the pill under the title. */}
-          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
-            <PanelTitle icon={Layers3} title={release.id} />
-            <ReleaseStatusBadge status={releaseStatus(release)} />
-          </div>
+    <Page inset="panel">
+      <div className="flex flex-col gap-6">
+        <DetailPanel>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            {/* Stacks below `sm`, as the mobile frame puts the pill under the title. */}
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+              <PanelTitle icon={Layers3} title={release.id} />
+              <ReleaseStatusBadge status={releaseStatus(release)} />
+            </div>
 
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-            <MetaCard bordered={false}>
-              <MetaValue label="Release ID" value={release.id} size="sm" copyable />
-              <MetaRule />
-              <MetaValue
-                label="Created"
-                value={formatDate(release.metadata.created_at)}
-                size="sm"
-              />
-            </MetaCard>
-            {/* A revoked release can never be served again, so there is nothing
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+              <MetaCard bordered={false}>
+                <MetaValue label="Release ID" value={release.id} size="sm" copyable />
+                <MetaRule />
+                <MetaValue
+                  label="Created"
+                  value={formatDate(release.metadata.created_at)}
+                  size="sm"
+                />
+              </MetaCard>
+              {/* A revoked release can never be served again, so there is nothing
                 to do with it. A new deployment lands in the card below. */}
-            {releaseStatus(release) === "active" && (
-              <ReleaseActions
-                release={release}
-                deployments={deployments}
-                onChanged={() => router.invalidate()}
-              />
-            )}
+              {releaseStatus(release) === "active" && (
+                <ReleaseActions
+                  release={release}
+                  deployments={deployments}
+                  onChanged={() => router.invalidate()}
+                />
+              )}
+            </div>
           </div>
-        </div>
 
-        <Separator />
+          <Separator />
 
-        {/* The section's own heading, ruled off from the groups it heads. */}
-        <h2 className={CARD_HEADING}>Release content</h2>
-        <Separator />
+          {/* The section's own heading, ruled off from the groups it heads. */}
+          <h2 className={CARD_HEADING}>Release content</h2>
+          <Separator />
 
-        {groups.map((group) => (
-          <Fragment key={group.kind}>
-            <PointerGroupSection group={group} />
-            <Separator />
-          </Fragment>
-        ))}
-      </DetailPanel>
+          {groups.map((group) => (
+            <Fragment key={group.kind}>
+              <PointerGroupSection group={group} />
+              <Separator />
+            </Fragment>
+          ))}
+        </DetailPanel>
 
-      <ReleaseDeployments deployments={deployments} />
+        <ReleaseDeployments deployments={deployments} />
 
-      <ReleaseMetadata release={release} />
-    </div>
+        <ReleaseMetadata release={release} />
+      </div>
+    </Page>
   );
 }
 
