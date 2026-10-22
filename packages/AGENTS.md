@@ -23,10 +23,16 @@ change needs a changeset, and the whole train versions together.
 - **TypeScript floor**: consumers need TypeScript ≥ 5.0, because the entry
   points use `export type *`. This is the one statement of it; READMEs link
   here.
-- **Keep each package's build tool** (its `build` script). `sdk-next` builds
-  per file with `tsc` because bundlers merge `"use client"` modules into shared
-  chunks and strip the directive. Never unify the builds without re-testing
-  the App Router client/server split.
+- **Build an SDK with plain Vite**: its `vite.config.ts` lists
+  `libraryBuild()` (`vite.shared.mjs`), the framework's Vite plugin and
+  `unplugin-dts` (`svelteTypes()` for `.svelte`).
+- **Add an entry point to `exports` and give it a source, never to a config**:
+  `libraryBuild()` derives the entries from `exports` and fails on any warning.
+- **Allow a warning code only with a comment saying why.**
+- **Keep `sdk-next` on `preserveModules`**: bundlers merge `"use client"` modules
+  into shared chunks and strip the directive. Re-test the App Router split.
+- **`sdk-nuxt` stays on `tsup` and `sdk-angular` on Vite and `ngc`**, until each
+  gets its own plugin; the non-SDK packages build with `tsdown`.
 - **The same-origin proxy is the shared concept**: every SDK fronts the API
   through `/__nextgen/*` on the app's own origin
   ([ADR 036](../docs/adrs/036-api-credential-planes.md), ADR 005). Server SDKs

@@ -1,21 +1,13 @@
+import react from "@vitejs/plugin-react";
+import dts from "unplugin-dts/vite";
 import { defineConfig } from "vite";
-import dts from "vite-plugin-dts";
 
-// React library build. esbuild compiles the TSX; vite-plugin-dts emits the
-// `.d.ts`. React and workspace deps are externalized — the consumer provides
-// them.
+import { libraryBuild } from "../../vite.shared.mjs";
+
 export default defineConfig({
-  build: {
-    lib: {
-      entry: "./src/index.tsx",
-      formats: ["es"],
-      fileName: "index",
-    },
-    rollupOptions: {
-      external: [/^@zitadel\//, /^react($|\/)/, /^react-dom($|\/)/, /^@lit\/react($|\/)/],
-    },
-  },
   plugins: [
-    dts({ tsconfigPath: "./tsconfig.lib.json", include: ["src"], exclude: ["src/**/*.spec.*"] }),
+    libraryBuild(import.meta.dirname),
+    react(),
+    dts({ tsconfigPath: "./tsconfig.lib.json" }),
   ],
 });

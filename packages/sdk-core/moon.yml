@@ -67,6 +67,8 @@ tasks:
       # And the meta-framework SDKs' server tests, to check they share their titles.
       - "/packages/sdk-*/src/__tests__/*.test.ts"
       - "/packages/sdk-*/src/__tests__/*/*.test.ts"
+      # And the meta-framework SDKs' sources, to check their relative imports.
+      - "/packages/sdk-*/src/**/*.{ts,tsx}"
       # It also reads every SDK's manifest and docs, and the demo apps' manifests
       # and sources, to check that apps go through their SDK.
       - "/packages/sdk-*/package.json"

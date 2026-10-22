@@ -57,8 +57,8 @@
     "msw": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
+    "unplugin-dts": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-dts": "catalog:",
     "vitest": "catalog:"
   }
 }

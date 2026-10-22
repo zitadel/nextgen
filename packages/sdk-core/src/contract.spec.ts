@@ -884,6 +884,7 @@ describe("client SDK edge specs", () => {
     const configs = [
       "components",
       "sdk-angular",
+      "sdk-core",
       "sdk-next",
       "sdk-nuxt",
       "sdk-qwik",
@@ -897,7 +898,7 @@ describe("client SDK edge specs", () => {
       "sdk-vue",
     ].map((dir) => `${dir}/vitest.config.ts`);
     expect(
-      [...configs, "sdk-core/vite.config.ts"].flatMap((path) =>
+      configs.flatMap((path) =>
         edgeConfigProblems(read(path)).map((problem) => `${path}: ${problem}`),
       ),
     ).toEqual([]);
@@ -1171,4 +1172,32 @@ describe("server SDK test titles", () => {
       });
     });
   });
+});
+
+/**
+ * These SDKs emit their declarations file by file, so a relative import without
+ * its `.js` extension stays one in `dist/*.d.ts`, where Node's ES module
+ * resolution (TypeScript's `node16`) cannot find the file it names.
+ */
+describe("server SDK sources ↔ declaration imports", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+
+  it.each(["sdk-sveltekit", "sdk-qwik-router", "sdk-solid-start", "sdk-tanstack-start"])(
+    "%s names every relative import with its .js extension",
+    (dir) => {
+      const src = `${packagesDir}${dir}/src`;
+      const bare = readdirSync(src, { recursive: true, encoding: "utf8" })
+        .filter((file) => /\.tsx?$/.test(file) && !file.startsWith("__tests__"))
+        .flatMap((file) =>
+          [
+            ...readFileSync(`${src}/${file}`, "utf8").matchAll(
+              /\bfrom\s+["'](\.{1,2}\/[^"']*)["']/g,
+            ),
+          ]
+            .map((match) => `${file}: ${match[1]}`)
+            .filter((specifier) => !specifier.endsWith(".js")),
+        );
+      expect(bare).toEqual([]);
+    },
+  );
 });

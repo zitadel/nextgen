@@ -1,5 +1,5 @@
-export { createNextgenMiddleware, getAuth } from "./middleware";
-export type { SolidFetchEvent, SolidMiddlewareConfig } from "./middleware";
+export { createNextgenMiddleware, getAuth } from "./middleware.js";
+export type { SolidFetchEvent, SolidMiddlewareConfig } from "./middleware.js";
 export type {
   NextgenMiddlewareOptions,
   AuthResult,

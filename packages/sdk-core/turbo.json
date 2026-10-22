@@ -43,6 +43,7 @@
         "$TURBO_ROOT$/packages/*/vitest.config.ts",
         "$TURBO_ROOT$/packages/sdk-*/src/__tests__/*.test.ts",
         "$TURBO_ROOT$/packages/sdk-*/src/__tests__/*/*.test.ts",
+        "$TURBO_ROOT$/packages/sdk-*/src/**/*.{ts,tsx}",
         "$TURBO_ROOT$/packages/sdk-*/package.json",
         "$TURBO_ROOT$/packages/sdk-*/README.md",
         "$TURBO_ROOT$/packages/sdk-*/skills/**/SKILL.md",
