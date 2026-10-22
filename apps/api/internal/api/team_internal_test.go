@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	api "github.com/zitadel/nextgen/api/generated"
+	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 

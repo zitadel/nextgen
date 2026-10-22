@@ -7,7 +7,7 @@ import (
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/stretchr/testify/require"
-	api "github.com/zitadel/nextgen/api/generated"
+	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service/mocks"

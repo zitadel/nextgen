@@ -41,8 +41,8 @@ tasks:
     inputs:
       - "**/*.go"
 
-  # Compiles the server module's generated Go (api/generated, the enumer and
-  # mock files) through the replace directive, which server:generate and its
+  # Compiles the server module's generated output (the JSON meta-schemas its
+  # api/openapi/endpoints/schemas package embeds, the enumer and mock files) through the replace directive, which server:generate and its
   # checks rewrite mid-graph; the dep keeps vet behind them, as server:vet is.
   # build and test are ordered through vet.
   vet:

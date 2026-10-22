@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/go-jose/go-jose/v4"
-	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	generated "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"

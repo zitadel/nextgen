@@ -6,7 +6,7 @@ import (
 	"github.com/ogen-go/ogen/middleware"
 	"go.opentelemetry.io/otel/trace"
 
-	oasapi "github.com/zitadel/nextgen/api/generated"
+	oasapi "github.com/zitadel/nextgen/internal/api/generated"
 )
 
 type operationIDContextKey struct {

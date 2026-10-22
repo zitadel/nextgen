@@ -10,8 +10,8 @@
     "format": {
       "inputs": ["**/*.go"]
     },
-    // Compiles the server module's generated Go (api/generated, the enumer and
-    // mock files) through the replace directive, which the server's
+    // Compiles the server module's generated output (the JSON meta-schemas its
+    // api/openapi/endpoints/schemas package embeds, the enumer and mock files) through the replace directive, which the server's
     // generation rewrites mid-graph; the edge keeps vet behind it, as the
     // server's own vet is. build and test are ordered through vet.
     "vet": {

@@ -77,7 +77,7 @@ tasks:
     # Mirrored by GENERATED_GLOBS in scripts/generated-outputs.mjs, which is
     # what `clean-generated` deletes. Change both together.
     outputs:
-      - "/apps/api/api/generated/**"
+      - "/apps/api/internal/api/generated/**"
       - "/apps/api/api/openapi/components/schemas/errors/**"
       - "/apps/api/api/openapi/endpoints/**/*-error-response.yaml"
       - "/apps/api/api/openapi/endpoints/events/event.yaml"
@@ -244,7 +244,7 @@ tasks:
       - "10m"
       - "./..."
     deps:
-      # check-generate rewrites api/generated while it runs. These suites
+      # check-generate rewrites internal/api/generated while it runs. These suites
       # compile that package and api/internal/erroranalysis type-loads it, so a
       # lane run beside it reads half-written files. vet, lint and build wait
       # for it the same way.

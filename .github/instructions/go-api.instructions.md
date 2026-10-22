@@ -10,7 +10,7 @@ Canonical scoped sources for this glob:
 [`apps/api/api/openapi/AGENTS.md`](../../apps/api/api/openapi/AGENTS.md). Review heuristics on
 top:
 
-- Never ask an author to hand-edit `apps/api/api/generated/**`; the fix goes into
+- Never ask an author to hand-edit `apps/api/internal/api/generated/**`; the fix goes into
   `apps/api/api/openapi/**` and `moon run server:generate`. CI checks drift with
   `server:check-generate-pruned` and lints the spec, wire casing included,
   with `server:openapi`. Wrong casing fails silently at runtime, so treat both

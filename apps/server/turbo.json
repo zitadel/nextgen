@@ -86,7 +86,7 @@
         "$TURBO_ROOT$/scripts/dev-process.mjs"
       ],
       "outputs": [
-        "$TURBO_ROOT$/apps/api/api/generated/**",
+        "$TURBO_ROOT$/apps/api/internal/api/generated/**",
         "$TURBO_ROOT$/apps/api/api/openapi/components/schemas/errors/**",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/**/*-error-response.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
@@ -244,7 +244,7 @@
     // them. They see the Docker and test-database variables. Their inputs
     // still matter: they decide when a change marks the lane affected
     // (scripts/ci-mode.mjs), as the server inputs do in moon. They wait for
-    // check-generate, which rewrites api/generated, a package they compile and
+    // check-generate, which rewrites internal/api/generated, a package they compile and
     // type-load (api/internal/erroranalysis).
     "test-postgres": {
       "cache": false,
