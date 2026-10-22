@@ -272,7 +272,7 @@ run on GitHub-hosted runners without the Depot cache credential.
 [`scripts/check.mjs`](scripts/check.mjs): the OpenAPI lint, the Go generate
 check and tests with the Postgres and Spanner lanes, the workspace gate, the
 release tarballs and snapshot, and the fresh-app journey. That comes close to
-`full-pr` but does not mirror it: CI runs Spanner only nightly, and adds the
+`full-pr` but does not mirror it: CI runs Spanner only weekly, and adds the
 SQLite lane, a few repository checks and every other e2e lane
 (`moon run e2e:all`). Rerun one phase with
 `moon run workspace:check -- --only <phase>`, one task with
@@ -341,10 +341,11 @@ complete run — and when the query returns an empty affected set, the run is
 only skipped if every changed file is on a narrow explicitly-inert allowlist
 (`docs/`, root agent notes), because unclaimed files are not assumed inert.
 
-The Spanner emulator suite (`moon run server:test-spanner`) is not part of
-`full-pr`. It runs in the separate `spanner` workflow, nightly on `main` and on
-demand, and is not a required check. To run it against a branch, use
-`gh workflow run spanner.yml --ref <branch>`, or run the Moon task locally.
+The Spanner suite (`moon run server:test-spanner`) is not part of `full-pr`.
+It runs in the separate `spanner` workflow against Spanner Omni, weekly on
+`main` and on demand, and is not a required check. To run it against a branch,
+use `gh workflow run spanner.yml --ref <branch>`, or run the Moon task locally,
+where it still starts the Spanner emulator.
 
 The PR title check is not part of `full-pr` either. It runs in the separate
 `pr-title` workflow, which a title edit starts on its own; see
@@ -397,36 +398,52 @@ connect instead of starting a container, so `go test -tags … ./...` needs no
 Docker. Point them at a throwaway database — the suites run migrations that
 create the `zitadel_nextgen` schema.
 
-The Spanner emulator only supports one transaction at a time, so concurrent
-integration tests make it abort read-write transactions aggressively. That is
-deliberate and useful: Spanner aborts under concurrency in production too, and
-the emulator surfaces a missing retry immediately. The suite therefore runs at
-full parallelism against the emulator, and `TestTransactionContention` asserts
-that concurrent writers to one row all commit.
+Spanner aborts read-write transactions under contention in production, and a
+test suite produces too little contention to catch a missing retry on its own.
+So under the `spanner_integration` tag the Spanner dialect aborts a seeded share
+of read-write transactions on purpose, whatever engine the suite runs against:
+about one attempt in five, and never one transaction twice, however many
+statements it runs. The suite also runs at full parallelism, and
+`TestTransactionContention` asserts that concurrent writers to one row all
+commit. Each test package logs its seed (`spanner abort injection on … seed=…`).
+Set `ZITADEL_TEST_SPANNER_ABORT_SEED` to replay a failure, most reliably with
+`-run` on the one test, or `ZITADEL_TEST_SPANNER_ABORTS=false` to turn the
+injection off.
 
-If you see a raw `ABORTED` ("aborted due to another transaction getting
-priority"), do not serialize the tests and do not move them to a real instance —
-both hide the bug. It means something on that code path stripped the gRPC status
-off the error, so Spanner's `ReadWriteTransaction` stopped recognising it as
-retryable. See the error-wrapping rules in
-[internal/storage/AGENTS.md](internal/storage/AGENTS.md) and #788.
+If you see a raw `ABORTED` (an injected one reads
+`spannerabort: injected ABORTED …`), do not serialize the tests and do not turn
+the injection off: both hide the bug. Something on that code path stripped the
+gRPC status off the error, so Spanner's `ReadWriteTransaction` stopped
+recognising it as retryable, or a callback could not run twice. See the
+error-wrapping rules in [internal/storage/AGENTS.md](internal/storage/AGENTS.md)
+and #788.
 
 A stalled transaction is a different failure and has a different fix. Read-write
-transactions run under a retry budget, and because the emulator serializes
-process-wide and hands priority to the newest transaction, a transaction
-spanning several statements can be starved by any concurrent write regardless of
-which rows it touches. So the emulator gets a much looser budget (2 minutes)
-than production (30 seconds). Tell the two apart by timing:
+transactions run under a 30-second retry budget, in tests as in production. Tell
+the two apart by timing:
 
 - **Fails immediately** with a raw `ABORTED`: the status was stripped, see
   above. Fix the wrapping.
 - **Stalls, then fails** with `unavailable` / HTTP 503 and a
-  `spanner transaction gave up retrying` warning naming the elapsed time: it was
-  starved. Do not raise the budget; shorten the transaction, or reduce how many
-  statements it holds open.
+  `spanner transaction hit its deadline while retrying` warning naming the
+  elapsed time: it was starved. Do not raise the budget; shorten the
+  transaction, or reduce how many statements it holds open.
 
 Before that budget existed the second case surfaced as an opaque 500 with no log
 line, and had to be diagnosed from a test's wall-clock duration (#794).
+
+Locally, `moon run server:test-spanner` still starts the emulator. It serves one
+read-write transaction at a time process-wide and hands priority to the newest,
+so a local run can starve a transaction past the budget where CI passes. To run
+against Spanner Omni as CI does, start it with host networking (on macOS,
+Docker Desktop has that as an opt-in setting) and point the suite at it:
+
+```sh
+docker run -d --name omni --network host \
+  us-docker.pkg.dev/spanner-omni/images/spanner-omni:2026.r4-lts start-single-server
+ZITADEL_TEST_SPANNER_INSTANCE=projects/default/instances/default \
+  SPANNER_EMULATOR_HOST=localhost:15000 moon run server:test-spanner
+```
 
 The emulator container is pinned to `linux/amd64`. The arm64 build returns
 commit timestamps at a different resolution, which fails seven `created_at`
@@ -438,14 +455,10 @@ To run against a Spanner you manage instead of the emulator testcontainer, set
 `ZITADEL_TEST_SPANNER_URL` to its DSN.
 
 `ZITADEL_TEST_SPANNER_INSTANCE` (an instance path,
-`projects/<project>/instances/<instance>`) still works and still provisions a
-uniquely named database per run, dropping it afterwards, authenticating via
-Application Default Credentials. Nothing sets it: CI is emulator-only on
-purpose, and this path is kept only so the real instance can be brought back
-quickly if the emulator turns out not to hold. Re-wiring is CI-side (restore the
-Workload Identity Federation auth step and set the variable); the Go side needs
-no change. Do not reach for it to make a failing test pass — that hides exactly
-the aborts these suites exist to catch. Removal is tracked in #793.
+`projects/<project>/instances/<instance>`) provisions a uniquely named database
+per test package and drops it afterwards. CI sets it to the Spanner Omni
+instance the `spanner` workflow starts; against a real Cloud Spanner instance it
+authenticates through Application Default Credentials.
 
 ### Demo end-to-end suites
 

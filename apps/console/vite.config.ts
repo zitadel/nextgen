@@ -27,6 +27,14 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     "import.meta.env.CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE": JSON.stringify(
       speedInsightsSampleRate(mode),
     ),
+    // The Zitadel server the dev loop proxies to, which the page cannot see
+    // from its own origin (`src/lib/server-origin.ts`). Empty in a build, where
+    // the console is served with the API, and in tests, which have no server.
+    "import.meta.env.CONSOLE_SERVER_ORIGIN": JSON.stringify(
+      command === "serve" && !isPreview && mode !== "test"
+        ? new URL(devBackendUrl(mode)).origin
+        : "",
+    ),
   },
   server: {
     port: 5174,
@@ -98,6 +106,20 @@ export default defineConfig(({ command, mode, isPreview }) => ({
   },
 }));
 
+/**
+ * The Go server the dev proxy forwards to. Node-only var — deliberately NOT
+ * VITE_ prefixed, so it is never inlined into the client bundle as-is; only
+ * its origin is, as CONSOLE_SERVER_ORIGIN. Loading with an empty prefix stays
+ * config-time and server-side only, so `.env.local` works without exporting it
+ * in the shell; the process environment still wins. `console:dev-real`
+ * threads it from the boot-captured @zitadel/testing instance handle
+ * (`scripts/dev-real.mts`).
+ */
+function devBackendUrl(mode: string): string {
+  const nodeEnv = loadEnv(mode, import.meta.dirname, "");
+  return process.env.CONSOLE_BACKEND_URL || nodeEnv.CONSOLE_BACKEND_URL || defaultBackendUrl;
+}
+
 function devApiProxy(mode: string): Record<string, ProxyOptions> {
   // Public, browser-safe var (VITE_ prefixed): the API base the SDK client
   // targets. `/api` is this proxy's own path and applies to the dev server
@@ -114,14 +136,7 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
         "takes its sign-in project from /console/runtime.json. Remove it from your env.",
     );
   }
-  // Node-only var — deliberately NOT VITE_ prefixed, so it is never inlined
-  // into the client bundle. Loading with an empty prefix stays config-time and
-  // server-side only, so `.env.local` works without exporting it in the shell;
-  // the process environment still wins. `console:dev-real` threads it from the
-  // boot-captured @zitadel/testing instance handle (`scripts/dev-real.mts`).
-  const nodeEnv = loadEnv(mode, import.meta.dirname, "");
-  const backendUrl =
-    process.env.CONSOLE_BACKEND_URL || nodeEnv.CONSOLE_BACKEND_URL || defaultBackendUrl;
+  const backendUrl = devBackendUrl(mode);
 
   // Anchor the context to a path segment so a similarly-prefixed path (e.g.
   // `/api2/...`) is not accidentally proxied and rewritten.
