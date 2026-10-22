@@ -1,16 +1,19 @@
 package middleware_test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	slogctx "github.com/veqryn/slog-context"
+	slogotel "github.com/veqryn/slog-context/otel"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog/extractors"
@@ -131,29 +134,37 @@ func TestWithLogging_flushBeforeWriteIs200(t *testing.T) {
 
 func TestWithLogging_unwrapReachesTheInnerWriter(t *testing.T) {
 	var inner http.ResponseWriter
-	rec := httptest.NewRecorder()
-	middleware.WithLogging(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	_, rec := serve(t, "/", func(w http.ResponseWriter, _ *http.Request) {
 		unwrapper, ok := w.(interface{ Unwrap() http.ResponseWriter })
 		require.True(t, ok)
 		inner = unwrapper.Unwrap()
-	})).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	})
 
 	assert.Same(t, rec, inner)
 }
 
-// The request id comes from the context through the process logger's
-// extractor, as on every other request-scoped line.
+// The request id is set on the request logger, so it reaches the access line
+// and every line the handler logs, with or without a context, exactly once.
 func TestWithLogging_carriesTheRequestID(t *testing.T) {
-	var records recordHandler
-	logger := slog.New(slogctx.NewHandler(&records, &slogctx.HandlerOptions{
-		Prependers: []slogctx.AttrExtractor{extractors.ExtractRequestID},
+	var logs bytes.Buffer
+	logger := slog.New(slogctx.NewHandler(slog.NewTextHandler(&logs, nil), &slogctx.HandlerOptions{
+		Prependers: []slogctx.AttrExtractor{
+			extractors.ExtractErrCause,
+			slogotel.ExtractTraceSpanID,
+			slogctx.ExtractPrepended,
+		},
 	}))
 	ctx := middleware.WithRequestIDContext(zlog.WithLoggingContext(context.Background(), logger), "req_1")
 	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
-	middleware.WithLogging(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).ServeHTTP(httptest.NewRecorder(), req)
+	middleware.WithLogging(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		zlog.GetLoggingContext(r.Context()).Warn("handler line")
+	})).ServeHTTP(httptest.NewRecorder(), req)
 
-	require.Len(t, records.records, 1)
-	requestID, ok := attrString(t, records.records[0], "request_id")
-	require.True(t, ok)
-	assert.Equal(t, "req_1", requestID)
+	lines := strings.Split(strings.TrimSpace(logs.String()), "\n")
+	require.Len(t, lines, 2)
+	assert.Contains(t, lines[0], "handler line")
+	assert.Contains(t, lines[1], "request served")
+	for _, line := range lines {
+		assert.Equal(t, 1, strings.Count(line, "request_id=req_1"), line)
+	}
 }

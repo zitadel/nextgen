@@ -22,7 +22,14 @@ func getLoggingContext(ctx context.Context) *slog.Logger {
 func WithLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		logger := getLoggingContext(ctx)
+
+		// ensure context has logger with request id inside
+		requestID, _ := GetRequestIDContext(ctx)
+		logger := zlog.GetLoggingContext(ctx).With("request_id", requestID)
+		ctx = zlog.WithLoggingContext(ctx, logger)
+		r = r.WithContext(ctx)
+
+		logger = getLoggingContext(ctx)
 		start := time.Now()
 
 		// Already set the operation id so that the value exists on the context.
