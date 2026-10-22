@@ -9,7 +9,7 @@ import { wireOf } from "../wire";
 import { type ParsedFilter, parseFilter, parseSort } from "../query";
 import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
-import { shellArg } from "../../../shell";
+import { shellOption } from "../../../shell";
 import { fieldPaths, itemSchemaOf } from "../paths";
 import { renderRows, renderTable } from "../table";
 import type { Json, ListSpec } from "../types";
@@ -223,7 +223,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
               [
                 `${topic} list`,
                 ...repeatedFlags(flags),
-                `--page-token ${shellArg(next)}`,
+                shellOption("--page-token", next),
                 "--json",
               ].join(" "),
             ),
@@ -245,7 +245,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
               renderTable(columns, items),
               "",
               `${items.length} ${items.length === 1 ? resource.singular : topic}`,
-              ...(next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : []),
+              ...(next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : []),
             ].join("\n"),
     };
   }
@@ -258,9 +258,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
  */
 const repeatedFlags = (flags: Json): readonly string[] => {
   const limit = typeof flags.limit === "number" ? [`--limit ${flags.limit}`] : [];
-  const sort = typeof flags.sort === "string" ? [`--sort ${shellArg(flags.sort)}`] : [];
-  const filters = (Array.isArray(flags.filter) ? flags.filter : []).map(
-    (filter) => `--filter ${shellArg(String(filter))}`,
+  const sort = typeof flags.sort === "string" ? [shellOption("--sort", flags.sort)] : [];
+  const filters = (Array.isArray(flags.filter) ? flags.filter : []).map((filter) =>
+    shellOption("--filter", String(filter)),
   );
   return [...limit, ...sort, ...filters];
 };

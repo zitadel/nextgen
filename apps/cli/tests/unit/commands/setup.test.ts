@@ -230,7 +230,9 @@ describe("setup command", () => {
       command: "npm install",
     });
     expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
-    expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
+    expect(json.data.next_commands[2]).toMatch(
+      /^npx @zitadel\/cli@\S+ plan --env-file \.env\.development\.local/,
+    );
   });
 
   // `data.sso` is a list, one entry per provider, because setup can enable
@@ -548,7 +550,9 @@ describe("setup command", () => {
       expect(json.data.install).toMatchObject({ status: "skipped", reason: "dry-run" });
       expect(json.data.files_written).toContain(expectedFile);
       expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
-      expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
+      expect(json.data.next_commands[2]).toMatch(
+        /^npx @zitadel\/cli@\S+ plan --env-file \.env\.development\.local/,
+      );
     },
   );
 

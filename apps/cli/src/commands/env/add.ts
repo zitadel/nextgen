@@ -19,7 +19,7 @@ import {
 import { PUBLIC_PROJECT_ID_VARIABLE } from "../../lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "../../lib/project";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "../../lib/server";
-import { shellArg } from "../../lib/shell";
+import { shellArg, shellOption } from "../../lib/shell";
 import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { nextCommandsData } from "../../lib/oclif/envelope";
 import { projectCommand } from "../../lib/suggestion";
@@ -110,10 +110,10 @@ export default class EnvAdd extends BaseCommand {
             [
               `env add ${shellArg(name)}`,
               "--server https://api.zitadel.cloud",
-              ...(flags.project === undefined ? [] : [`--project ${shellArg(flags.project)}`]),
+              ...(flags.project === undefined ? [] : [shellOption("--project", flags.project)]),
               ...(flags["app-url"] === undefined
                 ? []
-                : [`--app-url ${shellArg(flags["app-url"])}`]),
+                : [shellOption("--app-url", flags["app-url"])]),
               ...(flags.force ? ["--force"] : []),
             ].join(" "),
           ),
