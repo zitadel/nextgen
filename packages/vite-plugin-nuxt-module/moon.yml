@@ -1,0 +1,21 @@
+id: "vite-plugin-nuxt-module"
+language: "typescript"
+layer: "library"
+stack: "frontend"
+
+tasks:
+  typecheck:
+    deps:
+      # The contract harness imports the plugin by its package name, from its dist.
+      - "build"
+
+  # Builds a fixture Nuxt module with the plugin, installs it into a Nuxt app and starts the
+  # app: it stays out of the `test` gate and CI's graph. Run it with
+  # `moon run vite-plugin-nuxt-module:test-contract`.
+  test-contract:
+    command: "corepack pnpm run test:contract"
+    deps:
+      - "build"
+    options:
+      cache: false
+      runInCI: "skip"

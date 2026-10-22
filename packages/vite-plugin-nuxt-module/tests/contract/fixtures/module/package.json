@@ -1,0 +1,37 @@
+{
+  "name": "hello-timing",
+  "version": "1.2.3",
+  "description": "A Nuxt module that exercises the @nuxt/kit module APIs, built with vite-plugin-nuxt-module.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/types.d.mts",
+      "import": "./dist/module.mjs"
+    },
+    "./server": {
+      "types": "./dist/server.d.mts",
+      "import": "./dist/server.mjs"
+    }
+  },
+  "main": "./dist/module.mjs",
+  "typesVersions": {
+    "*": {
+      ".": [
+        "./dist/types.d.mts"
+      ],
+      "server": [
+        "./dist/server.d.mts"
+      ]
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@nuxt/kit": "^4.0.0"
+  },
+  "peerDependencies": {
+    "nuxt": ">=4"
+  }
+}

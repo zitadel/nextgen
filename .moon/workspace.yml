@@ -31,6 +31,7 @@ projects:
     sdk-qwik-router: "packages/sdk-qwik-router"
     sdk-vue: "packages/sdk-vue"
     testing: "packages/testing"
+    vite-plugin-nuxt-module: "packages/vite-plugin-nuxt-module"
     storybook: "apps/storybook"
     website: "apps/website"
 

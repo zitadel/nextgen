@@ -1,0 +1,5 @@
+@use "./vars" as v;
+
+.hello-global {
+  border-top: 1px solid v.$rule-color;
+}
