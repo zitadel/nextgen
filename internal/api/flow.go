@@ -348,10 +348,11 @@ func (h *Handler) withSealedRelease(ctx context.Context, state *domain.FlowState
 	}
 	resolution := &service.RuntimeResolution{Release: release}
 	if state.DeploymentID != "" && h.pool != nil {
-		dep, depErr := h.pool.Statements().GetDeploymentByID(ctx, state.ProjectID, state.DeploymentID)
-		if depErr == nil {
-			resolution.Deployment = dep
+		dep, err := h.pool.Statements().GetDeploymentByID(ctx, state.ProjectID, state.DeploymentID)
+		if err != nil {
+			return ctx, err
 		}
+		resolution.Deployment = dep
 	}
 	return service.WithRuntimeResolution(ctx, resolution), nil
 }
