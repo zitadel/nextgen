@@ -31,6 +31,22 @@
         },
         {
           "kind": "js",
+          "name": "ZlAvatar",
+          "declaration": {
+            "name": "ZlAvatar",
+            "module": "./zl-avatar.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "zlAvatarManifest",
+          "declaration": {
+            "name": "zlAvatarManifest",
+            "module": "./zl-avatar.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "ZlSubmitDetail",
           "declaration": {
             "name": "ZlSubmitDetail",
@@ -445,6 +461,78 @@
           "declaration": {
             "name": "zlAlertManifest",
             "module": "src/atoms/zl-alert.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/atoms/zl-avatar.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Atom: `<zl-avatar>` — a person's generated avatar, the gradient the console\nshows for the same identifier (`src/avatar.ts`).\n\nValues:\n\n  size        24px (`--zl-spacing-6`); a template resizes the host\n  radius      full\n  surface     two `--zl-gradient-*-start` colours picked from `seed`\n\n`seed` is what the visitor typed, never a user id: the login must not\nconfirm that an account exists. Its direction wanders unless the visitor\nasked for reduced motion.\n\nDecorative: the identifier always sits beside it, so it is hidden from\nassistive technology.",
+          "name": "ZlAvatar",
+          "members": [
+            {
+              "kind": "field",
+              "name": "seed",
+              "type": {
+                "text": "string"
+              },
+              "default": "\"\"",
+              "attribute": "seed"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "seed",
+              "type": {
+                "text": "string"
+              },
+              "default": "\"\"",
+              "fieldName": "seed"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "zl-avatar",
+          "customElement": true
+        },
+        {
+          "kind": "variable",
+          "name": "zlAvatarManifest",
+          "type": {
+            "text": "{\n  tag: \"zl-avatar\",\n  attrs: [\"seed\"],\n  parts: [\"avatar\"],\n  slots: [],\n  events: [],\n}"
+          },
+          "default": "{ tag: \"zl-avatar\", attrs: [\"seed\"], parts: [\"avatar\"], slots: [], events: [], }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ZlAvatar",
+          "declaration": {
+            "name": "ZlAvatar",
+            "module": "src/atoms/zl-avatar.ts"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "zl-avatar",
+          "declaration": {
+            "name": "ZlAvatar",
+            "module": "src/atoms/zl-avatar.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "zlAvatarManifest",
+          "declaration": {
+            "name": "zlAvatarManifest",
+            "module": "src/atoms/zl-avatar.ts"
           }
         }
       ]
@@ -2470,7 +2558,7 @@
         {
           "kind": "variable",
           "name": "SHIPPED_ICON_NAMES",
-          "default": "[ \"plus\", \"arrow-right\", \"arrow-left\", \"spinner\", \"check\", \"chevron-down\", \"cross\", \"warning\", \"alert-circle\", \"info\", \"passkey\", \"user\", \"eye\", \"eye-off\", \"brand-google\", ] as const satisfies readonly IconName[]",
+          "default": "[ \"plus\", \"arrow-right\", \"arrow-left\", \"arrow-left-right\", \"spinner\", \"check\", \"chevron-down\", \"cross\", \"warning\", \"alert-circle\", \"info\", \"passkey\", \"user\", \"eye\", \"eye-off\", \"brand-google\", ] as const satisfies readonly IconName[]",
           "description": "Auth-surface glyph list; every name maps to a glyph (zl-icon.spec.ts)."
         },
         {
@@ -3967,6 +4055,84 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/avatar.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "avatarVars",
+          "return": {
+            "type": {
+              "text": "AvatarVars"
+            }
+          },
+          "parameters": [
+            {
+              "name": "seed",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "The colours for a seed: two different design-system starts, the angle the\ngradient starts at and where in its motion it starts, all taken from the\nhash, so a person keeps theirs on every screen and device and two people\nrarely share one.\n\nThe seed is trimmed and lowercased first, so `Maya@Example.com ` as typed at\nsign-in paints the same as the stored `maya@example.com`. Set on a hover\nhost as well, the variables tint it with the same colours."
+        },
+        {
+          "kind": "function",
+          "name": "avatarSeed",
+          "return": {
+            "type": {
+              "text": "string"
+            }
+          },
+          "parameters": [
+            {
+              "name": "user",
+              "type": {
+                "text": "{ userId?: string; identifier?: string } | undefined"
+              }
+            }
+          ],
+          "description": "What a person's avatar is generated from: their identifier, because that is\nall the login widget can know. Its password step echoes what the visitor\ntyped whether or not the account exists, so a gradient from that string\nleaks nothing, where a user id would confirm the account and expose an\ninternal id. The cost: a changed email changes the avatar. The user id\nstands in only where no identifier is known."
+        },
+        {
+          "kind": "function",
+          "name": "registerAvatarProperties",
+          "return": {
+            "type": {
+              "text": "void"
+            }
+          },
+          "description": "Registers the angles `avatar.css` animates, so they interpolate. A\ndocument-level `@property` rule does the same, but one inside a shadow root\nis ignored, so `<zl-avatar>` registers them from script. Registering twice\nthrows; the first registration stands."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "avatarVars",
+          "declaration": {
+            "name": "avatarVars",
+            "module": "src/avatar.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "avatarSeed",
+          "declaration": {
+            "name": "avatarSeed",
+            "module": "src/avatar.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "registerAvatarProperties",
+          "declaration": {
+            "name": "registerAvatarProperties",
+            "module": "src/avatar.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/events.ts",
       "declarations": [
         {
@@ -4000,6 +4166,14 @@
           "name": "ZlAlert",
           "declaration": {
             "name": "ZlAlert",
+            "module": "./atoms/index.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ZlAvatar",
+          "declaration": {
+            "name": "ZlAvatar",
             "module": "./atoms/index.js"
           }
         },
@@ -4224,6 +4398,14 @@
           "name": "zlAlertManifest",
           "declaration": {
             "name": "zlAlertManifest",
+            "module": "./atoms/index.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "zlAvatarManifest",
+          "declaration": {
+            "name": "zlAvatarManifest",
             "module": "./atoms/index.js"
           }
         },
@@ -5400,9 +5582,9 @@
           "kind": "variable",
           "name": "manifestRegistry",
           "type": {
-            "text": "[\n  zlAlertManifest,\n  zlButtonManifest,\n  zlCardManifest,\n  zlCheckboxManifest,\n  zlFieldManifest,\n  zlIconManifest,\n  zlPageShellManifest,\n  zlPasskeyManifest,\n  zlPillManifest,\n  zlSelectManifest,\n  zlSsoProvidersManifest,\n]"
+            "text": "[\n  zlAlertManifest,\n  zlAvatarManifest,\n  zlButtonManifest,\n  zlCardManifest,\n  zlCheckboxManifest,\n  zlFieldManifest,\n  zlIconManifest,\n  zlPageShellManifest,\n  zlPasskeyManifest,\n  zlPillManifest,\n  zlSelectManifest,\n  zlSsoProvidersManifest,\n]"
           },
-          "default": "[ zlAlertManifest, zlButtonManifest, zlCardManifest, zlCheckboxManifest, zlFieldManifest, zlIconManifest, zlPageShellManifest, zlPasskeyManifest, zlPillManifest, zlSelectManifest, zlSsoProvidersManifest, ]"
+          "default": "[ zlAlertManifest, zlAvatarManifest, zlButtonManifest, zlCardManifest, zlCheckboxManifest, zlFieldManifest, zlIconManifest, zlPageShellManifest, zlPasskeyManifest, zlPillManifest, zlSelectManifest, zlSsoProvidersManifest, ]"
         },
         {
           "kind": "function",

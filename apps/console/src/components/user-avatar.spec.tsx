@@ -1,44 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UserAvatar, avatarSeed, avatarVars } from "./user-avatar";
-
-const avatarGradient = (seed: string) => JSON.stringify(avatarVars(seed));
-
-describe("avatarVars", () => {
-  it("gives a seed the same gradient every time", () => {
-    expect(avatarGradient("user_1")).toBe(avatarGradient("user_1"));
-  });
-
-  it("draws two different design-system starts", () => {
-    for (const seed of ["user_1", "user_2", "a", "", "01JZXYZ"]) {
-      const starts = avatarGradient(seed).match(/--zl-gradient-[a-z]+-start/g);
-      expect(starts).toHaveLength(2);
-      expect(starts?.[0]).not.toBe(starts?.[1]);
-    }
-  });
-
-  it("tells people apart", () => {
-    const gradients = new Set(
-      Array.from({ length: 50 }, (_, index) => avatarGradient(`user_${index}`)),
-    );
-    expect(gradients.size).toBeGreaterThan(45);
-  });
-});
-
-describe("avatarSeed", () => {
-  it("seeds from the identifier as typed at sign-in, whatever its case or spacing", () => {
-    expect(avatarSeed({ identifier: "  Maya@Example.com ", userId: "user_1" })).toBe(
-      "maya@example.com",
-    );
-  });
-
-  it("falls back to the user id only when there is no identifier", () => {
-    expect(avatarSeed({ userId: "user_1" })).toBe("user_1");
-    expect(avatarSeed({ identifier: "  ", userId: "user_1" })).toBe("user_1");
-    expect(avatarSeed(undefined)).toBe("");
-  });
-});
+import { UserAvatar } from "./user-avatar";
 
 describe("UserAvatar", () => {
   it("eases up to speed on hover, and coasts back to rest", () => {

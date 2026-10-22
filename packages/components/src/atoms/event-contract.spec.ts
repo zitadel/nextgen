@@ -11,6 +11,7 @@ import { manifestRegistry } from "../manifests.js";
 describe("atom event contract", () => {
   const expectations: Record<string, readonly string[]> = {
     "zl-alert": ["zl-dismiss"],
+    "zl-avatar": [],
     "zl-button": ["zl-submit"],
     "zl-card": [],
     "zl-checkbox": ["zl-change"],

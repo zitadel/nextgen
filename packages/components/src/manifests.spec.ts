@@ -7,6 +7,7 @@ describe("manifest registry", () => {
     expect([...listKnownTags()].sort()).toEqual(
       [
         "zl-alert",
+        "zl-avatar",
         "zl-button",
         "zl-card",
         "zl-checkbox",

@@ -1,62 +1,18 @@
 import { type CSSProperties, useEffect, useRef } from "react";
 
+import { avatarVars as sharedAvatarVars } from "@zitadel/components/avatar";
+
 import { cn } from "@/lib/utils";
 
-/**
- * The gradient starts the design system ships (`--zl-gradient-*-start`), in a
- * fixed order: a seed's colours depend on this list, so append, never reorder.
- */
-const STARTS = [
-  "--zl-gradient-red-start",
-  "--zl-gradient-purple-start",
-  "--zl-gradient-lavender-start",
-  "--zl-gradient-rose-start",
-  "--zl-gradient-neutral-start",
-] as const;
-
-/** FNV-1a, 32-bit: a small, stable hash; nothing here needs it to be secret. */
-function hash(seed: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
-}
+export { avatarSeed } from "@zitadel/components/avatar";
 
 /**
- * The colours for a seed, as the custom properties `.user-avatar` paints with
- * (`styles.css`): two different design-system starts, the angle it starts at
- * and where in its motion it starts, all taken from the hash, so a person keeps theirs on every
- * screen and device and two people rarely share one.
- *
- * Set on a hover host as well, they tint its hover wash with the same colours.
+ * The colours for a seed (`@zitadel/components/avatar`, shared with the
+ * login's `<zl-avatar>`), as React style. Set on a hover host as well, they
+ * tint its hover wash with the same colours.
  */
 export function avatarVars(seed: string): CSSProperties {
-  const h = hash(seed);
-  const from = h % STARTS.length;
-  // The second colour is drawn from the other four, so the two never match.
-  const to = (from + 1 + ((h >>> 8) % (STARTS.length - 1))) % STARTS.length;
-  return {
-    "--avatar-from": `var(${STARTS[from]})`,
-    "--avatar-to": `var(${STARTS[to]})`,
-    "--avatar-base": `${(h >>> 16) % 360}deg`,
-    // A negative delay starts the motion part-way through. The three
-    // periods (18, 26 and 60s) only line up again after over an hour.
-    "--avatar-phase": `-${(h >>> 4) % 1200}s`,
-  } as CSSProperties;
-}
-
-/**
- * What a person's avatar is generated from: their identifier, trimmed and
- * lowercased, because that is all the login widget can know. Its password
- * step echoes what the visitor typed whether or not the account exists, so a
- * gradient from that string leaks nothing, where a user id would confirm the
- * account and expose an internal id. The cost: a changed email changes the
- * avatar. The user id stands in only where no identifier is known.
- */
-export function avatarSeed(user: { userId?: string; identifier?: string } | undefined): string {
-  return user?.identifier?.trim().toLowerCase() || user?.userId || "";
+  return sharedAvatarVars(seed) as CSSProperties;
 }
 
 /** How much faster the gradient moves while the avatar's host is hovered. */
@@ -71,8 +27,9 @@ function setRate(element: HTMLElement | null, rate: number) {
 
 /**
  * A person's avatar: a gradient generated from their identifier
- * (`avatarSeed`) rather than a picture, the same one the login shows. A
- * picture can replace it once users can upload one.
+ * (`avatarSeed`) rather than a picture, painted by the shared `.zl-avatar`
+ * rules, so it is the one the login shows. A picture can replace it once
+ * users can upload one.
  *
  * Its gradient's direction wanders, unless the person asked for reduced
  * motion. With `fast` it moves `FAST` times quicker: the playback rate
@@ -117,7 +74,7 @@ export function UserAvatar({
     <span
       ref={ref}
       aria-hidden
-      className={cn("user-avatar size-6 shrink-0 rounded-full", className)}
+      className={cn("zl-avatar size-6 shrink-0", className)}
       style={avatarVars(seed)}
     />
   );

@@ -223,26 +223,60 @@ img[data-zl-asset-broken] {
   color: var(--zl-foreground);
 }
 /* The account a step signs in to (`step.identifier`), above its fields: whose
-   password is asked for, with the way back to change it. The address wraps
-   anywhere so a long one never widens the card. */
+   password is asked for, as a full-width chip with the avatar generated from
+   it. On the password step the chip is the way back to change it; on the SSO
+   conflict step it only names the provider's email. A long address ends in an
+   ellipsis rather than widening the card; the control's label carries it whole. */
 .zl-card-account {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--zl-spacing-1) var(--zl-spacing-3);
   margin: 0;
+}
+.zl-card-account__chip {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--zl-spacing-2);
+  inline-size: 100%;
+  min-block-size: var(--zl-spacing-9);
+  margin: 0;
+  padding-block: var(--zl-spacing-1);
+  padding-inline: var(--zl-spacing-1-5) var(--zl-spacing-3);
+  border: 1px solid var(--zl-border);
+  border-radius: var(--zl-radius-full);
+  background: transparent;
   font-family: var(--zl-font-family-sans);
   font-size: var(--zl-text-sm-size);
   line-height: var(--zl-text-sm-leading);
   font-weight: var(--zl-font-weight-normal);
-  color: var(--zl-muted-foreground);
+  color: var(--zl-foreground);
+  text-decoration: none;
+}
+a.zl-card-account__chip {
+  cursor: pointer;
+  transition: background-color var(--zl-duration-fast) var(--zl-easing-standard);
+}
+a.zl-card-account__chip:hover {
+  background: var(--zl-accent);
+}
+a.zl-card-account__chip:focus-visible {
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
 }
 .zl-card-account__value {
+  flex: 1;
   min-width: 0;
-  overflow-wrap: anywhere;
-  color: var(--zl-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: var(--zl-font-weight-medium);
+}
+.zl-card-account__chip zl-icon {
+  flex-shrink: 0;
+  color: var(--zl-muted-foreground);
+}
+@media (prefers-reduced-motion: reduce) {
+  a.zl-card-account__chip {
+    transition: none;
+  }
 }
 /* Standalone forgot-password row: emitted only by templates ejected before
    `<zl-field>` carried the link on its label row. */

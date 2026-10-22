@@ -109,6 +109,15 @@ describe("<zitadel-login> around the step", () => {
       expect(account.querySelector(".zl-card-account__value")?.textContent).toBe("alice@acme.com");
     });
 
+    it("shows the avatar generated from the identifier as typed", async () => {
+      const element = await mount(host);
+      type(element, "email", "Alice@Acme.com");
+      submit(element);
+
+      const account = await waitFor(() => query(element, '[data-testid="zitadel-account"]'));
+      expect(account.querySelector("zl-avatar")?.getAttribute("seed")).toBe("Alice@Acme.com");
+    });
+
     it("changes it by going back to the step that collects it", async () => {
       const element = await mount(host);
       type(element, "email", "alice@acme.com");
@@ -116,7 +125,9 @@ describe("<zitadel-login> around the step", () => {
       const change = await waitFor(() =>
         query(element, '[data-testid="zitadel-action-change-account"]'),
       );
-      expect(change.textContent).toBe("Use another account");
+      // The whole chip is the control: named by the account and what it does.
+      expect(change.getAttribute("aria-label")).toBe("alice@acme.com, Use another account");
+      expect(change.querySelector(".zl-card-account__value")?.textContent).toBe("alice@acme.com");
 
       change.click();
 

@@ -6,6 +6,7 @@ import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 import iconStyles from "./zl-icon.css?inline";
 import {
   ArrowLeft,
+  ArrowLeftRight,
   ArrowRight,
   Check,
   ChevronDown,
@@ -113,6 +114,7 @@ export type IconName =
   | "plus"
   | "arrow-right"
   | "arrow-left"
+  | "arrow-left-right"
   | "spinner"
   | "check"
   | "chevron-down"
@@ -139,6 +141,7 @@ export const SHIPPED_ICON_NAMES = [
   "plus",
   "arrow-right",
   "arrow-left",
+  "arrow-left-right",
   "spinner",
   "check",
   "chevron-down",
@@ -171,6 +174,7 @@ const ICON_NODES: Record<Exclude<IconName, BrandIconName>, IconNode> = {
   plus: Plus,
   "arrow-right": ArrowRight,
   "arrow-left": ArrowLeft,
+  "arrow-left-right": ArrowLeftRight,
   spinner: LoaderCircle,
   check: Check,
   "chevron-down": ChevronDown,

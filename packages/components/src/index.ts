@@ -15,6 +15,7 @@ import "./orchestrator/index.js";
 
 export {
   ZlAlert,
+  ZlAvatar,
   ZlButton,
   ZlCard,
   ZlCheckbox,
@@ -43,6 +44,7 @@ export {
   type ZlSsoSelectDetail,
   type ZlSubmitDetail,
   zlAlertManifest,
+  zlAvatarManifest,
   zlButtonManifest,
   zlCardManifest,
   zlCheckboxManifest,

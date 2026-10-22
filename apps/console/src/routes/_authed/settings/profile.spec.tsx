@@ -205,7 +205,7 @@ describe("settings profile, generated from the schema", () => {
     await renderAt("/settings/profile");
 
     await screen.findByLabelText("Email");
-    const avatars = document.querySelectorAll<HTMLElement>(".user-avatar");
+    const avatars = document.querySelectorAll<HTMLElement>(".zl-avatar");
     const profile = avatars[avatars.length - 1];
     const vars = avatarVars("maya@example.com") as Record<string, string>;
     expect(profile?.style.getPropertyValue("--avatar-from")).toBe(vars["--avatar-from"]);

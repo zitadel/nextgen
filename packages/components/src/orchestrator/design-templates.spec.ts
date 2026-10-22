@@ -38,6 +38,7 @@ const locale: Record<string, string> = {
   "sso-conflict.action.sign_in": "Back to sign in",
   "sso.continue_with": "Continue with {name}",
   "sso.divider": "or",
+  "action.use_another_account": "Use another account",
 };
 
 const step: CreateFlow201Step = {
@@ -96,6 +97,55 @@ function renderDesign(design: string): string {
   const sanitised = createSanitiser()(rendered);
   return patchMandatoryGates(sanitised, step, locale);
 }
+
+/**
+ * The account chip on a step that names the visitor's identifier: on the
+ * password step the whole chip goes back to change it; on the SSO conflict
+ * step, which has its own way out (`sign_in`), it only names the email.
+ */
+describe("account chip", () => {
+  const passwordStep = {
+    ...context,
+    step: { name: "password", texts: { title_key: "identifier.title" } },
+    fields: [{ name: "password", type: "password", text_key: "identifier.field.email" }],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
+      { name: "back", kind: "back", text_key: "action.back" },
+    ],
+    identifier: { value: "Maya@Example.com" },
+  };
+  const conflictStep = {
+    ...passwordStep,
+    actions: [
+      ...passwordStep.actions,
+      { name: "sign_in", kind: "navigate", text_key: "sso-conflict.action.sign_in" },
+    ],
+  };
+
+  function renderWith(design: string, data: Record<string, unknown>): string {
+    const engine = createLiquidEngine({ locale });
+    return createSanitiser()(engine.parseAndRenderSync(templateFor(design), data));
+  }
+
+  for (const design of BRANDING_DESIGNS) {
+    describe(design, () => {
+      it("makes the whole chip the way to another account, with the typed identifier's avatar", () => {
+        const html = renderWith(design, passwordStep);
+        expect(html).toMatch(
+          /<a[^>]*class="zl-card-account__chip"[^>]*data-action="back"[^>]*aria-label="Maya@Example.com, Use another account"/,
+        );
+        expect(html).toContain('<zl-avatar seed="Maya@Example.com">');
+      });
+
+      it("only names the account on a step with its own way out", () => {
+        const html = renderWith(design, conflictStep);
+        expect(html).toContain('<span class="zl-card-account__chip">');
+        expect(html).toContain('<zl-avatar seed="Maya@Example.com">');
+        expect(html).not.toContain('data-action="back"');
+      });
+    });
+  }
+});
 
 describe("branding design catalog", () => {
   it("ships only widget-structure designs (#1039)", () => {
