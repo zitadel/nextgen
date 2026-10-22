@@ -155,6 +155,7 @@ tracked below.
 | PolicyService publish (first revision of an operation's policy) | `policy.created` | `admin` | `policy` | `operation`, `revision_id`, `config` |
 | PolicyService publish (later revision) | `policy.updated` | `admin` | `policy` | `operation`, `revision_id`, `config` |
 | ReleaseService create | `release.created` | `admin` | `release` | `content_hash`, `message`, `git_sha`, `git_dirty`, `pointers` |
+| ReleaseService revoke | `release.revoked` | `admin` | `release` | `content_hash` |
 | IDPConnectionService create (new slug) | `idp.created` | `admin` | `idp_connection` | `slug`, `protocol`, `template`, `display_name`, `revision_id` |
 | IDPConnectionService revise (existing slug) | `idp.updated` | `admin` | `idp_connection` | `revision_id`; delta: `display_name`, `template` (when changed) |
 | `CreateIDPIdentityLink` (SSO sign-in creates the user and links the provider account, same TX) | `idp.identity_link.created` | `entity` | `idp_identity_link` | `connection_id`, `user_id` (secondary; never the provider subject or claims) |
@@ -190,11 +191,7 @@ every supported deployment; that removal is its own breaking change.
 Types whose API contract is published before their producer lands. Each has
 a `domain.EventType` constant and an events API schema, so clients can be
 built against it, but nothing emits it yet. A type moves to Path B with its
-producer.
-
-| `event_type` | Payload | Producer |
-|--------------|---------|----------|
-| `release.revoked` | `content_hash` | ReleaseService revoke ([#1574](https://github.com/zitadel/nextgen/issues/1574)) |
+producer. None today.
 
 ## Deferred
 

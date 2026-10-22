@@ -234,6 +234,10 @@ type ReleasePointerPayload struct {
 
 type ReleaseCreatedPayload = ReleasePayload
 
+type ReleaseRevokedPayload struct {
+	ContentHash string `json:"content_hash"`
+}
+
 // ReleasePayloadSnapshot is the allowlisted create snapshot for release events.
 func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
 	if rel == nil {
