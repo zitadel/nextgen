@@ -19,7 +19,7 @@ Both render every step of your login flow — sign-in, registration, passkey cer
 `zitadel setup` never applies a design: it embeds the maintained login component and publishes no branding revision. Take ownership of the template at any time:
 
 ```sh
-npx @zitadel/cli@alpha branding eject
+npx @zitadel/cli@latest branding eject
 ```
 
 `branding eject` offers the two starter designs above, then scaffolds `.zitadel/branding/` locally — nothing is uploaded until you apply:
@@ -56,8 +56,8 @@ Without `font_url` the login loads no font of its own: it renders in Arimo where
 Branding follows the same loop as schemas and flows:
 
 ```sh
-npx @zitadel/cli@alpha plan
-npx @zitadel/cli@alpha apply
+npx @zitadel/cli@latest plan
+npx @zitadel/cli@latest apply
 ```
 
 `plan` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the pending change; `apply` publishes it. Every publish creates an immutable revision — there is no in-place update, and rolling back means re-applying an earlier template. The live login picks up the newest revision on its next step response.

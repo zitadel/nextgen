@@ -16,6 +16,12 @@ content:
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
+        - $ref: '../../components/schemas/errors/proj-not_found.yaml'
+        - $ref: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
+        - $ref: '../../components/schemas/errors/proj-preview_not_live.yaml'
+        - $ref: '../../components/schemas/errors/rel-not_deployed.yaml'
+        - $ref: '../../components/schemas/errors/rel-not_found.yaml'
+        - $ref: '../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
       discriminator:
@@ -33,6 +39,12 @@ content:
           internal: '../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
           tkn.invalid_tknid: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
+          proj.not_found: '../../components/schemas/errors/proj-not_found.yaml'
+          proj.origin_not_allowed: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
+          proj.preview_not_live: '../../components/schemas/errors/proj-preview_not_live.yaml'
+          rel.not_deployed: '../../components/schemas/errors/rel-not_deployed.yaml'
+          rel.not_found: '../../components/schemas/errors/rel-not_found.yaml'
+          rel.revoked: '../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
     examples:
@@ -96,6 +108,36 @@ content:
         value:
           code: tkn.invalid_tknid
           message: 'token identifiers do not match token type'
+      proj.not_found:
+        summary: proj.not_found
+        value:
+          code: proj.not_found
+          message: 'project not found'
+      proj.origin_not_allowed:
+        summary: proj.origin_not_allowed
+        value:
+          code: proj.origin_not_allowed
+          message: 'the request origin is not an origin of this project'
+      proj.preview_not_live:
+        summary: proj.preview_not_live
+        value:
+          code: proj.preview_not_live
+          message: 'no live preview for this origin; run zitadel preview on this branch'
+      rel.not_deployed:
+        summary: rel.not_deployed
+        value:
+          code: rel.not_deployed
+          message: 'nothing is deployed to this origin'
+      rel.not_found:
+        summary: rel.not_found
+        value:
+          code: rel.not_found
+          message: 'release: not found'
+      rel.revoked:
+        summary: rel.revoked
+        value:
+          code: rel.revoked
+          message: 'the release this attempt runs on was revoked'
       req.invalid:
         summary: req.invalid
         value:

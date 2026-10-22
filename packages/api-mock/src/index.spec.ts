@@ -538,9 +538,9 @@ describe("setupMockHandlers — the provider round trip", () => {
     });
   }
 
-  // The callback redirects to this value, and the mock is publicly deployed:
-  // a foreign target would turn it into an open redirect. The engine binds the
-  // target to the request origin the same way (`internal/api/flow.go`).
+  // The callback redirects to this value: a foreign target would turn it into
+  // an open redirect. The engine binds the target to the request origin the
+  // same way (`internal/api/flow.go`).
   test.each([
     ["on another origin", "https://evil.example/phish"],
     ["carrying userinfo", "http://localhost@evil.example/"],

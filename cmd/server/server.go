@@ -308,13 +308,15 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	// Operation policies (ADR 066). Every template is compiled and checked
 	// here, so a template the server cannot evaluate stops it before it
-	// serves traffic. No project can store an instance yet, so the gate holds
-	// passwords to the server's length cap only.
+	// serves traffic. A project's published instance is resolved per password
+	// set through the policy service; without one, the gate holds passwords to
+	// the server's length cap only.
 	policyEngine, err := policy.New()
 	if err != nil {
 		return fmt.Errorf("failed to compile the policy catalog: %w", err)
 	}
-	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, service.NoPolicyResolver{}, passwordHasher, serviceDBPool)
+	policyService := service.NewPolicyService(serviceDBPool, policyEngine)
+	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {
 		return err
 	}
@@ -405,6 +407,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	defer shipper.Close()
 
+	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService)
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			flowService,
@@ -429,7 +432,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases),
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService),
 		api.NewSecurityHandler(tokenService),
 		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider())...)
 	if err != nil {

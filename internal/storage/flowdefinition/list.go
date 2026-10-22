@@ -23,3 +23,18 @@ func EnsureListOptions(opts *database.ListOptions[domain.FlowDefinitionField]) *
 	}
 	return &out
 }
+
+// ByIDs matches the named flow-definition revisions of one project. An OR of
+// equals rather than an IN clause, because IN is not in the shared filter
+// vocabulary and the id sets here are small — the pinned revisions of one
+// release.
+func ByIDs(projectID string, ids []string) database.Filter[domain.FlowDefinitionField] {
+	matches := make([]database.Filter[domain.FlowDefinitionField], len(ids))
+	for i, id := range ids {
+		matches[i] = database.Equal(database.Col(domain.FlowDefinitionFieldID), id)
+	}
+	return database.And(
+		database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
+		database.Or(matches...),
+	)
+}

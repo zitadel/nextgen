@@ -70,7 +70,7 @@ export async function runCli(
 ): Promise<unknown> {
   const run = promisify(execFile)(
     "npx",
-    ["--yes", `${metadata.cliPackage}@alpha`, ...args, "--cwd", metadata.appDir],
+    ["--yes", `${metadata.cliPackage}@latest`, ...args, "--cwd", metadata.appDir],
     {
       cwd: metadata.appDir,
       env: {

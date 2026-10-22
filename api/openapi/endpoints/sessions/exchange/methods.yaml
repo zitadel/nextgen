@@ -19,6 +19,13 @@ post:
     Clients must replace their stored token at this point.
 
     Requires a project service key (OAuth2 client credentials).
+
+    The project comes from the project secret. A query `project_id` that
+    disagrees answers `403` with `proj.mismatch`. The exchange resolves a
+    deployment the same way as other runtime operations; with no browser
+    `Origin` and nothing deployed to the resolved target the response is
+    `409` with `rel.not_deployed`. A revoked release answers `409` with
+    `rel.revoked`.
   tags:
     - Sessions
   security:
@@ -62,6 +69,39 @@ post:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
+    '403':
+      description: |
+        The `project_id` does not match the project the credential belongs to
+        (`proj.mismatch`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+          examples:
+            mismatch:
+              summary: project_id disagrees with the credential
+              value:
+                code: proj.mismatch
+                message: 'the project named in the request is not the one the credential belongs to'
+    '409':
+      description: |
+        Nothing is deployed to the resolved target (`rel.not_deployed`), or the
+        release of that deployment is revoked (`rel.revoked`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+          examples:
+            not_deployed:
+              summary: No deployment for the resolved target
+              value:
+                code: rel.not_deployed
+                message: 'nothing is deployed to this origin'
+            revoked:
+              summary: The release is revoked
+              value:
+                code: rel.revoked
+                message: 'the release this attempt runs on was revoked'
     default:
       $ref: exchangeHandoff-error-response.yaml
 

@@ -28,9 +28,9 @@ The default mode runs the full framework matrix in parallel. It uses the
 5. Publish tarballs to Verdaccio with `alpha` and `latest` tags.
 6. Install `@zitadel/cli` and `@zitadel/server` from the temporary registry.
 7. Create one empty app directory per selected framework in a temporary directory.
-8. Run `npx <cli-package>@alpha doctor --runtime binary --non-interactive --json`.
-9. Run `npx <cli-package>@alpha start --runtime binary --non-interactive --json`.
-10. Run `npx <cli-package>@alpha setup --framework <id> --server local --non-interactive --json`.
+8. Run `npx <cli-package>@latest doctor --runtime binary --non-interactive --json`.
+9. Run `npx <cli-package>@latest start --runtime binary --non-interactive --json`.
+10. Run `npx <cli-package>@latest setup --framework <id> --server local --non-interactive --json`.
 11. Start each generated app on `localhost`.
 12. Run the Playwright tests with one worker per framework journey.
 
