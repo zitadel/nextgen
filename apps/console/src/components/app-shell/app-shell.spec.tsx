@@ -552,7 +552,7 @@ describe("project pill", () => {
     await userEvent.click(pill);
     expect(await screen.findByRole("searchbox", { name: "Find a project" })).toHaveValue("");
     expect(
-      within(screen.getByRole("list", { name: "Switch project" })).getByRole("link", {
+      await within(screen.getByRole("list", { name: "Switch project" })).findByRole("link", {
         name: "River",
       }),
     ).toBeInTheDocument();
@@ -718,7 +718,47 @@ describe("search", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps listing projects while a search is on its way", async () => {
+    let answer: (() => void) | undefined;
+    server.use(
+      http.get(MY_PROJECTS, async ({ request }) => {
+        if (!new URL(request.url).searchParams.has("name_contains")) {
+          return HttpResponse.json({ projects: [{ id: "proj_1", name: "console-dev" }] });
+        }
+        await new Promise<void>((resolve) => {
+          answer = resolve;
+        });
+        return HttpResponse.json({ projects: [{ id: "proj_9", name: "Zephyr" }] });
+      }),
+    );
+    renderShell(scopedPath("/users", "proj_1"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await dialog.findByRole("option", { name: "console-dev" });
+
+    // Through the pause in typing and the request, the group keeps what it
+    // showed instead of emptying.
+    await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "zep");
+    expect(dialog.getByRole("option", { name: "console-dev" })).toBeInTheDocument();
+    await waitFor(() => expect(answer).toBeDefined());
+    expect(dialog.getByRole("option", { name: "console-dev" })).toBeInTheDocument();
+
+    answer?.();
+    expect(await dialog.findByRole("option", { name: "Zephyr" })).toBeInTheDocument();
+    expect(dialog.queryByRole("option", { name: "console-dev" })).not.toBeInTheDocument();
+  });
+
   it("says when nothing matches", async () => {
+    // The server finds no project by that name; the first page has one.
+    server.use(
+      http.get(MY_PROJECTS, ({ request }) =>
+        HttpResponse.json({
+          projects: new URL(request.url).searchParams.has("name_contains")
+            ? []
+            : [{ id: "proj_1", name: "console-dev" }],
+        }),
+      ),
+    );
     renderShell();
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));

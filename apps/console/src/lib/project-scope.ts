@@ -3,6 +3,7 @@ import { useRouter, useSearch } from "@tanstack/react-router";
 import { api } from "@/api/zitadel";
 import { consoleSessionProject } from "@/auth/session";
 import { useAsync } from "@/hooks/use-async";
+import { TYPING_PAUSE_MS, useDebounced } from "@/hooks/use-debounced";
 
 import { sessionCached } from "./session-cache";
 
@@ -65,15 +66,14 @@ export interface ProjectRef {
  * failed: the chrome degrades rather than blocking a screen behind a boundary.
  */
 export function useMyProjects(): { projects: ProjectRef[]; more: boolean } | undefined {
-  return useAsync(
-    () =>
-      listMyProjectsCached().then((page) => ({
-        projects: page.projects.map(toProjectRef),
-        more: Boolean(page.next_page_token),
-      })),
-    { projects: [], more: false },
-    [],
-  );
+  return useAsync(readMyProjects, { projects: [], more: false }, []);
+}
+
+function readMyProjects(): Promise<{ projects: ProjectRef[]; more: boolean }> {
+  return listMyProjectsCached().then((page) => ({
+    projects: page.projects.map(toProjectRef),
+    more: Boolean(page.next_page_token),
+  }));
 }
 
 /**
@@ -93,6 +93,33 @@ export async function searchMyProjects(nameContains: string, limit: number): Pro
 
 function toProjectRef({ id, name }: ProjectRef): ProjectRef {
   return { id, name };
+}
+
+/** Projects a search field lists, and the term they answer: empty for the first page. */
+export interface ProjectMatches {
+  term: string;
+  projects: ProjectRef[];
+}
+
+/**
+ * The project search behind the chrome's fields (the switcher, ⌘K). Once
+ * typing pauses, up to `limit` of the server's matches for `query`
+ * (`searchMyProjects`); with nothing typed, the first page, at once, since it
+ * needs no request. An answer stays until the next one lands, so a list never
+ * empties between keystrokes, and `term` says which search it answers. A
+ * failed search finds nothing. `undefined` until the first answer.
+ */
+export function useProjectSearch(query: string, limit: number): ProjectMatches | undefined {
+  const trimmed = query.trim();
+  const term = useDebounced(trimmed, trimmed ? TYPING_PAUSE_MS : 0);
+  return useAsync(
+    () =>
+      term
+        ? searchMyProjects(term, limit).then((projects) => ({ term, projects }))
+        : readMyProjects().then(({ projects }) => ({ term, projects })),
+    { term, projects: [] },
+    [term, limit],
+  );
 }
 
 /**

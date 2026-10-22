@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Boxes, Search } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { consoleSessionProject, validateNextSearch } from "@/auth/session";
@@ -26,11 +26,11 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { CliCommand, CliHint, cliSetup } from "@/components/cli-hint";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
-import { TYPING_PAUSE_MS, useDebounced } from "@/hooks/use-debounced";
 import { useLoadMore } from "@/hooks/use-load-more";
+import { useSearchDraft } from "@/hooks/use-search-draft";
 import { formatDate } from "@/lib/date";
 import { serverOrigin } from "@/lib/server-origin";
-import { useProjectScope, useSelectProjectTarget } from "@/lib/project-scope";
+import { useMyProjects, useProjectScope, useSelectProjectTarget } from "@/lib/project-scope";
 import { Page } from "@/components/layout";
 
 /**
@@ -49,10 +49,12 @@ import { Page } from "@/components/layout";
  * than a detail page: the project's own page is `Project settings` in the
  * sidebar once it is selected, and the row menu links there directly.
  *
- * Once the list runs past one page it carries a search, matched on the server
- * across every project the person can act on (`name_contains`), never against
- * the rows already loaded: an account with many projects finds one by name
- * rather than by paging. A list that fits on one page needs none.
+ * Once the person's projects run past one page it carries a search, matched on
+ * the server across every project they can act on (`name_contains`), never
+ * against the rows already loaded: an account with many projects finds one by
+ * name rather than by paging. A list that fits on one page needs none. "One
+ * page" is the first page the project switcher reads (`useMyProjects`), so the
+ * two offer a search to the same people.
  */
 export const Route = createFileRoute("/_authed/projects/")({
   // Order 1: above Teams (2), the first of the selected project's screens.
@@ -103,6 +105,11 @@ function ProjectsScreen() {
       void navigate({ search: (prev) => ({ ...prev, q: q || undefined }), replace: true }),
     [navigate],
   );
+  // Latched for the screen's lifetime: a cleared search drops `?q=` before the
+  // full list is back, and the field must not unmount in between.
+  const mine = useMyProjects();
+  const [searchable, setSearchable] = useState(false);
+  if (!searchable && (mine?.more || search.q)) setSearchable(true);
 
   const paging = useLoadMore(
     loaded,
@@ -132,7 +139,7 @@ function ProjectsScreen() {
           Select a project to manage its teams, users and login flows.
         </p>
       )}
-      {(search.q || loaded.nextPageToken) && (
+      {searchable && (
         <div className={`${RESOURCE_HEADER} ${RESOURCE_TABLE_TOP}`}>
           <ProjectSearch query={search.q ?? ""} onSearch={onSearch} />
         </div>
@@ -198,26 +205,10 @@ function ProjectsScreen() {
 
 /**
  * The list's search field. A pause in typing settles the term into the URL
- * (`?q=`), whose loader sends it to the server. The field follows the URL only
- * while nobody is typing in it: a link that clears the search (the sidebar's
- * Projects) clears the field, and the screen's own navigation never
- * overwrites what is being typed.
+ * (`?q=`), whose loader sends it to the server (`useSearchDraft`).
  */
 function ProjectSearch({ query, onSearch }: { query: string; onSearch: (q: string) => void }) {
-  const field = useRef<HTMLInputElement>(null);
-  const [text, setText] = useState(query);
-  const typed = useDebounced(text.trim(), TYPING_PAUSE_MS);
-
-  useEffect(() => {
-    if (document.activeElement !== field.current) setText(query);
-  }, [query]);
-
-  // Set during render: the URL moving on its own must not send a term back.
-  const settled = useRef(query);
-  settled.current = query;
-  useEffect(() => {
-    if (typed !== settled.current) onSearch(typed);
-  }, [typed, onSearch]);
+  const [draft, setDraft] = useSearchDraft(query, onSearch);
 
   return (
     <div className="relative w-full max-w-90">
@@ -227,10 +218,9 @@ function ProjectSearch({ query, onSearch }: { query: string; onSearch: (q: strin
         className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
       />
       <Input
-        ref={field}
         type="search"
-        value={text}
-        onChange={(event) => setText(event.target.value)}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
         placeholder="Search projects"
         aria-label="Search projects"
         className="pl-8"

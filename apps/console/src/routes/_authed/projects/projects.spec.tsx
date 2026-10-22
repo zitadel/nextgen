@@ -343,6 +343,41 @@ describe("projects screen", () => {
     expect(screen.getByRole("searchbox", { name: "Search projects" })).toHaveValue("zep");
   });
 
+  it("offers the search to the people the project switcher offers it to", async () => {
+    // The switcher's first page (the shared read, no `limit`) runs past one
+    // page, while this screen's larger page holds every project: both ask the
+    // same read whether to search, so the field is here too.
+    server.use(
+      http.get(PROJECTS_URL, ({ request }) => {
+        const shared = !new URL(request.url).searchParams.has("limit");
+        return HttpResponse.json({
+          projects: [listed("proj_1", "River"), listed("proj_2", "Delta")],
+          next_page_token: shared ? "page-2" : undefined,
+        });
+      }),
+    );
+    await renderProjects();
+
+    expect(await screen.findByRole("searchbox", { name: "Search projects" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the field while a cleared search reloads the list", async () => {
+    // A short list opened on a search: clearing it drops `?q=`, and the field
+    // stays rather than leaving with it.
+    server.use(
+      http.get(PROJECTS_URL, () => HttpResponse.json({ projects: [listed("proj_1", "River")] })),
+    );
+    const router = await renderProjects("/projects?q=riv");
+
+    const field = await screen.findByRole("searchbox", { name: "Search projects" });
+    await userEvent.clear(field);
+
+    await waitFor(() => expect(router.state.resolvedLocation?.search.q).toBeUndefined());
+    expect(screen.getByRole("searchbox", { name: "Search projects" })).toHaveValue("");
+    expect(screen.getByRole("link", { name: "River" })).toBeInTheDocument();
+  });
+
   it("keeps the search when loading more", async () => {
     const reads: URLSearchParams[] = [];
     server.use(

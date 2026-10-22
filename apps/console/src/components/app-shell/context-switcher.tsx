@@ -17,12 +17,11 @@ import { cn } from "@/lib/utils";
 
 import { queryActiveTeams } from "@/lib/teams";
 import { useAsync } from "@/hooks/use-async";
-import { TYPING_PAUSE_MS, useDebounced } from "@/hooks/use-debounced";
 import {
   type ProjectRef,
-  searchMyProjects,
   useMyProjects,
   useProjectScope,
+  useProjectSearch,
   useSelectedProject,
   useSelectProjectTarget,
   withoutTrailingSlash,
@@ -67,11 +66,12 @@ interface SwitcherOption {
 }
 
 export function ContextSwitcher() {
+  // The first page says whether there are more projects than it shows, and so
+  // whether the list offers a search; the list itself is the search's answer.
   const mine = useMyProjects();
-  const toOption = useProjectOption();
-  const projects = mine?.projects.map(toOption);
   const [query, setQuery] = useState("");
-  const found = useProjectSearch(query);
+  const found = useProjectSearch(query, PROJECT_RESULTS);
+  const toOption = useProjectOption();
   // The pill shows the selected project (`?project=`, `src/lib/project-scope.ts`),
   // never `getConsoleProjectId()`: that is the project the console signs into —
   // the platform project on a platform deployment — which is not what anybody
@@ -93,14 +93,11 @@ export function ContextSwitcher() {
           heading="Projects"
           label={current?.label}
           currentId={current?.id}
-          options={query.trim() && found ? found.map(toOption) : projects}
-          emptyLabel={projects?.length === 0 ? NO_PROJECTS : NO_SELECTION}
+          options={found?.projects.map(toOption)}
+          emptyLabel={mine?.projects.length === 0 ? NO_PROJECTS : NO_SELECTION}
+          noOptions={found?.term ? NO_MATCHES : undefined}
           ariaLabel="Switch project"
-          search={
-            mine?.more
-              ? { label: FIND_PROJECT, empty: NO_MATCHES, query, onQueryChange: setQuery }
-              : undefined
-          }
+          search={mine?.more ? { label: FIND_PROJECT, query, onQueryChange: setQuery } : undefined}
         />
       )}
       {/* The team switcher joins the bar once a team is open — the team is the
@@ -174,22 +171,6 @@ function useProjectOption(): (project: ProjectRef) => SwitcherOption {
 }
 
 /**
- * The projects whose name contains `query`, found on the server across all of
- * the person's projects once typing pauses; `undefined` until the first answer
- * for it lands, while the list keeps what it showed. A new query keeps the last
- * answer until its own arrives, so the list does not flash empty between
- * keystrokes. A failed search finds nothing.
- */
-function useProjectSearch(query: string): ProjectRef[] | undefined {
-  const typed = useDebounced(query.trim(), TYPING_PAUSE_MS);
-  return useAsync(
-    typed ? () => searchMyProjects(typed, PROJECT_RESULTS).catch(() => []) : null,
-    undefined,
-    [typed],
-  );
-}
-
-/**
  * Where selecting a project goes. A project-scoped list stays where it is and
  * re-reads under the new project, keeping its own filters (Teams' tab and
  * search). Anything else — a detail page, whose resource belongs to the
@@ -217,6 +198,7 @@ function Switcher({
   currentId,
   options,
   emptyLabel,
+  noOptions,
   ariaLabel,
   footer,
   search,
@@ -233,19 +215,13 @@ function Switcher({
   options: SwitcherOption[] | undefined;
   /** Shown in place of a label once the options have loaded and there are none. */
   emptyLabel: string;
+  /** What the empty list says instead of `emptyLabel`: a search that found nothing. */
+  noOptions?: string;
   ariaLabel: string;
   /** An action beneath the options, which closes the popover first. */
   footer?: { label: string; icon: LucideIcon; onSelect: () => void };
-  /**
-   * A field above the options. The caller searches with `query` and answers
-   * with `options`; `empty` is what the list says when nothing matches.
-   */
-  search?: {
-    label: string;
-    empty: string;
-    query: string;
-    onQueryChange: (query: string) => void;
-  };
+  /** A field above the options. The caller searches with `query` and answers with `options`. */
+  search?: { label: string; query: string; onQueryChange: (query: string) => void };
   /** The innermost context in the bar, whose label the design sets semibold. */
   current?: boolean;
 }) {
@@ -307,9 +283,7 @@ function Switcher({
         )}
         <ul aria-label={ariaLabel} className="flex flex-col">
           {rows.length === 0 ? (
-            <li className="px-2 py-1.5 text-sm text-muted-foreground">
-              {search?.query.trim() ? search.empty : emptyLabel}
-            </li>
+            <li className="px-2 py-1.5 text-sm text-muted-foreground">{noOptions ?? emptyLabel}</li>
           ) : (
             // Links, not buttons: selecting a project or a team is a navigation —
             // the project lives in the URL (`?project=`), the team is the page.

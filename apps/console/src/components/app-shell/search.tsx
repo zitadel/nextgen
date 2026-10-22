@@ -13,12 +13,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useAsync } from "@/hooks/use-async";
 import { TYPING_PAUSE_MS, useDebounced } from "@/hooks/use-debounced";
-import {
-  searchMyProjects,
-  useMyProjects,
-  useProjectScope,
-  useSelectedProject,
-} from "@/lib/project-scope";
+import { useProjectScope, useProjectSearch, useSelectedProject } from "@/lib/project-scope";
 import { queryActiveTeams } from "@/lib/teams";
 import { cn } from "@/lib/utils";
 
@@ -90,8 +85,6 @@ export function SearchDialog({
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const projectId = useProjectScope();
-  // The first page: the palette's projects before anything is typed.
-  const mine = useMyProjects();
   // One request per pause in typing, not per keystroke.
   const typed = useDebounced(open ? query.trim() : "", TYPING_PAUSE_MS);
   const teams = useAsync(
@@ -101,11 +94,9 @@ export function SearchDialog({
     [],
     [typed, projectId],
   );
-  const projects = useAsync(
-    typed ? () => searchMyProjects(typed, PROJECT_RESULTS) : null,
-    [],
-    [typed],
-  );
+  // The first page until something is typed, then the server's matches; each
+  // answer stays until the next lands, so the group never empties mid-typing.
+  const projects = useProjectSearch(open ? query : "", PROJECT_RESULTS);
   const pages = useNavItems();
   const yours = useNavItems("settings");
 
@@ -143,8 +134,7 @@ export function SearchDialog({
       go: close(() => void navigate({ to: "/teams/$teamId", params: { teamId: team.id } })),
     }));
 
-    // Typed, the server's matches across all of them; untyped, the first page.
-    const projectResults: Result[] = ((q ? projects : mine?.projects) ?? []).map((project) => ({
+    const projectResults: Result[] = (projects?.projects ?? []).map((project) => ({
       id: `project:${project.id}`,
       icon: Boxes,
       label: project.name,
@@ -161,7 +151,7 @@ export function SearchDialog({
       { heading: "Projects", results: projectResults },
       { heading: "You", results: navResults(yours) },
     ].filter((group) => group.results.length > 0);
-  }, [pages, yours, teams, projects, mine, projectName, q, navigate, onOpenChange]);
+  }, [pages, yours, teams, projects, projectName, q, navigate, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
