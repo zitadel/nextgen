@@ -341,6 +341,8 @@ func releaseErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrReleasePermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	case domain.ErrReleaseRevoked().Code, domain.ErrReleaseNotDeployed(nil).Code:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
 	default:
 		return internalErrorResponse(err)
 	}

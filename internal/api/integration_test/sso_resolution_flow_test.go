@@ -75,7 +75,7 @@ func (f *ssoResolutionFixture) startFlow(t *testing.T, session *domain.Session) 
 	if f.definitionName != "" {
 		req.FlowDefinitionName = api.NewOptString(f.definitionName)
 	}
-	resp, err := f.client.CreateFlow(t.Context(), req)
+	resp, err := f.client.CreateFlow(t.Context(), req, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 	created := resp.(*api.FlowResponseHeaders)

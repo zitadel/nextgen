@@ -9,10 +9,10 @@ import { type CodeLanguage, type CodeLine, highlightCode } from "@/lib/highlight
 /**
  * The command the footer tells an operator to run (decisions log D0b).
  *
- * The published CLI, invoked without installing it — the repo is in changesets
- * prerelease mode on the `alpha` dist-tag, which is the tag the design names.
+ * The published CLI, invoked without installing it, from npm's `latest` tag
+ * (docs/adrs/074-preview-releases-on-0x.md).
  */
-const CLI_COMMAND = "npx @zitadel/cli@alpha deploy";
+const CLI_COMMAND = "npx @zitadel/cli@latest deploy";
 
 /**
  * `lineWidth: 0` disables YAML's line folding. Folding is legal and Shiki reads

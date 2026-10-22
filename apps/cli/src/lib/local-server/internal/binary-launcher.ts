@@ -232,7 +232,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", "Zitadel server npm package is not available", {
         hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
-        nextCommands: [shellCommand("npm install @zitadel/cli@alpha")],
+        nextCommands: [shellCommand("npm install @zitadel/cli@latest")],
         details: { package: SERVER_NPM_PACKAGE, message: errorMessage(error) },
       });
     }
@@ -459,7 +459,7 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
   } catch (error) {
     throw new ZitadelError("E_VALIDATION", "The Zitadel server could not be started", {
       hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
-      nextCommands: [shellCommand("npm install @zitadel/cli@alpha")],
+      nextCommands: [shellCommand("npm install @zitadel/cli@latest")],
       details: { command, message: errorMessage(error) },
     });
   }

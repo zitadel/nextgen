@@ -108,7 +108,7 @@ describe("claim copy", () => {
     expect(claimAction("0.1.0", undefined, NO_SELECTOR)).toContain("within 14 days of creation");
     expect(claimAction("0.1.0", undefined, NO_SELECTOR)).toContain("its data may be lost");
     expect(claimAction("0.1.0", undefined, NO_SELECTOR)).not.toMatch(/delete|removed|expire/i);
-    expect(claimAction("0.1.0", undefined, NO_SELECTOR)).toContain("npx @zitadel/cli@latest claim");
+    expect(claimAction("0.1.0", undefined, NO_SELECTOR)).toContain("npx @zitadel/cli@0.1.0 claim");
   });
 
   it("names the concrete deadline when the creation time is known", () => {
@@ -124,7 +124,7 @@ describe("claim copy", () => {
 
   it("boxes the same nudge with the command pulled out of the prose", () => {
     const box = claimBoxAction("0.1.0", undefined, NO_SELECTOR);
-    expect(box.command).toBe("npx @zitadel/cli@latest claim");
+    expect(box.command).toBe("npx @zitadel/cli@0.1.0 claim");
     expect(box.text).toContain("temporary and its data may be lost");
     expect(box.text).not.toContain("npx");
   });
@@ -136,9 +136,9 @@ describe("claim copy", () => {
   it("frames a closed window as reconciliation, not a verdict", () => {
     const closed = claimWindowClosedAction("0.1.0", NO_SELECTOR);
     expect(closed).toContain("claim window has closed");
-    expect(closed).toContain("npx @zitadel/cli@latest claim");
+    expect(closed).toContain("npx @zitadel/cli@0.1.0 claim");
     expect(closed).toContain("no longer be claimed");
-    expect(closed).toContain("npx @zitadel/cli@latest setup");
+    expect(closed).toContain("npx @zitadel/cli@0.1.0 setup");
     expect(closed).not.toMatch(/delete|removed|expire/i);
   });
 

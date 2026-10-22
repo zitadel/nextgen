@@ -29,6 +29,7 @@ type Harness struct {
 	testServer      dependency[*httptest.Server]
 	hasherFactory   dependency[*crypto.HasherFactory]
 	passwordPolicy  dependency[*service.PasswordPolicy]
+	policyService   dependency[*service.PolicyService]
 	masterKeys      dependency[*domain.MasterKeys]
 	secretGenerator dependency[secrets.Generator]
 	joseSigner      dependency[jose.Signer]

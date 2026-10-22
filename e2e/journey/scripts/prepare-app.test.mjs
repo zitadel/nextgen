@@ -56,7 +56,7 @@ test("prepares the customer local setup journey in the app root", async () => {
       [
         [
           "--yes",
-          "@zitadel/cli@alpha",
+          "@zitadel/cli@latest",
           "doctor",
           "--port",
           "18080",
@@ -69,7 +69,7 @@ test("prepares the customer local setup journey in the app root", async () => {
         ],
         [
           "--yes",
-          "@zitadel/cli@alpha",
+          "@zitadel/cli@latest",
           "start",
           "--port",
           "18080",
@@ -82,7 +82,7 @@ test("prepares the customer local setup journey in the app root", async () => {
         ],
         [
           "--yes",
-          "@zitadel/cli@alpha",
+          "@zitadel/cli@latest",
           "setup",
           "--framework",
           "react",

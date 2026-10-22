@@ -5,7 +5,7 @@ Vue 3 components for the Zitadel auth UI, for client-side SPAs (Vite, etc.).
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-vue@alpha
+pnpm add @zitadel/sdk-vue@latest
 ```
 
 ## Requirements

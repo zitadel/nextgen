@@ -5,7 +5,7 @@ Nuxt module, Nitro middleware, and helpers for Nextgen Auth.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-nuxt@alpha
+pnpm add @zitadel/sdk-nuxt@latest
 ```
 
 There are two ways to wire the SDK. **The module is what `zitadel setup`

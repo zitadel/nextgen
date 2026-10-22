@@ -167,12 +167,11 @@ jobs:
         if: ${{ steps.remote-cache.outcome != 'success' }}
         run: echo "TURBO_CACHE=local:rw" >> "$GITHUB_ENV"
 
-      - name: Check PR title
+      - name: Check pending changesets
         if: ${{ github.event_name == 'pull_request' }}
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: node scripts/check-pr-title.mjs --title "$PR_TITLE" --base "$BASE_SHA" --summary
+        run: |
+          git branch --force main origin/main
+          node scripts/check-changesets-status.mjs --pending --summary
 
       # Same outputs and gates as ci.yml; the affected set comes from turbo's
       # task graph (NEXTGEN_TASK_RUNNER above) instead of `moon query`. On a
