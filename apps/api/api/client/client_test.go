@@ -1,8 +1,6 @@
 package client_test
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,13 +10,12 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/zitadel/nextgen/api/client"
-	api "github.com/zitadel/nextgen/api/generated"
 )
 
 // The spec's servers URL is the contract (ADR 077), and PathPrefix what the
-// server mounts the API under and the Go clients call; @zitadel/api's
-// API_PREFIX has the same test. A change to one alone would leave the others
-// behind.
+// server mounts the API under and the Go clients call; the public client's
+// api.PathPrefix (packages/go) and @zitadel/api's API_PREFIX have the same
+// test. A change to one alone would leave the others behind.
 func TestPathPrefixIsTheSpecsServerURL(t *testing.T) {
 	t.Parallel()
 	raw, err := os.ReadFile(filepath.Join("..", "openapi", "openapi-spec.yaml"))
@@ -45,22 +42,4 @@ func TestBaseURL(t *testing.T) {
 	} {
 		assert.Equal(t, want, client.BaseURL(origin), origin)
 	}
-}
-
-// The generated client puts an operation's path after its base URL's own.
-func TestNewCallsTheAPIUnderThePrefix(t *testing.T) {
-	t.Parallel()
-	var path string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path = r.URL.Path
-		w.Header().Set("Content-Type", "text/plain")
-		_, _ = w.Write([]byte("ok"))
-	}))
-	t.Cleanup(srv.Close)
-
-	c, err := client.New(srv.URL, nil, api.WithClient(srv.Client()))
-	require.NoError(t, err)
-	_, err = c.GetLive(t.Context())
-	require.NoError(t, err)
-	assert.Equal(t, "/api/v1/livez", path)
 }

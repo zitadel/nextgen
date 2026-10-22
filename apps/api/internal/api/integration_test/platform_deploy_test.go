@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	platformbootstrap "github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/domain"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // TestPlatformProjectSignsInFromTheConsole bootstraps the platform project as

@@ -1,3 +1,5 @@
+//go:build postgres_integration || spanner_integration
+
 package helpers
 
 import (
@@ -7,10 +9,9 @@ import (
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/api/client"
-	api "github.com/zitadel/nextgen/api/generated"
 	internalapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/domain"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 type FakeSecuritySource struct {
@@ -62,7 +63,7 @@ func NewApiClient(
 	origin string,
 ) (*ApiClient, error) {
 	securitySource := &FakeSecuritySource{}
-	c, err := client.New(origin, securitySource,
+	c, err := api.New(origin, securitySource,
 		//egress:allow integration-test client talking to the server under test
 		api.WithClient(&http.Client{Transport: csrfTransport{source: securitySource}}))
 	if err != nil {

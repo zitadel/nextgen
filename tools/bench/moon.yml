@@ -18,6 +18,10 @@ fileGroups:
     - "/apps/api/**/*.go"
     - "/apps/api/go.mod"
     - "/apps/api/go.sum"
+    # The Go client module, through the same kind of replace.
+    - "/packages/go/**/*.go"
+    - "/packages/go/go.mod"
+    - "/packages/go/go.sum"
     # Files the root packages bench imports compile in through //go:embed:
     # the JSON meta-schemas and the config defaults.
     - "/apps/api/api/openapi/endpoints/schemas/*.json"
