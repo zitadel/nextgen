@@ -85,6 +85,32 @@ async function add(cwd: string, ...extra: string[]) {
   return { result, envelope: parseJson(result.stdout) as { data: Added; code?: string } };
 }
 
+/**
+ * Binds an existing project, with its secret in the process environment as the
+ * teammate who sent the id would have it, so the follow-ups that need a
+ * credential are offered.
+ */
+async function addBound(cwd: string, ...extra: string[]) {
+  const result = await runCliForTest(
+    [
+      "env",
+      "add",
+      "production",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--non-interactive",
+      "--json",
+      "--project",
+      "proj_existing",
+      ...extra,
+    ],
+    { ZITADEL_PROJECT_SECRET: "sk_proj_existing_full" },
+  );
+  return { result, envelope: parseJson(result.stdout) as { data: Added; code?: string } };
+}
+
 /** The same, rendered for a terminal: what a person reads. */
 async function addRendered(cwd: string, ...extra: string[]): Promise<string> {
   const result = await runCliForTest([
@@ -116,7 +142,7 @@ describe("env add", () => {
 
       expect(suggested(envelope).length).toBeGreaterThan(0);
       for (const command of suggested(envelope)) {
-        expect(command).toContain(" --env production");
+        expect(command).toContain(" --env-file .env.production.local");
       }
     });
 
@@ -145,9 +171,17 @@ describe("env add", () => {
     it("quotes an IPv6 app origin in the follow-up a person reads", async () => {
       const cwd = await makeProject("next");
 
-      const out = await addRendered(cwd, "--app-url", "http://[::1]:3000");
+      const out = await addRendered(
+        cwd,
+        "--project",
+        "proj_existing",
+        "--app-url",
+        "http://[::1]:3000",
+      );
 
-      expect(out).toContain("origin add 'http://[::1]:3000' --kind primary --env production");
+      expect(out).toContain(
+        "origin add 'http://[::1]:3000' --kind primary --env-file .env.production.local",
+      );
     });
 
     it("tells a person the origin step waits on the project secret when none was written", async () => {
@@ -169,16 +203,26 @@ describe("env add", () => {
         "https://app.acme.com",
       );
 
-      expect(out).toContain("origin add https://app.acme.com --kind primary --env production");
+      expect(out).toContain(
+        "origin add https://app.acme.com --kind primary --env-file .env.production.local",
+      );
     });
 
-    it("restricts the project to the app's origin first", async () => {
+    it("offers no origin add for a project it created, which already holds the app URL", async () => {
       const cwd = await makeProject("next");
 
       const { envelope } = await add(cwd, "--app-url", "https://app.acme.com");
 
+      expect(suggested(envelope).some((command) => command.includes("origin add"))).toBe(false);
+    });
+
+    it("restricts a bound project to the app's origin first", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await addBound(cwd, "--app-url", "https://app.acme.com");
+
       expect(suggested(envelope)[0]).toContain(
-        "origin add https://app.acme.com --kind primary --env production",
+        "origin add https://app.acme.com --kind primary --env-file .env.production.local",
       );
     });
   });
