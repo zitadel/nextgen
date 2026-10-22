@@ -122,7 +122,7 @@ describe("release detail", () => {
     await renderAt("/releases/rel_1");
 
     expect(await screen.findByRole("heading", { name: "rel_1" })).toBeInTheDocument();
-    expect(screen.getByText("active")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy Release ID" })).toBeInTheDocument();
 
     // One group per kind the release pins, in the design's order, each pointer
@@ -195,7 +195,7 @@ describe("release detail", () => {
 
     await screen.findByRole("heading", { name: "rel_1" });
     expect(screen.getByText("Revoked")).toBeInTheDocument();
-    expect(screen.queryByText("active")).not.toBeInTheDocument();
+    expect(screen.queryByText("Active")).not.toBeInTheDocument();
   });
 
   it("lists where the release went, marking what is still served", async () => {
