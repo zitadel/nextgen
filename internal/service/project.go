@@ -515,12 +515,16 @@ func updateProjectPayload(req UpdateProjectRequest) domain.ProjectUpdatedPayload
 type ListProjectsRequest struct {
 	// ProjectID restricts results to that single project. Handlers set it from
 	// the caller's scope, and every credential today is bound to one project.
-	// Required.
+	// Required unless AllProjects is set.
 	ProjectID string
-	Limit     int
-	PageToken string
-	Sorting   *Sorting // optional; defaults to createdAt asc
-	Filters   []Filter
+	// AllProjects lists every project of the deployment instead, for a caller
+	// the platform operator path has authorized (ADR 075 §6). ProjectID must
+	// then be empty.
+	AllProjects bool
+	Limit       int
+	PageToken   string
+	Sorting     *Sorting // optional; defaults to createdAt asc
+	Filters     []Filter
 }
 
 // ListProjectsResponse is the output for listing projects.
@@ -534,12 +538,17 @@ func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (_ *
 	defer end(&err)
 
 	// TODO (grvijayan): update once a credential can hold a scope wider than one project (ADR 036).
-	if req.ProjectID == "" {
+	if req.ProjectID == "" && !req.AllProjects {
 		return nil, domain.ErrProjectMissingID()
+	}
+	if req.ProjectID != "" && req.AllProjects {
+		return nil, domain.ErrInternal(errors.New("list projects: a project id and all projects at once"))
 	}
 
 	filters := make([]database.Filter[domain.ProjectField], 0, len(req.Filters)+1)
-	filters = append(filters, database.Equal(database.Col(domain.ProjectFieldID), req.ProjectID))
+	if !req.AllProjects {
+		filters = append(filters, database.Equal(database.Col(domain.ProjectFieldID), req.ProjectID))
+	}
 	for _, f := range req.Filters {
 		filter, err := projectFilter(f)
 		if err != nil {
@@ -559,12 +568,16 @@ func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (_ *
 	}
 
 	opts := &database.ListOptions[domain.ProjectField]{
-		Filter: database.And(filters...),
 		Pagination: database.Page[domain.ProjectField]{
 			Limit:   uint32(normalizeLimit(req.Limit)),
 			OrderBy: orderBy,
 			Cursor:  cursor,
 		},
+	}
+	// Every project with no filter has nothing to AND: an empty AND would
+	// still open a WHERE clause.
+	if len(filters) > 0 {
+		opts.Filter = database.And(filters...)
 	}
 
 	result, err := s.v2Pool.Statements().ListProjects(ctx, opts)

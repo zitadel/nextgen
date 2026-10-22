@@ -3,12 +3,14 @@ post:
   x-zitadel-cli: projects list
   summary: Query projects
   description: |
-    Returns the project the project secret belongs to, as a page of at most one
-    project.
+    With a project secret, returns the project the secret belongs to, as a page
+    of at most one project. A credential is scoped to one project until ADR 036
+    widens it, so the filters and sorting apply to that project alone.
 
-    A credential is scoped to one project until ADR 036 widens it, so the filters
-    and sorting apply to that project alone. The projects a signed-in person can
-    act on are listed by `GET /users/me/projects`.
+    With the Console session of a platform operator (ADR 075), searches every
+    project of the deployment, with the same filters, sorting and paging. Any
+    other session is refused with `403`: the projects a signed-in person can act
+    on are listed by `GET /users/me/projects`.
   tags:
     - Projects
   security:
@@ -17,6 +19,7 @@ post:
         # browser-plane preview secret, so it cannot gate an operator read
         # until ADR 036 splits the credential planes into distinct schemes.
         - project.write
+    - nextgenSession: []
   requestBody:
     description: Request to query projects.
     required: true

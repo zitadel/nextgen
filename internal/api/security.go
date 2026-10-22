@@ -19,6 +19,10 @@ import (
 
 type SecurityHandler struct {
 	tokenService service.TokenService
+	// platformProjectID is the deployment's platform project (ADR 075). A
+	// session of a user homed there carries it in ScopeContext, which is what
+	// opens the platform operator path; empty opens it for nobody.
+	platformProjectID string
 }
 
 func NewSecurityHandler(
@@ -27,6 +31,14 @@ func NewSecurityHandler(
 	return &SecurityHandler{
 		tokenService: tokenService,
 	}
+}
+
+// WithPlatformProject names the deployment's platform project (ADR 075). A
+// chainable setter, like Handler's, so the constructor's call sites stay as
+// they are.
+func (s *SecurityHandler) WithPlatformProject(projectID string) *SecurityHandler {
+	s.platformProjectID = projectID
+	return s
 }
 
 func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.OperationName, t api.OAuth2) (context.Context, error) {
@@ -97,12 +109,16 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 	if token.UserID != "" {
 		// Session.Token() never mints Scope (always empty). Users skip the
 		// project.write ceiling in credentialCeiling; Check uses PrincipalType/ID.
-		ctx = WithScopeContext(ctx, ScopeContext{
+		scope := ScopeContext{
 			ProjectID:     token.ProjectID,
 			Scope:         token.Scope,
 			PrincipalType: domain.AuthzPrincipalTypeUser,
 			PrincipalID:   token.UserID,
-		})
+		}
+		if s.platformProjectID != "" && token.ProjectID == s.platformProjectID {
+			scope.PlatformProjectID = s.platformProjectID
+		}
+		ctx = WithScopeContext(ctx, scope)
 	}
 	return ctx, nil
 }
@@ -153,6 +169,7 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.ListMyPasskeysOperation:        true,
 	api.ListMyIdentityLinksOperation:   true,
 	api.GetMyPasswordStateOperation:    true,
+	api.GetMyPlatformAccessOperation:   true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous
@@ -175,6 +192,9 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.GetMyPasswordStateOperation:  true,
 	api.GetProjectOperation:          true,
 	api.PatchProjectOperation:        true,
+	// A platform operator's view of the deployment (ADR 075 §6).
+	api.QueryProjectsOperation:       true,
+	api.GetMyPlatformAccessOperation: true,
 	// Console management screens (#1300 §1). Their writes need the CSRF token
 	// (ADR 053 §5, csrf.go).
 	api.CreateUserOperation:            true,
@@ -351,6 +371,10 @@ type ScopeContext struct {
 	PrincipalID   string
 	// TeamID is the token team for sk_team_ principals (resolver ConstraintTeamID).
 	TeamID string
+	// PlatformProjectID is the deployment's platform project when this is a
+	// session of a user homed there (ADR 075), which adds the platform operator
+	// path to every Check. Empty for every other credential.
+	PlatformProjectID string
 	// SecretHash is domain.HashSecret of the presented bearer string: the
 	// proof-of-possession seam for the claim flow (ADR 046 §3). The claim
 	// service stores it on init and compares it on status; it is set only on

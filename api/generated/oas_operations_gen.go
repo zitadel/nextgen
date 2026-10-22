@@ -45,6 +45,7 @@ const (
 	GetIdpRevisionByIdOperation            OperationName = "GetIdpRevisionById"
 	GetLiveOperation                       OperationName = "GetLive"
 	GetMyPasswordStateOperation            OperationName = "GetMyPasswordState"
+	GetMyPlatformAccessOperation           OperationName = "GetMyPlatformAccess"
 	GetMySessionOperation                  OperationName = "GetMySession"
 	GetMySessionCsrfTokenOperation         OperationName = "GetMySessionCsrfToken"
 	GetMyUserOperation                     OperationName = "GetMyUser"

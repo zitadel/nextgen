@@ -39,6 +39,7 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"NEXTGEN_DATABASE_POSTGRES",
 		"NEXTGEN_INSTRUMENTATION_LOG_FORMAT",
 		"NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT",
+		"NEXTGEN_PLATFORM_OPERATORS",
 		"NEXTGEN_SERVER_ADDRESS",
 		"NEXTGEN_SERVER_CONSOLE_ENABLED",
 		"NEXTGEN_SERVER_CONSOLE_PATH",
@@ -372,6 +373,35 @@ func TestPrepareServerRendersTheBootstrapAdminDocument(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, doc, string(written))
 	assert.Empty(t, os.Getenv("BOOTSTRAP_ADMIN_USER_JSON_B64"))
+}
+
+func TestPrepareServerMakesTheBootstrapAdminAnOperator(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	doc := `{"header":{"version":1,"project_id":"proj_platform","id":"user_platformadmin"},"authenticators":[]}`
+	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(doc)))
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "user_platformadmin", os.Getenv("NEXTGEN_PLATFORM_OPERATORS"))
+}
+
+func TestPrepareServerKeepsConfiguredOperators(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	doc := `{"header":{"version":1,"id":"user_platformadmin"},"authenticators":[]}`
+	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(doc)))
+	t.Setenv("NEXTGEN_PLATFORM_OPERATORS", "user_support")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "user_support", os.Getenv("NEXTGEN_PLATFORM_OPERATORS"))
+}
+
+func TestPrepareServerNamesNoOperatorWithoutABootstrapAdmin(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+	assert.Empty(t, os.Getenv("NEXTGEN_PLATFORM_OPERATORS"))
 }
 
 func TestPrepareServerLocallyKeepsTheConfiguredDatabase(t *testing.T) {

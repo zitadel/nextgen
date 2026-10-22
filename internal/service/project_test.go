@@ -647,6 +647,32 @@ func TestProjectService_List(t *testing.T) {
 			},
 		},
 		{
+			// A platform operator's search (ADR 075 §6): no project filter at
+			// all, not an empty one, which would still open a WHERE clause.
+			name:   "all projects drop the project filter",
+			req:    service.ListProjectsRequest{AllProjects: true},
+			result: &database.ListResult[*domain.Project]{Items: []*domain.Project{{ID: "proj_a"}, {ID: "proj_b"}}},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Nil(t, opts.Filter)
+			},
+			checkResp: func(t *testing.T, resp *service.ListProjectsResponse) {
+				assert.Len(t, resp.Projects, 2)
+			},
+		},
+		{
+			name: "all projects keep the caller's filters",
+			req: service.ListProjectsRequest{
+				AllProjects: true,
+				Filters:     []service.Filter{{Field: "created_at", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)}},
+			},
+			result: &database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
+				require.NotNil(t, opts.Filter)
+				assert.False(t, opts.Filter.Restricts(database.Col(domain.ProjectFieldID)), "no project id filter")
+				assert.True(t, opts.Filter.Restricts(database.Col(domain.ProjectFieldCreatedAt)))
+			},
+		},
+		{
 			name:   "limit clamped to max",
 			req:    service.ListProjectsRequest{ProjectID: "proj_a", Limit: 500},
 			result: &database.ListResult[*domain.Project]{},
@@ -812,6 +838,11 @@ func TestProjectService_List_ValidationErrors(t *testing.T) {
 			name:    "missing project id is refused",
 			req:     service.ListProjectsRequest{},
 			wantErr: domain.ErrProjectMissingID(),
+		},
+		{
+			name:    "a project id and all projects at once is a caller bug",
+			req:     service.ListProjectsRequest{ProjectID: "proj_a", AllProjects: true},
+			wantErr: domain.ErrInternal(nil),
 		},
 		{
 			name: "unsupported operation not implemented",

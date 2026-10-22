@@ -84,16 +84,30 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 	return projectResponse(project), nil
 }
 
-// QueryProjects has no project parameter: results are restricted to the
-// caller's project. The authz gate rejects an unbound / no-foothold scope, so the
-// ProjectID passed on is always set.
+// QueryProjects has no project parameter. A project secret's results are
+// restricted to its own project: the authz gate rejects an unbound /
+// no-foothold scope, so the ProjectID passed on is always set. A session is a
+// platform operator's search across every project (ADR 075 §6), and any other
+// session is refused; its projects come from listMyProjects.
 func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsRequest) (api.QueryProjectsRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
-	if err := h.requireProjectAccess(ctx, scopeCtx.ProjectID, projectAccess, opRead); err != nil {
+	svcReq := mapQueryProjectsToService(scopeCtx.ProjectID, req)
+	if scopeCtx.PrincipalType == domain.AuthzPrincipalTypeUser {
+		operator, err := h.platformOperator(ctx, scopeCtx)
+		if err != nil {
+			return nil, err
+		}
+		if !operator {
+			return nil, domain.ErrProjectPermissionDenied()
+		}
+		markPlatformOperator(ctx, scopeCtx)
+		svcReq.ProjectID = ""
+		svcReq.AllProjects = true
+	} else if err := h.requireProjectAccess(ctx, scopeCtx.ProjectID, projectAccess, opRead); err != nil {
 		return nil, err
 	}
 
-	listed, err := h.projectService.List(ctx, mapQueryProjectsToService(scopeCtx.ProjectID, req))
+	listed, err := h.projectService.List(ctx, svcReq)
 	if err != nil {
 		return nil, err
 	}

@@ -5,6 +5,25 @@ description: |
   live risk-evaluator input.
 additionalProperties: true
 properties:
+  authorization:
+    description: |
+      What authorized the request, when it was not a grant on the event's
+      project (ADR 053 §8). Every event of such a request carries it.
+    type: object
+    additionalProperties: false
+    required:
+      - path
+    properties:
+      path:
+        type: string
+        description: |
+          `platform_operator`: the deployment's platform operator relation
+          (ADR 075), which administers every project.
+        enum:
+          - platform_operator
+      actor_home_project_id:
+        type: string
+        description: The project the actor's user belongs to.
   client:
     description: Observed HTTP requestor context on Path A request.api only.
     type: object

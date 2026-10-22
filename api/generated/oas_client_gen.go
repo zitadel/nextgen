@@ -559,6 +559,19 @@ type Invoker interface {
 	//
 	// GET /users/me/password
 	GetMyPasswordState(ctx context.Context, params GetMyPasswordStateParams) (GetMyPasswordStateRes, error)
+	// GetMyPlatformAccess invokes getMyPlatformAccess operation.
+	//
+	// The platform relations the signed-in user holds on the deployment
+	// (ADR 075). A platform operator administers every project of the
+	// deployment and may search them all with `queryProjects`.
+	// Only a user of the deployment's platform project can hold one; for
+	// everyone else `relations` is empty. Being a user of the platform project,
+	// or an administrator of it, grants none.
+	// With `project_id`, the relations are read only when the session belongs to
+	// that project.
+	//
+	// GET /users/me/platform_access
+	GetMyPlatformAccess(ctx context.Context, params GetMyPlatformAccessParams) (GetMyPlatformAccessRes, error)
 	// GetMySession invokes getMySession operation.
 	//
 	// Returns the current state of the current session including its factors and all currently
@@ -945,11 +958,13 @@ type Invoker interface {
 	QueryIdps(ctx context.Context, request *QueryIdpsRequest, params QueryIdpsParams) (QueryIdpsRes, error)
 	// QueryProjects invokes queryProjects operation.
 	//
-	// Returns the project the project secret belongs to, as a page of at most one
-	// project.
-	// A credential is scoped to one project until ADR 036 widens it, so the filters
-	// and sorting apply to that project alone. The projects a signed-in person can
-	// act on are listed by `GET /users/me/projects`.
+	// With a project secret, returns the project the secret belongs to, as a page
+	// of at most one project. A credential is scoped to one project until ADR 036
+	// widens it, so the filters and sorting apply to that project alone.
+	// With the Console session of a platform operator (ADR 075), searches every
+	// project of the deployment, with the same filters, sorting and paging. Any
+	// other session is refused with `403`: the projects a signed-in person can act
+	// on are listed by `GET /users/me/projects`.
 	//
 	// POST /projects/query
 	QueryProjects(ctx context.Context, request *QueryProjectsRequest) (QueryProjectsRes, error)
@@ -6834,6 +6849,144 @@ func (c *Client) sendGetMyPasswordState(ctx context.Context, params GetMyPasswor
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMyPasswordStateResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetMyPlatformAccess invokes getMyPlatformAccess operation.
+//
+// The platform relations the signed-in user holds on the deployment
+// (ADR 075). A platform operator administers every project of the
+// deployment and may search them all with `queryProjects`.
+// Only a user of the deployment's platform project can hold one; for
+// everyone else `relations` is empty. Being a user of the platform project,
+// or an administrator of it, grants none.
+// With `project_id`, the relations are read only when the session belongs to
+// that project.
+//
+// GET /users/me/platform_access
+func (c *Client) GetMyPlatformAccess(ctx context.Context, params GetMyPlatformAccessParams) (GetMyPlatformAccessRes, error) {
+	res, err := c.sendGetMyPlatformAccess(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetMyPlatformAccess(ctx context.Context, params GetMyPlatformAccessParams) (res GetMyPlatformAccessRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getMyPlatformAccess"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/users/me/platform_access"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetMyPlatformAccessOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/users/me/platform_access"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetMyPlatformAccessOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetMyPlatformAccessResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -13322,11 +13475,13 @@ func (c *Client) sendQueryIdps(ctx context.Context, request *QueryIdpsRequest, p
 
 // QueryProjects invokes queryProjects operation.
 //
-// Returns the project the project secret belongs to, as a page of at most one
-// project.
-// A credential is scoped to one project until ADR 036 widens it, so the filters
-// and sorting apply to that project alone. The projects a signed-in person can
-// act on are listed by `GET /users/me/projects`.
+// With a project secret, returns the project the secret belongs to, as a page
+// of at most one project. A credential is scoped to one project until ADR 036
+// widens it, so the filters and sorting apply to that project alone.
+// With the Console session of a platform operator (ADR 075), searches every
+// project of the deployment, with the same filters, sorting and paging. Any
+// other session is refused with `403`: the projects a signed-in person can act
+// on are listed by `GET /users/me/projects`.
 //
 // POST /projects/query
 func (c *Client) QueryProjects(ctx context.Context, request *QueryProjectsRequest) (QueryProjectsRes, error) {
@@ -13407,11 +13562,23 @@ func (c *Client) sendQueryProjects(ctx context.Context, request *QueryProjectsRe
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, QueryProjectsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {

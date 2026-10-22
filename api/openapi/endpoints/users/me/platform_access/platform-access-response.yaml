@@ -1,0 +1,14 @@
+type: object
+description: The platform relations the signed-in user holds (ADR 075).
+required:
+  - relations
+properties:
+  relations:
+    type: array
+    description: |
+      Each relation the user holds on the deployment's platform. `operator`
+      administers every project. Empty for everyone else.
+    items:
+      type: string
+      enum:
+        - operator

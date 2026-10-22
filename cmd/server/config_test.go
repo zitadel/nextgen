@@ -83,6 +83,26 @@ func TestPlatformConfigValidate(t *testing.T) {
 		t.Parallel()
 		require.Error(t, PlatformConfig{ProjectID: "user_01H0000000000000000000000"}.Validate())
 	})
+
+	t.Run("operators with a platform project are valid", func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, PlatformConfig{BootstrapProject: true, Operators: []string{"user_platformadmin"}}.Validate())
+		require.NoError(t, PlatformConfig{ProjectID: "proj_setup", Operators: []string{"user_01H0000000000000000000000"}}.Validate())
+	})
+
+	t.Run("operators without a platform project error", func(t *testing.T) {
+		t.Parallel()
+		err := PlatformConfig{Operators: []string{"user_platformadmin"}}.Validate()
+		require.ErrorContains(t, err, "platform.operators needs a platform project")
+	})
+
+	t.Run("an operator that is not a user id errors", func(t *testing.T) {
+		t.Parallel()
+		for _, id := range []string{"team_ops", "ffo@zitadel.com", " user_platformadmin", ""} {
+			err := PlatformConfig{BootstrapProject: true, Operators: []string{id}}.Validate()
+			require.ErrorContains(t, err, "platform.operators", "%q", id)
+		}
+	})
 }
 
 func TestPlatformConfigResolvedProjectID(t *testing.T) {

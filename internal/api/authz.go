@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/authz/resolver"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -401,6 +402,8 @@ func projectCheckRequest(scope ScopeContext, projectID string, op accessOp, rsi 
 		ObjectType:    "project",
 		Relation:      projectRelation(op),
 		TeamID:        scope.TeamID,
+		// Set only for a session homed in the platform project (ADR 075).
+		PlatformProjectID: scope.PlatformProjectID,
 	}
 	if rsi != nil {
 		req.ResourceID = rsi.ResourceID
@@ -422,11 +425,47 @@ func checkProjectAccess(ctx context.Context, r *resolver.Resolver, stmts service
 	if err := credentialCeiling(scope, projectID); err != nil {
 		return resolver.DecisionUnspecified, err
 	}
-	dec, err := r.Check(ctx, stmts, projectCheckRequest(scope, projectID, op, rsi))
+	dec, path, err := r.CheckPath(ctx, stmts, projectCheckRequest(scope, projectID, op, rsi))
 	if err != nil {
 		return resolver.DecisionUnspecified, domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}
+	if path == resolver.PathPlatformOperator {
+		markPlatformOperator(ctx, scope)
+	}
 	return dec, nil
+}
+
+// markPlatformOperator records on the request's events that the platform
+// operator relation, not a grant on the project, authorized it (ADR 075 §5).
+func markPlatformOperator(ctx context.Context, scope ScopeContext) {
+	audit.MarkAuthorization(ctx, domain.EventAuthorizationMetadata{
+		Path:               domain.EventAuthorizationPathPlatformOperator,
+		ActorHomeProjectID: scope.ProjectID,
+	})
+}
+
+// platformOperator reports whether the credential is a platform operator who
+// may read every project (ADR 075 §3). Only a session of a user homed in the
+// platform project can be one; everyone else is answered without a query.
+func (h *Handler) platformOperator(ctx context.Context, scope ScopeContext) (bool, error) {
+	if scope.PlatformProjectID == "" || scope.PrincipalType != domain.AuthzPrincipalTypeUser {
+		return false, nil
+	}
+	if h == nil || h.pool == nil {
+		return false, domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	ok, err := resolver.New().PlatformOperator(ctx, h.pool.Statements(), resolver.Request{
+		PrincipalType:     scope.PrincipalType,
+		PrincipalID:       scope.PrincipalID,
+		HomeProjectID:     scope.ProjectID,
+		PlatformProjectID: scope.PlatformProjectID,
+		ObjectType:        "project",
+		Relation:          projectRelation(opRead),
+	})
+	if err != nil {
+		return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
+	}
+	return ok, nil
 }
 
 // credentialCeiling is the pre-resolver gate on the credential plane.

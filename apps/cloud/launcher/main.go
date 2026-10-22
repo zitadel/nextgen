@@ -38,6 +38,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -333,12 +334,32 @@ func prepareServer(extra []string) ([]string, error) {
 		"NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT": "true",
 		"NEXTGEN_INSTRUMENTATION_LOG_FORMAT": "json",
 		"NEXTGEN_SERVER_PUBLIC_BASE":         publicBase(env),
+		// The bootstrap admin administers every project (ADR 075), unless
+		// the deployment names its platform operators itself.
+		"NEXTGEN_PLATFORM_OPERATORS": bootstrapAdminID(s.admin),
 	} {
 		if err := setDefault(key, value); err != nil {
 			return nil, err
 		}
 	}
 	return append(args, extra...), nil
+}
+
+// bootstrapAdminID is the user id the bootstrap admin document declares, or
+// empty when there is no document or it names no id.
+func bootstrapAdminID(doc []byte) string {
+	if doc == nil {
+		return ""
+	}
+	var parsed struct {
+		Header struct {
+			ID string `json:"id"`
+		} `json:"header"`
+	}
+	if err := json.Unmarshal(doc, &parsed); err != nil {
+		return ""
+	}
+	return parsed.Header.ID
 }
 
 // withParams adds each parameter the URL does not set yet. The server also
