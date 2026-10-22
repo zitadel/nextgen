@@ -9,3 +9,14 @@
  */
 export const shellArg = (value: string): string =>
   /^[A-Za-z0-9_.:@/=+-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
+
+/**
+ * An option and its value for a suggested command's text: `--cwd path`, but
+ * `--cwd=-path` for a value that starts with a dash. A separate token would be
+ * read as the next option rather than as this one's value, and quoting does not
+ * prevent that — `--cwd '--force'` still parses as two options — so the value
+ * is joined with `=`, which no parser splits. The argument-list form of the
+ * same rule is `optionArgs` in `public-cli.ts`.
+ */
+export const shellOption = (option: string, value: string): string =>
+  value.startsWith("-") ? `${option}=${shellArg(value)}` : `${option} ${shellArg(value)}`;

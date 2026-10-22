@@ -36,7 +36,7 @@ import type {
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
-import { shellArg } from "../shell";
+import { shellOption } from "../shell";
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
@@ -202,7 +202,7 @@ export abstract class BaseCommand extends Command {
     // A follow-up run from the shell's directory would act on whatever project
     // is there, so the directory this run addressed goes with it.
     return unscopedCommand(
-      this.typedCwd === undefined ? args : `${args} --cwd ${shellArg(this.typedCwd)}`,
+      this.typedCwd === undefined ? args : `${args} ${shellOption("--cwd", this.typedCwd)}`,
       this.meta.cliVersion,
     );
   }
