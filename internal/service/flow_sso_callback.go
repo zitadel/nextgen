@@ -186,9 +186,6 @@ func (c *FlowSSOCallback) deploymentID(ctx context.Context, projectID, attemptID
 	if err != nil {
 		return "", err
 	}
-	if attempt == nil {
-		return "", nil
-	}
 	return attempt.DeploymentID, nil
 }
 
@@ -218,9 +215,10 @@ func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, deploymentID,
 	})
 }
 
-// resolveClientSecret reads the secret for the token exchange. A sealed
-// deployment reads the ciphertext its set froze and decrypts it. No sealed
-// deployment reads the live primary secret.
+// resolveClientSecret reads the secret for the token exchange from the
+// variable the connection names. A plain value is refused: it is readable
+// through the variables surface, and refusing it makes the misconfiguration
+// visible.
 func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID, deploymentID string, conn idp.Connection) (string, error) {
 	name, ok := domain.VariableReferenceName(conn.OIDC.ClientSecretRef)
 	if !ok {
@@ -229,33 +227,9 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID, de
 		// logged.
 		return "", errors.New("client_secret is not a variable reference")
 	}
-	secret := ""
-	if deploymentID != "" {
-		set, err := c.variables.GetDeploymentVariables(ctx, projectID, deploymentID)
-		if err != nil {
-			return "", err
-		}
-		if set == nil {
-			return "", errNoFrozenVariables
-		}
-		variable := set.Variables()[name]
-		// A plain variable is refused: it is readable through the variables
-		// surface, and refusing it makes the misconfiguration visible.
-		if variable != nil && variable.IsSecret {
-			plain, err := variable.GetDecryptedValue(decrypterOfWritingKey(ctx, c.keys))
-			if err != nil {
-				return "", err
-			}
-			secret, _ = plain.(string)
-		}
-	} else {
-		vars, err := c.variables.GetDecryptedVariables(ctx, domain.VariableOwner{ProjectID: projectID}, new(domain.DeploymentOriginKindPrimary), name)
-		if err != nil {
-			return "", err
-		}
-		if len(vars) == 1 && vars[0].IsSecret {
-			secret, _ = vars[0].Value.(string)
-		}
+	secret, err := secretVariable(ctx, c.variables, decrypterOfWritingKey(ctx, c.keys), projectID, deploymentID, name)
+	if err != nil {
+		return "", err
 	}
 	if secret == "" {
 		return "", fmt.Errorf("client_secret variable %q is missing, not a secret, or not a string", name)

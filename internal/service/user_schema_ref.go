@@ -27,8 +27,7 @@ type userSchemaStatements interface {
 // When the request's release pins a flow definition, the revision is the one
 // that release pins for the handle. Otherwise it is the project's newest
 // revision. A handle that release's closure required and does not pin is an
-// internal error. Saving a flow definition calls this with no release on the
-// context, so it still checks the newest revision.
+// internal error.
 func resolveUserSchema(ctx context.Context, stmts userSchemaStatements, bases domain.BuiltinSchemaBases, projectID, ref string) (*domain.JSONSchema, error) {
 	handle, err := userSchemaHandle(ctx, stmts, bases, projectID, ref)
 	if err != nil {
