@@ -129,17 +129,26 @@ func addServerFlags(cmd *cobra.Command, applyMigrations *bool, userFiles *[]stri
 		"Fail the start instead of generating a master key when none is configured (server.generate_master_key: false)")
 }
 
-func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bool) error {
-	var err error
+// run is the server's lifetime. Its result is named so that the deferred report
+// sees what the caller gets. The early returns that declare err in an if or
+// case scope (`if err := f(); err != nil { return ... }`) never reached the
+// function-scoped err the defer used to check, so those failures went
+// unreported (#1409); the `x, err :=` returns reused that err, but it held the
+// unwrapped cause rather than the value returned.
+func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bool) (err error) {
 	sfs := &ShutdownFuncs{}
 	defer func() {
+		// Logged before the shutdown funcs run: one of them shuts down the
+		// OTel logger provider, after which a record reaches stderr only.
 		if err != nil {
 			slog.Error("run error", slogctx.Err(err))
 		}
-		err = sfs.Exec(context.WithoutCancel(ctx))
-		if err != nil {
-			slog.Error("shutdown error", slogctx.Err(err))
-			os.Exit(1)
+		// Kept apart from err: assigning the shutdown outcome to it would hand
+		// the caller nil after a clean shutdown of a failed start, and the
+		// process would exit 0.
+		if shutdownErr := sfs.Exec(context.WithoutCancel(ctx)); shutdownErr != nil {
+			slog.Error("shutdown error", slogctx.Err(shutdownErr))
+			err = errors.Join(err, shutdownErr)
 			return
 		}
 		slog.Info("shut down application")
@@ -308,13 +317,15 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	// Operation policies (ADR 066). Every template is compiled and checked
 	// here, so a template the server cannot evaluate stops it before it
-	// serves traffic. No project can store an instance yet, so the gate holds
-	// passwords to the server's length cap only.
+	// serves traffic. A project's published instance is resolved per password
+	// set through the policy service; without one, the gate holds passwords to
+	// the server's length cap only.
 	policyEngine, err := policy.New()
 	if err != nil {
 		return fmt.Errorf("failed to compile the policy catalog: %w", err)
 	}
-	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, service.NoPolicyResolver{}, passwordHasher, serviceDBPool)
+	policyService := service.NewPolicyService(serviceDBPool, policyEngine)
+	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {
 		return err
 	}
@@ -430,7 +441,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver),
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService),
 		api.NewSecurityHandler(tokenService),
 		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider())...)
 	if err != nil {

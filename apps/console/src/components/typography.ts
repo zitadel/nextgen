@@ -13,3 +13,6 @@ export const PANEL_HEAD_CELL =
 
 /** Body cell of a table inside a panel card. */
 export const PANEL_BODY_CELL = "px-0 py-3 text-sm";
+
+/** Form field labels: Arimo, 14px/20px, regular weight. */
+export const FIELD_LABEL_TYPOGRAPHY = "font-sans text-sm leading-5 font-normal";

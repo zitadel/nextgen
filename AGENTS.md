@@ -23,7 +23,7 @@ conflict.
 | `apps/docs/`, `apps/website/` | the docs site; the hosted cloud's front page | [docs](apps/docs/AGENTS.md), [website](apps/website/AGENTS.md) |
 | `apps/storybook/` | workbench and a11y gate for the login atoms | [storybook](apps/storybook/AGENTS.md) |
 | `apps/demo-*/` | reference apps for the sign-in component | [next](apps/demo-next/README.md), [nuxt](apps/demo-nuxt/README.md) |
-| `apps/cloud/`, `apps/mock-zitadel/` | the hosted cloud; the per-PR mock API | [runbook](docs/runbooks/cloud.md) |
+| `apps/cloud/` | the hosted cloud | [runbook](docs/runbooks/cloud.md) |
 | `e2e/` | every end-to-end lane, moon project `e2e` | [journey](e2e/journey/AGENTS.md), [console](e2e/console/AGENTS.md), [demo-next](e2e/demo-next/AGENTS.md), [demo-nuxt](e2e/demo-nuxt/AGENTS.md) |
 | `packages/` | SDKs (`sdk-*`), API client, config schemas | [packages](packages/AGENTS.md) |
 | `packages/components/` | `<zl-*>` atoms, the `<zitadel-login>` orchestrator | [components](packages/components/AGENTS.md) |

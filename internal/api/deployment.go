@@ -61,11 +61,39 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 	return &unchanged, nil
 }
 
-func (h *Handler) RollbackDeployment(ctx context.Context, _ api.OptRollbackDeploymentRequest, params api.RollbackDeploymentParams) (api.RollbackDeploymentRes, error) {
+func (h *Handler) RollbackDeployment(ctx context.Context, req api.OptRollbackDeploymentRequest, params api.RollbackDeploymentParams) (api.RollbackDeploymentRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+
+	input := service.RollbackDeploymentInput{
+		ProjectID:    string(params.ProjectID),
+		DeploymentID: string(params.DeploymentID),
+	}
+	if body, ok := req.Get(); ok {
+		if message, ok := body.Message.Get(); ok {
+			input.Message = &message
+		}
+		if expected, ok := body.ExpectedDeploymentID.Get(); ok {
+			input.ExpectedDeploymentID = new(string(expected))
+		}
+	}
+
+	result, err := h.deploymentService.Rollback(ctx, input)
+	if conflict, ok := deploymentConflictResponse(err); ok {
+		return conflict, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	// Created or not, the deployment is the project's newest primary one.
+	resp := toAPIDeployment(result.Deployment, api.DeploymentStatusLive)
+	if result.Created {
+		created := api.RollbackDeploymentCreated(resp)
+		return &created, nil
+	}
+	unchanged := api.RollbackDeploymentOK(resp)
+	return &unchanged, nil
 }
 
 func (h *Handler) GetDeploymentById(ctx context.Context, params api.GetDeploymentByIdParams) (api.GetDeploymentByIdRes, error) {
@@ -152,7 +180,14 @@ func (h *Handler) RemovePreview(ctx context.Context, _ *api.RemovePreviewRequest
 // the details would nest under details.details.
 func deploymentConflictResponse(err error) (*api.DeploymentConflict, bool) {
 	de, ok := errors.AsType[domain.Error](err)
-	if !ok || de.Code != domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code {
+	if !ok {
+		return nil, false
+	}
+	if de.Code == domain.ErrReleaseRevoked().Code {
+		resp := api.NewReleaseRevokedConflictDeploymentConflict(api.ReleaseRevokedConflict{Code: de.Code, Message: de.Message})
+		return &resp, true
+	}
+	if de.Code != domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code {
 		return nil, false
 	}
 	body := api.DeploymentGuardConflict{Code: de.Code, Message: de.Message}

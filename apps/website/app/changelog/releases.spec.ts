@@ -181,6 +181,7 @@ describe("parseRelease", () => {
       {
         summary: "Drops the old flag.",
         bump: "major",
+        markedBreaking: false,
         packages: ["@zitadel/cli"],
         source: { label: "abc1234", href: "https://github.com/zitadel/nextgen/commit/abc1234" },
         authors: [{ label: "@livio-a", href: "https://github.com/livio-a" }],
@@ -188,8 +189,46 @@ describe("parseRelease", () => {
       {
         summary: "Updates the help text.",
         bump: "major",
+        markedBreaking: false,
         packages: ["@zitadel/cli"],
         authors: [],
+      },
+    ]);
+  });
+
+  it("marks a change with a paragraph that starts with **Breaking:**, first or later", () => {
+    const body = [
+      "<!-- nextgen-release-facts:start -->",
+      "### Package Changes",
+      "",
+      "#### `@zitadel/server`",
+      "",
+      "### Minor Changes",
+      "",
+      "- [#2175](https://github.com/zitadel/nextgen/pull/2175) Thanks [@fforootd](https://github.com/fforootd)! - **Breaking:** Drops the old flag.",
+      "- Signing out now needs the CSRF token.",
+      "",
+      "  **Breaking:** an older `@zitadel/components` cannot sign out.",
+      "",
+      "- Adds a flag; nothing here is **Breaking:** in the middle of a sentence.",
+      "<!-- nextgen-release-facts:end -->",
+    ].join("\n");
+
+    expect(
+      parseRelease(release("v0.2.0", { body })).changes.map(({ summary, markedBreaking }) => ({
+        summary,
+        markedBreaking,
+      })),
+    ).toEqual([
+      { summary: "**Breaking:** Drops the old flag.", markedBreaking: true },
+      {
+        summary:
+          "Signing out now needs the CSRF token.\n\n**Breaking:** an older `@zitadel/components` cannot sign out.",
+        markedBreaking: true,
+      },
+      {
+        summary: "Adds a flag; nothing here is **Breaking:** in the middle of a sentence.",
+        markedBreaking: false,
       },
     ]);
   });
@@ -211,6 +250,17 @@ describe("parseReleases", () => {
       "v1.0.0-alpha.9",
       "nightly",
     ]);
+  });
+
+  it("starts at 0.1.0, leaving the alpha previews before it to GitHub", () => {
+    const releases = parseReleases([
+      release("v0.1.0-alpha.28"),
+      release("v0.1.1"),
+      release("v0.1.0"),
+      release("v0.1.0-alpha.9"),
+    ]);
+
+    expect(releases.map(({ tag }) => tag)).toEqual(["v0.1.1", "v0.1.0"]);
   });
 
   it("refuses an answer that is no list of releases", () => {

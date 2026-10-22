@@ -198,6 +198,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.GetBrandingByIdOperation:       true,
 	api.QueryIdpsOperation:             true,
 	api.GetIdpByIdOperation:            true,
+	api.GetIdpRevisionByIdOperation:    true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the

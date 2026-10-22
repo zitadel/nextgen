@@ -54,7 +54,7 @@ not support unchanged: a Next.js Pages Router app, a React app without Vite, or
 a framework older than setup supports
 ([Add Zitadel to an existing app](https://preview.zitadel.com/docs/get-started/existing-app.md)
 lists the versions). For those, reach for that framework's SDK skill and add
-auth by hand: install `@zitadel/sdk-<framework>@alpha`, configure it, add the
+auth by hand: install `@zitadel/sdk-<framework>@latest`, configure it, add the
 provider/guard/routes, and drop in the login component.
 
 Each skill points you at the package's real README and TypeScript types for exact
