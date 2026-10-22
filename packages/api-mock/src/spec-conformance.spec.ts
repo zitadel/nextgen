@@ -1835,6 +1835,102 @@ describe("api-mock releases and deployments", () => {
       body: JSON.stringify(body),
     });
 
+  test("builds a release whose bundle carries a connection, resolving it by slug", async () => {
+    const project = await newProject("release-build-idps");
+    const connection = (secret: string) => ({
+      slug: "google",
+      protocol: "oidc",
+      template: "google",
+      display_name: "Google",
+      oidc: {
+        issuer: "https://accounts.google.com",
+        client_id: "111.apps.googleusercontent.com",
+        client_secret: secret,
+        scopes: ["openid"],
+      },
+    });
+    const build = (body: object) =>
+      fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(body),
+      });
+
+    const first = await build({
+      bundle: { schemas: [], flow_definitions: [], idps: [connection("${{ A }}")] },
+    });
+
+    expect(first.status).toBe(201);
+    const pointers = ((await first.json()) as { pointers: { kind: string; handle: string }[] })
+      .pointers;
+    expect(pointers).toContainEqual(expect.objectContaining({ kind: "idp", handle: "google" }));
+
+    // The connection is the project's now, created by the build rather than by
+    // a separate write before it.
+    const listed = (await (
+      await fetch(`${BASE}/idps/query?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({}),
+      })
+    ).json()) as { idps: { slug: string }[] };
+    expect(listed.idps.map((idp) => idp.slug)).toEqual(["google"]);
+
+    // A changed document revises the same connection, so the slug keeps
+    // pointing at it rather than a second one appearing.
+    await build({
+      bundle: { schemas: [], flow_definitions: [], idps: [connection("${{ B }}")] },
+    });
+    const again = (await (
+      await fetch(`${BASE}/idps/query?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({}),
+      })
+    ).json()) as { idps: { slug: string }[] };
+    expect(again.idps).toHaveLength(1);
+  });
+
+  test("refuses a build that would change a connection's fixed field", async () => {
+    const project = await newProject("release-build-idp-immutable");
+    const connection = (issuer: string) => ({
+      slug: "google",
+      protocol: "oidc",
+      template: "google",
+      display_name: "Google",
+      oidc: {
+        issuer,
+        client_id: "111.apps.googleusercontent.com",
+        client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+        scopes: ["openid"],
+      },
+    });
+    const build = (body: object) =>
+      fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(body),
+      });
+    await build({
+      bundle: {
+        schemas: [],
+        flow_definitions: [],
+        idps: [connection("https://accounts.google.com")],
+      },
+    });
+
+    const res = await build({
+      bundle: {
+        schemas: [],
+        flow_definitions: [],
+        idps: [connection("https://login.microsoftonline.com")],
+      },
+    });
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe("idp.field_immutable");
+  });
+
   test("creates a release and dedupes a resubmission on content", async () => {
     const project = await newProject("release-create");
 

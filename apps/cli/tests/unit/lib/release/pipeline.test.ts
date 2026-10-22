@@ -13,8 +13,9 @@ function ctx(overrides: Partial<StepContext>): StepContext {
     dryRun: false,
     json: true,
     color: false,
-    bundle: { schemas: [], flow_definitions: [] },
+    bundle: { schemas: [], flow_definitions: [], idps: [] },
     brandingSources: [],
+    idpFiles: [],
     suggest: (args) => `${args} --env staging` as SuggestedCommand,
     ...overrides,
   };

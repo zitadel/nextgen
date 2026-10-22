@@ -11,6 +11,7 @@ import { flowEnvRefs } from "../../flows";
 import { reportWarning } from "../../warnings";
 import type { Step, StepContext } from "../pipeline";
 import { brandingAssetWarnings } from "./asset-probe";
+import { validateConnections } from "./idp-checks";
 import { validateSsoConsistency } from "./sso-consistency";
 import { validateLoginTemplate } from "@zitadel/config/template";
 
@@ -36,6 +37,7 @@ export const validateStep: Step = {
     // has already written.
     validateBundleShapes(ctx);
     validateFlows(ctx);
+    await validateConnections(ctx);
     await validateSsoConsistency(ctx.cwd);
     for (const warning of await brandingAssetWarnings(brandingsOf(ctx))) {
       reportWarning(warning);

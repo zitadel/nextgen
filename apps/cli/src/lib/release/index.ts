@@ -19,7 +19,6 @@ export {
 export { worktreeIsDirty, headSha } from "./git";
 export { runSteps, type PipelineMode, type Step, type StepContext } from "./pipeline";
 export { validateStep } from "./steps/validate";
-export { idpConnectionsStep } from "./steps/idp-connections";
 export { diffStep } from "./steps/diff";
 export { originMatchesPattern, type ProjectOriginEntry } from "./origins";
 

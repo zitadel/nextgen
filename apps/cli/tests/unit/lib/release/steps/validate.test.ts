@@ -28,15 +28,17 @@ const validBranding = {
 let dir: string;
 
 function ctx(
-  bundle: StepContext["bundle"],
+  bundle: Partial<StepContext["bundle"]>,
   {
     env = {},
     brandingSources = [],
     cwd = "/tmp",
+    idpFiles = [],
   }: {
     env?: StepContext["env"];
     brandingSources?: StepContext["brandingSources"];
     cwd?: string;
+    idpFiles?: StepContext["idpFiles"];
   } = {},
 ): StepContext {
   return {
@@ -48,8 +50,9 @@ function ctx(
     dryRun: false,
     json: true,
     color: false,
-    bundle,
+    bundle: { schemas: [], flow_definitions: [], idps: [], ...bundle },
     brandingSources,
+    idpFiles,
     suggest: (args) => args as SuggestedCommand,
   };
 }
