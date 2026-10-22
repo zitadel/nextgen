@@ -489,22 +489,40 @@
     {
       "id": "logs",
       "group": "Local server commands",
-      "description": "Show local Zitadel server logs.",
+      "description": "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory `zitadel start` ran in, or one inside it: the server is found from the nearest `.zitadel/local/` on the way up.",
       "args": [],
       "flags": [
         {
           "name": "follow",
-          "description": "Follow logs.",
+          "description": "Keep printing lines as the server writes them.",
           "type": "boolean"
         },
         {
+          "name": "level",
+          "description": "Show only lines at this level or above.",
+          "type": "option",
+          "options": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        {
           "name": "tail",
-          "description": "Number of lines to show.",
+          "description": "Number of lines to show, counting only those --level shows.",
           "type": "option",
           "default": 200
         }
       ],
-      "examples": []
+      "examples": [
+        {
+          "command": "logs --follow"
+        },
+        {
+          "command": "logs --level warn"
+        }
+      ]
     },
     {
       "id": "reset",

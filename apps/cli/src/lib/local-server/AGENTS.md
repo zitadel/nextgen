@@ -11,8 +11,8 @@ admin credential, and the CLI talks only to the server a
 `.zitadel/local/runtime.json` names.
 
 - Commands that write or remove local state act on the working directory.
-  Readers (`setup`, `doctor`, `console`) take the nearest record up the tree
-  (`findUpward` in `runtime.ts`).
+  Readers (`setup`, `doctor`, `console`, `logs`) take the nearest record up
+  the tree (`findUpward` in `runtime.ts`).
 - Never fall back to a default port.
 - Never trust a recorded URL or pid on its own: the record's own process or
   container must be the one serving (`LocalServer.resolveUrl`).

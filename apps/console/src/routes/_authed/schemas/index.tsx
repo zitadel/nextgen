@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Users } from "lucide-react";
+import { Braces } from "lucide-react";
 
 import { api } from "@/api/zitadel";
 import {
@@ -15,7 +15,6 @@ import {
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
-  ResourcePage,
   ResourceRow,
   ResourceTitle,
   RowMenu,
@@ -30,9 +29,10 @@ import {
   useRequiredProjectScope,
 } from "@/lib/project-scope";
 import { type UserSchema, schemaDisplayName, schemaSignInSummary } from "@/lib/schema";
+import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/schemas/")({
-  staticData: { scope: "project", nav: { label: "User schemas", order: 1, parent: "/users" } },
+  staticData: { scope: "project", nav: { label: "User schemas", order: 4, icon: Braces } },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);
@@ -102,7 +102,7 @@ function SchemasScreen() {
   const schemas = [...loaded.schemas, ...paging.extra];
 
   return (
-    <ResourcePage>
+    <Page>
       {/* The design titles this screen `Schemas`; D8 keeps the noun qualified
           everywhere it appears, which is also what the sidebar entry says. */}
       <ResourceTitle>User schemas</ResourceTitle>
@@ -129,7 +129,7 @@ function SchemasScreen() {
         </Table>
       </div>
       <LoadMore paging={paging} />
-    </ResourcePage>
+    </Page>
   );
 }
 
@@ -161,7 +161,7 @@ function SchemaRow({
     >
       <TableCell className={`${RESOURCE_CELL} truncate`}>
         <Link to="/schemas/$schemaId" params={{ schemaId: id }} className={RESOURCE_ROW_LINK}>
-          <Users aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
+          <Braces aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
           {name}
         </Link>
       </TableCell>

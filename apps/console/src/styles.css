@@ -121,3 +121,149 @@ select:-webkit-autofill {
   -webkit-text-fill-color: var(--color-foreground);
   caret-color: var(--color-foreground);
 }
+
+/* The generated avatar (`components/user-avatar.tsx`): the person's two
+   design-system gradient starts as one linear gradient across the circle, so
+   both colours always show in the same proportion.
+
+   Only its direction moves, and not evenly: a slow turn plus two sways on
+   different periods, all registered angles so they interpolate. The gradient
+   drifts round, speeds up, slows and sometimes swings back, rather than
+   turning steadily about its centre. Each person starts from their own angle
+   (`--avatar-base`) and point in the motion (`--avatar-phase`), so a list of
+   avatars never moves in step. The component speeds it up while its host is
+   hovered. */
+@property --avatar-turn {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --avatar-sway-a {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --avatar-sway-b {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes avatar-turn {
+  to {
+    --avatar-turn: 360deg;
+  }
+}
+
+@keyframes avatar-sway-a {
+  from {
+    --avatar-sway-a: -90deg;
+  }
+  to {
+    --avatar-sway-a: 90deg;
+  }
+}
+
+@keyframes avatar-sway-b {
+  from {
+    --avatar-sway-b: -45deg;
+  }
+  to {
+    --avatar-sway-b: 45deg;
+  }
+}
+
+.user-avatar {
+  background-image: linear-gradient(
+    calc(var(--avatar-base) + var(--avatar-turn) + var(--avatar-sway-a) + var(--avatar-sway-b)),
+    var(--avatar-from) 15%,
+    var(--avatar-to) 85%
+  );
+  animation:
+    avatar-turn 60s linear infinite,
+    avatar-sway-a 18s ease-in-out infinite alternate,
+    avatar-sway-b 26s ease-in-out infinite alternate;
+  animation-delay: var(--avatar-phase);
+}
+
+/* A hover host (the sidebar footer) carries the same colours: on hover or
+   while its menu is open, a wash of them sweeps in behind its content. */
+.avatar-host {
+  position: relative;
+  isolation: isolate;
+}
+
+.avatar-host::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in oklab, var(--avatar-from) 22%, transparent),
+    color-mix(in oklab, var(--avatar-to) 10%, transparent) 50%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  background-position: 100% 0;
+  opacity: 0;
+  transition:
+    opacity var(--zl-duration-slow) var(--zl-easing-standard),
+    background-position 600ms var(--zl-easing-standard);
+}
+
+.avatar-host:hover::before,
+.avatar-host[data-state="open"]::before {
+  opacity: 1;
+  background-position: 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-avatar {
+    animation: none;
+  }
+
+  .avatar-host::before {
+    transition: none;
+  }
+}
+
+/* The sidebar's logo (`ZitadelLogo`, components/app-shell/icons.tsx), as the
+   website's nav plays it: the Lottie's 150 frames at 30 a second, without its
+   still tail. The mark turns once in 60 frames and each letter rolls down in
+   30 (its start set in the component), once a hover or a quiet spell sets
+   data-playing, to the end even when the pointer leaves. */
+.logo-icon {
+  transform-box: view-box;
+  transform-origin: 63px 63px;
+}
+
+@keyframes logo-spin {
+  from {
+    rotate: -360deg;
+    animation-timing-function: cubic-bezier(0.108, 0, 0, 1);
+  }
+}
+
+@keyframes logo-roll {
+  from {
+    animation-timing-function: cubic-bezier(0.199, 0, 0.121, 1);
+  }
+
+  to {
+    translate: 0 100px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .logo[data-playing] .logo-icon {
+    animation: logo-spin 2s;
+  }
+
+  .logo[data-playing] .logo-letter {
+    animation: logo-roll 1s both;
+  }
+}
