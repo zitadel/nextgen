@@ -240,7 +240,9 @@ if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
  * and the plain methods by several, and the connection's "Used by" names one.
  *
  * Both schemas are the bootstrapped one with their own type, title and methods,
- * so they carry the properties the seeded users already validate against. The
+ * so they carry the properties the seeded users already validate against.
+ * `Employees` adds an optional boolean and integer, and one employee is seeded
+ * with both set, so the user page shows a switch and a number input. The
  * client id and secret are `${{ VAR }}` references: no variable backs them, so
  * the connection renders but cannot complete a sign-in — which nothing here
  * asks of it. Best-effort, like the grant: a failure costs the screen its
@@ -293,6 +295,7 @@ async function seedAuthentication(): Promise<boolean> {
     // document a schema rather than a revision of the bootstrapped one.
     const { $id: _id, ...document } = base;
     const methods = (document["x-auth-methods"] ?? {}) as Record<string, unknown>;
+    const properties = (document.properties ?? {}) as Record<string, unknown>;
 
     const customers = await post("/schemas", {
       ...document,
@@ -307,8 +310,25 @@ async function seedAuthentication(): Promise<boolean> {
       objectType: "employee",
       title: "Employees",
       "x-auth-methods": { ...methods, sso: { enabled: false } },
+      properties: {
+        ...properties,
+        newsletter: { type: "boolean", title: "Newsletter" },
+        deskNumber: { type: "integer", title: "Desk number" },
+      },
     });
-    return customers.ok && employees.ok;
+    if (!customers.ok || !employees.ok) return false;
+    const { id: schema } = (await employees.json()) as { id: string };
+    const employee = await post("/users", {
+      schema,
+      attributes: {
+        email: "employee@zitadel.local",
+        givenName: "Evelyn",
+        familyName: "Berezin",
+        newsletter: true,
+        deskNumber: 42,
+      },
+    });
+    return employee.ok;
   } catch {
     return false;
   }
@@ -316,7 +336,7 @@ async function seedAuthentication(): Promise<boolean> {
 
 if (!claimMode && !(await seedAuthentication())) {
   console.warn(
-    "[console-dev-real] could not seed the identity provider and its schemas; the Authentication screen will have no connection to show.",
+    "[console-dev-real] could not seed the identity provider, its schemas and the employee user; the Authentication screen and the user page may miss data.",
   );
 }
 
