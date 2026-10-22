@@ -1,9 +1,11 @@
-import { chmod, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "./errors";
+import { enforceMode } from "./fs-safe";
 import { isObject, parseJsonObject, stableStringify } from "./json";
 import { DEFAULT_SERVER } from "./server";
+import { unscopedCommand } from "./suggestion";
 
 /**
  * Reports whether `cwd` has already been initialized, i.e. a committed
@@ -70,7 +72,7 @@ export async function readZitadelConfig(cwd: string): Promise<Record<string, unk
     if (isNotFound(error)) {
       throw new ZitadelError("E_VALIDATION", "zitadel.json was not found", {
         hint: "Run `zitadel setup` first.",
-        nextCommands: ["zitadel setup"],
+        nextCommands: [unscopedCommand("setup")],
       });
     }
     throw error;
@@ -112,7 +114,7 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
     if (isNotFound(error)) {
       throw new ZitadelError("E_VALIDATION", ".zitadel/secret was not found", {
         hint: "Run `zitadel setup` first, or restore the project secret with `zitadel doctor --fix`.",
-        nextCommands: ["zitadel setup", "zitadel doctor --fix"],
+        nextCommands: [unscopedCommand("setup"), unscopedCommand("doctor --fix")],
       });
     }
     throw error;
@@ -136,7 +138,7 @@ export async function writeZitadelSecret(cwd: string, secret: ZitadelSecret): Pr
   const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
   await writeFile(tmp, `${stableStringify(secret)}\n`, { mode: 0o600 });
   // `writeFile`'s mode is masked by the process umask, so re-assert it.
-  await chmod(tmp, 0o600).catch(() => undefined);
+  await enforceMode(tmp, 0o600);
   await rename(tmp, path);
 }
 
@@ -183,15 +185,6 @@ export function readUseCase(config: Record<string, unknown>): string | undefined
  */
 export function readProjectServer(config: Record<string, unknown>): string {
   return typeof config.server === "string" ? config.server : DEFAULT_SERVER;
-}
-
-/** Reads `environments.development.issuer` from a parsed `zitadel.json`, if present. */
-export function readDevelopmentIssuer(config: Record<string, unknown>): string | undefined {
-  if (isObject(config.environments) && isObject(config.environments.development)) {
-    const issuer = config.environments.development.issuer;
-    return typeof issuer === "string" ? issuer : undefined;
-  }
-  return undefined;
 }
 
 function isNotFound(error: unknown): boolean {

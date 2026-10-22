@@ -7,7 +7,7 @@ import type { LocalServers, ManagedRuntimeProcess } from "../../src/lib/local-se
 import { publicCliCommand } from "../../src/lib/public-cli";
 import { cliPackageRoot } from "./oclif-build";
 
-const cliVersion = JSON.parse(
+export const cliVersion = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 ) as { version: string };
 

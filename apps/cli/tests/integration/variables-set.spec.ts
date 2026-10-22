@@ -84,7 +84,7 @@ describe("variables set", () => {
 
         const result = await app.setVariableWithNothingPiped("TOKEN", { secret: true });
 
-        expect(result).toSuggest("variables set TOKEN --project-level --secret < value.txt");
+        expect(result).toSuggest("variables set TOKEN --project-level --secret");
       });
 
       it("enters nothing", async () => {

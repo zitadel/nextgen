@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/pr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ClaimCheck,
@@ -72,9 +72,9 @@ async function makeProject(): Promise<string> {
       project: "proj-001",
       server: "https://api.zitadel.cloud",
       framework: { id: "next" },
-      environments: { development: { issuer: "http://localhost:3000" } },
     }),
   );
+  await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:3000\n");
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
   await chmod(join(cwd, ".zitadel/secret"), 0o600);
   await writeFile(
@@ -152,9 +152,9 @@ async function makeAngularProject(): Promise<string> {
       project: "proj-001",
       server: "https://api.zitadel.cloud",
       framework: { id: "angular" },
-      environments: { development: { issuer: "http://localhost:4200" } },
     }),
   );
+  await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:4200\n");
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
   await chmod(join(cwd, ".zitadel/secret"), 0o600);
   await writeFile(
@@ -862,17 +862,7 @@ describe("ManagedFilesCheck", () => {
       join(cwd, "package.json"),
       JSON.stringify({ ...pkg, scripts: { dev: devScript } }),
     );
-    const config = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as Record<
-      string,
-      unknown
-    >;
-    await writeFile(
-      join(cwd, "zitadel.json"),
-      JSON.stringify({
-        ...config,
-        environments: { development: { issuer: `http://localhost:${String(issuerPort)}` } },
-      }),
-    );
+    await writeFile(join(cwd, ".env.local"), `ZITADEL_ISSUER=http://localhost:${issuerPort}\n`);
     return cwd;
   }
 
@@ -1409,7 +1399,6 @@ describe("loadPatchContext", () => {
         project: "proj-001",
         server: "https://api.zitadel.cloud",
         framework: { id: "next" },
-        environments: { development: { issuer: "http://localhost:3000" } },
         preset: "passkey-first",
         useCase: "consumer",
       }),
@@ -1421,8 +1410,21 @@ describe("loadPatchContext", () => {
     expect(ctx.preset).toBe("passkey-first");
     expect(ctx.useCase).toBe("consumer");
     expect(ctx.scaffoldedFramework).toBe(true);
-    // The config issuer still wins over the manifest port.
+    // The issuer in the env file still wins over the manifest port.
     expect(ctx.issuer).toBe("http://localhost:3000");
+  });
+
+  it("takes the issuer from the project's files, never the shell's environment", async () => {
+    const cwd = await makeProject();
+    vi.stubEnv("ZITADEL_ENV", "production");
+    vi.stubEnv("ZITADEL_ISSUER", "https://auth.example.com");
+    try {
+      expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).issuer).toBe(
+        "http://localhost:3000",
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("falls back to the manifest dev_port for the issuer", async () => {
@@ -1435,6 +1437,7 @@ describe("loadPatchContext", () => {
         framework: { id: "next" },
       }),
     );
+    await rm(join(cwd, ".env.local"));
     await writeScaffoldState(cwd, { files: {}, dev_port: 3005 });
 
     const ctx = await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0");

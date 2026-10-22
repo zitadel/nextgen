@@ -158,12 +158,12 @@ describe("plan command", () => {
     expect(json.code).toBe("E_VALIDATION");
   });
 
-  it.each(["-e", "--environment"])("refuses %s, which addresses no environment", async (flag) => {
+  it("refuses --environment, which addresses no environment", async () => {
     const cwd = await makeProject();
 
     const res = await runCliForTest([
       "plan",
-      flag,
+      "--environment",
       "prod",
       "--cwd",
       cwd,

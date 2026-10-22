@@ -1,6 +1,7 @@
 import { type ApiOperation, operations } from "@zitadel/api/generated/operations";
 
 import { ZitadelError } from "../errors";
+import { unscopedCommand } from "../suggestion";
 
 export type { ApiOperation };
 
@@ -16,7 +17,7 @@ export type Target = Readonly<{
   query: URLSearchParams;
 }>;
 
-const LIST = "zitadel api ls --json";
+const LIST = unscopedCommand("api ls --json");
 
 /**
  * Why the CLI cannot call an operation, or `undefined` when it can. It holds a

@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 
 import { isErrno, ZitadelError } from "../errors";
 import { isPortableShellWord, isTrainVersion } from "../public-cli";
+import { unscopedCommand } from "../suggestion";
 import { parseJsonObject } from "../json";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
 
@@ -348,7 +349,7 @@ export function localServerNotRunning(serverUrl?: string): ZitadelError {
     hint: serverUrl
       ? `No healthy local server responded at ${serverUrl}.`
       : "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
-    nextCommands: ["zitadel start"],
+    nextCommands: [unscopedCommand("start")],
     details: { server_url: serverUrl },
   });
 }
@@ -519,7 +520,7 @@ function explicitUrlPort(value: string): number | undefined {
 function malformedRuntime(input: Record<string, unknown>): ZitadelError {
   return new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {
     hint: "Run `zitadel reset --force`, then `zitadel start`.",
-    nextCommands: ["zitadel reset --force", "zitadel start"],
+    nextCommands: [unscopedCommand("reset --force"), unscopedCommand("start")],
     details: input,
   });
 }
@@ -545,7 +546,14 @@ export function retargetMalformedRuntime(error: unknown, dir: string): unknown {
       ? `Run \`${reset}\`, then \`${start}\`.`
       : `Run \`zitadel reset --force\`, then \`zitadel start\`, each with --cwd ${dir} ` +
         "(details.suggested_args holds the exact arguments).",
-    ...(portable ? { nextCommands: [reset, start] } : {}),
+    ...(portable
+      ? {
+          nextCommands: [
+            unscopedCommand(resetArgs.join(" ")),
+            unscopedCommand(startArgs.join(" ")),
+          ],
+        }
+      : {}),
     details: { ...(error.details as Record<string, unknown>), suggested_args: suggestedArgs },
   });
 }

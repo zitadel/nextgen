@@ -238,6 +238,17 @@
           "description": "Seconds to wait for the browser step. Defaults to the link's own expiry (10 minutes).",
           "type": "option",
           "min": 1
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -281,6 +292,17 @@
             "binary",
             "docker"
           ]
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": []
@@ -302,6 +324,105 @@
         }
       ],
       "examples": []
+    },
+    {
+      "id": "env",
+      "group": "Project commands",
+      "description": "Show which server and project resolve, and where each value came from.",
+      "args": [],
+      "flags": [
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "env"
+        },
+        {
+          "command": "env --env production"
+        },
+        {
+          "command": "env --env-file ./infra/acme-staging.env"
+        }
+      ]
+    },
+    {
+      "id": "env list",
+      "group": "Project commands",
+      "description": "List the environments bound in this directory's .env files.",
+      "args": [],
+      "flags": [
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "env list"
+        },
+        {
+          "command": "env list --plain"
+        }
+      ]
+    },
+    {
+      "id": "env add",
+      "group": "Project commands",
+      "description": "Bind an environment to a project, creating the project if needed.",
+      "args": [
+        {
+          "name": "name",
+          "description": "The environment name, e.g. production.",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "project",
+          "description": "Bind this existing project instead of creating one. Its secrets come from ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN in the process environment.",
+          "type": "option"
+        },
+        {
+          "name": "app-url",
+          "description": "The URL this environment's app is served from. It becomes ZITADEL_ISSUER and is registered with a new project.",
+          "type": "option"
+        },
+        {
+          "name": "force",
+          "description": "Overwrite an existing .env.<name>.local.",
+          "type": "boolean"
+        }
+      ],
+      "examples": [
+        {
+          "command": "env add production --server https://api.zitadel.cloud --app-url https://app.acme.com"
+        },
+        {
+          "command": "env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T"
+        }
+      ]
     },
     {
       "id": "start",
@@ -350,7 +471,19 @@
       "group": "Local server commands",
       "description": "Summarize the local Zitadel server and project state.",
       "args": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
       "examples": []
     },
     {
@@ -432,7 +565,19 @@
       "group": "Configuration commands",
       "description": "Validate config without mutation and preview the sync diff.",
       "args": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
       "examples": []
     },
     {
@@ -440,7 +585,19 @@
       "group": "Configuration commands",
       "description": "Validate and upload repo config to the platform.",
       "args": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
       "examples": []
     },
     {
@@ -632,6 +789,17 @@
           "type": "option"
         },
         {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        },
+        {
           "name": "schema",
           "description": "User schema to change. Required when the Project has more than one.",
           "type": "option"
@@ -671,6 +839,17 @@
           "name": "fields",
           "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
           "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -697,6 +876,17 @@
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -720,6 +910,17 @@
         {
           "name": "fields",
           "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -774,6 +975,17 @@
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: name (equals), purpose (equals), revisions (equals; values all|latest).",
           "type": "option",
           "multiple": true
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -803,6 +1015,17 @@
         {
           "name": "fields",
           "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -851,6 +1074,17 @@
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -877,6 +1111,17 @@
         {
           "name": "fields",
           "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -931,6 +1176,17 @@
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: object_type (equals), kind (equals), revisions (equals; values all|latest).",
           "type": "option",
           "multiple": true
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -964,6 +1220,17 @@
           "type": "boolean"
         },
         {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        },
+        {
           "name": "project-level",
           "description": "Address the project level. Required: it is the only owner the CLI can address today.",
           "type": "boolean"
@@ -991,6 +1258,17 @@
       ],
       "flags": [
         {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        },
+        {
           "name": "project-level",
           "description": "Address the project level. Required: it is the only owner the CLI can address today.",
           "type": "boolean"
@@ -1015,6 +1293,17 @@
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
           "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         },
         {
           "name": "project-level",
@@ -1060,6 +1349,17 @@
           "default": "string"
         },
         {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        },
+        {
           "name": "project-level",
           "description": "Address the project level. Required: it is the only owner the CLI can address today.",
           "type": "boolean"
@@ -1082,7 +1382,13 @@
       "group": "Resource commands",
       "description": "List the resources this CLI manages and what can be done to each.",
       "args": [],
-      "flags": [],
+      "flags": [
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        }
+      ],
       "examples": [
         {
           "command": "resources"
@@ -1091,7 +1397,7 @@
           "command": "resources --json"
         },
         {
-          "command": "resources --json | jq -r '.data.resources[] | \"\\(.topic): \\(.verbs | join(\", \"))\"'"
+          "command": "resources --json | jq -r '.data.items[] | \"\\(.topic): \\(.verbs | join(\", \"))\"'"
         }
       ]
     },
@@ -1199,6 +1505,17 @@
           "name": "fields",
           "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
           "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -1256,6 +1573,17 @@
         {
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: occurred_at.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1342,6 +1670,17 @@
           "type": "option",
           "multiple": true,
           "helpGroup": "RAW BODY"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -1373,6 +1712,17 @@
           "char": "f",
           "description": "Delete the grant without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -1396,6 +1746,17 @@
         {
           "name": "fields",
           "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1454,6 +1815,17 @@
         {
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at, expires_at, id.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1636,6 +2008,17 @@
           "type": "option",
           "multiple": true,
           "helpGroup": "RAW BODY"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -1665,6 +2048,17 @@
         {
           "name": "fields",
           "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1724,6 +2118,17 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: slug, created_at.",
           "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -1753,6 +2158,17 @@
         {
           "name": "fields",
           "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1811,6 +2227,17 @@
         {
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1925,6 +2352,17 @@
           "type": "option",
           "multiple": true,
           "helpGroup": "RAW BODY"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -1951,6 +2389,17 @@
         {
           "name": "fields",
           "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2010,6 +2459,17 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at, user_id.",
           "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -2041,6 +2501,17 @@
           "char": "f",
           "description": "Revoke the session without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -2085,6 +2556,17 @@
           "type": "option",
           "multiple": true,
           "helpGroup": "RAW BODY"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -2116,6 +2598,17 @@
           "char": "f",
           "description": "Deactivate the team without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -2139,6 +2632,17 @@
         {
           "name": "fields",
           "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2198,6 +2702,17 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at, name, status.",
           "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -2254,6 +2769,17 @@
           "type": "option",
           "multiple": true,
           "helpGroup": "RAW BODY"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -2308,6 +2834,17 @@
           "type": "option",
           "multiple": true,
           "helpGroup": "RAW BODY"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -2339,6 +2876,17 @@
           "char": "f",
           "description": "Delete the user without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -2362,6 +2910,17 @@
         {
           "name": "fields",
           "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2420,6 +2979,17 @@
         {
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at, id, schema, status, lifecycle_owner_team_id.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2484,6 +3054,17 @@
           "type": "option",
           "multiple": true,
           "helpGroup": "RAW BODY"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [

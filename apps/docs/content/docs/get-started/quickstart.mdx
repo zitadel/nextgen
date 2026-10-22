@@ -59,7 +59,7 @@ When it scaffolds a new app, setup asks which framework to use. Scripted runs pa
 
 Setup also asks how users should sign in and scaffolds the matching schema and login flow: `--preset password-first` (the default: email + password) or `--preset passkey-first` (a one-tap passkey up front, with an email + password fallback). The preset only picks the starting point: the schema and login flow it writes to `.zitadel/schemas/` and `.zitadel/flows/` are yours to edit.
 
-Setup writes the app files, `.env.example`, `.env.local` (with the project id and the project secret), `zitadel.json`, and `.zitadel/**`, adds the files that hold secrets to `.gitignore` ([Configuration as code](/docs/concepts/repo-config)), then installs dependencies with the detected package manager unless `--skip-install` is passed.
+Setup writes the app files, `.env.example`, `.env.local` (read by your app, with the project id and the project secret), `.env.development.local` (read by the CLI: the server, project and credentials), `zitadel.json`, and `.zitadel/**`, adds the files that hold secrets to `.gitignore` ([Configuration as code](/docs/concepts/repo-config)), then installs dependencies with the detected package manager unless `--skip-install` is passed.
 
 Against a local server, setup by default also attaches the project to the local admin's team and prints `Project owned by admin@zitadel.localhost (team ...)`: there is nothing to [claim](/docs/concepts/project-team-user#claim).
 

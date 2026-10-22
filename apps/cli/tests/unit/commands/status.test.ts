@@ -63,9 +63,9 @@ async function configuredProject(): Promise<string> {
     JSON.stringify({
       project: "proj-001",
       server: "https://api.zitadel.cloud",
-      environments: { development: { issuer: "http://localhost:3000" } },
     }),
   );
+  await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:3000\n");
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
   return cwd;
 }
@@ -90,7 +90,9 @@ describe("status command", () => {
     expect(json.data.project.lifecycle).toBe("configured");
     expect(json.data.project.project_id).toBe("proj-001");
     expect(json.data.project.issuer).toBe("http://localhost:3000");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("doctor"));
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(`doctor --server https://api.zitadel.cloud --cwd ${cwd}`),
+    );
   });
 
   it("reports a project with no owning team as temporary and points at claim", async () => {
@@ -107,7 +109,9 @@ describe("status command", () => {
     };
     expect(json.data.project.claim).toMatchObject({ kind: "detached", claimable: true });
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+    );
   });
 
   // Once the locally recorded creation time says the 14-day window has
@@ -136,7 +140,9 @@ describe("status command", () => {
     expect(actions).toContain("claim window has closed");
     expect(actions).toContain("no longer be claimed");
     expect(actions).not.toContain("its data may be lost");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+    );
   });
 
   it("reports the owning team once claimed, and stops nudging", async () => {
@@ -161,7 +167,9 @@ describe("status command", () => {
       claimed_at: "2026-01-02T00:00:00.000Z",
     });
     expect(json.data.next_actions.join("\n")).not.toContain("its data may be lost");
-    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim"));
+    expect(json.data.next_commands).not.toContain(
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+    );
   });
 
   // The project lives wherever `zitadel.json` says, not wherever this
@@ -173,7 +181,6 @@ describe("status command", () => {
       JSON.stringify({
         project: "proj-001",
         server: "http://localhost:8080",
-        environments: { development: { issuer: "http://localhost:3000" } },
       }),
     );
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
@@ -184,7 +191,9 @@ describe("status command", () => {
       data: { project: { claim?: unknown }; next_commands: string[] };
     };
     expect(json.data.project.claim).toBeUndefined();
-    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim"));
+    expect(json.data.next_commands).not.toContain(
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+    );
   });
 
   it("reports orphaned-config when zitadel.json exists but secret is missing", async () => {
@@ -205,9 +214,57 @@ describe("status command", () => {
       };
     };
     expect(json.status).toBe("ok");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("setup --force"));
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(`setup --force --cwd ${cwd}`),
+    );
     expect(json.data.project.project_id).toBe("orphan");
     expect(json.data.project.lifecycle).toBe("orphaned-config");
+  });
+
+  it("reports the resolved environment's project when --env names one without a local secret", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({ project: "proj-local", server: "https://api.zitadel.cloud" }),
+    );
+    await writeFile(
+      join(cwd, ".env.production.local"),
+      "ZITADEL_URL=https://api.zitadel.cloud\nZITADEL_PROJECT_ID=proj-prod\nZITADEL_PROJECT_SECRET=sk_prod\n",
+    );
+
+    const res = await runCliForTest(["status", "--cwd", cwd, "--json", "--env", "production"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { project: { lifecycle: string; project_id?: string } };
+    };
+    // Without the reorder this reads "orphaned-config" because `.zitadel/secret`
+    // is absent; the resolved environment names proj-prod, so status reports
+    // that project as configured and ignores config.project.
+    expect(json.data.project.lifecycle).toBe("configured");
+    expect(json.data.project.project_id).toBe("proj-prod");
+  });
+
+  it("reports a named environment that binds no project as not configured", async () => {
+    const cwd = await makeProject();
+
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({ project: "proj-local", server: "https://api.zitadel.cloud" }),
+    );
+
+    const res = await runCliForTest(["status", "--cwd", cwd, "--json", "--env", "production"]);
+
+    const json = parseJson(res.stdout) as {
+      data: { project: { lifecycle: string; environment?: string }; next_commands: string[] };
+    };
+    expect(json.data.project).toMatchObject({
+      lifecycle: "not-configured",
+      environment: "production",
+    });
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(`env add production --cwd ${cwd}`),
+    );
   });
 
   it("reports not-configured when zitadel.json is missing entirely", async () => {
@@ -229,8 +286,10 @@ describe("status command", () => {
     expect(json.data.server.lifecycle).toBe("missing");
     expect(json.data.project.lifecycle).toBe("not-configured");
     expect(json.data.next_actions.join("\n")).toContain("From your app directory");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("start"));
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("setup --server local"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand(`start --cwd ${cwd}`));
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(`setup --server local --cwd ${cwd}`),
+    );
   });
 
   it("normalizes relative --cwd before reading runtime metadata", async () => {
@@ -304,8 +363,12 @@ describe("status command", () => {
     expect(actions).not.toContain(".zitadel/schemas/");
     // next_commands is staged in lockstep: preview is fine, publishing
     // waits for the first proven login.
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("plan"));
-    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("apply"));
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(`plan --server https://api.zitadel.cloud --cwd ${cwd}`),
+    );
+    expect(json.data.next_commands).not.toContain(
+      expectedPublicCliCommand(`apply --server https://api.zitadel.cloud --cwd ${cwd}`),
+    );
   });
 
   it("switches to customize/publish guidance once users exist", async () => {
@@ -322,11 +385,13 @@ describe("status command", () => {
     expect(actions).toContain("Customize what you ask for and how people sign in");
     expect(actions).toContain(".zitadel/schemas/");
     expect(actions).toContain(
-      `See your changes before they go live: ${expectedPublicCliCommand("plan")} to preview, ` +
-        `then ${expectedPublicCliCommand("apply")} to publish.`,
+      `See your changes before they go live: ${expectedPublicCliCommand(`plan --server https://api.zitadel.cloud --cwd ${cwd}`)} to preview, ` +
+        `then ${expectedPublicCliCommand(`apply --server https://api.zitadel.cloud --cwd ${cwd}`)} to publish.`,
     );
     expect(actions).not.toContain("register a user");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply"));
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(`apply --server https://api.zitadel.cloud --cwd ${cwd}`),
+    );
   });
 
   it("keeps lifecycle-only output when the platform is unreachable", async () => {
@@ -346,7 +411,9 @@ describe("status command", () => {
     expect(actions).not.toContain("register a user");
     expect(actions).not.toContain("Customize what you ask for");
     expect(actions).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply"));
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(`apply --server https://api.zitadel.cloud --cwd ${cwd}`),
+    );
   });
 });
 

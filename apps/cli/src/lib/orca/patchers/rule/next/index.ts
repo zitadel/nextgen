@@ -8,6 +8,7 @@ import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher, PREFLIGHT_FORCE_NOTE } from "../base";
 import { devScriptPortOp } from "../dev-script-port";
+import { PUBLIC_PROJECT_ID_VARIABLE } from "../public-project-id";
 import { getRenderer } from "./renderers/registry";
 import type { RendererSpec } from "./renderers/types";
 
@@ -235,11 +236,11 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       ? { kind: "write", path: join(appDir, "../custom-elements.d.ts"), contents: dts.contents }
       : undefined,
     // Next.js exposes NEXT_PUBLIC_-prefixed vars to client code.
-    { kind: "merge-env", path: ".env.example", entries: { NEXT_PUBLIC_ZITADEL_PROJECT_ID: "" } },
+    { kind: "merge-env", path: ".env.example", entries: { [PUBLIC_PROJECT_ID_VARIABLE.next]: "" } },
     {
       kind: "merge-env",
       path: ".env.local",
-      entries: { NEXT_PUBLIC_ZITADEL_PROJECT_ID: ctx.project.id },
+      entries: { [PUBLIC_PROJECT_ID_VARIABLE.next]: ctx.project.id },
     },
     {
       kind: "add-dep",

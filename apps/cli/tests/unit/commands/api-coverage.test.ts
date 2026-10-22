@@ -67,7 +67,7 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
 const NOT_CALLED: Readonly<Record<string, string>> = {
   // Bootstrap and the claim flow belong to their own commands.
   createProject:
-    "unauthenticated bootstrap minting secrets into .zitadel/secret; `zitadel setup` owns it",
+    "unauthenticated bootstrap minting secrets; `zitadel setup` and `zitadel env add` own it",
   initClaim: "the browser claim flow; `zitadel claim` calls it",
   getClaimStatus: "the browser claim flow; `zitadel claim` calls it",
   // These two are reached by nothing in the CLI at all — not the registry, not
