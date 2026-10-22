@@ -66,6 +66,23 @@ func ErrReleaseRevisionUnpinnable(details any) Error {
 	return newError(PrefixRelease.ErrorCodePrefix("revision_unpinnable"), "release: pinned revision declares no handle", details, nil)
 }
 
+// ReleaseInUseOrigin is one origin whose newest deployment pins the release.
+type ReleaseInUseOrigin struct {
+	Origin       string `json:"origin"`
+	DeploymentID string `json:"deployment_id"`
+}
+
+// ReleaseInUseDetails names every origin that still serves the release.
+type ReleaseInUseDetails struct {
+	Origins []ReleaseInUseOrigin `json:"origins"`
+}
+
+// ErrReleaseInUse refuses to revoke a release an origin still serves; the
+// details name each such origin and the deployment that pins it.
+func ErrReleaseInUse(details ReleaseInUseDetails) Error {
+	return newError(PrefixRelease.ErrorCodePrefix("in_use"), "release: still served by an origin", details, nil)
+}
+
 // ErrReleaseUnresolvedReference reports a handle a revision names that the
 // release does not include.
 func ErrReleaseUnresolvedReference() Error {

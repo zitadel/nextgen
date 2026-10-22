@@ -127,12 +127,29 @@ func decodeBuildReleaseRequest(body string) (api.BuildReleaseRequest, error) {
 	return req, req.Validate()
 }
 
-// Pins revoke's answer until the service can revoke: 501, not the 500 the
-// generated stub's sentinel would map to.
-func TestRevokeReleaseNotImplemented(t *testing.T) {
-	_, err := (&Handler{}).RevokeRelease(t.Context(), api.RevokeReleaseParams{})
-	require.Error(t, err)
-	assert.Equal(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
+// A revoked release and one still served are both conflicts.
+func TestReleaseErrorResponseConflicts(t *testing.T) {
+	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseRevoked()).StatusCode)
+	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{})).StatusCode)
+}
+
+// The 409 names every origin still serving the release, so the caller can
+// deploy elsewhere or roll back before revoking again.
+func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {
+	resp, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
+		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+	}}))
+	require.True(t, ok)
+	assert.Equal(t, api.ErrorCode(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code), resp.Code)
+	assert.Equal(t, []api.RevokeReleaseConflictDetailsOriginsItem{
+		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+	}, resp.Details.Origins)
+}
+
+// Without the origins the 409 cannot name them, so the generic envelope answers.
+func TestReleaseInUseResponseNeedsOrigins(t *testing.T) {
+	_, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).WithDetails(nil))
+	assert.False(t, ok)
 }
 
 func TestRequireBuildKindScopes(t *testing.T) {
