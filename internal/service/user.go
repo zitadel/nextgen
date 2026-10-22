@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"time"
 
 	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/audit"
@@ -43,6 +44,12 @@ type SetPasswordInput struct {
 	ProjectID string
 	UserID    string
 	Password  string
+	// SelfService is true when the user sets their own password. Only then
+	// does the password policy compare it with the user's kept passwords: an
+	// administrator setting it, or a new user, has none to compare with, and an
+	// administrator must not learn whether a guess matches an old one. No
+	// caller sets it yet; the self-service change and reset journeys will.
+	SelfService bool
 }
 
 type GetUserInput struct {
@@ -87,6 +94,11 @@ type ListPasskeysInput struct {
 	UserID    string
 	PageToken string
 	Limit     int
+}
+
+type GetPasswordInput struct {
+	ProjectID string
+	UserID    string
 }
 
 type ListIdentityLinksInput struct {
@@ -136,6 +148,9 @@ type UserService interface {
 	GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error)
 	PatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error)
 	SetPassword(ctx context.Context, input SetPasswordInput) (err error)
+	// GetPasswordSetAt reports when the user's current password was set, or
+	// nil when the user has none.
+	GetPasswordSetAt(ctx context.Context, input GetPasswordInput) (*time.Time, error)
 	GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error)
 	GetMyUserSchema(ctx context.Context, input GetMyUserInput) (*domain.JSONSchema, error)
 	PatchMyUser(ctx context.Context, input PatchMyUserInput) (*domain.User, error)
@@ -147,6 +162,7 @@ type userService struct {
 	v2Pool      StatementPool
 	schemaStore domain.JSONSchemaStore
 	hashers     ProjectHasherResolver
+	passwords   PasswordGate
 	refs        UserRefResolver
 	// builtinBases lets a filter on a built-in schema's `$id` match the users
 	// stored under any of its bases, the way schemaStore resolves one.
@@ -163,6 +179,7 @@ func NewUserService(
 	v2Pool StatementPool,
 	schemaStore domain.JSONSchemaStore,
 	hashers ProjectHasherResolver,
+	passwords PasswordGate,
 	refs UserRefResolver,
 	builtinBases domain.BuiltinSchemaBases,
 ) UserService {
@@ -170,6 +187,7 @@ func NewUserService(
 		v2Pool:       v2Pool,
 		schemaStore:  schemaStore,
 		hashers:      hashers,
+		passwords:    passwords,
 		refs:         refs,
 		builtinBases: builtinBases,
 	}
@@ -665,8 +683,26 @@ func (s *userService) SetPassword(ctx context.Context, input SetPasswordInput) (
 	ctx, end := startSpan(ctx, "UserService.SetPassword")
 	defer end(&err)
 
-	action := NewSetUserPasswordAction(input, s.hashers)
+	action := NewSetUserPasswordAction(input, s.hashers, s.passwords)
 	return s.ApplyActions(ctx, action)
+}
+
+func (s *userService) GetPasswordSetAt(ctx context.Context, input GetPasswordInput) (_ *time.Time, err error) {
+	ctx, end := startSpan(ctx, "UserService.GetPasswordSetAt")
+	defer end(&err)
+
+	password, err := s.v2Pool.Statements().GetUserPassword(ctx, database.And(
+		database.Equal(database.Col(domain.UserPasswordFieldProjectID), input.ProjectID),
+		database.Equal(database.Col(domain.UserPasswordFieldUserID), input.UserID),
+	))
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		// No password is an answer only for a user that exists.
+		return nil, s.requireUser(ctx, input.ProjectID, input.UserID)
+	}
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to get user password from database")
+	}
+	return &password.CreatedAt, nil
 }
 
 func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (_ *domain.User, err error) {
@@ -959,14 +995,17 @@ type SetPasswordUserAction struct {
 	SetPasswordInput
 
 	hashers ProjectHasherResolver
+	gate    PasswordGate
 
-	hash string
+	hash  string
+	check PasswordCheck
 }
 
-func NewSetUserPasswordAction(input SetPasswordInput, hashers ProjectHasherResolver) *SetPasswordUserAction {
+func NewSetUserPasswordAction(input SetPasswordInput, hashers ProjectHasherResolver, gate PasswordGate) *SetPasswordUserAction {
 	return &SetPasswordUserAction{
 		SetPasswordInput: input,
 		hashers:          hashers,
+		gate:             gate,
 	}
 }
 
@@ -974,7 +1013,17 @@ func NewSetUserPasswordAction(input SetPasswordInput, hashers ProjectHasherResol
 // hashing method is resolved: the policy is read for the password in front of
 // it rather than for a hasher wired in at startup, so an admin's change takes
 // effect on the next password rather than the next restart.
+//
+// The password policy is checked first, before the hash: a rejected password
+// costs neither an argon2 hash nor a transaction.
 func (o *SetPasswordUserAction) Prepare(ctx context.Context) (err error) {
+	if o.gate == nil {
+		return domain.ErrInternal(errors.New("set password: no password gate")).WithMessage("failed to set password")
+	}
+	o.check, err = o.gate.CheckPassword(ctx, o.SetPasswordInput)
+	if err != nil {
+		return err
+	}
 	hasher, err := o.hashers.HasherForProject(ctx, o.ProjectID)
 	if err != nil {
 		return err
@@ -998,6 +1047,9 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 		}
 		return domain.ErrInternal(err).WithMessage("failed to set password")
 	}
+	if err := o.checkReplacedPassword(ctx, stmts); err != nil {
+		return err
+	}
 	return audit.Emit(ctx, stmts, audit.EmitSpec{
 		Type:       domain.EventTypeAuthFactorPasswordSet,
 		Category:   domain.EventCategoryAuth,
@@ -1009,6 +1061,33 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 			FactorID: pw.ID,
 		},
 	})
+}
+
+// checkReplacedPassword rejects the write when the history check ran against
+// a password that is no longer the one this write replaces. Prepare compared
+// the candidate outside this transaction, so a change that committed in
+// between could have set the candidate itself, and the comparison would have
+// missed it. Read after the write, the newest kept password is the one it
+// replaced, and no other change can slip in before the commit: Postgres holds
+// the user's lock SetUserPassword took, SQLite the write lock BEGIN IMMEDIATE
+// took, and Spanner aborts and replays the transaction when a change commits
+// against what it read.
+func (o *SetPasswordUserAction) checkReplacedPassword(ctx context.Context, stmts AllStatements) error {
+	if !o.check.HistoryChecked {
+		return nil
+	}
+	kept, err := stmts.GetUserPasswordHistory(ctx, o.ProjectID, o.UserID)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to set password")
+	}
+	var replaced string
+	if len(kept) > 0 {
+		replaced = kept[0].ID
+	}
+	if replaced != o.check.CurrentPasswordID {
+		return domain.ErrUserConflict()
+	}
+	return nil
 }
 
 // ---- Delete ACTION -------------------------------------------------------------

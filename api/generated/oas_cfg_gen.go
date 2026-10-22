@@ -38,10 +38,12 @@ var regexMap = map[string]ogenregex.Regexp{
 	"^ch_[a-zA-Z0-9_-]+$":                ogenregex.MustCompile("^ch_[a-zA-Z0-9_-]+$"),
 	"^dep_[a-zA-Z0-9_-]+$":               ogenregex.MustCompile("^dep_[a-zA-Z0-9_-]+$"),
 	"^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$": ogenregex.MustCompile("^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$"),
-	"^rel_[a-zA-Z0-9_-]+$":  ogenregex.MustCompile("^rel_[a-zA-Z0-9_-]+$"),
-	"^sess_[a-zA-Z0-9_-]+$": ogenregex.MustCompile("^sess_[a-zA-Z0-9_-]+$"),
-	"^sha256:[0-9a-f]{64}$": ogenregex.MustCompile("^sha256:[0-9a-f]{64}$"),
-	"^user_[a-zA-Z0-9_-]+$": ogenregex.MustCompile("^user_[a-zA-Z0-9_-]+$"),
+	"^pol_[a-zA-Z0-9_-]+$":    ogenregex.MustCompile("^pol_[a-zA-Z0-9_-]+$"),
+	"^polrev_[a-zA-Z0-9_-]+$": ogenregex.MustCompile("^polrev_[a-zA-Z0-9_-]+$"),
+	"^rel_[a-zA-Z0-9_-]+$":    ogenregex.MustCompile("^rel_[a-zA-Z0-9_-]+$"),
+	"^sess_[a-zA-Z0-9_-]+$":   ogenregex.MustCompile("^sess_[a-zA-Z0-9_-]+$"),
+	"^sha256:[0-9a-f]{64}$":   ogenregex.MustCompile("^sha256:[0-9a-f]{64}$"),
+	"^user_[a-zA-Z0-9_-]+$":   ogenregex.MustCompile("^user_[a-zA-Z0-9_-]+$"),
 }
 var (
 	// Allocate option closure once.

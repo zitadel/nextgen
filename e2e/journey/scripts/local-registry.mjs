@@ -3,7 +3,9 @@ import { spawn } from "node:child_process";
 import { cp, mkdir, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+import { runCapture } from "../../../scripts/dev-process.mjs";
+import { packPublicPackages } from "../../../scripts/release-artifacts.mjs";
+import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 import { runnerCommand } from "../../../scripts/task-runner.mjs";
 import { packageName, parsePort } from "./lib.mjs";
 
@@ -58,16 +60,22 @@ export async function prepareLocalRegistry(input) {
   await writeVerdaccioConfig(paths.verdaccioConfigPath, paths.storagePath, input);
   await writeVerdaccioNpmrc(paths.npmrcPath, input.registryUrl, input);
 
-  await buildPackages(input.repoRoot, input.run, env, log, input.prebuiltTarballsDir);
-  await packPackages(
-    input.repoRoot,
-    paths.tarballsDir,
-    input.run,
-    env,
-    log,
-    input.prebuiltTarballsDir,
-  );
-  await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env);
+  if (input.packageSet === "app") {
+    await buildAppPackages(input.repoRoot, input.run, env, log);
+    await packAppPackages(input.repoRoot, paths.tarballsDir, env, log, input.runCapture);
+    await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env, ["--app-packages"]);
+  } else {
+    await buildPackages(input.repoRoot, input.run, env, log, input.prebuiltTarballsDir);
+    await packPackages(
+      input.repoRoot,
+      paths.tarballsDir,
+      input.run,
+      env,
+      log,
+      input.prebuiltTarballsDir,
+    );
+    await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env);
+  }
   const startRegistry = input.startLocalRegistry ?? startLocalRegistry;
   const registry = await startRegistry({
     env,
@@ -127,8 +135,39 @@ export async function packPackages(
   }
 }
 
-export async function verifyTarballs(repoRoot, tarballsDir, run, env) {
-  await run("node", ["e2e/journey/scripts/verify-tarballs.mjs", tarballsDir], {
+// The `app` package set: what a generated app installs, packed from the
+// packages' cached dev builds. `release:pack` rebuilds every public package
+// after cli:test and cross-compiles the server for every platform, none of
+// which a generated app installs.
+export async function buildAppPackages(repoRoot, run, env, log = () => undefined) {
+  log(`building ${APP_RELEASE_PACKAGES.map((pkg) => pkg.name).join(", ")}`);
+  const build = runnerCommand(
+    APP_RELEASE_PACKAGES.map((pkg) => `${pkg.moonProject}:build`),
+    env,
+  );
+  await run(build.command, build.args, { cwd: repoRoot, env });
+}
+
+// Each pack runs on pipes of its own (runReplayed in scripts/dev-process.mjs
+// says why); a failed pack's error carries its output.
+export async function packAppPackages(
+  repoRoot,
+  tarballsDir,
+  env,
+  log = () => undefined,
+  runCaptureFn = runCapture,
+) {
+  log(`packing npm tarballs into ${tarballsDir}`);
+  await packPublicPackages({
+    repoRoot,
+    dirs: APP_RELEASE_PACKAGES.map((pkg) => pkg.dir),
+    tarballsDir,
+    run: (command, args, options) => runCaptureFn(command, args, { ...options, env }),
+  });
+}
+
+export async function verifyTarballs(repoRoot, tarballsDir, run, env, flags = []) {
+  await run("node", ["e2e/journey/scripts/verify-tarballs.mjs", tarballsDir, ...flags], {
     cwd: repoRoot,
     env,
   });
@@ -147,16 +186,27 @@ export async function publishTarballs(repoRoot, tarballsDir, registryUrl, npmrcP
 
 export async function startLocalRegistry(input) {
   const log = input.log ?? (() => undefined);
+  // Otherwise the readiness check passes against whatever holds the port,
+  // the packages go there, and the Verdaccio started here exits unseen.
+  const port = String(input.registryPort);
+  if (await isServing(`http://127.0.0.1:${port}/-/ping`)) {
+    throw new Error(
+      `127.0.0.1:${port} is already in use, likely by a Verdaccio an earlier run left ` +
+        `behind. Stop that process (lsof -i :${port}), or pick another port ` +
+        "(ZITADEL_CLI_LOCAL_REGISTRY_PORT for the CLI wrapper).",
+    );
+  }
   log("starting Verdaccio");
   await mkdir(dirname(input.paths.registryLogPath), { recursive: true });
   const logFile = await open(input.paths.registryLogPath, "a", 0o600);
   try {
+    // Verdaccio's own bin under this Node, one process: through `corepack
+    // pnpm exec`, stopLocalRegistry's signal reached only corepack, and pnpm
+    // and Verdaccio kept serving the port.
     const child = spawn(
-      "corepack",
+      process.execPath,
       [
-        "pnpm",
-        "exec",
-        "verdaccio",
+        join(input.repoRoot, "node_modules", "verdaccio", "bin", "verdaccio"),
         "--config",
         input.paths.verdaccioConfigPath,
         "--listen",
@@ -224,6 +274,16 @@ export async function waitForHttp(url, label, child, log = () => undefined) {
     await delay(1000);
   }
   throw new Error(`timed out waiting for ${label} at ${url}: ${lastError?.message}`);
+}
+
+// Anything but a refused connection means something holds the port.
+async function isServing(url) {
+  try {
+    await fetch(url, { signal: AbortSignal.timeout(2000) });
+    return true;
+  } catch (error) {
+    return error?.cause?.code !== "ECONNREFUSED";
+  }
 }
 
 export function npmEnvironment(env, registryUrl, npmrcPath) {

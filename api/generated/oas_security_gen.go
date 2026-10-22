@@ -57,6 +57,7 @@ var operationRolesNextgenSession = map[string][]string{
 	GetFlowDefinitionOperation:     []string{},
 	GetGrantOperation:              []string{},
 	GetIdpByIdOperation:            []string{},
+	GetMyPasswordStateOperation:    []string{},
 	GetMySessionOperation:          []string{},
 	GetMySessionCsrfTokenOperation: []string{},
 	GetMyUserOperation:             []string{},
@@ -65,8 +66,11 @@ var operationRolesNextgenSession = map[string][]string{
 	GetSchemaByIdOperation:         []string{},
 	GetTeamOperation:               []string{},
 	GetUserByIDOperation:           []string{},
+	GetUserPasswordStateOperation:  []string{},
 	ListBrandingOperation:          []string{},
 	ListFlowDefinitionsOperation:   []string{},
+	ListMyIdentityLinksOperation:   []string{},
+	ListMyPasskeysOperation:        []string{},
 	ListMyProjectsOperation:        []string{},
 	ListMyTeamsOperation:           []string{},
 	ListSchemasOperation:           []string{},
@@ -201,6 +205,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetIdpRevisionByIdOperation: []string{
 		"idp.read",
 	},
+	GetPolicyRevisionOperation: []string{
+		"policy.read",
+	},
 	GetProjectOperation: []string{
 		"project.write",
 	},
@@ -217,6 +224,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"team.read",
 	},
 	GetUserByIDOperation: []string{
+		"user.read",
+	},
+	GetUserPasswordStateOperation: []string{
 		"user.read",
 	},
 	GetVariableOperation: []string{
@@ -270,6 +280,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	PatchUserByIDOperation: []string{
 		"user.write",
+	},
+	PublishPolicyOperation: []string{
+		"policy.write",
 	},
 	QueryGrantsOperation: []string{
 		"project.read",

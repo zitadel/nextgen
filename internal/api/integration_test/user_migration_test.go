@@ -479,7 +479,7 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 	})
 
 	t.Run("signs in with the passkey", func(t *testing.T) {
-		flow := f.startFlow(t, "")
+		flow := f.startFlow(t, nil)
 		issued, err := f.client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{Action: "passkey"},
 			api.SubmitFlowStepParams{ID: flow.id, Zflow: flow.zflow, Origin: api.NewOptURI(*rpOrigin)})
 		require.NoError(t, err)
@@ -514,7 +514,7 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 	})
 
 	t.Run("signs in with SSO", func(t *testing.T) {
-		flow := f.startFlow(t, "")
+		flow := f.startFlow(t, nil)
 		parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-migrant",
 			map[string]any{"email": email}, map[string]bool{"email": true})
 

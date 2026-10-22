@@ -6676,11 +6676,14 @@ func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
 	s.Details = val
 }
 
-func (*AuthUnauthorized) completeClaimRes()   {}
-func (*AuthUnauthorized) getMyUserSchemaRes() {}
-func (*AuthUnauthorized) listMyProjectsRes()  {}
-func (*AuthUnauthorized) listMyTeamsRes()     {}
-func (*AuthUnauthorized) revokeMySessionRes() {}
+func (*AuthUnauthorized) completeClaimRes()       {}
+func (*AuthUnauthorized) getMyPasswordStateRes()  {}
+func (*AuthUnauthorized) getMyUserSchemaRes()     {}
+func (*AuthUnauthorized) listMyIdentityLinksRes() {}
+func (*AuthUnauthorized) listMyPasskeysRes()      {}
+func (*AuthUnauthorized) listMyProjectsRes()      {}
+func (*AuthUnauthorized) listMyTeamsRes()         {}
+func (*AuthUnauthorized) revokeMySessionRes()     {}
 
 // Additional error-specific context.
 type AuthUnauthorizedDetails map[string]jx.Raw
@@ -9502,6 +9505,218 @@ func (s *BrandingTypography) SetScale(val OptFloat64) {
 
 // Merged schema.
 // Ref: #
+type BrndInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptBrndInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *BrndInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *BrndInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *BrndInvalid) GetDetails() OptBrndInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *BrndInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *BrndInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *BrndInvalid) SetDetails(val OptBrndInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type BrndInvalidDetails map[string]jx.Raw
+
+func (s *BrndInvalidDetails) init() BrndInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type BrndMissingProjectID struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptBrndMissingProjectIDDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *BrndMissingProjectID) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *BrndMissingProjectID) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *BrndMissingProjectID) GetDetails() OptBrndMissingProjectIDDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *BrndMissingProjectID) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *BrndMissingProjectID) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *BrndMissingProjectID) SetDetails(val OptBrndMissingProjectIDDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type BrndMissingProjectIDDetails map[string]jx.Raw
+
+func (s *BrndMissingProjectIDDetails) init() BrndMissingProjectIDDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type BrndNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptBrndNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *BrndNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *BrndNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *BrndNotFound) GetDetails() OptBrndNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *BrndNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *BrndNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *BrndNotFound) SetDetails(val OptBrndNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type BrndNotFoundDetails map[string]jx.Raw
+
+func (s *BrndNotFoundDetails) init() BrndNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type BrndPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptBrndPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *BrndPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *BrndPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *BrndPermissionDenied) GetDetails() OptBrndPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *BrndPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *BrndPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *BrndPermissionDenied) SetDetails(val OptBrndPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type BrndPermissionDeniedDetails map[string]jx.Raw
+
+func (s *BrndPermissionDeniedDetails) init() BrndPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type BuildReleaseBadRequest struct {
 	Code ErrorCode `json:"code"`
 	// Human-readable explanation of the error.
@@ -10629,6 +10844,112 @@ func (s *ChallengeResponseState) UnmarshalText(data []byte) error {
 
 // Merged schema.
 // Ref: #
+type ClaimChallengeInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptClaimChallengeInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ClaimChallengeInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ClaimChallengeInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ClaimChallengeInvalid) GetDetails() OptClaimChallengeInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ClaimChallengeInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ClaimChallengeInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ClaimChallengeInvalid) SetDetails(val OptClaimChallengeInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ClaimChallengeInvalidDetails map[string]jx.Raw
+
+func (s *ClaimChallengeInvalidDetails) init() ClaimChallengeInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ClaimChallengeNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptClaimChallengeNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ClaimChallengeNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ClaimChallengeNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ClaimChallengeNotFound) GetDetails() OptClaimChallengeNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ClaimChallengeNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ClaimChallengeNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ClaimChallengeNotFound) SetDetails(val OptClaimChallengeNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ClaimChallengeNotFoundDetails map[string]jx.Raw
+
+func (s *ClaimChallengeNotFoundDetails) init() ClaimChallengeNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type ClaimNoPersonalTeam struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -10988,6 +11309,466 @@ func (*ClaimWindowResponse) getClaimWindowRes() {}
 type CompleteClaimBadRequest ErrorDetails
 
 func (*CompleteClaimBadRequest) completeClaimRes() {}
+
+// CompleteClaimErrorResponse represents sum type.
+type CompleteClaimErrorResponse struct {
+	Type                       CompleteClaimErrorResponseType // switch on this field
+	AuthCsrfInvalid            AuthCsrfInvalid
+	AuthUnauthorized           AuthUnauthorized
+	ClaimChallengeNotFound     ClaimChallengeNotFound
+	ClaimNoPersonalTeam        ClaimNoPersonalTeam
+	EvtInvalid                 EvtInvalid
+	Internal                   Internal
+	NotImplemented             NotImplemented
+	ClaimPersonalTeamNotActive ClaimPersonalTeamNotActive
+	ProjAlreadyClaimed         ProjAlreadyClaimed
+	ProjClaimExpired           ProjClaimExpired
+	ProjClaimWindowExpired     ProjClaimWindowExpired
+	ProjNotFound               ProjNotFound
+	ReqInvalid                 ReqInvalid
+	SessNotFound               SessNotFound
+	Unavailable                Unavailable
+}
+
+// CompleteClaimErrorResponseType is oneOf type of CompleteClaimErrorResponse.
+type CompleteClaimErrorResponseType string
+
+// Possible values for CompleteClaimErrorResponseType.
+const (
+	AuthCsrfInvalidCompleteClaimErrorResponse            CompleteClaimErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedCompleteClaimErrorResponse           CompleteClaimErrorResponseType = "auth.unauthorized"
+	ClaimChallengeNotFoundCompleteClaimErrorResponse     CompleteClaimErrorResponseType = "claim_challenge.not_found"
+	ClaimNoPersonalTeamCompleteClaimErrorResponse        CompleteClaimErrorResponseType = "claim.no_personal_team"
+	EvtInvalidCompleteClaimErrorResponse                 CompleteClaimErrorResponseType = "evt.invalid"
+	InternalCompleteClaimErrorResponse                   CompleteClaimErrorResponseType = "internal"
+	NotImplementedCompleteClaimErrorResponse             CompleteClaimErrorResponseType = "not_implemented"
+	ClaimPersonalTeamNotActiveCompleteClaimErrorResponse CompleteClaimErrorResponseType = "claim.personal_team_not_active"
+	ProjAlreadyClaimedCompleteClaimErrorResponse         CompleteClaimErrorResponseType = "proj.already_claimed"
+	ProjClaimExpiredCompleteClaimErrorResponse           CompleteClaimErrorResponseType = "proj.claim_expired"
+	ProjClaimWindowExpiredCompleteClaimErrorResponse     CompleteClaimErrorResponseType = "proj.claim_window_expired"
+	ProjNotFoundCompleteClaimErrorResponse               CompleteClaimErrorResponseType = "proj.not_found"
+	ReqInvalidCompleteClaimErrorResponse                 CompleteClaimErrorResponseType = "req.invalid"
+	SessNotFoundCompleteClaimErrorResponse               CompleteClaimErrorResponseType = "sess.not_found"
+	UnavailableCompleteClaimErrorResponse                CompleteClaimErrorResponseType = "unavailable"
+)
+
+// IsAuthCsrfInvalid reports whether CompleteClaimErrorResponse is AuthCsrfInvalid.
+func (s CompleteClaimErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidCompleteClaimErrorResponse
+}
+
+// IsAuthUnauthorized reports whether CompleteClaimErrorResponse is AuthUnauthorized.
+func (s CompleteClaimErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCompleteClaimErrorResponse
+}
+
+// IsClaimChallengeNotFound reports whether CompleteClaimErrorResponse is ClaimChallengeNotFound.
+func (s CompleteClaimErrorResponse) IsClaimChallengeNotFound() bool {
+	return s.Type == ClaimChallengeNotFoundCompleteClaimErrorResponse
+}
+
+// IsClaimNoPersonalTeam reports whether CompleteClaimErrorResponse is ClaimNoPersonalTeam.
+func (s CompleteClaimErrorResponse) IsClaimNoPersonalTeam() bool {
+	return s.Type == ClaimNoPersonalTeamCompleteClaimErrorResponse
+}
+
+// IsEvtInvalid reports whether CompleteClaimErrorResponse is EvtInvalid.
+func (s CompleteClaimErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCompleteClaimErrorResponse
+}
+
+// IsInternal reports whether CompleteClaimErrorResponse is Internal.
+func (s CompleteClaimErrorResponse) IsInternal() bool {
+	return s.Type == InternalCompleteClaimErrorResponse
+}
+
+// IsNotImplemented reports whether CompleteClaimErrorResponse is NotImplemented.
+func (s CompleteClaimErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCompleteClaimErrorResponse
+}
+
+// IsClaimPersonalTeamNotActive reports whether CompleteClaimErrorResponse is ClaimPersonalTeamNotActive.
+func (s CompleteClaimErrorResponse) IsClaimPersonalTeamNotActive() bool {
+	return s.Type == ClaimPersonalTeamNotActiveCompleteClaimErrorResponse
+}
+
+// IsProjAlreadyClaimed reports whether CompleteClaimErrorResponse is ProjAlreadyClaimed.
+func (s CompleteClaimErrorResponse) IsProjAlreadyClaimed() bool {
+	return s.Type == ProjAlreadyClaimedCompleteClaimErrorResponse
+}
+
+// IsProjClaimExpired reports whether CompleteClaimErrorResponse is ProjClaimExpired.
+func (s CompleteClaimErrorResponse) IsProjClaimExpired() bool {
+	return s.Type == ProjClaimExpiredCompleteClaimErrorResponse
+}
+
+// IsProjClaimWindowExpired reports whether CompleteClaimErrorResponse is ProjClaimWindowExpired.
+func (s CompleteClaimErrorResponse) IsProjClaimWindowExpired() bool {
+	return s.Type == ProjClaimWindowExpiredCompleteClaimErrorResponse
+}
+
+// IsProjNotFound reports whether CompleteClaimErrorResponse is ProjNotFound.
+func (s CompleteClaimErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundCompleteClaimErrorResponse
+}
+
+// IsReqInvalid reports whether CompleteClaimErrorResponse is ReqInvalid.
+func (s CompleteClaimErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCompleteClaimErrorResponse
+}
+
+// IsSessNotFound reports whether CompleteClaimErrorResponse is SessNotFound.
+func (s CompleteClaimErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundCompleteClaimErrorResponse
+}
+
+// IsUnavailable reports whether CompleteClaimErrorResponse is Unavailable.
+func (s CompleteClaimErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCompleteClaimErrorResponse
+}
+
+// SetAuthCsrfInvalid sets CompleteClaimErrorResponse to AuthCsrfInvalid.
+func (s *CompleteClaimErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidCompleteClaimErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if CompleteClaimErrorResponse is AuthCsrfInvalid.
+func (s CompleteClaimErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidCompleteClaimErrorResponse(v AuthCsrfInvalid) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets CompleteClaimErrorResponse to AuthUnauthorized.
+func (s *CompleteClaimErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCompleteClaimErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CompleteClaimErrorResponse is AuthUnauthorized.
+func (s CompleteClaimErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCompleteClaimErrorResponse(v AuthUnauthorized) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetClaimChallengeNotFound sets CompleteClaimErrorResponse to ClaimChallengeNotFound.
+func (s *CompleteClaimErrorResponse) SetClaimChallengeNotFound(v ClaimChallengeNotFound) {
+	s.Type = ClaimChallengeNotFoundCompleteClaimErrorResponse
+	s.ClaimChallengeNotFound = v
+}
+
+// GetClaimChallengeNotFound returns ClaimChallengeNotFound and true boolean if CompleteClaimErrorResponse is ClaimChallengeNotFound.
+func (s CompleteClaimErrorResponse) GetClaimChallengeNotFound() (v ClaimChallengeNotFound, ok bool) {
+	if !s.IsClaimChallengeNotFound() {
+		return v, false
+	}
+	return s.ClaimChallengeNotFound, true
+}
+
+// NewClaimChallengeNotFoundCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from ClaimChallengeNotFound.
+func NewClaimChallengeNotFoundCompleteClaimErrorResponse(v ClaimChallengeNotFound) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetClaimChallengeNotFound(v)
+	return s
+}
+
+// SetClaimNoPersonalTeam sets CompleteClaimErrorResponse to ClaimNoPersonalTeam.
+func (s *CompleteClaimErrorResponse) SetClaimNoPersonalTeam(v ClaimNoPersonalTeam) {
+	s.Type = ClaimNoPersonalTeamCompleteClaimErrorResponse
+	s.ClaimNoPersonalTeam = v
+}
+
+// GetClaimNoPersonalTeam returns ClaimNoPersonalTeam and true boolean if CompleteClaimErrorResponse is ClaimNoPersonalTeam.
+func (s CompleteClaimErrorResponse) GetClaimNoPersonalTeam() (v ClaimNoPersonalTeam, ok bool) {
+	if !s.IsClaimNoPersonalTeam() {
+		return v, false
+	}
+	return s.ClaimNoPersonalTeam, true
+}
+
+// NewClaimNoPersonalTeamCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from ClaimNoPersonalTeam.
+func NewClaimNoPersonalTeamCompleteClaimErrorResponse(v ClaimNoPersonalTeam) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetClaimNoPersonalTeam(v)
+	return s
+}
+
+// SetEvtInvalid sets CompleteClaimErrorResponse to EvtInvalid.
+func (s *CompleteClaimErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCompleteClaimErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CompleteClaimErrorResponse is EvtInvalid.
+func (s CompleteClaimErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from EvtInvalid.
+func NewEvtInvalidCompleteClaimErrorResponse(v EvtInvalid) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetInternal sets CompleteClaimErrorResponse to Internal.
+func (s *CompleteClaimErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCompleteClaimErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CompleteClaimErrorResponse is Internal.
+func (s CompleteClaimErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from Internal.
+func NewInternalCompleteClaimErrorResponse(v Internal) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets CompleteClaimErrorResponse to NotImplemented.
+func (s *CompleteClaimErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCompleteClaimErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CompleteClaimErrorResponse is NotImplemented.
+func (s CompleteClaimErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from NotImplemented.
+func NewNotImplementedCompleteClaimErrorResponse(v NotImplemented) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetClaimPersonalTeamNotActive sets CompleteClaimErrorResponse to ClaimPersonalTeamNotActive.
+func (s *CompleteClaimErrorResponse) SetClaimPersonalTeamNotActive(v ClaimPersonalTeamNotActive) {
+	s.Type = ClaimPersonalTeamNotActiveCompleteClaimErrorResponse
+	s.ClaimPersonalTeamNotActive = v
+}
+
+// GetClaimPersonalTeamNotActive returns ClaimPersonalTeamNotActive and true boolean if CompleteClaimErrorResponse is ClaimPersonalTeamNotActive.
+func (s CompleteClaimErrorResponse) GetClaimPersonalTeamNotActive() (v ClaimPersonalTeamNotActive, ok bool) {
+	if !s.IsClaimPersonalTeamNotActive() {
+		return v, false
+	}
+	return s.ClaimPersonalTeamNotActive, true
+}
+
+// NewClaimPersonalTeamNotActiveCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from ClaimPersonalTeamNotActive.
+func NewClaimPersonalTeamNotActiveCompleteClaimErrorResponse(v ClaimPersonalTeamNotActive) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetClaimPersonalTeamNotActive(v)
+	return s
+}
+
+// SetProjAlreadyClaimed sets CompleteClaimErrorResponse to ProjAlreadyClaimed.
+func (s *CompleteClaimErrorResponse) SetProjAlreadyClaimed(v ProjAlreadyClaimed) {
+	s.Type = ProjAlreadyClaimedCompleteClaimErrorResponse
+	s.ProjAlreadyClaimed = v
+}
+
+// GetProjAlreadyClaimed returns ProjAlreadyClaimed and true boolean if CompleteClaimErrorResponse is ProjAlreadyClaimed.
+func (s CompleteClaimErrorResponse) GetProjAlreadyClaimed() (v ProjAlreadyClaimed, ok bool) {
+	if !s.IsProjAlreadyClaimed() {
+		return v, false
+	}
+	return s.ProjAlreadyClaimed, true
+}
+
+// NewProjAlreadyClaimedCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from ProjAlreadyClaimed.
+func NewProjAlreadyClaimedCompleteClaimErrorResponse(v ProjAlreadyClaimed) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetProjAlreadyClaimed(v)
+	return s
+}
+
+// SetProjClaimExpired sets CompleteClaimErrorResponse to ProjClaimExpired.
+func (s *CompleteClaimErrorResponse) SetProjClaimExpired(v ProjClaimExpired) {
+	s.Type = ProjClaimExpiredCompleteClaimErrorResponse
+	s.ProjClaimExpired = v
+}
+
+// GetProjClaimExpired returns ProjClaimExpired and true boolean if CompleteClaimErrorResponse is ProjClaimExpired.
+func (s CompleteClaimErrorResponse) GetProjClaimExpired() (v ProjClaimExpired, ok bool) {
+	if !s.IsProjClaimExpired() {
+		return v, false
+	}
+	return s.ProjClaimExpired, true
+}
+
+// NewProjClaimExpiredCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from ProjClaimExpired.
+func NewProjClaimExpiredCompleteClaimErrorResponse(v ProjClaimExpired) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetProjClaimExpired(v)
+	return s
+}
+
+// SetProjClaimWindowExpired sets CompleteClaimErrorResponse to ProjClaimWindowExpired.
+func (s *CompleteClaimErrorResponse) SetProjClaimWindowExpired(v ProjClaimWindowExpired) {
+	s.Type = ProjClaimWindowExpiredCompleteClaimErrorResponse
+	s.ProjClaimWindowExpired = v
+}
+
+// GetProjClaimWindowExpired returns ProjClaimWindowExpired and true boolean if CompleteClaimErrorResponse is ProjClaimWindowExpired.
+func (s CompleteClaimErrorResponse) GetProjClaimWindowExpired() (v ProjClaimWindowExpired, ok bool) {
+	if !s.IsProjClaimWindowExpired() {
+		return v, false
+	}
+	return s.ProjClaimWindowExpired, true
+}
+
+// NewProjClaimWindowExpiredCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from ProjClaimWindowExpired.
+func NewProjClaimWindowExpiredCompleteClaimErrorResponse(v ProjClaimWindowExpired) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetProjClaimWindowExpired(v)
+	return s
+}
+
+// SetProjNotFound sets CompleteClaimErrorResponse to ProjNotFound.
+func (s *CompleteClaimErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundCompleteClaimErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if CompleteClaimErrorResponse is ProjNotFound.
+func (s CompleteClaimErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from ProjNotFound.
+func NewProjNotFoundCompleteClaimErrorResponse(v ProjNotFound) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetReqInvalid sets CompleteClaimErrorResponse to ReqInvalid.
+func (s *CompleteClaimErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCompleteClaimErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CompleteClaimErrorResponse is ReqInvalid.
+func (s CompleteClaimErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from ReqInvalid.
+func NewReqInvalidCompleteClaimErrorResponse(v ReqInvalid) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessNotFound sets CompleteClaimErrorResponse to SessNotFound.
+func (s *CompleteClaimErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundCompleteClaimErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if CompleteClaimErrorResponse is SessNotFound.
+func (s CompleteClaimErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from SessNotFound.
+func NewSessNotFoundCompleteClaimErrorResponse(v SessNotFound) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetSessNotFound(v)
+	return s
+}
+
+// SetUnavailable sets CompleteClaimErrorResponse to Unavailable.
+func (s *CompleteClaimErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCompleteClaimErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CompleteClaimErrorResponse is Unavailable.
+func (s CompleteClaimErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCompleteClaimErrorResponse returns new CompleteClaimErrorResponse from Unavailable.
+func NewUnavailableCompleteClaimErrorResponse(v Unavailable) CompleteClaimErrorResponse {
+	var s CompleteClaimErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// CompleteClaimErrorResponseStatusCode wraps CompleteClaimErrorResponse with StatusCode.
+type CompleteClaimErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CompleteClaimErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CompleteClaimErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CompleteClaimErrorResponseStatusCode) GetResponse() CompleteClaimErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CompleteClaimErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CompleteClaimErrorResponseStatusCode) SetResponse(val CompleteClaimErrorResponse) {
+	s.Response = val
+}
+
+func (*CompleteClaimErrorResponseStatusCode) completeClaimRes() {}
 
 // CompleteClaimForbidden represents sum type.
 type CompleteClaimForbidden struct {
@@ -11525,14 +12306,20 @@ func NewSchemaURLConfigurationBundleSchemasItem(v SchemaURL) ConfigurationBundle
 	return s
 }
 
+type CreateAuthAttemptConflict ErrorDetails
+
+func (*CreateAuthAttemptConflict) createAuthAttemptRes() {}
+
 // CreateAuthAttemptErrorResponse represents sum type.
 type CreateAuthAttemptErrorResponse struct {
-	Type              CreateAuthAttemptErrorResponseType // switch on this field
-	AttInvalidRequest AttInvalidRequest
-	AuthUnauthorized  AuthUnauthorized
-	EvtInvalid        EvtInvalid
-	Internal          Internal
-	ReqInvalid        ReqInvalid
+	Type                CreateAuthAttemptErrorResponseType // switch on this field
+	AttInvalidRequest   AttInvalidRequest
+	AuthUnauthorized    AuthUnauthorized
+	EncKeyDecryptFailed EncKeyDecryptFailed
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	EncKeyUnknownAlg    EncKeyUnknownAlg
 }
 
 // CreateAuthAttemptErrorResponseType is oneOf type of CreateAuthAttemptErrorResponse.
@@ -11540,11 +12327,13 @@ type CreateAuthAttemptErrorResponseType string
 
 // Possible values for CreateAuthAttemptErrorResponseType.
 const (
-	AttInvalidRequestCreateAuthAttemptErrorResponse CreateAuthAttemptErrorResponseType = "att.invalid_request"
-	AuthUnauthorizedCreateAuthAttemptErrorResponse  CreateAuthAttemptErrorResponseType = "auth.unauthorized"
-	EvtInvalidCreateAuthAttemptErrorResponse        CreateAuthAttemptErrorResponseType = "evt.invalid"
-	InternalCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "internal"
-	ReqInvalidCreateAuthAttemptErrorResponse        CreateAuthAttemptErrorResponseType = "req.invalid"
+	AttInvalidRequestCreateAuthAttemptErrorResponse   CreateAuthAttemptErrorResponseType = "att.invalid_request"
+	AuthUnauthorizedCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "auth.unauthorized"
+	EncKeyDecryptFailedCreateAuthAttemptErrorResponse CreateAuthAttemptErrorResponseType = "enc_key.decrypt_failed"
+	EvtInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "evt.invalid"
+	InternalCreateAuthAttemptErrorResponse            CreateAuthAttemptErrorResponseType = "internal"
+	ReqInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "enc_key.unknown_alg"
 )
 
 // IsAttInvalidRequest reports whether CreateAuthAttemptErrorResponse is AttInvalidRequest.
@@ -11555,6 +12344,11 @@ func (s CreateAuthAttemptErrorResponse) IsAttInvalidRequest() bool {
 // IsAuthUnauthorized reports whether CreateAuthAttemptErrorResponse is AuthUnauthorized.
 func (s CreateAuthAttemptErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateAuthAttemptErrorResponse
+}
+
+// IsEncKeyDecryptFailed reports whether CreateAuthAttemptErrorResponse is EncKeyDecryptFailed.
+func (s CreateAuthAttemptErrorResponse) IsEncKeyDecryptFailed() bool {
+	return s.Type == EncKeyDecryptFailedCreateAuthAttemptErrorResponse
 }
 
 // IsEvtInvalid reports whether CreateAuthAttemptErrorResponse is EvtInvalid.
@@ -11570,6 +12364,11 @@ func (s CreateAuthAttemptErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether CreateAuthAttemptErrorResponse is ReqInvalid.
 func (s CreateAuthAttemptErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateAuthAttemptErrorResponse
+}
+
+// IsEncKeyUnknownAlg reports whether CreateAuthAttemptErrorResponse is EncKeyUnknownAlg.
+func (s CreateAuthAttemptErrorResponse) IsEncKeyUnknownAlg() bool {
+	return s.Type == EncKeyUnknownAlgCreateAuthAttemptErrorResponse
 }
 
 // SetAttInvalidRequest sets CreateAuthAttemptErrorResponse to AttInvalidRequest.
@@ -11611,6 +12410,27 @@ func (s CreateAuthAttemptErrorResponse) GetAuthUnauthorized() (v AuthUnauthorize
 func NewAuthUnauthorizedCreateAuthAttemptErrorResponse(v AuthUnauthorized) CreateAuthAttemptErrorResponse {
 	var s CreateAuthAttemptErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEncKeyDecryptFailed sets CreateAuthAttemptErrorResponse to EncKeyDecryptFailed.
+func (s *CreateAuthAttemptErrorResponse) SetEncKeyDecryptFailed(v EncKeyDecryptFailed) {
+	s.Type = EncKeyDecryptFailedCreateAuthAttemptErrorResponse
+	s.EncKeyDecryptFailed = v
+}
+
+// GetEncKeyDecryptFailed returns EncKeyDecryptFailed and true boolean if CreateAuthAttemptErrorResponse is EncKeyDecryptFailed.
+func (s CreateAuthAttemptErrorResponse) GetEncKeyDecryptFailed() (v EncKeyDecryptFailed, ok bool) {
+	if !s.IsEncKeyDecryptFailed() {
+		return v, false
+	}
+	return s.EncKeyDecryptFailed, true
+}
+
+// NewEncKeyDecryptFailedCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from EncKeyDecryptFailed.
+func NewEncKeyDecryptFailedCreateAuthAttemptErrorResponse(v EncKeyDecryptFailed) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetEncKeyDecryptFailed(v)
 	return s
 }
 
@@ -11677,6 +12497,27 @@ func NewReqInvalidCreateAuthAttemptErrorResponse(v ReqInvalid) CreateAuthAttempt
 	return s
 }
 
+// SetEncKeyUnknownAlg sets CreateAuthAttemptErrorResponse to EncKeyUnknownAlg.
+func (s *CreateAuthAttemptErrorResponse) SetEncKeyUnknownAlg(v EncKeyUnknownAlg) {
+	s.Type = EncKeyUnknownAlgCreateAuthAttemptErrorResponse
+	s.EncKeyUnknownAlg = v
+}
+
+// GetEncKeyUnknownAlg returns EncKeyUnknownAlg and true boolean if CreateAuthAttemptErrorResponse is EncKeyUnknownAlg.
+func (s CreateAuthAttemptErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok bool) {
+	if !s.IsEncKeyUnknownAlg() {
+		return v, false
+	}
+	return s.EncKeyUnknownAlg, true
+}
+
+// NewEncKeyUnknownAlgCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from EncKeyUnknownAlg.
+func NewEncKeyUnknownAlgCreateAuthAttemptErrorResponse(v EncKeyUnknownAlg) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
 // CreateAuthAttemptErrorResponseStatusCode wraps CreateAuthAttemptErrorResponse with StatusCode.
 type CreateAuthAttemptErrorResponseStatusCode struct {
 	StatusCode int
@@ -11705,6 +12546,10 @@ func (s *CreateAuthAttemptErrorResponseStatusCode) SetResponse(val CreateAuthAtt
 
 func (*CreateAuthAttemptErrorResponseStatusCode) createAuthAttemptRes() {}
 
+type CreateAuthAttemptForbidden ErrorDetails
+
+func (*CreateAuthAttemptForbidden) createAuthAttemptRes() {}
+
 // Request to create a new authentication attempt.
 // Ref: #
 type CreateAuthAttemptRequest struct {
@@ -11712,7 +12557,9 @@ type CreateAuthAttemptRequest struct {
 	ChallengeNonce OptChallengeNonce `json:"challenge_nonce"`
 	// Optional. If provided, this attempt adds factors to an existing session (step-up auth).
 	// If omitted, a new session is created implicitly on successful handoff.
-	SessionID OptNilSessionID `json:"session_id"`
+	// Requires `session_token`.
+	SessionID    OptNilSessionID      `json:"session_id"`
+	SessionToken OptSessionProofToken `json:"session_token"`
 }
 
 // GetProjectID returns the value of ProjectID.
@@ -11730,6 +12577,11 @@ func (s *CreateAuthAttemptRequest) GetSessionID() OptNilSessionID {
 	return s.SessionID
 }
 
+// GetSessionToken returns the value of SessionToken.
+func (s *CreateAuthAttemptRequest) GetSessionToken() OptSessionProofToken {
+	return s.SessionToken
+}
+
 // SetProjectID sets the value of ProjectID.
 func (s *CreateAuthAttemptRequest) SetProjectID(val ProjectID) {
 	s.ProjectID = val
@@ -11744,6 +12596,275 @@ func (s *CreateAuthAttemptRequest) SetChallengeNonce(val OptChallengeNonce) {
 func (s *CreateAuthAttemptRequest) SetSessionID(val OptNilSessionID) {
 	s.SessionID = val
 }
+
+// SetSessionToken sets the value of SessionToken.
+func (s *CreateAuthAttemptRequest) SetSessionToken(val OptSessionProofToken) {
+	s.SessionToken = val
+}
+
+// CreateBrandingErrorResponse represents sum type.
+type CreateBrandingErrorResponse struct {
+	Type                 CreateBrandingErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	BrndInvalid          BrndInvalid
+	BrndMissingProjectID BrndMissingProjectID
+	BrndNotFound         BrndNotFound
+	BrndPermissionDenied BrndPermissionDenied
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+}
+
+// CreateBrandingErrorResponseType is oneOf type of CreateBrandingErrorResponse.
+type CreateBrandingErrorResponseType string
+
+// Possible values for CreateBrandingErrorResponseType.
+const (
+	AuthUnauthorizedCreateBrandingErrorResponse     CreateBrandingErrorResponseType = "auth.unauthorized"
+	BrndInvalidCreateBrandingErrorResponse          CreateBrandingErrorResponseType = "brnd.invalid"
+	BrndMissingProjectIDCreateBrandingErrorResponse CreateBrandingErrorResponseType = "brnd.missing_project_id"
+	BrndNotFoundCreateBrandingErrorResponse         CreateBrandingErrorResponseType = "brnd.not_found"
+	BrndPermissionDeniedCreateBrandingErrorResponse CreateBrandingErrorResponseType = "brnd.permission_denied"
+	EvtInvalidCreateBrandingErrorResponse           CreateBrandingErrorResponseType = "evt.invalid"
+	InternalCreateBrandingErrorResponse             CreateBrandingErrorResponseType = "internal"
+	ReqInvalidCreateBrandingErrorResponse           CreateBrandingErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether CreateBrandingErrorResponse is AuthUnauthorized.
+func (s CreateBrandingErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateBrandingErrorResponse
+}
+
+// IsBrndInvalid reports whether CreateBrandingErrorResponse is BrndInvalid.
+func (s CreateBrandingErrorResponse) IsBrndInvalid() bool {
+	return s.Type == BrndInvalidCreateBrandingErrorResponse
+}
+
+// IsBrndMissingProjectID reports whether CreateBrandingErrorResponse is BrndMissingProjectID.
+func (s CreateBrandingErrorResponse) IsBrndMissingProjectID() bool {
+	return s.Type == BrndMissingProjectIDCreateBrandingErrorResponse
+}
+
+// IsBrndNotFound reports whether CreateBrandingErrorResponse is BrndNotFound.
+func (s CreateBrandingErrorResponse) IsBrndNotFound() bool {
+	return s.Type == BrndNotFoundCreateBrandingErrorResponse
+}
+
+// IsBrndPermissionDenied reports whether CreateBrandingErrorResponse is BrndPermissionDenied.
+func (s CreateBrandingErrorResponse) IsBrndPermissionDenied() bool {
+	return s.Type == BrndPermissionDeniedCreateBrandingErrorResponse
+}
+
+// IsEvtInvalid reports whether CreateBrandingErrorResponse is EvtInvalid.
+func (s CreateBrandingErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateBrandingErrorResponse
+}
+
+// IsInternal reports whether CreateBrandingErrorResponse is Internal.
+func (s CreateBrandingErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateBrandingErrorResponse
+}
+
+// IsReqInvalid reports whether CreateBrandingErrorResponse is ReqInvalid.
+func (s CreateBrandingErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateBrandingErrorResponse
+}
+
+// SetAuthUnauthorized sets CreateBrandingErrorResponse to AuthUnauthorized.
+func (s *CreateBrandingErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateBrandingErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateBrandingErrorResponse is AuthUnauthorized.
+func (s CreateBrandingErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateBrandingErrorResponse returns new CreateBrandingErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateBrandingErrorResponse(v AuthUnauthorized) CreateBrandingErrorResponse {
+	var s CreateBrandingErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetBrndInvalid sets CreateBrandingErrorResponse to BrndInvalid.
+func (s *CreateBrandingErrorResponse) SetBrndInvalid(v BrndInvalid) {
+	s.Type = BrndInvalidCreateBrandingErrorResponse
+	s.BrndInvalid = v
+}
+
+// GetBrndInvalid returns BrndInvalid and true boolean if CreateBrandingErrorResponse is BrndInvalid.
+func (s CreateBrandingErrorResponse) GetBrndInvalid() (v BrndInvalid, ok bool) {
+	if !s.IsBrndInvalid() {
+		return v, false
+	}
+	return s.BrndInvalid, true
+}
+
+// NewBrndInvalidCreateBrandingErrorResponse returns new CreateBrandingErrorResponse from BrndInvalid.
+func NewBrndInvalidCreateBrandingErrorResponse(v BrndInvalid) CreateBrandingErrorResponse {
+	var s CreateBrandingErrorResponse
+	s.SetBrndInvalid(v)
+	return s
+}
+
+// SetBrndMissingProjectID sets CreateBrandingErrorResponse to BrndMissingProjectID.
+func (s *CreateBrandingErrorResponse) SetBrndMissingProjectID(v BrndMissingProjectID) {
+	s.Type = BrndMissingProjectIDCreateBrandingErrorResponse
+	s.BrndMissingProjectID = v
+}
+
+// GetBrndMissingProjectID returns BrndMissingProjectID and true boolean if CreateBrandingErrorResponse is BrndMissingProjectID.
+func (s CreateBrandingErrorResponse) GetBrndMissingProjectID() (v BrndMissingProjectID, ok bool) {
+	if !s.IsBrndMissingProjectID() {
+		return v, false
+	}
+	return s.BrndMissingProjectID, true
+}
+
+// NewBrndMissingProjectIDCreateBrandingErrorResponse returns new CreateBrandingErrorResponse from BrndMissingProjectID.
+func NewBrndMissingProjectIDCreateBrandingErrorResponse(v BrndMissingProjectID) CreateBrandingErrorResponse {
+	var s CreateBrandingErrorResponse
+	s.SetBrndMissingProjectID(v)
+	return s
+}
+
+// SetBrndNotFound sets CreateBrandingErrorResponse to BrndNotFound.
+func (s *CreateBrandingErrorResponse) SetBrndNotFound(v BrndNotFound) {
+	s.Type = BrndNotFoundCreateBrandingErrorResponse
+	s.BrndNotFound = v
+}
+
+// GetBrndNotFound returns BrndNotFound and true boolean if CreateBrandingErrorResponse is BrndNotFound.
+func (s CreateBrandingErrorResponse) GetBrndNotFound() (v BrndNotFound, ok bool) {
+	if !s.IsBrndNotFound() {
+		return v, false
+	}
+	return s.BrndNotFound, true
+}
+
+// NewBrndNotFoundCreateBrandingErrorResponse returns new CreateBrandingErrorResponse from BrndNotFound.
+func NewBrndNotFoundCreateBrandingErrorResponse(v BrndNotFound) CreateBrandingErrorResponse {
+	var s CreateBrandingErrorResponse
+	s.SetBrndNotFound(v)
+	return s
+}
+
+// SetBrndPermissionDenied sets CreateBrandingErrorResponse to BrndPermissionDenied.
+func (s *CreateBrandingErrorResponse) SetBrndPermissionDenied(v BrndPermissionDenied) {
+	s.Type = BrndPermissionDeniedCreateBrandingErrorResponse
+	s.BrndPermissionDenied = v
+}
+
+// GetBrndPermissionDenied returns BrndPermissionDenied and true boolean if CreateBrandingErrorResponse is BrndPermissionDenied.
+func (s CreateBrandingErrorResponse) GetBrndPermissionDenied() (v BrndPermissionDenied, ok bool) {
+	if !s.IsBrndPermissionDenied() {
+		return v, false
+	}
+	return s.BrndPermissionDenied, true
+}
+
+// NewBrndPermissionDeniedCreateBrandingErrorResponse returns new CreateBrandingErrorResponse from BrndPermissionDenied.
+func NewBrndPermissionDeniedCreateBrandingErrorResponse(v BrndPermissionDenied) CreateBrandingErrorResponse {
+	var s CreateBrandingErrorResponse
+	s.SetBrndPermissionDenied(v)
+	return s
+}
+
+// SetEvtInvalid sets CreateBrandingErrorResponse to EvtInvalid.
+func (s *CreateBrandingErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateBrandingErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateBrandingErrorResponse is EvtInvalid.
+func (s CreateBrandingErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateBrandingErrorResponse returns new CreateBrandingErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateBrandingErrorResponse(v EvtInvalid) CreateBrandingErrorResponse {
+	var s CreateBrandingErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetInternal sets CreateBrandingErrorResponse to Internal.
+func (s *CreateBrandingErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateBrandingErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateBrandingErrorResponse is Internal.
+func (s CreateBrandingErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateBrandingErrorResponse returns new CreateBrandingErrorResponse from Internal.
+func NewInternalCreateBrandingErrorResponse(v Internal) CreateBrandingErrorResponse {
+	var s CreateBrandingErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets CreateBrandingErrorResponse to ReqInvalid.
+func (s *CreateBrandingErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateBrandingErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateBrandingErrorResponse is ReqInvalid.
+func (s CreateBrandingErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateBrandingErrorResponse returns new CreateBrandingErrorResponse from ReqInvalid.
+func NewReqInvalidCreateBrandingErrorResponse(v ReqInvalid) CreateBrandingErrorResponse {
+	var s CreateBrandingErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// CreateBrandingErrorResponseStatusCode wraps CreateBrandingErrorResponse with StatusCode.
+type CreateBrandingErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateBrandingErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateBrandingErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateBrandingErrorResponseStatusCode) GetResponse() CreateBrandingErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateBrandingErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateBrandingErrorResponseStatusCode) SetResponse(val CreateBrandingErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateBrandingErrorResponseStatusCode) createBrandingRes() {}
 
 // The deployment cannot be made, told apart by `code`; `req.invalid` is a
 // request the schema rejects.
@@ -11854,11 +12975,16 @@ func (*CreateDeploymentCreated) createDeploymentRes() {}
 type CreateDeploymentErrorResponse struct {
 	Type                CreateDeploymentErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
+	DepConflict         DepConflict
+	DepInvalid          DepInvalid
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	EnvProjectNotFound  EnvProjectNotFound
+	EvtInvalid          EvtInvalid
 	Internal            Internal
 	NotImplemented      NotImplemented
+	ProjNotFound        ProjNotFound
+	RelNotFound         RelNotFound
 	ReqInvalid          ReqInvalid
 }
 
@@ -11868,17 +12994,32 @@ type CreateDeploymentErrorResponseType string
 // Possible values for CreateDeploymentErrorResponseType.
 const (
 	AuthUnauthorizedCreateDeploymentErrorResponse    CreateDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.invalid"
 	DepNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "dep.not_found"
 	DepPermissionDeniedCreateDeploymentErrorResponse CreateDeploymentErrorResponseType = "dep.permission_denied"
 	EnvProjectNotFoundCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "evt.invalid"
 	InternalCreateDeploymentErrorResponse            CreateDeploymentErrorResponseType = "internal"
 	NotImplementedCreateDeploymentErrorResponse      CreateDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundCreateDeploymentErrorResponse        CreateDeploymentErrorResponseType = "proj.not_found"
+	RelNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "rel.not_found"
 	ReqInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether CreateDeploymentErrorResponse is AuthUnauthorized.
 func (s CreateDeploymentErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateDeploymentErrorResponse
+}
+
+// IsDepConflict reports whether CreateDeploymentErrorResponse is DepConflict.
+func (s CreateDeploymentErrorResponse) IsDepConflict() bool {
+	return s.Type == DepConflictCreateDeploymentErrorResponse
+}
+
+// IsDepInvalid reports whether CreateDeploymentErrorResponse is DepInvalid.
+func (s CreateDeploymentErrorResponse) IsDepInvalid() bool {
+	return s.Type == DepInvalidCreateDeploymentErrorResponse
 }
 
 // IsDepNotFound reports whether CreateDeploymentErrorResponse is DepNotFound.
@@ -11896,6 +13037,11 @@ func (s CreateDeploymentErrorResponse) IsEnvProjectNotFound() bool {
 	return s.Type == EnvProjectNotFoundCreateDeploymentErrorResponse
 }
 
+// IsEvtInvalid reports whether CreateDeploymentErrorResponse is EvtInvalid.
+func (s CreateDeploymentErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateDeploymentErrorResponse
+}
+
 // IsInternal reports whether CreateDeploymentErrorResponse is Internal.
 func (s CreateDeploymentErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateDeploymentErrorResponse
@@ -11904,6 +13050,16 @@ func (s CreateDeploymentErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether CreateDeploymentErrorResponse is NotImplemented.
 func (s CreateDeploymentErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedCreateDeploymentErrorResponse
+}
+
+// IsProjNotFound reports whether CreateDeploymentErrorResponse is ProjNotFound.
+func (s CreateDeploymentErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundCreateDeploymentErrorResponse
+}
+
+// IsRelNotFound reports whether CreateDeploymentErrorResponse is RelNotFound.
+func (s CreateDeploymentErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundCreateDeploymentErrorResponse
 }
 
 // IsReqInvalid reports whether CreateDeploymentErrorResponse is ReqInvalid.
@@ -11929,6 +13085,48 @@ func (s CreateDeploymentErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized
 func NewAuthUnauthorizedCreateDeploymentErrorResponse(v AuthUnauthorized) CreateDeploymentErrorResponse {
 	var s CreateDeploymentErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetDepConflict sets CreateDeploymentErrorResponse to DepConflict.
+func (s *CreateDeploymentErrorResponse) SetDepConflict(v DepConflict) {
+	s.Type = DepConflictCreateDeploymentErrorResponse
+	s.DepConflict = v
+}
+
+// GetDepConflict returns DepConflict and true boolean if CreateDeploymentErrorResponse is DepConflict.
+func (s CreateDeploymentErrorResponse) GetDepConflict() (v DepConflict, ok bool) {
+	if !s.IsDepConflict() {
+		return v, false
+	}
+	return s.DepConflict, true
+}
+
+// NewDepConflictCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from DepConflict.
+func NewDepConflictCreateDeploymentErrorResponse(v DepConflict) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetDepConflict(v)
+	return s
+}
+
+// SetDepInvalid sets CreateDeploymentErrorResponse to DepInvalid.
+func (s *CreateDeploymentErrorResponse) SetDepInvalid(v DepInvalid) {
+	s.Type = DepInvalidCreateDeploymentErrorResponse
+	s.DepInvalid = v
+}
+
+// GetDepInvalid returns DepInvalid and true boolean if CreateDeploymentErrorResponse is DepInvalid.
+func (s CreateDeploymentErrorResponse) GetDepInvalid() (v DepInvalid, ok bool) {
+	if !s.IsDepInvalid() {
+		return v, false
+	}
+	return s.DepInvalid, true
+}
+
+// NewDepInvalidCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from DepInvalid.
+func NewDepInvalidCreateDeploymentErrorResponse(v DepInvalid) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetDepInvalid(v)
 	return s
 }
 
@@ -11995,6 +13193,27 @@ func NewEnvProjectNotFoundCreateDeploymentErrorResponse(v EnvProjectNotFound) Cr
 	return s
 }
 
+// SetEvtInvalid sets CreateDeploymentErrorResponse to EvtInvalid.
+func (s *CreateDeploymentErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateDeploymentErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateDeploymentErrorResponse is EvtInvalid.
+func (s CreateDeploymentErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateDeploymentErrorResponse(v EvtInvalid) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets CreateDeploymentErrorResponse to Internal.
 func (s *CreateDeploymentErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalCreateDeploymentErrorResponse
@@ -12034,6 +13253,48 @@ func (s CreateDeploymentErrorResponse) GetNotImplemented() (v NotImplemented, ok
 func NewNotImplementedCreateDeploymentErrorResponse(v NotImplemented) CreateDeploymentErrorResponse {
 	var s CreateDeploymentErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjNotFound sets CreateDeploymentErrorResponse to ProjNotFound.
+func (s *CreateDeploymentErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundCreateDeploymentErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if CreateDeploymentErrorResponse is ProjNotFound.
+func (s CreateDeploymentErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from ProjNotFound.
+func NewProjNotFoundCreateDeploymentErrorResponse(v ProjNotFound) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetRelNotFound sets CreateDeploymentErrorResponse to RelNotFound.
+func (s *CreateDeploymentErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundCreateDeploymentErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if CreateDeploymentErrorResponse is RelNotFound.
+func (s CreateDeploymentErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from RelNotFound.
+func NewRelNotFoundCreateDeploymentErrorResponse(v RelNotFound) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetRelNotFound(v)
 	return s
 }
 
@@ -12192,6 +13453,14 @@ func (s *CreateDeploymentRequest) SetMessage(val OptString) {
 func (s *CreateDeploymentRequest) SetExpectedDeploymentID(val OptDeploymentID) {
 	s.ExpectedDeploymentID = val
 }
+
+type CreateFlowBadRequest ErrorDetails
+
+func (*CreateFlowBadRequest) createFlowRes() {}
+
+type CreateFlowConflict ErrorDetails
+
+func (*CreateFlowConflict) createFlowRes() {}
 
 // CreateFlowDefinitionErrorResponse represents sum type.
 type CreateFlowDefinitionErrorResponse struct {
@@ -12568,6 +13837,12 @@ type CreateFlowErrorResponse struct {
 	Internal               Internal
 	TknInvalid             TknInvalid
 	TknInvalidTknid        TknInvalidTknid
+	ProjNotFound           ProjNotFound
+	ProjOriginNotAllowed   ProjOriginNotAllowed
+	ProjPreviewNotLive     ProjPreviewNotLive
+	RelNotDeployed         RelNotDeployed
+	RelNotFound            RelNotFound
+	RelRevoked             RelRevoked
 	ReqInvalid             ReqInvalid
 	EncKeyUnknownAlg       EncKeyUnknownAlg
 }
@@ -12589,6 +13864,12 @@ const (
 	InternalCreateFlowErrorResponse               CreateFlowErrorResponseType = "internal"
 	TknInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "tkn.invalid"
 	TknInvalidTknidCreateFlowErrorResponse        CreateFlowErrorResponseType = "tkn.invalid_tknid"
+	ProjNotFoundCreateFlowErrorResponse           CreateFlowErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedCreateFlowErrorResponse   CreateFlowErrorResponseType = "proj.origin_not_allowed"
+	ProjPreviewNotLiveCreateFlowErrorResponse     CreateFlowErrorResponseType = "proj.preview_not_live"
+	RelNotDeployedCreateFlowErrorResponse         CreateFlowErrorResponseType = "rel.not_deployed"
+	RelNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "rel.not_found"
+	RelRevokedCreateFlowErrorResponse             CreateFlowErrorResponseType = "rel.revoked"
 	ReqInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateFlowErrorResponse       CreateFlowErrorResponseType = "enc_key.unknown_alg"
 )
@@ -12649,6 +13930,36 @@ func (s CreateFlowErrorResponse) IsTknInvalid() bool {
 // IsTknInvalidTknid reports whether CreateFlowErrorResponse is TknInvalidTknid.
 func (s CreateFlowErrorResponse) IsTknInvalidTknid() bool {
 	return s.Type == TknInvalidTknidCreateFlowErrorResponse
+}
+
+// IsProjNotFound reports whether CreateFlowErrorResponse is ProjNotFound.
+func (s CreateFlowErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundCreateFlowErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether CreateFlowErrorResponse is ProjOriginNotAllowed.
+func (s CreateFlowErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedCreateFlowErrorResponse
+}
+
+// IsProjPreviewNotLive reports whether CreateFlowErrorResponse is ProjPreviewNotLive.
+func (s CreateFlowErrorResponse) IsProjPreviewNotLive() bool {
+	return s.Type == ProjPreviewNotLiveCreateFlowErrorResponse
+}
+
+// IsRelNotDeployed reports whether CreateFlowErrorResponse is RelNotDeployed.
+func (s CreateFlowErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedCreateFlowErrorResponse
+}
+
+// IsRelNotFound reports whether CreateFlowErrorResponse is RelNotFound.
+func (s CreateFlowErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundCreateFlowErrorResponse
+}
+
+// IsRelRevoked reports whether CreateFlowErrorResponse is RelRevoked.
+func (s CreateFlowErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedCreateFlowErrorResponse
 }
 
 // IsReqInvalid reports whether CreateFlowErrorResponse is ReqInvalid.
@@ -12913,6 +14224,132 @@ func NewTknInvalidTknidCreateFlowErrorResponse(v TknInvalidTknid) CreateFlowErro
 	return s
 }
 
+// SetProjNotFound sets CreateFlowErrorResponse to ProjNotFound.
+func (s *CreateFlowErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundCreateFlowErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if CreateFlowErrorResponse is ProjNotFound.
+func (s CreateFlowErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from ProjNotFound.
+func NewProjNotFoundCreateFlowErrorResponse(v ProjNotFound) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets CreateFlowErrorResponse to ProjOriginNotAllowed.
+func (s *CreateFlowErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedCreateFlowErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if CreateFlowErrorResponse is ProjOriginNotAllowed.
+func (s CreateFlowErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedCreateFlowErrorResponse returns new CreateFlowErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedCreateFlowErrorResponse(v ProjOriginNotAllowed) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
+// SetProjPreviewNotLive sets CreateFlowErrorResponse to ProjPreviewNotLive.
+func (s *CreateFlowErrorResponse) SetProjPreviewNotLive(v ProjPreviewNotLive) {
+	s.Type = ProjPreviewNotLiveCreateFlowErrorResponse
+	s.ProjPreviewNotLive = v
+}
+
+// GetProjPreviewNotLive returns ProjPreviewNotLive and true boolean if CreateFlowErrorResponse is ProjPreviewNotLive.
+func (s CreateFlowErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, ok bool) {
+	if !s.IsProjPreviewNotLive() {
+		return v, false
+	}
+	return s.ProjPreviewNotLive, true
+}
+
+// NewProjPreviewNotLiveCreateFlowErrorResponse returns new CreateFlowErrorResponse from ProjPreviewNotLive.
+func NewProjPreviewNotLiveCreateFlowErrorResponse(v ProjPreviewNotLive) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNotDeployed sets CreateFlowErrorResponse to RelNotDeployed.
+func (s *CreateFlowErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedCreateFlowErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if CreateFlowErrorResponse is RelNotDeployed.
+func (s CreateFlowErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedCreateFlowErrorResponse returns new CreateFlowErrorResponse from RelNotDeployed.
+func NewRelNotDeployedCreateFlowErrorResponse(v RelNotDeployed) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetRelNotDeployed(v)
+	return s
+}
+
+// SetRelNotFound sets CreateFlowErrorResponse to RelNotFound.
+func (s *CreateFlowErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundCreateFlowErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if CreateFlowErrorResponse is RelNotFound.
+func (s CreateFlowErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from RelNotFound.
+func NewRelNotFoundCreateFlowErrorResponse(v RelNotFound) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets CreateFlowErrorResponse to RelRevoked.
+func (s *CreateFlowErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedCreateFlowErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if CreateFlowErrorResponse is RelRevoked.
+func (s CreateFlowErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedCreateFlowErrorResponse returns new CreateFlowErrorResponse from RelRevoked.
+func NewRelRevokedCreateFlowErrorResponse(v RelRevoked) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetRelRevoked(v)
+	return s
+}
+
 // SetReqInvalid sets CreateFlowErrorResponse to ReqInvalid.
 func (s *CreateFlowErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateFlowErrorResponse
@@ -12983,6 +14420,10 @@ func (s *CreateFlowErrorResponseStatusCode) SetResponse(val CreateFlowErrorRespo
 
 func (*CreateFlowErrorResponseStatusCode) createFlowRes() {}
 
+type CreateFlowForbidden ErrorDetails
+
+func (*CreateFlowForbidden) createFlowRes() {}
+
 // Ref: #
 type CreateFlowRequest struct {
 	ProjectID ProjectID                `json:"project_id"`
@@ -13001,7 +14442,9 @@ type CreateFlowRequest struct {
 	ChallengeNonce OptChallengeNonce `json:"challenge_nonce"`
 	// Existing session to attach to (for step-up / reauth).
 	// Omit to let the flow create a new session implicitly.
-	SessionID OptString `json:"session_id"`
+	// Requires `session_token`.
+	SessionID    OptString            `json:"session_id"`
+	SessionToken OptSessionProofToken `json:"session_token"`
 	// OIDC/SAML auth request ID (links flow to protocol request).
 	AuthRequestID OptString   `json:"auth_request_id"`
 	RedirectURI   OptURI      `json:"redirect_uri"`
@@ -13041,6 +14484,11 @@ func (s *CreateFlowRequest) GetChallengeNonce() OptChallengeNonce {
 // GetSessionID returns the value of SessionID.
 func (s *CreateFlowRequest) GetSessionID() OptString {
 	return s.SessionID
+}
+
+// GetSessionToken returns the value of SessionToken.
+func (s *CreateFlowRequest) GetSessionToken() OptSessionProofToken {
+	return s.SessionToken
 }
 
 // GetAuthRequestID returns the value of AuthRequestID.
@@ -13091,6 +14539,11 @@ func (s *CreateFlowRequest) SetChallengeNonce(val OptChallengeNonce) {
 // SetSessionID sets the value of SessionID.
 func (s *CreateFlowRequest) SetSessionID(val OptString) {
 	s.SessionID = val
+}
+
+// SetSessionToken sets the value of SessionToken.
+func (s *CreateFlowRequest) SetSessionToken(val OptSessionProofToken) {
+	s.SessionToken = val
 }
 
 // SetAuthRequestID sets the value of AuthRequestID.
@@ -16204,6 +17657,324 @@ type CreateTeamConflict ErrorDetails
 
 func (*CreateTeamConflict) createTeamRes() {}
 
+// CreateTeamErrorResponse represents sum type.
+type CreateTeamErrorResponse struct {
+	Type                 CreateTeamErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
+	AuthUnauthorized     AuthUnauthorized
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+	TeamAlreadyExists    TeamAlreadyExists
+	TeamNameInvalid      TeamNameInvalid
+	TeamTeamNotFound     TeamTeamNotFound
+	TeamPermissionDenied TeamPermissionDenied
+	TeamProjectNotFound  TeamProjectNotFound
+}
+
+// CreateTeamErrorResponseType is oneOf type of CreateTeamErrorResponse.
+type CreateTeamErrorResponseType string
+
+// Possible values for CreateTeamErrorResponseType.
+const (
+	AuthCsrfInvalidCreateTeamErrorResponse      CreateTeamErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedCreateTeamErrorResponse     CreateTeamErrorResponseType = "auth.unauthorized"
+	EvtInvalidCreateTeamErrorResponse           CreateTeamErrorResponseType = "evt.invalid"
+	InternalCreateTeamErrorResponse             CreateTeamErrorResponseType = "internal"
+	ReqInvalidCreateTeamErrorResponse           CreateTeamErrorResponseType = "req.invalid"
+	TeamAlreadyExistsCreateTeamErrorResponse    CreateTeamErrorResponseType = "team.already_exists"
+	TeamNameInvalidCreateTeamErrorResponse      CreateTeamErrorResponseType = "team.name_invalid"
+	TeamTeamNotFoundCreateTeamErrorResponse     CreateTeamErrorResponseType = "team.team_not_found"
+	TeamPermissionDeniedCreateTeamErrorResponse CreateTeamErrorResponseType = "team.permission_denied"
+	TeamProjectNotFoundCreateTeamErrorResponse  CreateTeamErrorResponseType = "team.project_not_found"
+)
+
+// IsAuthCsrfInvalid reports whether CreateTeamErrorResponse is AuthCsrfInvalid.
+func (s CreateTeamErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidCreateTeamErrorResponse
+}
+
+// IsAuthUnauthorized reports whether CreateTeamErrorResponse is AuthUnauthorized.
+func (s CreateTeamErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedCreateTeamErrorResponse
+}
+
+// IsEvtInvalid reports whether CreateTeamErrorResponse is EvtInvalid.
+func (s CreateTeamErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateTeamErrorResponse
+}
+
+// IsInternal reports whether CreateTeamErrorResponse is Internal.
+func (s CreateTeamErrorResponse) IsInternal() bool { return s.Type == InternalCreateTeamErrorResponse }
+
+// IsReqInvalid reports whether CreateTeamErrorResponse is ReqInvalid.
+func (s CreateTeamErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateTeamErrorResponse
+}
+
+// IsTeamAlreadyExists reports whether CreateTeamErrorResponse is TeamAlreadyExists.
+func (s CreateTeamErrorResponse) IsTeamAlreadyExists() bool {
+	return s.Type == TeamAlreadyExistsCreateTeamErrorResponse
+}
+
+// IsTeamNameInvalid reports whether CreateTeamErrorResponse is TeamNameInvalid.
+func (s CreateTeamErrorResponse) IsTeamNameInvalid() bool {
+	return s.Type == TeamNameInvalidCreateTeamErrorResponse
+}
+
+// IsTeamTeamNotFound reports whether CreateTeamErrorResponse is TeamTeamNotFound.
+func (s CreateTeamErrorResponse) IsTeamTeamNotFound() bool {
+	return s.Type == TeamTeamNotFoundCreateTeamErrorResponse
+}
+
+// IsTeamPermissionDenied reports whether CreateTeamErrorResponse is TeamPermissionDenied.
+func (s CreateTeamErrorResponse) IsTeamPermissionDenied() bool {
+	return s.Type == TeamPermissionDeniedCreateTeamErrorResponse
+}
+
+// IsTeamProjectNotFound reports whether CreateTeamErrorResponse is TeamProjectNotFound.
+func (s CreateTeamErrorResponse) IsTeamProjectNotFound() bool {
+	return s.Type == TeamProjectNotFoundCreateTeamErrorResponse
+}
+
+// SetAuthCsrfInvalid sets CreateTeamErrorResponse to AuthCsrfInvalid.
+func (s *CreateTeamErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidCreateTeamErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if CreateTeamErrorResponse is AuthCsrfInvalid.
+func (s CreateTeamErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidCreateTeamErrorResponse returns new CreateTeamErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidCreateTeamErrorResponse(v AuthCsrfInvalid) CreateTeamErrorResponse {
+	var s CreateTeamErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets CreateTeamErrorResponse to AuthUnauthorized.
+func (s *CreateTeamErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedCreateTeamErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateTeamErrorResponse is AuthUnauthorized.
+func (s CreateTeamErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedCreateTeamErrorResponse returns new CreateTeamErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedCreateTeamErrorResponse(v AuthUnauthorized) CreateTeamErrorResponse {
+	var s CreateTeamErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets CreateTeamErrorResponse to EvtInvalid.
+func (s *CreateTeamErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateTeamErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateTeamErrorResponse is EvtInvalid.
+func (s CreateTeamErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateTeamErrorResponse returns new CreateTeamErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateTeamErrorResponse(v EvtInvalid) CreateTeamErrorResponse {
+	var s CreateTeamErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetInternal sets CreateTeamErrorResponse to Internal.
+func (s *CreateTeamErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateTeamErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateTeamErrorResponse is Internal.
+func (s CreateTeamErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateTeamErrorResponse returns new CreateTeamErrorResponse from Internal.
+func NewInternalCreateTeamErrorResponse(v Internal) CreateTeamErrorResponse {
+	var s CreateTeamErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets CreateTeamErrorResponse to ReqInvalid.
+func (s *CreateTeamErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateTeamErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateTeamErrorResponse is ReqInvalid.
+func (s CreateTeamErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateTeamErrorResponse returns new CreateTeamErrorResponse from ReqInvalid.
+func NewReqInvalidCreateTeamErrorResponse(v ReqInvalid) CreateTeamErrorResponse {
+	var s CreateTeamErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetTeamAlreadyExists sets CreateTeamErrorResponse to TeamAlreadyExists.
+func (s *CreateTeamErrorResponse) SetTeamAlreadyExists(v TeamAlreadyExists) {
+	s.Type = TeamAlreadyExistsCreateTeamErrorResponse
+	s.TeamAlreadyExists = v
+}
+
+// GetTeamAlreadyExists returns TeamAlreadyExists and true boolean if CreateTeamErrorResponse is TeamAlreadyExists.
+func (s CreateTeamErrorResponse) GetTeamAlreadyExists() (v TeamAlreadyExists, ok bool) {
+	if !s.IsTeamAlreadyExists() {
+		return v, false
+	}
+	return s.TeamAlreadyExists, true
+}
+
+// NewTeamAlreadyExistsCreateTeamErrorResponse returns new CreateTeamErrorResponse from TeamAlreadyExists.
+func NewTeamAlreadyExistsCreateTeamErrorResponse(v TeamAlreadyExists) CreateTeamErrorResponse {
+	var s CreateTeamErrorResponse
+	s.SetTeamAlreadyExists(v)
+	return s
+}
+
+// SetTeamNameInvalid sets CreateTeamErrorResponse to TeamNameInvalid.
+func (s *CreateTeamErrorResponse) SetTeamNameInvalid(v TeamNameInvalid) {
+	s.Type = TeamNameInvalidCreateTeamErrorResponse
+	s.TeamNameInvalid = v
+}
+
+// GetTeamNameInvalid returns TeamNameInvalid and true boolean if CreateTeamErrorResponse is TeamNameInvalid.
+func (s CreateTeamErrorResponse) GetTeamNameInvalid() (v TeamNameInvalid, ok bool) {
+	if !s.IsTeamNameInvalid() {
+		return v, false
+	}
+	return s.TeamNameInvalid, true
+}
+
+// NewTeamNameInvalidCreateTeamErrorResponse returns new CreateTeamErrorResponse from TeamNameInvalid.
+func NewTeamNameInvalidCreateTeamErrorResponse(v TeamNameInvalid) CreateTeamErrorResponse {
+	var s CreateTeamErrorResponse
+	s.SetTeamNameInvalid(v)
+	return s
+}
+
+// SetTeamTeamNotFound sets CreateTeamErrorResponse to TeamTeamNotFound.
+func (s *CreateTeamErrorResponse) SetTeamTeamNotFound(v TeamTeamNotFound) {
+	s.Type = TeamTeamNotFoundCreateTeamErrorResponse
+	s.TeamTeamNotFound = v
+}
+
+// GetTeamTeamNotFound returns TeamTeamNotFound and true boolean if CreateTeamErrorResponse is TeamTeamNotFound.
+func (s CreateTeamErrorResponse) GetTeamTeamNotFound() (v TeamTeamNotFound, ok bool) {
+	if !s.IsTeamTeamNotFound() {
+		return v, false
+	}
+	return s.TeamTeamNotFound, true
+}
+
+// NewTeamTeamNotFoundCreateTeamErrorResponse returns new CreateTeamErrorResponse from TeamTeamNotFound.
+func NewTeamTeamNotFoundCreateTeamErrorResponse(v TeamTeamNotFound) CreateTeamErrorResponse {
+	var s CreateTeamErrorResponse
+	s.SetTeamTeamNotFound(v)
+	return s
+}
+
+// SetTeamPermissionDenied sets CreateTeamErrorResponse to TeamPermissionDenied.
+func (s *CreateTeamErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
+	s.Type = TeamPermissionDeniedCreateTeamErrorResponse
+	s.TeamPermissionDenied = v
+}
+
+// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if CreateTeamErrorResponse is TeamPermissionDenied.
+func (s CreateTeamErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
+	if !s.IsTeamPermissionDenied() {
+		return v, false
+	}
+	return s.TeamPermissionDenied, true
+}
+
+// NewTeamPermissionDeniedCreateTeamErrorResponse returns new CreateTeamErrorResponse from TeamPermissionDenied.
+func NewTeamPermissionDeniedCreateTeamErrorResponse(v TeamPermissionDenied) CreateTeamErrorResponse {
+	var s CreateTeamErrorResponse
+	s.SetTeamPermissionDenied(v)
+	return s
+}
+
+// SetTeamProjectNotFound sets CreateTeamErrorResponse to TeamProjectNotFound.
+func (s *CreateTeamErrorResponse) SetTeamProjectNotFound(v TeamProjectNotFound) {
+	s.Type = TeamProjectNotFoundCreateTeamErrorResponse
+	s.TeamProjectNotFound = v
+}
+
+// GetTeamProjectNotFound returns TeamProjectNotFound and true boolean if CreateTeamErrorResponse is TeamProjectNotFound.
+func (s CreateTeamErrorResponse) GetTeamProjectNotFound() (v TeamProjectNotFound, ok bool) {
+	if !s.IsTeamProjectNotFound() {
+		return v, false
+	}
+	return s.TeamProjectNotFound, true
+}
+
+// NewTeamProjectNotFoundCreateTeamErrorResponse returns new CreateTeamErrorResponse from TeamProjectNotFound.
+func NewTeamProjectNotFoundCreateTeamErrorResponse(v TeamProjectNotFound) CreateTeamErrorResponse {
+	var s CreateTeamErrorResponse
+	s.SetTeamProjectNotFound(v)
+	return s
+}
+
+// CreateTeamErrorResponseStatusCode wraps CreateTeamErrorResponse with StatusCode.
+type CreateTeamErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateTeamErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateTeamErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateTeamErrorResponseStatusCode) GetResponse() CreateTeamErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateTeamErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateTeamErrorResponseStatusCode) SetResponse(val CreateTeamErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateTeamErrorResponseStatusCode) createTeamRes() {}
+
 type CreateTeamForbidden ErrorDetails
 
 func (*CreateTeamForbidden) createTeamRes() {}
@@ -16905,6 +18676,240 @@ type DeleteTeamConflict ErrorDetails
 
 func (*DeleteTeamConflict) deleteTeamRes() {}
 
+// DeleteTeamErrorResponse represents sum type.
+type DeleteTeamErrorResponse struct {
+	Type                 DeleteTeamErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+	TeamTeamNotFound     TeamTeamNotFound
+	TeamOwnsProject      TeamOwnsProject
+	TeamPermissionDenied TeamPermissionDenied
+}
+
+// DeleteTeamErrorResponseType is oneOf type of DeleteTeamErrorResponse.
+type DeleteTeamErrorResponseType string
+
+// Possible values for DeleteTeamErrorResponseType.
+const (
+	AuthUnauthorizedDeleteTeamErrorResponse     DeleteTeamErrorResponseType = "auth.unauthorized"
+	EvtInvalidDeleteTeamErrorResponse           DeleteTeamErrorResponseType = "evt.invalid"
+	InternalDeleteTeamErrorResponse             DeleteTeamErrorResponseType = "internal"
+	ReqInvalidDeleteTeamErrorResponse           DeleteTeamErrorResponseType = "req.invalid"
+	TeamTeamNotFoundDeleteTeamErrorResponse     DeleteTeamErrorResponseType = "team.team_not_found"
+	TeamOwnsProjectDeleteTeamErrorResponse      DeleteTeamErrorResponseType = "team.owns_project"
+	TeamPermissionDeniedDeleteTeamErrorResponse DeleteTeamErrorResponseType = "team.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether DeleteTeamErrorResponse is AuthUnauthorized.
+func (s DeleteTeamErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedDeleteTeamErrorResponse
+}
+
+// IsEvtInvalid reports whether DeleteTeamErrorResponse is EvtInvalid.
+func (s DeleteTeamErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidDeleteTeamErrorResponse
+}
+
+// IsInternal reports whether DeleteTeamErrorResponse is Internal.
+func (s DeleteTeamErrorResponse) IsInternal() bool { return s.Type == InternalDeleteTeamErrorResponse }
+
+// IsReqInvalid reports whether DeleteTeamErrorResponse is ReqInvalid.
+func (s DeleteTeamErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidDeleteTeamErrorResponse
+}
+
+// IsTeamTeamNotFound reports whether DeleteTeamErrorResponse is TeamTeamNotFound.
+func (s DeleteTeamErrorResponse) IsTeamTeamNotFound() bool {
+	return s.Type == TeamTeamNotFoundDeleteTeamErrorResponse
+}
+
+// IsTeamOwnsProject reports whether DeleteTeamErrorResponse is TeamOwnsProject.
+func (s DeleteTeamErrorResponse) IsTeamOwnsProject() bool {
+	return s.Type == TeamOwnsProjectDeleteTeamErrorResponse
+}
+
+// IsTeamPermissionDenied reports whether DeleteTeamErrorResponse is TeamPermissionDenied.
+func (s DeleteTeamErrorResponse) IsTeamPermissionDenied() bool {
+	return s.Type == TeamPermissionDeniedDeleteTeamErrorResponse
+}
+
+// SetAuthUnauthorized sets DeleteTeamErrorResponse to AuthUnauthorized.
+func (s *DeleteTeamErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedDeleteTeamErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if DeleteTeamErrorResponse is AuthUnauthorized.
+func (s DeleteTeamErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedDeleteTeamErrorResponse returns new DeleteTeamErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedDeleteTeamErrorResponse(v AuthUnauthorized) DeleteTeamErrorResponse {
+	var s DeleteTeamErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets DeleteTeamErrorResponse to EvtInvalid.
+func (s *DeleteTeamErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidDeleteTeamErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if DeleteTeamErrorResponse is EvtInvalid.
+func (s DeleteTeamErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidDeleteTeamErrorResponse returns new DeleteTeamErrorResponse from EvtInvalid.
+func NewEvtInvalidDeleteTeamErrorResponse(v EvtInvalid) DeleteTeamErrorResponse {
+	var s DeleteTeamErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetInternal sets DeleteTeamErrorResponse to Internal.
+func (s *DeleteTeamErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalDeleteTeamErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if DeleteTeamErrorResponse is Internal.
+func (s DeleteTeamErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalDeleteTeamErrorResponse returns new DeleteTeamErrorResponse from Internal.
+func NewInternalDeleteTeamErrorResponse(v Internal) DeleteTeamErrorResponse {
+	var s DeleteTeamErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets DeleteTeamErrorResponse to ReqInvalid.
+func (s *DeleteTeamErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidDeleteTeamErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if DeleteTeamErrorResponse is ReqInvalid.
+func (s DeleteTeamErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidDeleteTeamErrorResponse returns new DeleteTeamErrorResponse from ReqInvalid.
+func NewReqInvalidDeleteTeamErrorResponse(v ReqInvalid) DeleteTeamErrorResponse {
+	var s DeleteTeamErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetTeamTeamNotFound sets DeleteTeamErrorResponse to TeamTeamNotFound.
+func (s *DeleteTeamErrorResponse) SetTeamTeamNotFound(v TeamTeamNotFound) {
+	s.Type = TeamTeamNotFoundDeleteTeamErrorResponse
+	s.TeamTeamNotFound = v
+}
+
+// GetTeamTeamNotFound returns TeamTeamNotFound and true boolean if DeleteTeamErrorResponse is TeamTeamNotFound.
+func (s DeleteTeamErrorResponse) GetTeamTeamNotFound() (v TeamTeamNotFound, ok bool) {
+	if !s.IsTeamTeamNotFound() {
+		return v, false
+	}
+	return s.TeamTeamNotFound, true
+}
+
+// NewTeamTeamNotFoundDeleteTeamErrorResponse returns new DeleteTeamErrorResponse from TeamTeamNotFound.
+func NewTeamTeamNotFoundDeleteTeamErrorResponse(v TeamTeamNotFound) DeleteTeamErrorResponse {
+	var s DeleteTeamErrorResponse
+	s.SetTeamTeamNotFound(v)
+	return s
+}
+
+// SetTeamOwnsProject sets DeleteTeamErrorResponse to TeamOwnsProject.
+func (s *DeleteTeamErrorResponse) SetTeamOwnsProject(v TeamOwnsProject) {
+	s.Type = TeamOwnsProjectDeleteTeamErrorResponse
+	s.TeamOwnsProject = v
+}
+
+// GetTeamOwnsProject returns TeamOwnsProject and true boolean if DeleteTeamErrorResponse is TeamOwnsProject.
+func (s DeleteTeamErrorResponse) GetTeamOwnsProject() (v TeamOwnsProject, ok bool) {
+	if !s.IsTeamOwnsProject() {
+		return v, false
+	}
+	return s.TeamOwnsProject, true
+}
+
+// NewTeamOwnsProjectDeleteTeamErrorResponse returns new DeleteTeamErrorResponse from TeamOwnsProject.
+func NewTeamOwnsProjectDeleteTeamErrorResponse(v TeamOwnsProject) DeleteTeamErrorResponse {
+	var s DeleteTeamErrorResponse
+	s.SetTeamOwnsProject(v)
+	return s
+}
+
+// SetTeamPermissionDenied sets DeleteTeamErrorResponse to TeamPermissionDenied.
+func (s *DeleteTeamErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
+	s.Type = TeamPermissionDeniedDeleteTeamErrorResponse
+	s.TeamPermissionDenied = v
+}
+
+// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if DeleteTeamErrorResponse is TeamPermissionDenied.
+func (s DeleteTeamErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
+	if !s.IsTeamPermissionDenied() {
+		return v, false
+	}
+	return s.TeamPermissionDenied, true
+}
+
+// NewTeamPermissionDeniedDeleteTeamErrorResponse returns new DeleteTeamErrorResponse from TeamPermissionDenied.
+func NewTeamPermissionDeniedDeleteTeamErrorResponse(v TeamPermissionDenied) DeleteTeamErrorResponse {
+	var s DeleteTeamErrorResponse
+	s.SetTeamPermissionDenied(v)
+	return s
+}
+
+// DeleteTeamErrorResponseStatusCode wraps DeleteTeamErrorResponse with StatusCode.
+type DeleteTeamErrorResponseStatusCode struct {
+	StatusCode int
+	Response   DeleteTeamErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *DeleteTeamErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *DeleteTeamErrorResponseStatusCode) GetResponse() DeleteTeamErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *DeleteTeamErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *DeleteTeamErrorResponseStatusCode) SetResponse(val DeleteTeamErrorResponse) {
+	s.Response = val
+}
+
+func (*DeleteTeamErrorResponseStatusCode) deleteTeamRes() {}
+
 type DeleteTeamForbidden ErrorDetails
 
 func (*DeleteTeamForbidden) deleteTeamRes() {}
@@ -17379,6 +19384,59 @@ func (*DeleteVariableErrorResponseStatusCode) deleteVariableRes() {}
 type DeleteVariableNoContent struct{}
 
 func (*DeleteVariableNoContent) deleteVariableRes() {}
+
+// Merged schema.
+// Ref: #
+type DepConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptDepConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *DepConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *DepConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *DepConflict) GetDetails() OptDepConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *DepConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *DepConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *DepConflict) SetDetails(val OptDepConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type DepConflictDetails map[string]jx.Raw
+
+func (s *DepConflictDetails) init() DepConflictDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // Merged schema.
 // Ref: #
@@ -19041,17 +21099,22 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 
 func (*ErrorDetails) createBrandingRes()       {}
 func (*ErrorDetails) createFlowDefinitionRes() {}
-func (*ErrorDetails) createFlowRes()           {}
+func (*ErrorDetails) createHandoffRes()        {}
 func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
+func (*ErrorDetails) getAuthAttemptRes()       {}
 func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
+func (*ErrorDetails) issueChallengeRes()       {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
+func (*ErrorDetails) listMyIdentityLinksRes()  {}
+func (*ErrorDetails) listMyPasskeysRes()       {}
 func (*ErrorDetails) listMyTeamsRes()          {}
 func (*ErrorDetails) revokeMySessionRes()      {}
 func (*ErrorDetails) rollbackDeploymentRes()   {}
 func (*ErrorDetails) submitFlowStepRes()       {}
+func (*ErrorDetails) verifyChallengeProofRes() {}
 
 // Additional error-specific context.
 type ErrorDetailsDetails map[string]jx.Raw
@@ -19091,23 +21154,9 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 	s.Response = val
 }
 
-func (*ErrorDetailsStatusCode) completeClaimRes()   {}
-func (*ErrorDetailsStatusCode) createBrandingRes()  {}
-func (*ErrorDetailsStatusCode) createTeamRes()      {}
-func (*ErrorDetailsStatusCode) deleteTeamRes()      {}
-func (*ErrorDetailsStatusCode) getBrandingByIdRes() {}
-func (*ErrorDetailsStatusCode) getClaimStatusRes()  {}
-func (*ErrorDetailsStatusCode) getClaimWindowRes()  {}
-func (*ErrorDetailsStatusCode) getEventRes()        {}
-func (*ErrorDetailsStatusCode) getHealthRes()       {}
-func (*ErrorDetailsStatusCode) getLiveRes()         {}
-func (*ErrorDetailsStatusCode) getReadyRes()        {}
-func (*ErrorDetailsStatusCode) getTeamRes()         {}
-func (*ErrorDetailsStatusCode) initClaimRes()       {}
-func (*ErrorDetailsStatusCode) listBrandingRes()    {}
-func (*ErrorDetailsStatusCode) listEventsRes()      {}
-func (*ErrorDetailsStatusCode) queryTeamsRes()      {}
-func (*ErrorDetailsStatusCode) updateTeamRes()      {}
+func (*ErrorDetailsStatusCode) getHealthRes() {}
+func (*ErrorDetailsStatusCode) getLiveRes()   {}
+func (*ErrorDetailsStatusCode) getReadyRes()  {}
 
 // Discriminated wide-event union (ADR 048 / ADR 049). Clients select the
 // member via event_type; each member carries a typed payload.
@@ -19138,6 +21187,8 @@ type Event struct {
 	IdpUpdatedEvent                 IdpUpdatedEvent
 	OriginAddedEvent                OriginAddedEvent
 	OriginRemovedEvent              OriginRemovedEvent
+	PolicyCreatedEvent              PolicyCreatedEvent
+	PolicyUpdatedEvent              PolicyUpdatedEvent
 	ProjectCreatedEvent             ProjectCreatedEvent
 	ProjectDeletedEvent             ProjectDeletedEvent
 	ProjectUpdatedEvent             ProjectUpdatedEvent
@@ -19186,6 +21237,8 @@ const (
 	IdpUpdatedEventEvent                 EventType = "idp.updated"
 	OriginAddedEventEvent                EventType = "origin.added"
 	OriginRemovedEventEvent              EventType = "origin.removed"
+	PolicyCreatedEventEvent              EventType = "policy.created"
+	PolicyUpdatedEventEvent              EventType = "policy.updated"
 	ProjectCreatedEventEvent             EventType = "project.created"
 	ProjectDeletedEventEvent             EventType = "project.deleted"
 	ProjectUpdatedEventEvent             EventType = "project.updated"
@@ -19282,6 +21335,12 @@ func (s Event) IsOriginAddedEvent() bool { return s.Type == OriginAddedEventEven
 
 // IsOriginRemovedEvent reports whether Event is OriginRemovedEvent.
 func (s Event) IsOriginRemovedEvent() bool { return s.Type == OriginRemovedEventEvent }
+
+// IsPolicyCreatedEvent reports whether Event is PolicyCreatedEvent.
+func (s Event) IsPolicyCreatedEvent() bool { return s.Type == PolicyCreatedEventEvent }
+
+// IsPolicyUpdatedEvent reports whether Event is PolicyUpdatedEvent.
+func (s Event) IsPolicyUpdatedEvent() bool { return s.Type == PolicyUpdatedEventEvent }
 
 // IsProjectCreatedEvent reports whether Event is ProjectCreatedEvent.
 func (s Event) IsProjectCreatedEvent() bool { return s.Type == ProjectCreatedEventEvent }
@@ -19820,6 +21879,48 @@ func NewOriginRemovedEventEvent(v OriginRemovedEvent) Event {
 	return s
 }
 
+// SetPolicyCreatedEvent sets Event to PolicyCreatedEvent.
+func (s *Event) SetPolicyCreatedEvent(v PolicyCreatedEvent) {
+	s.Type = PolicyCreatedEventEvent
+	s.PolicyCreatedEvent = v
+}
+
+// GetPolicyCreatedEvent returns PolicyCreatedEvent and true boolean if Event is PolicyCreatedEvent.
+func (s Event) GetPolicyCreatedEvent() (v PolicyCreatedEvent, ok bool) {
+	if !s.IsPolicyCreatedEvent() {
+		return v, false
+	}
+	return s.PolicyCreatedEvent, true
+}
+
+// NewPolicyCreatedEventEvent returns new Event from PolicyCreatedEvent.
+func NewPolicyCreatedEventEvent(v PolicyCreatedEvent) Event {
+	var s Event
+	s.SetPolicyCreatedEvent(v)
+	return s
+}
+
+// SetPolicyUpdatedEvent sets Event to PolicyUpdatedEvent.
+func (s *Event) SetPolicyUpdatedEvent(v PolicyUpdatedEvent) {
+	s.Type = PolicyUpdatedEventEvent
+	s.PolicyUpdatedEvent = v
+}
+
+// GetPolicyUpdatedEvent returns PolicyUpdatedEvent and true boolean if Event is PolicyUpdatedEvent.
+func (s Event) GetPolicyUpdatedEvent() (v PolicyUpdatedEvent, ok bool) {
+	if !s.IsPolicyUpdatedEvent() {
+		return v, false
+	}
+	return s.PolicyUpdatedEvent, true
+}
+
+// NewPolicyUpdatedEventEvent returns new Event from PolicyUpdatedEvent.
+func NewPolicyUpdatedEventEvent(v PolicyUpdatedEvent) Event {
+	var s Event
+	s.SetPolicyUpdatedEvent(v)
+	return s
+}
+
 // SetProjectCreatedEvent sets Event to ProjectCreatedEvent.
 func (s *Event) SetProjectCreatedEvent(v ProjectCreatedEvent) {
 	s.Type = ProjectCreatedEventEvent
@@ -20334,9 +22435,119 @@ func (s *EvtInvalidDetails) init() EvtInvalidDetails {
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type EvtNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptEvtNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *EvtNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *EvtNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *EvtNotFound) GetDetails() OptEvtNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *EvtNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *EvtNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *EvtNotFound) SetDetails(val OptEvtNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type EvtNotFoundDetails map[string]jx.Raw
+
+func (s *EvtNotFoundDetails) init() EvtNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type EvtPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptEvtPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *EvtPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *EvtPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *EvtPermissionDenied) GetDetails() OptEvtPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *EvtPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *EvtPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *EvtPermissionDenied) SetDetails(val OptEvtPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type EvtPermissionDeniedDetails map[string]jx.Raw
+
+func (s *EvtPermissionDeniedDetails) init() EvtPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 type ExchangeHandoffBadRequest ErrorDetails
 
 func (*ExchangeHandoffBadRequest) exchangeHandoffRes() {}
+
+type ExchangeHandoffConflict ErrorDetails
+
+func (*ExchangeHandoffConflict) exchangeHandoffRes() {}
 
 // ExchangeHandoffErrorResponse represents sum type.
 type ExchangeHandoffErrorResponse struct {
@@ -20797,6 +23008,10 @@ func (s *ExchangeHandoffErrorResponseStatusCode) SetResponse(val ExchangeHandoff
 }
 
 func (*ExchangeHandoffErrorResponseStatusCode) exchangeHandoffRes() {}
+
+type ExchangeHandoffForbidden ErrorDetails
+
+func (*ExchangeHandoffForbidden) exchangeHandoffRes() {}
 
 type ExchangeHandoffUnauthorized ErrorDetails
 
@@ -21504,23 +23719,24 @@ func (*FinishUserPasskeyRegistrationBadRequest) finishUserPasskeyRegistrationRes
 
 // FinishUserPasskeyRegistrationErrorResponse represents sum type.
 type FinishUserPasskeyRegistrationErrorResponse struct {
-	Type                 FinishUserPasskeyRegistrationErrorResponseType // switch on this field
-	AttAlreadyHandedOff  AttAlreadyHandedOff
-	AttInvalidProof      AttInvalidProof
-	AttInvalidRequest    AttInvalidRequest
-	AttInvalidState      AttInvalidState
-	AttNotFound          AttNotFound
-	AttProofRejected     AttProofRejected
-	AttStaleChallenge    AttStaleChallenge
-	AuthUnauthorized     AuthUnauthorized
-	EvtInvalid           EvtInvalid
-	Internal             Internal
-	ReqInvalid           ReqInvalid
-	UserInvalid          UserInvalid
-	UserNotFound         UserNotFound
-	UserPasswordEmpty    UserPasswordEmpty
-	UserPasswordTooLong  UserPasswordTooLong
-	UserPermissionDenied UserPermissionDenied
+	Type                        FinishUserPasskeyRegistrationErrorResponseType // switch on this field
+	AttAlreadyHandedOff         AttAlreadyHandedOff
+	AttInvalidProof             AttInvalidProof
+	AttInvalidRequest           AttInvalidRequest
+	AttInvalidState             AttInvalidState
+	AttNotFound                 AttNotFound
+	AttProofRejected            AttProofRejected
+	AttStaleChallenge           AttStaleChallenge
+	AuthUnauthorized            AuthUnauthorized
+	EvtInvalid                  EvtInvalid
+	Internal                    Internal
+	ReqInvalid                  ReqInvalid
+	UserInvalid                 UserInvalid
+	UserNotFound                UserNotFound
+	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordPolicyViolation UserPasswordPolicyViolation
+	UserPasswordTooLong         UserPasswordTooLong
+	UserPermissionDenied        UserPermissionDenied
 }
 
 // FinishUserPasskeyRegistrationErrorResponseType is oneOf type of FinishUserPasskeyRegistrationErrorResponse.
@@ -21528,22 +23744,23 @@ type FinishUserPasskeyRegistrationErrorResponseType string
 
 // Possible values for FinishUserPasskeyRegistrationErrorResponseType.
 const (
-	AttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse  FinishUserPasskeyRegistrationErrorResponseType = "att.already_handed_off"
-	AttInvalidProofFinishUserPasskeyRegistrationErrorResponse      FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_proof"
-	AttInvalidRequestFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_request"
-	AttInvalidStateFinishUserPasskeyRegistrationErrorResponse      FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_state"
-	AttNotFoundFinishUserPasskeyRegistrationErrorResponse          FinishUserPasskeyRegistrationErrorResponseType = "att.not_found"
-	AttProofRejectedFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "att.stale_challenge"
-	AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "auth.unauthorized"
-	EvtInvalidFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "evt.invalid"
-	InternalFinishUserPasskeyRegistrationErrorResponse             FinishUserPasskeyRegistrationErrorResponseType = "internal"
-	ReqInvalidFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "req.invalid"
-	UserInvalidFinishUserPasskeyRegistrationErrorResponse          FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
-	UserNotFoundFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
-	UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "user.password_empty"
-	UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse  FinishUserPasskeyRegistrationErrorResponseType = "user.password_too_long"
-	UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse FinishUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
+	AttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "att.already_handed_off"
+	AttInvalidProofFinishUserPasskeyRegistrationErrorResponse             FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_proof"
+	AttInvalidRequestFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_request"
+	AttInvalidStateFinishUserPasskeyRegistrationErrorResponse             FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_state"
+	AttNotFoundFinishUserPasskeyRegistrationErrorResponse                 FinishUserPasskeyRegistrationErrorResponseType = "att.not_found"
+	AttProofRejectedFinishUserPasskeyRegistrationErrorResponse            FinishUserPasskeyRegistrationErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "att.stale_challenge"
+	AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse            FinishUserPasskeyRegistrationErrorResponseType = "auth.unauthorized"
+	EvtInvalidFinishUserPasskeyRegistrationErrorResponse                  FinishUserPasskeyRegistrationErrorResponseType = "evt.invalid"
+	InternalFinishUserPasskeyRegistrationErrorResponse                    FinishUserPasskeyRegistrationErrorResponseType = "internal"
+	ReqInvalidFinishUserPasskeyRegistrationErrorResponse                  FinishUserPasskeyRegistrationErrorResponseType = "req.invalid"
+	UserInvalidFinishUserPasskeyRegistrationErrorResponse                 FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
+	UserNotFoundFinishUserPasskeyRegistrationErrorResponse                FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
+	UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "user.password_empty"
+	UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse FinishUserPasskeyRegistrationErrorResponseType = "user.password_policy_violation"
+	UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "user.password_too_long"
+	UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse        FinishUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
 )
 
 // IsAttAlreadyHandedOff reports whether FinishUserPasskeyRegistrationErrorResponse is AttAlreadyHandedOff.
@@ -21614,6 +23831,11 @@ func (s FinishUserPasskeyRegistrationErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordEmpty.
 func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserPasswordPolicyViolation reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordPolicyViolation.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordPolicyViolation() bool {
+	return s.Type == UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse
 }
 
 // IsUserPasswordTooLong reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordTooLong.
@@ -21917,6 +24139,27 @@ func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordEmpty() (v Us
 func NewUserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse(v UserPasswordEmpty) FinishUserPasskeyRegistrationErrorResponse {
 	var s FinishUserPasskeyRegistrationErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordPolicyViolation sets FinishUserPasskeyRegistrationErrorResponse to UserPasswordPolicyViolation.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserPasswordPolicyViolation(v UserPasswordPolicyViolation) {
+	s.Type = UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse
+	s.UserPasswordPolicyViolation = v
+}
+
+// GetUserPasswordPolicyViolation returns UserPasswordPolicyViolation and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserPasswordPolicyViolation.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordPolicyViolation() (v UserPasswordPolicyViolation, ok bool) {
+	if !s.IsUserPasswordPolicyViolation() {
+		return v, false
+	}
+	return s.UserPasswordPolicyViolation, true
+}
+
+// NewUserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserPasswordPolicyViolation.
+func NewUserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse(v UserPasswordPolicyViolation) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserPasswordPolicyViolation(v)
 	return s
 }
 
@@ -23547,8 +25790,10 @@ type FlowStep struct {
 	// with CSS over `type="hidden"`: a manager looks for a
 	// credential-shaped control, and a hidden-typed input is easy to
 	// skip.
-	// It is not display text: do not render it as a greeting or a label.
-	// `texts.description_key` is the place for that.
+	// The client may also show it as the account being signed in to, next
+	// to a way to change it (the step's `back` action, which returns to
+	// the step that collects the identifier). Do not build other text from
+	// it; `texts.description_key` is the place for that.
 	Identifier OptFlowStepIdentifier `json:"identifier"`
 	// Ordered list of available user actions. The LiquidJS template iterates
 	// this array and builds a name-indexed map locally for keyed lookup.
@@ -23998,11 +26243,16 @@ func (s *FlowStepGates) init() FlowStepGates {
 // with CSS over `type="hidden"`: a manager looks for a
 // credential-shaped control, and a hidden-typed input is easy to
 // skip.
-// It is not display text: do not render it as a greeting or a label.
-// `texts.description_key` is the place for that.
+// The client may also show it as the account being signed in to, next
+// to a way to change it (the step's `back` action, which returns to
+// the step that collects the identifier). Do not build other text from
+// it; `texts.description_key` is the place for that.
 type FlowStepIdentifier struct {
 	// The identifier the user supplied. Use it as the input's
-	// `value`, verbatim.
+	// `value`, verbatim. After an identity provider's sign-in
+	// collided with an existing account, it is the address that
+	// provider verified; an address the provider did not verify is
+	// not sent unless the user typed it.
 	Value string `json:"value"`
 	// Value for the input's HTML `autocomplete` attribute, used
 	// verbatim. `username` is the token that pairs an identifier
@@ -26478,6 +28728,450 @@ func (s *GetAuthAttemptErrorResponseStatusCode) SetResponse(val GetAuthAttemptEr
 
 func (*GetAuthAttemptErrorResponseStatusCode) getAuthAttemptRes() {}
 
+// GetBrandingByIdErrorResponse represents sum type.
+type GetBrandingByIdErrorResponse struct {
+	Type                 GetBrandingByIdErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	BrndNotFound         BrndNotFound
+	BrndPermissionDenied BrndPermissionDenied
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+}
+
+// GetBrandingByIdErrorResponseType is oneOf type of GetBrandingByIdErrorResponse.
+type GetBrandingByIdErrorResponseType string
+
+// Possible values for GetBrandingByIdErrorResponseType.
+const (
+	AuthUnauthorizedGetBrandingByIdErrorResponse     GetBrandingByIdErrorResponseType = "auth.unauthorized"
+	BrndNotFoundGetBrandingByIdErrorResponse         GetBrandingByIdErrorResponseType = "brnd.not_found"
+	BrndPermissionDeniedGetBrandingByIdErrorResponse GetBrandingByIdErrorResponseType = "brnd.permission_denied"
+	InternalGetBrandingByIdErrorResponse             GetBrandingByIdErrorResponseType = "internal"
+	ReqInvalidGetBrandingByIdErrorResponse           GetBrandingByIdErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether GetBrandingByIdErrorResponse is AuthUnauthorized.
+func (s GetBrandingByIdErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetBrandingByIdErrorResponse
+}
+
+// IsBrndNotFound reports whether GetBrandingByIdErrorResponse is BrndNotFound.
+func (s GetBrandingByIdErrorResponse) IsBrndNotFound() bool {
+	return s.Type == BrndNotFoundGetBrandingByIdErrorResponse
+}
+
+// IsBrndPermissionDenied reports whether GetBrandingByIdErrorResponse is BrndPermissionDenied.
+func (s GetBrandingByIdErrorResponse) IsBrndPermissionDenied() bool {
+	return s.Type == BrndPermissionDeniedGetBrandingByIdErrorResponse
+}
+
+// IsInternal reports whether GetBrandingByIdErrorResponse is Internal.
+func (s GetBrandingByIdErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetBrandingByIdErrorResponse
+}
+
+// IsReqInvalid reports whether GetBrandingByIdErrorResponse is ReqInvalid.
+func (s GetBrandingByIdErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetBrandingByIdErrorResponse
+}
+
+// SetAuthUnauthorized sets GetBrandingByIdErrorResponse to AuthUnauthorized.
+func (s *GetBrandingByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetBrandingByIdErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetBrandingByIdErrorResponse is AuthUnauthorized.
+func (s GetBrandingByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetBrandingByIdErrorResponse returns new GetBrandingByIdErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetBrandingByIdErrorResponse(v AuthUnauthorized) GetBrandingByIdErrorResponse {
+	var s GetBrandingByIdErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetBrndNotFound sets GetBrandingByIdErrorResponse to BrndNotFound.
+func (s *GetBrandingByIdErrorResponse) SetBrndNotFound(v BrndNotFound) {
+	s.Type = BrndNotFoundGetBrandingByIdErrorResponse
+	s.BrndNotFound = v
+}
+
+// GetBrndNotFound returns BrndNotFound and true boolean if GetBrandingByIdErrorResponse is BrndNotFound.
+func (s GetBrandingByIdErrorResponse) GetBrndNotFound() (v BrndNotFound, ok bool) {
+	if !s.IsBrndNotFound() {
+		return v, false
+	}
+	return s.BrndNotFound, true
+}
+
+// NewBrndNotFoundGetBrandingByIdErrorResponse returns new GetBrandingByIdErrorResponse from BrndNotFound.
+func NewBrndNotFoundGetBrandingByIdErrorResponse(v BrndNotFound) GetBrandingByIdErrorResponse {
+	var s GetBrandingByIdErrorResponse
+	s.SetBrndNotFound(v)
+	return s
+}
+
+// SetBrndPermissionDenied sets GetBrandingByIdErrorResponse to BrndPermissionDenied.
+func (s *GetBrandingByIdErrorResponse) SetBrndPermissionDenied(v BrndPermissionDenied) {
+	s.Type = BrndPermissionDeniedGetBrandingByIdErrorResponse
+	s.BrndPermissionDenied = v
+}
+
+// GetBrndPermissionDenied returns BrndPermissionDenied and true boolean if GetBrandingByIdErrorResponse is BrndPermissionDenied.
+func (s GetBrandingByIdErrorResponse) GetBrndPermissionDenied() (v BrndPermissionDenied, ok bool) {
+	if !s.IsBrndPermissionDenied() {
+		return v, false
+	}
+	return s.BrndPermissionDenied, true
+}
+
+// NewBrndPermissionDeniedGetBrandingByIdErrorResponse returns new GetBrandingByIdErrorResponse from BrndPermissionDenied.
+func NewBrndPermissionDeniedGetBrandingByIdErrorResponse(v BrndPermissionDenied) GetBrandingByIdErrorResponse {
+	var s GetBrandingByIdErrorResponse
+	s.SetBrndPermissionDenied(v)
+	return s
+}
+
+// SetInternal sets GetBrandingByIdErrorResponse to Internal.
+func (s *GetBrandingByIdErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetBrandingByIdErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetBrandingByIdErrorResponse is Internal.
+func (s GetBrandingByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetBrandingByIdErrorResponse returns new GetBrandingByIdErrorResponse from Internal.
+func NewInternalGetBrandingByIdErrorResponse(v Internal) GetBrandingByIdErrorResponse {
+	var s GetBrandingByIdErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetBrandingByIdErrorResponse to ReqInvalid.
+func (s *GetBrandingByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetBrandingByIdErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetBrandingByIdErrorResponse is ReqInvalid.
+func (s GetBrandingByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetBrandingByIdErrorResponse returns new GetBrandingByIdErrorResponse from ReqInvalid.
+func NewReqInvalidGetBrandingByIdErrorResponse(v ReqInvalid) GetBrandingByIdErrorResponse {
+	var s GetBrandingByIdErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetBrandingByIdErrorResponseStatusCode wraps GetBrandingByIdErrorResponse with StatusCode.
+type GetBrandingByIdErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetBrandingByIdErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetBrandingByIdErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetBrandingByIdErrorResponseStatusCode) GetResponse() GetBrandingByIdErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetBrandingByIdErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetBrandingByIdErrorResponseStatusCode) SetResponse(val GetBrandingByIdErrorResponse) {
+	s.Response = val
+}
+
+func (*GetBrandingByIdErrorResponseStatusCode) getBrandingByIdRes() {}
+
+// GetClaimStatusErrorResponse represents sum type.
+type GetClaimStatusErrorResponse struct {
+	Type                   GetClaimStatusErrorResponseType // switch on this field
+	AuthUnauthorized       AuthUnauthorized
+	ClaimChallengeNotFound ClaimChallengeNotFound
+	Internal               Internal
+	ProjClaimExpired       ProjClaimExpired
+	ProjClaimWindowExpired ProjClaimWindowExpired
+	ProjNotFound           ProjNotFound
+	ProjPermissionDenied   ProjPermissionDenied
+	ReqInvalid             ReqInvalid
+}
+
+// GetClaimStatusErrorResponseType is oneOf type of GetClaimStatusErrorResponse.
+type GetClaimStatusErrorResponseType string
+
+// Possible values for GetClaimStatusErrorResponseType.
+const (
+	AuthUnauthorizedGetClaimStatusErrorResponse       GetClaimStatusErrorResponseType = "auth.unauthorized"
+	ClaimChallengeNotFoundGetClaimStatusErrorResponse GetClaimStatusErrorResponseType = "claim_challenge.not_found"
+	InternalGetClaimStatusErrorResponse               GetClaimStatusErrorResponseType = "internal"
+	ProjClaimExpiredGetClaimStatusErrorResponse       GetClaimStatusErrorResponseType = "proj.claim_expired"
+	ProjClaimWindowExpiredGetClaimStatusErrorResponse GetClaimStatusErrorResponseType = "proj.claim_window_expired"
+	ProjNotFoundGetClaimStatusErrorResponse           GetClaimStatusErrorResponseType = "proj.not_found"
+	ProjPermissionDeniedGetClaimStatusErrorResponse   GetClaimStatusErrorResponseType = "proj.permission_denied"
+	ReqInvalidGetClaimStatusErrorResponse             GetClaimStatusErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether GetClaimStatusErrorResponse is AuthUnauthorized.
+func (s GetClaimStatusErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetClaimStatusErrorResponse
+}
+
+// IsClaimChallengeNotFound reports whether GetClaimStatusErrorResponse is ClaimChallengeNotFound.
+func (s GetClaimStatusErrorResponse) IsClaimChallengeNotFound() bool {
+	return s.Type == ClaimChallengeNotFoundGetClaimStatusErrorResponse
+}
+
+// IsInternal reports whether GetClaimStatusErrorResponse is Internal.
+func (s GetClaimStatusErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetClaimStatusErrorResponse
+}
+
+// IsProjClaimExpired reports whether GetClaimStatusErrorResponse is ProjClaimExpired.
+func (s GetClaimStatusErrorResponse) IsProjClaimExpired() bool {
+	return s.Type == ProjClaimExpiredGetClaimStatusErrorResponse
+}
+
+// IsProjClaimWindowExpired reports whether GetClaimStatusErrorResponse is ProjClaimWindowExpired.
+func (s GetClaimStatusErrorResponse) IsProjClaimWindowExpired() bool {
+	return s.Type == ProjClaimWindowExpiredGetClaimStatusErrorResponse
+}
+
+// IsProjNotFound reports whether GetClaimStatusErrorResponse is ProjNotFound.
+func (s GetClaimStatusErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundGetClaimStatusErrorResponse
+}
+
+// IsProjPermissionDenied reports whether GetClaimStatusErrorResponse is ProjPermissionDenied.
+func (s GetClaimStatusErrorResponse) IsProjPermissionDenied() bool {
+	return s.Type == ProjPermissionDeniedGetClaimStatusErrorResponse
+}
+
+// IsReqInvalid reports whether GetClaimStatusErrorResponse is ReqInvalid.
+func (s GetClaimStatusErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetClaimStatusErrorResponse
+}
+
+// SetAuthUnauthorized sets GetClaimStatusErrorResponse to AuthUnauthorized.
+func (s *GetClaimStatusErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetClaimStatusErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetClaimStatusErrorResponse is AuthUnauthorized.
+func (s GetClaimStatusErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetClaimStatusErrorResponse returns new GetClaimStatusErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetClaimStatusErrorResponse(v AuthUnauthorized) GetClaimStatusErrorResponse {
+	var s GetClaimStatusErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetClaimChallengeNotFound sets GetClaimStatusErrorResponse to ClaimChallengeNotFound.
+func (s *GetClaimStatusErrorResponse) SetClaimChallengeNotFound(v ClaimChallengeNotFound) {
+	s.Type = ClaimChallengeNotFoundGetClaimStatusErrorResponse
+	s.ClaimChallengeNotFound = v
+}
+
+// GetClaimChallengeNotFound returns ClaimChallengeNotFound and true boolean if GetClaimStatusErrorResponse is ClaimChallengeNotFound.
+func (s GetClaimStatusErrorResponse) GetClaimChallengeNotFound() (v ClaimChallengeNotFound, ok bool) {
+	if !s.IsClaimChallengeNotFound() {
+		return v, false
+	}
+	return s.ClaimChallengeNotFound, true
+}
+
+// NewClaimChallengeNotFoundGetClaimStatusErrorResponse returns new GetClaimStatusErrorResponse from ClaimChallengeNotFound.
+func NewClaimChallengeNotFoundGetClaimStatusErrorResponse(v ClaimChallengeNotFound) GetClaimStatusErrorResponse {
+	var s GetClaimStatusErrorResponse
+	s.SetClaimChallengeNotFound(v)
+	return s
+}
+
+// SetInternal sets GetClaimStatusErrorResponse to Internal.
+func (s *GetClaimStatusErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetClaimStatusErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetClaimStatusErrorResponse is Internal.
+func (s GetClaimStatusErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetClaimStatusErrorResponse returns new GetClaimStatusErrorResponse from Internal.
+func NewInternalGetClaimStatusErrorResponse(v Internal) GetClaimStatusErrorResponse {
+	var s GetClaimStatusErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetProjClaimExpired sets GetClaimStatusErrorResponse to ProjClaimExpired.
+func (s *GetClaimStatusErrorResponse) SetProjClaimExpired(v ProjClaimExpired) {
+	s.Type = ProjClaimExpiredGetClaimStatusErrorResponse
+	s.ProjClaimExpired = v
+}
+
+// GetProjClaimExpired returns ProjClaimExpired and true boolean if GetClaimStatusErrorResponse is ProjClaimExpired.
+func (s GetClaimStatusErrorResponse) GetProjClaimExpired() (v ProjClaimExpired, ok bool) {
+	if !s.IsProjClaimExpired() {
+		return v, false
+	}
+	return s.ProjClaimExpired, true
+}
+
+// NewProjClaimExpiredGetClaimStatusErrorResponse returns new GetClaimStatusErrorResponse from ProjClaimExpired.
+func NewProjClaimExpiredGetClaimStatusErrorResponse(v ProjClaimExpired) GetClaimStatusErrorResponse {
+	var s GetClaimStatusErrorResponse
+	s.SetProjClaimExpired(v)
+	return s
+}
+
+// SetProjClaimWindowExpired sets GetClaimStatusErrorResponse to ProjClaimWindowExpired.
+func (s *GetClaimStatusErrorResponse) SetProjClaimWindowExpired(v ProjClaimWindowExpired) {
+	s.Type = ProjClaimWindowExpiredGetClaimStatusErrorResponse
+	s.ProjClaimWindowExpired = v
+}
+
+// GetProjClaimWindowExpired returns ProjClaimWindowExpired and true boolean if GetClaimStatusErrorResponse is ProjClaimWindowExpired.
+func (s GetClaimStatusErrorResponse) GetProjClaimWindowExpired() (v ProjClaimWindowExpired, ok bool) {
+	if !s.IsProjClaimWindowExpired() {
+		return v, false
+	}
+	return s.ProjClaimWindowExpired, true
+}
+
+// NewProjClaimWindowExpiredGetClaimStatusErrorResponse returns new GetClaimStatusErrorResponse from ProjClaimWindowExpired.
+func NewProjClaimWindowExpiredGetClaimStatusErrorResponse(v ProjClaimWindowExpired) GetClaimStatusErrorResponse {
+	var s GetClaimStatusErrorResponse
+	s.SetProjClaimWindowExpired(v)
+	return s
+}
+
+// SetProjNotFound sets GetClaimStatusErrorResponse to ProjNotFound.
+func (s *GetClaimStatusErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundGetClaimStatusErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if GetClaimStatusErrorResponse is ProjNotFound.
+func (s GetClaimStatusErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundGetClaimStatusErrorResponse returns new GetClaimStatusErrorResponse from ProjNotFound.
+func NewProjNotFoundGetClaimStatusErrorResponse(v ProjNotFound) GetClaimStatusErrorResponse {
+	var s GetClaimStatusErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjPermissionDenied sets GetClaimStatusErrorResponse to ProjPermissionDenied.
+func (s *GetClaimStatusErrorResponse) SetProjPermissionDenied(v ProjPermissionDenied) {
+	s.Type = ProjPermissionDeniedGetClaimStatusErrorResponse
+	s.ProjPermissionDenied = v
+}
+
+// GetProjPermissionDenied returns ProjPermissionDenied and true boolean if GetClaimStatusErrorResponse is ProjPermissionDenied.
+func (s GetClaimStatusErrorResponse) GetProjPermissionDenied() (v ProjPermissionDenied, ok bool) {
+	if !s.IsProjPermissionDenied() {
+		return v, false
+	}
+	return s.ProjPermissionDenied, true
+}
+
+// NewProjPermissionDeniedGetClaimStatusErrorResponse returns new GetClaimStatusErrorResponse from ProjPermissionDenied.
+func NewProjPermissionDeniedGetClaimStatusErrorResponse(v ProjPermissionDenied) GetClaimStatusErrorResponse {
+	var s GetClaimStatusErrorResponse
+	s.SetProjPermissionDenied(v)
+	return s
+}
+
+// SetReqInvalid sets GetClaimStatusErrorResponse to ReqInvalid.
+func (s *GetClaimStatusErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetClaimStatusErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetClaimStatusErrorResponse is ReqInvalid.
+func (s GetClaimStatusErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetClaimStatusErrorResponse returns new GetClaimStatusErrorResponse from ReqInvalid.
+func NewReqInvalidGetClaimStatusErrorResponse(v ReqInvalid) GetClaimStatusErrorResponse {
+	var s GetClaimStatusErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetClaimStatusErrorResponseStatusCode wraps GetClaimStatusErrorResponse with StatusCode.
+type GetClaimStatusErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetClaimStatusErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetClaimStatusErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetClaimStatusErrorResponseStatusCode) GetResponse() GetClaimStatusErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetClaimStatusErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetClaimStatusErrorResponseStatusCode) SetResponse(val GetClaimStatusErrorResponse) {
+	s.Response = val
+}
+
+func (*GetClaimStatusErrorResponseStatusCode) getClaimStatusRes() {}
+
 // GetClaimStatusGone represents sum type.
 type GetClaimStatusGone struct {
 	Type                   GetClaimStatusGoneType // switch on this field
@@ -26560,6 +29254,130 @@ type GetClaimStatusUnauthorized ErrorDetails
 
 func (*GetClaimStatusUnauthorized) getClaimStatusRes() {}
 
+// GetClaimWindowErrorResponse represents sum type.
+type GetClaimWindowErrorResponse struct {
+	Type                   GetClaimWindowErrorResponseType // switch on this field
+	ClaimChallengeNotFound ClaimChallengeNotFound
+	Internal               Internal
+	ReqInvalid             ReqInvalid
+}
+
+// GetClaimWindowErrorResponseType is oneOf type of GetClaimWindowErrorResponse.
+type GetClaimWindowErrorResponseType string
+
+// Possible values for GetClaimWindowErrorResponseType.
+const (
+	ClaimChallengeNotFoundGetClaimWindowErrorResponse GetClaimWindowErrorResponseType = "claim_challenge.not_found"
+	InternalGetClaimWindowErrorResponse               GetClaimWindowErrorResponseType = "internal"
+	ReqInvalidGetClaimWindowErrorResponse             GetClaimWindowErrorResponseType = "req.invalid"
+)
+
+// IsClaimChallengeNotFound reports whether GetClaimWindowErrorResponse is ClaimChallengeNotFound.
+func (s GetClaimWindowErrorResponse) IsClaimChallengeNotFound() bool {
+	return s.Type == ClaimChallengeNotFoundGetClaimWindowErrorResponse
+}
+
+// IsInternal reports whether GetClaimWindowErrorResponse is Internal.
+func (s GetClaimWindowErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetClaimWindowErrorResponse
+}
+
+// IsReqInvalid reports whether GetClaimWindowErrorResponse is ReqInvalid.
+func (s GetClaimWindowErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetClaimWindowErrorResponse
+}
+
+// SetClaimChallengeNotFound sets GetClaimWindowErrorResponse to ClaimChallengeNotFound.
+func (s *GetClaimWindowErrorResponse) SetClaimChallengeNotFound(v ClaimChallengeNotFound) {
+	s.Type = ClaimChallengeNotFoundGetClaimWindowErrorResponse
+	s.ClaimChallengeNotFound = v
+}
+
+// GetClaimChallengeNotFound returns ClaimChallengeNotFound and true boolean if GetClaimWindowErrorResponse is ClaimChallengeNotFound.
+func (s GetClaimWindowErrorResponse) GetClaimChallengeNotFound() (v ClaimChallengeNotFound, ok bool) {
+	if !s.IsClaimChallengeNotFound() {
+		return v, false
+	}
+	return s.ClaimChallengeNotFound, true
+}
+
+// NewClaimChallengeNotFoundGetClaimWindowErrorResponse returns new GetClaimWindowErrorResponse from ClaimChallengeNotFound.
+func NewClaimChallengeNotFoundGetClaimWindowErrorResponse(v ClaimChallengeNotFound) GetClaimWindowErrorResponse {
+	var s GetClaimWindowErrorResponse
+	s.SetClaimChallengeNotFound(v)
+	return s
+}
+
+// SetInternal sets GetClaimWindowErrorResponse to Internal.
+func (s *GetClaimWindowErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetClaimWindowErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetClaimWindowErrorResponse is Internal.
+func (s GetClaimWindowErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetClaimWindowErrorResponse returns new GetClaimWindowErrorResponse from Internal.
+func NewInternalGetClaimWindowErrorResponse(v Internal) GetClaimWindowErrorResponse {
+	var s GetClaimWindowErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetClaimWindowErrorResponse to ReqInvalid.
+func (s *GetClaimWindowErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetClaimWindowErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetClaimWindowErrorResponse is ReqInvalid.
+func (s GetClaimWindowErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetClaimWindowErrorResponse returns new GetClaimWindowErrorResponse from ReqInvalid.
+func NewReqInvalidGetClaimWindowErrorResponse(v ReqInvalid) GetClaimWindowErrorResponse {
+	var s GetClaimWindowErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetClaimWindowErrorResponseStatusCode wraps GetClaimWindowErrorResponse with StatusCode.
+type GetClaimWindowErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetClaimWindowErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetClaimWindowErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetClaimWindowErrorResponseStatusCode) GetResponse() GetClaimWindowErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetClaimWindowErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetClaimWindowErrorResponseStatusCode) SetResponse(val GetClaimWindowErrorResponse) {
+	s.Response = val
+}
+
+func (*GetClaimWindowErrorResponseStatusCode) getClaimWindowRes() {}
+
 type GetClaimWindowNotFound ErrorDetails
 
 func (*GetClaimWindowNotFound) getClaimWindowRes() {}
@@ -26575,7 +29393,6 @@ type GetDeploymentByIdErrorResponse struct {
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	Internal            Internal
-	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 }
 
@@ -26588,7 +29405,6 @@ const (
 	DepNotFoundGetDeploymentByIdErrorResponse         GetDeploymentByIdErrorResponseType = "dep.not_found"
 	DepPermissionDeniedGetDeploymentByIdErrorResponse GetDeploymentByIdErrorResponseType = "dep.permission_denied"
 	InternalGetDeploymentByIdErrorResponse            GetDeploymentByIdErrorResponseType = "internal"
-	NotImplementedGetDeploymentByIdErrorResponse      GetDeploymentByIdErrorResponseType = "not_implemented"
 	ReqInvalidGetDeploymentByIdErrorResponse          GetDeploymentByIdErrorResponseType = "req.invalid"
 )
 
@@ -26610,11 +29426,6 @@ func (s GetDeploymentByIdErrorResponse) IsDepPermissionDenied() bool {
 // IsInternal reports whether GetDeploymentByIdErrorResponse is Internal.
 func (s GetDeploymentByIdErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetDeploymentByIdErrorResponse
-}
-
-// IsNotImplemented reports whether GetDeploymentByIdErrorResponse is NotImplemented.
-func (s GetDeploymentByIdErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedGetDeploymentByIdErrorResponse
 }
 
 // IsReqInvalid reports whether GetDeploymentByIdErrorResponse is ReqInvalid.
@@ -26703,27 +29514,6 @@ func (s GetDeploymentByIdErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetDeploymentByIdErrorResponse(v Internal) GetDeploymentByIdErrorResponse {
 	var s GetDeploymentByIdErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetNotImplemented sets GetDeploymentByIdErrorResponse to NotImplemented.
-func (s *GetDeploymentByIdErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedGetDeploymentByIdErrorResponse
-	s.NotImplemented = v
-}
-
-// GetNotImplemented returns NotImplemented and true boolean if GetDeploymentByIdErrorResponse is NotImplemented.
-func (s GetDeploymentByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
-	if !s.IsNotImplemented() {
-		return v, false
-	}
-	return s.NotImplemented, true
-}
-
-// NewNotImplementedGetDeploymentByIdErrorResponse returns new GetDeploymentByIdErrorResponse from NotImplemented.
-func NewNotImplementedGetDeploymentByIdErrorResponse(v NotImplemented) GetDeploymentByIdErrorResponse {
-	var s GetDeploymentByIdErrorResponse
-	s.SetNotImplemented(v)
 	return s
 }
 
@@ -27040,6 +29830,208 @@ func (s *GetDeploymentVariablesErrorResponseStatusCode) SetResponse(val GetDeplo
 
 func (*GetDeploymentVariablesErrorResponseStatusCode) getDeploymentVariablesRes() {}
 
+// GetEventErrorResponse represents sum type.
+type GetEventErrorResponse struct {
+	Type                GetEventErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	EvtNotFound         EvtNotFound
+	EvtPermissionDenied EvtPermissionDenied
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+}
+
+// GetEventErrorResponseType is oneOf type of GetEventErrorResponse.
+type GetEventErrorResponseType string
+
+// Possible values for GetEventErrorResponseType.
+const (
+	AuthUnauthorizedGetEventErrorResponse    GetEventErrorResponseType = "auth.unauthorized"
+	EvtInvalidGetEventErrorResponse          GetEventErrorResponseType = "evt.invalid"
+	EvtNotFoundGetEventErrorResponse         GetEventErrorResponseType = "evt.not_found"
+	EvtPermissionDeniedGetEventErrorResponse GetEventErrorResponseType = "evt.permission_denied"
+	InternalGetEventErrorResponse            GetEventErrorResponseType = "internal"
+	ReqInvalidGetEventErrorResponse          GetEventErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether GetEventErrorResponse is AuthUnauthorized.
+func (s GetEventErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetEventErrorResponse
+}
+
+// IsEvtInvalid reports whether GetEventErrorResponse is EvtInvalid.
+func (s GetEventErrorResponse) IsEvtInvalid() bool { return s.Type == EvtInvalidGetEventErrorResponse }
+
+// IsEvtNotFound reports whether GetEventErrorResponse is EvtNotFound.
+func (s GetEventErrorResponse) IsEvtNotFound() bool {
+	return s.Type == EvtNotFoundGetEventErrorResponse
+}
+
+// IsEvtPermissionDenied reports whether GetEventErrorResponse is EvtPermissionDenied.
+func (s GetEventErrorResponse) IsEvtPermissionDenied() bool {
+	return s.Type == EvtPermissionDeniedGetEventErrorResponse
+}
+
+// IsInternal reports whether GetEventErrorResponse is Internal.
+func (s GetEventErrorResponse) IsInternal() bool { return s.Type == InternalGetEventErrorResponse }
+
+// IsReqInvalid reports whether GetEventErrorResponse is ReqInvalid.
+func (s GetEventErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidGetEventErrorResponse }
+
+// SetAuthUnauthorized sets GetEventErrorResponse to AuthUnauthorized.
+func (s *GetEventErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetEventErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetEventErrorResponse is AuthUnauthorized.
+func (s GetEventErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetEventErrorResponse returns new GetEventErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetEventErrorResponse(v AuthUnauthorized) GetEventErrorResponse {
+	var s GetEventErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets GetEventErrorResponse to EvtInvalid.
+func (s *GetEventErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidGetEventErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if GetEventErrorResponse is EvtInvalid.
+func (s GetEventErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidGetEventErrorResponse returns new GetEventErrorResponse from EvtInvalid.
+func NewEvtInvalidGetEventErrorResponse(v EvtInvalid) GetEventErrorResponse {
+	var s GetEventErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetEvtNotFound sets GetEventErrorResponse to EvtNotFound.
+func (s *GetEventErrorResponse) SetEvtNotFound(v EvtNotFound) {
+	s.Type = EvtNotFoundGetEventErrorResponse
+	s.EvtNotFound = v
+}
+
+// GetEvtNotFound returns EvtNotFound and true boolean if GetEventErrorResponse is EvtNotFound.
+func (s GetEventErrorResponse) GetEvtNotFound() (v EvtNotFound, ok bool) {
+	if !s.IsEvtNotFound() {
+		return v, false
+	}
+	return s.EvtNotFound, true
+}
+
+// NewEvtNotFoundGetEventErrorResponse returns new GetEventErrorResponse from EvtNotFound.
+func NewEvtNotFoundGetEventErrorResponse(v EvtNotFound) GetEventErrorResponse {
+	var s GetEventErrorResponse
+	s.SetEvtNotFound(v)
+	return s
+}
+
+// SetEvtPermissionDenied sets GetEventErrorResponse to EvtPermissionDenied.
+func (s *GetEventErrorResponse) SetEvtPermissionDenied(v EvtPermissionDenied) {
+	s.Type = EvtPermissionDeniedGetEventErrorResponse
+	s.EvtPermissionDenied = v
+}
+
+// GetEvtPermissionDenied returns EvtPermissionDenied and true boolean if GetEventErrorResponse is EvtPermissionDenied.
+func (s GetEventErrorResponse) GetEvtPermissionDenied() (v EvtPermissionDenied, ok bool) {
+	if !s.IsEvtPermissionDenied() {
+		return v, false
+	}
+	return s.EvtPermissionDenied, true
+}
+
+// NewEvtPermissionDeniedGetEventErrorResponse returns new GetEventErrorResponse from EvtPermissionDenied.
+func NewEvtPermissionDeniedGetEventErrorResponse(v EvtPermissionDenied) GetEventErrorResponse {
+	var s GetEventErrorResponse
+	s.SetEvtPermissionDenied(v)
+	return s
+}
+
+// SetInternal sets GetEventErrorResponse to Internal.
+func (s *GetEventErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetEventErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetEventErrorResponse is Internal.
+func (s GetEventErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetEventErrorResponse returns new GetEventErrorResponse from Internal.
+func NewInternalGetEventErrorResponse(v Internal) GetEventErrorResponse {
+	var s GetEventErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetEventErrorResponse to ReqInvalid.
+func (s *GetEventErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetEventErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetEventErrorResponse is ReqInvalid.
+func (s GetEventErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetEventErrorResponse returns new GetEventErrorResponse from ReqInvalid.
+func NewReqInvalidGetEventErrorResponse(v ReqInvalid) GetEventErrorResponse {
+	var s GetEventErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetEventErrorResponseStatusCode wraps GetEventErrorResponse with StatusCode.
+type GetEventErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetEventErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetEventErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetEventErrorResponseStatusCode) GetResponse() GetEventErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetEventErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetEventErrorResponseStatusCode) SetResponse(val GetEventErrorResponse) {
+	s.Response = val
+}
+
+func (*GetEventErrorResponseStatusCode) getEventRes() {}
+
 type GetEventForbidden ErrorDetails
 
 func (*GetEventForbidden) getEventRes() {}
@@ -27294,39 +30286,40 @@ func (*GetFlowStepConflict) getFlowStepRes() {}
 
 // GetFlowStepErrorResponse represents sum type.
 type GetFlowStepErrorResponse struct {
-	Type                    GetFlowStepErrorResponseType // switch on this field
-	AttAlreadyHandedOff     AttAlreadyHandedOff
-	AttInvalidRequest       AttInvalidRequest
-	AttInvalidState         AttInvalidState
-	AttNotCompleted         AttNotCompleted
-	AttNotFound             AttNotFound
-	EncKeyDecryptFailed     EncKeyDecryptFailed
-	EncKeyEncryptFailed     EncKeyEncryptFailed
-	EncKeyNotFound          EncKeyNotFound
-	EvtInvalid              EvtInvalid
-	FlowCompleted           FlowCompleted
-	FlowCookieExpired       FlowCookieExpired
-	FlowCookieInvalid       FlowCookieInvalid
-	FlowIntegrity           FlowIntegrity
-	FlowInvalidAction       FlowInvalidAction
-	FlowNotFound            FlowNotFound
-	FlowRestartRequired     FlowRestartRequired
-	FlowUnsupported         FlowUnsupported
-	IdpNotFound             IdpNotFound
-	IdpEndpointCleartext    IdpEndpointCleartext
-	IdpEndpointsPartial     IdpEndpointsPartial
-	IdpProtocolBlockMissing IdpProtocolBlockMissing
-	IdpScopesMissingOpenid  IdpScopesMissingOpenid
-	Internal                Internal
-	TknInvalid              TknInvalid
-	ReqInvalid              ReqInvalid
-	EncKeyUnknownAlg        EncKeyUnknownAlg
-	UserAlreadyExists       UserAlreadyExists
-	UserConflict            UserConflict
-	UserInvalid             UserInvalid
-	UserNotFound            UserNotFound
-	UserPasswordEmpty       UserPasswordEmpty
-	UserPasswordTooLong     UserPasswordTooLong
+	Type                        GetFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff         AttAlreadyHandedOff
+	AttInvalidRequest           AttInvalidRequest
+	AttInvalidState             AttInvalidState
+	AttNotCompleted             AttNotCompleted
+	AttNotFound                 AttNotFound
+	EncKeyDecryptFailed         EncKeyDecryptFailed
+	EncKeyEncryptFailed         EncKeyEncryptFailed
+	EncKeyNotFound              EncKeyNotFound
+	EvtInvalid                  EvtInvalid
+	FlowCompleted               FlowCompleted
+	FlowCookieExpired           FlowCookieExpired
+	FlowCookieInvalid           FlowCookieInvalid
+	FlowIntegrity               FlowIntegrity
+	FlowInvalidAction           FlowInvalidAction
+	FlowNotFound                FlowNotFound
+	FlowRestartRequired         FlowRestartRequired
+	FlowUnsupported             FlowUnsupported
+	IdpNotFound                 IdpNotFound
+	IdpEndpointCleartext        IdpEndpointCleartext
+	IdpEndpointsPartial         IdpEndpointsPartial
+	IdpProtocolBlockMissing     IdpProtocolBlockMissing
+	IdpScopesMissingOpenid      IdpScopesMissingOpenid
+	Internal                    Internal
+	TknInvalid                  TknInvalid
+	ReqInvalid                  ReqInvalid
+	EncKeyUnknownAlg            EncKeyUnknownAlg
+	UserAlreadyExists           UserAlreadyExists
+	UserConflict                UserConflict
+	UserInvalid                 UserInvalid
+	UserNotFound                UserNotFound
+	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordPolicyViolation UserPasswordPolicyViolation
+	UserPasswordTooLong         UserPasswordTooLong
 }
 
 // GetFlowStepErrorResponseType is oneOf type of GetFlowStepErrorResponse.
@@ -27334,38 +30327,39 @@ type GetFlowStepErrorResponseType string
 
 // Possible values for GetFlowStepErrorResponseType.
 const (
-	AttAlreadyHandedOffGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "att.already_handed_off"
-	AttInvalidRequestGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "att.invalid_request"
-	AttInvalidStateGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "att.invalid_state"
-	AttNotCompletedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "att.not_completed"
-	AttNotFoundGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "att.not_found"
-	EncKeyDecryptFailedGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "enc_key.not_found"
-	EvtInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "evt.invalid"
-	FlowCompletedGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.completed"
-	FlowCookieExpiredGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegrityGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.integrity"
-	FlowInvalidActionGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.invalid_action"
-	FlowNotFoundGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "flow.not_found"
-	FlowRestartRequiredGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "flow.restart_required"
-	FlowUnsupportedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "flow.unsupported"
-	IdpNotFoundGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "idp.not_found"
-	IdpEndpointCleartextGetFlowStepErrorResponse    GetFlowStepErrorResponseType = "idp.endpoint_cleartext"
-	IdpEndpointsPartialGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "idp.endpoints_partial"
-	IdpProtocolBlockMissingGetFlowStepErrorResponse GetFlowStepErrorResponseType = "idp.protocol_block_missing"
-	IdpScopesMissingOpenidGetFlowStepErrorResponse  GetFlowStepErrorResponseType = "idp.scopes_missing_openid"
-	InternalGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "internal"
-	TknInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "tkn.invalid"
-	ReqInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "enc_key.unknown_alg"
-	UserAlreadyExistsGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "user.already_exists"
-	UserConflictGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "user.conflict"
-	UserInvalidGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.invalid"
-	UserNotFoundGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "user.not_found"
-	UserPasswordEmptyGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "user.password_empty"
-	UserPasswordTooLongGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "user.password_too_long"
+	AttAlreadyHandedOffGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "att.not_found"
+	EncKeyDecryptFailedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "enc_key.not_found"
+	EvtInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "evt.invalid"
+	FlowCompletedGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "flow.completed"
+	FlowCookieExpiredGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegrityGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.invalid_action"
+	FlowNotFoundGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "flow.not_found"
+	FlowRestartRequiredGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "flow.restart_required"
+	FlowUnsupportedGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.unsupported"
+	IdpNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "idp.not_found"
+	IdpEndpointCleartextGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "idp.endpoint_cleartext"
+	IdpEndpointsPartialGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "idp.endpoints_partial"
+	IdpProtocolBlockMissingGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "idp.protocol_block_missing"
+	IdpScopesMissingOpenidGetFlowStepErrorResponse      GetFlowStepErrorResponseType = "idp.scopes_missing_openid"
+	InternalGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "internal"
+	TknInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "tkn.invalid"
+	ReqInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UserAlreadyExistsGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "user.already_exists"
+	UserConflictGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "user.conflict"
+	UserInvalidGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "user.not_found"
+	UserPasswordEmptyGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordPolicyViolationGetFlowStepErrorResponse GetFlowStepErrorResponseType = "user.password_policy_violation"
+	UserPasswordTooLongGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether GetFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -27521,6 +30515,11 @@ func (s GetFlowStepErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether GetFlowStepErrorResponse is UserPasswordEmpty.
 func (s GetFlowStepErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyGetFlowStepErrorResponse
+}
+
+// IsUserPasswordPolicyViolation reports whether GetFlowStepErrorResponse is UserPasswordPolicyViolation.
+func (s GetFlowStepErrorResponse) IsUserPasswordPolicyViolation() bool {
+	return s.Type == UserPasswordPolicyViolationGetFlowStepErrorResponse
 }
 
 // IsUserPasswordTooLong reports whether GetFlowStepErrorResponse is UserPasswordTooLong.
@@ -28179,6 +31178,27 @@ func NewUserPasswordEmptyGetFlowStepErrorResponse(v UserPasswordEmpty) GetFlowSt
 	return s
 }
 
+// SetUserPasswordPolicyViolation sets GetFlowStepErrorResponse to UserPasswordPolicyViolation.
+func (s *GetFlowStepErrorResponse) SetUserPasswordPolicyViolation(v UserPasswordPolicyViolation) {
+	s.Type = UserPasswordPolicyViolationGetFlowStepErrorResponse
+	s.UserPasswordPolicyViolation = v
+}
+
+// GetUserPasswordPolicyViolation returns UserPasswordPolicyViolation and true boolean if GetFlowStepErrorResponse is UserPasswordPolicyViolation.
+func (s GetFlowStepErrorResponse) GetUserPasswordPolicyViolation() (v UserPasswordPolicyViolation, ok bool) {
+	if !s.IsUserPasswordPolicyViolation() {
+		return v, false
+	}
+	return s.UserPasswordPolicyViolation, true
+}
+
+// NewUserPasswordPolicyViolationGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserPasswordPolicyViolation.
+func NewUserPasswordPolicyViolationGetFlowStepErrorResponse(v UserPasswordPolicyViolation) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserPasswordPolicyViolation(v)
+	return s
+}
+
 // SetUserPasswordTooLong sets GetFlowStepErrorResponse to UserPasswordTooLong.
 func (s *GetFlowStepErrorResponse) SetUserPasswordTooLong(v UserPasswordTooLong) {
 	s.Type = UserPasswordTooLongGetFlowStepErrorResponse
@@ -28479,6 +31499,100 @@ func (*GetGrantNotFound) getGrantRes() {}
 type GetGrantUnauthorized ErrorDetails
 
 func (*GetGrantUnauthorized) getGrantRes() {}
+
+// GetHealthErrorResponse represents sum type.
+type GetHealthErrorResponse struct {
+	Type       GetHealthErrorResponseType // switch on this field
+	Internal   Internal
+	ReqInvalid ReqInvalid
+}
+
+// GetHealthErrorResponseType is oneOf type of GetHealthErrorResponse.
+type GetHealthErrorResponseType string
+
+// Possible values for GetHealthErrorResponseType.
+const (
+	InternalGetHealthErrorResponse   GetHealthErrorResponseType = "internal"
+	ReqInvalidGetHealthErrorResponse GetHealthErrorResponseType = "req.invalid"
+)
+
+// IsInternal reports whether GetHealthErrorResponse is Internal.
+func (s GetHealthErrorResponse) IsInternal() bool { return s.Type == InternalGetHealthErrorResponse }
+
+// IsReqInvalid reports whether GetHealthErrorResponse is ReqInvalid.
+func (s GetHealthErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetHealthErrorResponse
+}
+
+// SetInternal sets GetHealthErrorResponse to Internal.
+func (s *GetHealthErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetHealthErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetHealthErrorResponse is Internal.
+func (s GetHealthErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetHealthErrorResponse returns new GetHealthErrorResponse from Internal.
+func NewInternalGetHealthErrorResponse(v Internal) GetHealthErrorResponse {
+	var s GetHealthErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetHealthErrorResponse to ReqInvalid.
+func (s *GetHealthErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetHealthErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetHealthErrorResponse is ReqInvalid.
+func (s GetHealthErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetHealthErrorResponse returns new GetHealthErrorResponse from ReqInvalid.
+func NewReqInvalidGetHealthErrorResponse(v ReqInvalid) GetHealthErrorResponse {
+	var s GetHealthErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetHealthErrorResponseStatusCode wraps GetHealthErrorResponse with StatusCode.
+type GetHealthErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetHealthErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetHealthErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetHealthErrorResponseStatusCode) GetResponse() GetHealthErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetHealthErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetHealthErrorResponseStatusCode) SetResponse(val GetHealthErrorResponse) {
+	s.Response = val
+}
+
+func (*GetHealthErrorResponseStatusCode) getHealthRes() {}
 
 type GetHealthOK struct {
 	Data io.Reader
@@ -28878,6 +31992,98 @@ type GetIdpRevisionByIdUnauthorized ErrorDetails
 
 func (*GetIdpRevisionByIdUnauthorized) getIdpRevisionByIdRes() {}
 
+// GetLiveErrorResponse represents sum type.
+type GetLiveErrorResponse struct {
+	Type       GetLiveErrorResponseType // switch on this field
+	Internal   Internal
+	ReqInvalid ReqInvalid
+}
+
+// GetLiveErrorResponseType is oneOf type of GetLiveErrorResponse.
+type GetLiveErrorResponseType string
+
+// Possible values for GetLiveErrorResponseType.
+const (
+	InternalGetLiveErrorResponse   GetLiveErrorResponseType = "internal"
+	ReqInvalidGetLiveErrorResponse GetLiveErrorResponseType = "req.invalid"
+)
+
+// IsInternal reports whether GetLiveErrorResponse is Internal.
+func (s GetLiveErrorResponse) IsInternal() bool { return s.Type == InternalGetLiveErrorResponse }
+
+// IsReqInvalid reports whether GetLiveErrorResponse is ReqInvalid.
+func (s GetLiveErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidGetLiveErrorResponse }
+
+// SetInternal sets GetLiveErrorResponse to Internal.
+func (s *GetLiveErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetLiveErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetLiveErrorResponse is Internal.
+func (s GetLiveErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetLiveErrorResponse returns new GetLiveErrorResponse from Internal.
+func NewInternalGetLiveErrorResponse(v Internal) GetLiveErrorResponse {
+	var s GetLiveErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetLiveErrorResponse to ReqInvalid.
+func (s *GetLiveErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetLiveErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetLiveErrorResponse is ReqInvalid.
+func (s GetLiveErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetLiveErrorResponse returns new GetLiveErrorResponse from ReqInvalid.
+func NewReqInvalidGetLiveErrorResponse(v ReqInvalid) GetLiveErrorResponse {
+	var s GetLiveErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetLiveErrorResponseStatusCode wraps GetLiveErrorResponse with StatusCode.
+type GetLiveErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetLiveErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetLiveErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetLiveErrorResponseStatusCode) GetResponse() GetLiveErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetLiveErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetLiveErrorResponseStatusCode) SetResponse(val GetLiveErrorResponse) {
+	s.Response = val
+}
+
+func (*GetLiveErrorResponseStatusCode) getLiveRes() {}
+
 type GetLiveOK struct {
 	Data io.Reader
 }
@@ -28893,6 +32099,186 @@ func (s GetLiveOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetLiveOK) getLiveRes() {}
+
+// GetMyPasswordStateErrorResponse represents sum type.
+type GetMyPasswordStateErrorResponse struct {
+	Type                GetMyPasswordStateErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
+}
+
+// GetMyPasswordStateErrorResponseType is oneOf type of GetMyPasswordStateErrorResponse.
+type GetMyPasswordStateErrorResponseType string
+
+// Possible values for GetMyPasswordStateErrorResponseType.
+const (
+	AuthUnauthorizedGetMyPasswordStateErrorResponse    GetMyPasswordStateErrorResponseType = "auth.unauthorized"
+	InternalGetMyPasswordStateErrorResponse            GetMyPasswordStateErrorResponseType = "internal"
+	ReqInvalidGetMyPasswordStateErrorResponse          GetMyPasswordStateErrorResponseType = "req.invalid"
+	SessProjectMismatchGetMyPasswordStateErrorResponse GetMyPasswordStateErrorResponseType = "sess.project_mismatch"
+	UserNotFoundGetMyPasswordStateErrorResponse        GetMyPasswordStateErrorResponseType = "user.not_found"
+)
+
+// IsAuthUnauthorized reports whether GetMyPasswordStateErrorResponse is AuthUnauthorized.
+func (s GetMyPasswordStateErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetMyPasswordStateErrorResponse
+}
+
+// IsInternal reports whether GetMyPasswordStateErrorResponse is Internal.
+func (s GetMyPasswordStateErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetMyPasswordStateErrorResponse
+}
+
+// IsReqInvalid reports whether GetMyPasswordStateErrorResponse is ReqInvalid.
+func (s GetMyPasswordStateErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetMyPasswordStateErrorResponse
+}
+
+// IsSessProjectMismatch reports whether GetMyPasswordStateErrorResponse is SessProjectMismatch.
+func (s GetMyPasswordStateErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchGetMyPasswordStateErrorResponse
+}
+
+// IsUserNotFound reports whether GetMyPasswordStateErrorResponse is UserNotFound.
+func (s GetMyPasswordStateErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundGetMyPasswordStateErrorResponse
+}
+
+// SetAuthUnauthorized sets GetMyPasswordStateErrorResponse to AuthUnauthorized.
+func (s *GetMyPasswordStateErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetMyPasswordStateErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetMyPasswordStateErrorResponse is AuthUnauthorized.
+func (s GetMyPasswordStateErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetMyPasswordStateErrorResponse returns new GetMyPasswordStateErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetMyPasswordStateErrorResponse(v AuthUnauthorized) GetMyPasswordStateErrorResponse {
+	var s GetMyPasswordStateErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetMyPasswordStateErrorResponse to Internal.
+func (s *GetMyPasswordStateErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetMyPasswordStateErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetMyPasswordStateErrorResponse is Internal.
+func (s GetMyPasswordStateErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetMyPasswordStateErrorResponse returns new GetMyPasswordStateErrorResponse from Internal.
+func NewInternalGetMyPasswordStateErrorResponse(v Internal) GetMyPasswordStateErrorResponse {
+	var s GetMyPasswordStateErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetMyPasswordStateErrorResponse to ReqInvalid.
+func (s *GetMyPasswordStateErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetMyPasswordStateErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetMyPasswordStateErrorResponse is ReqInvalid.
+func (s GetMyPasswordStateErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetMyPasswordStateErrorResponse returns new GetMyPasswordStateErrorResponse from ReqInvalid.
+func NewReqInvalidGetMyPasswordStateErrorResponse(v ReqInvalid) GetMyPasswordStateErrorResponse {
+	var s GetMyPasswordStateErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets GetMyPasswordStateErrorResponse to SessProjectMismatch.
+func (s *GetMyPasswordStateErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchGetMyPasswordStateErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if GetMyPasswordStateErrorResponse is SessProjectMismatch.
+func (s GetMyPasswordStateErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchGetMyPasswordStateErrorResponse returns new GetMyPasswordStateErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchGetMyPasswordStateErrorResponse(v SessProjectMismatch) GetMyPasswordStateErrorResponse {
+	var s GetMyPasswordStateErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUserNotFound sets GetMyPasswordStateErrorResponse to UserNotFound.
+func (s *GetMyPasswordStateErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundGetMyPasswordStateErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if GetMyPasswordStateErrorResponse is UserNotFound.
+func (s GetMyPasswordStateErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundGetMyPasswordStateErrorResponse returns new GetMyPasswordStateErrorResponse from UserNotFound.
+func NewUserNotFoundGetMyPasswordStateErrorResponse(v UserNotFound) GetMyPasswordStateErrorResponse {
+	var s GetMyPasswordStateErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// GetMyPasswordStateErrorResponseStatusCode wraps GetMyPasswordStateErrorResponse with StatusCode.
+type GetMyPasswordStateErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetMyPasswordStateErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetMyPasswordStateErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetMyPasswordStateErrorResponseStatusCode) GetResponse() GetMyPasswordStateErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetMyPasswordStateErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetMyPasswordStateErrorResponseStatusCode) SetResponse(val GetMyPasswordStateErrorResponse) {
+	s.Response = val
+}
+
+func (*GetMyPasswordStateErrorResponseStatusCode) getMyPasswordStateRes() {}
 
 // GetMySessionCsrfTokenErrorResponse represents sum type.
 type GetMySessionCsrfTokenErrorResponse struct {
@@ -29612,6 +32998,186 @@ func (s *GetMyUserSchemaErrorResponseStatusCode) SetResponse(val GetMyUserSchema
 
 func (*GetMyUserSchemaErrorResponseStatusCode) getMyUserSchemaRes() {}
 
+// GetPolicyRevisionErrorResponse represents sum type.
+type GetPolicyRevisionErrorResponse struct {
+	Type                GetPolicyRevisionErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	PolNotFound         PolNotFound
+	PolPermissionDenied PolPermissionDenied
+	ReqInvalid          ReqInvalid
+}
+
+// GetPolicyRevisionErrorResponseType is oneOf type of GetPolicyRevisionErrorResponse.
+type GetPolicyRevisionErrorResponseType string
+
+// Possible values for GetPolicyRevisionErrorResponseType.
+const (
+	AuthUnauthorizedGetPolicyRevisionErrorResponse    GetPolicyRevisionErrorResponseType = "auth.unauthorized"
+	InternalGetPolicyRevisionErrorResponse            GetPolicyRevisionErrorResponseType = "internal"
+	PolNotFoundGetPolicyRevisionErrorResponse         GetPolicyRevisionErrorResponseType = "pol.not_found"
+	PolPermissionDeniedGetPolicyRevisionErrorResponse GetPolicyRevisionErrorResponseType = "pol.permission_denied"
+	ReqInvalidGetPolicyRevisionErrorResponse          GetPolicyRevisionErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether GetPolicyRevisionErrorResponse is AuthUnauthorized.
+func (s GetPolicyRevisionErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetPolicyRevisionErrorResponse
+}
+
+// IsInternal reports whether GetPolicyRevisionErrorResponse is Internal.
+func (s GetPolicyRevisionErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetPolicyRevisionErrorResponse
+}
+
+// IsPolNotFound reports whether GetPolicyRevisionErrorResponse is PolNotFound.
+func (s GetPolicyRevisionErrorResponse) IsPolNotFound() bool {
+	return s.Type == PolNotFoundGetPolicyRevisionErrorResponse
+}
+
+// IsPolPermissionDenied reports whether GetPolicyRevisionErrorResponse is PolPermissionDenied.
+func (s GetPolicyRevisionErrorResponse) IsPolPermissionDenied() bool {
+	return s.Type == PolPermissionDeniedGetPolicyRevisionErrorResponse
+}
+
+// IsReqInvalid reports whether GetPolicyRevisionErrorResponse is ReqInvalid.
+func (s GetPolicyRevisionErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetPolicyRevisionErrorResponse
+}
+
+// SetAuthUnauthorized sets GetPolicyRevisionErrorResponse to AuthUnauthorized.
+func (s *GetPolicyRevisionErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetPolicyRevisionErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetPolicyRevisionErrorResponse is AuthUnauthorized.
+func (s GetPolicyRevisionErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetPolicyRevisionErrorResponse returns new GetPolicyRevisionErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetPolicyRevisionErrorResponse(v AuthUnauthorized) GetPolicyRevisionErrorResponse {
+	var s GetPolicyRevisionErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetPolicyRevisionErrorResponse to Internal.
+func (s *GetPolicyRevisionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetPolicyRevisionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetPolicyRevisionErrorResponse is Internal.
+func (s GetPolicyRevisionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetPolicyRevisionErrorResponse returns new GetPolicyRevisionErrorResponse from Internal.
+func NewInternalGetPolicyRevisionErrorResponse(v Internal) GetPolicyRevisionErrorResponse {
+	var s GetPolicyRevisionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetPolNotFound sets GetPolicyRevisionErrorResponse to PolNotFound.
+func (s *GetPolicyRevisionErrorResponse) SetPolNotFound(v PolNotFound) {
+	s.Type = PolNotFoundGetPolicyRevisionErrorResponse
+	s.PolNotFound = v
+}
+
+// GetPolNotFound returns PolNotFound and true boolean if GetPolicyRevisionErrorResponse is PolNotFound.
+func (s GetPolicyRevisionErrorResponse) GetPolNotFound() (v PolNotFound, ok bool) {
+	if !s.IsPolNotFound() {
+		return v, false
+	}
+	return s.PolNotFound, true
+}
+
+// NewPolNotFoundGetPolicyRevisionErrorResponse returns new GetPolicyRevisionErrorResponse from PolNotFound.
+func NewPolNotFoundGetPolicyRevisionErrorResponse(v PolNotFound) GetPolicyRevisionErrorResponse {
+	var s GetPolicyRevisionErrorResponse
+	s.SetPolNotFound(v)
+	return s
+}
+
+// SetPolPermissionDenied sets GetPolicyRevisionErrorResponse to PolPermissionDenied.
+func (s *GetPolicyRevisionErrorResponse) SetPolPermissionDenied(v PolPermissionDenied) {
+	s.Type = PolPermissionDeniedGetPolicyRevisionErrorResponse
+	s.PolPermissionDenied = v
+}
+
+// GetPolPermissionDenied returns PolPermissionDenied and true boolean if GetPolicyRevisionErrorResponse is PolPermissionDenied.
+func (s GetPolicyRevisionErrorResponse) GetPolPermissionDenied() (v PolPermissionDenied, ok bool) {
+	if !s.IsPolPermissionDenied() {
+		return v, false
+	}
+	return s.PolPermissionDenied, true
+}
+
+// NewPolPermissionDeniedGetPolicyRevisionErrorResponse returns new GetPolicyRevisionErrorResponse from PolPermissionDenied.
+func NewPolPermissionDeniedGetPolicyRevisionErrorResponse(v PolPermissionDenied) GetPolicyRevisionErrorResponse {
+	var s GetPolicyRevisionErrorResponse
+	s.SetPolPermissionDenied(v)
+	return s
+}
+
+// SetReqInvalid sets GetPolicyRevisionErrorResponse to ReqInvalid.
+func (s *GetPolicyRevisionErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetPolicyRevisionErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetPolicyRevisionErrorResponse is ReqInvalid.
+func (s GetPolicyRevisionErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetPolicyRevisionErrorResponse returns new GetPolicyRevisionErrorResponse from ReqInvalid.
+func NewReqInvalidGetPolicyRevisionErrorResponse(v ReqInvalid) GetPolicyRevisionErrorResponse {
+	var s GetPolicyRevisionErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetPolicyRevisionErrorResponseStatusCode wraps GetPolicyRevisionErrorResponse with StatusCode.
+type GetPolicyRevisionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetPolicyRevisionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetPolicyRevisionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetPolicyRevisionErrorResponseStatusCode) GetResponse() GetPolicyRevisionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetPolicyRevisionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetPolicyRevisionErrorResponseStatusCode) SetResponse(val GetPolicyRevisionErrorResponse) {
+	s.Response = val
+}
+
+func (*GetPolicyRevisionErrorResponseStatusCode) getPolicyRevisionRes() {}
+
 // GetProjectErrorResponse represents sum type.
 type GetProjectErrorResponse struct {
 	Type                 GetProjectErrorResponseType // switch on this field
@@ -29853,6 +33419,98 @@ func (*GetProjectNotFound) getProjectRes() {}
 type GetProjectUnauthorized ErrorDetails
 
 func (*GetProjectUnauthorized) getProjectRes() {}
+
+// GetReadyErrorResponse represents sum type.
+type GetReadyErrorResponse struct {
+	Type       GetReadyErrorResponseType // switch on this field
+	Internal   Internal
+	ReqInvalid ReqInvalid
+}
+
+// GetReadyErrorResponseType is oneOf type of GetReadyErrorResponse.
+type GetReadyErrorResponseType string
+
+// Possible values for GetReadyErrorResponseType.
+const (
+	InternalGetReadyErrorResponse   GetReadyErrorResponseType = "internal"
+	ReqInvalidGetReadyErrorResponse GetReadyErrorResponseType = "req.invalid"
+)
+
+// IsInternal reports whether GetReadyErrorResponse is Internal.
+func (s GetReadyErrorResponse) IsInternal() bool { return s.Type == InternalGetReadyErrorResponse }
+
+// IsReqInvalid reports whether GetReadyErrorResponse is ReqInvalid.
+func (s GetReadyErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidGetReadyErrorResponse }
+
+// SetInternal sets GetReadyErrorResponse to Internal.
+func (s *GetReadyErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetReadyErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetReadyErrorResponse is Internal.
+func (s GetReadyErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetReadyErrorResponse returns new GetReadyErrorResponse from Internal.
+func NewInternalGetReadyErrorResponse(v Internal) GetReadyErrorResponse {
+	var s GetReadyErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetReadyErrorResponse to ReqInvalid.
+func (s *GetReadyErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetReadyErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetReadyErrorResponse is ReqInvalid.
+func (s GetReadyErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetReadyErrorResponse returns new GetReadyErrorResponse from ReqInvalid.
+func NewReqInvalidGetReadyErrorResponse(v ReqInvalid) GetReadyErrorResponse {
+	var s GetReadyErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// GetReadyErrorResponseStatusCode wraps GetReadyErrorResponse with StatusCode.
+type GetReadyErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetReadyErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetReadyErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetReadyErrorResponseStatusCode) GetResponse() GetReadyErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetReadyErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetReadyErrorResponseStatusCode) SetResponse(val GetReadyErrorResponse) {
+	s.Response = val
+}
+
+func (*GetReadyErrorResponseStatusCode) getReadyRes() {}
 
 type GetReadyOK struct {
 	Data io.Reader
@@ -30420,6 +34078,182 @@ type GetSessionUnauthorized ErrorDetails
 
 func (*GetSessionUnauthorized) getSessionRes() {}
 
+// GetTeamErrorResponse represents sum type.
+type GetTeamErrorResponse struct {
+	Type                 GetTeamErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+	TeamTeamNotFound     TeamTeamNotFound
+	TeamPermissionDenied TeamPermissionDenied
+}
+
+// GetTeamErrorResponseType is oneOf type of GetTeamErrorResponse.
+type GetTeamErrorResponseType string
+
+// Possible values for GetTeamErrorResponseType.
+const (
+	AuthUnauthorizedGetTeamErrorResponse     GetTeamErrorResponseType = "auth.unauthorized"
+	InternalGetTeamErrorResponse             GetTeamErrorResponseType = "internal"
+	ReqInvalidGetTeamErrorResponse           GetTeamErrorResponseType = "req.invalid"
+	TeamTeamNotFoundGetTeamErrorResponse     GetTeamErrorResponseType = "team.team_not_found"
+	TeamPermissionDeniedGetTeamErrorResponse GetTeamErrorResponseType = "team.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether GetTeamErrorResponse is AuthUnauthorized.
+func (s GetTeamErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetTeamErrorResponse
+}
+
+// IsInternal reports whether GetTeamErrorResponse is Internal.
+func (s GetTeamErrorResponse) IsInternal() bool { return s.Type == InternalGetTeamErrorResponse }
+
+// IsReqInvalid reports whether GetTeamErrorResponse is ReqInvalid.
+func (s GetTeamErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidGetTeamErrorResponse }
+
+// IsTeamTeamNotFound reports whether GetTeamErrorResponse is TeamTeamNotFound.
+func (s GetTeamErrorResponse) IsTeamTeamNotFound() bool {
+	return s.Type == TeamTeamNotFoundGetTeamErrorResponse
+}
+
+// IsTeamPermissionDenied reports whether GetTeamErrorResponse is TeamPermissionDenied.
+func (s GetTeamErrorResponse) IsTeamPermissionDenied() bool {
+	return s.Type == TeamPermissionDeniedGetTeamErrorResponse
+}
+
+// SetAuthUnauthorized sets GetTeamErrorResponse to AuthUnauthorized.
+func (s *GetTeamErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetTeamErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetTeamErrorResponse is AuthUnauthorized.
+func (s GetTeamErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetTeamErrorResponse returns new GetTeamErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetTeamErrorResponse(v AuthUnauthorized) GetTeamErrorResponse {
+	var s GetTeamErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetTeamErrorResponse to Internal.
+func (s *GetTeamErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetTeamErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetTeamErrorResponse is Internal.
+func (s GetTeamErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetTeamErrorResponse returns new GetTeamErrorResponse from Internal.
+func NewInternalGetTeamErrorResponse(v Internal) GetTeamErrorResponse {
+	var s GetTeamErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetTeamErrorResponse to ReqInvalid.
+func (s *GetTeamErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetTeamErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetTeamErrorResponse is ReqInvalid.
+func (s GetTeamErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetTeamErrorResponse returns new GetTeamErrorResponse from ReqInvalid.
+func NewReqInvalidGetTeamErrorResponse(v ReqInvalid) GetTeamErrorResponse {
+	var s GetTeamErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetTeamTeamNotFound sets GetTeamErrorResponse to TeamTeamNotFound.
+func (s *GetTeamErrorResponse) SetTeamTeamNotFound(v TeamTeamNotFound) {
+	s.Type = TeamTeamNotFoundGetTeamErrorResponse
+	s.TeamTeamNotFound = v
+}
+
+// GetTeamTeamNotFound returns TeamTeamNotFound and true boolean if GetTeamErrorResponse is TeamTeamNotFound.
+func (s GetTeamErrorResponse) GetTeamTeamNotFound() (v TeamTeamNotFound, ok bool) {
+	if !s.IsTeamTeamNotFound() {
+		return v, false
+	}
+	return s.TeamTeamNotFound, true
+}
+
+// NewTeamTeamNotFoundGetTeamErrorResponse returns new GetTeamErrorResponse from TeamTeamNotFound.
+func NewTeamTeamNotFoundGetTeamErrorResponse(v TeamTeamNotFound) GetTeamErrorResponse {
+	var s GetTeamErrorResponse
+	s.SetTeamTeamNotFound(v)
+	return s
+}
+
+// SetTeamPermissionDenied sets GetTeamErrorResponse to TeamPermissionDenied.
+func (s *GetTeamErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
+	s.Type = TeamPermissionDeniedGetTeamErrorResponse
+	s.TeamPermissionDenied = v
+}
+
+// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if GetTeamErrorResponse is TeamPermissionDenied.
+func (s GetTeamErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
+	if !s.IsTeamPermissionDenied() {
+		return v, false
+	}
+	return s.TeamPermissionDenied, true
+}
+
+// NewTeamPermissionDeniedGetTeamErrorResponse returns new GetTeamErrorResponse from TeamPermissionDenied.
+func NewTeamPermissionDeniedGetTeamErrorResponse(v TeamPermissionDenied) GetTeamErrorResponse {
+	var s GetTeamErrorResponse
+	s.SetTeamPermissionDenied(v)
+	return s
+}
+
+// GetTeamErrorResponseStatusCode wraps GetTeamErrorResponse with StatusCode.
+type GetTeamErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetTeamErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetTeamErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetTeamErrorResponseStatusCode) GetResponse() GetTeamErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetTeamErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetTeamErrorResponseStatusCode) SetResponse(val GetTeamErrorResponse) {
+	s.Response = val
+}
+
+func (*GetTeamErrorResponseStatusCode) getTeamRes() {}
+
 type GetTeamNotFound ErrorDetails
 
 func (*GetTeamNotFound) getTeamRes() {}
@@ -30615,6 +34449,202 @@ func (*GetUserByIDNotFound) getUserByIDRes() {}
 type GetUserByIDUnauthorized ErrorDetails
 
 func (*GetUserByIDUnauthorized) getUserByIDRes() {}
+
+// GetUserPasswordStateErrorResponse represents sum type.
+type GetUserPasswordStateErrorResponse struct {
+	Type                 GetUserPasswordStateErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+	UserNotFound         UserNotFound
+	UserPermissionDenied UserPermissionDenied
+}
+
+// GetUserPasswordStateErrorResponseType is oneOf type of GetUserPasswordStateErrorResponse.
+type GetUserPasswordStateErrorResponseType string
+
+// Possible values for GetUserPasswordStateErrorResponseType.
+const (
+	AuthUnauthorizedGetUserPasswordStateErrorResponse     GetUserPasswordStateErrorResponseType = "auth.unauthorized"
+	InternalGetUserPasswordStateErrorResponse             GetUserPasswordStateErrorResponseType = "internal"
+	ReqInvalidGetUserPasswordStateErrorResponse           GetUserPasswordStateErrorResponseType = "req.invalid"
+	UserNotFoundGetUserPasswordStateErrorResponse         GetUserPasswordStateErrorResponseType = "user.not_found"
+	UserPermissionDeniedGetUserPasswordStateErrorResponse GetUserPasswordStateErrorResponseType = "user.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether GetUserPasswordStateErrorResponse is AuthUnauthorized.
+func (s GetUserPasswordStateErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetUserPasswordStateErrorResponse
+}
+
+// IsInternal reports whether GetUserPasswordStateErrorResponse is Internal.
+func (s GetUserPasswordStateErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetUserPasswordStateErrorResponse
+}
+
+// IsReqInvalid reports whether GetUserPasswordStateErrorResponse is ReqInvalid.
+func (s GetUserPasswordStateErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetUserPasswordStateErrorResponse
+}
+
+// IsUserNotFound reports whether GetUserPasswordStateErrorResponse is UserNotFound.
+func (s GetUserPasswordStateErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundGetUserPasswordStateErrorResponse
+}
+
+// IsUserPermissionDenied reports whether GetUserPasswordStateErrorResponse is UserPermissionDenied.
+func (s GetUserPasswordStateErrorResponse) IsUserPermissionDenied() bool {
+	return s.Type == UserPermissionDeniedGetUserPasswordStateErrorResponse
+}
+
+// SetAuthUnauthorized sets GetUserPasswordStateErrorResponse to AuthUnauthorized.
+func (s *GetUserPasswordStateErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetUserPasswordStateErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetUserPasswordStateErrorResponse is AuthUnauthorized.
+func (s GetUserPasswordStateErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetUserPasswordStateErrorResponse returns new GetUserPasswordStateErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetUserPasswordStateErrorResponse(v AuthUnauthorized) GetUserPasswordStateErrorResponse {
+	var s GetUserPasswordStateErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetUserPasswordStateErrorResponse to Internal.
+func (s *GetUserPasswordStateErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetUserPasswordStateErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetUserPasswordStateErrorResponse is Internal.
+func (s GetUserPasswordStateErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetUserPasswordStateErrorResponse returns new GetUserPasswordStateErrorResponse from Internal.
+func NewInternalGetUserPasswordStateErrorResponse(v Internal) GetUserPasswordStateErrorResponse {
+	var s GetUserPasswordStateErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetUserPasswordStateErrorResponse to ReqInvalid.
+func (s *GetUserPasswordStateErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetUserPasswordStateErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetUserPasswordStateErrorResponse is ReqInvalid.
+func (s GetUserPasswordStateErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetUserPasswordStateErrorResponse returns new GetUserPasswordStateErrorResponse from ReqInvalid.
+func NewReqInvalidGetUserPasswordStateErrorResponse(v ReqInvalid) GetUserPasswordStateErrorResponse {
+	var s GetUserPasswordStateErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets GetUserPasswordStateErrorResponse to UserNotFound.
+func (s *GetUserPasswordStateErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundGetUserPasswordStateErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if GetUserPasswordStateErrorResponse is UserNotFound.
+func (s GetUserPasswordStateErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundGetUserPasswordStateErrorResponse returns new GetUserPasswordStateErrorResponse from UserNotFound.
+func NewUserNotFoundGetUserPasswordStateErrorResponse(v UserNotFound) GetUserPasswordStateErrorResponse {
+	var s GetUserPasswordStateErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPermissionDenied sets GetUserPasswordStateErrorResponse to UserPermissionDenied.
+func (s *GetUserPasswordStateErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
+	s.Type = UserPermissionDeniedGetUserPasswordStateErrorResponse
+	s.UserPermissionDenied = v
+}
+
+// GetUserPermissionDenied returns UserPermissionDenied and true boolean if GetUserPasswordStateErrorResponse is UserPermissionDenied.
+func (s GetUserPasswordStateErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
+	if !s.IsUserPermissionDenied() {
+		return v, false
+	}
+	return s.UserPermissionDenied, true
+}
+
+// NewUserPermissionDeniedGetUserPasswordStateErrorResponse returns new GetUserPasswordStateErrorResponse from UserPermissionDenied.
+func NewUserPermissionDeniedGetUserPasswordStateErrorResponse(v UserPermissionDenied) GetUserPasswordStateErrorResponse {
+	var s GetUserPasswordStateErrorResponse
+	s.SetUserPermissionDenied(v)
+	return s
+}
+
+// GetUserPasswordStateErrorResponseStatusCode wraps GetUserPasswordStateErrorResponse with StatusCode.
+type GetUserPasswordStateErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetUserPasswordStateErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetUserPasswordStateErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetUserPasswordStateErrorResponseStatusCode) GetResponse() GetUserPasswordStateErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetUserPasswordStateErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetUserPasswordStateErrorResponseStatusCode) SetResponse(val GetUserPasswordStateErrorResponse) {
+	s.Response = val
+}
+
+func (*GetUserPasswordStateErrorResponseStatusCode) getUserPasswordStateRes() {}
+
+type GetUserPasswordStateForbidden ErrorDetails
+
+func (*GetUserPasswordStateForbidden) getUserPasswordStateRes() {}
+
+type GetUserPasswordStateInternalServerError ErrorDetails
+
+func (*GetUserPasswordStateInternalServerError) getUserPasswordStateRes() {}
+
+type GetUserPasswordStateNotFound ErrorDetails
+
+func (*GetUserPasswordStateNotFound) getUserPasswordStateRes() {}
+
+type GetUserPasswordStateUnauthorized ErrorDetails
+
+func (*GetUserPasswordStateUnauthorized) getUserPasswordStateRes() {}
 
 // GetVariableErrorResponse represents sum type.
 type GetVariableErrorResponse struct {
@@ -34552,6 +38582,268 @@ func (s *IdpUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
+// InitClaimErrorResponse represents sum type.
+type InitClaimErrorResponse struct {
+	Type                   InitClaimErrorResponseType // switch on this field
+	AuthUnauthorized       AuthUnauthorized
+	ClaimChallengeInvalid  ClaimChallengeInvalid
+	Internal               Internal
+	ProjAlreadyClaimed     ProjAlreadyClaimed
+	ProjClaimWindowExpired ProjClaimWindowExpired
+	ProjNotFound           ProjNotFound
+	ProjPermissionDenied   ProjPermissionDenied
+	ReqInvalid             ReqInvalid
+}
+
+// InitClaimErrorResponseType is oneOf type of InitClaimErrorResponse.
+type InitClaimErrorResponseType string
+
+// Possible values for InitClaimErrorResponseType.
+const (
+	AuthUnauthorizedInitClaimErrorResponse       InitClaimErrorResponseType = "auth.unauthorized"
+	ClaimChallengeInvalidInitClaimErrorResponse  InitClaimErrorResponseType = "claim_challenge.invalid"
+	InternalInitClaimErrorResponse               InitClaimErrorResponseType = "internal"
+	ProjAlreadyClaimedInitClaimErrorResponse     InitClaimErrorResponseType = "proj.already_claimed"
+	ProjClaimWindowExpiredInitClaimErrorResponse InitClaimErrorResponseType = "proj.claim_window_expired"
+	ProjNotFoundInitClaimErrorResponse           InitClaimErrorResponseType = "proj.not_found"
+	ProjPermissionDeniedInitClaimErrorResponse   InitClaimErrorResponseType = "proj.permission_denied"
+	ReqInvalidInitClaimErrorResponse             InitClaimErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether InitClaimErrorResponse is AuthUnauthorized.
+func (s InitClaimErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedInitClaimErrorResponse
+}
+
+// IsClaimChallengeInvalid reports whether InitClaimErrorResponse is ClaimChallengeInvalid.
+func (s InitClaimErrorResponse) IsClaimChallengeInvalid() bool {
+	return s.Type == ClaimChallengeInvalidInitClaimErrorResponse
+}
+
+// IsInternal reports whether InitClaimErrorResponse is Internal.
+func (s InitClaimErrorResponse) IsInternal() bool { return s.Type == InternalInitClaimErrorResponse }
+
+// IsProjAlreadyClaimed reports whether InitClaimErrorResponse is ProjAlreadyClaimed.
+func (s InitClaimErrorResponse) IsProjAlreadyClaimed() bool {
+	return s.Type == ProjAlreadyClaimedInitClaimErrorResponse
+}
+
+// IsProjClaimWindowExpired reports whether InitClaimErrorResponse is ProjClaimWindowExpired.
+func (s InitClaimErrorResponse) IsProjClaimWindowExpired() bool {
+	return s.Type == ProjClaimWindowExpiredInitClaimErrorResponse
+}
+
+// IsProjNotFound reports whether InitClaimErrorResponse is ProjNotFound.
+func (s InitClaimErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundInitClaimErrorResponse
+}
+
+// IsProjPermissionDenied reports whether InitClaimErrorResponse is ProjPermissionDenied.
+func (s InitClaimErrorResponse) IsProjPermissionDenied() bool {
+	return s.Type == ProjPermissionDeniedInitClaimErrorResponse
+}
+
+// IsReqInvalid reports whether InitClaimErrorResponse is ReqInvalid.
+func (s InitClaimErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidInitClaimErrorResponse
+}
+
+// SetAuthUnauthorized sets InitClaimErrorResponse to AuthUnauthorized.
+func (s *InitClaimErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedInitClaimErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if InitClaimErrorResponse is AuthUnauthorized.
+func (s InitClaimErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedInitClaimErrorResponse returns new InitClaimErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedInitClaimErrorResponse(v AuthUnauthorized) InitClaimErrorResponse {
+	var s InitClaimErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetClaimChallengeInvalid sets InitClaimErrorResponse to ClaimChallengeInvalid.
+func (s *InitClaimErrorResponse) SetClaimChallengeInvalid(v ClaimChallengeInvalid) {
+	s.Type = ClaimChallengeInvalidInitClaimErrorResponse
+	s.ClaimChallengeInvalid = v
+}
+
+// GetClaimChallengeInvalid returns ClaimChallengeInvalid and true boolean if InitClaimErrorResponse is ClaimChallengeInvalid.
+func (s InitClaimErrorResponse) GetClaimChallengeInvalid() (v ClaimChallengeInvalid, ok bool) {
+	if !s.IsClaimChallengeInvalid() {
+		return v, false
+	}
+	return s.ClaimChallengeInvalid, true
+}
+
+// NewClaimChallengeInvalidInitClaimErrorResponse returns new InitClaimErrorResponse from ClaimChallengeInvalid.
+func NewClaimChallengeInvalidInitClaimErrorResponse(v ClaimChallengeInvalid) InitClaimErrorResponse {
+	var s InitClaimErrorResponse
+	s.SetClaimChallengeInvalid(v)
+	return s
+}
+
+// SetInternal sets InitClaimErrorResponse to Internal.
+func (s *InitClaimErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalInitClaimErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if InitClaimErrorResponse is Internal.
+func (s InitClaimErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalInitClaimErrorResponse returns new InitClaimErrorResponse from Internal.
+func NewInternalInitClaimErrorResponse(v Internal) InitClaimErrorResponse {
+	var s InitClaimErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetProjAlreadyClaimed sets InitClaimErrorResponse to ProjAlreadyClaimed.
+func (s *InitClaimErrorResponse) SetProjAlreadyClaimed(v ProjAlreadyClaimed) {
+	s.Type = ProjAlreadyClaimedInitClaimErrorResponse
+	s.ProjAlreadyClaimed = v
+}
+
+// GetProjAlreadyClaimed returns ProjAlreadyClaimed and true boolean if InitClaimErrorResponse is ProjAlreadyClaimed.
+func (s InitClaimErrorResponse) GetProjAlreadyClaimed() (v ProjAlreadyClaimed, ok bool) {
+	if !s.IsProjAlreadyClaimed() {
+		return v, false
+	}
+	return s.ProjAlreadyClaimed, true
+}
+
+// NewProjAlreadyClaimedInitClaimErrorResponse returns new InitClaimErrorResponse from ProjAlreadyClaimed.
+func NewProjAlreadyClaimedInitClaimErrorResponse(v ProjAlreadyClaimed) InitClaimErrorResponse {
+	var s InitClaimErrorResponse
+	s.SetProjAlreadyClaimed(v)
+	return s
+}
+
+// SetProjClaimWindowExpired sets InitClaimErrorResponse to ProjClaimWindowExpired.
+func (s *InitClaimErrorResponse) SetProjClaimWindowExpired(v ProjClaimWindowExpired) {
+	s.Type = ProjClaimWindowExpiredInitClaimErrorResponse
+	s.ProjClaimWindowExpired = v
+}
+
+// GetProjClaimWindowExpired returns ProjClaimWindowExpired and true boolean if InitClaimErrorResponse is ProjClaimWindowExpired.
+func (s InitClaimErrorResponse) GetProjClaimWindowExpired() (v ProjClaimWindowExpired, ok bool) {
+	if !s.IsProjClaimWindowExpired() {
+		return v, false
+	}
+	return s.ProjClaimWindowExpired, true
+}
+
+// NewProjClaimWindowExpiredInitClaimErrorResponse returns new InitClaimErrorResponse from ProjClaimWindowExpired.
+func NewProjClaimWindowExpiredInitClaimErrorResponse(v ProjClaimWindowExpired) InitClaimErrorResponse {
+	var s InitClaimErrorResponse
+	s.SetProjClaimWindowExpired(v)
+	return s
+}
+
+// SetProjNotFound sets InitClaimErrorResponse to ProjNotFound.
+func (s *InitClaimErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundInitClaimErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if InitClaimErrorResponse is ProjNotFound.
+func (s InitClaimErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundInitClaimErrorResponse returns new InitClaimErrorResponse from ProjNotFound.
+func NewProjNotFoundInitClaimErrorResponse(v ProjNotFound) InitClaimErrorResponse {
+	var s InitClaimErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjPermissionDenied sets InitClaimErrorResponse to ProjPermissionDenied.
+func (s *InitClaimErrorResponse) SetProjPermissionDenied(v ProjPermissionDenied) {
+	s.Type = ProjPermissionDeniedInitClaimErrorResponse
+	s.ProjPermissionDenied = v
+}
+
+// GetProjPermissionDenied returns ProjPermissionDenied and true boolean if InitClaimErrorResponse is ProjPermissionDenied.
+func (s InitClaimErrorResponse) GetProjPermissionDenied() (v ProjPermissionDenied, ok bool) {
+	if !s.IsProjPermissionDenied() {
+		return v, false
+	}
+	return s.ProjPermissionDenied, true
+}
+
+// NewProjPermissionDeniedInitClaimErrorResponse returns new InitClaimErrorResponse from ProjPermissionDenied.
+func NewProjPermissionDeniedInitClaimErrorResponse(v ProjPermissionDenied) InitClaimErrorResponse {
+	var s InitClaimErrorResponse
+	s.SetProjPermissionDenied(v)
+	return s
+}
+
+// SetReqInvalid sets InitClaimErrorResponse to ReqInvalid.
+func (s *InitClaimErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidInitClaimErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if InitClaimErrorResponse is ReqInvalid.
+func (s InitClaimErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidInitClaimErrorResponse returns new InitClaimErrorResponse from ReqInvalid.
+func NewReqInvalidInitClaimErrorResponse(v ReqInvalid) InitClaimErrorResponse {
+	var s InitClaimErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// InitClaimErrorResponseStatusCode wraps InitClaimErrorResponse with StatusCode.
+type InitClaimErrorResponseStatusCode struct {
+	StatusCode int
+	Response   InitClaimErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *InitClaimErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *InitClaimErrorResponseStatusCode) GetResponse() InitClaimErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *InitClaimErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *InitClaimErrorResponseStatusCode) SetResponse(val InitClaimErrorResponse) {
+	s.Response = val
+}
+
+func (*InitClaimErrorResponseStatusCode) initClaimRes() {}
+
 // The claim challenge minted for a project.
 // Ref: #
 type InitClaimResponse struct {
@@ -35008,6 +39300,186 @@ func (s *IssueChallengeRequestPasskeyOptionsUserVerification) UnmarshalText(data
 
 type Limit int
 
+// ListBrandingErrorResponse represents sum type.
+type ListBrandingErrorResponse struct {
+	Type                 ListBrandingErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	BrndNotFound         BrndNotFound
+	BrndPermissionDenied BrndPermissionDenied
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+}
+
+// ListBrandingErrorResponseType is oneOf type of ListBrandingErrorResponse.
+type ListBrandingErrorResponseType string
+
+// Possible values for ListBrandingErrorResponseType.
+const (
+	AuthUnauthorizedListBrandingErrorResponse     ListBrandingErrorResponseType = "auth.unauthorized"
+	BrndNotFoundListBrandingErrorResponse         ListBrandingErrorResponseType = "brnd.not_found"
+	BrndPermissionDeniedListBrandingErrorResponse ListBrandingErrorResponseType = "brnd.permission_denied"
+	InternalListBrandingErrorResponse             ListBrandingErrorResponseType = "internal"
+	ReqInvalidListBrandingErrorResponse           ListBrandingErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether ListBrandingErrorResponse is AuthUnauthorized.
+func (s ListBrandingErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListBrandingErrorResponse
+}
+
+// IsBrndNotFound reports whether ListBrandingErrorResponse is BrndNotFound.
+func (s ListBrandingErrorResponse) IsBrndNotFound() bool {
+	return s.Type == BrndNotFoundListBrandingErrorResponse
+}
+
+// IsBrndPermissionDenied reports whether ListBrandingErrorResponse is BrndPermissionDenied.
+func (s ListBrandingErrorResponse) IsBrndPermissionDenied() bool {
+	return s.Type == BrndPermissionDeniedListBrandingErrorResponse
+}
+
+// IsInternal reports whether ListBrandingErrorResponse is Internal.
+func (s ListBrandingErrorResponse) IsInternal() bool {
+	return s.Type == InternalListBrandingErrorResponse
+}
+
+// IsReqInvalid reports whether ListBrandingErrorResponse is ReqInvalid.
+func (s ListBrandingErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListBrandingErrorResponse
+}
+
+// SetAuthUnauthorized sets ListBrandingErrorResponse to AuthUnauthorized.
+func (s *ListBrandingErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListBrandingErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListBrandingErrorResponse is AuthUnauthorized.
+func (s ListBrandingErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListBrandingErrorResponse returns new ListBrandingErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListBrandingErrorResponse(v AuthUnauthorized) ListBrandingErrorResponse {
+	var s ListBrandingErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetBrndNotFound sets ListBrandingErrorResponse to BrndNotFound.
+func (s *ListBrandingErrorResponse) SetBrndNotFound(v BrndNotFound) {
+	s.Type = BrndNotFoundListBrandingErrorResponse
+	s.BrndNotFound = v
+}
+
+// GetBrndNotFound returns BrndNotFound and true boolean if ListBrandingErrorResponse is BrndNotFound.
+func (s ListBrandingErrorResponse) GetBrndNotFound() (v BrndNotFound, ok bool) {
+	if !s.IsBrndNotFound() {
+		return v, false
+	}
+	return s.BrndNotFound, true
+}
+
+// NewBrndNotFoundListBrandingErrorResponse returns new ListBrandingErrorResponse from BrndNotFound.
+func NewBrndNotFoundListBrandingErrorResponse(v BrndNotFound) ListBrandingErrorResponse {
+	var s ListBrandingErrorResponse
+	s.SetBrndNotFound(v)
+	return s
+}
+
+// SetBrndPermissionDenied sets ListBrandingErrorResponse to BrndPermissionDenied.
+func (s *ListBrandingErrorResponse) SetBrndPermissionDenied(v BrndPermissionDenied) {
+	s.Type = BrndPermissionDeniedListBrandingErrorResponse
+	s.BrndPermissionDenied = v
+}
+
+// GetBrndPermissionDenied returns BrndPermissionDenied and true boolean if ListBrandingErrorResponse is BrndPermissionDenied.
+func (s ListBrandingErrorResponse) GetBrndPermissionDenied() (v BrndPermissionDenied, ok bool) {
+	if !s.IsBrndPermissionDenied() {
+		return v, false
+	}
+	return s.BrndPermissionDenied, true
+}
+
+// NewBrndPermissionDeniedListBrandingErrorResponse returns new ListBrandingErrorResponse from BrndPermissionDenied.
+func NewBrndPermissionDeniedListBrandingErrorResponse(v BrndPermissionDenied) ListBrandingErrorResponse {
+	var s ListBrandingErrorResponse
+	s.SetBrndPermissionDenied(v)
+	return s
+}
+
+// SetInternal sets ListBrandingErrorResponse to Internal.
+func (s *ListBrandingErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListBrandingErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListBrandingErrorResponse is Internal.
+func (s ListBrandingErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListBrandingErrorResponse returns new ListBrandingErrorResponse from Internal.
+func NewInternalListBrandingErrorResponse(v Internal) ListBrandingErrorResponse {
+	var s ListBrandingErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListBrandingErrorResponse to ReqInvalid.
+func (s *ListBrandingErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListBrandingErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListBrandingErrorResponse is ReqInvalid.
+func (s ListBrandingErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListBrandingErrorResponse returns new ListBrandingErrorResponse from ReqInvalid.
+func NewReqInvalidListBrandingErrorResponse(v ReqInvalid) ListBrandingErrorResponse {
+	var s ListBrandingErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// ListBrandingErrorResponseStatusCode wraps ListBrandingErrorResponse with StatusCode.
+type ListBrandingErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListBrandingErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListBrandingErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListBrandingErrorResponseStatusCode) GetResponse() ListBrandingErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListBrandingErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListBrandingErrorResponseStatusCode) SetResponse(val ListBrandingErrorResponse) {
+	s.Response = val
+}
+
+func (*ListBrandingErrorResponseStatusCode) listBrandingRes() {}
+
 type ListBrandingResponse []ListBrandingResponseItem
 
 func (*ListBrandingResponse) listBrandingRes() {}
@@ -35046,7 +39518,6 @@ type ListDeploymentsErrorResponse struct {
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	Internal            Internal
-	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 }
 
@@ -35059,7 +39530,6 @@ const (
 	DepNotFoundListDeploymentsErrorResponse         ListDeploymentsErrorResponseType = "dep.not_found"
 	DepPermissionDeniedListDeploymentsErrorResponse ListDeploymentsErrorResponseType = "dep.permission_denied"
 	InternalListDeploymentsErrorResponse            ListDeploymentsErrorResponseType = "internal"
-	NotImplementedListDeploymentsErrorResponse      ListDeploymentsErrorResponseType = "not_implemented"
 	ReqInvalidListDeploymentsErrorResponse          ListDeploymentsErrorResponseType = "req.invalid"
 )
 
@@ -35081,11 +39551,6 @@ func (s ListDeploymentsErrorResponse) IsDepPermissionDenied() bool {
 // IsInternal reports whether ListDeploymentsErrorResponse is Internal.
 func (s ListDeploymentsErrorResponse) IsInternal() bool {
 	return s.Type == InternalListDeploymentsErrorResponse
-}
-
-// IsNotImplemented reports whether ListDeploymentsErrorResponse is NotImplemented.
-func (s ListDeploymentsErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedListDeploymentsErrorResponse
 }
 
 // IsReqInvalid reports whether ListDeploymentsErrorResponse is ReqInvalid.
@@ -35174,27 +39639,6 @@ func (s ListDeploymentsErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalListDeploymentsErrorResponse(v Internal) ListDeploymentsErrorResponse {
 	var s ListDeploymentsErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetNotImplemented sets ListDeploymentsErrorResponse to NotImplemented.
-func (s *ListDeploymentsErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedListDeploymentsErrorResponse
-	s.NotImplemented = v
-}
-
-// GetNotImplemented returns NotImplemented and true boolean if ListDeploymentsErrorResponse is NotImplemented.
-func (s ListDeploymentsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
-	if !s.IsNotImplemented() {
-		return v, false
-	}
-	return s.NotImplemented, true
-}
-
-// NewNotImplementedListDeploymentsErrorResponse returns new ListDeploymentsErrorResponse from NotImplemented.
-func NewNotImplementedListDeploymentsErrorResponse(v NotImplemented) ListDeploymentsErrorResponse {
-	var s ListDeploymentsErrorResponse
-	s.SetNotImplemented(v)
 	return s
 }
 
@@ -35350,6 +39794,212 @@ func (s *ListEventsCategoryItem) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// ListEventsErrorResponse represents sum type.
+type ListEventsErrorResponse struct {
+	Type                ListEventsErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	EvtNotFound         EvtNotFound
+	EvtPermissionDenied EvtPermissionDenied
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+}
+
+// ListEventsErrorResponseType is oneOf type of ListEventsErrorResponse.
+type ListEventsErrorResponseType string
+
+// Possible values for ListEventsErrorResponseType.
+const (
+	AuthUnauthorizedListEventsErrorResponse    ListEventsErrorResponseType = "auth.unauthorized"
+	EvtInvalidListEventsErrorResponse          ListEventsErrorResponseType = "evt.invalid"
+	EvtNotFoundListEventsErrorResponse         ListEventsErrorResponseType = "evt.not_found"
+	EvtPermissionDeniedListEventsErrorResponse ListEventsErrorResponseType = "evt.permission_denied"
+	InternalListEventsErrorResponse            ListEventsErrorResponseType = "internal"
+	ReqInvalidListEventsErrorResponse          ListEventsErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether ListEventsErrorResponse is AuthUnauthorized.
+func (s ListEventsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListEventsErrorResponse
+}
+
+// IsEvtInvalid reports whether ListEventsErrorResponse is EvtInvalid.
+func (s ListEventsErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidListEventsErrorResponse
+}
+
+// IsEvtNotFound reports whether ListEventsErrorResponse is EvtNotFound.
+func (s ListEventsErrorResponse) IsEvtNotFound() bool {
+	return s.Type == EvtNotFoundListEventsErrorResponse
+}
+
+// IsEvtPermissionDenied reports whether ListEventsErrorResponse is EvtPermissionDenied.
+func (s ListEventsErrorResponse) IsEvtPermissionDenied() bool {
+	return s.Type == EvtPermissionDeniedListEventsErrorResponse
+}
+
+// IsInternal reports whether ListEventsErrorResponse is Internal.
+func (s ListEventsErrorResponse) IsInternal() bool { return s.Type == InternalListEventsErrorResponse }
+
+// IsReqInvalid reports whether ListEventsErrorResponse is ReqInvalid.
+func (s ListEventsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListEventsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListEventsErrorResponse to AuthUnauthorized.
+func (s *ListEventsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListEventsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListEventsErrorResponse is AuthUnauthorized.
+func (s ListEventsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListEventsErrorResponse returns new ListEventsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListEventsErrorResponse(v AuthUnauthorized) ListEventsErrorResponse {
+	var s ListEventsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets ListEventsErrorResponse to EvtInvalid.
+func (s *ListEventsErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidListEventsErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if ListEventsErrorResponse is EvtInvalid.
+func (s ListEventsErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidListEventsErrorResponse returns new ListEventsErrorResponse from EvtInvalid.
+func NewEvtInvalidListEventsErrorResponse(v EvtInvalid) ListEventsErrorResponse {
+	var s ListEventsErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetEvtNotFound sets ListEventsErrorResponse to EvtNotFound.
+func (s *ListEventsErrorResponse) SetEvtNotFound(v EvtNotFound) {
+	s.Type = EvtNotFoundListEventsErrorResponse
+	s.EvtNotFound = v
+}
+
+// GetEvtNotFound returns EvtNotFound and true boolean if ListEventsErrorResponse is EvtNotFound.
+func (s ListEventsErrorResponse) GetEvtNotFound() (v EvtNotFound, ok bool) {
+	if !s.IsEvtNotFound() {
+		return v, false
+	}
+	return s.EvtNotFound, true
+}
+
+// NewEvtNotFoundListEventsErrorResponse returns new ListEventsErrorResponse from EvtNotFound.
+func NewEvtNotFoundListEventsErrorResponse(v EvtNotFound) ListEventsErrorResponse {
+	var s ListEventsErrorResponse
+	s.SetEvtNotFound(v)
+	return s
+}
+
+// SetEvtPermissionDenied sets ListEventsErrorResponse to EvtPermissionDenied.
+func (s *ListEventsErrorResponse) SetEvtPermissionDenied(v EvtPermissionDenied) {
+	s.Type = EvtPermissionDeniedListEventsErrorResponse
+	s.EvtPermissionDenied = v
+}
+
+// GetEvtPermissionDenied returns EvtPermissionDenied and true boolean if ListEventsErrorResponse is EvtPermissionDenied.
+func (s ListEventsErrorResponse) GetEvtPermissionDenied() (v EvtPermissionDenied, ok bool) {
+	if !s.IsEvtPermissionDenied() {
+		return v, false
+	}
+	return s.EvtPermissionDenied, true
+}
+
+// NewEvtPermissionDeniedListEventsErrorResponse returns new ListEventsErrorResponse from EvtPermissionDenied.
+func NewEvtPermissionDeniedListEventsErrorResponse(v EvtPermissionDenied) ListEventsErrorResponse {
+	var s ListEventsErrorResponse
+	s.SetEvtPermissionDenied(v)
+	return s
+}
+
+// SetInternal sets ListEventsErrorResponse to Internal.
+func (s *ListEventsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListEventsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListEventsErrorResponse is Internal.
+func (s ListEventsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListEventsErrorResponse returns new ListEventsErrorResponse from Internal.
+func NewInternalListEventsErrorResponse(v Internal) ListEventsErrorResponse {
+	var s ListEventsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListEventsErrorResponse to ReqInvalid.
+func (s *ListEventsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListEventsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListEventsErrorResponse is ReqInvalid.
+func (s ListEventsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListEventsErrorResponse returns new ListEventsErrorResponse from ReqInvalid.
+func NewReqInvalidListEventsErrorResponse(v ReqInvalid) ListEventsErrorResponse {
+	var s ListEventsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// ListEventsErrorResponseStatusCode wraps ListEventsErrorResponse with StatusCode.
+type ListEventsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListEventsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListEventsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListEventsErrorResponseStatusCode) GetResponse() ListEventsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListEventsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListEventsErrorResponseStatusCode) SetResponse(val ListEventsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListEventsErrorResponseStatusCode) listEventsRes() {}
 
 type ListEventsForbidden ErrorDetails
 
@@ -36056,6 +40706,366 @@ func (*ListIdpRevisionsResponse) listIdpRevisionsRes() {}
 type ListIdpRevisionsUnauthorized ErrorDetails
 
 func (*ListIdpRevisionsUnauthorized) listIdpRevisionsRes() {}
+
+// ListMyIdentityLinksErrorResponse represents sum type.
+type ListMyIdentityLinksErrorResponse struct {
+	Type                ListMyIdentityLinksErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
+}
+
+// ListMyIdentityLinksErrorResponseType is oneOf type of ListMyIdentityLinksErrorResponse.
+type ListMyIdentityLinksErrorResponseType string
+
+// Possible values for ListMyIdentityLinksErrorResponseType.
+const (
+	AuthUnauthorizedListMyIdentityLinksErrorResponse    ListMyIdentityLinksErrorResponseType = "auth.unauthorized"
+	InternalListMyIdentityLinksErrorResponse            ListMyIdentityLinksErrorResponseType = "internal"
+	ReqInvalidListMyIdentityLinksErrorResponse          ListMyIdentityLinksErrorResponseType = "req.invalid"
+	SessProjectMismatchListMyIdentityLinksErrorResponse ListMyIdentityLinksErrorResponseType = "sess.project_mismatch"
+	UserNotFoundListMyIdentityLinksErrorResponse        ListMyIdentityLinksErrorResponseType = "user.not_found"
+)
+
+// IsAuthUnauthorized reports whether ListMyIdentityLinksErrorResponse is AuthUnauthorized.
+func (s ListMyIdentityLinksErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListMyIdentityLinksErrorResponse
+}
+
+// IsInternal reports whether ListMyIdentityLinksErrorResponse is Internal.
+func (s ListMyIdentityLinksErrorResponse) IsInternal() bool {
+	return s.Type == InternalListMyIdentityLinksErrorResponse
+}
+
+// IsReqInvalid reports whether ListMyIdentityLinksErrorResponse is ReqInvalid.
+func (s ListMyIdentityLinksErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListMyIdentityLinksErrorResponse
+}
+
+// IsSessProjectMismatch reports whether ListMyIdentityLinksErrorResponse is SessProjectMismatch.
+func (s ListMyIdentityLinksErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchListMyIdentityLinksErrorResponse
+}
+
+// IsUserNotFound reports whether ListMyIdentityLinksErrorResponse is UserNotFound.
+func (s ListMyIdentityLinksErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundListMyIdentityLinksErrorResponse
+}
+
+// SetAuthUnauthorized sets ListMyIdentityLinksErrorResponse to AuthUnauthorized.
+func (s *ListMyIdentityLinksErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListMyIdentityLinksErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListMyIdentityLinksErrorResponse is AuthUnauthorized.
+func (s ListMyIdentityLinksErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListMyIdentityLinksErrorResponse(v AuthUnauthorized) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListMyIdentityLinksErrorResponse to Internal.
+func (s *ListMyIdentityLinksErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListMyIdentityLinksErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListMyIdentityLinksErrorResponse is Internal.
+func (s ListMyIdentityLinksErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from Internal.
+func NewInternalListMyIdentityLinksErrorResponse(v Internal) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListMyIdentityLinksErrorResponse to ReqInvalid.
+func (s *ListMyIdentityLinksErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListMyIdentityLinksErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListMyIdentityLinksErrorResponse is ReqInvalid.
+func (s ListMyIdentityLinksErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from ReqInvalid.
+func NewReqInvalidListMyIdentityLinksErrorResponse(v ReqInvalid) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets ListMyIdentityLinksErrorResponse to SessProjectMismatch.
+func (s *ListMyIdentityLinksErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchListMyIdentityLinksErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if ListMyIdentityLinksErrorResponse is SessProjectMismatch.
+func (s ListMyIdentityLinksErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchListMyIdentityLinksErrorResponse(v SessProjectMismatch) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUserNotFound sets ListMyIdentityLinksErrorResponse to UserNotFound.
+func (s *ListMyIdentityLinksErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundListMyIdentityLinksErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if ListMyIdentityLinksErrorResponse is UserNotFound.
+func (s ListMyIdentityLinksErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from UserNotFound.
+func NewUserNotFoundListMyIdentityLinksErrorResponse(v UserNotFound) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// ListMyIdentityLinksErrorResponseStatusCode wraps ListMyIdentityLinksErrorResponse with StatusCode.
+type ListMyIdentityLinksErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListMyIdentityLinksErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListMyIdentityLinksErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyIdentityLinksErrorResponseStatusCode) GetResponse() ListMyIdentityLinksErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListMyIdentityLinksErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyIdentityLinksErrorResponseStatusCode) SetResponse(val ListMyIdentityLinksErrorResponse) {
+	s.Response = val
+}
+
+func (*ListMyIdentityLinksErrorResponseStatusCode) listMyIdentityLinksRes() {}
+
+// ListMyPasskeysErrorResponse represents sum type.
+type ListMyPasskeysErrorResponse struct {
+	Type                ListMyPasskeysErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	UserNotFound        UserNotFound
+}
+
+// ListMyPasskeysErrorResponseType is oneOf type of ListMyPasskeysErrorResponse.
+type ListMyPasskeysErrorResponseType string
+
+// Possible values for ListMyPasskeysErrorResponseType.
+const (
+	AuthUnauthorizedListMyPasskeysErrorResponse    ListMyPasskeysErrorResponseType = "auth.unauthorized"
+	InternalListMyPasskeysErrorResponse            ListMyPasskeysErrorResponseType = "internal"
+	ReqInvalidListMyPasskeysErrorResponse          ListMyPasskeysErrorResponseType = "req.invalid"
+	SessProjectMismatchListMyPasskeysErrorResponse ListMyPasskeysErrorResponseType = "sess.project_mismatch"
+	UserNotFoundListMyPasskeysErrorResponse        ListMyPasskeysErrorResponseType = "user.not_found"
+)
+
+// IsAuthUnauthorized reports whether ListMyPasskeysErrorResponse is AuthUnauthorized.
+func (s ListMyPasskeysErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListMyPasskeysErrorResponse
+}
+
+// IsInternal reports whether ListMyPasskeysErrorResponse is Internal.
+func (s ListMyPasskeysErrorResponse) IsInternal() bool {
+	return s.Type == InternalListMyPasskeysErrorResponse
+}
+
+// IsReqInvalid reports whether ListMyPasskeysErrorResponse is ReqInvalid.
+func (s ListMyPasskeysErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListMyPasskeysErrorResponse
+}
+
+// IsSessProjectMismatch reports whether ListMyPasskeysErrorResponse is SessProjectMismatch.
+func (s ListMyPasskeysErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchListMyPasskeysErrorResponse
+}
+
+// IsUserNotFound reports whether ListMyPasskeysErrorResponse is UserNotFound.
+func (s ListMyPasskeysErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundListMyPasskeysErrorResponse
+}
+
+// SetAuthUnauthorized sets ListMyPasskeysErrorResponse to AuthUnauthorized.
+func (s *ListMyPasskeysErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListMyPasskeysErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListMyPasskeysErrorResponse is AuthUnauthorized.
+func (s ListMyPasskeysErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListMyPasskeysErrorResponse(v AuthUnauthorized) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListMyPasskeysErrorResponse to Internal.
+func (s *ListMyPasskeysErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListMyPasskeysErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListMyPasskeysErrorResponse is Internal.
+func (s ListMyPasskeysErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from Internal.
+func NewInternalListMyPasskeysErrorResponse(v Internal) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListMyPasskeysErrorResponse to ReqInvalid.
+func (s *ListMyPasskeysErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListMyPasskeysErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListMyPasskeysErrorResponse is ReqInvalid.
+func (s ListMyPasskeysErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from ReqInvalid.
+func NewReqInvalidListMyPasskeysErrorResponse(v ReqInvalid) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets ListMyPasskeysErrorResponse to SessProjectMismatch.
+func (s *ListMyPasskeysErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchListMyPasskeysErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if ListMyPasskeysErrorResponse is SessProjectMismatch.
+func (s ListMyPasskeysErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchListMyPasskeysErrorResponse(v SessProjectMismatch) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUserNotFound sets ListMyPasskeysErrorResponse to UserNotFound.
+func (s *ListMyPasskeysErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundListMyPasskeysErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if ListMyPasskeysErrorResponse is UserNotFound.
+func (s ListMyPasskeysErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from UserNotFound.
+func NewUserNotFoundListMyPasskeysErrorResponse(v UserNotFound) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// ListMyPasskeysErrorResponseStatusCode wraps ListMyPasskeysErrorResponse with StatusCode.
+type ListMyPasskeysErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListMyPasskeysErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListMyPasskeysErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyPasskeysErrorResponseStatusCode) GetResponse() ListMyPasskeysErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListMyPasskeysErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyPasskeysErrorResponseStatusCode) SetResponse(val ListMyPasskeysErrorResponse) {
+	s.Response = val
+}
+
+func (*ListMyPasskeysErrorResponseStatusCode) listMyPasskeysRes() {}
 
 type ListMyProjectsBadRequest ErrorDetails
 
@@ -37418,6 +42428,34 @@ func (s *ListUserIdentityLinksResponse) SetNextPageToken(val OptNilPageToken) {
 
 func (*ListUserIdentityLinksResponse) listUserIdentityLinksRes() {}
 
+// ListUserIdentityLinksResponseHeaders wraps ListUserIdentityLinksResponse with response headers.
+type ListUserIdentityLinksResponseHeaders struct {
+	CacheControl OptString
+	Response     ListUserIdentityLinksResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *ListUserIdentityLinksResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *ListUserIdentityLinksResponseHeaders) GetResponse() ListUserIdentityLinksResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *ListUserIdentityLinksResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListUserIdentityLinksResponseHeaders) SetResponse(val ListUserIdentityLinksResponse) {
+	s.Response = val
+}
+
+func (*ListUserIdentityLinksResponseHeaders) listMyIdentityLinksRes() {}
+
 type ListUserIdentityLinksUnauthorized ErrorDetails
 
 func (*ListUserIdentityLinksUnauthorized) listUserIdentityLinksRes() {}
@@ -37648,6 +42686,34 @@ func (s *ListUserPasskeysResponse) SetNextPageToken(val OptNilPageToken) {
 }
 
 func (*ListUserPasskeysResponse) listUserPasskeysRes() {}
+
+// ListUserPasskeysResponseHeaders wraps ListUserPasskeysResponse with response headers.
+type ListUserPasskeysResponseHeaders struct {
+	CacheControl OptString
+	Response     ListUserPasskeysResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *ListUserPasskeysResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *ListUserPasskeysResponseHeaders) GetResponse() ListUserPasskeysResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *ListUserPasskeysResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListUserPasskeysResponseHeaders) SetResponse(val ListUserPasskeysResponse) {
+	s.Response = val
+}
+
+func (*ListUserPasskeysResponseHeaders) listMyPasskeysRes() {}
 
 type ListUserPasskeysResponsePasskeysItem struct {
 	// The unique identifier of the passkey.
@@ -39846,6 +44912,190 @@ func (o OptBrandingTypography) Or(d BrandingTypography) BrandingTypography {
 	return d
 }
 
+// NewOptBrndInvalidDetails returns new OptBrndInvalidDetails with value set to v.
+func NewOptBrndInvalidDetails(v BrndInvalidDetails) OptBrndInvalidDetails {
+	return OptBrndInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrndInvalidDetails is optional BrndInvalidDetails.
+type OptBrndInvalidDetails struct {
+	Value BrndInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptBrndInvalidDetails was set.
+func (o OptBrndInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrndInvalidDetails) Reset() {
+	var v BrndInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrndInvalidDetails) SetTo(v BrndInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrndInvalidDetails) Get() (v BrndInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrndInvalidDetails) Or(d BrndInvalidDetails) BrndInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrndMissingProjectIDDetails returns new OptBrndMissingProjectIDDetails with value set to v.
+func NewOptBrndMissingProjectIDDetails(v BrndMissingProjectIDDetails) OptBrndMissingProjectIDDetails {
+	return OptBrndMissingProjectIDDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrndMissingProjectIDDetails is optional BrndMissingProjectIDDetails.
+type OptBrndMissingProjectIDDetails struct {
+	Value BrndMissingProjectIDDetails
+	Set   bool
+}
+
+// IsSet returns true if OptBrndMissingProjectIDDetails was set.
+func (o OptBrndMissingProjectIDDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrndMissingProjectIDDetails) Reset() {
+	var v BrndMissingProjectIDDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrndMissingProjectIDDetails) SetTo(v BrndMissingProjectIDDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrndMissingProjectIDDetails) Get() (v BrndMissingProjectIDDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrndMissingProjectIDDetails) Or(d BrndMissingProjectIDDetails) BrndMissingProjectIDDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrndNotFoundDetails returns new OptBrndNotFoundDetails with value set to v.
+func NewOptBrndNotFoundDetails(v BrndNotFoundDetails) OptBrndNotFoundDetails {
+	return OptBrndNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrndNotFoundDetails is optional BrndNotFoundDetails.
+type OptBrndNotFoundDetails struct {
+	Value BrndNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptBrndNotFoundDetails was set.
+func (o OptBrndNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrndNotFoundDetails) Reset() {
+	var v BrndNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrndNotFoundDetails) SetTo(v BrndNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrndNotFoundDetails) Get() (v BrndNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrndNotFoundDetails) Or(d BrndNotFoundDetails) BrndNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBrndPermissionDeniedDetails returns new OptBrndPermissionDeniedDetails with value set to v.
+func NewOptBrndPermissionDeniedDetails(v BrndPermissionDeniedDetails) OptBrndPermissionDeniedDetails {
+	return OptBrndPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBrndPermissionDeniedDetails is optional BrndPermissionDeniedDetails.
+type OptBrndPermissionDeniedDetails struct {
+	Value BrndPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptBrndPermissionDeniedDetails was set.
+func (o OptBrndPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBrndPermissionDeniedDetails) Reset() {
+	var v BrndPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBrndPermissionDeniedDetails) SetTo(v BrndPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBrndPermissionDeniedDetails) Get() (v BrndPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBrndPermissionDeniedDetails) Or(d BrndPermissionDeniedDetails) BrndPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptBuildReleaseBadRequestDetails returns new OptBuildReleaseBadRequestDetails with value set to v.
 func NewOptBuildReleaseBadRequestDetails(v BuildReleaseBadRequestDetails) OptBuildReleaseBadRequestDetails {
 	return OptBuildReleaseBadRequestDetails{
@@ -40024,6 +45274,98 @@ func (o OptChallengeResponsePayload) Get() (v ChallengeResponsePayload, ok bool)
 
 // Or returns value if set, or given parameter if does not.
 func (o OptChallengeResponsePayload) Or(d ChallengeResponsePayload) ChallengeResponsePayload {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptClaimChallengeInvalidDetails returns new OptClaimChallengeInvalidDetails with value set to v.
+func NewOptClaimChallengeInvalidDetails(v ClaimChallengeInvalidDetails) OptClaimChallengeInvalidDetails {
+	return OptClaimChallengeInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptClaimChallengeInvalidDetails is optional ClaimChallengeInvalidDetails.
+type OptClaimChallengeInvalidDetails struct {
+	Value ClaimChallengeInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptClaimChallengeInvalidDetails was set.
+func (o OptClaimChallengeInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptClaimChallengeInvalidDetails) Reset() {
+	var v ClaimChallengeInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptClaimChallengeInvalidDetails) SetTo(v ClaimChallengeInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptClaimChallengeInvalidDetails) Get() (v ClaimChallengeInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptClaimChallengeInvalidDetails) Or(d ClaimChallengeInvalidDetails) ClaimChallengeInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptClaimChallengeNotFoundDetails returns new OptClaimChallengeNotFoundDetails with value set to v.
+func NewOptClaimChallengeNotFoundDetails(v ClaimChallengeNotFoundDetails) OptClaimChallengeNotFoundDetails {
+	return OptClaimChallengeNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptClaimChallengeNotFoundDetails is optional ClaimChallengeNotFoundDetails.
+type OptClaimChallengeNotFoundDetails struct {
+	Value ClaimChallengeNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptClaimChallengeNotFoundDetails was set.
+func (o OptClaimChallengeNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptClaimChallengeNotFoundDetails) Reset() {
+	var v ClaimChallengeNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptClaimChallengeNotFoundDetails) SetTo(v ClaimChallengeNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptClaimChallengeNotFoundDetails) Get() (v ClaimChallengeNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptClaimChallengeNotFoundDetails) Or(d ClaimChallengeNotFoundDetails) ClaimChallengeNotFoundDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -40254,6 +45596,52 @@ func (o OptDateTime) Get() (v time.Time, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptDepConflictDetails returns new OptDepConflictDetails with value set to v.
+func NewOptDepConflictDetails(v DepConflictDetails) OptDepConflictDetails {
+	return OptDepConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDepConflictDetails is optional DepConflictDetails.
+type OptDepConflictDetails struct {
+	Value DepConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptDepConflictDetails was set.
+func (o OptDepConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDepConflictDetails) Reset() {
+	var v DepConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDepConflictDetails) SetTo(v DepConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDepConflictDetails) Get() (v DepConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDepConflictDetails) Or(d DepConflictDetails) DepConflictDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -40990,6 +46378,98 @@ func (o OptEvtInvalidDetails) Get() (v EvtInvalidDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEvtInvalidDetails) Or(d EvtInvalidDetails) EvtInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEvtNotFoundDetails returns new OptEvtNotFoundDetails with value set to v.
+func NewOptEvtNotFoundDetails(v EvtNotFoundDetails) OptEvtNotFoundDetails {
+	return OptEvtNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEvtNotFoundDetails is optional EvtNotFoundDetails.
+type OptEvtNotFoundDetails struct {
+	Value EvtNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptEvtNotFoundDetails was set.
+func (o OptEvtNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEvtNotFoundDetails) Reset() {
+	var v EvtNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEvtNotFoundDetails) SetTo(v EvtNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEvtNotFoundDetails) Get() (v EvtNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEvtNotFoundDetails) Or(d EvtNotFoundDetails) EvtNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEvtPermissionDeniedDetails returns new OptEvtPermissionDeniedDetails with value set to v.
+func NewOptEvtPermissionDeniedDetails(v EvtPermissionDeniedDetails) OptEvtPermissionDeniedDetails {
+	return OptEvtPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEvtPermissionDeniedDetails is optional EvtPermissionDeniedDetails.
+type OptEvtPermissionDeniedDetails struct {
+	Value EvtPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptEvtPermissionDeniedDetails was set.
+func (o OptEvtPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEvtPermissionDeniedDetails) Reset() {
+	var v EvtPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEvtPermissionDeniedDetails) SetTo(v EvtPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEvtPermissionDeniedDetails) Get() (v EvtPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEvtPermissionDeniedDetails) Or(d EvtPermissionDeniedDetails) EvtPermissionDeniedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -46428,6 +51908,132 @@ func (o OptNilPasswordHashPolicy) Or(d PasswordHashPolicy) PasswordHashPolicy {
 	return d
 }
 
+// NewOptNilPolicyCreatedEventActorType returns new OptNilPolicyCreatedEventActorType with value set to v.
+func NewOptNilPolicyCreatedEventActorType(v PolicyCreatedEventActorType) OptNilPolicyCreatedEventActorType {
+	return OptNilPolicyCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilPolicyCreatedEventActorType is optional nullable PolicyCreatedEventActorType.
+type OptNilPolicyCreatedEventActorType struct {
+	Value PolicyCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilPolicyCreatedEventActorType was set.
+func (o OptNilPolicyCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilPolicyCreatedEventActorType) Reset() {
+	var v PolicyCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilPolicyCreatedEventActorType) SetTo(v PolicyCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilPolicyCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilPolicyCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v PolicyCreatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilPolicyCreatedEventActorType) Get() (v PolicyCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilPolicyCreatedEventActorType) Or(d PolicyCreatedEventActorType) PolicyCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilPolicyUpdatedEventActorType returns new OptNilPolicyUpdatedEventActorType with value set to v.
+func NewOptNilPolicyUpdatedEventActorType(v PolicyUpdatedEventActorType) OptNilPolicyUpdatedEventActorType {
+	return OptNilPolicyUpdatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilPolicyUpdatedEventActorType is optional nullable PolicyUpdatedEventActorType.
+type OptNilPolicyUpdatedEventActorType struct {
+	Value PolicyUpdatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilPolicyUpdatedEventActorType was set.
+func (o OptNilPolicyUpdatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilPolicyUpdatedEventActorType) Reset() {
+	var v PolicyUpdatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilPolicyUpdatedEventActorType) SetTo(v PolicyUpdatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilPolicyUpdatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilPolicyUpdatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v PolicyUpdatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilPolicyUpdatedEventActorType) Get() (v PolicyUpdatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilPolicyUpdatedEventActorType) Or(d PolicyUpdatedEventActorType) PolicyUpdatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilProjectCreatedEventActorType returns new OptNilProjectCreatedEventActorType with value set to v.
 func NewOptNilProjectCreatedEventActorType(v ProjectCreatedEventActorType) OptNilProjectCreatedEventActorType {
 	return OptNilProjectCreatedEventActorType{
@@ -48773,6 +54379,282 @@ func (o OptPatchUserRequestAttributes) Or(d PatchUserRequestAttributes) PatchUse
 	return d
 }
 
+// NewOptPolInvalidDetails returns new OptPolInvalidDetails with value set to v.
+func NewOptPolInvalidDetails(v PolInvalidDetails) OptPolInvalidDetails {
+	return OptPolInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPolInvalidDetails is optional PolInvalidDetails.
+type OptPolInvalidDetails struct {
+	Value PolInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptPolInvalidDetails was set.
+func (o OptPolInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPolInvalidDetails) Reset() {
+	var v PolInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPolInvalidDetails) SetTo(v PolInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPolInvalidDetails) Get() (v PolInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPolInvalidDetails) Or(d PolInvalidDetails) PolInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptPolNotFoundDetails returns new OptPolNotFoundDetails with value set to v.
+func NewOptPolNotFoundDetails(v PolNotFoundDetails) OptPolNotFoundDetails {
+	return OptPolNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPolNotFoundDetails is optional PolNotFoundDetails.
+type OptPolNotFoundDetails struct {
+	Value PolNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptPolNotFoundDetails was set.
+func (o OptPolNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPolNotFoundDetails) Reset() {
+	var v PolNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPolNotFoundDetails) SetTo(v PolNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPolNotFoundDetails) Get() (v PolNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPolNotFoundDetails) Or(d PolNotFoundDetails) PolNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptPolPermissionDeniedDetails returns new OptPolPermissionDeniedDetails with value set to v.
+func NewOptPolPermissionDeniedDetails(v PolPermissionDeniedDetails) OptPolPermissionDeniedDetails {
+	return OptPolPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPolPermissionDeniedDetails is optional PolPermissionDeniedDetails.
+type OptPolPermissionDeniedDetails struct {
+	Value PolPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptPolPermissionDeniedDetails was set.
+func (o OptPolPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPolPermissionDeniedDetails) Reset() {
+	var v PolPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPolPermissionDeniedDetails) SetTo(v PolPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPolPermissionDeniedDetails) Get() (v PolPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPolPermissionDeniedDetails) Or(d PolPermissionDeniedDetails) PolPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptPolRevisionConflictDetails returns new OptPolRevisionConflictDetails with value set to v.
+func NewOptPolRevisionConflictDetails(v PolRevisionConflictDetails) OptPolRevisionConflictDetails {
+	return OptPolRevisionConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPolRevisionConflictDetails is optional PolRevisionConflictDetails.
+type OptPolRevisionConflictDetails struct {
+	Value PolRevisionConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptPolRevisionConflictDetails was set.
+func (o OptPolRevisionConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPolRevisionConflictDetails) Reset() {
+	var v PolRevisionConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPolRevisionConflictDetails) SetTo(v PolRevisionConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPolRevisionConflictDetails) Get() (v PolRevisionConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPolRevisionConflictDetails) Or(d PolRevisionConflictDetails) PolRevisionConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptPolicyCreatedEventDelegationType returns new OptPolicyCreatedEventDelegationType with value set to v.
+func NewOptPolicyCreatedEventDelegationType(v PolicyCreatedEventDelegationType) OptPolicyCreatedEventDelegationType {
+	return OptPolicyCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPolicyCreatedEventDelegationType is optional PolicyCreatedEventDelegationType.
+type OptPolicyCreatedEventDelegationType struct {
+	Value PolicyCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptPolicyCreatedEventDelegationType was set.
+func (o OptPolicyCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPolicyCreatedEventDelegationType) Reset() {
+	var v PolicyCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPolicyCreatedEventDelegationType) SetTo(v PolicyCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPolicyCreatedEventDelegationType) Get() (v PolicyCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPolicyCreatedEventDelegationType) Or(d PolicyCreatedEventDelegationType) PolicyCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptPolicyUpdatedEventDelegationType returns new OptPolicyUpdatedEventDelegationType with value set to v.
+func NewOptPolicyUpdatedEventDelegationType(v PolicyUpdatedEventDelegationType) OptPolicyUpdatedEventDelegationType {
+	return OptPolicyUpdatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPolicyUpdatedEventDelegationType is optional PolicyUpdatedEventDelegationType.
+type OptPolicyUpdatedEventDelegationType struct {
+	Value PolicyUpdatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptPolicyUpdatedEventDelegationType was set.
+func (o OptPolicyUpdatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPolicyUpdatedEventDelegationType) Reset() {
+	var v PolicyUpdatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPolicyUpdatedEventDelegationType) SetTo(v PolicyUpdatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPolicyUpdatedEventDelegationType) Get() (v PolicyUpdatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPolicyUpdatedEventDelegationType) Or(d PolicyUpdatedEventDelegationType) PolicyUpdatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptPreviewTTL returns new OptPreviewTTL with value set to v.
 func NewOptPreviewTTL(v PreviewTTL) OptPreviewTTL {
 	return OptPreviewTTL{
@@ -48813,6 +54695,52 @@ func (o OptPreviewTTL) Get() (v PreviewTTL, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptPreviewTTL) Or(d PreviewTTL) PreviewTTL {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjAlreadyClaimedDetails returns new OptProjAlreadyClaimedDetails with value set to v.
+func NewOptProjAlreadyClaimedDetails(v ProjAlreadyClaimedDetails) OptProjAlreadyClaimedDetails {
+	return OptProjAlreadyClaimedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjAlreadyClaimedDetails is optional ProjAlreadyClaimedDetails.
+type OptProjAlreadyClaimedDetails struct {
+	Value ProjAlreadyClaimedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjAlreadyClaimedDetails was set.
+func (o OptProjAlreadyClaimedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjAlreadyClaimedDetails) Reset() {
+	var v ProjAlreadyClaimedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjAlreadyClaimedDetails) SetTo(v ProjAlreadyClaimedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjAlreadyClaimedDetails) Get() (v ProjAlreadyClaimedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjAlreadyClaimedDetails) Or(d ProjAlreadyClaimedDetails) ProjAlreadyClaimedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -49049,6 +54977,52 @@ func (o OptProjNotFoundDetails) Or(d ProjNotFoundDetails) ProjNotFoundDetails {
 	return d
 }
 
+// NewOptProjOriginNotAllowedDetails returns new OptProjOriginNotAllowedDetails with value set to v.
+func NewOptProjOriginNotAllowedDetails(v ProjOriginNotAllowedDetails) OptProjOriginNotAllowedDetails {
+	return OptProjOriginNotAllowedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjOriginNotAllowedDetails is optional ProjOriginNotAllowedDetails.
+type OptProjOriginNotAllowedDetails struct {
+	Value ProjOriginNotAllowedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjOriginNotAllowedDetails was set.
+func (o OptProjOriginNotAllowedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjOriginNotAllowedDetails) Reset() {
+	var v ProjOriginNotAllowedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjOriginNotAllowedDetails) SetTo(v ProjOriginNotAllowedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjOriginNotAllowedDetails) Get() (v ProjOriginNotAllowedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjOriginNotAllowedDetails) Or(d ProjOriginNotAllowedDetails) ProjOriginNotAllowedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjPasswordHashInvalidDetails returns new OptProjPasswordHashInvalidDetails with value set to v.
 func NewOptProjPasswordHashInvalidDetails(v ProjPasswordHashInvalidDetails) OptProjPasswordHashInvalidDetails {
 	return OptProjPasswordHashInvalidDetails{
@@ -49135,6 +55109,52 @@ func (o OptProjPermissionDeniedDetails) Get() (v ProjPermissionDeniedDetails, ok
 
 // Or returns value if set, or given parameter if does not.
 func (o OptProjPermissionDeniedDetails) Or(d ProjPermissionDeniedDetails) ProjPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjPreviewNotLiveDetails returns new OptProjPreviewNotLiveDetails with value set to v.
+func NewOptProjPreviewNotLiveDetails(v ProjPreviewNotLiveDetails) OptProjPreviewNotLiveDetails {
+	return OptProjPreviewNotLiveDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjPreviewNotLiveDetails is optional ProjPreviewNotLiveDetails.
+type OptProjPreviewNotLiveDetails struct {
+	Value ProjPreviewNotLiveDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjPreviewNotLiveDetails was set.
+func (o OptProjPreviewNotLiveDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjPreviewNotLiveDetails) Reset() {
+	var v ProjPreviewNotLiveDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjPreviewNotLiveDetails) SetTo(v ProjPreviewNotLiveDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjPreviewNotLiveDetails) Get() (v ProjPreviewNotLiveDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjPreviewNotLiveDetails) Or(d ProjPreviewNotLiveDetails) ProjPreviewNotLiveDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -49647,6 +55667,52 @@ func (o OptRelInvalidDetails) Or(d RelInvalidDetails) RelInvalidDetails {
 	return d
 }
 
+// NewOptRelNotDeployedDetails returns new OptRelNotDeployedDetails with value set to v.
+func NewOptRelNotDeployedDetails(v RelNotDeployedDetails) OptRelNotDeployedDetails {
+	return OptRelNotDeployedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelNotDeployedDetails is optional RelNotDeployedDetails.
+type OptRelNotDeployedDetails struct {
+	Value RelNotDeployedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelNotDeployedDetails was set.
+func (o OptRelNotDeployedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelNotDeployedDetails) Reset() {
+	var v RelNotDeployedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelNotDeployedDetails) SetTo(v RelNotDeployedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelNotDeployedDetails) Get() (v RelNotDeployedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelNotDeployedDetails) Or(d RelNotDeployedDetails) RelNotDeployedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptRelNotFoundDetails returns new OptRelNotFoundDetails with value set to v.
 func NewOptRelNotFoundDetails(v RelNotFoundDetails) OptRelNotFoundDetails {
 	return OptRelNotFoundDetails{
@@ -49871,6 +55937,52 @@ func (o OptRelRevisionUnpinnableDetails) Get() (v RelRevisionUnpinnableDetails, 
 
 // Or returns value if set, or given parameter if does not.
 func (o OptRelRevisionUnpinnableDetails) Or(d RelRevisionUnpinnableDetails) RelRevisionUnpinnableDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptRelRevokedDetails returns new OptRelRevokedDetails with value set to v.
+func NewOptRelRevokedDetails(v RelRevokedDetails) OptRelRevokedDetails {
+	return OptRelRevokedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelRevokedDetails is optional RelRevokedDetails.
+type OptRelRevokedDetails struct {
+	Value RelRevokedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelRevokedDetails was set.
+func (o OptRelRevokedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelRevokedDetails) Reset() {
+	var v RelRevokedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelRevokedDetails) SetTo(v RelRevokedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelRevokedDetails) Get() (v RelRevokedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelRevokedDetails) Or(d RelRevokedDetails) RelRevokedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -51303,6 +57415,52 @@ func (o OptSessionEstablishedEventDelegationType) Or(d SessionEstablishedEventDe
 	return d
 }
 
+// NewOptSessionProofToken returns new OptSessionProofToken with value set to v.
+func NewOptSessionProofToken(v SessionProofToken) OptSessionProofToken {
+	return OptSessionProofToken{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessionProofToken is optional SessionProofToken.
+type OptSessionProofToken struct {
+	Value SessionProofToken
+	Set   bool
+}
+
+// IsSet returns true if OptSessionProofToken was set.
+func (o OptSessionProofToken) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessionProofToken) Reset() {
+	var v SessionProofToken
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessionProofToken) SetTo(v SessionProofToken) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessionProofToken) Get() (v SessionProofToken, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessionProofToken) Or(d SessionProofToken) SessionProofToken {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptStepTexts returns new OptStepTexts with value set to v.
 func NewOptStepTexts(v StepTexts) OptStepTexts {
 	return OptStepTexts{
@@ -51389,6 +57547,52 @@ func (o OptString) Get() (v string, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptString) Or(d string) string {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptTeamAlreadyExistsDetails returns new OptTeamAlreadyExistsDetails with value set to v.
+func NewOptTeamAlreadyExistsDetails(v TeamAlreadyExistsDetails) OptTeamAlreadyExistsDetails {
+	return OptTeamAlreadyExistsDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTeamAlreadyExistsDetails is optional TeamAlreadyExistsDetails.
+type OptTeamAlreadyExistsDetails struct {
+	Value TeamAlreadyExistsDetails
+	Set   bool
+}
+
+// IsSet returns true if OptTeamAlreadyExistsDetails was set.
+func (o OptTeamAlreadyExistsDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTeamAlreadyExistsDetails) Reset() {
+	var v TeamAlreadyExistsDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTeamAlreadyExistsDetails) SetTo(v TeamAlreadyExistsDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTeamAlreadyExistsDetails) Get() (v TeamAlreadyExistsDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTeamAlreadyExistsDetails) Or(d TeamAlreadyExistsDetails) TeamAlreadyExistsDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -51579,6 +57783,98 @@ func (o OptTeamLocator) Or(d TeamLocator) TeamLocator {
 	return d
 }
 
+// NewOptTeamNameInvalidDetails returns new OptTeamNameInvalidDetails with value set to v.
+func NewOptTeamNameInvalidDetails(v TeamNameInvalidDetails) OptTeamNameInvalidDetails {
+	return OptTeamNameInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTeamNameInvalidDetails is optional TeamNameInvalidDetails.
+type OptTeamNameInvalidDetails struct {
+	Value TeamNameInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptTeamNameInvalidDetails was set.
+func (o OptTeamNameInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTeamNameInvalidDetails) Reset() {
+	var v TeamNameInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTeamNameInvalidDetails) SetTo(v TeamNameInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTeamNameInvalidDetails) Get() (v TeamNameInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTeamNameInvalidDetails) Or(d TeamNameInvalidDetails) TeamNameInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptTeamOwnsProjectDetails returns new OptTeamOwnsProjectDetails with value set to v.
+func NewOptTeamOwnsProjectDetails(v TeamOwnsProjectDetails) OptTeamOwnsProjectDetails {
+	return OptTeamOwnsProjectDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTeamOwnsProjectDetails is optional TeamOwnsProjectDetails.
+type OptTeamOwnsProjectDetails struct {
+	Value TeamOwnsProjectDetails
+	Set   bool
+}
+
+// IsSet returns true if OptTeamOwnsProjectDetails was set.
+func (o OptTeamOwnsProjectDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTeamOwnsProjectDetails) Reset() {
+	var v TeamOwnsProjectDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTeamOwnsProjectDetails) SetTo(v TeamOwnsProjectDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTeamOwnsProjectDetails) Get() (v TeamOwnsProjectDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTeamOwnsProjectDetails) Or(d TeamOwnsProjectDetails) TeamOwnsProjectDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptTeamPermissionDeniedDetails returns new OptTeamPermissionDeniedDetails with value set to v.
 func NewOptTeamPermissionDeniedDetails(v TeamPermissionDeniedDetails) OptTeamPermissionDeniedDetails {
 	return OptTeamPermissionDeniedDetails{
@@ -51625,6 +57921,52 @@ func (o OptTeamPermissionDeniedDetails) Or(d TeamPermissionDeniedDetails) TeamPe
 	return d
 }
 
+// NewOptTeamProjectNotFoundDetails returns new OptTeamProjectNotFoundDetails with value set to v.
+func NewOptTeamProjectNotFoundDetails(v TeamProjectNotFoundDetails) OptTeamProjectNotFoundDetails {
+	return OptTeamProjectNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTeamProjectNotFoundDetails is optional TeamProjectNotFoundDetails.
+type OptTeamProjectNotFoundDetails struct {
+	Value TeamProjectNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptTeamProjectNotFoundDetails was set.
+func (o OptTeamProjectNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTeamProjectNotFoundDetails) Reset() {
+	var v TeamProjectNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTeamProjectNotFoundDetails) SetTo(v TeamProjectNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTeamProjectNotFoundDetails) Get() (v TeamProjectNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTeamProjectNotFoundDetails) Or(d TeamProjectNotFoundDetails) TeamProjectNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptTeamStatus returns new OptTeamStatus with value set to v.
 func NewOptTeamStatus(v TeamStatus) OptTeamStatus {
 	return OptTeamStatus{
@@ -51665,6 +58007,52 @@ func (o OptTeamStatus) Get() (v TeamStatus, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptTeamStatus) Or(d TeamStatus) TeamStatus {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptTeamTeamNotFoundDetails returns new OptTeamTeamNotFoundDetails with value set to v.
+func NewOptTeamTeamNotFoundDetails(v TeamTeamNotFoundDetails) OptTeamTeamNotFoundDetails {
+	return OptTeamTeamNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTeamTeamNotFoundDetails is optional TeamTeamNotFoundDetails.
+type OptTeamTeamNotFoundDetails struct {
+	Value TeamTeamNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptTeamTeamNotFoundDetails was set.
+func (o OptTeamTeamNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTeamTeamNotFoundDetails) Reset() {
+	var v TeamTeamNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTeamTeamNotFoundDetails) SetTo(v TeamTeamNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTeamTeamNotFoundDetails) Get() (v TeamTeamNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTeamTeamNotFoundDetails) Or(d TeamTeamNotFoundDetails) TeamTeamNotFoundDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -52493,6 +58881,52 @@ func (o OptUserPasswordEmptyDetails) Get() (v UserPasswordEmptyDetails, ok bool)
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserPasswordEmptyDetails) Or(d UserPasswordEmptyDetails) UserPasswordEmptyDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserPasswordPolicyViolationDetails returns new OptUserPasswordPolicyViolationDetails with value set to v.
+func NewOptUserPasswordPolicyViolationDetails(v UserPasswordPolicyViolationDetails) OptUserPasswordPolicyViolationDetails {
+	return OptUserPasswordPolicyViolationDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPasswordPolicyViolationDetails is optional UserPasswordPolicyViolationDetails.
+type OptUserPasswordPolicyViolationDetails struct {
+	Value UserPasswordPolicyViolationDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserPasswordPolicyViolationDetails was set.
+func (o OptUserPasswordPolicyViolationDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPasswordPolicyViolationDetails) Reset() {
+	var v UserPasswordPolicyViolationDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPasswordPolicyViolationDetails) SetTo(v UserPasswordPolicyViolationDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPasswordPolicyViolationDetails) Get() (v UserPasswordPolicyViolationDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPasswordPolicyViolationDetails) Or(d UserPasswordPolicyViolationDetails) UserPasswordPolicyViolationDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -56538,6 +62972,1340 @@ func (s *PatchUserRequestAttributes) init() PatchUserRequestAttributes {
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type PolInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptPolInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *PolInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *PolInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *PolInvalid) GetDetails() OptPolInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *PolInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *PolInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *PolInvalid) SetDetails(val OptPolInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type PolInvalidDetails map[string]jx.Raw
+
+func (s *PolInvalidDetails) init() PolInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type PolNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptPolNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *PolNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *PolNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *PolNotFound) GetDetails() OptPolNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *PolNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *PolNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *PolNotFound) SetDetails(val OptPolNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type PolNotFoundDetails map[string]jx.Raw
+
+func (s *PolNotFoundDetails) init() PolNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type PolPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptPolPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *PolPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *PolPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *PolPermissionDenied) GetDetails() OptPolPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *PolPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *PolPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *PolPermissionDenied) SetDetails(val OptPolPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type PolPermissionDeniedDetails map[string]jx.Raw
+
+func (s *PolPermissionDeniedDetails) init() PolPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type PolRevisionConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptPolRevisionConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *PolRevisionConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *PolRevisionConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *PolRevisionConflict) GetDetails() OptPolRevisionConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *PolRevisionConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *PolRevisionConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *PolRevisionConflict) SetDetails(val OptPolRevisionConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type PolRevisionConflictDetails map[string]jx.Raw
+
+func (s *PolRevisionConflictDetails) init() PolRevisionConflictDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// One revision of a project's policy for an operation (ADR 066). `id` is
+// shared by every revision of the operation's policy; `revision_id` names this
+// revision.
+// Ref: #
+type Policy struct {
+	ID         PolicyID         `json:"id"`
+	RevisionID PolicyRevisionID `json:"revision_id"`
+	// The project the policy belongs to.
+	ProjectID ProjectID `json:"project_id"`
+	// The operation the policy guards.
+	Operation string `json:"operation"`
+	// The settings this revision publishes.
+	Config PolicyConfig `json:"config"`
+	// When the operation's policy was first published.
+	CreatedAt time.Time `json:"created_at"`
+	// When this revision was published.
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// GetID returns the value of ID.
+func (s *Policy) GetID() PolicyID {
+	return s.ID
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *Policy) GetRevisionID() PolicyRevisionID {
+	return s.RevisionID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *Policy) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetOperation returns the value of Operation.
+func (s *Policy) GetOperation() string {
+	return s.Operation
+}
+
+// GetConfig returns the value of Config.
+func (s *Policy) GetConfig() PolicyConfig {
+	return s.Config
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *Policy) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *Policy) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *Policy) SetID(val PolicyID) {
+	s.ID = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *Policy) SetRevisionID(val PolicyRevisionID) {
+	s.RevisionID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *Policy) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *Policy) SetOperation(val string) {
+	s.Operation = val
+}
+
+// SetConfig sets the value of Config.
+func (s *Policy) SetConfig(val PolicyConfig) {
+	s.Config = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *Policy) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *Policy) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*Policy) getPolicyRevisionRes() {}
+func (*Policy) publishPolicyRes()     {}
+
+// The settings this revision publishes.
+type PolicyConfig map[string]jx.Raw
+
+func (s *PolicyConfig) init() PolicyConfig {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// PolicyCreated2XX is 2XX pattern response for PolicyCreated operation.
+type PolicyCreated2XX struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *PolicyCreated2XX) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *PolicyCreated2XX) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*PolicyCreated2XX) policyCreatedRes() {}
+
+// PolicyCreatedDef is default response for PolicyCreated operation.
+type PolicyCreatedDef struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *PolicyCreatedDef) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *PolicyCreatedDef) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*PolicyCreatedDef) policyCreatedRes() {}
+
+// Merged schema.
+// Ref: #
+type PolicyCreatedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category PolicyCreatedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilPolicyCreatedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptPolicyCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                           `json:"delegation_id"`
+	Grantor        OptString                           `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  PolicyPayload    `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *PolicyCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *PolicyCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *PolicyCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *PolicyCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *PolicyCreatedEvent) GetCategory() PolicyCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *PolicyCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *PolicyCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *PolicyCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *PolicyCreatedEvent) GetActorType() OptNilPolicyCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *PolicyCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *PolicyCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *PolicyCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *PolicyCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *PolicyCreatedEvent) GetDelegationType() OptPolicyCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *PolicyCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *PolicyCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *PolicyCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *PolicyCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *PolicyCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *PolicyCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *PolicyCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *PolicyCreatedEvent) GetPayload() PolicyPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *PolicyCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *PolicyCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *PolicyCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *PolicyCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *PolicyCreatedEvent) SetCategory(val PolicyCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *PolicyCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *PolicyCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *PolicyCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *PolicyCreatedEvent) SetActorType(val OptNilPolicyCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *PolicyCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *PolicyCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *PolicyCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *PolicyCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *PolicyCreatedEvent) SetDelegationType(val OptPolicyCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *PolicyCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *PolicyCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *PolicyCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *PolicyCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *PolicyCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *PolicyCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *PolicyCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *PolicyCreatedEvent) SetPayload(val PolicyPayload) {
+	s.Payload = val
+}
+
+type PolicyCreatedEventActorType string
+
+const (
+	PolicyCreatedEventActorTypeHuman   PolicyCreatedEventActorType = "human"
+	PolicyCreatedEventActorTypeService PolicyCreatedEventActorType = "service"
+	PolicyCreatedEventActorTypeSystem  PolicyCreatedEventActorType = "system"
+	PolicyCreatedEventActorTypeAgent   PolicyCreatedEventActorType = "agent"
+)
+
+// AllValues returns all PolicyCreatedEventActorType values.
+func (PolicyCreatedEventActorType) AllValues() []PolicyCreatedEventActorType {
+	return []PolicyCreatedEventActorType{
+		PolicyCreatedEventActorTypeHuman,
+		PolicyCreatedEventActorTypeService,
+		PolicyCreatedEventActorTypeSystem,
+		PolicyCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case PolicyCreatedEventActorTypeService:
+		return []byte(s), nil
+	case PolicyCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case PolicyCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch PolicyCreatedEventActorType(data) {
+	case PolicyCreatedEventActorTypeHuman:
+		*s = PolicyCreatedEventActorTypeHuman
+		return nil
+	case PolicyCreatedEventActorTypeService:
+		*s = PolicyCreatedEventActorTypeService
+		return nil
+	case PolicyCreatedEventActorTypeSystem:
+		*s = PolicyCreatedEventActorTypeSystem
+		return nil
+	case PolicyCreatedEventActorTypeAgent:
+		*s = PolicyCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type PolicyCreatedEventCategory string
+
+const (
+	PolicyCreatedEventCategoryRequest PolicyCreatedEventCategory = "request"
+	PolicyCreatedEventCategoryAuth    PolicyCreatedEventCategory = "auth"
+	PolicyCreatedEventCategorySession PolicyCreatedEventCategory = "session"
+	PolicyCreatedEventCategoryAdmin   PolicyCreatedEventCategory = "admin"
+	PolicyCreatedEventCategoryEntity  PolicyCreatedEventCategory = "entity"
+	PolicyCreatedEventCategorySignal  PolicyCreatedEventCategory = "signal"
+)
+
+// AllValues returns all PolicyCreatedEventCategory values.
+func (PolicyCreatedEventCategory) AllValues() []PolicyCreatedEventCategory {
+	return []PolicyCreatedEventCategory{
+		PolicyCreatedEventCategoryRequest,
+		PolicyCreatedEventCategoryAuth,
+		PolicyCreatedEventCategorySession,
+		PolicyCreatedEventCategoryAdmin,
+		PolicyCreatedEventCategoryEntity,
+		PolicyCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case PolicyCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case PolicyCreatedEventCategorySession:
+		return []byte(s), nil
+	case PolicyCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case PolicyCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case PolicyCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch PolicyCreatedEventCategory(data) {
+	case PolicyCreatedEventCategoryRequest:
+		*s = PolicyCreatedEventCategoryRequest
+		return nil
+	case PolicyCreatedEventCategoryAuth:
+		*s = PolicyCreatedEventCategoryAuth
+		return nil
+	case PolicyCreatedEventCategorySession:
+		*s = PolicyCreatedEventCategorySession
+		return nil
+	case PolicyCreatedEventCategoryAdmin:
+		*s = PolicyCreatedEventCategoryAdmin
+		return nil
+	case PolicyCreatedEventCategoryEntity:
+		*s = PolicyCreatedEventCategoryEntity
+		return nil
+	case PolicyCreatedEventCategorySignal:
+		*s = PolicyCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type PolicyCreatedEventDelegationType string
+
+const (
+	PolicyCreatedEventDelegationTypeDirect    PolicyCreatedEventDelegationType = "direct"
+	PolicyCreatedEventDelegationTypeDelegated PolicyCreatedEventDelegationType = "delegated"
+	PolicyCreatedEventDelegationTypePatShared PolicyCreatedEventDelegationType = "pat_shared"
+	PolicyCreatedEventDelegationTypeExchanged PolicyCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all PolicyCreatedEventDelegationType values.
+func (PolicyCreatedEventDelegationType) AllValues() []PolicyCreatedEventDelegationType {
+	return []PolicyCreatedEventDelegationType{
+		PolicyCreatedEventDelegationTypeDirect,
+		PolicyCreatedEventDelegationTypeDelegated,
+		PolicyCreatedEventDelegationTypePatShared,
+		PolicyCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case PolicyCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case PolicyCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case PolicyCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch PolicyCreatedEventDelegationType(data) {
+	case PolicyCreatedEventDelegationTypeDirect:
+		*s = PolicyCreatedEventDelegationTypeDirect
+		return nil
+	case PolicyCreatedEventDelegationTypeDelegated:
+		*s = PolicyCreatedEventDelegationTypeDelegated
+		return nil
+	case PolicyCreatedEventDelegationTypePatShared:
+		*s = PolicyCreatedEventDelegationTypePatShared
+		return nil
+	case PolicyCreatedEventDelegationTypeExchanged:
+		*s = PolicyCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type PolicyID string
+
+// Allowlisted fields for `policy.created` (the first publish of an
+// operation's policy) and `policy.updated` (every later publish). The policy id
+// is the event's `entity_id`. `config` holds the published settings, which are
+// configuration values, never user data.
+// Ref: #
+type PolicyPayload struct {
+	// The operation the policy guards, e.g. `auth.factor.password.set`.
+	Operation string `json:"operation"`
+	// The revision the publish appended.
+	RevisionID string `json:"revision_id"`
+	// The instance's settings as published.
+	Config PolicyPayloadConfig `json:"config"`
+}
+
+// GetOperation returns the value of Operation.
+func (s *PolicyPayload) GetOperation() string {
+	return s.Operation
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *PolicyPayload) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// GetConfig returns the value of Config.
+func (s *PolicyPayload) GetConfig() PolicyPayloadConfig {
+	return s.Config
+}
+
+// SetOperation sets the value of Operation.
+func (s *PolicyPayload) SetOperation(val string) {
+	s.Operation = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *PolicyPayload) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// SetConfig sets the value of Config.
+func (s *PolicyPayload) SetConfig(val PolicyPayloadConfig) {
+	s.Config = val
+}
+
+// The instance's settings as published.
+type PolicyPayloadConfig map[string]jx.Raw
+
+func (s *PolicyPayloadConfig) init() PolicyPayloadConfig {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type PolicyRevisionID string
+
+// PolicyUpdated2XX is 2XX pattern response for PolicyUpdated operation.
+type PolicyUpdated2XX struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *PolicyUpdated2XX) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *PolicyUpdated2XX) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*PolicyUpdated2XX) policyUpdatedRes() {}
+
+// PolicyUpdatedDef is default response for PolicyUpdated operation.
+type PolicyUpdatedDef struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *PolicyUpdatedDef) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *PolicyUpdatedDef) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*PolicyUpdatedDef) policyUpdatedRes() {}
+
+// Merged schema.
+// Ref: #
+type PolicyUpdatedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category PolicyUpdatedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilPolicyUpdatedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptPolicyUpdatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                           `json:"delegation_id"`
+	Grantor        OptString                           `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  PolicyPayload    `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *PolicyUpdatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *PolicyUpdatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *PolicyUpdatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *PolicyUpdatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *PolicyUpdatedEvent) GetCategory() PolicyUpdatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *PolicyUpdatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *PolicyUpdatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *PolicyUpdatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *PolicyUpdatedEvent) GetActorType() OptNilPolicyUpdatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *PolicyUpdatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *PolicyUpdatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *PolicyUpdatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *PolicyUpdatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *PolicyUpdatedEvent) GetDelegationType() OptPolicyUpdatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *PolicyUpdatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *PolicyUpdatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *PolicyUpdatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *PolicyUpdatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *PolicyUpdatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *PolicyUpdatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *PolicyUpdatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *PolicyUpdatedEvent) GetPayload() PolicyPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *PolicyUpdatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *PolicyUpdatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *PolicyUpdatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *PolicyUpdatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *PolicyUpdatedEvent) SetCategory(val PolicyUpdatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *PolicyUpdatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *PolicyUpdatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *PolicyUpdatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *PolicyUpdatedEvent) SetActorType(val OptNilPolicyUpdatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *PolicyUpdatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *PolicyUpdatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *PolicyUpdatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *PolicyUpdatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *PolicyUpdatedEvent) SetDelegationType(val OptPolicyUpdatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *PolicyUpdatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *PolicyUpdatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *PolicyUpdatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *PolicyUpdatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *PolicyUpdatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *PolicyUpdatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *PolicyUpdatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *PolicyUpdatedEvent) SetPayload(val PolicyPayload) {
+	s.Payload = val
+}
+
+type PolicyUpdatedEventActorType string
+
+const (
+	PolicyUpdatedEventActorTypeHuman   PolicyUpdatedEventActorType = "human"
+	PolicyUpdatedEventActorTypeService PolicyUpdatedEventActorType = "service"
+	PolicyUpdatedEventActorTypeSystem  PolicyUpdatedEventActorType = "system"
+	PolicyUpdatedEventActorTypeAgent   PolicyUpdatedEventActorType = "agent"
+)
+
+// AllValues returns all PolicyUpdatedEventActorType values.
+func (PolicyUpdatedEventActorType) AllValues() []PolicyUpdatedEventActorType {
+	return []PolicyUpdatedEventActorType{
+		PolicyUpdatedEventActorTypeHuman,
+		PolicyUpdatedEventActorTypeService,
+		PolicyUpdatedEventActorTypeSystem,
+		PolicyUpdatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyUpdatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyUpdatedEventActorTypeHuman:
+		return []byte(s), nil
+	case PolicyUpdatedEventActorTypeService:
+		return []byte(s), nil
+	case PolicyUpdatedEventActorTypeSystem:
+		return []byte(s), nil
+	case PolicyUpdatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyUpdatedEventActorType) UnmarshalText(data []byte) error {
+	switch PolicyUpdatedEventActorType(data) {
+	case PolicyUpdatedEventActorTypeHuman:
+		*s = PolicyUpdatedEventActorTypeHuman
+		return nil
+	case PolicyUpdatedEventActorTypeService:
+		*s = PolicyUpdatedEventActorTypeService
+		return nil
+	case PolicyUpdatedEventActorTypeSystem:
+		*s = PolicyUpdatedEventActorTypeSystem
+		return nil
+	case PolicyUpdatedEventActorTypeAgent:
+		*s = PolicyUpdatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type PolicyUpdatedEventCategory string
+
+const (
+	PolicyUpdatedEventCategoryRequest PolicyUpdatedEventCategory = "request"
+	PolicyUpdatedEventCategoryAuth    PolicyUpdatedEventCategory = "auth"
+	PolicyUpdatedEventCategorySession PolicyUpdatedEventCategory = "session"
+	PolicyUpdatedEventCategoryAdmin   PolicyUpdatedEventCategory = "admin"
+	PolicyUpdatedEventCategoryEntity  PolicyUpdatedEventCategory = "entity"
+	PolicyUpdatedEventCategorySignal  PolicyUpdatedEventCategory = "signal"
+)
+
+// AllValues returns all PolicyUpdatedEventCategory values.
+func (PolicyUpdatedEventCategory) AllValues() []PolicyUpdatedEventCategory {
+	return []PolicyUpdatedEventCategory{
+		PolicyUpdatedEventCategoryRequest,
+		PolicyUpdatedEventCategoryAuth,
+		PolicyUpdatedEventCategorySession,
+		PolicyUpdatedEventCategoryAdmin,
+		PolicyUpdatedEventCategoryEntity,
+		PolicyUpdatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyUpdatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyUpdatedEventCategoryRequest:
+		return []byte(s), nil
+	case PolicyUpdatedEventCategoryAuth:
+		return []byte(s), nil
+	case PolicyUpdatedEventCategorySession:
+		return []byte(s), nil
+	case PolicyUpdatedEventCategoryAdmin:
+		return []byte(s), nil
+	case PolicyUpdatedEventCategoryEntity:
+		return []byte(s), nil
+	case PolicyUpdatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyUpdatedEventCategory) UnmarshalText(data []byte) error {
+	switch PolicyUpdatedEventCategory(data) {
+	case PolicyUpdatedEventCategoryRequest:
+		*s = PolicyUpdatedEventCategoryRequest
+		return nil
+	case PolicyUpdatedEventCategoryAuth:
+		*s = PolicyUpdatedEventCategoryAuth
+		return nil
+	case PolicyUpdatedEventCategorySession:
+		*s = PolicyUpdatedEventCategorySession
+		return nil
+	case PolicyUpdatedEventCategoryAdmin:
+		*s = PolicyUpdatedEventCategoryAdmin
+		return nil
+	case PolicyUpdatedEventCategoryEntity:
+		*s = PolicyUpdatedEventCategoryEntity
+		return nil
+	case PolicyUpdatedEventCategorySignal:
+		*s = PolicyUpdatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type PolicyUpdatedEventDelegationType string
+
+const (
+	PolicyUpdatedEventDelegationTypeDirect    PolicyUpdatedEventDelegationType = "direct"
+	PolicyUpdatedEventDelegationTypeDelegated PolicyUpdatedEventDelegationType = "delegated"
+	PolicyUpdatedEventDelegationTypePatShared PolicyUpdatedEventDelegationType = "pat_shared"
+	PolicyUpdatedEventDelegationTypeExchanged PolicyUpdatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all PolicyUpdatedEventDelegationType values.
+func (PolicyUpdatedEventDelegationType) AllValues() []PolicyUpdatedEventDelegationType {
+	return []PolicyUpdatedEventDelegationType{
+		PolicyUpdatedEventDelegationTypeDirect,
+		PolicyUpdatedEventDelegationTypeDelegated,
+		PolicyUpdatedEventDelegationTypePatShared,
+		PolicyUpdatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyUpdatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyUpdatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case PolicyUpdatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case PolicyUpdatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case PolicyUpdatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyUpdatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch PolicyUpdatedEventDelegationType(data) {
+	case PolicyUpdatedEventDelegationTypeDirect:
+		*s = PolicyUpdatedEventDelegationTypeDirect
+		return nil
+	case PolicyUpdatedEventDelegationTypeDelegated:
+		*s = PolicyUpdatedEventDelegationTypeDelegated
+		return nil
+	case PolicyUpdatedEventDelegationTypePatShared:
+		*s = PolicyUpdatedEventDelegationTypePatShared
+		return nil
+	case PolicyUpdatedEventDelegationTypeExchanged:
+		*s = PolicyUpdatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // A preview URL that is live: an origin matching one of the project's
 // preview patterns, with something deployed to it, until it expires.
 // There is no create operation. A deployment whose targets are preview URLs
@@ -56588,6 +64356,59 @@ func (s *Preview) SetCreatedAt(val time.Time) {
 }
 
 type PreviewTTL string
+
+// Merged schema.
+// Ref: #
+type ProjAlreadyClaimed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjAlreadyClaimedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjAlreadyClaimed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjAlreadyClaimed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjAlreadyClaimed) GetDetails() OptProjAlreadyClaimedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjAlreadyClaimed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjAlreadyClaimed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjAlreadyClaimed) SetDetails(val OptProjAlreadyClaimedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjAlreadyClaimedDetails map[string]jx.Raw
+
+func (s *ProjAlreadyClaimedDetails) init() ProjAlreadyClaimedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // Merged schema.
 // Ref: #
@@ -56860,6 +64681,59 @@ func (s *ProjNotFoundDetails) init() ProjNotFoundDetails {
 
 // Merged schema.
 // Ref: #
+type ProjOriginNotAllowed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjOriginNotAllowedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjOriginNotAllowed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjOriginNotAllowed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjOriginNotAllowed) GetDetails() OptProjOriginNotAllowedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjOriginNotAllowed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjOriginNotAllowed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjOriginNotAllowed) SetDetails(val OptProjOriginNotAllowedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjOriginNotAllowedDetails map[string]jx.Raw
+
+func (s *ProjOriginNotAllowedDetails) init() ProjOriginNotAllowedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type ProjPasswordHashInvalid struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -56958,6 +64832,59 @@ func (*ProjPermissionDenied) getClaimStatusRes() {}
 type ProjPermissionDeniedDetails map[string]jx.Raw
 
 func (s *ProjPermissionDeniedDetails) init() ProjPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjPreviewNotLive struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjPreviewNotLiveDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjPreviewNotLive) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjPreviewNotLive) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjPreviewNotLive) GetDetails() OptProjPreviewNotLiveDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjPreviewNotLive) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjPreviewNotLive) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjPreviewNotLive) SetDetails(val OptProjPreviewNotLiveDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjPreviewNotLiveDetails map[string]jx.Raw
+
+func (s *ProjPreviewNotLiveDetails) init() ProjPreviewNotLiveDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -58603,6 +66530,314 @@ func (s *ProjectUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// PublishPolicyErrorResponse represents sum type.
+type PublishPolicyErrorResponse struct {
+	Type                PublishPolicyErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	PolInvalid          PolInvalid
+	PolNotFound         PolNotFound
+	PolPermissionDenied PolPermissionDenied
+	PolRevisionConflict PolRevisionConflict
+	ReqInvalid          ReqInvalid
+}
+
+// PublishPolicyErrorResponseType is oneOf type of PublishPolicyErrorResponse.
+type PublishPolicyErrorResponseType string
+
+// Possible values for PublishPolicyErrorResponseType.
+const (
+	AuthUnauthorizedPublishPolicyErrorResponse    PublishPolicyErrorResponseType = "auth.unauthorized"
+	EvtInvalidPublishPolicyErrorResponse          PublishPolicyErrorResponseType = "evt.invalid"
+	InternalPublishPolicyErrorResponse            PublishPolicyErrorResponseType = "internal"
+	PolInvalidPublishPolicyErrorResponse          PublishPolicyErrorResponseType = "pol.invalid"
+	PolNotFoundPublishPolicyErrorResponse         PublishPolicyErrorResponseType = "pol.not_found"
+	PolPermissionDeniedPublishPolicyErrorResponse PublishPolicyErrorResponseType = "pol.permission_denied"
+	PolRevisionConflictPublishPolicyErrorResponse PublishPolicyErrorResponseType = "pol.revision_conflict"
+	ReqInvalidPublishPolicyErrorResponse          PublishPolicyErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether PublishPolicyErrorResponse is AuthUnauthorized.
+func (s PublishPolicyErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedPublishPolicyErrorResponse
+}
+
+// IsEvtInvalid reports whether PublishPolicyErrorResponse is EvtInvalid.
+func (s PublishPolicyErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidPublishPolicyErrorResponse
+}
+
+// IsInternal reports whether PublishPolicyErrorResponse is Internal.
+func (s PublishPolicyErrorResponse) IsInternal() bool {
+	return s.Type == InternalPublishPolicyErrorResponse
+}
+
+// IsPolInvalid reports whether PublishPolicyErrorResponse is PolInvalid.
+func (s PublishPolicyErrorResponse) IsPolInvalid() bool {
+	return s.Type == PolInvalidPublishPolicyErrorResponse
+}
+
+// IsPolNotFound reports whether PublishPolicyErrorResponse is PolNotFound.
+func (s PublishPolicyErrorResponse) IsPolNotFound() bool {
+	return s.Type == PolNotFoundPublishPolicyErrorResponse
+}
+
+// IsPolPermissionDenied reports whether PublishPolicyErrorResponse is PolPermissionDenied.
+func (s PublishPolicyErrorResponse) IsPolPermissionDenied() bool {
+	return s.Type == PolPermissionDeniedPublishPolicyErrorResponse
+}
+
+// IsPolRevisionConflict reports whether PublishPolicyErrorResponse is PolRevisionConflict.
+func (s PublishPolicyErrorResponse) IsPolRevisionConflict() bool {
+	return s.Type == PolRevisionConflictPublishPolicyErrorResponse
+}
+
+// IsReqInvalid reports whether PublishPolicyErrorResponse is ReqInvalid.
+func (s PublishPolicyErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidPublishPolicyErrorResponse
+}
+
+// SetAuthUnauthorized sets PublishPolicyErrorResponse to AuthUnauthorized.
+func (s *PublishPolicyErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedPublishPolicyErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if PublishPolicyErrorResponse is AuthUnauthorized.
+func (s PublishPolicyErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedPublishPolicyErrorResponse returns new PublishPolicyErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedPublishPolicyErrorResponse(v AuthUnauthorized) PublishPolicyErrorResponse {
+	var s PublishPolicyErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets PublishPolicyErrorResponse to EvtInvalid.
+func (s *PublishPolicyErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidPublishPolicyErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if PublishPolicyErrorResponse is EvtInvalid.
+func (s PublishPolicyErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidPublishPolicyErrorResponse returns new PublishPolicyErrorResponse from EvtInvalid.
+func NewEvtInvalidPublishPolicyErrorResponse(v EvtInvalid) PublishPolicyErrorResponse {
+	var s PublishPolicyErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetInternal sets PublishPolicyErrorResponse to Internal.
+func (s *PublishPolicyErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalPublishPolicyErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if PublishPolicyErrorResponse is Internal.
+func (s PublishPolicyErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalPublishPolicyErrorResponse returns new PublishPolicyErrorResponse from Internal.
+func NewInternalPublishPolicyErrorResponse(v Internal) PublishPolicyErrorResponse {
+	var s PublishPolicyErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetPolInvalid sets PublishPolicyErrorResponse to PolInvalid.
+func (s *PublishPolicyErrorResponse) SetPolInvalid(v PolInvalid) {
+	s.Type = PolInvalidPublishPolicyErrorResponse
+	s.PolInvalid = v
+}
+
+// GetPolInvalid returns PolInvalid and true boolean if PublishPolicyErrorResponse is PolInvalid.
+func (s PublishPolicyErrorResponse) GetPolInvalid() (v PolInvalid, ok bool) {
+	if !s.IsPolInvalid() {
+		return v, false
+	}
+	return s.PolInvalid, true
+}
+
+// NewPolInvalidPublishPolicyErrorResponse returns new PublishPolicyErrorResponse from PolInvalid.
+func NewPolInvalidPublishPolicyErrorResponse(v PolInvalid) PublishPolicyErrorResponse {
+	var s PublishPolicyErrorResponse
+	s.SetPolInvalid(v)
+	return s
+}
+
+// SetPolNotFound sets PublishPolicyErrorResponse to PolNotFound.
+func (s *PublishPolicyErrorResponse) SetPolNotFound(v PolNotFound) {
+	s.Type = PolNotFoundPublishPolicyErrorResponse
+	s.PolNotFound = v
+}
+
+// GetPolNotFound returns PolNotFound and true boolean if PublishPolicyErrorResponse is PolNotFound.
+func (s PublishPolicyErrorResponse) GetPolNotFound() (v PolNotFound, ok bool) {
+	if !s.IsPolNotFound() {
+		return v, false
+	}
+	return s.PolNotFound, true
+}
+
+// NewPolNotFoundPublishPolicyErrorResponse returns new PublishPolicyErrorResponse from PolNotFound.
+func NewPolNotFoundPublishPolicyErrorResponse(v PolNotFound) PublishPolicyErrorResponse {
+	var s PublishPolicyErrorResponse
+	s.SetPolNotFound(v)
+	return s
+}
+
+// SetPolPermissionDenied sets PublishPolicyErrorResponse to PolPermissionDenied.
+func (s *PublishPolicyErrorResponse) SetPolPermissionDenied(v PolPermissionDenied) {
+	s.Type = PolPermissionDeniedPublishPolicyErrorResponse
+	s.PolPermissionDenied = v
+}
+
+// GetPolPermissionDenied returns PolPermissionDenied and true boolean if PublishPolicyErrorResponse is PolPermissionDenied.
+func (s PublishPolicyErrorResponse) GetPolPermissionDenied() (v PolPermissionDenied, ok bool) {
+	if !s.IsPolPermissionDenied() {
+		return v, false
+	}
+	return s.PolPermissionDenied, true
+}
+
+// NewPolPermissionDeniedPublishPolicyErrorResponse returns new PublishPolicyErrorResponse from PolPermissionDenied.
+func NewPolPermissionDeniedPublishPolicyErrorResponse(v PolPermissionDenied) PublishPolicyErrorResponse {
+	var s PublishPolicyErrorResponse
+	s.SetPolPermissionDenied(v)
+	return s
+}
+
+// SetPolRevisionConflict sets PublishPolicyErrorResponse to PolRevisionConflict.
+func (s *PublishPolicyErrorResponse) SetPolRevisionConflict(v PolRevisionConflict) {
+	s.Type = PolRevisionConflictPublishPolicyErrorResponse
+	s.PolRevisionConflict = v
+}
+
+// GetPolRevisionConflict returns PolRevisionConflict and true boolean if PublishPolicyErrorResponse is PolRevisionConflict.
+func (s PublishPolicyErrorResponse) GetPolRevisionConflict() (v PolRevisionConflict, ok bool) {
+	if !s.IsPolRevisionConflict() {
+		return v, false
+	}
+	return s.PolRevisionConflict, true
+}
+
+// NewPolRevisionConflictPublishPolicyErrorResponse returns new PublishPolicyErrorResponse from PolRevisionConflict.
+func NewPolRevisionConflictPublishPolicyErrorResponse(v PolRevisionConflict) PublishPolicyErrorResponse {
+	var s PublishPolicyErrorResponse
+	s.SetPolRevisionConflict(v)
+	return s
+}
+
+// SetReqInvalid sets PublishPolicyErrorResponse to ReqInvalid.
+func (s *PublishPolicyErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidPublishPolicyErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if PublishPolicyErrorResponse is ReqInvalid.
+func (s PublishPolicyErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidPublishPolicyErrorResponse returns new PublishPolicyErrorResponse from ReqInvalid.
+func NewReqInvalidPublishPolicyErrorResponse(v ReqInvalid) PublishPolicyErrorResponse {
+	var s PublishPolicyErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// PublishPolicyErrorResponseStatusCode wraps PublishPolicyErrorResponse with StatusCode.
+type PublishPolicyErrorResponseStatusCode struct {
+	StatusCode int
+	Response   PublishPolicyErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *PublishPolicyErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *PublishPolicyErrorResponseStatusCode) GetResponse() PublishPolicyErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *PublishPolicyErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *PublishPolicyErrorResponseStatusCode) SetResponse(val PublishPolicyErrorResponse) {
+	s.Response = val
+}
+
+func (*PublishPolicyErrorResponseStatusCode) publishPolicyRes() {}
+
+// One publish of the project's policy for an operation. `config` sets the
+// operation template's settings; a setting left out is off, and `{}` switches
+// every rule off. The settings each operation accepts are listed in the policy
+// catalog.
+// Ref: #
+type PublishPolicyRequest struct {
+	// The operation the policy guards.
+	Operation string `json:"operation"`
+	// The settings, checked against the operation's template.
+	Config PublishPolicyRequestConfig `json:"config"`
+}
+
+// GetOperation returns the value of Operation.
+func (s *PublishPolicyRequest) GetOperation() string {
+	return s.Operation
+}
+
+// GetConfig returns the value of Config.
+func (s *PublishPolicyRequest) GetConfig() PublishPolicyRequestConfig {
+	return s.Config
+}
+
+// SetOperation sets the value of Operation.
+func (s *PublishPolicyRequest) SetOperation(val string) {
+	s.Operation = val
+}
+
+// SetConfig sets the value of Config.
+func (s *PublishPolicyRequest) SetConfig(val PublishPolicyRequestConfig) {
+	s.Config = val
+}
+
+// The settings, checked against the operation's template.
+type PublishPolicyRequestConfig map[string]jx.Raw
+
+func (s *PublishPolicyRequestConfig) init() PublishPolicyRequestConfig {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 type QueryGrantsBadRequest ErrorDetails
@@ -60300,6 +68535,268 @@ type QueryTeamsBadRequest ErrorDetails
 
 func (*QueryTeamsBadRequest) queryTeamsRes() {}
 
+// QueryTeamsErrorResponse represents sum type.
+type QueryTeamsErrorResponse struct {
+	Type                 QueryTeamsErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
+	AuthUnauthorized     AuthUnauthorized
+	Internal             Internal
+	NotImplemented       NotImplemented
+	ReqInvalid           ReqInvalid
+	TeamTeamNotFound     TeamTeamNotFound
+	TeamPermissionDenied TeamPermissionDenied
+	TeamProjectNotFound  TeamProjectNotFound
+}
+
+// QueryTeamsErrorResponseType is oneOf type of QueryTeamsErrorResponse.
+type QueryTeamsErrorResponseType string
+
+// Possible values for QueryTeamsErrorResponseType.
+const (
+	AuthCsrfInvalidQueryTeamsErrorResponse      QueryTeamsErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedQueryTeamsErrorResponse     QueryTeamsErrorResponseType = "auth.unauthorized"
+	InternalQueryTeamsErrorResponse             QueryTeamsErrorResponseType = "internal"
+	NotImplementedQueryTeamsErrorResponse       QueryTeamsErrorResponseType = "not_implemented"
+	ReqInvalidQueryTeamsErrorResponse           QueryTeamsErrorResponseType = "req.invalid"
+	TeamTeamNotFoundQueryTeamsErrorResponse     QueryTeamsErrorResponseType = "team.team_not_found"
+	TeamPermissionDeniedQueryTeamsErrorResponse QueryTeamsErrorResponseType = "team.permission_denied"
+	TeamProjectNotFoundQueryTeamsErrorResponse  QueryTeamsErrorResponseType = "team.project_not_found"
+)
+
+// IsAuthCsrfInvalid reports whether QueryTeamsErrorResponse is AuthCsrfInvalid.
+func (s QueryTeamsErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidQueryTeamsErrorResponse
+}
+
+// IsAuthUnauthorized reports whether QueryTeamsErrorResponse is AuthUnauthorized.
+func (s QueryTeamsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedQueryTeamsErrorResponse
+}
+
+// IsInternal reports whether QueryTeamsErrorResponse is Internal.
+func (s QueryTeamsErrorResponse) IsInternal() bool { return s.Type == InternalQueryTeamsErrorResponse }
+
+// IsNotImplemented reports whether QueryTeamsErrorResponse is NotImplemented.
+func (s QueryTeamsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedQueryTeamsErrorResponse
+}
+
+// IsReqInvalid reports whether QueryTeamsErrorResponse is ReqInvalid.
+func (s QueryTeamsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidQueryTeamsErrorResponse
+}
+
+// IsTeamTeamNotFound reports whether QueryTeamsErrorResponse is TeamTeamNotFound.
+func (s QueryTeamsErrorResponse) IsTeamTeamNotFound() bool {
+	return s.Type == TeamTeamNotFoundQueryTeamsErrorResponse
+}
+
+// IsTeamPermissionDenied reports whether QueryTeamsErrorResponse is TeamPermissionDenied.
+func (s QueryTeamsErrorResponse) IsTeamPermissionDenied() bool {
+	return s.Type == TeamPermissionDeniedQueryTeamsErrorResponse
+}
+
+// IsTeamProjectNotFound reports whether QueryTeamsErrorResponse is TeamProjectNotFound.
+func (s QueryTeamsErrorResponse) IsTeamProjectNotFound() bool {
+	return s.Type == TeamProjectNotFoundQueryTeamsErrorResponse
+}
+
+// SetAuthCsrfInvalid sets QueryTeamsErrorResponse to AuthCsrfInvalid.
+func (s *QueryTeamsErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidQueryTeamsErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if QueryTeamsErrorResponse is AuthCsrfInvalid.
+func (s QueryTeamsErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidQueryTeamsErrorResponse returns new QueryTeamsErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidQueryTeamsErrorResponse(v AuthCsrfInvalid) QueryTeamsErrorResponse {
+	var s QueryTeamsErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets QueryTeamsErrorResponse to AuthUnauthorized.
+func (s *QueryTeamsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedQueryTeamsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if QueryTeamsErrorResponse is AuthUnauthorized.
+func (s QueryTeamsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedQueryTeamsErrorResponse returns new QueryTeamsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedQueryTeamsErrorResponse(v AuthUnauthorized) QueryTeamsErrorResponse {
+	var s QueryTeamsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets QueryTeamsErrorResponse to Internal.
+func (s *QueryTeamsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalQueryTeamsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if QueryTeamsErrorResponse is Internal.
+func (s QueryTeamsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalQueryTeamsErrorResponse returns new QueryTeamsErrorResponse from Internal.
+func NewInternalQueryTeamsErrorResponse(v Internal) QueryTeamsErrorResponse {
+	var s QueryTeamsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets QueryTeamsErrorResponse to NotImplemented.
+func (s *QueryTeamsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedQueryTeamsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if QueryTeamsErrorResponse is NotImplemented.
+func (s QueryTeamsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedQueryTeamsErrorResponse returns new QueryTeamsErrorResponse from NotImplemented.
+func NewNotImplementedQueryTeamsErrorResponse(v NotImplemented) QueryTeamsErrorResponse {
+	var s QueryTeamsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets QueryTeamsErrorResponse to ReqInvalid.
+func (s *QueryTeamsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidQueryTeamsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if QueryTeamsErrorResponse is ReqInvalid.
+func (s QueryTeamsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidQueryTeamsErrorResponse returns new QueryTeamsErrorResponse from ReqInvalid.
+func NewReqInvalidQueryTeamsErrorResponse(v ReqInvalid) QueryTeamsErrorResponse {
+	var s QueryTeamsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetTeamTeamNotFound sets QueryTeamsErrorResponse to TeamTeamNotFound.
+func (s *QueryTeamsErrorResponse) SetTeamTeamNotFound(v TeamTeamNotFound) {
+	s.Type = TeamTeamNotFoundQueryTeamsErrorResponse
+	s.TeamTeamNotFound = v
+}
+
+// GetTeamTeamNotFound returns TeamTeamNotFound and true boolean if QueryTeamsErrorResponse is TeamTeamNotFound.
+func (s QueryTeamsErrorResponse) GetTeamTeamNotFound() (v TeamTeamNotFound, ok bool) {
+	if !s.IsTeamTeamNotFound() {
+		return v, false
+	}
+	return s.TeamTeamNotFound, true
+}
+
+// NewTeamTeamNotFoundQueryTeamsErrorResponse returns new QueryTeamsErrorResponse from TeamTeamNotFound.
+func NewTeamTeamNotFoundQueryTeamsErrorResponse(v TeamTeamNotFound) QueryTeamsErrorResponse {
+	var s QueryTeamsErrorResponse
+	s.SetTeamTeamNotFound(v)
+	return s
+}
+
+// SetTeamPermissionDenied sets QueryTeamsErrorResponse to TeamPermissionDenied.
+func (s *QueryTeamsErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
+	s.Type = TeamPermissionDeniedQueryTeamsErrorResponse
+	s.TeamPermissionDenied = v
+}
+
+// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if QueryTeamsErrorResponse is TeamPermissionDenied.
+func (s QueryTeamsErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
+	if !s.IsTeamPermissionDenied() {
+		return v, false
+	}
+	return s.TeamPermissionDenied, true
+}
+
+// NewTeamPermissionDeniedQueryTeamsErrorResponse returns new QueryTeamsErrorResponse from TeamPermissionDenied.
+func NewTeamPermissionDeniedQueryTeamsErrorResponse(v TeamPermissionDenied) QueryTeamsErrorResponse {
+	var s QueryTeamsErrorResponse
+	s.SetTeamPermissionDenied(v)
+	return s
+}
+
+// SetTeamProjectNotFound sets QueryTeamsErrorResponse to TeamProjectNotFound.
+func (s *QueryTeamsErrorResponse) SetTeamProjectNotFound(v TeamProjectNotFound) {
+	s.Type = TeamProjectNotFoundQueryTeamsErrorResponse
+	s.TeamProjectNotFound = v
+}
+
+// GetTeamProjectNotFound returns TeamProjectNotFound and true boolean if QueryTeamsErrorResponse is TeamProjectNotFound.
+func (s QueryTeamsErrorResponse) GetTeamProjectNotFound() (v TeamProjectNotFound, ok bool) {
+	if !s.IsTeamProjectNotFound() {
+		return v, false
+	}
+	return s.TeamProjectNotFound, true
+}
+
+// NewTeamProjectNotFoundQueryTeamsErrorResponse returns new QueryTeamsErrorResponse from TeamProjectNotFound.
+func NewTeamProjectNotFoundQueryTeamsErrorResponse(v TeamProjectNotFound) QueryTeamsErrorResponse {
+	var s QueryTeamsErrorResponse
+	s.SetTeamProjectNotFound(v)
+	return s
+}
+
+// QueryTeamsErrorResponseStatusCode wraps QueryTeamsErrorResponse with StatusCode.
+type QueryTeamsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   QueryTeamsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *QueryTeamsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *QueryTeamsErrorResponseStatusCode) GetResponse() QueryTeamsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *QueryTeamsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *QueryTeamsErrorResponseStatusCode) SetResponse(val QueryTeamsErrorResponse) {
+	s.Response = val
+}
+
+func (*QueryTeamsErrorResponseStatusCode) queryTeamsRes() {}
+
 type QueryTeamsForbidden ErrorDetails
 
 func (*QueryTeamsForbidden) queryTeamsRes() {}
@@ -60927,6 +69424,59 @@ func (s *RelInvalidDetails) init() RelInvalidDetails {
 
 // Merged schema.
 // Ref: #
+type RelNotDeployed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelNotDeployedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelNotDeployed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelNotDeployed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelNotDeployed) GetDetails() OptRelNotDeployedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelNotDeployed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelNotDeployed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelNotDeployed) SetDetails(val OptRelNotDeployedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelNotDeployedDetails map[string]jx.Raw
+
+func (s *RelNotDeployedDetails) init() RelNotDeployedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type RelNotFound struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -61182,6 +69732,59 @@ func (s *RelRevisionUnpinnable) SetDetails(val OptRelRevisionUnpinnableDetails) 
 type RelRevisionUnpinnableDetails map[string]jx.Raw
 
 func (s *RelRevisionUnpinnableDetails) init() RelRevisionUnpinnableDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type RelRevoked struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelRevokedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelRevoked) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelRevoked) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelRevoked) GetDetails() OptRelRevokedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelRevoked) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelRevoked) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelRevoked) SetDetails(val OptRelRevokedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelRevokedDetails map[string]jx.Raw
+
+func (s *RelRevokedDetails) init() RelRevokedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -66643,10 +75246,13 @@ func (s *SessProjectMismatch) SetDetails(val OptSessProjectMismatchDetails) {
 	s.Details = val
 }
 
-func (*SessProjectMismatch) getMyUserRes()       {}
-func (*SessProjectMismatch) getMyUserSchemaRes() {}
-func (*SessProjectMismatch) listMyProjectsRes()  {}
-func (*SessProjectMismatch) listMyTeamsRes()     {}
+func (*SessProjectMismatch) getMyPasswordStateRes()  {}
+func (*SessProjectMismatch) getMyUserRes()           {}
+func (*SessProjectMismatch) getMyUserSchemaRes()     {}
+func (*SessProjectMismatch) listMyIdentityLinksRes() {}
+func (*SessProjectMismatch) listMyPasskeysRes()      {}
+func (*SessProjectMismatch) listMyProjectsRes()      {}
+func (*SessProjectMismatch) listMyTeamsRes()         {}
 
 // Additional error-specific context.
 type SessProjectMismatchDetails map[string]jx.Raw
@@ -67803,6 +76409,8 @@ func (s *SessionFilterField) UnmarshalText(data []byte) error {
 
 type SessionID string
 
+type SessionProofToken string
+
 // The current state of a session.
 // A session is the durable post-auth primitive. It accumulates verified authentication
 // factors and exposes `assurance_levels[]` — the set of assurance profiles its current
@@ -68213,16 +76821,18 @@ func (*SetUserPasswordBadRequest) setUserPasswordRes() {}
 
 // SetUserPasswordErrorResponse represents sum type.
 type SetUserPasswordErrorResponse struct {
-	Type                 SetUserPasswordErrorResponseType // switch on this field
-	AuthUnauthorized     AuthUnauthorized
-	EvtInvalid           EvtInvalid
-	Internal             Internal
-	ReqInvalid           ReqInvalid
-	UserInvalid          UserInvalid
-	UserNotFound         UserNotFound
-	UserPasswordEmpty    UserPasswordEmpty
-	UserPasswordTooLong  UserPasswordTooLong
-	UserPermissionDenied UserPermissionDenied
+	Type                        SetUserPasswordErrorResponseType // switch on this field
+	AuthUnauthorized            AuthUnauthorized
+	EvtInvalid                  EvtInvalid
+	Internal                    Internal
+	ReqInvalid                  ReqInvalid
+	UserConflict                UserConflict
+	UserInvalid                 UserInvalid
+	UserNotFound                UserNotFound
+	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordPolicyViolation UserPasswordPolicyViolation
+	UserPasswordTooLong         UserPasswordTooLong
+	UserPermissionDenied        UserPermissionDenied
 }
 
 // SetUserPasswordErrorResponseType is oneOf type of SetUserPasswordErrorResponse.
@@ -68230,15 +76840,17 @@ type SetUserPasswordErrorResponseType string
 
 // Possible values for SetUserPasswordErrorResponseType.
 const (
-	AuthUnauthorizedSetUserPasswordErrorResponse     SetUserPasswordErrorResponseType = "auth.unauthorized"
-	EvtInvalidSetUserPasswordErrorResponse           SetUserPasswordErrorResponseType = "evt.invalid"
-	InternalSetUserPasswordErrorResponse             SetUserPasswordErrorResponseType = "internal"
-	ReqInvalidSetUserPasswordErrorResponse           SetUserPasswordErrorResponseType = "req.invalid"
-	UserInvalidSetUserPasswordErrorResponse          SetUserPasswordErrorResponseType = "user.invalid"
-	UserNotFoundSetUserPasswordErrorResponse         SetUserPasswordErrorResponseType = "user.not_found"
-	UserPasswordEmptySetUserPasswordErrorResponse    SetUserPasswordErrorResponseType = "user.password_empty"
-	UserPasswordTooLongSetUserPasswordErrorResponse  SetUserPasswordErrorResponseType = "user.password_too_long"
-	UserPermissionDeniedSetUserPasswordErrorResponse SetUserPasswordErrorResponseType = "user.permission_denied"
+	AuthUnauthorizedSetUserPasswordErrorResponse            SetUserPasswordErrorResponseType = "auth.unauthorized"
+	EvtInvalidSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "evt.invalid"
+	InternalSetUserPasswordErrorResponse                    SetUserPasswordErrorResponseType = "internal"
+	ReqInvalidSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "req.invalid"
+	UserConflictSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "user.conflict"
+	UserInvalidSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "user.invalid"
+	UserNotFoundSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "user.not_found"
+	UserPasswordEmptySetUserPasswordErrorResponse           SetUserPasswordErrorResponseType = "user.password_empty"
+	UserPasswordPolicyViolationSetUserPasswordErrorResponse SetUserPasswordErrorResponseType = "user.password_policy_violation"
+	UserPasswordTooLongSetUserPasswordErrorResponse         SetUserPasswordErrorResponseType = "user.password_too_long"
+	UserPermissionDeniedSetUserPasswordErrorResponse        SetUserPasswordErrorResponseType = "user.permission_denied"
 )
 
 // IsAuthUnauthorized reports whether SetUserPasswordErrorResponse is AuthUnauthorized.
@@ -68261,6 +76873,11 @@ func (s SetUserPasswordErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidSetUserPasswordErrorResponse
 }
 
+// IsUserConflict reports whether SetUserPasswordErrorResponse is UserConflict.
+func (s SetUserPasswordErrorResponse) IsUserConflict() bool {
+	return s.Type == UserConflictSetUserPasswordErrorResponse
+}
+
 // IsUserInvalid reports whether SetUserPasswordErrorResponse is UserInvalid.
 func (s SetUserPasswordErrorResponse) IsUserInvalid() bool {
 	return s.Type == UserInvalidSetUserPasswordErrorResponse
@@ -68274,6 +76891,11 @@ func (s SetUserPasswordErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether SetUserPasswordErrorResponse is UserPasswordEmpty.
 func (s SetUserPasswordErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptySetUserPasswordErrorResponse
+}
+
+// IsUserPasswordPolicyViolation reports whether SetUserPasswordErrorResponse is UserPasswordPolicyViolation.
+func (s SetUserPasswordErrorResponse) IsUserPasswordPolicyViolation() bool {
+	return s.Type == UserPasswordPolicyViolationSetUserPasswordErrorResponse
 }
 
 // IsUserPasswordTooLong reports whether SetUserPasswordErrorResponse is UserPasswordTooLong.
@@ -68370,6 +76992,27 @@ func NewReqInvalidSetUserPasswordErrorResponse(v ReqInvalid) SetUserPasswordErro
 	return s
 }
 
+// SetUserConflict sets SetUserPasswordErrorResponse to UserConflict.
+func (s *SetUserPasswordErrorResponse) SetUserConflict(v UserConflict) {
+	s.Type = UserConflictSetUserPasswordErrorResponse
+	s.UserConflict = v
+}
+
+// GetUserConflict returns UserConflict and true boolean if SetUserPasswordErrorResponse is UserConflict.
+func (s SetUserPasswordErrorResponse) GetUserConflict() (v UserConflict, ok bool) {
+	if !s.IsUserConflict() {
+		return v, false
+	}
+	return s.UserConflict, true
+}
+
+// NewUserConflictSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from UserConflict.
+func NewUserConflictSetUserPasswordErrorResponse(v UserConflict) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetUserConflict(v)
+	return s
+}
+
 // SetUserInvalid sets SetUserPasswordErrorResponse to UserInvalid.
 func (s *SetUserPasswordErrorResponse) SetUserInvalid(v UserInvalid) {
 	s.Type = UserInvalidSetUserPasswordErrorResponse
@@ -68430,6 +77073,27 @@ func (s SetUserPasswordErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpt
 func NewUserPasswordEmptySetUserPasswordErrorResponse(v UserPasswordEmpty) SetUserPasswordErrorResponse {
 	var s SetUserPasswordErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordPolicyViolation sets SetUserPasswordErrorResponse to UserPasswordPolicyViolation.
+func (s *SetUserPasswordErrorResponse) SetUserPasswordPolicyViolation(v UserPasswordPolicyViolation) {
+	s.Type = UserPasswordPolicyViolationSetUserPasswordErrorResponse
+	s.UserPasswordPolicyViolation = v
+}
+
+// GetUserPasswordPolicyViolation returns UserPasswordPolicyViolation and true boolean if SetUserPasswordErrorResponse is UserPasswordPolicyViolation.
+func (s SetUserPasswordErrorResponse) GetUserPasswordPolicyViolation() (v UserPasswordPolicyViolation, ok bool) {
+	if !s.IsUserPasswordPolicyViolation() {
+		return v, false
+	}
+	return s.UserPasswordPolicyViolation, true
+}
+
+// NewUserPasswordPolicyViolationSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from UserPasswordPolicyViolation.
+func NewUserPasswordPolicyViolationSetUserPasswordErrorResponse(v UserPasswordPolicyViolation) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetUserPasswordPolicyViolation(v)
 	return s
 }
 
@@ -68748,41 +77412,42 @@ func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
 
 // SubmitFlowStepErrorResponse represents sum type.
 type SubmitFlowStepErrorResponse struct {
-	Type                    SubmitFlowStepErrorResponseType // switch on this field
-	AttAlreadyHandedOff     AttAlreadyHandedOff
-	AttInvalidRequest       AttInvalidRequest
-	AttInvalidState         AttInvalidState
-	AttNotCompleted         AttNotCompleted
-	AttNotFound             AttNotFound
-	AttProofRejected        AttProofRejected
-	AttStaleChallenge       AttStaleChallenge
-	EncKeyDecryptFailed     EncKeyDecryptFailed
-	EncKeyEncryptFailed     EncKeyEncryptFailed
-	EncKeyNotFound          EncKeyNotFound
-	EvtInvalid              EvtInvalid
-	FlowCookieExpired       FlowCookieExpired
-	FlowCookieInvalid       FlowCookieInvalid
-	FlowIntegrity           FlowIntegrity
-	FlowInvalidAction       FlowInvalidAction
-	FlowNotFound            FlowNotFound
-	FlowRestartRequired     FlowRestartRequired
-	FlowUnsupported         FlowUnsupported
-	IdpEndpointCleartext    IdpEndpointCleartext
-	IdpEndpointsPartial     IdpEndpointsPartial
-	IdpProtocolBlockMissing IdpProtocolBlockMissing
-	IdpScopesMissingOpenid  IdpScopesMissingOpenid
-	Internal                Internal
-	TknInvalid              TknInvalid
-	NotImplemented          NotImplemented
-	ReqInvalid              ReqInvalid
-	EncKeyUnknownAlg        EncKeyUnknownAlg
-	Unavailable             Unavailable
-	UserAlreadyExists       UserAlreadyExists
-	UserConflict            UserConflict
-	UserInvalid             UserInvalid
-	UserNotFound            UserNotFound
-	UserPasswordEmpty       UserPasswordEmpty
-	UserPasswordTooLong     UserPasswordTooLong
+	Type                        SubmitFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff         AttAlreadyHandedOff
+	AttInvalidRequest           AttInvalidRequest
+	AttInvalidState             AttInvalidState
+	AttNotCompleted             AttNotCompleted
+	AttNotFound                 AttNotFound
+	AttProofRejected            AttProofRejected
+	AttStaleChallenge           AttStaleChallenge
+	EncKeyDecryptFailed         EncKeyDecryptFailed
+	EncKeyEncryptFailed         EncKeyEncryptFailed
+	EncKeyNotFound              EncKeyNotFound
+	EvtInvalid                  EvtInvalid
+	FlowCookieExpired           FlowCookieExpired
+	FlowCookieInvalid           FlowCookieInvalid
+	FlowIntegrity               FlowIntegrity
+	FlowInvalidAction           FlowInvalidAction
+	FlowNotFound                FlowNotFound
+	FlowRestartRequired         FlowRestartRequired
+	FlowUnsupported             FlowUnsupported
+	IdpEndpointCleartext        IdpEndpointCleartext
+	IdpEndpointsPartial         IdpEndpointsPartial
+	IdpProtocolBlockMissing     IdpProtocolBlockMissing
+	IdpScopesMissingOpenid      IdpScopesMissingOpenid
+	Internal                    Internal
+	TknInvalid                  TknInvalid
+	NotImplemented              NotImplemented
+	ReqInvalid                  ReqInvalid
+	EncKeyUnknownAlg            EncKeyUnknownAlg
+	Unavailable                 Unavailable
+	UserAlreadyExists           UserAlreadyExists
+	UserConflict                UserConflict
+	UserInvalid                 UserInvalid
+	UserNotFound                UserNotFound
+	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordPolicyViolation UserPasswordPolicyViolation
+	UserPasswordTooLong         UserPasswordTooLong
 }
 
 // SubmitFlowStepErrorResponseType is oneOf type of SubmitFlowStepErrorResponse.
@@ -68790,40 +77455,41 @@ type SubmitFlowStepErrorResponseType string
 
 // Possible values for SubmitFlowStepErrorResponseType.
 const (
-	AttAlreadyHandedOffSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.already_handed_off"
-	AttInvalidRequestSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "att.invalid_request"
-	AttInvalidStateSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.invalid_state"
-	AttNotCompletedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.not_completed"
-	AttNotFoundSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.not_found"
-	AttProofRejectedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "att.stale_challenge"
-	EncKeyDecryptFailedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "enc_key.not_found"
-	EvtInvalidSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "evt.invalid"
-	FlowCookieExpiredSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegritySubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.integrity"
-	FlowInvalidActionSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.invalid_action"
-	FlowNotFoundSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "flow.not_found"
-	FlowRestartRequiredSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.restart_required"
-	FlowUnsupportedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "flow.unsupported"
-	IdpEndpointCleartextSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "idp.endpoint_cleartext"
-	IdpEndpointsPartialSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "idp.endpoints_partial"
-	IdpProtocolBlockMissingSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "idp.protocol_block_missing"
-	IdpScopesMissingOpenidSubmitFlowStepErrorResponse  SubmitFlowStepErrorResponseType = "idp.scopes_missing_openid"
-	InternalSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "internal"
-	TknInvalidSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "tkn.invalid"
-	NotImplementedSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "not_implemented"
-	ReqInvalidSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
-	UnavailableSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "unavailable"
-	UserAlreadyExistsSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "user.already_exists"
-	UserConflictSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "user.conflict"
-	UserInvalidSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.invalid"
-	UserNotFoundSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "user.not_found"
-	UserPasswordEmptySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "user.password_empty"
-	UserPasswordTooLongSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "user.password_too_long"
+	AttAlreadyHandedOffSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "att.not_found"
+	AttProofRejectedSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "att.stale_challenge"
+	EncKeyDecryptFailedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "enc_key.not_found"
+	EvtInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "evt.invalid"
+	FlowCookieExpiredSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegritySubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.invalid_action"
+	FlowNotFoundSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "flow.not_found"
+	FlowRestartRequiredSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "flow.restart_required"
+	FlowUnsupportedSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.unsupported"
+	IdpEndpointCleartextSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "idp.endpoint_cleartext"
+	IdpEndpointsPartialSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "idp.endpoints_partial"
+	IdpProtocolBlockMissingSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "idp.protocol_block_missing"
+	IdpScopesMissingOpenidSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "idp.scopes_missing_openid"
+	InternalSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "internal"
+	TknInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "tkn.invalid"
+	NotImplementedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "not_implemented"
+	ReqInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UnavailableSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "unavailable"
+	UserAlreadyExistsSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "user.already_exists"
+	UserConflictSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "user.conflict"
+	UserInvalidSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "user.not_found"
+	UserPasswordEmptySubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordPolicyViolationSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "user.password_policy_violation"
+	UserPasswordTooLongSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether SubmitFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -68989,6 +77655,11 @@ func (s SubmitFlowStepErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether SubmitFlowStepErrorResponse is UserPasswordEmpty.
 func (s SubmitFlowStepErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptySubmitFlowStepErrorResponse
+}
+
+// IsUserPasswordPolicyViolation reports whether SubmitFlowStepErrorResponse is UserPasswordPolicyViolation.
+func (s SubmitFlowStepErrorResponse) IsUserPasswordPolicyViolation() bool {
+	return s.Type == UserPasswordPolicyViolationSubmitFlowStepErrorResponse
 }
 
 // IsUserPasswordTooLong reports whether SubmitFlowStepErrorResponse is UserPasswordTooLong.
@@ -69689,6 +78360,27 @@ func NewUserPasswordEmptySubmitFlowStepErrorResponse(v UserPasswordEmpty) Submit
 	return s
 }
 
+// SetUserPasswordPolicyViolation sets SubmitFlowStepErrorResponse to UserPasswordPolicyViolation.
+func (s *SubmitFlowStepErrorResponse) SetUserPasswordPolicyViolation(v UserPasswordPolicyViolation) {
+	s.Type = UserPasswordPolicyViolationSubmitFlowStepErrorResponse
+	s.UserPasswordPolicyViolation = v
+}
+
+// GetUserPasswordPolicyViolation returns UserPasswordPolicyViolation and true boolean if SubmitFlowStepErrorResponse is UserPasswordPolicyViolation.
+func (s SubmitFlowStepErrorResponse) GetUserPasswordPolicyViolation() (v UserPasswordPolicyViolation, ok bool) {
+	if !s.IsUserPasswordPolicyViolation() {
+		return v, false
+	}
+	return s.UserPasswordPolicyViolation, true
+}
+
+// NewUserPasswordPolicyViolationSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserPasswordPolicyViolation.
+func NewUserPasswordPolicyViolationSubmitFlowStepErrorResponse(v UserPasswordPolicyViolation) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserPasswordPolicyViolation(v)
+	return s
+}
+
 // SetUserPasswordTooLong sets SubmitFlowStepErrorResponse to UserPasswordTooLong.
 func (s *SubmitFlowStepErrorResponse) SetUserPasswordTooLong(v UserPasswordTooLong) {
 	s.Type = UserPasswordTooLongSubmitFlowStepErrorResponse
@@ -69741,6 +78433,59 @@ func (*SubmitFlowStepErrorResponseStatusCode) submitFlowStepRes() {}
 type SubmitFlowStepOK FlowResponseHeaders
 
 func (*SubmitFlowStepOK) submitFlowStepRes() {}
+
+// Merged schema.
+// Ref: #
+type TeamAlreadyExists struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptTeamAlreadyExistsDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *TeamAlreadyExists) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *TeamAlreadyExists) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *TeamAlreadyExists) GetDetails() OptTeamAlreadyExistsDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *TeamAlreadyExists) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *TeamAlreadyExists) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *TeamAlreadyExists) SetDetails(val OptTeamAlreadyExistsDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type TeamAlreadyExistsDetails map[string]jx.Raw
+
+func (s *TeamAlreadyExistsDetails) init() TeamAlreadyExistsDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // TeamCreated2XX is 2XX pattern response for TeamCreated operation.
 type TeamCreated2XX struct {
@@ -70786,6 +79531,112 @@ func (s *TeamLocator) SetName(val OptString) {
 	s.Name = val
 }
 
+// Merged schema.
+// Ref: #
+type TeamNameInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptTeamNameInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *TeamNameInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *TeamNameInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *TeamNameInvalid) GetDetails() OptTeamNameInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *TeamNameInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *TeamNameInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *TeamNameInvalid) SetDetails(val OptTeamNameInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type TeamNameInvalidDetails map[string]jx.Raw
+
+func (s *TeamNameInvalidDetails) init() TeamNameInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type TeamOwnsProject struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptTeamOwnsProjectDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *TeamOwnsProject) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *TeamOwnsProject) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *TeamOwnsProject) GetDetails() OptTeamOwnsProjectDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *TeamOwnsProject) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *TeamOwnsProject) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *TeamOwnsProject) SetDetails(val OptTeamOwnsProjectDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type TeamOwnsProjectDetails map[string]jx.Raw
+
+func (s *TeamOwnsProjectDetails) init() TeamOwnsProjectDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // Shared allowlisted fields for `team.created` (snapshot) and
 // `team.updated` (delta: only changed fields present).
 // Ref: #
@@ -70848,6 +79699,59 @@ func (s *TeamPermissionDenied) SetDetails(val OptTeamPermissionDeniedDetails) {
 type TeamPermissionDeniedDetails map[string]jx.Raw
 
 func (s *TeamPermissionDeniedDetails) init() TeamPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type TeamProjectNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptTeamProjectNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *TeamProjectNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *TeamProjectNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *TeamProjectNotFound) GetDetails() OptTeamProjectNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *TeamProjectNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *TeamProjectNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *TeamProjectNotFound) SetDetails(val OptTeamProjectNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type TeamProjectNotFoundDetails map[string]jx.Raw
+
+func (s *TeamProjectNotFoundDetails) init() TeamProjectNotFoundDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -70967,6 +79871,59 @@ func (s *TeamStatus) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Merged schema.
+// Ref: #
+type TeamTeamNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptTeamTeamNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *TeamTeamNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *TeamTeamNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *TeamTeamNotFound) GetDetails() OptTeamTeamNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *TeamTeamNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *TeamTeamNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *TeamTeamNotFound) SetDetails(val OptTeamTeamNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type TeamTeamNotFoundDetails map[string]jx.Raw
+
+func (s *TeamTeamNotFoundDetails) init() TeamTeamNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // TeamUpdated2XX is 2XX pattern response for TeamUpdated operation.
@@ -71614,6 +80571,324 @@ func (*UpdateTeamBadRequest) updateTeamRes() {}
 type UpdateTeamConflict ErrorDetails
 
 func (*UpdateTeamConflict) updateTeamRes() {}
+
+// UpdateTeamErrorResponse represents sum type.
+type UpdateTeamErrorResponse struct {
+	Type                 UpdateTeamErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
+	AuthUnauthorized     AuthUnauthorized
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+	TeamAlreadyExists    TeamAlreadyExists
+	TeamNameInvalid      TeamNameInvalid
+	TeamTeamNotFound     TeamTeamNotFound
+	TeamPermissionDenied TeamPermissionDenied
+	TeamProjectNotFound  TeamProjectNotFound
+}
+
+// UpdateTeamErrorResponseType is oneOf type of UpdateTeamErrorResponse.
+type UpdateTeamErrorResponseType string
+
+// Possible values for UpdateTeamErrorResponseType.
+const (
+	AuthCsrfInvalidUpdateTeamErrorResponse      UpdateTeamErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedUpdateTeamErrorResponse     UpdateTeamErrorResponseType = "auth.unauthorized"
+	EvtInvalidUpdateTeamErrorResponse           UpdateTeamErrorResponseType = "evt.invalid"
+	InternalUpdateTeamErrorResponse             UpdateTeamErrorResponseType = "internal"
+	ReqInvalidUpdateTeamErrorResponse           UpdateTeamErrorResponseType = "req.invalid"
+	TeamAlreadyExistsUpdateTeamErrorResponse    UpdateTeamErrorResponseType = "team.already_exists"
+	TeamNameInvalidUpdateTeamErrorResponse      UpdateTeamErrorResponseType = "team.name_invalid"
+	TeamTeamNotFoundUpdateTeamErrorResponse     UpdateTeamErrorResponseType = "team.team_not_found"
+	TeamPermissionDeniedUpdateTeamErrorResponse UpdateTeamErrorResponseType = "team.permission_denied"
+	TeamProjectNotFoundUpdateTeamErrorResponse  UpdateTeamErrorResponseType = "team.project_not_found"
+)
+
+// IsAuthCsrfInvalid reports whether UpdateTeamErrorResponse is AuthCsrfInvalid.
+func (s UpdateTeamErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidUpdateTeamErrorResponse
+}
+
+// IsAuthUnauthorized reports whether UpdateTeamErrorResponse is AuthUnauthorized.
+func (s UpdateTeamErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedUpdateTeamErrorResponse
+}
+
+// IsEvtInvalid reports whether UpdateTeamErrorResponse is EvtInvalid.
+func (s UpdateTeamErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidUpdateTeamErrorResponse
+}
+
+// IsInternal reports whether UpdateTeamErrorResponse is Internal.
+func (s UpdateTeamErrorResponse) IsInternal() bool { return s.Type == InternalUpdateTeamErrorResponse }
+
+// IsReqInvalid reports whether UpdateTeamErrorResponse is ReqInvalid.
+func (s UpdateTeamErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidUpdateTeamErrorResponse
+}
+
+// IsTeamAlreadyExists reports whether UpdateTeamErrorResponse is TeamAlreadyExists.
+func (s UpdateTeamErrorResponse) IsTeamAlreadyExists() bool {
+	return s.Type == TeamAlreadyExistsUpdateTeamErrorResponse
+}
+
+// IsTeamNameInvalid reports whether UpdateTeamErrorResponse is TeamNameInvalid.
+func (s UpdateTeamErrorResponse) IsTeamNameInvalid() bool {
+	return s.Type == TeamNameInvalidUpdateTeamErrorResponse
+}
+
+// IsTeamTeamNotFound reports whether UpdateTeamErrorResponse is TeamTeamNotFound.
+func (s UpdateTeamErrorResponse) IsTeamTeamNotFound() bool {
+	return s.Type == TeamTeamNotFoundUpdateTeamErrorResponse
+}
+
+// IsTeamPermissionDenied reports whether UpdateTeamErrorResponse is TeamPermissionDenied.
+func (s UpdateTeamErrorResponse) IsTeamPermissionDenied() bool {
+	return s.Type == TeamPermissionDeniedUpdateTeamErrorResponse
+}
+
+// IsTeamProjectNotFound reports whether UpdateTeamErrorResponse is TeamProjectNotFound.
+func (s UpdateTeamErrorResponse) IsTeamProjectNotFound() bool {
+	return s.Type == TeamProjectNotFoundUpdateTeamErrorResponse
+}
+
+// SetAuthCsrfInvalid sets UpdateTeamErrorResponse to AuthCsrfInvalid.
+func (s *UpdateTeamErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidUpdateTeamErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if UpdateTeamErrorResponse is AuthCsrfInvalid.
+func (s UpdateTeamErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidUpdateTeamErrorResponse returns new UpdateTeamErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidUpdateTeamErrorResponse(v AuthCsrfInvalid) UpdateTeamErrorResponse {
+	var s UpdateTeamErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets UpdateTeamErrorResponse to AuthUnauthorized.
+func (s *UpdateTeamErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedUpdateTeamErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if UpdateTeamErrorResponse is AuthUnauthorized.
+func (s UpdateTeamErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedUpdateTeamErrorResponse returns new UpdateTeamErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedUpdateTeamErrorResponse(v AuthUnauthorized) UpdateTeamErrorResponse {
+	var s UpdateTeamErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets UpdateTeamErrorResponse to EvtInvalid.
+func (s *UpdateTeamErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidUpdateTeamErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if UpdateTeamErrorResponse is EvtInvalid.
+func (s UpdateTeamErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidUpdateTeamErrorResponse returns new UpdateTeamErrorResponse from EvtInvalid.
+func NewEvtInvalidUpdateTeamErrorResponse(v EvtInvalid) UpdateTeamErrorResponse {
+	var s UpdateTeamErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetInternal sets UpdateTeamErrorResponse to Internal.
+func (s *UpdateTeamErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalUpdateTeamErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if UpdateTeamErrorResponse is Internal.
+func (s UpdateTeamErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalUpdateTeamErrorResponse returns new UpdateTeamErrorResponse from Internal.
+func NewInternalUpdateTeamErrorResponse(v Internal) UpdateTeamErrorResponse {
+	var s UpdateTeamErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets UpdateTeamErrorResponse to ReqInvalid.
+func (s *UpdateTeamErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidUpdateTeamErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if UpdateTeamErrorResponse is ReqInvalid.
+func (s UpdateTeamErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidUpdateTeamErrorResponse returns new UpdateTeamErrorResponse from ReqInvalid.
+func NewReqInvalidUpdateTeamErrorResponse(v ReqInvalid) UpdateTeamErrorResponse {
+	var s UpdateTeamErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetTeamAlreadyExists sets UpdateTeamErrorResponse to TeamAlreadyExists.
+func (s *UpdateTeamErrorResponse) SetTeamAlreadyExists(v TeamAlreadyExists) {
+	s.Type = TeamAlreadyExistsUpdateTeamErrorResponse
+	s.TeamAlreadyExists = v
+}
+
+// GetTeamAlreadyExists returns TeamAlreadyExists and true boolean if UpdateTeamErrorResponse is TeamAlreadyExists.
+func (s UpdateTeamErrorResponse) GetTeamAlreadyExists() (v TeamAlreadyExists, ok bool) {
+	if !s.IsTeamAlreadyExists() {
+		return v, false
+	}
+	return s.TeamAlreadyExists, true
+}
+
+// NewTeamAlreadyExistsUpdateTeamErrorResponse returns new UpdateTeamErrorResponse from TeamAlreadyExists.
+func NewTeamAlreadyExistsUpdateTeamErrorResponse(v TeamAlreadyExists) UpdateTeamErrorResponse {
+	var s UpdateTeamErrorResponse
+	s.SetTeamAlreadyExists(v)
+	return s
+}
+
+// SetTeamNameInvalid sets UpdateTeamErrorResponse to TeamNameInvalid.
+func (s *UpdateTeamErrorResponse) SetTeamNameInvalid(v TeamNameInvalid) {
+	s.Type = TeamNameInvalidUpdateTeamErrorResponse
+	s.TeamNameInvalid = v
+}
+
+// GetTeamNameInvalid returns TeamNameInvalid and true boolean if UpdateTeamErrorResponse is TeamNameInvalid.
+func (s UpdateTeamErrorResponse) GetTeamNameInvalid() (v TeamNameInvalid, ok bool) {
+	if !s.IsTeamNameInvalid() {
+		return v, false
+	}
+	return s.TeamNameInvalid, true
+}
+
+// NewTeamNameInvalidUpdateTeamErrorResponse returns new UpdateTeamErrorResponse from TeamNameInvalid.
+func NewTeamNameInvalidUpdateTeamErrorResponse(v TeamNameInvalid) UpdateTeamErrorResponse {
+	var s UpdateTeamErrorResponse
+	s.SetTeamNameInvalid(v)
+	return s
+}
+
+// SetTeamTeamNotFound sets UpdateTeamErrorResponse to TeamTeamNotFound.
+func (s *UpdateTeamErrorResponse) SetTeamTeamNotFound(v TeamTeamNotFound) {
+	s.Type = TeamTeamNotFoundUpdateTeamErrorResponse
+	s.TeamTeamNotFound = v
+}
+
+// GetTeamTeamNotFound returns TeamTeamNotFound and true boolean if UpdateTeamErrorResponse is TeamTeamNotFound.
+func (s UpdateTeamErrorResponse) GetTeamTeamNotFound() (v TeamTeamNotFound, ok bool) {
+	if !s.IsTeamTeamNotFound() {
+		return v, false
+	}
+	return s.TeamTeamNotFound, true
+}
+
+// NewTeamTeamNotFoundUpdateTeamErrorResponse returns new UpdateTeamErrorResponse from TeamTeamNotFound.
+func NewTeamTeamNotFoundUpdateTeamErrorResponse(v TeamTeamNotFound) UpdateTeamErrorResponse {
+	var s UpdateTeamErrorResponse
+	s.SetTeamTeamNotFound(v)
+	return s
+}
+
+// SetTeamPermissionDenied sets UpdateTeamErrorResponse to TeamPermissionDenied.
+func (s *UpdateTeamErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
+	s.Type = TeamPermissionDeniedUpdateTeamErrorResponse
+	s.TeamPermissionDenied = v
+}
+
+// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if UpdateTeamErrorResponse is TeamPermissionDenied.
+func (s UpdateTeamErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
+	if !s.IsTeamPermissionDenied() {
+		return v, false
+	}
+	return s.TeamPermissionDenied, true
+}
+
+// NewTeamPermissionDeniedUpdateTeamErrorResponse returns new UpdateTeamErrorResponse from TeamPermissionDenied.
+func NewTeamPermissionDeniedUpdateTeamErrorResponse(v TeamPermissionDenied) UpdateTeamErrorResponse {
+	var s UpdateTeamErrorResponse
+	s.SetTeamPermissionDenied(v)
+	return s
+}
+
+// SetTeamProjectNotFound sets UpdateTeamErrorResponse to TeamProjectNotFound.
+func (s *UpdateTeamErrorResponse) SetTeamProjectNotFound(v TeamProjectNotFound) {
+	s.Type = TeamProjectNotFoundUpdateTeamErrorResponse
+	s.TeamProjectNotFound = v
+}
+
+// GetTeamProjectNotFound returns TeamProjectNotFound and true boolean if UpdateTeamErrorResponse is TeamProjectNotFound.
+func (s UpdateTeamErrorResponse) GetTeamProjectNotFound() (v TeamProjectNotFound, ok bool) {
+	if !s.IsTeamProjectNotFound() {
+		return v, false
+	}
+	return s.TeamProjectNotFound, true
+}
+
+// NewTeamProjectNotFoundUpdateTeamErrorResponse returns new UpdateTeamErrorResponse from TeamProjectNotFound.
+func NewTeamProjectNotFoundUpdateTeamErrorResponse(v TeamProjectNotFound) UpdateTeamErrorResponse {
+	var s UpdateTeamErrorResponse
+	s.SetTeamProjectNotFound(v)
+	return s
+}
+
+// UpdateTeamErrorResponseStatusCode wraps UpdateTeamErrorResponse with StatusCode.
+type UpdateTeamErrorResponseStatusCode struct {
+	StatusCode int
+	Response   UpdateTeamErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *UpdateTeamErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *UpdateTeamErrorResponseStatusCode) GetResponse() UpdateTeamErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *UpdateTeamErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *UpdateTeamErrorResponseStatusCode) SetResponse(val UpdateTeamErrorResponse) {
+	s.Response = val
+}
+
+func (*UpdateTeamErrorResponseStatusCode) updateTeamRes() {}
 
 type UpdateTeamForbidden ErrorDetails
 
@@ -74440,6 +83715,107 @@ func (s *UserPasswordEmptyDetails) init() UserPasswordEmptyDetails {
 	}
 	return m
 }
+
+// Merged schema.
+// Ref: #
+type UserPasswordPolicyViolation struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserPasswordPolicyViolationDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserPasswordPolicyViolation) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserPasswordPolicyViolation) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserPasswordPolicyViolation) GetDetails() OptUserPasswordPolicyViolationDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserPasswordPolicyViolation) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserPasswordPolicyViolation) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserPasswordPolicyViolation) SetDetails(val OptUserPasswordPolicyViolationDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserPasswordPolicyViolationDetails map[string]jx.Raw
+
+func (s *UserPasswordPolicyViolationDetails) init() UserPasswordPolicyViolationDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Whether the user has a password, and since when. Never the password or its
+// hash.
+// Ref: #
+type UserPasswordState struct {
+	// When the current password was set. Absent when the user has no password.
+	SetAt OptDateTime `json:"set_at"`
+}
+
+// GetSetAt returns the value of SetAt.
+func (s *UserPasswordState) GetSetAt() OptDateTime {
+	return s.SetAt
+}
+
+// SetSetAt sets the value of SetAt.
+func (s *UserPasswordState) SetSetAt(val OptDateTime) {
+	s.SetAt = val
+}
+
+func (*UserPasswordState) getUserPasswordStateRes() {}
+
+// UserPasswordStateHeaders wraps UserPasswordState with response headers.
+type UserPasswordStateHeaders struct {
+	CacheControl OptString
+	Response     UserPasswordState
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *UserPasswordStateHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *UserPasswordStateHeaders) GetResponse() UserPasswordState {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *UserPasswordStateHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *UserPasswordStateHeaders) SetResponse(val UserPasswordState) {
+	s.Response = val
+}
+
+func (*UserPasswordStateHeaders) getMyPasswordStateRes() {}
 
 // Merged schema.
 // Ref: #
@@ -77401,23 +86777,24 @@ func (*VariablesByKind) updateVariablesRes() {}
 
 // VerifyChallengeProofErrorResponse represents sum type.
 type VerifyChallengeProofErrorResponse struct {
-	Type                VerifyChallengeProofErrorResponseType // switch on this field
-	AttAlreadyHandedOff AttAlreadyHandedOff
-	AttInvalidProof     AttInvalidProof
-	AttInvalidRequest   AttInvalidRequest
-	AttInvalidState     AttInvalidState
-	AttNotFound         AttNotFound
-	AttProofRejected    AttProofRejected
-	AttStaleChallenge   AttStaleChallenge
-	AuthUnauthorized    AuthUnauthorized
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	ReqInvalid          ReqInvalid
-	UserAlreadyExists   UserAlreadyExists
-	UserInvalid         UserInvalid
-	UserNotFound        UserNotFound
-	UserPasswordEmpty   UserPasswordEmpty
-	UserPasswordTooLong UserPasswordTooLong
+	Type                        VerifyChallengeProofErrorResponseType // switch on this field
+	AttAlreadyHandedOff         AttAlreadyHandedOff
+	AttInvalidProof             AttInvalidProof
+	AttInvalidRequest           AttInvalidRequest
+	AttInvalidState             AttInvalidState
+	AttNotFound                 AttNotFound
+	AttProofRejected            AttProofRejected
+	AttStaleChallenge           AttStaleChallenge
+	AuthUnauthorized            AuthUnauthorized
+	EvtInvalid                  EvtInvalid
+	Internal                    Internal
+	ReqInvalid                  ReqInvalid
+	UserAlreadyExists           UserAlreadyExists
+	UserInvalid                 UserInvalid
+	UserNotFound                UserNotFound
+	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordPolicyViolation UserPasswordPolicyViolation
+	UserPasswordTooLong         UserPasswordTooLong
 }
 
 // VerifyChallengeProofErrorResponseType is oneOf type of VerifyChallengeProofErrorResponse.
@@ -77425,22 +86802,23 @@ type VerifyChallengeProofErrorResponseType string
 
 // Possible values for VerifyChallengeProofErrorResponseType.
 const (
-	AttAlreadyHandedOffVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "att.already_handed_off"
-	AttInvalidProofVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "att.invalid_proof"
-	AttInvalidRequestVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "att.invalid_request"
-	AttInvalidStateVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "att.invalid_state"
-	AttNotFoundVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "att.not_found"
-	AttProofRejectedVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "att.stale_challenge"
-	AuthUnauthorizedVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "auth.unauthorized"
-	EvtInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "evt.invalid"
-	InternalVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "internal"
-	ReqInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "req.invalid"
-	UserAlreadyExistsVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.already_exists"
-	UserInvalidVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.invalid"
-	UserNotFoundVerifyChallengeProofErrorResponse        VerifyChallengeProofErrorResponseType = "user.not_found"
-	UserPasswordEmptyVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.password_empty"
-	UserPasswordTooLongVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "user.password_too_long"
+	AttAlreadyHandedOffVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "att.already_handed_off"
+	AttInvalidProofVerifyChallengeProofErrorResponse             VerifyChallengeProofErrorResponseType = "att.invalid_proof"
+	AttInvalidRequestVerifyChallengeProofErrorResponse           VerifyChallengeProofErrorResponseType = "att.invalid_request"
+	AttInvalidStateVerifyChallengeProofErrorResponse             VerifyChallengeProofErrorResponseType = "att.invalid_state"
+	AttNotFoundVerifyChallengeProofErrorResponse                 VerifyChallengeProofErrorResponseType = "att.not_found"
+	AttProofRejectedVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeVerifyChallengeProofErrorResponse           VerifyChallengeProofErrorResponseType = "att.stale_challenge"
+	AuthUnauthorizedVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "auth.unauthorized"
+	EvtInvalidVerifyChallengeProofErrorResponse                  VerifyChallengeProofErrorResponseType = "evt.invalid"
+	InternalVerifyChallengeProofErrorResponse                    VerifyChallengeProofErrorResponseType = "internal"
+	ReqInvalidVerifyChallengeProofErrorResponse                  VerifyChallengeProofErrorResponseType = "req.invalid"
+	UserAlreadyExistsVerifyChallengeProofErrorResponse           VerifyChallengeProofErrorResponseType = "user.already_exists"
+	UserInvalidVerifyChallengeProofErrorResponse                 VerifyChallengeProofErrorResponseType = "user.invalid"
+	UserNotFoundVerifyChallengeProofErrorResponse                VerifyChallengeProofErrorResponseType = "user.not_found"
+	UserPasswordEmptyVerifyChallengeProofErrorResponse           VerifyChallengeProofErrorResponseType = "user.password_empty"
+	UserPasswordPolicyViolationVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "user.password_policy_violation"
+	UserPasswordTooLongVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether VerifyChallengeProofErrorResponse is AttAlreadyHandedOff.
@@ -77516,6 +86894,11 @@ func (s VerifyChallengeProofErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether VerifyChallengeProofErrorResponse is UserPasswordEmpty.
 func (s VerifyChallengeProofErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyVerifyChallengeProofErrorResponse
+}
+
+// IsUserPasswordPolicyViolation reports whether VerifyChallengeProofErrorResponse is UserPasswordPolicyViolation.
+func (s VerifyChallengeProofErrorResponse) IsUserPasswordPolicyViolation() bool {
+	return s.Type == UserPasswordPolicyViolationVerifyChallengeProofErrorResponse
 }
 
 // IsUserPasswordTooLong reports whether VerifyChallengeProofErrorResponse is UserPasswordTooLong.
@@ -77835,6 +87218,27 @@ func (s VerifyChallengeProofErrorResponse) GetUserPasswordEmpty() (v UserPasswor
 func NewUserPasswordEmptyVerifyChallengeProofErrorResponse(v UserPasswordEmpty) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordPolicyViolation sets VerifyChallengeProofErrorResponse to UserPasswordPolicyViolation.
+func (s *VerifyChallengeProofErrorResponse) SetUserPasswordPolicyViolation(v UserPasswordPolicyViolation) {
+	s.Type = UserPasswordPolicyViolationVerifyChallengeProofErrorResponse
+	s.UserPasswordPolicyViolation = v
+}
+
+// GetUserPasswordPolicyViolation returns UserPasswordPolicyViolation and true boolean if VerifyChallengeProofErrorResponse is UserPasswordPolicyViolation.
+func (s VerifyChallengeProofErrorResponse) GetUserPasswordPolicyViolation() (v UserPasswordPolicyViolation, ok bool) {
+	if !s.IsUserPasswordPolicyViolation() {
+		return v, false
+	}
+	return s.UserPasswordPolicyViolation, true
+}
+
+// NewUserPasswordPolicyViolationVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserPasswordPolicyViolation.
+func NewUserPasswordPolicyViolationVerifyChallengeProofErrorResponse(v UserPasswordPolicyViolation) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserPasswordPolicyViolation(v)
 	return s
 }
 

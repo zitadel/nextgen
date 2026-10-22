@@ -379,7 +379,7 @@ func TestUserService_PatchUser_LastWriteWinsRetry(t *testing.T) {
 	)
 
 	svcPool := service.NewPool(pool)
-	svc := service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{})
+	svc := service.NewUserService(svcPool, schemaStore, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{})
 
 	got, err := svc.PatchUser(t.Context(), service.PatchUserInput{
 		ProjectID:  "proj_1",
@@ -427,7 +427,7 @@ func TestUserService_PatchUser_ConflictAfterRetriesExhausted(t *testing.T) {
 		Return(database.NewNoRowFoundError(nil)).Times(3)
 
 	svcPool := service.NewPool(pool)
-	svc := service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{})
+	svc := service.NewUserService(svcPool, schemaStore, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{})
 
 	_, err := svc.PatchUser(t.Context(), service.PatchUserInput{
 		ProjectID:  "proj_1",
@@ -486,7 +486,7 @@ func TestUserService_PatchUser_OtherLogicalSchemaRefused(t *testing.T) {
 		}, nil)
 
 	svcPool := service.NewPool(pool)
-	svc := service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{})
+	svc := service.NewUserService(svcPool, schemaStore, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{})
 
 	_, err := svc.PatchUser(t.Context(), service.PatchUserInput{
 		ProjectID: "proj_1",
@@ -529,7 +529,7 @@ func newMockedUserService(t *testing.T) (service.UserService, *servicemocks.Mock
 		Return(&database.ListResult[*domain.JSONSchema]{}, nil).AnyTimes()
 
 	svcPool := service.NewPool(pool)
-	return service.NewUserService(svcPool, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{}), stmts
+	return service.NewUserService(svcPool, nil, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{}), stmts
 }
 
 // A `schema` equality on a built-in schema's `$id` must match the users
@@ -546,7 +546,7 @@ func TestUserService_ListUsers_SchemaFilterCoversEveryBuiltinBase(t *testing.T) 
 	stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&database.ListResult[*domain.JSONSchema]{}, nil).AnyTimes()
 	svcPool := service.NewPool(pool)
-	svc := service.NewUserService(svcPool, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}, bases)
+	svc := service.NewUserService(svcPool, nil, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}, bases)
 
 	var gotList *database.ListOptions[domain.UserField]
 	stmts.EXPECT().
@@ -657,7 +657,7 @@ func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]str
 	).AnyTimes()
 
 	svcPool := service.NewPool(pool)
-	return service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{}), stmts
+	return service.NewUserService(svcPool, schemaStore, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{}), stmts
 }
 
 func requireTakenFields(t *testing.T, err error, keys ...domain.AttributeKey) {

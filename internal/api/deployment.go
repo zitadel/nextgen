@@ -2,21 +2,63 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"slices"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
-// The deployment operations answer 501 until the deployment service deploys
-// to targets. The access check stays in front, so a caller without the
-// permission learns that before it learns the operation is not served yet.
-
-func (h *Handler) CreateDeployment(ctx context.Context, _ *api.CreateDeploymentRequest, params api.CreateDeploymentParams) (api.CreateDeploymentRes, error) {
+func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymentRequest, params api.CreateDeploymentParams) (api.CreateDeploymentRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+
+	// Not in the schema: ogen cannot generate an exactly-one constraint.
+	if req.ReleaseID.Set == req.ContentHash.Set {
+		return nil, domain.ErrDeploymentInvalid().WithMessage("name the release by exactly one of release_id and content_hash")
+	}
+	// TODO(#1574): look the release up by its digest.
+	if req.ContentHash.Set {
+		return nil, domain.ErrNotImplemented()
+	}
+	input := service.DeployInput{
+		ProjectID: string(params.ProjectID),
+		ReleaseID: string(req.ReleaseID.Value),
+		Targets:   req.Targets,
+		HasTTL:    req.TTL.Set,
+	}
+	if reason, ok := req.Reason.Get(); ok {
+		parsed, err := domain.DeploymentReasonString(string(reason))
+		if err != nil {
+			return nil, domain.ErrDeploymentInvalid().WithMessage("unknown reason").WithParent(err)
+		}
+		input.Reason = parsed
+	}
+	if message, ok := req.Message.Get(); ok {
+		input.Message = &message
+	}
+	if expected, ok := req.ExpectedDeploymentID.Get(); ok {
+		input.ExpectedDeploymentID = new(string(expected))
+	}
+
+	result, err := h.deploymentService.Deploy(ctx, input)
+	if conflict, ok := deploymentConflictResponse(err); ok {
+		return conflict, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	// Created or not, the deployment is the project's newest primary one.
+	resp := toAPIDeployment(result.Deployment, api.DeploymentStatusLive)
+	if result.Created {
+		created := api.CreateDeploymentCreated(resp)
+		return &created, nil
+	}
+	unchanged := api.CreateDeploymentOK(resp)
+	return &unchanged, nil
 }
 
 func (h *Handler) RollbackDeployment(ctx context.Context, _ api.OptRollbackDeploymentRequest, params api.RollbackDeploymentParams) (api.RollbackDeploymentRes, error) {
@@ -30,7 +72,12 @@ func (h *Handler) GetDeploymentById(ctx context.Context, params api.GetDeploymen
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+	entity, live, err := h.deploymentService.Read(ctx, string(params.ProjectID), string(params.DeploymentID))
+	if err != nil {
+		return nil, err
+	}
+	resp := toAPIDeployment(entity, toAPIDeploymentStatus(live))
+	return &resp, nil
 }
 
 func (h *Handler) GetDeploymentVariables(ctx context.Context, params api.GetDeploymentVariablesParams) (api.GetDeploymentVariablesRes, error) {
@@ -48,14 +95,39 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 	if err != nil {
 		return nil, err
 	}
-	for _, expand := range params.Expand {
-		if expand == api.DeploymentExpandRelease {
-			if err := requireReleaseRead(ctx); err != nil {
-				return nil, err
-			}
+	includeReleases := slices.Contains(params.Expand, api.DeploymentExpandRelease)
+	if includeReleases {
+		if err := requireReleaseRead(ctx); err != nil {
+			return nil, err
 		}
 	}
-	return nil, domain.ErrNotImplemented()
+
+	input := service.ListDeploymentsInput{
+		ProjectID:       string(params.ProjectID),
+		Live:            params.Live.Value,
+		IncludeReleases: includeReleases,
+		PageToken:       string(params.PageToken.Value),
+		Limit:           int(params.Limit.Value),
+	}
+	if origin, ok := params.Origin.Get(); ok {
+		input.Origin = new(string(origin))
+	}
+	result, err := h.deploymentService.List(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := api.ListDeploymentsResponse{Deployments: make([]api.Deployment, len(result.Items))}
+	for i, entity := range result.Items {
+		resp.Deployments[i] = toAPIDeployment(entity, toAPIDeploymentStatus(result.Live[entity.ID]))
+		if release, ok := result.ReleasesByID[entity.ReleaseID]; ok {
+			resp.Deployments[i].Release = api.NewOptRelease(toAPIRelease(release))
+		}
+	}
+	if result.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))
+	}
+	return &resp, nil
 }
 
 // The preview operations answer 501 like the deployment ones: a preview
@@ -75,6 +147,25 @@ func (h *Handler) RemovePreview(ctx context.Context, _ *api.RemovePreviewRequest
 	return nil, domain.ErrNotImplemented()
 }
 
+// deploymentConflictResponse answers dep.conflict with the typed 409, whose
+// details.deployment is the deployment the write replaces. Through NewError
+// the details would nest under details.details.
+func deploymentConflictResponse(err error) (*api.DeploymentConflict, bool) {
+	de, ok := errors.AsType[domain.Error](err)
+	if !ok || de.Code != domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code {
+		return nil, false
+	}
+	body := api.DeploymentGuardConflict{Code: de.Code, Message: de.Message}
+	if details, _ := de.Details.(domain.DeploymentConflictDetails); details.Deployment != nil {
+		// The deployment a write replaces is the newest one.
+		body.Details.Deployment = api.NewNilDeployment(toAPIDeployment(details.Deployment, api.DeploymentStatusLive))
+	} else {
+		body.Details.Deployment.SetToNull()
+	}
+	resp := api.NewDeploymentGuardConflictDeploymentConflict(body)
+	return &resp, true
+}
+
 // deploymentErrorResponse maps the deployment error codes onto statuses.
 // dep.conflict is the failed expected_deployment_id check: the 409 details
 // carry the deployment the write would replace.
@@ -84,11 +175,51 @@ func deploymentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
-	case domain.ErrDeploymentInvalid(nil, nil).Code:
+	case domain.ErrDeploymentInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrDeploymentPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:
 		return internalErrorResponse(err)
 	}
+}
+
+func toAPIDeploymentStatus(live bool) api.DeploymentStatus {
+	if live {
+		return api.DeploymentStatusLive
+	}
+	return api.DeploymentStatusInactive
+}
+
+// toAPIDeployment converts a deployment.
+func toAPIDeployment(entity *domain.Deployment, status api.DeploymentStatus) api.Deployment {
+	resp := api.Deployment{
+		ID:         api.DeploymentID(entity.ID),
+		ProjectID:  api.ProjectID(entity.ProjectID),
+		ReleaseID:  api.ReleaseID(entity.ReleaseID),
+		Kind:       api.DeploymentKind(entity.OriginKind.String()),
+		Targets:    make([]api.DeploymentTarget, len(entity.Targets)),
+		Status:     status,
+		DeployedAt: entity.DeployedAt,
+		Metadata: api.DeploymentMetadata{
+			Reason: api.DeploymentReason(entity.Metadata.Reason.String()),
+		},
+	}
+	for i, target := range entity.Targets {
+		resp.Targets[i] = api.DeploymentTarget{Origin: api.Origin(target.Origin)}
+	}
+	m := entity.Metadata
+	if m.Message != nil {
+		resp.Metadata.Message = api.NewOptNilString(*m.Message)
+	}
+	if m.RollbackTo != nil {
+		resp.Metadata.RollbackTo = api.NewOptNilDeploymentID(api.DeploymentID(*m.RollbackTo))
+	}
+	if m.DeployedBy != nil {
+		resp.Metadata.DeployedBy = api.NewOptNilString(*m.DeployedBy)
+	}
+	if m.DeployedByType != nil {
+		resp.Metadata.DeployedByType = api.NewOptNilDeploymentMetadataDeployedByType(api.DeploymentMetadataDeployedByType(*m.DeployedByType))
+	}
+	return resp
 }

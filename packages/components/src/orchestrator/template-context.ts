@@ -14,6 +14,8 @@
  * 2. `messages` — populated by orchestrator decoration hooks (info banners,
  *    sticky notices); not on the wire.
  * 3. `identity` — resolved client-side for greet-by-name; not on the wire.
+ * 4. `pending_action` — the action a submit in flight was sent with, so only
+ *    the control that started it shows progress; not on the wire.
  */
 import type {
   CreateFlow201Step,
@@ -21,6 +23,7 @@ import type {
   CreateFlow201StepChallenge,
   CreateFlow201StepFieldsItem,
   CreateFlow201StepGates,
+  CreateFlow201StepIdentifier,
   CreateFlow201StepSsoProvidersItem,
 } from "@zitadel/api/generated/model";
 
@@ -64,7 +67,7 @@ export type FlowIdentity = {
  *
  * Capability dictionaries point at the orval wire shapes directly. The only
  * client-only pieces are `messages`, `identity`, `errors`, the resolved
- * `branding` (v2 superset), and `loading`.
+ * `branding` (v2 superset), `loading` and `pending_action`.
  */
 export type LiquidContext = {
   step: Pick<CreateFlow201Step, "name" | "complete" | "texts">;
@@ -73,9 +76,21 @@ export type LiquidContext = {
   gates: CreateFlow201StepGates;
   sso_providers: readonly CreateFlow201StepSsoProvidersItem[];
   challenge: CreateFlow201StepChallenge | null;
+  /**
+   * The account the step signs in to, when the visitor named it on an
+   * earlier step (`step.identifier`); the template shows it with a way to
+   * change it.
+   */
+  identifier: CreateFlow201StepIdentifier | null;
   messages: readonly FlowMessage[];
   identity: FlowIdentity | null;
   errors: readonly FlowError[];
   branding: Branding | Record<string, never>;
   loading: boolean;
+  /**
+   * The action of the submit in flight, or `null` when the busy state has no
+   * single control behind it (a preview of `loading`). Only that control shows
+   * progress.
+   */
+  pending_action: string | null;
 };

@@ -88,6 +88,7 @@ see [§ Drift notes](#drift-notes).
 | `signing_key` | action-verbs | `create`, `read`, `delete` — **no `signing_key.rotate`.** Rotation is create-a-successor ([ADR 039](../../adrs/039-signing-key-rotation-and-incident-response.md)), not in-place secret replacement. Emergency replacement creates the successor before deleting the compromised key. |
 | `billing` | read-write-only | Tier/subscription/payment — no `billing.create`. |
 | `branding` | manage | Immutable revisions: `write` publishes a revision; no update or delete. Already matches OpenAPI. |
+| `policy` | manage | Operation policies (ADR 066), immutable revisions: `write` publishes a revision; no update or delete. |
 | `domain`, `origin`, `webhook` | manage | Project-scoped collections; `write` = create + update; `delete` separate. Class covers the full set; grant `write` and/or `delete`, never a `manage` permission. |
 | `feature` | read-write-only | Project feature configuration has no independent create/delete lifecycle. |
 | `import` | job-lifecycle | Start job (`create`); poll status (`read`). |
@@ -126,6 +127,8 @@ the target catalog for the planned paths in
 |---|---|---|
 | `branding.read` | `GET /branding`, `GET /branding/{id}` | Read/list immutable branding revisions. |
 | `branding.write` | `POST /branding` | Publish a new immutable revision; no separate create/delete permission. |
+| `policy.read` | `GET /policies/revisions/{revision_id}` | Read operation policy revisions. |
+| `policy.write` | `POST /policies` | Publish a new immutable policy revision. |
 | `domain.read` | Read/list `/projects/{id}/domains` | Domain context known to Zitadel; does not imply DNS/TLS infrastructure management. |
 | `domain.write` | Add/update a domain | Create + manage. |
 | `domain.delete` | Remove a domain | |
@@ -167,7 +170,7 @@ the corresponding resource permission.
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `user.create` | `POST /users` | |
-| `user.read` | `POST /users/query`, `GET /users/{id}`, `GET /users/{id}/identity_links` | Get + list; full representation for now. Listing is `POST /users/query` — there is no `GET /users`. `project_id` is optional and defaults to the credential's project; a session may name another project it holds a grant on (#1300), a project secret only its own. |
+| `user.read` | `POST /users/query`, `GET /users/{id}`, `GET /users/{id}/identity_links`, `GET /users/{id}/passkeys`, `GET /users/{id}/password` | Get + list; full representation for now. Listing is `POST /users/query` — there is no `GET /users`. `project_id` is optional and defaults to the credential's project; a session may name another project it holds a grant on (#1300), a project secret only its own. |
 | `user.write` | `PATCH /users/{id}`, non-credential action verbs (e.g. `verify_email`) | Profile / attribute edits. Does **not** include setting another user's password — see `user.set_password`. `PATCH /users/{id}` takes the full project secret (`project.write`; the `user.write` scope is not checked) or a Console session, and needs editor access on the user's project. An editor can change any user's attributes there, identifiers and its own included, and move a user to another schema of the project. That is safe only while no sign-in method trusts the email alone: `magic_link` or `otp` must revisit this level (`internal/domain/schema_designation.go:68`). |
 | `user.set_password` | `PUT /users/{id}/password` | **Credential-tier, account-takeover-grade.** Admin sets/resets *another* user's password. Held separately so a profile-editor / help-desk role can hold `user.write` without it. OpenAPI tags this endpoint `user.write` today (see [Drift notes](#drift-notes)). Reserve `user.reset_mfa` / similar for future admin factor-reset endpoints. |
 | `user.delete` | `DELETE /users/{id}` | Takes the full project secret (`project.write`; the `user.delete` scope is not checked) or a Console session, and needs admin access on the user's project. |
@@ -389,6 +392,7 @@ Full control over a project and its project-scoped resources.
 ```
 project.create, project.read, project.write, project.delete,
 branding.read, branding.write,
+policy.read, policy.write,
 domain.read, domain.write, domain.delete,
 feature.read, feature.write,
 origin.read, origin.write, origin.delete,
@@ -422,6 +426,7 @@ Read-only access to all project resources.
 ```
 project.read,
 branding.read,
+policy.read,
 domain.read,
 feature.read,
 origin.read,

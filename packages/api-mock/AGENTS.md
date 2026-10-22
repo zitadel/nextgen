@@ -3,8 +3,7 @@
 `@zitadel/api-mock` stands in for the Zitadel API: MSW handlers for the typed
 `@zitadel/api` Flow API and the platform API, and a standalone server built on
 the same handlers. Storybook, the component, SDK and CLI tests use it in
-process; the demos (`moon run api-mock:start`) and `apps/mock-zitadel` run the
-server.
+process; the demos run the server (`moon run api-mock:start`).
 
 It is not published, but it builds to `dist/` (tsdown) like every package:
 consumers resolve its export map (`@zitadel/source` points in-repo tooling at
@@ -69,7 +68,8 @@ takes the happy path.
   `return_target`. As on the engine (`internal/api/flow.go`), the target must
   pass `parseRedirectTarget` (`src/redirect-target.ts`, a port of
   `httputil.ParseRedirectTarget`) and be on the request origin, or the submit
-  is refused with `req.invalid`: the mock is publicly deployed.
+  is refused with `req.invalid`, so a client the server would refuse fails
+  against the mock too.
 - The refused and accepted targets are one list,
   `internal/httputil/testdata/redirect_targets.json`, read by the Go tests and
   `src/redirect-target.spec.ts`. A new way around the check goes there and

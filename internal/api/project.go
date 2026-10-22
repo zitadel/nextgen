@@ -321,7 +321,10 @@ func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrProjectNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrProjectPermissionDenied().Code:
+	case domain.ErrProjectPermissionDenied().Code,
+		domain.ErrProjectOriginNotAllowed(nil).Code,
+		domain.ErrProjectPreviewNotLive(nil).Code,
+		domain.ErrProjectMismatch().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	case domain.ErrProjectNameInvalid().Code, domain.ErrProjectMissingID().Code,
 		domain.ErrProjectPasswordHashInvalid().Code:

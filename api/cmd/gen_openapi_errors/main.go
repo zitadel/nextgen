@@ -936,11 +936,14 @@ var remappedErrors = []string{
 var operationExcludedErrors = map[string][]string{
 	// Self-access operations answer any refused session as auth.unauthorized
 	// (requireSelf, #553).
-	"getMyUser":       {"domain.ErrSessionTokenInvalid"},
-	"patchMyUser":     {"domain.ErrSessionTokenInvalid"},
-	"getMyUserSchema": {"domain.ErrSessionTokenInvalid"},
-	"listMyTeams":     {"domain.ErrSessionTokenInvalid"},
-	"listMyProjects":  {"domain.ErrSessionTokenInvalid"},
+	"getMyUser":           {"domain.ErrSessionTokenInvalid"},
+	"patchMyUser":         {"domain.ErrSessionTokenInvalid"},
+	"getMyUserSchema":     {"domain.ErrSessionTokenInvalid"},
+	"listMyTeams":         {"domain.ErrSessionTokenInvalid"},
+	"listMyPasskeys":      {"domain.ErrSessionTokenInvalid"},
+	"listMyIdentityLinks": {"domain.ErrSessionTokenInvalid"},
+	"getMyPasswordState":  {"domain.ErrSessionTokenInvalid"},
+	"listMyProjects":      {"domain.ErrSessionTokenInvalid"},
 	// The flow engine catches a stale parked SSO row with errors.Is and renders
 	// the step; the analysis cannot see that check prune the error. The SSO
 	// resolver turns a user schema the project does not hold into
@@ -970,7 +973,9 @@ var operationExcludedErrors = map[string][]string{
 		"domain.ErrIDPScopesMissingOpenID",
 	},
 	// A new flow has no parked SSO row, so the collection step's prefill
-	// returns before it reads the attempt's row or a connection.
+	// returns before it reads the attempt's row or a connection. A
+	// session_token that introspection rejects is refused as req.invalid
+	// (provenSessionID), so tkn.revoked never reaches the response.
 	"createFlow": {
 		"domain.ErrAuthAttemptNotFound",
 		"domain.ErrFlowRestartRequired",
@@ -979,6 +984,15 @@ var operationExcludedErrors = map[string][]string{
 		"domain.ErrIDPEndpointsPartial",
 		"domain.ErrIDPProtocolBlockMissing",
 		"domain.ErrIDPScopesMissingOpenID",
+		"domain.ErrTokenRevoked",
+	},
+	// A session_token that introspection rejects is refused as
+	// att.invalid_request (provenSessionID), so the token's own codes never
+	// reach the response.
+	"createAuthAttempt": {
+		"domain.ErrEncryptionKeyNotFound",
+		"domain.ErrInvalidToken",
+		"domain.ErrTokenRevoked",
 	},
 }
 

@@ -76,14 +76,14 @@ func newSSOResolverFixture(t *testing.T) *ssoResolverFixture {
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
 	hasher := cryptomock.NewMockHasher(ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
-	users := service.NewUserService(pool, schemaStore, nil, nil, domain.BuiltinSchemaBases{})
+	users := service.NewUserService(pool, schemaStore, nil, nil, nil, domain.BuiltinSchemaBases{})
 	return &ssoResolverFixture{
 		pool:        pool,
 		stmts:       stmts,
 		connections: connections,
 		schemaStore: schemaStore,
 		hasher:      hasher,
-		resolver:    service.NewFlowSSOIdentityResolver(pool, connections, users, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}),
+		resolver:    service.NewFlowSSOIdentityResolver(pool, connections, users, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}, noPolicyGate(t)),
 	}
 }
 
@@ -1037,6 +1037,34 @@ func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// One passkey row is enough to answer, so the read asks for one, of this
+// user in this project.
+func TestFlowSSOIdentityResolver_UserHasPasskey(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		keys []*domain.UserPasskey
+		want bool
+	}{
+		{name: "none", want: false},
+		{name: "one", keys: []*domain.UserPasskey{{UserID: "user-1"}}, want: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newSSOResolverFixture(t)
+			f.stmts.EXPECT().
+				ListUserPasskeys(gomock.Any(), gomock.Cond(func(opts *database.ListOptions[domain.UserPasskeyField]) bool {
+					return opts.Pagination.Limit == 1 && opts.Filter != nil
+				})).
+				Return(&database.ListResult[*domain.UserPasskey]{Items: tt.keys}, nil)
+
+			got, err := f.resolver.UserHasPasskey(t.Context(), ssoProjectID, "user-1")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

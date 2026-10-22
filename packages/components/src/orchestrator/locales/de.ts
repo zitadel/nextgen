@@ -159,6 +159,7 @@ export const de: Locale = {
   // Generische Rückfalloption für den von der Engine injizierten
   // `<step>.action.back`-Schlüssel (siehe INJECTED_KEY_FALLBACKS in liquid.ts).
   "action.back": "Zurück",
+  "action.use_another_account": "Anderes Konto verwenden",
 
   // --- SSO ---
   "sso.continue_with": "Weiter mit {name}",

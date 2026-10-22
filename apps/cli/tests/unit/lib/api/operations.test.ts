@@ -163,6 +163,7 @@ describe("findOperations", () => {
       "listUserPasskeys",
       "beginUserPasskeyRegistration",
       "finishUserPasskeyRegistration",
+      "listMyPasskeys",
     ]);
   });
 

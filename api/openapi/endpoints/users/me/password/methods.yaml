@@ -1,0 +1,40 @@
+get:
+  operationId: getMyPasswordState
+  summary: Get my password state
+  description: |
+    Reports when the signed-in user's current password was set, and leaves
+    `set_at` out when they have none. The password and its hash are never
+    returned.
+
+    With `project_id`, the state is read only when the session belongs to that
+    project.
+  tags:
+    - Users
+  security:
+    - nextgenSession: []
+  parameters:
+    - $ref: ../../../../components/parameters/session-project-id.yaml
+  responses:
+    '200':
+      description: The state of the user's password.
+      headers:
+        Cache-Control:
+          $ref: ../../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../by_id/password/user-password-state.yaml
+    '401':
+      description: Missing or invalid session token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/auth-unauthorized.yaml
+    '403':
+      description: The session belongs to a different project than `project_id`.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/sess-project_mismatch.yaml
+    default:
+      $ref: getMyPasswordState-error-response.yaml

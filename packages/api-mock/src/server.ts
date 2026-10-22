@@ -171,9 +171,8 @@ const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
  * Build the configured Express app without binding it to a port.
  *
  * Returning the bare app (rather than a listening {@link Server}) lets a
- * serverless host — e.g. a Vercel function — use it directly as a
- * request handler, while {@link startMockServer} wraps it for the
- * standalone dev server.
+ * caller mount it as a request handler, while {@link startMockServer} wraps
+ * it for the standalone dev server.
  *
  * The issuer is fixed at construction on purpose: the handoff tokens the
  * mock signs (inside the MSW handlers) and the `expectedIss` it later
@@ -185,15 +184,14 @@ const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
  * branding overlay is likewise module-scoped — `applyBranding` mutates it
  * during construction. So two apps built in the same process **share** all
  * of that state; there is no per-instance isolation. This is intentional
- * for the single-app dev/serverless use cases; tests that need isolation
- * should run in separate workers (as Vitest does) rather than creating
- * multiple apps in one.
+ * for the single-app dev server; tests that need isolation should run in
+ * separate workers (as Vitest does) rather than creating multiple apps in
+ * one.
  *
  * @param options.issuer - Absolute base URL this mock advertises as its
- *   OIDC issuer (`http://localhost:8080` locally, the preview domain on
- *   Vercel). Embedded in the discovery document and used as the expected
- *   issuer when verifying handoff tokens (the JWKS responses carry only
- *   the key, not the issuer).
+ *   OIDC issuer (e.g. `http://localhost:8080`). Embedded in the discovery
+ *   document and used as the expected issuer when verifying handoff tokens
+ *   (the JWKS responses carry only the key, not the issuer).
  */
 export function createMockApp(options: { issuer: string }): express.Express {
   applyBranding(defaultDevBranding);
@@ -201,11 +199,10 @@ export function createMockApp(options: { issuer: string }): express.Express {
   const app = express();
   app.use(cookieParser());
 
-  // CORS reflects any origin, with credentials, on purpose. Besides local
-  // development, apps/mock-zitadel deploys this app publicly for every pull
-  // request so a demo app, an SDK or a manual test on another origin can be
-  // pointed at a branch, and those callers need the session cookie. It serves
-  // only fake data. The real server's rules (ADR 053 §5) are not modelled here.
+  // CORS reflects any origin, with credentials, on purpose: a demo app, an SDK
+  // or a manual test on another local origin (another port) needs the session
+  // cookie. It serves only fake data. The real server's rules (ADR 053 §5) are
+  // not modelled here.
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const origin = req.headers.origin;
     res.setHeader("Vary", "Origin");

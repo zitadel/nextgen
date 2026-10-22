@@ -395,6 +395,49 @@ func TestDeleteUser(t *testing.T) {
 	})
 }
 
+func TestGetUserPasswordState(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID:  project.ID,
+		SchemaURL:  test_data.UserSchemaURL,
+		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuserpassword@example.com"),
+	})
+	require.NoError(t, err)
+	params := api.GetUserPasswordStateParams{UserID: api.UserID(user.ID)}
+	setAt := func(t *testing.T) api.OptDateTime {
+		t.Helper()
+		resp, err := client.GetUserPasswordState(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.UserPasswordState{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.UserPasswordState).SetAt
+	}
+	assert.False(t, setAt(t).IsSet(), "a user without a password has no set_at")
+
+	resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "fake-password"},
+		api.SetUserPasswordParams{UserID: params.UserID})
+	require.NoError(t, err)
+	require.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
+
+	got := setAt(t)
+	require.True(t, got.IsSet())
+	// The database stamps it, on its own clock.
+	assert.WithinDuration(t, time.Now(), got.Value, time.Minute)
+
+	t.Run("unknown user", func(t *testing.T) {
+		resp, err := client.GetUserPasswordState(t.Context(), api.GetUserPasswordStateParams{UserID: "user_unknown"})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetUserPasswordStateNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.GetUserPasswordStateNotFound).Code)
+	})
+}
+
 func TestSetUserPassword(t *testing.T) {
 	t.Parallel()
 
@@ -540,7 +583,15 @@ func TestSetUserPassword(t *testing.T) {
 
 		t.Run("longer than 64 characters", func(t *testing.T) {
 			t.Parallel()
-			badRequest(t, strings.Repeat("a", domain.MaxPasswordLength+1), domain.ErrUserPasswordTooLong().Code)
+			// The server's cap is reported in the password policy's shape,
+			// as a max_length violation, whether or not a policy exists.
+			params, _ := createUser(t, "testsetuserpassword.toolong@example.com")
+			resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: strings.Repeat("a", domain.MaxPasswordLength+1)}, params)
+			assert.NoError(t, err)
+			require.IsType(t, &api.SetUserPasswordBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			body := resp.(*api.SetUserPasswordBadRequest)
+			assert.Equal(t, domain.ErrUserPasswordPolicyViolation(nil).Code, string(body.Code))
+			assert.JSONEq(t, `{"violations":{"max_length":64}}`, string(body.Details.Value["details"]))
 		})
 
 		t.Run("empty", func(t *testing.T) {
@@ -1368,6 +1419,21 @@ func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	require.IsType(t, &api.SessProjectMismatch{}, teams, helpers.MustMarshal(t, teams))
 	assert.Equal(t, "sess.project_mismatch", teams.(*api.SessProjectMismatch).Code)
 
+	passkeys, err := client.ListMyPasskeys(t.Context(), api.ListMyPasskeysParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, passkeys, helpers.MustMarshal(t, passkeys))
+	assert.Equal(t, "sess.project_mismatch", passkeys.(*api.SessProjectMismatch).Code)
+
+	links, err := client.ListMyIdentityLinks(t.Context(), api.ListMyIdentityLinksParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, links, helpers.MustMarshal(t, links))
+	assert.Equal(t, "sess.project_mismatch", links.(*api.SessProjectMismatch).Code)
+
+	passwordState, err := client.GetMyPasswordState(t.Context(), api.GetMyPasswordStateParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, passwordState, helpers.MustMarshal(t, passwordState))
+	assert.Equal(t, "sess.project_mismatch", passwordState.(*api.SessProjectMismatch).Code)
+
 	read, err = client.GetMyUser(t.Context(), api.GetMyUserParams{ProjectID: own})
 	require.NoError(t, err)
 	require.IsType(t, &api.User{}, read, helpers.MustMarshal(t, read))
@@ -1391,6 +1457,20 @@ func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	teams, err = client.ListMyTeams(t.Context(), api.ListMyTeamsParams{ProjectID: own})
 	require.NoError(t, err)
 	require.IsType(t, &api.ListUserTeamsResponseHeaders{}, teams, helpers.MustMarshal(t, teams))
+
+	passkeys, err = client.ListMyPasskeys(t.Context(), api.ListMyPasskeysParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListUserPasskeysResponseHeaders{}, passkeys, helpers.MustMarshal(t, passkeys))
+
+	links, err = client.ListMyIdentityLinks(t.Context(), api.ListMyIdentityLinksParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListUserIdentityLinksResponseHeaders{}, links, helpers.MustMarshal(t, links))
+
+	// The session was made with a password, so its state carries when it was set.
+	passwordState, err = client.GetMyPasswordState(t.Context(), api.GetMyPasswordStateParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.UserPasswordStateHeaders{}, passwordState, helpers.MustMarshal(t, passwordState))
+	assert.True(t, passwordState.(*api.UserPasswordStateHeaders).Response.SetAt.IsSet())
 }
 
 func TestListPasskeys(t *testing.T) {
@@ -1495,9 +1575,9 @@ func TestListPasskeys(t *testing.T) {
 	})
 }
 
-// TestSelfAccessReads: a person reads their own schema and roster with only
-// their session, and anything short of a user-bound session gets the 401 the
-// contract declares.
+// TestSelfAccessReads: a person reads their own schema, roster, sign-in methods
+// and password state with only their session, and anything short of a
+// user-bound session gets the 401 the contract declares.
 func TestSelfAccessReads(t *testing.T) {
 	t.Parallel()
 
@@ -1526,13 +1606,38 @@ func TestSelfAccessReads(t *testing.T) {
 		assert.Equal(t, teamID, string(teams[0].ID))
 	})
 
+	t.Run("own passkeys, without a grant", func(t *testing.T) {
+		t.Parallel()
+		harness.RegisterPasskey(t, project.ID, userID, "laptop")
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/passkeys", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		passkeys := helpers.MustUnmarshal[api.ListUserPasskeysResponse](t, []byte(body)).Passkeys
+		require.Len(t, passkeys, 1)
+		assert.Equal(t, "laptop", passkeys[0].Name)
+	})
+
+	t.Run("own password state, without a grant", func(t *testing.T) {
+		t.Parallel()
+		// The user signs in with a cookie, not a password, so they have none.
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/password", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.False(t, helpers.MustUnmarshal[api.UserPasswordState](t, []byte(body)).SetAt.IsSet())
+	})
+
+	t.Run("own identity links, without a grant", func(t *testing.T) {
+		t.Parallel()
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/identity_links", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Empty(t, helpers.MustUnmarshal[api.ListUserIdentityLinksResponse](t, []byte(body)).IdentityLinks)
+	})
+
 	session := harness.CreateSession(t, project.ID, time.Hour)
 	crypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
 	require.NoError(t, err)
 	anonymous, err := session.Token(crypter)
 	require.NoError(t, err)
 
-	for _, path := range []string{"/users/me", "/users/me/schema", "/users/me/teams"} {
+	for _, path := range []string{"/users/me", "/users/me/schema", "/users/me/teams", "/users/me/passkeys", "/users/me/identity_links", "/users/me/password"} {
 		for name, cookie := range map[string]*http.Cookie{
 			"anonymous session": {Name: "__nextgen_session", Value: anonymous},
 			"no cookie":         nil,
