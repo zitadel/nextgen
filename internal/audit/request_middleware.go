@@ -99,9 +99,9 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 		ev := FromContext(WithActorContext(r.Context(), *ac), domain.EventTypeRequestAPI, domain.EventCategoryRequest)
 		ev.ProjectID = ac.ProjectID
 		ev.Payload = payload
-		if c := clientFromRequest(r); c != nil {
-			if meta, err := events.MarshalPayload(domain.EventMetadata{Client: c}); err == nil {
-				ev.Metadata = meta
+		if meta := (domain.EventMetadata{Client: clientFromRequest(r), Authorization: ac.Authorization}); meta.Client != nil || meta.Authorization != nil {
+			if raw, err := events.MarshalPayload(meta); err == nil {
+				ev.Metadata = raw
 			}
 		}
 		buf.EnqueueSince(ctx, ev, start)

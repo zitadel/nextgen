@@ -119,3 +119,30 @@ func TestWithPayload(t *testing.T) {
 	assert.Contains(t, string(ev.Payload), "sch_1")
 	assert.Contains(t, string(ev.Payload), "email")
 }
+
+// TestFromContextCarriesTheAuthorizationMark: Path B events built after the
+// authz gate marked the request's slot carry the mark, though the value actor
+// was stamped before it (ADR 075 §5).
+func TestFromContextCarriesTheAuthorizationMark(t *testing.T) {
+	ctx := WithActorSlot(t.Context())
+	actor := "user_op"
+	ctx = WithActorContext(ctx, ActorContext{ProjectID: "proj_platform", ActorID: &actor})
+
+	plain := FromContext(ctx, domain.EventTypeAuthzGranted, domain.EventCategoryAdmin)
+	assert.JSONEq(t, `{}`, string(plain.Metadata))
+
+	MarkAuthorization(ctx, domain.EventAuthorizationMetadata{
+		Path:               domain.EventAuthorizationPathPlatformOperator,
+		ActorHomeProjectID: "proj_platform",
+	})
+	marked := FromContext(ctx, domain.EventTypeAuthzGranted, domain.EventCategoryAdmin)
+	assert.JSONEq(t, `{"authorization":{"path":"platform_operator","actor_home_project_id":"proj_platform"}}`, string(marked.Metadata))
+	assert.Equal(t, &actor, marked.ActorID)
+}
+
+// TestMarkAuthorizationWithoutASlotIsANoOp: outside an HTTP request there is no
+// request to mark, and nothing to fail.
+func TestMarkAuthorizationWithoutASlotIsANoOp(t *testing.T) {
+	MarkAuthorization(t.Context(), domain.EventAuthorizationMetadata{Path: domain.EventAuthorizationPathPlatformOperator})
+	assert.JSONEq(t, `{}`, string(FromContext(t.Context(), domain.EventTypeAuthzGranted, domain.EventCategoryAdmin).Metadata))
+}
