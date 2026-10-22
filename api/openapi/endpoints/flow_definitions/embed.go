@@ -19,60 +19,67 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string) ([]*domain.
 	defs := make([]*domain.FlowDefinition, len(bss))
 
 	for i, bs := range bss {
-		jscontent := string(bs)
-		jscontent = strings.ReplaceAll(jscontent, "${SERVER_URL}", serverURL)
-		jscontent = fmt.Sprintf(
-			`{"project_id":%q,"schema_uri":%q,"flow_definition":%s}`,
-			projectID,
-			configdefaults.DefaultFlowSchemaURI,
-			jscontent,
-		)
-
-		req := &api.CreateFlowDefinitionRequest{}
-		err := req.UnmarshalJSON([]byte(jscontent))
+		def, err := ParseFlowDefinition(serverURL, projectID, bs)
 		if err != nil {
 			return nil, err
 		}
-
-		if err = req.Validate(); err != nil {
-			return nil, err
-		}
-
-		purposes, err := convertPurposes(req.FlowDefinition.GetPurposes())
-		if err != nil {
-			return nil, err
-		}
-
-		steps, err := convertSteps(req.FlowDefinition.GetSteps())
-		if err != nil {
-			return nil, err
-		}
-
-		status, err := domain.FlowDefinitionStatusString(string(req.FlowDefinition.GetStatus()))
-		if err != nil {
-			return nil, domain.ErrFlowDefinitionInvalid("invalid status", err)
-		}
-
-		defs[i], err = domain.NewFlowDefinition(
-			"",
-			projectID,
-			req.FlowDefinition.GetName(),
-			new(url.URL(req.GetSchemaURI().Value)).String(),
-			req.FlowDefinition.GetUserSchema(),
-			purposes,
-			domain.FlowDefinitionAudience{
-				AppIDs:  req.FlowDefinition.GetAudience().Value.AppIds,
-				TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
-			},
-			steps,
-			status,
-		)
-		if err != nil {
-			return nil, err
-		}
+		defs[i] = def
 	}
 
 	return defs, nil
+}
+
+// ParseFlowDefinition parses a flow definition document, as the files under
+// packages/config/defaults hold one, into the domain model.
+func ParseFlowDefinition(serverURL string, projectID string, document []byte) (*domain.FlowDefinition, error) {
+	jscontent := string(document)
+	jscontent = strings.ReplaceAll(jscontent, "${SERVER_URL}", serverURL)
+	jscontent = fmt.Sprintf(
+		`{"project_id":%q,"schema_uri":%q,"flow_definition":%s}`,
+		projectID,
+		configdefaults.DefaultFlowSchemaURI,
+		jscontent,
+	)
+
+	req := &api.CreateFlowDefinitionRequest{}
+	err := req.UnmarshalJSON([]byte(jscontent))
+	if err != nil {
+		return nil, err
+	}
+
+	if err = req.Validate(); err != nil {
+		return nil, err
+	}
+
+	purposes, err := convertPurposes(req.FlowDefinition.GetPurposes())
+	if err != nil {
+		return nil, err
+	}
+
+	steps, err := convertSteps(req.FlowDefinition.GetSteps())
+	if err != nil {
+		return nil, err
+	}
+
+	status, err := domain.FlowDefinitionStatusString(string(req.FlowDefinition.GetStatus()))
+	if err != nil {
+		return nil, domain.ErrFlowDefinitionInvalid("invalid status", err)
+	}
+
+	return domain.NewFlowDefinition(
+		"",
+		projectID,
+		req.FlowDefinition.GetName(),
+		new(url.URL(req.GetSchemaURI().Value)).String(),
+		req.FlowDefinition.GetUserSchema(),
+		purposes,
+		domain.FlowDefinitionAudience{
+			AppIDs:  req.FlowDefinition.GetAudience().Value.AppIds,
+			TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
+		},
+		steps,
+		status,
+	)
 }
 
 func convertPurposes(purposes api.FlowDefinitionPurposes) (map[domain.FlowDefinitionPurpose]string, error) {
