@@ -1,7 +1,8 @@
 # Console ADR 0005: Team navigation
 
-> **Status:** Proposed
-> **Date:** 2026-10-21
+> **Status:** Accepted (§1 and §3, shipped with #1803); §2 and §4 are recorded
+> targets, decided when a team owns configuration and when accounts matter
+> **Date:** 2026-10-21; accepted 2026-10-22
 > **Implementation state:** §1 and §3 are implemented. §4 is open. Team detail
 > (`src/routes/_authed/teams/$teamId.tsx`) has Overview and Members tabs.
 > §2 is the recorded target, not built.

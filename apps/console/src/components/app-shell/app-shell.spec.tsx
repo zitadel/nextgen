@@ -1,5 +1,5 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -547,6 +547,61 @@ describe("search", () => {
     await userEvent.keyboard("{Control>}k{/Control}");
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "Go to" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("toggles once for a held shortcut, and not over another open dialog", async () => {
+    renderShell();
+    await screen.findByRole("link", { name: /^Users/ });
+    // A held key: one press, then auto-repeats. It opens once and stays open.
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true, repeat: true });
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true, repeat: true });
+    expect(await screen.findByRole("dialog", { name: "Go to" })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Go to" })).not.toBeInTheDocument(),
+    );
+
+    // Another dialog open: the shortcut leaves it alone.
+    const other = document.createElement("div");
+    other.setAttribute("role", "dialog");
+    other.dataset.state = "open";
+    document.body.append(other);
+    try {
+      fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+      expect(screen.queryByRole("dialog", { name: "Go to" })).not.toBeInTheDocument();
+    } finally {
+      other.remove();
+    }
+  });
+
+  it("drops a team the typing has ruled out before the next read lands", async () => {
+    server.use(
+      http.post(TEAMS_QUERY, async ({ request }) => {
+        const body = (await request.json()) as { filter?: { field: string; value: string }[] };
+        const name = body.filter?.find((f) => f.field === "name")?.value;
+        // The answer for "ma"; the one for "mar" never lands in this test.
+        if (name === "ma") {
+          return HttpResponse.json({
+            teams: [
+              { id: "team_m", name: "Mainframe", status: "active", created_at: "", updated_at: "" },
+            ],
+          });
+        }
+        return new Promise(() => {});
+      }),
+    );
+    renderShell();
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    const input = dialog.getByPlaceholderText("Go to a page, project or team");
+
+    await userEvent.type(input, "ma");
+    expect(await dialog.findByRole("option", { name: /Mainframe/ })).toBeInTheDocument();
+    await userEvent.type(input, "r");
+    await waitFor(() =>
+      expect(dialog.queryByRole("option", { name: /Mainframe/ })).not.toBeInTheDocument(),
     );
   });
 

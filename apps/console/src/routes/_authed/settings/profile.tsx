@@ -22,12 +22,12 @@ import { Separator } from "@/components/ui/separator";
 import { UserAvatar, avatarSeed } from "@/components/user-avatar";
 
 import { api } from "@/api/zitadel";
-import { consoleSessionProject, invalidateSessionCache } from "@/auth/session";
+import { consoleSessionProject, refreshSession } from "@/auth/session";
 import { useSubmit } from "@/hooks/use-submit";
 import { fetchAllIdps, fetchMyIdentityLinks } from "@/lib/idp";
 import { fetchMyPasskeys, fetchMyPasswordSetAt, passwordState } from "@/lib/sign-in-methods";
 import { displayValue, field } from "@/lib/record";
-import { type SchemaField, attributeValue, schemaFields } from "@/lib/schema";
+import { type SchemaField, attributeValue, inputAttributes, schemaFields } from "@/lib/schema";
 import { readOwnUserSchema } from "@/lib/user-schema";
 import { userAttributes } from "@/lib/user";
 
@@ -203,8 +203,9 @@ function ProfileForm({ fields, saved }: { fields: SchemaField[]; saved: Record<s
     }
     await api.patchMyUser({ attributes: patch }, consoleSessionProject());
     // The account menu renders the session's `display`; drop the cached
-    // session so a changed name shows without waiting out the cache.
-    invalidateSessionCache();
+    // session (only it: the CSRF token and the other cached reads still hold)
+    // so a changed name shows without waiting out the cache.
+    refreshSession();
     await router.invalidate();
   }, "Could not save your profile.");
 
@@ -263,7 +264,7 @@ function ProfileRow({
         <Input
           id={id}
           name={entry.key}
-          type={entry.inputType}
+          {...inputAttributes(entry)}
           value={value}
           placeholder={
             readOnly

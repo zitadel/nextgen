@@ -181,8 +181,36 @@ describe("settings profile, generated from the schema", () => {
 
     expect(await screen.findByLabelText("Username")).toBeDisabled();
     expect(screen.getByLabelText("Company")).toHaveValue("Acme");
-    expect(screen.getByLabelText("Age")).toHaveValue(30);
+    // A number is typed as text, as on Add user and user detail
+    // (`inputAttributes`): a number input reports text it cannot parse as "".
+    expect(screen.getByLabelText("Age")).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText("Age")).toHaveValue("30");
     expect(screen.getByLabelText("Company")).toBeEnabled();
+  });
+
+  it("sends a half-typed number as typed, never as a deleted attribute", async () => {
+    let patched: unknown;
+    server.use(
+      schema({
+        "x-identifier": "username",
+        required: ["username"],
+        properties: { username: { type: "string" }, age: { type: "integer" } },
+      }),
+      http.get(ME_URL, () => HttpResponse.json(me({ attributes: { username: "maya", age: 30 } }))),
+      http.patch(ME_URL, async ({ request }) => {
+        patched = await request.json();
+        return HttpResponse.json(me({ attributes: { username: "maya", age: 30 } }));
+      }),
+    );
+    await renderAt("/settings/profile");
+
+    const age = await screen.findByLabelText("Age");
+    await userEvent.type(age, "-");
+    expect(age).toHaveValue("30-");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    // The server explains why "30-" is not an integer; nothing is deleted.
+    await waitFor(() => expect(patched).toEqual({ attributes: { age: "30-" } }));
   });
 
   it("falls back to the record's own identifier when the schema cannot be read", async () => {
