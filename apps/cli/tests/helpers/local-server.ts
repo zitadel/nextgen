@@ -23,8 +23,12 @@ export const LOGGED_LINES = {
     'time=2026-10-22T07:58:52.104-07:00 level=ERROR msg="request failed" stream=request request.status_code=500',
 } as const;
 
-const PLAIN_SERVER = `#!/usr/bin/env node
-const http = require("node:http");
+/** The `logging` server's first statement: it writes {@link LOGGED_LINES} to its log. */
+const WRITE_LOGGED_LINES = `process.stderr.write(${JSON.stringify(`${Object.values(LOGGED_LINES).join("\n")}\n`)});
+`;
+
+/** The stand-in server, after its `#!` line. */
+const PLAIN_SERVER = `const http = require("node:http");
 const port = Number((process.env.NEXTGEN_SERVER_ADDRESS || ":8080").split(":").at(-1));
 const server = http.createServer((req, res) => {
   res.writeHead(req.url === "/healthz" ? 200 : 404).end("ok");
@@ -43,12 +47,7 @@ export async function aFakeServerBinary(shape: ServerShape): Promise<string> {
   const server = join(dir, "nextgen");
   await writeFile(
     server,
-    shape === "logging"
-      ? PLAIN_SERVER.replace(
-          "\n",
-          `\nprocess.stderr.write(${JSON.stringify(`${Object.values(LOGGED_LINES).join("\n")}\n`)});\n`,
-        )
-      : PLAIN_SERVER,
+    `#!/usr/bin/env node\n${shape === "logging" ? WRITE_LOGGED_LINES : ""}${PLAIN_SERVER}`,
   );
   await chmod(server, 0o755);
   if (shape !== "orphaned") {
