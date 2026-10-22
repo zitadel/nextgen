@@ -127,7 +127,7 @@ Two cases still can't reach the provider, and `sso enable` warns about both:
 
 `setup --sso custom` doesn't know yet which server will run, so it warns about any `localhost` issuer.
 
-When the server can't reach the provider, the widget only says "This sign-in provider is not available right now", and `zitadel logs` shows `idp.discovery_failed` with `address is denied by 'localhost'`. After changing the variable in `.env.local`, stop the server and start it again: `start` alone keeps a running server as it is.
+When the server can't reach the provider, the widget only says "This sign-in provider is not available right now", and `zitadel logs --level warn` shows a `sso provider unavailable` warning with `idp.discovery_failed` and `address is denied by 'localhost'`. After changing the variable in `.env.local`, stop the server and start it again: `start` alone keeps a running server as it is.
 
 ```sh
 npx @zitadel/cli@latest stop

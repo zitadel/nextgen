@@ -549,6 +549,13 @@ export class ScaffoldedApp {
     await writeFile(join(this.path, ".zitadel/local/runtime.json"), "{not json");
   }
 
+  /** The log lines a `logs --json` run returned. */
+  loggedLinesOf(result: CliResult): string[] {
+    expect(result, "logs should have succeeded").toSucceed();
+    const { logs } = this.envelopeOf<{ logs: string }>(result).data;
+    return logs.split("\n").filter((line) => line !== "");
+  }
+
   /** The lifecycle `status` reports for the local server. */
   async localServerLifecycle(): Promise<string> {
     const status = await this.cli(["status", "--json"]);

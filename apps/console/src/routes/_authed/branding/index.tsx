@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Monitor, Smartphone, Sun, Workflow } from "lucide-react";
+import { Monitor, Paintbrush, Smartphone, Sun, Workflow } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -7,8 +7,9 @@ import {
   type PreviewJourney,
   type PreviewState,
 } from "@/components/branding/login-preview";
+import { PreviewStage } from "@/components/branding/preview-stage";
 import { SettingsPanel } from "@/components/branding/settings-panel";
-import { ResourcePage, ResourceTitle } from "@/components/resource-list";
+import { ResourceTitle } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -25,13 +26,14 @@ import { flowDisplayName } from "@/lib/flow-definition";
 
 import { api } from "@/api/zitadel";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/branding/")({
-  // Nested under Login flows, as in the design: branding is how those flows
-  // render, not a resource of its own. Sub-rows carry no icon.
+  // Order 6: right after Login flows, whose screens it styles, as the design's
+  // single-level sidebar places it.
   staticData: {
     scope: "project",
-    nav: { label: "Branding", order: 1, parent: "/flow-definitions" },
+    nav: { label: "Branding", order: 6, icon: Paintbrush },
   },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
@@ -150,7 +152,7 @@ function BrandingScreen() {
   const revisionMode = revision.theme?.mode ?? "auto";
 
   return (
-    <ResourcePage>
+    <Page fill>
       <ResourceTitle>Branding</ResourceTitle>
 
       {/* Three rows on a phone, one on a desktop: the flow selector, then the
@@ -244,31 +246,39 @@ function BrandingScreen() {
       </div>
 
       {/* The panel is long and the preview is content-sized, so the row takes
-          its height from the viewport and the panel scrolls inside it —
-          otherwise the grid stretches the preview to the panel's full length.
+          what the page leaves under the toolbar (`Page fill`, `flex-1`) and
+          the panel scrolls inside it — otherwise the grid stretches the
+          preview to the panel's full length, and a fixed `100vh` offset
+          overflows whenever the chrome above changes.
           302px is the design's 300 plus the 1px card border each side, so the
           content the rows align to is the 276 the design lays them out in. */}
-      <div className="mt-3 grid gap-4 lg:h-[calc(100vh-11rem)] lg:grid-cols-[minmax(0,1fr)_302px] lg:px-2">
-        <Card className="flex min-h-[29rem] items-center justify-center overflow-auto border-foreground/10 p-6 shadow-xs lg:min-h-[32rem]">
-          {/* The widget is content-sized, so the preview constrains the width
-              rather than the element: that is what an embedding page does. */}
-          <div className={narrow ? "w-96" : "w-full max-w-lg"}>
-            <LoginPreview
-              journey={activeJourney}
-              flowName={activeFlowName}
-              theme={theme}
-              state={activeState}
-              successStep={selected?.successStep}
-              onStates={(next) => setServed({ preview, states: next })}
-            />
-          </div>
-        </Card>
+      <div className="mt-3 grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_302px] lg:px-2">
+        <PreviewStage className="flex min-h-[29rem] overflow-auto rounded-md border border-foreground/10 bg-card p-6 shadow-xs transition-colors duration-300 lg:min-h-[32rem]">
+          {(onGround) => (
+            // The widget is content-sized, so the preview constrains the width
+            // rather than the element: that is what an embedding page does.
+            // Centred by auto margins, not the stage's alignment: a step
+            // taller than the stage (an error banner) then starts at its top
+            // and scrolls, instead of spilling above where it cannot.
+            <div className={narrow ? "m-auto w-96" : "m-auto w-full max-w-lg"}>
+              <LoginPreview
+                journey={activeJourney}
+                flowName={activeFlowName}
+                theme={theme}
+                state={activeState}
+                successStep={selected?.successStep}
+                onStates={(next) => setServed({ preview, states: next })}
+                onGround={onGround}
+              />
+            </div>
+          )}
+        </PreviewStage>
 
         <Card className="min-h-0 overflow-hidden border-foreground/10 p-0 shadow-xs">
           <SettingsPanel revision={revision} />
         </Card>
       </div>
-    </ResourcePage>
+    </Page>
   );
 }
 

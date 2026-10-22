@@ -3,6 +3,7 @@ import { Flags } from "@oclif/core";
 import consola from "consola";
 
 import { ZitadelError, toZitadelError } from "../lib/errors";
+import { serverLogAction } from "../lib/journey-guidance";
 import { ensureLocalAdmin, type LocalAdmin } from "../lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "../lib/local-server/env-vars";
 import {
@@ -219,6 +220,7 @@ function readyData(
         : []),
       "Run setup in this directory or one inside it, so it finds this server's local admin; the CLI will detect the framework or ask when needed.",
       "Setup installs dependencies when needed; then start your app dev server.",
+      serverLogAction(cliVersion),
     ],
     ...nextCommandsData([
       unscopedCommand("setup --server local", cliVersion),
