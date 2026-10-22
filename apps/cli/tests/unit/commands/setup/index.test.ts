@@ -555,7 +555,7 @@ describe("setup command pre-flight", () => {
     expect(capture.body).toMatchObject({
       name: expect.any(String),
       origins: expect.arrayContaining([
-        expect.objectContaining({ pattern: expect.any(String), kind: "preview" }),
+        expect.objectContaining({ pattern: expect.any(String), kind: "primary" }),
       ]),
       seed_defaults: false,
     });

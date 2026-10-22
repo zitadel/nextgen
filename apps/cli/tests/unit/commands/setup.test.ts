@@ -592,7 +592,7 @@ describe("setup command", () => {
             name: "demo",
             project_secret: "sk_proj_test_full",
             preview_secret: "sk_proj_test_preview",
-            origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
+            origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
             created_at: "2026-04-21T14:03:11.000Z",
           },
           { status: 201 },
@@ -605,7 +605,7 @@ describe("setup command", () => {
     expect(res.exitCode).toBe(0);
     expect(createProjectBody).toMatchObject({
       name: expect.any(String),
-      origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "preview" }]),
+      origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "primary" }]),
       seed_defaults: false,
     });
     const projectName = (createProjectBody as { name?: unknown }).name;
@@ -1175,6 +1175,7 @@ describe("setup --dev-port on an app already set up", () => {
   type MovedFile = {
     scripts?: { dev?: string };
     environments?: unknown;
+    primary_origins?: unknown;
     preview_origins?: unknown;
     project_id?: string;
   };
@@ -1209,12 +1210,12 @@ describe("setup --dev-port on an app already set up", () => {
     expect((await readJsonFile(cwd, "zitadel.json")).environments).toEqual({
       development: { issuer: "http://localhost:3101" },
     });
-    expect((await readJsonFile(cwd, ".zitadel/secret")).preview_origins).toEqual([
+    expect((await readJsonFile(cwd, ".zitadel/secret")).primary_origins).toEqual([
       "http://localhost:3101",
     ]);
     expect(await readFile(join(cwd, "README.md"), "utf8")).toContain("http://localhost:3101/login");
     expect(await projectOrigins(cwd)).toEqual([
-      { pattern: "http://localhost:3101", kind: "preview" },
+      { pattern: "http://localhost:3101", kind: "primary" },
     ]);
   });
 
@@ -1244,7 +1245,7 @@ describe("setup --dev-port on an app already set up", () => {
     const json = parseJson(res.stdout) as { data: { moved: boolean; files_written: string[] } };
     expect(json.data.moved).toBe(false);
     expect(await projectOrigins(cwd)).toEqual([
-      { pattern: "http://localhost:3000", kind: "preview" },
+      { pattern: "http://localhost:3000", kind: "primary" },
     ]);
   });
 
