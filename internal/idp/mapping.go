@@ -42,11 +42,6 @@ var standardClaims = map[string]standardClaim{
 // user can change just the same.
 var mutableSubjects = map[string]bool{"login": true, "username": true}
 
-// standardScopes are the scopes OpenID Connect itself defines. A list of
-// these alone returns only the standard claims; a scope outside them may
-// bundle more, so nothing is said about a claim left out.
-var standardScopes = []string{"openid", "profile", "email", "address", "phone", "offline_access"}
-
 // vouchesFor names the claim each standard verification claim speaks for.
 var vouchesFor = map[string]string{
 	"email_verified":        "email",
@@ -91,7 +86,7 @@ func MappingProblems(doc map[string]any) []string {
 		}
 		if claim, standard := standardClaims[source]; standard && claim.typ != "boolean" {
 			problems = append(problems, fmt.Sprintf(
-				"verified_claims reads %q to verify %q, but that is a %s claim and only a boolean true counts as verified. Read a boolean claim such as \"email_verified\", or use true to trust the provider",
+				"verified_claims reads %q to verify %q, but that is a %s claim and only a boolean true counts as verified. Read the boolean claim the provider sends for this value (such as \"email_verified\"). Only use true to trust the provider outright, which is safe only if it never returns an unverified value",
 				source, property, claim.typ))
 		}
 		if speaksFor, ok := vouchesFor[source]; ok {
@@ -103,69 +98,6 @@ func MappingProblems(doc map[string]any) []string {
 		}
 	}
 
-	if oidc, ok := doc["oidc"].(map[string]any); ok {
-		if scopes, ok := oidc["scopes"].([]any); ok {
-			problems = append(problems, scopeProblems(scopes, mapping, verified)...)
-		}
-	}
-	return problems
-}
-
-// scopeProblems reports each standard claim read without the scope that
-// makes a provider return it, once per field and scope however many claims
-// need it. A scope list holding anything but standard scopes is not judged.
-func scopeProblems(scopes []any, mapping map[string]string, verified map[string]any) []string {
-	requested := make([]string, 0, len(scopes))
-	for _, scope := range scopes {
-		name, ok := scope.(string)
-		if !ok {
-			continue
-		}
-		if !slices.Contains(standardScopes, name) {
-			return nil
-		}
-		requested = append(requested, name)
-	}
-	type key struct{ field, scope string }
-	claimsFor := map[key][]string{}
-	check := func(field, claim string) {
-		standard, ok := standardClaims[claim]
-		if !ok || slices.Contains(requested, standard.scope) {
-			return
-		}
-		k := key{field, standard.scope}
-		if !slices.Contains(claimsFor[k], claim) {
-			claimsFor[k] = append(claimsFor[k], claim)
-		}
-	}
-	for _, property := range sortedKeys(mapping) {
-		check("claim_mapping", mapping[property])
-	}
-	for _, property := range sortedKeys(verified) {
-		if source, ok := verified[property].(string); ok {
-			check("verified_claims", source)
-		}
-	}
-	keys := make([]key, 0, len(claimsFor))
-	for k := range claimsFor {
-		keys = append(keys, k)
-	}
-	slices.SortFunc(keys, func(a, b key) int {
-		if a.field != b.field {
-			return strings.Compare(a.field, b.field)
-		}
-		return strings.Compare(a.scope, b.scope)
-	})
-	var problems []string
-	for _, k := range keys {
-		quoted := make([]string, len(claimsFor[k]))
-		for i, claim := range claimsFor[k] {
-			quoted[i] = fmt.Sprintf("%q", claim)
-		}
-		problems = append(problems, fmt.Sprintf(
-			"%s reads %s, which a provider only returns for the %q scope. Add %q to oidc.scopes, or read another claim",
-			k.field, strings.Join(quoted, ", "), k.scope, k.scope))
-	}
 	return problems
 }
 

@@ -105,6 +105,27 @@ describe("apply", () => {
       });
     });
 
+    describe("an SSO configuration that only warns", () => {
+      it("applies it, warning but not stopping, on a verification of a property nothing reads", async () => {
+        const app = await aSetUpApp();
+        expect(
+          await app.enableSso("google", { clientId: "1234-abc", secret: "the-client-secret" }),
+        ).toSucceed();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+        await app.editConnection("google", (connection) => {
+          connection.claim_mapping = { ...connection.claim_mapping, nickname: "nickname" };
+          connection.verified_claims = { ...connection.verified_claims, nickname: "nickname_ok" };
+        });
+
+        const result = await app.apply();
+
+        expect(result).toSucceed();
+        expect(result).toSay("not unique");
+      });
+    });
+
     describe("a connection file removed after it was applied", () => {
       /** A set-up project with a connection no schema lists, applied, then its file removed. */
       async function aProjectThatRemovedAConnection(): Promise<ScaffoldedApp> {

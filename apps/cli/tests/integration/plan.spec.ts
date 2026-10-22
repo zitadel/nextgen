@@ -243,23 +243,43 @@ describe("plan", () => {
               });
             },
           ],
-          [
-            "a verification nothing reads",
-            async (app: ScaffoldedApp) => {
-              await app.editUserSchema((schema) => {
-                schema.properties.nickname = { type: "string" };
-              });
-              await app.editConnection("google", (c) => {
-                c.claim_mapping = { ...c.claim_mapping, nickname: "nickname" };
-                c.verified_claims = { ...c.verified_claims, nickname: "nickname_ok" };
-              });
-            },
-          ],
         ])("stops on %s", async (_name, edit) => {
           const app = await anAppWithGoogle();
           await edit(app);
 
           expect(await app.planAttempt()).toFailWith("E_VALIDATION");
+        });
+
+        it("warns, but does not stop, on a verification of a property nothing reads", async () => {
+          const app = await anAppWithGoogle();
+          await app.editUserSchema((schema) => {
+            schema.properties.nickname = { type: "string" };
+          });
+          await app.editConnection("google", (c) => {
+            c.claim_mapping = { ...c.claim_mapping, nickname: "nickname" };
+            c.verified_claims = { ...c.verified_claims, nickname: "nickname_ok" };
+          });
+
+          const result = await app.planRendered();
+
+          expect(result).toSucceed();
+          expect(result).toSay("not unique");
+        });
+
+        it("warns, but does not stop, on a custom connection whose scopes omit a claim it reads", async () => {
+          const app = await aSetUpApp();
+          await app.enableCustomSso(
+            { slug: "acme-sso", displayName: "Acme SSO", issuer: "https://sso.acme.example" },
+            { clientId: "acme-client-id", secret: "acme-client-secret" },
+          );
+          await app.editConnection("acme-sso", (c) => {
+            c.oidc.scopes = ["openid"];
+          });
+
+          const result = await app.planRendered();
+
+          expect(result).toSucceed();
+          expect(result).toSay("only returns for");
         });
 
         it("plans an edit of a field that does not identify the connection", async () => {

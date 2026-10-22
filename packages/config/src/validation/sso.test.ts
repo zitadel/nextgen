@@ -33,6 +33,7 @@ type Schema = {
 };
 type Connection = {
   slug: string;
+  template?: string;
   claim_mapping?: Record<string, string>;
   verified_claims?: Record<string, string>;
   provisioning?: { creation: "auto" | "disabled" };
@@ -124,6 +125,8 @@ type Expected = {
   rule: ProjectRuleId;
   file: string;
   steps?: string[];
+  /** The issue's severity, defaulting to the error that most rules are. */
+  severity?: "error" | "warning";
   /** Fragments of the message: the name at fault, and the fix. */
   says: string[];
 };
@@ -402,6 +405,7 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
       {
         rule: "sso/verification-needs-unique",
         file: GOOGLE,
+        severity: "warning",
         says: ["givenName", "not unique", "x-unique", "remove it from verified_claims"],
       },
     ],
@@ -413,7 +417,12 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
       connectionOf(p).verified_claims = { email: "email_verified" };
     },
     expect: [
-      { rule: "sso/verification-needs-unique", file: GOOGLE, says: ["email", "not unique"] },
+      {
+        rule: "sso/verification-needs-unique",
+        file: GOOGLE,
+        severity: "warning",
+        says: ["email", "not unique"],
+      },
     ],
   },
   {
@@ -423,11 +432,16 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
       connectionOf(p).verified_claims = { email: "email_verified" };
     },
     expect: [
-      { rule: "sso/verification-needs-unique", file: GOOGLE, says: ["email", "not unique"] },
+      {
+        rule: "sso/verification-needs-unique",
+        file: GOOGLE,
+        severity: "warning",
+        says: ["email", "not unique"],
+      },
     ],
   },
   {
-    name: "a standard claim is mapped without the scope that returns it",
+    name: "a custom connection maps a standard claim without the scope that returns it",
     edit: (p) => {
       schemaOf(p).properties.givenName = { type: "string" };
       connectionOf(p).oidc = { client_id: "a", client_secret: "b", scopes: ["openid", "email"] };
@@ -437,12 +451,30 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
       {
         rule: "sso/claim-needs-scope",
         file: GOOGLE,
+        severity: "warning",
         says: ["claim_mapping", "given_name", '"profile"', 'Add "profile" to oidc.scopes'],
       },
     ],
   },
   {
-    name: "a verification reads a standard claim without the scope that returns it",
+    name: "a catalog connection maps a standard claim without the scope that returns it",
+    edit: (p) => {
+      schemaOf(p).properties.givenName = { type: "string" };
+      connectionOf(p).template = "google";
+      connectionOf(p).oidc = { client_id: "a", client_secret: "b", scopes: ["openid", "email"] };
+      connectionOf(p).claim_mapping = { email: "email", givenName: "given_name" };
+    },
+    expect: [
+      {
+        rule: "sso/claim-needs-scope",
+        file: GOOGLE,
+        severity: "error",
+        says: ["claim_mapping", "given_name", '"profile"', 'Add "profile" to oidc.scopes'],
+      },
+    ],
+  },
+  {
+    name: "a custom connection verifies a standard claim without the scope that returns it",
     edit: (p) => {
       schemaOf(p).properties.email = { "x-unique": "project" };
       connectionOf(p).oidc = { client_id: "a", client_secret: "b", scopes: ["openid", "profile"] };
@@ -450,10 +482,16 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
       connectionOf(p).verified_claims = { email: "email_verified" };
     },
     expect: [
-      { rule: "sso/claim-needs-scope", file: GOOGLE, says: ["claim_mapping", '"email"'] },
       {
         rule: "sso/claim-needs-scope",
         file: GOOGLE,
+        severity: "warning",
+        says: ["claim_mapping", '"email"'],
+      },
+      {
+        rule: "sso/claim-needs-scope",
+        file: GOOGLE,
+        severity: "warning",
         says: ["verified_claims", "email_verified", '"email"'],
       },
     ],
@@ -703,7 +741,12 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
       schemaOf(p)["x-identifier"] = "email";
     },
     expect: [
-      { rule: "sso/claim-needs-scope", file: GOOGLE, says: ['claim_mapping reads "email"'] },
+      {
+        rule: "sso/claim-needs-scope",
+        file: GOOGLE,
+        severity: "warning",
+        says: ['claim_mapping reads "email"'],
+      },
     ],
   },
   {
@@ -1061,9 +1104,13 @@ describe("validateProject: the SSO rules", () => {
       }
     });
 
-    it("is reported as an error under a rule the registry knows at project scope", () => {
-      for (const issue of validate(edit)) {
-        expect(issue.severity).toBe("error");
+    it("is reported at its expected severity under a rule the registry knows at project scope", () => {
+      const issues = validate(edit);
+
+      expect(issues.map((issue) => issue.severity)).toEqual(
+        expected.map(({ severity }) => severity ?? "error"),
+      );
+      for (const issue of issues) {
         expect(VALIDATION_RULES[issue.rule].scope).toBe("project");
       }
     });

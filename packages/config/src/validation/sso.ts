@@ -19,6 +19,7 @@
  */
 
 import idpConnectionMetaSchema from "../../meta-schemas/idp-connection.json" with { type: "json" };
+import { IDP_PROVIDERS } from "../idp/index.js";
 import { referencedVariable } from "../idp/provider.js";
 import { standardClaim, type ClaimType } from "../idp/standard-claims.js";
 import type { ProjectRuleId } from "./rules.js";
@@ -261,11 +262,23 @@ const stepsText = (steps: readonly string[]) =>
 const createsUsers = (connection: Json | undefined) =>
   !isObject(connection?.provisioning) || connection.provisioning.creation !== "disabled";
 
+/** The catalog provider ids a connection's `template` may name. */
+const CATALOG_TEMPLATES = new Set<string>(IDP_PROVIDERS);
+
+/**
+ * Whether a connection was scaffolded from a catalog provider, which its
+ * `template` names. A catalog connection's scopes are vendor knowledge, so a
+ * missing scope is an error; a custom connection's are the developer's to get
+ * right, so it is only a warning.
+ */
+const isCatalog = (body: Json): boolean =>
+  typeof body.template === "string" && CATALOG_TEMPLATES.has(body.template);
+
 /** The SSO rules: schemas, flows and connection files read together. */
 export function ssoRules(tree: ProjectTree): ProjectIssue[] {
   const issues: ProjectIssue[] = [];
-  const add = (issue: Omit<ProjectIssue, "severity">) =>
-    issues.push({ severity: "error", ...issue });
+  const add = (issue: Omit<ProjectIssue, "severity"> & { severity?: ProjectIssue["severity"] }) =>
+    issues.push({ ...issue, severity: issue.severity ?? "error" });
 
   // A mistake made on several steps is one cause. Steps are gathered under the
   // rule, file and subject they share, and each group becomes one issue.
@@ -614,10 +627,15 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
           missingScope.set(key, entry);
         }
       }
+      // A catalog provider's scopes are vendor knowledge the CLI scaffolded, so
+      // a missing one is an error; a custom connection's are the developer's, so
+      // it only warns and `apply` carries on.
+      const scopeSeverity: ProjectIssue["severity"] = isCatalog(body) ? "error" : "warning";
       for (const { field, scope, claims } of missingScope.values()) {
         add({
           rule: "sso/claim-needs-scope",
           file: path,
+          severity: scopeSeverity,
           message: `${field} reads ${[...claims].map(q).join(", ")}, which a provider only returns for the ${q(scope)} scope, and oidc.scopes is ${scopes.map(q).join(", ")}. Add ${q(scope)} to oidc.scopes, or read another claim.`,
         });
       }
@@ -630,7 +648,7 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
         add({
           rule: "sso/verification-source-not-boolean",
           file: path,
-          message: `verified_claims reads ${q(source)} to verify ${q(key)}, but that is ${article(standard.type)} ${standard.type} claim and only a boolean true counts as verified, so it never verifies. Read a boolean claim such as "email_verified", or use true to trust the provider.`,
+          message: `verified_claims reads ${q(source)} to verify ${q(key)}, but that is ${article(standard.type)} ${standard.type} claim and only a boolean true counts as verified, so it never verifies. Read the boolean claim the provider sends for this value (such as "email_verified"). Only use true to trust the provider outright, which is safe only if it never returns an unverified value.`,
         });
       }
     }
@@ -731,7 +749,8 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
         add({
           rule: "sso/verification-needs-unique",
           file: path,
-          message: `verified_claims key ${q(key)} is not unique in any schema that lists ${q(slug)} in sso.providers, so nothing ever reads whether it is verified. Give ${q(key)} an x-unique scope of "project" or "team" in the schema, or remove it from verified_claims.`,
+          severity: "warning",
+          message: `verified_claims marks ${q(key)} as verified, but ${q(key)} is not unique in any schema that lists ${q(slug)} in sso.providers, so nothing reads that verification today. It is harmless to keep; to make it take effect give ${q(key)} an x-unique scope of "project" or "team" in the schema, or remove it from verified_claims to silence this.`,
         });
       }
     }

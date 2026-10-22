@@ -394,10 +394,6 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 			`"verified_claims":{"email":true},"oidc":{` + oidcBlock + `}`,
 			`verified_claims has \"email\"`,
 		},
-		"a standard claim read without its scope": {
-			`"claim_mapping":{"email":"email"},"oidc":{` + oidcBlock + `}`,
-			`only returns for the \"email\" scope`,
-		},
 		"a claim name with a space around it": {
 			`"claim_mapping":{"email":"mail "},"oidc":{` + oidcBlock + `}`,
 			`has a space`,

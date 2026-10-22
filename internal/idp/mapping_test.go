@@ -58,21 +58,9 @@ func TestMappingProblems(t *testing.T) {
 			`{"claim_mapping":{"phone":"mobile"},"verified_claims":{"phone":"phone_number_verified"}}`,
 			`only vouches for the claim "phone_number"`,
 		},
-		"two claims needing one scope are one problem": {
-			`{"claim_mapping":{"givenName":"given_name","familyName":"family_name"},"oidc":{"scopes":["openid"]}}`,
-			`reads "family_name", "given_name", which a provider only returns for the "profile" scope`,
-		},
 		"a login name as the subject": {
 			`{"subject_claim":"login"}`,
 			`subject_claim is "login"`,
-		},
-		"a profile claim without the profile scope": {
-			`{"claim_mapping":{"givenName":"given_name"},"oidc":{"scopes":["openid","email"]}}`,
-			`reads "given_name", which a provider only returns for the "profile" scope`,
-		},
-		"a verification claim without the email scope": {
-			`{"claim_mapping":{"email":"email"},"verified_claims":{"email":"email_verified"},"oidc":{"scopes":["openid","profile"]}}`,
-			`verified_claims reads "email_verified"`,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -101,12 +89,6 @@ func TestMappingProblemsAcceptsWhatWorks(t *testing.T) {
 			require.Empty(t, problemsOf(t, document))
 		})
 	}
-}
-
-func TestMappingProblemsReportAScopeOnce(t *testing.T) {
-	t.Parallel()
-	problems := problemsOf(t, `{"claim_mapping":{"givenName":"given_name","familyName":"family_name"},"oidc":{"scopes":["openid"]}}`)
-	require.Len(t, problems, 1)
 }
 
 func TestMappingProblemsAreInAStableOrder(t *testing.T) {
