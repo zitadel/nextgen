@@ -1,14 +1,11 @@
-// Package client points the generated API client at a deployment. The
-// resource API lives under PathPrefix on the deployment's host (ADR 077),
-// and callers know the host by its origin: ZITADEL_URL, the CLI's --server,
-// the issuer a token is checked against.
+// Package client is where the resource API lives on a deployment's host
+// (ADR 077): the prefix the server mounts the API under, and the base URL a
+// caller builds on an origin. The Go client of the API is the public module
+// go.zitadel.com/zitadel/v5 (packages/go), whose api package has the same
+// constant and New for a generated client on an origin.
 package client
 
-import (
-	"strings"
-
-	api "github.com/zitadel/nextgen/api/generated"
-)
+import "strings"
 
 // PathPrefix is where the resource API lives on a deployment's host, the
 // spec's servers URL. The health probes, the console and the IdP callbacks
@@ -20,9 +17,4 @@ const PathPrefix = "/api/v1"
 // base URL, so the prefix is never doubled.
 func BaseURL(origin string) string {
 	return strings.TrimSuffix(strings.TrimRight(origin, "/"), PathPrefix) + PathPrefix
-}
-
-// New is the generated client for the API on origin.
-func New(origin string, sec api.SecuritySource, opts ...api.ClientOption) (*api.Client, error) {
-	return api.NewClient(BaseURL(origin), sec, opts...)
 }

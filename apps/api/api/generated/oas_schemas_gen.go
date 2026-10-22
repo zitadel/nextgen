@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
-	"github.com/zitadel/nextgen/internal/api/ogenx"
+	"go.zitadel.com/zitadel/v5/ogenx"
 )
 
 // AddOriginErrorResponse represents sum type.

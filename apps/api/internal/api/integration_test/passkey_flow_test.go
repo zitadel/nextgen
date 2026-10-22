@@ -12,10 +12,10 @@ import (
 
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/require"
-	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // TestPasskeyFlowLogin exercises the full two-phase passkey ceremony through the
