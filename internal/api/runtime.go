@@ -40,10 +40,11 @@ func (h *Handler) withSealedRuntime(ctx context.Context, projectID, deploymentID
 	}
 	resolution := &service.RuntimeResolution{Release: release}
 	if deploymentID != "" && h.pool != nil {
-		dep, depErr := h.pool.Statements().GetDeploymentByID(ctx, projectID, deploymentID)
-		if depErr == nil {
-			resolution.Deployment = dep
+		dep, err := h.pool.Statements().GetDeploymentByID(ctx, projectID, deploymentID)
+		if err != nil {
+			return ctx, err
 		}
+		resolution.Deployment = dep
 	}
 	return service.WithRuntimeResolution(ctx, resolution), nil
 }
