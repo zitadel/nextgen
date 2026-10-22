@@ -63,12 +63,19 @@ export async function diffConfigAgainst(
   cwd: string,
   sha: string,
   color: boolean,
+  /**
+   * Project-relative files the bundle inlines from outside {@link CONFIG_PATHS}
+   * — a branding descriptor's `$file` template may sit anywhere in the project.
+   * Editing only that file changes what a deploy publishes, so it diffs too.
+   */
+  referenced: readonly string[] = [],
 ): Promise<string | null> {
+  const paths = [...CONFIG_PATHS, ...referenced];
   const resolved = await git(cwd, ["cat-file", "-e", `${sha}^{commit}`]);
   if (resolved === null) {
     return null;
   }
-  const diffArgs = ["diff", color ? "--color=always" : "--no-color", sha, "--", ...CONFIG_PATHS];
+  const diffArgs = ["diff", color ? "--color=always" : "--no-color", sha, "--", ...paths];
 
   // `git diff` omits untracked files, but a release bundle includes every new
   // file under `.zitadel/`, so a brand-new (untracked) resource must show in
@@ -90,7 +97,7 @@ export async function diffConfigAgainst(
     const env: NodeJS.ProcessEnv = { GIT_INDEX_FILE: tempIndex };
     // `git add` refuses a whole pathspec when one part matches nothing, so only
     // the directories this project has are marked.
-    const present = CONFIG_PATHS.filter((path) => existsSync(join(cwd, path)));
+    const present = paths.filter((path) => existsSync(join(cwd, path)));
     if (present.length > 0) {
       await git(cwd, ["add", "-N", "--", ...present], env);
     }
