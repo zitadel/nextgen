@@ -281,8 +281,8 @@ export default class EnvAdd extends BaseCommand {
         ...(needsOrigin
           ? [
               writtenKeys.has("ZITADEL_PROJECT_SECRET")
-                ? `Allow this project's origin: zitadel origin add ${issuer === undefined ? "<your-app-url>" : shellArg(issuer)} --kind primary${newEnvironment}`
-                : `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add ${issuer === undefined ? "<your-app-url>" : shellArg(issuer)} --kind primary${newEnvironment}`,
+                ? `Allow this project's origin: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : shellArg(issuer)} --kind primary${newEnvironment}`
+                : `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : shellArg(issuer)} --kind primary${newEnvironment}`,
             ]
           : []),
         `Check what resolves: zitadel env${newEnvironment}`,
