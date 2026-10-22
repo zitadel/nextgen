@@ -397,6 +397,15 @@ func TestDeploymentServiceRollback(t *testing.T) {
 	})
 }
 
+func TestDeploymentServiceCreateRefusesARevokedRelease(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	revokedAt := deployedAt.Add(-time.Hour)
+	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1", RevokedAt: &revokedAt}, nil)
+
+	_, err := svc.Create(t.Context(), deploymentInput())
+	assertServiceDomainCode(t, err, domain.ErrReleaseRevoked().Code)
+}
+
 func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 	t.Run("release missing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)

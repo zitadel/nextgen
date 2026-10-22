@@ -232,11 +232,16 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		output = nil
 		stmts := tx.Statements()
-		if _, err := stmts.GetReleaseByID(ctx, entity.ProjectID, entity.ReleaseID); err != nil {
+		release, err := stmts.GetReleaseByID(ctx, entity.ProjectID, entity.ReleaseID)
+		if err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 				return domain.ErrReleaseNotFound()
 			}
 			return err
+		}
+		// TODO(#2206): a concurrent revoke of this release can land after this check.
+		if release.Revoked() {
+			return domain.ErrReleaseRevoked()
 		}
 		read, current, err := servedBy(ctx, stmts, entity)
 		if err != nil {

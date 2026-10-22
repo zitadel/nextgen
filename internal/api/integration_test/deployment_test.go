@@ -5,6 +5,7 @@ package integration_test
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,6 +13,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 const (
@@ -66,6 +68,22 @@ func (f deploymentFixture) deploy(t *testing.T, releaseID api.ReleaseID) api.Cre
 	}, api.CreateDeploymentParams{ProjectID: api.ProjectID(f.project)})
 	require.NoError(t, err)
 	return resp
+}
+
+// deployPreview deploys the release to previewOrigin through the service: the
+// API does not take preview targets yet.
+func (f deploymentFixture) deployPreview(t *testing.T, releaseID api.ReleaseID) *service.CreateDeploymentOutput {
+	t.Helper()
+	out, err := service.NewDeploymentService(harness.EnsureServiceDB(t)).Create(t.Context(), service.CreateDeploymentInput{
+		ProjectID:  f.project,
+		ReleaseID:  string(releaseID),
+		OriginKind: domain.DeploymentOriginKindPreview,
+		Origins:    []string{previewOrigin},
+		Reason:     domain.DeploymentReasonDeploy,
+		PreviewTTL: time.Hour,
+	})
+	require.NoError(t, err)
+	return out
 }
 
 // refused asserts the create answered with the response type of its status
@@ -331,6 +349,107 @@ func TestRollbackDeployment(t *testing.T) {
 
 		rollback := alone.rollback(t, resp.(*api.CreateDeploymentCreated).ID, api.RollbackDeploymentRequest{})
 		assertAuthzError(t, rollback, domain.ErrDeploymentInvalid().Code)
+	})
+}
+
+// TestRevokeRelease revokes a release once nothing serves it, refuses while
+// an origin does, and keeps a revoked release out of every deploy.
+func TestRevokeRelease(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	project := api.ProjectID(fixture.project)
+	revoke := func(t *testing.T, id api.ReleaseID) api.RevokeReleaseRes {
+		t.Helper()
+		resp, err := fixture.client.RevokeRelease(t.Context(), api.RevokeReleaseParams{ProjectID: project, ReleaseID: id})
+		require.NoError(t, err)
+		return resp
+	}
+
+	deployed := fixture.deploy(t, fixture.release.ID)
+	require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
+	live := deployed.(*api.CreateDeploymentCreated)
+
+	t.Run("refused while the primary origins serve it", func(t *testing.T) {
+		resp := revoke(t, fixture.release.ID)
+		require.IsType(t, &api.RevokeReleaseConflict{}, resp, helpers.MustMarshal(t, resp))
+		conflict := resp.(*api.RevokeReleaseConflict)
+		assert.Equal(t, api.ErrorCode(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code), conflict.Code)
+		var served []string
+		for _, origin := range conflict.Details.Origins {
+			assert.Equal(t, live.ID, origin.DeploymentID)
+			served = append(served, string(origin.Origin))
+		}
+		assert.Equal(t, origins(live.Targets), served)
+	})
+
+	other := fixture.otherRelease(t)
+	replaced := fixture.deploy(t, other)
+	require.IsType(t, &api.CreateDeploymentCreated{}, replaced, helpers.MustMarshal(t, replaced))
+
+	t.Run("refused while a live preview serves it", func(t *testing.T) {
+		preview := fixture.deployPreview(t, fixture.release.ID)
+		resp := revoke(t, fixture.release.ID)
+		require.IsType(t, &api.RevokeReleaseConflict{}, resp, helpers.MustMarshal(t, resp))
+		conflict := resp.(*api.RevokeReleaseConflict)
+		require.Len(t, conflict.Details.Origins, 1)
+		assert.Equal(t, api.Origin(previewOrigin), conflict.Details.Origins[0].Origin)
+		assert.Equal(t, api.DeploymentID(preview.Deployment.ID), conflict.Details.Origins[0].DeploymentID)
+
+		// The preview moves on to the other release, so nothing serves it.
+		fixture.deployPreview(t, other)
+	})
+
+	var revokedAt time.Time
+	t.Run("revokes once nothing serves it", func(t *testing.T) {
+		resp := revoke(t, fixture.release.ID)
+		require.IsType(t, &api.Release{}, resp, helpers.MustMarshal(t, resp))
+		got := resp.(*api.Release)
+		assert.Equal(t, fixture.release.ID, got.ID)
+		require.False(t, got.RevokedAt.Null, helpers.MustMarshal(t, got))
+		assert.WithinDuration(t, time.Now(), got.RevokedAt.Value, time.Minute)
+		revokedAt = got.RevokedAt.Value
+
+		read, err := fixture.client.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: project, ReleaseID: fixture.release.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.Release{}, read, helpers.MustMarshal(t, read))
+		assert.Equal(t, revokedAt, read.(*api.Release).RevokedAt.Value)
+	})
+
+	t.Run("again keeps the first revocation", func(t *testing.T) {
+		resp := revoke(t, fixture.release.ID)
+		require.IsType(t, &api.Release{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, revokedAt, resp.(*api.Release).RevokedAt.Value)
+	})
+
+	t.Run("a revoked release does not deploy", func(t *testing.T) {
+		resp := fixture.deploy(t, fixture.release.ID)
+		require.IsType(t, &api.DeploymentConflict{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ReleaseRevokedConflictDeploymentConflict, resp.(*api.DeploymentConflict).Type)
+	})
+
+	t.Run("the history keeps its deployments", func(t *testing.T) {
+		read, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{ProjectID: project, DeploymentID: live.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.Deployment{}, read, helpers.MustMarshal(t, read))
+		assert.Equal(t, api.DeploymentStatusInactive, read.(*api.Deployment).Status)
+	})
+
+	t.Run("an unknown release", func(t *testing.T) {
+		status, code, _, ok := errorResponseParts(t, revoke(t, "rel_01KX5N7C9D2E7F0N9WD3P2E4YM6"))
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, status)
+		assert.Equal(t, domain.ErrReleaseNotFound().Code, code)
+	})
+
+	t.Run("another project's release", func(t *testing.T) {
+		// Own token and project; the release is another project's, and the
+		// lookup is scoped to the project, so it reads as unknown.
+		theirs := newDeploymentFixture(t)
+		status, code, _, ok := errorResponseParts(t, revoke(t, theirs.release.ID))
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, status)
+		assert.Equal(t, domain.ErrReleaseNotFound().Code, code)
 	})
 }
 

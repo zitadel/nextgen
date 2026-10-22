@@ -180,7 +180,14 @@ func (h *Handler) RemovePreview(ctx context.Context, _ *api.RemovePreviewRequest
 // the details would nest under details.details.
 func deploymentConflictResponse(err error) (*api.DeploymentConflict, bool) {
 	de, ok := errors.AsType[domain.Error](err)
-	if !ok || de.Code != domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code {
+	if !ok {
+		return nil, false
+	}
+	if de.Code == domain.ErrReleaseRevoked().Code {
+		resp := api.NewReleaseRevokedConflictDeploymentConflict(api.ReleaseRevokedConflict{Code: de.Code, Message: de.Message})
+		return &resp, true
+	}
+	if de.Code != domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code {
 		return nil, false
 	}
 	body := api.DeploymentGuardConflict{Code: de.Code, Message: de.Message}
