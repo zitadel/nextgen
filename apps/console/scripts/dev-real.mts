@@ -242,12 +242,14 @@ if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
  * Both schemas are the bootstrapped one with their own type, title and methods,
  * so they carry the properties the seeded users already validate against.
  * `Employees` adds an optional boolean and integer, and one employee is seeded
- * with both set, so the user page shows a switch and a number input. The
+ * with both set, so the user page shows a switch and a number field. The
  * client id and secret are `${{ VAR }}` references: no variable backs them, so
  * the connection renders but cannot complete a sign-in — which nothing here
  * asks of it. Best-effort, like the grant: a failure costs the screen its
  * data, not the instance.
  */
+const EMPLOYEE_EMAIL = "employee@zitadel.local";
+
 async function seedAuthentication(): Promise<boolean> {
   const headers = {
     authorization: `Bearer ${projectSecret}`,
@@ -318,17 +320,23 @@ async function seedAuthentication(): Promise<boolean> {
     });
     if (!customers.ok || !employees.ok) return false;
     const { id: schema } = (await employees.json()) as { id: string };
+    // Its own warning: the provider and schemas above are seeded either way.
     const employee = await post("/users", {
       schema,
       attributes: {
-        email: "employee@zitadel.local",
+        email: EMPLOYEE_EMAIL,
         givenName: "Evelyn",
         familyName: "Berezin",
         newsletter: true,
         deskNumber: 42,
       },
-    });
-    return employee.ok;
+    }).catch(() => undefined);
+    if (!employee?.ok) {
+      console.warn(
+        `[console-dev-real] could not seed ${EMPLOYEE_EMAIL}; the user page has no boolean or number field to show.`,
+      );
+    }
+    return true;
   } catch {
     return false;
   }
@@ -336,7 +344,7 @@ async function seedAuthentication(): Promise<boolean> {
 
 if (!claimMode && !(await seedAuthentication())) {
   console.warn(
-    "[console-dev-real] could not seed the identity provider, its schemas and the employee user; the Authentication screen and the user page may miss data.",
+    "[console-dev-real] could not seed the identity provider and its schemas; the Authentication screen will have no connection to show.",
   );
 }
 
@@ -382,6 +390,7 @@ console.log(
     `  │  instance   ${baseUrl}`,
     `  │  project    ${projectId}`,
     `  │  users      ${seeded.length} seeded`,
+    ...(claimMode ? [] : [`  │             + ${EMPLOYEE_EMAIL}, no password (cannot sign in)`]),
     "  │",
     `  │  sign in at ${consoleOrigin}/login`,
     `  │    email     ${DEV_USER.email}`,
