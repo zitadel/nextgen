@@ -15,10 +15,10 @@ func getLoggingContext(ctx context.Context) *slog.Logger {
 	return logger
 }
 
-// WithLogging logs one Info line per request once the handler returns,
-// whatever the status. The path is logged without its query, so no query
-// value (an authorization code, a single-use state) reaches the log. Errors
-// are logged by the API error sink, not here.
+// WithLogging logs one Info line per request, whatever the status. The line
+// is written when the handler returns or panics. The path is logged without
+// its query, so no query value (an authorization code, a single-use state)
+// reaches the log. Errors are logged by the API error sink, not here.
 func WithLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -39,21 +39,24 @@ func WithLogging(next http.Handler) http.Handler {
 		ctx = WithOperationIDContext(ctx, "")
 
 		lrw := &loggingResponseWriter{ResponseWriter: w}
+		// Deferred without recover: a panic keeps propagating and the request
+		// still gets its line.
+		defer func() {
+			status := lrw.statusCode
+			if status == 0 {
+				status = http.StatusOK
+			}
+			operationID, _ := GetOperationIDContext(ctx)
+			logger.InfoContext(ctx, "request served",
+				slog.String("method", r.Method),
+				slog.String("path", r.URL.Path),
+				slog.String("operation_id", operationID),
+				slog.Int("status", status),
+				slog.Int64("response_size", lrw.bytes),
+				slog.Duration("duration", time.Since(start)),
+			)
+		}()
 		next.ServeHTTP(lrw, r.WithContext(ctx))
-
-		status := lrw.statusCode
-		if status == 0 {
-			status = http.StatusOK
-		}
-		operationID, _ := GetOperationIDContext(ctx)
-		logger.InfoContext(ctx, "request served",
-			slog.String("method", r.Method),
-			slog.String("path", r.URL.Path),
-			slog.String("operation_id", operationID),
-			slog.Int("status", status),
-			slog.Int64("response_size", lrw.bytes),
-			slog.Duration("duration", time.Since(start)),
-		)
 	})
 }
 

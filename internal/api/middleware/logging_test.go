@@ -168,3 +168,32 @@ func TestWithLogging_carriesTheRequestID(t *testing.T) {
 		assert.Equal(t, 1, strings.Count(line, "request_id=req_1"), line)
 	}
 }
+
+// ogen's middleware fills the holder WithLogging put on the context, and the
+// access line reads it back.
+func TestWithLogging_logsTheOperationID(t *testing.T) {
+	record, _ := serve(t, "/healthz", func(_ http.ResponseWriter, r *http.Request) {
+		middleware.WithOperationIDContext(r.Context(), "getHealth")
+	})
+
+	operationID, _ := attrString(t, record, "operation_id")
+	assert.Equal(t, "getHealth", operationID)
+}
+
+// A panic after the response started keeps propagating, and the request still
+// gets its line with the status the client saw.
+func TestWithLogging_logsAPanickingRequest(t *testing.T) {
+	var records recordHandler
+	ctx := zlog.WithLoggingContext(context.Background(), slog.New(&records))
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
+	mw := middleware.WithLogging(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		panic(http.ErrAbortHandler)
+	}))
+
+	require.PanicsWithValue(t, http.ErrAbortHandler, func() { mw.ServeHTTP(httptest.NewRecorder(), req) })
+	require.Len(t, records.records, 1)
+	assert.Equal(t, "request served", records.records[0].Message)
+	status, _ := attrString(t, records.records[0], "status")
+	assert.Equal(t, "201", status)
+}
