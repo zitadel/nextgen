@@ -32,6 +32,17 @@ INSERT INTO authz_assignments (
     @p14, @p15, @p16, @p17
 ) THEN RETURN created_at, updated_at`
 
+	listActiveAuthzAssignmentsByRelationStmt = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM authz_assignments
+WHERE project_id = @p1 AND object_type = @p2 AND relation = @p3
+  AND revoked_at IS NULL
+ORDER BY created_at, id`
+
 	listAuthzAssignmentsStmt = `
 SELECT id, project_id, catalog_id,
        principal_type, principal_id, object_type, relation,
@@ -141,6 +152,17 @@ func (s authzAssignmentStatements) GetAuthzAssignment(ctx context.Context, proje
 func (s authzAssignmentStatements) ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error) {
 	var assignments []*domain.AuthzAssignment
 	err := s.db.Query(ctx, buildStatement(listAuthzAssignmentsStmt, projectID, principalType.String(), principalID, includeRevoked).statement(), func(iter *spanner.RowIterator) error {
+		var qErr error
+		assignments, qErr = collectRows(iter, scanAuthzAssignment)
+		return qErr
+	})
+	return assignments, err
+}
+
+// ListActiveAuthzAssignmentsByRelation implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListActiveAuthzAssignmentsByRelation(ctx context.Context, projectID, objectType, relation string) ([]*domain.AuthzAssignment, error) {
+	var assignments []*domain.AuthzAssignment
+	err := s.db.Query(ctx, buildStatement(listActiveAuthzAssignmentsByRelationStmt, projectID, objectType, relation).statement(), func(iter *spanner.RowIterator) error {
 		var qErr error
 		assignments, qErr = collectRows(iter, scanAuthzAssignment)
 		return qErr

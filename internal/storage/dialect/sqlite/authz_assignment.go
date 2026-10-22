@@ -44,6 +44,17 @@ SELECT id, project_id, catalog_id,
        expires_at, revoked_at, created_at, updated_at
 FROM authz_assignments`
 
+	listActiveAuthzAssignmentsByRelationStmt = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM authz_assignments
+WHERE project_id = ? AND object_type = ? AND relation = ?
+  AND revoked_at IS NULL
+ORDER BY created_at, id`
+
 	listAuthzAssignmentsStmt = `
 SELECT id, project_id, catalog_id,
        principal_type, principal_id, object_type, relation,
@@ -141,6 +152,20 @@ func (s authzAssignmentStatements) ListAuthzAssignments(ctx context.Context, pro
 		include = 1
 	}
 	rows, err := s.client.Query(ctx, listAuthzAssignmentsStmt, projectID, principalType.String(), principalID, include)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	assignments, err := collectRows(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return assignments, nil
+}
+
+// ListActiveAuthzAssignmentsByRelation implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListActiveAuthzAssignmentsByRelation(ctx context.Context, projectID, objectType, relation string) ([]*domain.AuthzAssignment, error) {
+	rows, err := s.client.Query(ctx, listActiveAuthzAssignmentsByRelationStmt, projectID, objectType, relation)
 	if err != nil {
 		return nil, wrapError(err)
 	}

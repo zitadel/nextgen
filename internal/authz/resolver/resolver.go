@@ -34,6 +34,10 @@ type Request struct {
 	// default it to ProjectID (the target). SQL still falls back via
 	// AuthzCheckParams.HomeProjectID() when unset.
 	HomeProjectID string
+	// PlatformProjectID is the deployment's platform project, set by the
+	// gate when the credential is a user homed there (ADR 075). It adds the
+	// platform operator path; empty leaves it out.
+	PlatformProjectID string
 }
 
 // ListRequest is the public ListObjects input (L4 / oracle helper).
@@ -45,26 +49,34 @@ type ListRequest struct {
 // memoKey is the request-scoped Check cache key. A struct key avoids
 // delimiter aliasing that string joins can introduce.
 type memoKey struct {
-	PrincipalType  domain.AuthzPrincipalType
-	PrincipalID    string
-	ProjectID      string
-	ObjectType     string
-	Relation       string
-	TeamID         string
-	ResourceID     string
-	ResourceTeamID string
+	PrincipalType     domain.AuthzPrincipalType
+	PrincipalID       string
+	ProjectID         string
+	ObjectType        string
+	Relation          string
+	TeamID            string
+	ResourceID        string
+	ResourceTeamID    string
+	HomeProjectID     string
+	PlatformProjectID string
+}
+
+// outcome is one memoized Check: the decision and the path that allowed it.
+type outcome struct {
+	decision Decision
+	path     Path
 }
 
 // Resolver evaluates checks with optional request-scoped memoization.
 // Create one per request; it is not safe for concurrent use.
 type Resolver struct {
 	catalogID string
-	memo      map[memoKey]Decision
+	memo      map[memoKey]outcome
 }
 
 // New returns a request-scoped resolver.
 func New() *Resolver {
-	return &Resolver{memo: make(map[memoKey]Decision)}
+	return &Resolver{memo: make(map[memoKey]outcome)}
 }
 
 // Check returns Allow / NotFound / Forbidden for one permission check.
@@ -74,49 +86,108 @@ func New() *Resolver {
 // map like other NotFound). Allowed permissions still use storage Allow /
 // Forbidden / NotFound as usual.
 func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStatements, req Request) (Decision, error) {
+	d, _, err := r.CheckPath(ctx, stmts, req)
+	return d, err
+}
+
+// CheckPath is Check that also reports the path that allowed (ADR 053 §8).
+//
+// The protected project's grants answer first. Only when they do not allow,
+// and req names a user homed in the platform project, does the platform
+// operator path get a say (ADR 075 §3). It allows outright: an operator
+// administers every project, so it never turns a denial into a foothold.
+func (r *Resolver) CheckPath(ctx context.Context, stmts service.AuthzResolverStatements, req Request) (Decision, Path, error) {
 	if err := validateCheckRequest(req); err != nil {
-		return DecisionUnspecified, err
+		return DecisionUnspecified, PathNone, err
 	}
 	if err := requireSKTeamTeamBoundResourceID(req); err != nil {
-		return DecisionUnspecified, err
+		return DecisionUnspecified, PathNone, err
 	}
 	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam &&
 		!skTeamPermissionAllowed(PermissionName(req.ObjectType, req.Relation)) {
-		return DecisionNotFound, nil
+		return DecisionNotFound, PathNone, nil
 	}
 
 	key := memoKey{
-		PrincipalType:  req.PrincipalType,
-		PrincipalID:    req.PrincipalID,
-		ProjectID:      req.ProjectID,
-		ObjectType:     req.ObjectType,
-		Relation:       req.Relation,
-		TeamID:         req.TeamID,
-		ResourceID:     req.ResourceID,
-		ResourceTeamID: req.ResourceTeamID,
+		PrincipalType:     req.PrincipalType,
+		PrincipalID:       req.PrincipalID,
+		ProjectID:         req.ProjectID,
+		ObjectType:        req.ObjectType,
+		Relation:          req.Relation,
+		TeamID:            req.TeamID,
+		ResourceID:        req.ResourceID,
+		ResourceTeamID:    req.ResourceTeamID,
+		HomeProjectID:     req.HomeProjectID,
+		PlatformProjectID: req.PlatformProjectID,
 	}
-	if d, ok := r.memo[key]; ok {
-		return d, nil
+	if o, ok := r.memo[key]; ok {
+		return o.decision, o.path, nil
 	}
 
 	catalogID, err := r.ActiveCatalogID(ctx, stmts)
 	if err != nil {
-		return DecisionUnspecified, err
+		return DecisionUnspecified, PathNone, err
 	}
 
-	allowed, foothold, err := stmts.CheckAuthz(ctx, checkParams(catalogID, req))
+	params := checkParams(catalogID, req)
+	allowed, foothold, err := stmts.CheckAuthz(ctx, params)
 	if err != nil {
-		return DecisionUnspecified, err
+		return DecisionUnspecified, PathNone, err
 	}
-	d := DecisionNotFound
+	o := outcome{decision: DecisionNotFound}
 	switch {
 	case allowed:
-		d = DecisionAllow
-	case foothold:
-		d = DecisionForbidden
+		o = outcome{decision: DecisionAllow, path: PathGrant}
+	default:
+		operator, err := platformOperatorAllows(ctx, stmts, params)
+		if err != nil {
+			return DecisionUnspecified, PathNone, err
+		}
+		switch {
+		case operator:
+			o = outcome{decision: DecisionAllow, path: PathPlatformOperator}
+		case foothold:
+			o = outcome{decision: DecisionForbidden}
+		}
 	}
-	r.memo[key] = d
-	return d, nil
+	r.memo[key] = o
+	return o.decision, o.path, nil
+}
+
+// PlatformOperator reports whether req's principal holds ObjectType.Relation on
+// every object through the platform operator relation (ADR 075 §3). It is the
+// question asked without a target: whether a session may search every project,
+// and which platform relations the Console shows. ProjectID is not consulted.
+func (r *Resolver) PlatformOperator(ctx context.Context, stmts service.AuthzResolverStatements, req Request) (bool, error) {
+	switch {
+	case req.PrincipalType == "":
+		return false, fmt.Errorf("resolver: principal type is required")
+	case req.PrincipalID == "":
+		return false, fmt.Errorf("resolver: principal id is required")
+	case req.ObjectType == "":
+		return false, fmt.Errorf("resolver: object type is required")
+	case req.Relation == "":
+		return false, fmt.Errorf("resolver: relation is required")
+	}
+	params := checkParams("", req)
+	if !params.PlatformOperatorEligible() {
+		return false, nil
+	}
+	catalogID, err := r.ActiveCatalogID(ctx, stmts)
+	if err != nil {
+		return false, err
+	}
+	params.CatalogID = catalogID
+	return platformOperatorAllows(ctx, stmts, params)
+}
+
+// platformOperatorAllows asks storage for the operator path, but only for a
+// principal that can hold it: everyone else is answered without a query.
+func platformOperatorAllows(ctx context.Context, stmts service.AuthzResolverStatements, params domain.AuthzCheckParams) (bool, error) {
+	if !params.PlatformOperatorEligible() {
+		return false, nil
+	}
+	return stmts.CheckPlatformOperator(ctx, params.PlatformCheckParams())
 }
 
 // ListObjects returns resource_scope_index ids of ResourceKind the principal may see.
@@ -171,6 +242,7 @@ func checkParams(catalogID string, req Request) domain.AuthzCheckParams {
 		Relation:               req.Relation,
 		ResourceID:             req.ResourceID,
 		ResourceTeamID:         req.ResourceTeamID,
+		PlatformProjectID:      req.PlatformProjectID,
 	}
 	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam {
 		p.ConstraintTeamID = req.TeamID
