@@ -5,8 +5,6 @@ post:
   description: |
     A release was revoked.
 
-    Not sent yet: the contract is published ahead of the code that sends it.
-
     The body is the event as `GET /events` returns it.
   tags:
     - Event Webhooks

@@ -15485,6 +15485,45 @@ func (c *MockReleaseServiceListCall) DoAndReturn(f func(context.Context, service
 	return c
 }
 
+// Revoke mocks base method.
+func (m *MockReleaseService) Revoke(ctx context.Context, projectID, id string) (*domain.Release, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Revoke", ctx, projectID, id)
+	ret0, _ := ret[0].(*domain.Release)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Revoke indicates an expected call of Revoke.
+func (mr *MockReleaseServiceMockRecorder) Revoke(ctx, projectID, id any) *MockReleaseServiceRevokeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Revoke", reflect.TypeOf((*MockReleaseService)(nil).Revoke), ctx, projectID, id)
+	return &MockReleaseServiceRevokeCall{Call: call}
+}
+
+// MockReleaseServiceRevokeCall wrap *gomock.Call
+type MockReleaseServiceRevokeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockReleaseServiceRevokeCall) Return(arg0 *domain.Release, arg1 error) *MockReleaseServiceRevokeCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockReleaseServiceRevokeCall) Do(f func(context.Context, string, string) (*domain.Release, error)) *MockReleaseServiceRevokeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockReleaseServiceRevokeCall) DoAndReturn(f func(context.Context, string, string) (*domain.Release, error)) *MockReleaseServiceRevokeCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MockSessionResolver is a mock of SessionResolver interface.
 type MockSessionResolver struct {
 	ctrl     *gomock.Controller

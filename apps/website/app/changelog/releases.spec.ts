@@ -252,6 +252,17 @@ describe("parseReleases", () => {
     ]);
   });
 
+  it("starts at 0.1.0, leaving the alpha previews before it to GitHub", () => {
+    const releases = parseReleases([
+      release("v0.1.0-alpha.28"),
+      release("v0.1.1"),
+      release("v0.1.0"),
+      release("v0.1.0-alpha.9"),
+    ]);
+
+    expect(releases.map(({ tag }) => tag)).toEqual(["v0.1.1", "v0.1.0"]);
+  });
+
   it("refuses an answer that is no list of releases", () => {
     expect(() => parseReleases({ message: "API rate limit exceeded" })).toThrow(
       "not a list of releases",

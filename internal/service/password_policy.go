@@ -45,11 +45,10 @@ type PolicyResolver interface {
 	ResolvePolicy(ctx context.Context, projectID, operation string) (*policy.Instance, error)
 }
 
-// NoPolicyResolver resolves no instance for any project. It stands in until
-// policy instances can be stored (the policy resource, #1438-#1440): until
-// then no project has a policy, and the gate applies only the server's own
-// length cap. (Registration and SSO sign-up also keep the flow field's own
-// minimum until the field reads the policy, #1449.)
+// NoPolicyResolver resolves no instance for any project, so the gate applies
+// only the server's own length cap. The server resolves through
+// [PolicyService]; this stands in where no project's policy matters, such as
+// tests.
 type NoPolicyResolver struct{}
 
 func (NoPolicyResolver) ResolvePolicy(context.Context, string, string) (*policy.Instance, error) {

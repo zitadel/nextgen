@@ -1,0 +1,22 @@
+title: PolicyPayload
+type: object
+description: |
+  Allowlisted fields for `policy.created` (the first publish of an
+  operation's policy) and `policy.updated` (every later publish). The policy id
+  is the event's `entity_id`. `config` holds the published settings, which are
+  configuration values, never user data.
+required:
+  - operation
+  - revision_id
+  - config
+properties:
+  operation:
+    type: string
+    description: The operation the policy guards, e.g. `auth.factor.password.set`.
+  revision_id:
+    type: string
+    description: The revision the publish appended.
+  config:
+    type: object
+    additionalProperties: true
+    description: The instance's settings as published.

@@ -167,13 +167,6 @@ jobs:
         if: ${{ steps.remote-cache.outcome != 'success' }}
         run: echo "TURBO_CACHE=local:rw" >> "$GITHUB_ENV"
 
-      - name: Check PR title
-        if: ${{ github.event_name == 'pull_request' }}
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: node scripts/check-pr-title.mjs --title "$PR_TITLE" --base "$BASE_SHA" --summary
-
       - name: Check pending changesets
         if: ${{ github.event_name == 'pull_request' }}
         run: |

@@ -228,3 +228,18 @@ func TestPasswordSet_ValidateInstance(t *testing.T) {
 	assert.ErrorContains(t, err, `"min_length"`)
 	assert.ErrorContains(t, err, `"max_length"`)
 }
+
+func TestBound_Settings(t *testing.T) {
+	e, err := policy.New()
+	require.NoError(t, err)
+	b, err := e.Bind(t.Context(), passwordSet, passwordInstance(t, `{"min_length":12.0,"history_depth":4}`))
+	require.NoError(t, err)
+
+	got := b.Settings()
+	assert.Equal(t, map[string]any{"min_length": int64(12), "history_depth": int64(4)}, got)
+	got["min_length"] = int64(1)
+	assert.Equal(t, int64(12), b.Settings()["min_length"], "Settings returns a copy")
+
+	var zero policy.Bound
+	assert.Nil(t, zero.Settings())
+}

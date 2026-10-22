@@ -1,0 +1,44 @@
+title: Policy
+type: object
+description: |
+  One revision of a project's policy for an operation (ADR 066). `id` is
+  shared by every revision of the operation's policy; `revision_id` names this
+  revision.
+required:
+  - id
+  - revision_id
+  - project_id
+  - operation
+  - config
+  - created_at
+  - updated_at
+properties:
+  id:
+    readOnly: true
+    $ref: ../../components/schemas/policy-id.yaml
+  revision_id:
+    readOnly: true
+    $ref: ../../components/schemas/policy-revision-id.yaml
+  project_id:
+    readOnly: true
+    description: The project the policy belongs to.
+    $ref: ../../components/schemas/project-id.yaml
+  operation:
+    type: string
+    readOnly: true
+    description: The operation the policy guards.
+  config:
+    type: object
+    additionalProperties: true
+    readOnly: true
+    description: The settings this revision publishes.
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: When the operation's policy was first published.
+  updated_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: When this revision was published.
