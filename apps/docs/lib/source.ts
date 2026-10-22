@@ -12,7 +12,7 @@ import { pathnameFromRequest } from "fumadocs-openapi/requests/generators";
 import { curl } from "fumadocs-openapi/requests/generators/curl";
 
 import { cliCommandUrl, cliSidebarNames, cliSource, commandOperations } from "./cli-reference";
-import { codeThemes } from "./code-theme";
+import { codeOptions } from "./code-theme";
 import { cliCommand, cliSample } from "./cli-sample";
 import { defaultRequest, withRefValues } from "./default-request";
 import { firstSentence, shortDescription } from "./description";
@@ -27,7 +27,7 @@ const docs = defineDocs({
     schema: pageSchema,
     // Fumadocs' defaults, the code blocks in the console's colours.
     mdxOptions: (environment) =>
-      applyMdxPreset({ rehypeCodeOptions: { themes: codeThemes } })(environment),
+      applyMdxPreset({ rehypeCodeOptions: codeOptions })(environment),
     postprocess: {
       // An API tag's page lists the tag's operations with <Operations />,
       // which its Markdown renders as the page does (pageText).
