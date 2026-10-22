@@ -22672,7 +22672,6 @@ type ExchangeHandoffErrorResponse struct {
 	TknInvalid              TknInvalid
 	TknInvalidTknid         TknInvalidTknid
 	ProjMismatch            ProjMismatch
-	RelNotFound             RelNotFound
 	RelRevoked              RelRevoked
 	ReqInvalid              ReqInvalid
 	SessExchangeConflict    SessExchangeConflict
@@ -22697,7 +22696,6 @@ const (
 	TknInvalidExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "tkn.invalid"
 	TknInvalidTknidExchangeHandoffErrorResponse         ExchangeHandoffErrorResponseType = "tkn.invalid_tknid"
 	ProjMismatchExchangeHandoffErrorResponse            ExchangeHandoffErrorResponseType = "proj.mismatch"
-	RelNotFoundExchangeHandoffErrorResponse             ExchangeHandoffErrorResponseType = "rel.not_found"
 	RelRevokedExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "rel.revoked"
 	ReqInvalidExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "req.invalid"
 	SessExchangeConflictExchangeHandoffErrorResponse    ExchangeHandoffErrorResponseType = "sess.exchange_conflict"
@@ -22751,11 +22749,6 @@ func (s ExchangeHandoffErrorResponse) IsTknInvalidTknid() bool {
 // IsProjMismatch reports whether ExchangeHandoffErrorResponse is ProjMismatch.
 func (s ExchangeHandoffErrorResponse) IsProjMismatch() bool {
 	return s.Type == ProjMismatchExchangeHandoffErrorResponse
-}
-
-// IsRelNotFound reports whether ExchangeHandoffErrorResponse is RelNotFound.
-func (s ExchangeHandoffErrorResponse) IsRelNotFound() bool {
-	return s.Type == RelNotFoundExchangeHandoffErrorResponse
 }
 
 // IsRelRevoked reports whether ExchangeHandoffErrorResponse is RelRevoked.
@@ -22984,27 +22977,6 @@ func (s ExchangeHandoffErrorResponse) GetProjMismatch() (v ProjMismatch, ok bool
 func NewProjMismatchExchangeHandoffErrorResponse(v ProjMismatch) ExchangeHandoffErrorResponse {
 	var s ExchangeHandoffErrorResponse
 	s.SetProjMismatch(v)
-	return s
-}
-
-// SetRelNotFound sets ExchangeHandoffErrorResponse to RelNotFound.
-func (s *ExchangeHandoffErrorResponse) SetRelNotFound(v RelNotFound) {
-	s.Type = RelNotFoundExchangeHandoffErrorResponse
-	s.RelNotFound = v
-}
-
-// GetRelNotFound returns RelNotFound and true boolean if ExchangeHandoffErrorResponse is RelNotFound.
-func (s ExchangeHandoffErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
-	if !s.IsRelNotFound() {
-		return v, false
-	}
-	return s.RelNotFound, true
-}
-
-// NewRelNotFoundExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from RelNotFound.
-func NewRelNotFoundExchangeHandoffErrorResponse(v RelNotFound) ExchangeHandoffErrorResponse {
-	var s ExchangeHandoffErrorResponse
-	s.SetRelNotFound(v)
 	return s
 }
 
