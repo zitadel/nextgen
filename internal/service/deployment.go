@@ -173,8 +173,6 @@ func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeployme
 	if previous.OriginKind != domain.DeploymentOriginKindPrimary {
 		return nil, domain.ErrDeploymentInvalid().WithMessage("a deployment to preview URLs cannot be rolled back")
 	}
-	// TODO(#2207): refuse a revoked release with rel.revoked.
-	// TODO(#1781): re-apply the variable set the deployment froze.
 	return s.Deploy(ctx, DeployInput{
 		ProjectID:            input.ProjectID,
 		ReleaseID:            previous.ReleaseID,
@@ -234,6 +232,8 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		output = nil
 		stmts := tx.Statements()
+		// TODO(#2207): keep this release and refuse a revoked one with rel.revoked
+		// here, before equality and insert, so deploy and rollback share the check.
 		if _, err := stmts.GetReleaseByID(ctx, entity.ProjectID, entity.ReleaseID); err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 				return domain.ErrReleaseNotFound()
@@ -247,6 +247,10 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 		if err := domain.CheckExpectedDeployment(current, input.ExpectedDeploymentID); err != nil {
 			return err
 		}
+		// TODO(#1781): resolve the frozen set in this transaction before
+		// DeploymentsEqual. Nil RollbackTo freezes the project's current values
+		// for this origin kind; a set RollbackTo links that deployment's set.
+		// Compare the resolved set. Reason does not select it.
 		if domain.DeploymentsEqual(entity, current) {
 			output = &CreateDeploymentOutput{Deployment: current}
 			return nil
@@ -262,7 +266,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
-		// TODO(#1781): freeze the deployment's variables here, in this transaction.
+		// TODO(#1781): link the set resolved above. Only the deployment this insert writes gets a row.
 		if written.OriginKind == domain.DeploymentOriginKindPreview {
 			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
 				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {

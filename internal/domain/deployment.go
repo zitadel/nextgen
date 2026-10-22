@@ -126,7 +126,8 @@ func NewestOriginDeployment(deployments []OriginDeployment) *OriginDeployment {
 // newest primary deployment: the same release to the same origins, so writing
 // it would change nothing. A deployment to preview URLs never equals one,
 // since writing it renews its previews.
-// TODO(#1781): compare the frozen variable set too.
+// TODO(#1781): also compare the set hash create resolved before this call.
+// Nil RollbackTo is the project's current values; a set RollbackTo is that deployment's set.
 func DeploymentsEqual(candidate, current *Deployment) bool {
 	return candidate.OriginKind == DeploymentOriginKindPrimary && current != nil &&
 		current.OriginKind == DeploymentOriginKindPrimary &&

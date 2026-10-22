@@ -86,6 +86,7 @@ func (h *Handler) RollbackDeployment(ctx context.Context, req api.OptRollbackDep
 	if err != nil {
 		return nil, err
 	}
+	// Created or not, this is the project's newest primary deployment.
 	resp := toAPIDeployment(result.Deployment, api.DeploymentStatusLive)
 	if result.Created {
 		created := api.RollbackDeploymentCreated(resp)
