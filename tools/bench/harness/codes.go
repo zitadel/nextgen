@@ -1,6 +1,6 @@
 package harness
 
-import api "github.com/zitadel/nextgen/api/generated"
+import api "go.zitadel.com/zitadel/v5/api"
 
 // StatusClasses is the status_class tag vocabulary: see OpError.StatusClass.
 var StatusClasses = []string{"0", "2xx", "4xx", "5xx"}

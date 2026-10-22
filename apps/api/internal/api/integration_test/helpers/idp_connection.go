@@ -3,8 +3,8 @@ package helpers
 import (
 	"testing"
 
-	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/service"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 func (h *Harness) EnsureIDPConnectionService(t testing.TB) service.IDPConnectionService {

@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	api "github.com/zitadel/nextgen/api/generated"
 	"go.k6.io/k6/v2/js/modules"
 	"go.k6.io/k6/v2/metrics"
+	api "go.zitadel.com/zitadel/v5/api"
 
 	"github.com/zitadel/nextgen/tools/bench/harness"
 )

@@ -12,7 +12,7 @@ import (
 	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/json"
 	"github.com/ogen-go/ogen/validate"
-	"github.com/zitadel/nextgen/internal/api/ogenx"
+	"go.zitadel.com/zitadel/v5/ogenx"
 )
 
 // Encode encodes AddOriginErrorResponse as json.

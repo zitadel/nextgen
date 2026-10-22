@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/go-faster/jx"
-	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // Fixture declares what a benchmark target needs: one project and one user

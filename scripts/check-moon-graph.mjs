@@ -28,6 +28,7 @@ function artifactEdge(project, target) {
   if (project === "server") return target === "console" || target === "login-ui"; // //go:embed of the UI dists
   if (project === "testing") return target === "server"; // integration tests boot the binary
   if (project === "bench") return target === "server"; // vet compiles the Go the server's generation writes
+  if (project === "go") return target === "server"; // its api/ package is the server's generation output
   if (project === "console") return target === "cli"; // dev-real boots an instance through the built CLI
   if (project === "workspace") return target === "console" || target === "login-ui"; // the local image embeds the UI builds
   // The e2e suite runs built apps, the server binary and the journey's mock

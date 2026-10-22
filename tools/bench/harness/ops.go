@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/go-faster/jx"
-	api "github.com/zitadel/nextgen/api/generated"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // Operation ids. They are the `op` tag on every sample and the only

@@ -26,6 +26,12 @@ fileGroups:
     - "/apps/api/internal/**/*.json"
     - "/docs/design/api/events-catalog.md"
     - "/apps/api/api/.ogen.yaml"
+    - "/apps/api/api/.ogen-client.yaml"
+    # The public Go client module, which the tests and the server compile
+    # (go.zitadel.com/zitadel/v5 through a replace in apps/api/go.mod).
+    - "/packages/go/**/*.go"
+    - "/packages/go/go.mod"
+    - "/packages/go/go.sum"
     - "/scripts/check-go-generate.mjs"
     - "/scripts/generate-meta-schemas.ts"
     - "moon.yml"
@@ -80,6 +86,7 @@ tasks:
       - "/apps/api/api/openapi/endpoints/schemas/*.json"
       - "/apps/api/internal/**/*_enumer.go"
       - "/apps/api/internal/**/*.mock.go"
+      - "/packages/go/api/**"
     options:
       runFromWorkspaceRoot: true
       # Generation rewrites files other projects read mid-graph: the JSON

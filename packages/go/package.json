@@ -1,0 +1,13 @@
+{
+  "name": "@zitadel/go",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Go API client, a nested Go module (go.zitadel.com/zitadel/v5). This manifest only gives the task runner its scripts; nothing is published to npm.",
+  "license": "MIT",
+  "scripts": {
+    "format": "node ../../scripts/go-format-check.mjs",
+    "vet": "go vet ./...",
+    "build": "go build ./...",
+    "test": "go test -timeout 5m ./..."
+  }
+}

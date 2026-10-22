@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	api "github.com/zitadel/nextgen/api/generated"
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // TestFlowStepRendersSSOProvidersFromConnection covers a step whose

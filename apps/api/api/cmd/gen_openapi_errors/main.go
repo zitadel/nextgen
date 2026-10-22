@@ -404,9 +404,21 @@ func runDirectives(dir, filter, pattern string) {
 // generatedClientExists reports whether ogen has written its output yet. It
 // separates "the analysis failed" from "the analysis could not have run" — the
 // second is the pruned-tree case the bootstrap pass exists for.
+//
+// Both ogen outputs count: the server's api/generated and the public client
+// (packages/go/api), which internal/api/integration_test/helpers imports. The
+// bootstrap's `go generate -run "go tool ogen"` writes both.
 func generatedClientExists(moduleRoot string) bool {
-	matches, err := filepath.Glob(filepath.Join(moduleRoot, "api", "generated", "*.go"))
-	return err == nil && len(matches) > 0
+	for _, dir := range [][]string{
+		{moduleRoot, "api", "generated"},
+		{moduleRoot, "..", "..", "packages", "go", "api"},
+	} {
+		matches, err := filepath.Glob(filepath.Join(append(dir, "*.go")...))
+		if err != nil || len(matches) == 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func discoverServiceMethodByOperation(internalAPIPath string, endpoints []endpointOperation) (map[string][]string, error) {
