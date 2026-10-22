@@ -8,7 +8,6 @@ import {
   createReleaseFromBundle,
   diffStep,
   headSha,
-  idpConnectionsStep,
   listLiveDeployments,
   runSteps,
   servesPrimary,
@@ -91,7 +90,7 @@ export default class Deploy extends EnvironmentCommand {
       }
     }
 
-    const { bundle, resourceCount, brandingSources } = await buildBundle(cwd);
+    const { bundle, resourceCount, brandingSources, idpFiles } = await buildBundle(cwd);
     this.recordTelemetry({ resources: resourceCount });
     const ctx: StepContext = {
       cwd,
@@ -104,12 +103,13 @@ export default class Deploy extends EnvironmentCommand {
       color,
       bundle,
       brandingSources,
+      idpFiles,
       suggest: (args) => this.suggest(args),
     };
 
     // Before-release steps: validate, sync IdPs (validated and previewed but
     // not written on a dry run), diff.
-    await runSteps([validateStep, idpConnectionsStep, diffStep], ctx);
+    await runSteps([validateStep, diffStep], ctx);
 
     if (dryRun) {
       return this.emit({

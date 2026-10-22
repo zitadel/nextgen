@@ -3,18 +3,25 @@ import { join } from "node:path";
 import { BRANDING_DIR, toBrandingWireBody } from "../branding";
 import { ZitadelError } from "../errors";
 import { FLOWS_DIR } from "../flows";
-import { readJsonDir } from "../json-dir";
+import { IDPS_DIR } from "../idp";
+import { readJsonDir, readJsonDirEntries } from "../json-dir";
 import { SCHEMAS_DIR } from "../user-schema";
 
 /**
  * The resources of `.zitadel/` as `POST /releases/build` takes them, grouped by
- * kind: the schemas and flow definitions as authored, and the branding
- * descriptor with its `$file` template inlined. The editor-only `$schema`
- * affordance is stripped from each so it never reaches the wire.
+ * kind: the schemas, flow definitions and identity-provider connections as
+ * authored, and the branding descriptor with its `$file` template inlined. The
+ * editor-only `$schema` affordance is stripped from each so it never reaches
+ * the wire.
+ *
+ * Connections ride the bundle like every other kind, so the server creates or
+ * revises them inside the same transaction as the release: a build that fails
+ * leaves none of them behind, and a release that is never deployed writes none.
  */
 export type ConfigurationBundle = {
   schemas: Record<string, unknown>[];
   flow_definitions: Record<string, unknown>[];
+  idps: Record<string, unknown>[];
   branding?: Record<string, unknown>;
 };
 
@@ -28,6 +35,11 @@ export type BuiltBundle = {
    * needs the originals to report a missing `$file` before anything is written.
    */
   brandingSources: Record<string, unknown>[];
+  /**
+   * The connection files' names, in the order their bodies sit in the bundle,
+   * so `validate` can name the file a bad connection came from.
+   */
+  idpFiles: string[];
 };
 
 /** The most resources a release may pin — the cap `POST /releases/build` enforces. */
@@ -50,6 +62,10 @@ function stripSchema(resource: Record<string, unknown>): Record<string, unknown>
 export async function buildBundle(cwd: string): Promise<BuiltBundle> {
   const schemas = (await readJsonDir(join(cwd, SCHEMAS_DIR))).map(stripSchema);
   const flow_definitions = (await readJsonDir(join(cwd, FLOWS_DIR))).map(stripSchema);
+  // Kept with their file names: `validate` reports a bad connection against
+  // the file it came from, and the bundle carries only the bodies.
+  const idpEntries = await readJsonDirEntries(join(cwd, IDPS_DIR));
+  const idps = idpEntries.map((entry) => stripSchema(entry.body));
   const brandingSources = (await readJsonDir(join(cwd, BRANDING_DIR))).map((descriptor) => ({
     ...descriptor,
   }));
@@ -73,7 +89,8 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
       ? undefined
       : (toBrandingWireBody(cwd, descriptor) as Record<string, unknown>);
 
-  const resourceCount = schemas.length + flow_definitions.length + (branding === undefined ? 0 : 1);
+  const resourceCount =
+    schemas.length + flow_definitions.length + idps.length + (branding === undefined ? 0 : 1);
   if (resourceCount === 0) {
     throw new ZitadelError("E_VALIDATION", "There is nothing in .zitadel/ to deploy", {
       hint: "Add a schema, flow or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
@@ -87,8 +104,9 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
   }
 
   return {
-    bundle: { schemas, flow_definitions, ...(branding === undefined ? {} : { branding }) },
+    bundle: { schemas, flow_definitions, idps, ...(branding === undefined ? {} : { branding }) },
     resourceCount,
     brandingSources,
+    idpFiles: idpEntries.map((entry) => entry.name),
   };
 }

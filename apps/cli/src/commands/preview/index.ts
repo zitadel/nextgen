@@ -8,7 +8,6 @@ import {
   createDeployment,
   createReleaseFromBundle,
   headSha,
-  idpConnectionsStep,
   runSteps,
   type StepContext,
   validateStep,
@@ -170,7 +169,7 @@ export default class Preview extends PreviewCommand {
       });
     }
 
-    const { bundle, brandingSources } = await buildBundle(cwd);
+    const { bundle, brandingSources, idpFiles } = await buildBundle(cwd);
     const ctx: StepContext = {
       cwd,
       client,
@@ -182,13 +181,14 @@ export default class Preview extends PreviewCommand {
       color,
       bundle,
       brandingSources,
+      idpFiles,
       suggest: (args) => this.suggest(args),
     };
 
     // The IdP step validates the connection files and stops short of syncing
     // them in a preview, so a pull-request build never reconfigures the
     // connections a merged deploy owns.
-    await runSteps([validateStep, idpConnectionsStep], ctx);
+    await runSteps([validateStep], ctx);
 
     // A dry run validates and resolves the targets but writes nothing — no
     // release, no deployment, no preview registration — so a pull-request build

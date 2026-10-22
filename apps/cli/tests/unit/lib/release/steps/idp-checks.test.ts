@@ -1,13 +1,8 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { ApiError } from "@zitadel/api/runtime/fetch";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { IDPS_DIR } from "../../../../../src/lib/idp";
 import type { StepContext } from "../../../../../src/lib/release/pipeline";
-import { idpConnectionsStep } from "../../../../../src/lib/release/steps/idp-connections";
+import { validateConnections } from "../../../../../src/lib/release/steps/idp-checks";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 
 /** A connection the server would accept: a `${{ NAME }}` client_secret. */
@@ -25,15 +20,16 @@ const googleBody = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-let dir: string;
+/** The connections the bundle in hand carries, with the files they came from. */
+let connections: { name: string; body: Record<string, unknown> }[] = [];
 
-async function project(files: Record<string, unknown>): Promise<string> {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-idp-step-"));
-  await mkdir(join(dir, IDPS_DIR), { recursive: true });
-  for (const [name, body] of Object.entries(files)) {
-    await writeFile(join(dir, IDPS_DIR, name), JSON.stringify(body), "utf8");
-  }
-  return dir;
+/** Puts the connections in the bundle the checks read, as `buildBundle` would. */
+function project(files: Record<string, unknown>): string {
+  connections = Object.entries(files).map(([name, body]) => ({
+    name,
+    body: body as Record<string, unknown>,
+  }));
+  return "/tmp/project";
 }
 
 /** The variables the project holds unless a test says otherwise: the secret googleBody names. */
@@ -61,31 +57,21 @@ function ctx(cwd: string, over: Partial<StepContext>, held: object = HELD): Step
     dryRun: false,
     json: true,
     color: false,
-    bundle: { schemas: [], flow_definitions: [] },
+    bundle: {
+      schemas: [],
+      flow_definitions: [],
+      idps: connections.map((entry) => entry.body),
+    },
     brandingSources: [],
+    idpFiles: connections.map((entry) => entry.name),
     suggest: (args) => `${args} --env staging` as SuggestedCommand,
     ...rest,
   };
 }
 
-afterEach(async () => {
-  if (dir) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-describe("idp-connections step", () => {
-  it("writes no idp on a dry run but still runs", async () => {
-    const cwd = await project({ "google.json": googleBody() });
-    const createIdp = vi.fn();
-
-    await idpConnectionsStep.run(ctx(cwd, { dryRun: true, client: { createIdp } as never }));
-
-    expect(createIdp).not.toHaveBeenCalled();
-  });
-
-  it("validates the files on a dry run, rejecting a literal client_secret", async () => {
-    const cwd = await project({
+describe("connection checks", () => {
+  it("rejects a literal client_secret, which must never leave the machine", async () => {
+    const cwd = project({
       "google.json": googleBody({
         oidc: {
           issuer: "https://accounts.google.com",
@@ -95,74 +81,60 @@ describe("idp-connections step", () => {
         },
       }),
     });
-    const createIdp = vi.fn();
-
-    await expect(
-      idpConnectionsStep.run(ctx(cwd, { dryRun: true, client: { createIdp } as never })),
-    ).rejects.toThrow();
-    expect(createIdp).not.toHaveBeenCalled();
-  });
-
-  it("writes no idp in a preview", async () => {
-    const cwd = await project({ "google.json": googleBody() });
-    const createIdp = vi.fn();
-
-    await idpConnectionsStep.run(ctx(cwd, { mode: "preview", client: { createIdp } as never }));
-
-    expect(createIdp).not.toHaveBeenCalled();
+    await expect(validateConnections(ctx(cwd, { dryRun: true }))).rejects.toThrow();
   });
 
   it("refuses a connection a preview names with a variable the project lacks", async () => {
-    const cwd = await project({ "google.json": googleBody() });
+    const cwd = project({ "google.json": googleBody() });
 
-    await expect(idpConnectionsStep.run(ctx(cwd, { mode: "preview" }, {}))).rejects.toMatchObject({
+    await expect(validateConnections(ctx(cwd, { mode: "preview" }, {}))).rejects.toMatchObject({
       code: "E_CREDENTIAL_MISSING",
     });
   });
 
   it("reads the preview kind for a preview, so a primary-only secret does not count", async () => {
-    const cwd = await project({ "google.json": googleBody() });
+    const cwd = project({ "google.json": googleBody() });
     const getVariables = vi.fn(async (params: { kind?: string }) =>
       params.kind === "preview" ? {} : { GOOGLE_CLIENT_SECRET: { primary: { secret: true } } },
     );
 
     await expect(
-      idpConnectionsStep.run(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
     ).rejects.toMatchObject({ code: "E_CREDENTIAL_MISSING" });
   });
 
   it("suggests setting the missing credential for the preview kind", async () => {
-    const cwd = await project({ "google.json": googleBody() });
+    const cwd = project({ "google.json": googleBody() });
 
-    await expect(idpConnectionsStep.run(ctx(cwd, { mode: "preview" }, {}))).rejects.toMatchObject({
+    await expect(validateConnections(ctx(cwd, { mode: "preview" }, {}))).rejects.toMatchObject({
       nextCommands: ["variable set GOOGLE_CLIENT_SECRET --secret --preview --env staging"],
     });
   });
 
   it("counts a credential the preview kind holds", async () => {
-    const cwd = await project({ "google.json": googleBody() });
+    const cwd = project({ "google.json": googleBody() });
     const getVariables = vi.fn(async (params: { kind?: string }) =>
       params.kind === "preview" ? { GOOGLE_CLIENT_SECRET: { preview: { secret: true } } } : {},
     );
 
     await expect(
-      idpConnectionsStep.run(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
     ).resolves.toBeUndefined();
   });
 
   it("leaves the variable check to the deploy when a preview's token may not read them", async () => {
-    const cwd = await project({ "google.json": googleBody() });
+    const cwd = project({ "google.json": googleBody() });
     const getVariables = vi
       .fn()
       .mockRejectedValue(new ApiError(403, "https://api.example/variables", {}, "Forbidden"));
 
     await expect(
-      idpConnectionsStep.run(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
     ).resolves.toBeUndefined();
   });
 
   it("names the deploy's environment in how to publish a literal client_secret", async () => {
-    const cwd = await project({
+    const cwd = project({
       "google.json": googleBody({
         oidc: {
           issuer: "https://accounts.google.com",
@@ -173,13 +145,13 @@ describe("idp-connections step", () => {
       }),
     });
 
-    await expect(idpConnectionsStep.run(ctx(cwd, {}))).rejects.toMatchObject({
+    await expect(validateConnections(ctx(cwd, {}))).rejects.toMatchObject({
       hint: expect.stringContaining("variable set NAME --secret --env staging"),
     });
   });
 
   it("refuses an oidc block that names some endpoints but not the rest", async () => {
-    const cwd = await project({
+    const cwd = project({
       "google.json": googleBody({
         oidc: {
           issuer: "https://accounts.google.com",
@@ -191,13 +163,13 @@ describe("idp-connections step", () => {
       }),
     });
 
-    await expect(idpConnectionsStep.run(ctx(cwd, {}))).rejects.toThrow(
+    await expect(validateConnections(ctx(cwd, {}))).rejects.toThrow(
       /google\.json: oidc names some endpoints but not jwks_uri, token_endpoint, userinfo_endpoint/,
     );
   });
 
   it("accepts an oidc block that names every endpoint", async () => {
-    const cwd = await project({
+    const cwd = project({
       "google.json": googleBody({
         oidc: {
           issuer: "https://accounts.google.com",
@@ -211,64 +183,44 @@ describe("idp-connections step", () => {
         },
       }),
     });
-    const createIdp = vi.fn().mockResolvedValue({ id: "idp_1" });
-
-    await idpConnectionsStep.run(ctx(cwd, { client: { createIdp } as never }));
-
-    expect(createIdp).toHaveBeenCalledTimes(1);
+    await expect(validateConnections(ctx(cwd, {}))).resolves.toBeUndefined();
   });
 
-  it("creates no connection when a later file is malformed", async () => {
-    // Lexical order: `a-google.json` is read before `b-bad.json`, so a
-    // validate-then-create loop would create the first before the second
-    // failed. Validating the whole set first must leave none created.
-    const cwd = await project({
+  it("refuses the whole bundle when a later connection is malformed", async () => {
+    const cwd = project({
       "a-google.json": googleBody(),
       "b-bad.json": { slug: "bad", protocol: "oidc" },
     });
-    const createIdp = vi.fn().mockResolvedValue({ id: "idp_1" });
 
-    await expect(
-      idpConnectionsStep.run(ctx(cwd, { client: { createIdp } as never })),
-    ).rejects.toThrow();
-    expect(createIdp).not.toHaveBeenCalled();
-  });
-
-  it("creates each connection on a real run", async () => {
-    const cwd = await project({ "google.json": googleBody() });
-    const createIdp = vi.fn().mockResolvedValue({ id: "idp_1" });
-
-    await idpConnectionsStep.run(ctx(cwd, { client: { createIdp } as never }));
-
-    expect(createIdp).toHaveBeenCalledTimes(1);
+    await expect(validateConnections(ctx(cwd, {}))).rejects.toThrow();
   });
 
   it("refuses a connection whose client_secret names a variable the project lacks", async () => {
-    const cwd = await project({ "google.json": googleBody() });
+    const cwd = project({ "google.json": googleBody() });
 
-    await expect(idpConnectionsStep.run(ctx(cwd, {}, {}))).rejects.toMatchObject({
+    await expect(validateConnections(ctx(cwd, {}, {}))).rejects.toMatchObject({
       code: "E_CREDENTIAL_MISSING",
     });
   });
 
   it("suggests publishing a missing variable in the environment the deploy addressed", async () => {
-    const cwd = await project({ "google.json": googleBody() });
+    const cwd = project({ "google.json": googleBody() });
 
-    await expect(idpConnectionsStep.run(ctx(cwd, {}, {}))).rejects.toMatchObject({
+    await expect(validateConnections(ctx(cwd, {}, {}))).rejects.toMatchObject({
       nextCommands: ["variable set GOOGLE_CLIENT_SECRET --secret --env staging"],
     });
   });
 
   it("refuses a client_secret held in a plain variable", async () => {
-    const cwd = await project({ "google.json": googleBody() });
+    const cwd = project({ "google.json": googleBody() });
 
     await expect(
-      idpConnectionsStep.run(ctx(cwd, {}, { GOOGLE_CLIENT_SECRET: "plain" })),
+      validateConnections(ctx(cwd, {}, { GOOGLE_CLIENT_SECRET: "plain" })),
     ).rejects.toThrow(/which is not a secret/);
   });
 
   it("refuses a client_id held in a secret variable", async () => {
-    const cwd = await project({
+    const cwd = project({
       "google.json": googleBody({
         oidc: {
           issuer: "https://accounts.google.com",
@@ -280,7 +232,7 @@ describe("idp-connections step", () => {
     });
 
     await expect(
-      idpConnectionsStep.run(
+      validateConnections(
         ctx(
           cwd,
           {},
@@ -291,9 +243,9 @@ describe("idp-connections step", () => {
   });
 
   it("names the connection file in the refusal", async () => {
-    const cwd = await project({ "google-workspace.json": googleBody() });
+    const cwd = project({ "google-workspace.json": googleBody() });
 
-    await expect(idpConnectionsStep.run(ctx(cwd, {}, {}))).rejects.toThrow(
+    await expect(validateConnections(ctx(cwd, {}, {}))).rejects.toThrow(
       /\.zitadel\/idps\/google-workspace\.json/,
     );
   });

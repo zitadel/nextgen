@@ -896,6 +896,9 @@ function bundleResourceHandle(kind: string, resource: Record<string, unknown>): 
   if (kind === "flow_definition") {
     return typeof resource.name === "string" ? resource.name : "flow";
   }
+  if (kind === "idp") {
+    return typeof resource.slug === "string" ? resource.slug : "idp";
+  }
   return "default";
 }
 
@@ -955,6 +958,43 @@ function materializeBundle(projectId: string, bundle: Record<string, unknown>): 
     }
     pointers.push({ kind: "flow_definition", handle, revision_id: id });
   }
+  // A connection is resolved by its slug, as the service does: an unchanged
+  // document reuses the revision it already has, a changed one revises the same
+  // connection so everything referencing the slug keeps pointing at it.
+  for (const item of asArray(bundle.idps)) {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("idp", resource);
+    const existing = [...store.idps.values()].find(
+      (record) => record.projectId === projectId && record.slug === handle,
+    );
+    const unchanged =
+      existing !== undefined && JSON.stringify(existing.body) === JSON.stringify(resource);
+    const now = nowIso();
+    const record: IdpConnectionRecord = unchanged
+      ? (existing as IdpConnectionRecord)
+      : existing
+        ? {
+            ...existing,
+            revisionId: `idprev_${shortId()}`,
+            updatedAt: now,
+            seq: ++store.lastSeq,
+            body: resource,
+          }
+        : {
+            id: `idp_${shortId()}`,
+            revisionId: `idprev_${shortId()}`,
+            projectId,
+            slug: handle,
+            createdAt: now,
+            updatedAt: now,
+            seq: ++store.lastSeq,
+            body: resource,
+          };
+    if (!unchanged) {
+      store.idps.set(record.id, record);
+    }
+    pointers.push({ kind: "idp", handle, revision_id: record.revisionId });
+  }
   for (const item of isObject(bundle.branding) ? [bundle.branding] : []) {
     const resource = item;
     pointers.push({
@@ -964,6 +1004,28 @@ function materializeBundle(projectId: string, bundle: Record<string, unknown>): 
     });
   }
   return pointers;
+}
+
+/**
+ * The first connection in the bundle that would change a field fixed for the
+ * life of the connection, with the field it changes.
+ */
+function bundleIdpClash(
+  projectId: string,
+  bundle: Record<string, unknown>,
+): { slug: string; field: string } | undefined {
+  for (const item of asArray(bundle.idps)) {
+    const resource = isObject(item) ? item : {};
+    const slug = bundleResourceHandle("idp", resource);
+    const existing = [...store.idps.values()].find(
+      (record) => record.projectId === projectId && record.slug === slug,
+    );
+    const field = existing === undefined ? undefined : immutableFieldClash(existing.body, resource);
+    if (field !== undefined) {
+      return { slug, field };
+    }
+  }
+  return undefined;
 }
 
 /** The array at a bundle field, or an empty one when the field is absent. */
@@ -979,6 +1041,7 @@ function bundleDigestEntries(
   const groups: [string, string][] = [
     ["schemas", "schema"],
     ["flow_definitions", "flow_definition"],
+    ["idps", "idp"],
   ];
   for (const [field, kind] of groups) {
     const items = bundle[field];
@@ -1397,6 +1460,19 @@ export function setupPlatformHandlers() {
         });
       }
       const bundle = data.bundle;
+      // A connection's fixed fields are checked before anything is written, as
+      // the service checks them inside the build's transaction: a bundle that
+      // would change one is refused whole rather than revising it.
+      const clash = bundleIdpClash(project.id, bundle);
+      if (clash) {
+        return HttpResponse.json(
+          errorBody(
+            "idp.field_immutable",
+            `release: ${clash.slug}: the field ${clash.field} is fixed for the life of the connection`,
+          ),
+          { status: 400 },
+        );
+      }
       const entries = bundleDigestEntries(bundle);
       if (entries.length === 0 || entries.length > 50) {
         return HttpResponse.json(

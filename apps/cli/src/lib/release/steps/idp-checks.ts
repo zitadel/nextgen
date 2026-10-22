@@ -1,88 +1,48 @@
-import { join } from "node:path";
-
-import type { CreateIdpBodyIdp } from "@zitadel/api/generated/model";
-import { ApiError } from "@zitadel/api/runtime/fetch";
-import { consola } from "consola";
-
 import { isVariableReference, missingEndpoints, referencedVariable } from "@zitadel/config/idp";
 import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { ZitadelError } from "../../errors";
 import { IDPS_DIR, refuseResolvedSecret } from "../../idp";
-import { readJsonDirEntries } from "../../json-dir";
 import { valuesOfKind } from "../../variables";
-import type { Step, StepContext } from "../pipeline";
+import type { StepContext } from "../pipeline";
 
 /**
- * TEMPORARY. Identity-provider connections are not a release-bundle kind yet,
- * so a deploy syncs them on the side — `POST /idps`, one per
- * `.zitadel/idps/*.json`, before the release — because flow steps reference a
- * connection by slug and the slug must exist when the release is built. When
- * the bundle gains an `idp` kind this whole step goes away and connections ride
- * the bundle like schemas, flows and branding do. A preview runs it to validate
- * the connection files and never writes one: the early return on
- * `ctx.mode === "preview"` keeps a pull-request build away from `createIdp`.
+ * The checks a connection file gets before the release is built.
+ *
+ * The server creates the connections from the bundle, inside the release's own
+ * transaction, and holds them to the same rules. These run first anyway so a
+ * bad file is named locally — with the file it came from and the command that
+ * fixes it — rather than coming back as one bulk `rel.invalid`. Two of them the
+ * server cannot run for us: that a `client_secret` references a variable rather
+ * than holding a value, which must fail before anything leaves the machine, and
+ * that the variables a connection names are the kind the engine needs.
+ *
+ * A preview is checked the same way, except that its token may not read the
+ * project's variables; that check then belongs to the deploy that merges it.
  */
-export const idpConnectionsStep: Step = {
-  name: "idp-connections",
-  runsFor: ["deploy", "preview"],
-  // Not marked `writes`: a dry run must still run this step to validate and
-  // preview the connection files. The write itself (`POST /idps`) is guarded on
-  // `ctx.dryRun` below rather than the whole step being skipped, so a dry run
-  // reports what it would sync without a bad file slipping past validation. A
-  // preview validates the same way and never writes: a pull-request build must
-  // not reconfigure the connections a merged deploy owns.
-  async run(ctx: StepContext): Promise<void> {
-    const entries = await readJsonDirEntries(join(ctx.cwd, IDPS_DIR));
-    const connections = entries.map((entry) => entry.body);
-    // Validate every file before creating any. `POST /idps` writes one
-    // connection at a time, so a malformed file partway through would leave the
-    // earlier ones already created — a partial write. Checking the whole set
-    // first means a bad file stops the deploy before any connection is written.
-    // A dry run surfaces the same failures, which is why it validates here too.
-    for (const entry of entries) {
-      validateConnection(entry.body, `${IDPS_DIR}/${entry.name}`, ctx.suggest);
-    }
-    // The credentials a connection names must be variables the project holds,
-    // the client id a plain one and the secret a secret one: otherwise the
-    // deploy publishes a sign-in button that fails at the provider.
-    if (connections.length > 0) {
-      const held = await heldVariables(ctx);
-      if (held !== undefined) {
-        for (const entry of entries) {
-          checkCredentialVariables(
-            entry.body,
-            `${IDPS_DIR}/${entry.name}`,
-            held,
-            ctx.suggest,
-            ctx.mode === "preview",
-          );
-        }
-      }
-    }
-    if (ctx.mode === "preview") {
-      return;
-    }
-    for (const connection of connections) {
-      if (ctx.dryRun) {
-        // A dry run writes nothing; it only reports what the real deploy would
-        // sync. Withheld under `--json` so the envelope travels alone on stdout.
-        if (!ctx.json) {
-          const slug = typeof connection.slug === "string" ? connection.slug : "(unnamed)";
-          process.stdout.write(`Would sync idp connection ${slug}\n`);
-        }
-        continue;
-      }
-      // `POST /idps` dedupes on the slug inside the body, so re-sending an
-      // unchanged connection revises it in place rather than creating a second.
-      const result = await ctx.client.createIdp(
-        { idp: connection as CreateIdpBodyIdp },
-        { project_id: ctx.projectId },
-      );
-      consola.debug(`synced idp connection ${result.id}`);
-    }
-  },
-};
+export async function validateConnections(ctx: StepContext): Promise<void> {
+  const files = ctx.idpFiles;
+  const named = ctx.bundle.idps.map((body, index) => ({
+    body,
+    file: `${IDPS_DIR}/${files[index] ?? "(unnamed)"}`,
+  }));
+  // Every file first: a later bad one must not be reported only after the
+  // earlier ones passed, because the whole bundle is built or none of it is.
+  for (const { body, file } of named) {
+    validateConnection(body, file, ctx.suggest);
+  }
+  if (named.length === 0) {
+    return;
+  }
+  const held = await heldVariables(ctx);
+  if (held === undefined) {
+    return;
+  }
+  for (const { body, file } of named) {
+    checkCredentialVariables(body, file, held, ctx.suggest, ctx.mode === "preview");
+  }
+}
 
 /**
  * The connection's shape, and the one mistake that would publish a credential:
