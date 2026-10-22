@@ -72,7 +72,7 @@ describe("resolveTelemetryEndpoint", () => {
   it("matches the cloud's rewrite to Mixpanel's EU host, ahead of the catch-all", async () => {
     const vercelJson = join(import.meta.dirname, "../../../../../../vercel.json");
     const { rewrites } = JSON.parse(await readFile(vercelJson, "utf8")) as {
-      rewrites: { source: string; destination: unknown }[];
+      rewrites: { source: string; has?: { type: string }[]; destination: unknown }[];
     };
     const proxy = rewrites.findIndex(
       ({ source, destination }) =>
@@ -82,6 +82,13 @@ describe("resolveTelemetryEndpoint", () => {
     expect(proxy, "vercel.json has no rewrite for the CLI's Mixpanel path").toBeGreaterThanOrEqual(
       0,
     );
-    expect(proxy).toBeLessThan(rewrites.findIndex(({ source }) => source === "/(.*)"));
+    // The catch-all is the first `/(.*)` on the cloud's own host: a rule
+    // conditioned on the request's host is another host's (go.zitadel.com),
+    // while one conditioned on a header or cookie still is the cloud's.
+    expect(proxy).toBeLessThan(
+      rewrites.findIndex(
+        ({ source, has }) => source === "/(.*)" && !has?.some(({ type }) => type === "host"),
+      ),
+    );
   });
 });

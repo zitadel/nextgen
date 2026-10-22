@@ -11,3 +11,5 @@ The public Go client module, `go.zitadel.com/zitadel/v5`.
 - Keep `README.md`'s example and `api/example_test.go` the same in substance;
   `go:test` compiles and runs the Example.
 - MIT, not AGPL ([LICENSING.md](../../LICENSING.md)).
+- Change the `module` line together with the go-import page
+  (`apps/cloud/go-import/public/index.html`); `TestVercelJSONServesGoImportMetadataOnGoHost` (`server:test`) fails on drift.

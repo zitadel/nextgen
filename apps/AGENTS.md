@@ -19,6 +19,8 @@ Conventions shared by the deployable apps.
     `dist/nextgen-launcher`, and the `schemas` service's built-in schemas in
     `dist/cloud-schemas` ([`vercel.json`](../vercel.json)), so neither
     serves the other.
+  - The `go-import` service serves `cloud/go-import/public`, a checked-in
+    page, not build output: it has no build, so there is no `dist`.
 
 ## What `next dev` writes
 

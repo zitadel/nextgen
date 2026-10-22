@@ -49,6 +49,7 @@ fileGroups:
     - "/docs/product-analytics-events.yaml"
     - "/vercel.json"
     - "/apps/cloud/build-launcher.sh"
+    - "/apps/cloud/go-import/**/*"
     - "/apps/console/index.html"
 
 # Go's own cache accounts for the effective compiler and target defaults.
