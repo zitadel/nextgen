@@ -44,6 +44,14 @@ type DeployInput struct {
 	Targets              []string
 	Reason               domain.DeploymentReason
 	Message              *string
+	RollbackTo           *string
+	ExpectedDeploymentID *string
+}
+
+type RollbackDeploymentInput struct {
+	ProjectID            string
+	DeploymentID         string
+	Message              *string
 	ExpectedDeploymentID *string
 }
 
@@ -147,6 +155,31 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 		Origins:              resolved,
 		Reason:               input.Reason,
 		Message:              input.Message,
+		RollbackTo:           input.RollbackTo,
+		ExpectedDeploymentID: input.ExpectedDeploymentID,
+	})
+}
+
+// Rollback re-deploys the release of a primary deployment to primary, which
+// covers every current primary origin.
+func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeploymentInput) (_ *CreateDeploymentOutput, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.Rollback")
+	defer end(&err)
+
+	previous, err := s.Get(ctx, input.ProjectID, input.DeploymentID)
+	if err != nil {
+		return nil, err
+	}
+	if previous.OriginKind != domain.DeploymentOriginKindPrimary {
+		return nil, domain.ErrDeploymentInvalid().WithMessage("a deployment to preview URLs cannot be rolled back")
+	}
+	return s.Deploy(ctx, DeployInput{
+		ProjectID:            input.ProjectID,
+		ReleaseID:            previous.ReleaseID,
+		Targets:              []string{domain.DeploymentTargetPrimary},
+		Reason:               domain.DeploymentReasonRollback,
+		Message:              input.Message,
+		RollbackTo:           &previous.ID,
 		ExpectedDeploymentID: input.ExpectedDeploymentID,
 	})
 }
@@ -227,7 +260,8 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
-		// TODO(#1781): freeze the deployment's variables here, in this transaction.
+		// TODO(#1781): resolve the variable set before DeploymentsEqual, from
+		// RollbackTo's frozen set or else the current values, and link it here.
 		if written.OriginKind == domain.DeploymentOriginKindPreview {
 			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
 				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {

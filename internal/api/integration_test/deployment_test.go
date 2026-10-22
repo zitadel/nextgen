@@ -249,6 +249,91 @@ func TestCreateDeployment(t *testing.T) {
 	})
 }
 
+func (f deploymentFixture) rollback(t *testing.T, deploymentID api.DeploymentID, req api.RollbackDeploymentRequest) api.RollbackDeploymentRes {
+	t.Helper()
+	resp, err := f.client.RollbackDeployment(t.Context(), api.NewOptRollbackDeploymentRequest(req),
+		api.RollbackDeploymentParams{ProjectID: api.ProjectID(f.project), DeploymentID: deploymentID})
+	require.NoError(t, err)
+	return resp
+}
+
+// TestRollbackDeployment rolls back to an earlier primary deployment. The
+// subtests share one project and run in order: each builds on what the one
+// before deployed.
+func TestRollbackDeployment(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	resp := fixture.deploy(t, fixture.release.ID)
+	require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+	first := resp.(*api.CreateDeploymentCreated)
+	resp = fixture.deploy(t, fixture.otherRelease(t))
+	require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+	second := resp.(*api.CreateDeploymentCreated)
+
+	var rolledBack *api.RollbackDeploymentCreated
+	t.Run("re-deploys the release with rollback_to naming the deployment", func(t *testing.T) {
+		resp := fixture.rollback(t, first.ID, api.RollbackDeploymentRequest{
+			Message:              api.NewOptString("phone_number broke sign-up"),
+			ExpectedDeploymentID: api.NewOptDeploymentID(second.ID),
+		})
+		require.IsType(t, &api.RollbackDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		rolledBack = resp.(*api.RollbackDeploymentCreated)
+		assert.Equal(t, fixture.release.ID, rolledBack.ReleaseID)
+		assert.Equal(t, api.DeploymentKindPrimary, rolledBack.Kind)
+		assert.Equal(t, api.DeploymentStatusLive, rolledBack.Status)
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, origins(rolledBack.Targets))
+		assert.Equal(t, api.DeploymentReasonRollback, rolledBack.Metadata.Reason)
+		rollbackTo, _ := rolledBack.Metadata.RollbackTo.Get()
+		assert.Equal(t, first.ID, rollbackTo)
+		message, _ := rolledBack.Metadata.Message.Get()
+		assert.Equal(t, "phone_number broke sign-up", message)
+	})
+
+	t.Run("again is a no-op", func(t *testing.T) {
+		resp := fixture.rollback(t, first.ID, api.RollbackDeploymentRequest{})
+		require.IsType(t, &api.RollbackDeploymentOK{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, rolledBack.ID, resp.(*api.RollbackDeploymentOK).ID)
+	})
+
+	t.Run("a stale guard conflicts with the newest primary deployment", func(t *testing.T) {
+		resp := fixture.rollback(t, second.ID, api.RollbackDeploymentRequest{
+			ExpectedDeploymentID: api.NewOptDeploymentID(second.ID),
+		})
+		require.IsType(t, &api.DeploymentConflict{}, resp, helpers.MustMarshal(t, resp))
+		newest := resp.(*api.DeploymentConflict).DeploymentGuardConflict.Details.Deployment
+		require.False(t, newest.Null)
+		assert.Equal(t, rolledBack.ID, newest.Value.ID)
+	})
+
+	t.Run("covers a primary origin added since", func(t *testing.T) {
+		fixture.addOrigin(t, domain.Origin{Pattern: "https://acme.com", Kind: domain.OriginKindPrimary})
+		resp := fixture.rollback(t, second.ID, api.RollbackDeploymentRequest{})
+		require.IsType(t, &api.RollbackDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		got := resp.(*api.RollbackDeploymentCreated)
+		assert.Equal(t, second.ReleaseID, got.ReleaseID)
+		assert.Equal(t, []string{"https://acme.com", appOrigin, wwwOrigin}, origins(got.Targets))
+	})
+
+	t.Run("an unknown deployment", func(t *testing.T) {
+		resp := fixture.rollback(t, "dep_01KX4SB9C8E1F0N9WD3P2E4YM5", api.RollbackDeploymentRequest{})
+		assertAuthzStatus(t, resp, http.StatusNotFound, domain.ErrDeploymentNotFound().Code)
+	})
+
+	t.Run("a project with no primary origin", func(t *testing.T) {
+		alone := deploymentFixture{releaseFixture: newReleaseFixture(t)}
+		alone.addOrigin(t, domain.Origin{Pattern: appOrigin, Kind: domain.OriginKindPrimary})
+		created := alone.create(t, &api.CreateReleaseRequest{Pointers: alone.pointers()})
+		require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
+		resp := alone.deploy(t, created.(*api.CreateReleaseCreated).ID)
+		require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		require.NoError(t, harness.EnsureProjectService(t).RemoveOrigin(t.Context(), alone.project, appOrigin))
+
+		rollback := alone.rollback(t, resp.(*api.CreateDeploymentCreated).ID, api.RollbackDeploymentRequest{})
+		assertAuthzError(t, rollback, domain.ErrDeploymentInvalid().Code)
+	})
+}
+
 // TestDeploymentReads deploys two releases to primary and reads them back:
 // only the newer one is live, and the live view follows the project's
 // primary origins.
@@ -394,19 +479,6 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 				Targets:     api.DeploymentTargetsRequest{"https://app.acme.com"},
 			},
 			api.CreateDeploymentParams{ProjectID: project})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("rollback", func(t *testing.T) {
-		resp, err := fixture.client.RollbackDeployment(t.Context(),
-			api.NewOptRollbackDeploymentRequest(api.RollbackDeploymentRequest{
-				Message: api.NewOptString("phone_number broke sign-up"),
-			}),
-			api.RollbackDeploymentParams{
-				ProjectID:    project,
-				DeploymentID: "dep_01KX4SB9C8E1F0N9WD3P2E4YM5",
-			})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
 	})
