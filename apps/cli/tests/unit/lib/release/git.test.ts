@@ -85,6 +85,29 @@ describe("diffConfigAgainst", () => {
     expect(diff).not.toContain("README.md");
   });
 
+  it("shows a referenced template the bundle inlines from outside .zitadel/", async () => {
+    const cwd = await cleanRepo();
+    const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
+    await mkdir(join(cwd, "templates"), { recursive: true });
+    await writeFile(join(cwd, "templates", "login.liquid"), "<p>edited</p>\n");
+
+    const diff = await diffConfigAgainst(cwd, sha, false, ["templates/login.liquid"]);
+
+    expect(diff).toContain("login.liquid");
+    expect(diff).toContain("edited");
+  });
+
+  it("leaves a referenced file out when nothing references it", async () => {
+    const cwd = await cleanRepo();
+    const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
+    await mkdir(join(cwd, "templates"), { recursive: true });
+    await writeFile(join(cwd, "templates", "login.liquid"), "<p>edited</p>\n");
+
+    const diff = await diffConfigAgainst(cwd, sha, false);
+
+    expect(diff).not.toContain("login.liquid");
+  });
+
   it("never shows .zitadel/secret, which is not part of a release", async () => {
     const cwd = await cleanRepo();
     const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
