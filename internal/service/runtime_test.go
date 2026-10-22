@@ -96,6 +96,31 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		assert.Nil(t, got)
 	})
 
+	t.Run("server's own origin keeps pre-resolution path", func(t *testing.T) {
+		resolver, statements, _ := newMockedRuntimeResolver(t)
+		resolver, err := resolver.WithFirstPartyOrigin("https://Preview.Zitadel.com")
+		require.NoError(t, err)
+		console := "https://preview.zitadel.com"
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+			Origins: []domain.Origin{
+				{Pattern: origin, Kind: domain.OriginKindPrimary},
+			},
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{console}).
+			Return([]domain.OriginDeployment{}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, console)
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("first-party origin needs a valid origin", func(t *testing.T) {
+		resolver, _, _ := newMockedRuntimeResolver(t)
+		_, err := resolver.WithFirstPartyOrigin("preview.zitadel.com")
+		require.Error(t, err)
+	})
+
 	t.Run("primary origin with no deployment is not deployed", func(t *testing.T) {
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{

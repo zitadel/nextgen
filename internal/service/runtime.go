@@ -51,13 +51,27 @@ func (res *RuntimeResolution) logAttrs() []any {
 
 // RuntimeResolver answers which release serves a public request of a project.
 type RuntimeResolver struct {
-	v2Pool   *DB
-	releases ReleaseService
-	now      func() time.Time
+	v2Pool     *DB
+	releases   ReleaseService
+	now        func() time.Time
+	firstParty string
 }
 
 func NewRuntimeResolver(v2Pool *DB, releases ReleaseService) *RuntimeResolver {
 	return &RuntimeResolver{v2Pool: v2Pool, releases: releases, now: time.Now}
+}
+
+// WithFirstPartyOrigin admits the server's own public origin for every
+// project. The console runs there and starts real flows of the selected
+// project for its branding preview; that page is the server's own code, not
+// the project's app, so the project's patterns do not describe it.
+func (r *RuntimeResolver) WithFirstPartyOrigin(origin string) (*RuntimeResolver, error) {
+	normalized, err := domain.NormalizeOrigin(origin)
+	if err != nil {
+		return nil, err
+	}
+	r.firstParty = normalized
+	return r, nil
 }
 
 // Resolve walks the three layers: the gate refuses an origin no pattern
@@ -172,8 +186,9 @@ type matchedOrigin struct {
 
 // Gate decides whether a request from origin may be served at all. An absent
 // origin is not a browser and passes with no match. An empty origin list
-// admits every origin. A loopback origin is always admitted. A preview
-// pattern admits nothing by itself: the preview row for the exact URL does.
+// admits every origin. A loopback origin and the server's own public origin
+// are always admitted. A preview pattern admits nothing by itself: the
+// preview row for the exact URL does.
 func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	origin = strings.TrimSpace(origin)
 	if origin == "" {
@@ -184,7 +199,7 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 		return nil, domain.ErrProjectOriginNotAllowed(map[string]string{"origin": origin}).
 			WithMessage(origin + " is not an origin of this project")
 	}
-	if len(project.Origins) == 0 || domain.IsLoopbackOrigin(normalized) {
+	if len(project.Origins) == 0 || domain.IsLoopbackOrigin(normalized) || normalized == r.firstParty {
 		return &matchedOrigin{origin: normalized, open: true}, nil
 	}
 	entry, ok := domain.MatchOrigin(project.Origins, normalized)

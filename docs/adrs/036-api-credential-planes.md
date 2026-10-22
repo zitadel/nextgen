@@ -289,6 +289,10 @@ no environments ([ADR 068](068-project-is-the-data-boundary.md)), so:
   first pattern closes it; a loopback origin is always admitted. That is the
   development allowance this ADR tied to non-production environments,
   carried by the pattern list instead of by a key.
+- The server's own public origin (`server.public_base`) is admitted for
+  every project too: the console runs there and starts real flows of the
+  selected project for its branding preview, and it is the server's code,
+  not the project's app.
 - `zitadel.json` holds no environment and no key. The public triple a
   deployed app needs, `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and the publishable
   key, lives in the platform's environment store; a directory's binding to a
