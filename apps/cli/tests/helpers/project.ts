@@ -90,9 +90,10 @@ export interface ProjectOrigin {
 
 /**
  * The origin `zitadel setup` registers for the app it scaffolds: the development
- * server, as a preview pattern. A fresh project already holds it.
+ * server, as a primary pattern, because only a primary one admits the app's own
+ * requests. A fresh project already holds it.
  */
-export const SETUP_ORIGIN: ProjectOrigin = { pattern: "http://localhost:3000", kind: "preview" };
+export const SETUP_ORIGIN: ProjectOrigin = { pattern: "http://localhost:3000", kind: "primary" };
 
 export interface RegisteredIdp {
   readonly id: string;
