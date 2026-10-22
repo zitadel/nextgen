@@ -1,13 +1,17 @@
 package postgres
 
 import (
+	"context"
 	"errors"
+	"io"
+	"net"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -64,4 +68,36 @@ func TestWrapError(t *testing.T) {
 			assert.ErrorIs(t, got, tt.want)
 		})
 	}
+}
+
+// A query the client's cancel interrupts must still name context.Canceled
+// after wrapError and a service's domain.ErrInternal: the API logs a client
+// that went away at Warn only when the cause survives the wrapping.
+func TestWrapErrorKeepsContextCanceled(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// A server that takes the query and never answers; the client cancels
+	// once the query has arrived, so pgx sees the cancel mid-query.
+	client, server := net.Pipe()
+	t.Cleanup(func() {
+		_ = client.Close()
+		_ = server.Close()
+	})
+	go func() {
+		_, _ = server.Read(make([]byte, 1024))
+		cancel()
+		_, _ = io.Copy(io.Discard, server)
+	}()
+	config, err := pgconn.ParseConfig("postgres://test@localhost/test")
+	require.NoError(t, err)
+	conn, err := pgconn.Construct(&pgconn.HijackedConn{Conn: client, Config: config})
+	require.NoError(t, err)
+
+	_, err = conn.Exec(ctx, "select pg_sleep(60)").ReadAll()
+	require.ErrorIs(t, err, context.Canceled, "the precondition: pgx reports the cancel")
+
+	got := domain.ErrInternal(wrapError(err)).WithMessage("failed to query projects")
+	require.ErrorIs(t, got, context.Canceled)
 }

@@ -14,7 +14,9 @@ import (
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/ogen-go/ogen/validate"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
 // FullErrorInResponse attaches the unwrapped cause of an error to the response
@@ -193,6 +195,8 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 	var (
 		status  int
 		details api.ErrorDetails
+		// logged is the error the log line carries.
+		logged domain.Error
 	)
 
 	switch {
@@ -202,20 +206,19 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 		// server fault, not a refused credential. The client gets the generic
 		// internal answer; the cause goes to the log, where a wiring mistake
 		// that makes every cookie request fail has to be findable.
-		// Logged as a domain.Error too, so its parent (the actual cause) is kept.
-		var cause domain.Error
-		_ = errors.As(err, &cause)
-		slog.ErrorContext(ctx, "security handler could not reach a decision", "error", err, "cause", cause)
+		_ = errors.As(err, &logged)
 		status = http.StatusInternalServerError
 		details = domainErrorDetails(domain.ErrInternal(nil))
 
 	case isCSRFError(err):
 		status = http.StatusForbidden
-		details = domainErrorDetails(domain.ErrAuthCSRFInvalid())
+		logged = domain.ErrAuthCSRFInvalid()
+		details = domainErrorDetails(logged)
 
 	case isSecurityError(err):
 		status = http.StatusUnauthorized
-		details = securityErrorDetails(err)
+		logged = securityError(err)
+		details = domainErrorDetails(logged)
 
 	case isDecodeError(err):
 		status = http.StatusBadRequest
@@ -227,13 +230,40 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 			invalid = invalid.WithDetails(domain.InvalidFieldPathsDetails{Fields: fields})
 		}
 		details = domainErrorDetails(invalid)
+		// The log keeps ogen's decode reason.
+		logged = invalid.WithParent(err)
 
 	default:
-		resp := errorResponse(err)
+		if !errors.As(err, &logged) {
+			logged = domain.ErrInternal(err)
+		}
+		resp := errorResponse(logged)
 		status = resp.StatusCode
 		details = resp.Response
 	}
 
+	logAPIError(ctx, status, logged)
+	writeErrorDetails(w, status, details)
+}
+
+// logAPIError writes the one log line a returned error gets (ADR 030).
+func logAPIError(ctx context.Context, status int, err domain.Error) {
+	level := slog.LevelInfo
+	switch {
+	case status >= http.StatusInternalServerError && errors.Is(err, context.Canceled) && ctx.Err() != nil:
+		level = slog.LevelWarn // the client went away, not a server fault
+	case status >= http.StatusInternalServerError:
+		level = slog.LevelError
+	}
+	operationID, _ := middleware.GetOperationIDContext(ctx)
+	zlog.Log(ctx, level, "api error",
+		slog.Int("status", status),
+		slog.String("operation_id", operationID),
+		slog.Any(zlog.ErrorAttributeKey, err),
+	)
+}
+
+func writeErrorDetails(w http.ResponseWriter, status int, details api.ErrorDetails) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	data, err := details.MarshalJSON()
@@ -269,15 +299,15 @@ func isSecurityError(err error) bool {
 	return errors.As(err, &target)
 }
 
-// securityErrorDetails maps an ogen security failure to the auth.unauthorized
+// securityError maps an ogen security failure to the auth.unauthorized
 // wire contract. Session-only ops use sessionUnauthorizedMessage; dual-scheme
 // ops stay on the default unauthorized message (ADR 030, Decision 4).
-func securityErrorDetails(err error) api.ErrorDetails {
+func securityError(err error) domain.Error {
 	unauthorized := domain.ErrAuthUnauthorized(err)
 	if secErr := new(ogenerrors.SecurityError); errors.As(err, &secErr) && sessionCookieOperations[secErr.OperationContext.Name] {
 		unauthorized = unauthorized.WithMessage(sessionUnauthorizedMessage)
 	}
-	return domainErrorDetails(unauthorized)
+	return unauthorized
 }
 
 // validationFieldPaths returns the dotted paths of the fields ogen's request

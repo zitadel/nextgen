@@ -1,9 +1,13 @@
 package api
 
 import (
+	"bytes"
+	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,8 +19,13 @@ import (
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/ogen-go/ogen/validate"
 	"github.com/stretchr/testify/require"
+	slogctx "github.com/veqryn/slog-context"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog/extractors"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
 	"go.uber.org/mock/gomock"
@@ -698,5 +707,183 @@ func TestOgenErrorHandlerMalformedCredentialHeader(t *testing.T) {
 				require.JSONEq(t, want, rec.Body.String())
 			})
 		}
+	}
+}
+
+// errorStubHandler answers GET /healthz with err, or panics with panicValue.
+type errorStubHandler struct {
+	api.UnimplementedHandler
+	err        error
+	panicValue any
+}
+
+func (h errorStubHandler) GetHealth(context.Context) (api.GetHealthRes, error) {
+	if h.panicValue != nil {
+		panic(h.panicValue)
+	}
+	return nil, h.err
+}
+
+// serveAndRecordLogs serves req the way the production chain does (WithRecover
+// around the generated server, ogen's operation id middleware, a request
+// logger that adds the request id) and returns the response and every record
+// logged while serving it. slog.Default writes to the same records, so a line
+// logged past the request logger counts too. Location and stack capture are
+// on. Not parallel: it changes globals.
+func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenService, req *http.Request) (*httptest.ResponseRecorder, []map[string]any) {
+	t.Helper()
+	errreport.EnableLocation(true)
+	errreport.EnableStack(true)
+	defaultLogger := slog.Default()
+	t.Cleanup(func() {
+		errreport.EnableLocation(false)
+		errreport.EnableStack(false)
+		slog.SetDefault(defaultLogger)
+	})
+
+	var logs bytes.Buffer
+	logger := slog.New(slogctx.NewHandler(slog.NewJSONHandler(&logs, nil), &slogctx.HandlerOptions{
+		Prependers: []slogctx.AttrExtractor{extractors.ExtractRequestID},
+	}))
+	slog.SetDefault(logger)
+
+	srv, err := api.NewServer(h, NewSecurityHandler(tokenService),
+		api.WithErrorHandler(OgenErrorHandler),
+		api.WithMiddleware(middleware.AddOperationIdToContext()),
+	)
+	require.NoError(t, err)
+
+	ctx := middleware.WithRequestIDContext(req.Context(), "req_1")
+	ctx = middleware.WithOperationIDContext(ctx, "")
+	ctx = zlog.WithLoggingContext(ctx, logger)
+	rec := httptest.NewRecorder()
+	WithRecover(srv).ServeHTTP(rec, req.WithContext(ctx))
+
+	var records []map[string]any
+	for line := range bytes.Lines(logs.Bytes()) {
+		var record map[string]any
+		require.NoError(t, json.Unmarshal(line, &record))
+		records = append(records, record)
+	}
+	return rec, records
+}
+
+// A handler error answered with a 5xx is logged once, at Error, with the
+// request and operation it failed and where it was raised.
+func TestOgenErrorHandlerLogsServerFaultOnce(t *testing.T) {
+	rec, records := serveAndRecordLogs(t, errorStubHandler{err: errors.New("disk on fire")}, nil,
+		httptest.NewRequest(http.MethodGet, "/healthz", nil))
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.Len(t, records, 1)
+	record := records[0]
+	require.Equal(t, "ERROR", record["level"])
+	require.Equal(t, "api error", record["msg"])
+	require.EqualValues(t, http.StatusInternalServerError, record["status"])
+	require.Equal(t, "getHealth", record["operation_id"])
+	require.Equal(t, "req_1", record["request_id"])
+	logged, ok := record["error"].(map[string]any)
+	require.True(t, ok, "error must be logged as a group: %v", record["error"])
+	require.Equal(t, "internal", logged["code"])
+	require.Equal(t, "An unexpected error occurred.", logged["message"])
+	require.Equal(t, "disk on fire", logged["parent"])
+	require.NotEmpty(t, logged["reportLocation"])
+	require.NotEmpty(t, logged["stackTrace"])
+}
+
+// A handler error answered with a 4xx is logged once, at Info.
+func TestOgenErrorHandlerLogsClientErrorAtInfo(t *testing.T) {
+	rec, records := serveAndRecordLogs(t, errorStubHandler{err: domain.ErrProjectNotFound()}, nil,
+		httptest.NewRequest(http.MethodGet, "/healthz", nil))
+
+	require.Equal(t, http.StatusNotFound, rec.Code)
+	require.Len(t, records, 1)
+	require.Equal(t, "INFO", records[0]["level"])
+	require.EqualValues(t, http.StatusNotFound, records[0]["status"])
+	require.Equal(t, domain.ErrProjectNotFound().Code, records[0]["error"].(map[string]any)["code"])
+}
+
+// A body ogen cannot decode is logged with ogen's reason, which the client
+// never sees: its body keeps the stable message.
+func TestOgenErrorHandlerLogsDecodeReason(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/projects", strings.NewReader(`{"name":`))
+	req.Header.Set("Content-Type", "application/json")
+	rec, records := serveAndRecordLogs(t, errorStubHandler{}, nil, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.JSONEq(t, `{"code":"req.invalid","message":`+fmt.Sprintf("%q", domain.ErrRequestInvalid().Message)+`}`, rec.Body.String())
+	require.Len(t, records, 1)
+	require.Equal(t, "INFO", records[0]["level"])
+	logged := records[0]["error"].(map[string]any)
+	require.Equal(t, "req.invalid", logged["code"])
+	require.Contains(t, logged["parent"], "unexpected EOF")
+}
+
+// Details are for the client: the log line never carries them.
+func TestOgenErrorHandlerLogOmitsDetails(t *testing.T) {
+	err := domain.ErrUserAlreadyExists().WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"email"}})
+	rec, records := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
+		httptest.NewRequest(http.MethodGet, "/healthz", nil))
+
+	require.Equal(t, http.StatusConflict, rec.Code)
+	require.Contains(t, rec.Body.String(), "attributes.email")
+	require.Len(t, records, 1)
+	line, marshalErr := json.Marshal(records[0])
+	require.NoError(t, marshalErr)
+	require.NotContains(t, string(line), `"details"`)
+	require.NotContains(t, string(line), "email")
+}
+
+// A security handler that could not decide is logged once, at Error, with
+// the cause that kept it from deciding.
+func TestOgenErrorHandlerLogsSecurityInternalErrorOnce(t *testing.T) {
+	mock := gomock.NewController(t)
+	tokenService := mocks.NewMockTokenService(mock)
+	tokenService.EXPECT().IntrospectToken(gomock.Any(), "credential").
+		Return(nil, domain.ErrInternal(errors.New("connection refused")).WithMessage("failed to read token record"))
+	req := httptest.NewRequest(http.MethodGet, "/sessions/me", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "credential"})
+
+	rec, records := serveAndRecordLogs(t, errorStubHandler{}, tokenService, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.JSONEq(t, `{"code":"internal","message":"An unexpected error occurred."}`, rec.Body.String())
+	require.Len(t, records, 1)
+	record := records[0]
+	require.Equal(t, "ERROR", record["level"])
+	require.Equal(t, "api error", record["msg"])
+	logged := record["error"].(map[string]any)
+	require.Equal(t, "internal", logged["code"])
+	require.Equal(t, "failed to read token record", logged["message"])
+	require.Equal(t, "connection refused", logged["parent"])
+}
+
+// A request the client gave up on is logged at Warn, not as a server fault,
+// though it still answers 500. A cancel the server caused itself stays an
+// Error.
+func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
+	err := domain.ErrInternal(fmt.Errorf("query projects: %w", context.Canceled))
+	for _, tc := range []struct {
+		name      string
+		canceled  bool
+		wantLevel string
+	}{
+		{"request canceled", true, "WARN"},
+		{"request alive", false, "ERROR"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if tc.canceled {
+				cancel()
+			}
+			rec, records := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
+				httptest.NewRequestWithContext(ctx, http.MethodGet, "/healthz", nil))
+
+			require.Equal(t, http.StatusInternalServerError, rec.Code)
+			require.Len(t, records, 1)
+			require.Equal(t, tc.wantLevel, records[0]["level"])
+			require.EqualValues(t, http.StatusInternalServerError, records[0]["status"])
+		})
 	}
 }

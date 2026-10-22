@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -119,14 +118,6 @@ func (h *Handler) WithPersonalTeamEnsurer(e service.PersonalTeamEnsurer) *Handle
 func (h *Handler) WithBuiltinSchemaBases(bases domain.BuiltinSchemaBases) *Handler {
 	h.builtinBases = bases
 	return h
-}
-
-// NewError implements the api.Handler interface and is used by ogen to convert any error
-// returned by an endpoint handler into a well-formed error response.
-// By centralizing this logic here, we can ensure that all errors are handled
-// consistently regardless of where they originate.
-func (h *Handler) NewError(ctx context.Context, err error) *api.ErrorDetailsStatusCode {
-	return errorResponse(err)
 }
 
 var _ api.Handler = (*Handler)(nil)
