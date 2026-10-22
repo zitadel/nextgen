@@ -214,6 +214,7 @@ tasks:
       # server compiles reads them.
       - "/vercel.json"
       - "/apps/cloud/build.sh"
+      - "/apps/cloud/go-import/**/*"
     options:
       runFromWorkspaceRoot: true
 

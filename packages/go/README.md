@@ -31,5 +31,9 @@ The client is generated from the OpenAPI source in
 server:generate`, with ogen. Do not edit the `*_gen.go` files: change the
 spec and regenerate.
 
-Versions are tagged `packages/go/v5.x.y`; the module path `go.zitadel.com/zitadel/v5`
-resolves to this directory of the repository through the vanity host.
+Versions are tagged `packages/go/v5.x.y`. The module path resolves through the
+vanity host: `go get` asks `https://go.zitadel.com/zitadel/v5/...?go-get=1`, and
+the hosted cloud answers every path on that host with one page whose
+`go-import` meta names this module's repository and its directory,
+`packages/go` ([`apps/cloud/go-import`](../../apps/cloud/go-import),
+[runbook](../../docs/runbooks/cloud.md#go-import-path)).

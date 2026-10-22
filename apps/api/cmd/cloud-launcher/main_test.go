@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -307,6 +308,77 @@ func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{"/console/runtime.json → server", consolePath + "/(.*) → console"}, routes)
+}
+
+// go.zitadel.com serves Go's vanity-import metadata for the client module
+// (packages/go): every path on that host answers with one static page, whose
+// go-import prefix is the module path and whose subdirectory is the module's
+// directory. The three live in different files, so this test holds them
+// together, and it pins the host rewrite ahead of the catch-all that would
+// otherwise send the request to the server.
+func TestVercelJSONServesGoImportMetadataOnGoHost(t *testing.T) {
+	repo := filepath.Join("..", "..", "..", "..")
+	raw, err := os.ReadFile(filepath.Join(repo, "vercel.json"))
+	require.NoError(t, err)
+	var config struct {
+		Services map[string]struct {
+			OutputDirectory string `json:"outputDirectory"`
+			Rewrites        []struct {
+				Source      string `json:"source"`
+				Destination string `json:"destination"`
+			} `json:"rewrites"`
+		} `json:"services"`
+		Rewrites []struct {
+			Source string `json:"source"`
+			Has    []struct {
+				Type  string `json:"type"`
+				Value string `json:"value"`
+			} `json:"has"`
+			Destination json.RawMessage `json:"destination"`
+		} `json:"rewrites"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &config))
+
+	const host = "go.zitadel.com"
+	// Top-level rewrites match in order: the host rule must come before any
+	// catch-all without a host condition, or the server answers for the host.
+	hostRule := -1
+	for i, rewrite := range config.Rewrites {
+		var destination struct{ Service string }
+		_ = json.Unmarshal(rewrite.Destination, &destination)
+		if len(rewrite.Has) == 1 && rewrite.Has[0].Type == "host" && rewrite.Has[0].Value == host {
+			assert.Equal(t, "/(.*)", rewrite.Source, "every path on the host")
+			assert.Equal(t, "go-import", destination.Service)
+			hostRule = i
+			break
+		}
+		if rewrite.Source == "/(.*)" && len(rewrite.Has) == 0 {
+			t.Fatalf("the catch-all %q → %s precedes the %s host rewrite", rewrite.Source, destination.Service, host)
+		}
+	}
+	require.NotEqual(t, -1, hostRule, "no top-level rewrite for host %s", host)
+
+	service, ok := config.Services["go-import"]
+	require.True(t, ok, "no go-import service")
+	require.Len(t, service.Rewrites, 1)
+	assert.Equal(t, "/(.*) → /index.html", service.Rewrites[0].Source+" → "+service.Rewrites[0].Destination,
+		"the one page answers every path")
+
+	page, err := os.ReadFile(filepath.Join(repo, "apps", "cloud", "go-import", service.OutputDirectory, "index.html"))
+	require.NoError(t, err)
+	goImport := regexp.MustCompile(`<meta name="go-import" content="([^"]*)"`).FindSubmatch(page)
+	require.NotNil(t, goImport, "index.html has no go-import meta")
+	fields := strings.Fields(string(goImport[1]))
+	require.Len(t, fields, 4, "go-import content is PREFIX VCS REPO SUBDIR (Go 1.25+)")
+
+	goMod, err := os.ReadFile(filepath.Join(repo, "packages", "go", "go.mod"))
+	require.NoError(t, err)
+	module := regexp.MustCompile(`(?m)^module (\S+)$`).FindSubmatch(goMod)
+	require.NotNil(t, module, "packages/go/go.mod has no module line")
+	assert.Equal(t, string(module[1]), fields[0], "the go-import prefix is the module path")
+	assert.True(t, strings.HasPrefix(fields[0], host+"/"), "the module path lives under the host")
+	assert.Equal(t, "git", fields[1])
+	assert.Equal(t, "packages/go", fields[3], "the module's directory in the repository")
 }
 
 // The console service builds into the server's embed directory in the same
