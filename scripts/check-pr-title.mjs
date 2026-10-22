@@ -29,6 +29,7 @@ const CUSTOMER_TYPES = new Set(["feat", "fix"]);
 const NON_CUSTOMER_TYPES = new Set(["docs", "chore"]);
 
 const NON_SHIPPING_TOP_LEVEL_DIRS = [
+  ".agents",
   ".changeset",
   ".devcontainer",
   ".github",
