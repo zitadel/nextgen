@@ -12,6 +12,8 @@ the one-database rule `stmttest` runs under.
 - Dialects (pool, migrations, statements) live under `dialect/`. `testdb`
   brings up Postgres and Spanner for integration tests (testcontainers or env
   DSNs).
+- List a new package whose `spanner_integration` tests open a database in
+  `server:test-spanner` (`apps/server/moon.yml` and its `package.json` twin).
 
 ## Identifier minting
 
