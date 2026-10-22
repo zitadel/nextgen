@@ -199,6 +199,11 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
   // rollback` re-applies one. The operations live in the `lib/release` wrappers
   // these commands call, which {@link standaloneOperations} scans too.
   deployments: ["deployment/create", "deployment/list", "deployment/get", "deployment/rollback"],
+  // A preview is written by a preview deployment, not created directly: `preview`
+  // deploys to the preview URLs, `preview list` reads the live ones and
+  // `preview rm` removes one. `preview` reaches the release/deployment
+  // operations through the `lib/release` wrappers scanned above.
+  previews: ["preview/index", "preview/list", "preview/rm"],
 };
 
 /**
@@ -424,6 +429,9 @@ describe("the CLI covers the API client", () => {
  * entry cannot outlive the sharing that justifies it.
  */
 const SHARES_OPERATION: Readonly<Record<string, string>> = {
+  // Reads the project to resolve the preview URLs it deploys to; the deploy
+  // itself is `POST /deployments`, which names `deployment create`.
+  "preview index": "projects get",
   // Builds a release from `.zitadel/` exactly as `deploy` does, without
   // deploying it, so `POST /releases/build` names `deploy`.
   "release create": "deploy",
