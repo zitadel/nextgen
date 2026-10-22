@@ -93,7 +93,18 @@ patch:
           schema:
             $ref: ../user.yaml
     '400':
-      description: Invalid request body, empty patch, unknown schema, or merged attributes failing schema validation.
+      description: |
+        Invalid request body, empty patch, unknown schema, or merged attributes
+        failing schema validation.
+
+        Merged attributes that fail the target schema answer `req.invalid`,
+        the same way a malformed body does and the same way a create does:
+        `details.details.fields` lists the dotted path of every failing field
+        from the request body, such as `attributes.country` or
+        `attributes.address.zip`. A field the patch did not touch is named
+        too when the merged document fails on it, as after a move to a schema
+        that requires it. Only the field names are reported, never the
+        rejected values.
       content:
         application/json:
           schema:
@@ -120,6 +131,13 @@ patch:
       description: |
         A patched value is unique and already taken by another user, or
         concurrent writes kept the user changing under the patch; retry.
+
+        A taken value answers `user.already_exists`, as on create, with
+        `details.details.fields` naming the attributes whose value is taken in
+        the same dotted form as a `400`, such as `attributes.email`. The user
+        holding the value is not named. When no attribute can be named, as
+        when the value was freed again since, `details` is absent. Concurrent
+        writes answer `user.conflict`.
       content:
         application/json:
           schema:

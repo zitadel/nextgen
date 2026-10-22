@@ -70,6 +70,9 @@ var payloadByEventType = map[string]string{
 
 	"branding.created": "branding-created-payload.yaml",
 
+	"policy.created": "policy-payload.yaml",
+	"policy.updated": "policy-payload.yaml",
+
 	"release.created": "release-created-payload.yaml",
 	"release.revoked": "release-revoked-payload.yaml",
 
@@ -165,6 +168,10 @@ var webhookByEventType = map[string]webhookDoc{
 	"schema.created": {description: "A schema was created."},
 
 	"branding.created": {description: "A branding revision was created."},
+
+	"policy.created": {description: "A project published the first revision of its policy for an operation."},
+	"policy.updated": {description: "A project published a new revision of its policy for an operation. The " +
+		"payload holds the new revision and its settings."},
 
 	"release.created": {description: "A release was created."},
 	"release.revoked": {description: "A release was revoked.", status: statusContracted},

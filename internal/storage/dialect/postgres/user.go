@@ -337,6 +337,43 @@ func (us userStatements) GetUserUniqueAttributeScopes(ctx context.Context, proje
 	return scopes, nil
 }
 
+// GetTakenUniqueAttributeKeys implements [service.UserStatements].
+func (us userStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projectID, userID string, claims []service.UniqueAttributeClaim) ([]domain.AttributeKey, error) {
+	if len(claims) == 0 {
+		return nil, nil
+	}
+	var compiler statementCompiler
+	compiler.WriteString("SELECT key FROM ")
+	compiler.WriteString(userUniqueAttributesTable)
+	compiler.WriteString(" WHERE project_id = ")
+	compiler.WriteArg(projectID)
+	compiler.WriteString(" AND user_id <> ")
+	compiler.WriteArg(userID)
+	compiler.WriteString(" AND (")
+	for i, claim := range claims {
+		if i > 0 {
+			compiler.WriteString(" OR ")
+		}
+		compiler.WriteString("(team_id = ")
+		compiler.WriteArg(claim.TeamID)
+		compiler.WriteString(" AND key = ")
+		compiler.WriteArg(claim.Key)
+		compiler.WriteString(" AND value_hash = ")
+		compiler.WriteArg(claim.ValueHash[:])
+		compiler.WriteString(")")
+	}
+	compiler.WriteString(")")
+	rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	keys, err := pgx.CollectRows(rows, pgx.RowTo[domain.AttributeKey])
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return keys, nil
+}
+
 // GetUser implements [service.UserStatements].
 // By-id lookup is compileRead-shaped (#839): WithAuthzListUnrestricted skips
 // the #838 tripwire and ignores an inherited list filter. HTTP ListUsers is

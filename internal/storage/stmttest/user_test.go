@@ -803,3 +803,63 @@ func TestUserStatements_GetUser_UniqueTeamIDFiltersRegistryRows(t *testing.T) {
 		assert.Equal(t, owner.ID, got.ID)
 	})
 }
+
+// GetTakenUniqueAttributeKeys answers every claim in one read: a claim
+// matches under its own team scope only, a value the asking user holds itself
+// is not taken, and a value nobody holds is absent.
+func TestUserStatements_GetTakenUniqueAttributeKeys(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		owner := newTestUser(t, projectID, schemaURL, "user_taken_owner", "held@example.com", "Owner")
+		require.NoError(t, d.stmts.CreateUser(t.Context(), owner))
+
+		team := newTestTeam(projectID, "team_taken")
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
+		teamHandle, err := domain.NewCreateAttribute("handle", "alice", domain.AttributeUniquenessTeam)
+		require.NoError(t, err)
+		teamUser := &domain.CreateUser{
+			ProjectID:               projectID,
+			SchemaURL:               schemaURL,
+			ID:                      "user_taken_team",
+			InitialMembershipTeamID: &team.ID,
+			Attributes:              domain.CreateAttributes{*teamHandle},
+		}
+		require.NoError(t, d.stmts.CreateUser(t.Context(), teamUser))
+
+		claim := func(teamID string, key domain.AttributeKey, value any) service.UniqueAttributeClaim {
+			hash, err := domain.UniqueValueHash(value)
+			require.NoError(t, err)
+			return service.UniqueAttributeClaim{TeamID: teamID, Key: key, ValueHash: hash}
+		}
+		email := claim("", "email", "held@example.com")
+		phone := claim("", "phone", "+41000000000")
+
+		t.Run("each claim under its own scope", func(t *testing.T) {
+			got, err := d.stmts.GetTakenUniqueAttributeKeys(t.Context(), projectID, "user_taken_other",
+				[]service.UniqueAttributeClaim{email, claim(team.ID, "handle", "alice"), phone})
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []domain.AttributeKey{"email", "handle"}, got)
+		})
+
+		t.Run("a claim under another scope is not taken", func(t *testing.T) {
+			got, err := d.stmts.GetTakenUniqueAttributeKeys(t.Context(), projectID, "user_taken_other",
+				[]service.UniqueAttributeClaim{claim("", "handle", "alice")})
+			require.NoError(t, err)
+			assert.Empty(t, got)
+		})
+
+		t.Run("the asking user's own claim is not taken", func(t *testing.T) {
+			got, err := d.stmts.GetTakenUniqueAttributeKeys(t.Context(), projectID, owner.ID,
+				[]service.UniqueAttributeClaim{email, claim(team.ID, "handle", "alice")})
+			require.NoError(t, err)
+			assert.Equal(t, []domain.AttributeKey{"handle"}, got)
+		})
+
+		t.Run("no claims read nothing", func(t *testing.T) {
+			got, err := d.stmts.GetTakenUniqueAttributeKeys(t.Context(), projectID, owner.ID, nil)
+			require.NoError(t, err)
+			assert.Empty(t, got)
+		})
+	})
+}

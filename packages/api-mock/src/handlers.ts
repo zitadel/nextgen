@@ -127,8 +127,8 @@ const IDP_CALLBACK_ERROR_PAGE = `<!doctype html>
  * `httputil.ParseRedirectTarget`, ported as `parseRedirectTarget`, then binds it
  * to the request origin: the `Origin` header, else the request's own host. The
  * callback redirects to this value, so a target the server would refuse would
- * make it an open redirect, and this mock is publicly deployed
- * (`apps/mock-zitadel`). The accepted target is the one stored, as on the
+ * make it an open redirect, and a client that sends one must fail here as it
+ * would against the server. The accepted target is the one stored, as on the
  * engine.
  */
 function returnTargetRefusal(

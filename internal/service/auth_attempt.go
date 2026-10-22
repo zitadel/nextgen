@@ -120,7 +120,7 @@ type AuthAttemptService interface {
 
 type CreateAuthAttemptInput struct {
 	ProjectID string
-	// SessionID is set for step-up auth against an existing session.
+	// SessionID is set for step-up auth against a session the caller proved it holds.
 	SessionID *string
 	// RequiredChecks overrides the project's default policy.
 	// Used by the OIDC adapter (acr_values) and flow engine.
@@ -346,9 +346,12 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 	defer end(&err)
 
 	requiredChecks := input.RequiredChecks
-	if requiredChecks == nil {
-		// TODO: load project default required checks
-	}
+	// A nil RequiredChecks means no explicit policy was pinned: the project
+	// default-required-checks policy is not wired yet. This does not fall open
+	// — [domain.AuthAttempt.IsCompleted] still requires a verified
+	// credential-class factor before handoff/exchange, so the bare identifier
+	// cannot complete an attempt — so leaving the list nil is safe. Populate it
+	// here once the policy engine lands (TODO).
 
 	opts := make([]domain.AuthAttemptOption, 0, 1)
 	if input.SessionID != nil {
