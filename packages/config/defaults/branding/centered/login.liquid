@@ -14,34 +14,24 @@
     {% assign recover = actions | where: "name", "recover" | first %}
     {% assign password_field = fields | where: "type", "password" | first %}
     {% comment %}
-      The account the step signs in to, when the visitor named it earlier: the
-      password step says whose password it asks for, with the way back to the
-      step that collects the identifier. A step with its own way out to sign-in
-      (the SSO conflict step's `sign_in`) keeps only that one.
+      The account the step signs in to, when the visitor named it earlier
+      (`identifier`, which the engine sends on a password step). The template
+      decides what `<zl-account>` shows on each step:
+      - action: the step's `back`, which returns to the step that collected the
+        identifier. A step with its own way out to sign-in (the SSO conflict
+        step's `sign_in`) keeps only that one, so its chip is static.
+      - avatar: generated from what was typed. Left off the sign-up steps,
+        where no account exists yet.
     {% endcomment %}
     {% if identifier and identifier.value != blank %}
       {% assign change_account = actions | where: "kind", "back" | first %}
       {% assign sign_in_action = actions | where: "name", "sign_in" | first %}
-      {% comment %}
-        A full-width chip with the avatar generated from the identifier as
-        typed, never a user id, so it confirms no account. Where it changes
-        the account, the whole chip is the control.
-      {% endcomment %}
-      <div class="zl-card-account" data-testid="zitadel-account">
-        {% if change_account and sign_in_action == nil %}
-          {% assign use_another_account = 'action.use_another_account' | t %}
-          <a href="#" class="zl-card-account__chip" data-action="{{ change_account.name }}" data-testid="zitadel-action-change-account" title="{{ use_another_account }}" aria-label="{{ identifier.value }}, {{ use_another_account }}">
-            <zl-avatar seed="{{ identifier.value }}"></zl-avatar>
-            <span class="zl-card-account__value">{{ identifier.value }}</span>
-            <zl-icon name="arrow-left-right" size="16" decorative></zl-icon>
-          </a>
-        {% else %}
-          <span class="zl-card-account__chip">
-            <zl-avatar seed="{{ identifier.value }}"></zl-avatar>
-            <span class="zl-card-account__value">{{ identifier.value }}</span>
-          </span>
-        {% endif %}
-      </div>
+      <zl-account
+        data-testid="zitadel-account"
+        identifier="{{ identifier.value }}"
+        {% if change_account and sign_in_action == nil %}action="{{ change_account.name }}" label="{{ 'action.use_another_account' | t }}"{% endif %}
+        {% unless step.name contains "register" %}avatar{% endunless %}
+      ></zl-account>
     {% endif %}
 
     <div class="zl-field-group">

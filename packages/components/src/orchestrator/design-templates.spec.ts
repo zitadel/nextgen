@@ -99,9 +99,11 @@ function renderDesign(design: string): string {
 }
 
 /**
- * The account chip on a step that names the visitor's identifier: on the
- * password step the whole chip goes back to change it; on the SSO conflict
- * step, which has its own way out (`sign_in`), it only names the email.
+ * The account chip on a step that names the visitor's identifier. The
+ * template decides what it shows: on the sign-in password step the avatar and
+ * the way back to change the account; on sign-up the way back without the
+ * avatar, since no account exists yet; on the SSO conflict step, which has its
+ * own way out (`sign_in`), the avatar alone.
  */
 describe("account chip", () => {
   const passwordStep = {
@@ -114,6 +116,10 @@ describe("account chip", () => {
     ],
     identifier: { value: "Maya@Example.com" },
   };
+  const signUpStep = {
+    ...passwordStep,
+    step: { name: "register-password", texts: { title_key: "identifier.title" } },
+  };
   const conflictStep = {
     ...passwordStep,
     actions: [
@@ -122,26 +128,34 @@ describe("account chip", () => {
     ],
   };
 
-  function renderWith(design: string, data: Record<string, unknown>): string {
+  function chip(design: string, data: Record<string, unknown>): Element | null {
     const engine = createLiquidEngine({ locale });
-    return createSanitiser()(engine.parseAndRenderSync(templateFor(design), data));
+    const html = createSanitiser()(engine.parseAndRenderSync(templateFor(design), data));
+    const doc = document.createElement("template");
+    doc.innerHTML = html;
+    return doc.content.querySelector('zl-account[data-testid="zitadel-account"]');
   }
 
   for (const design of BRANDING_DESIGNS) {
     describe(design, () => {
-      it("makes the whole chip the way to another account, with the typed identifier's avatar", () => {
-        const html = renderWith(design, passwordStep);
-        expect(html).toMatch(
-          /<a[^>]*class="zl-card-account__chip"[^>]*data-action="back"[^>]*aria-label="Maya@Example.com, Use another account"/,
-        );
-        expect(html).toContain('<zl-avatar seed="Maya@Example.com">');
+      it("signs in: the avatar, and the whole chip goes back to change the account", () => {
+        const account = chip(design, passwordStep);
+        expect(account?.getAttribute("identifier")).toBe("Maya@Example.com");
+        expect(account?.getAttribute("action")).toBe("back");
+        expect(account?.getAttribute("label")).toBe("Use another account");
+        expect(account?.hasAttribute("avatar")).toBe(true);
+      });
+
+      it("signs up: the way back, but no avatar for an account that does not exist yet", () => {
+        const account = chip(design, signUpStep);
+        expect(account?.getAttribute("action")).toBe("back");
+        expect(account?.hasAttribute("avatar")).toBe(false);
       });
 
       it("only names the account on a step with its own way out", () => {
-        const html = renderWith(design, conflictStep);
-        expect(html).toContain('<span class="zl-card-account__chip">');
-        expect(html).toContain('<zl-avatar seed="Maya@Example.com">');
-        expect(html).not.toContain('data-action="back"');
+        const account = chip(design, conflictStep);
+        expect(account?.hasAttribute("action")).toBe(false);
+        expect(account?.hasAttribute("avatar")).toBe(true);
       });
     });
   }

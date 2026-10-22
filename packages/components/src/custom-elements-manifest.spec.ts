@@ -52,6 +52,7 @@ const EXPECTED_TAGS = [
   "zitadel-login",
   "zitadel-logout",
   "zitadel-session",
+  "zl-account",
   "zl-alert",
   "zl-avatar",
   "zl-button",

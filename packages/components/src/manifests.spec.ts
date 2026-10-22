@@ -6,6 +6,7 @@ describe("manifest registry", () => {
   it("exposes the documented atom set", () => {
     expect([...listKnownTags()].sort()).toEqual(
       [
+        "zl-account",
         "zl-alert",
         "zl-avatar",
         "zl-button",

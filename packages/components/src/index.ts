@@ -14,6 +14,7 @@ import "./atoms/index.js";
 import "./orchestrator/index.js";
 
 export {
+  ZlAccount,
   ZlAlert,
   ZlAvatar,
   ZlButton,
@@ -43,6 +44,7 @@ export {
   type SsoProvider,
   type ZlSsoSelectDetail,
   type ZlSubmitDetail,
+  zlAccountManifest,
   zlAlertManifest,
   zlAvatarManifest,
   zlButtonManifest,

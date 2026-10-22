@@ -100,36 +100,24 @@ describe("<zitadel-login> around the step", () => {
   });
 
   describe("the account a step signs in to", () => {
-    it("names it on the password step", async () => {
-      const element = await mount(host);
-      type(element, "email", "alice@acme.com");
-      submit(element);
-
-      const account = await waitFor(() => query(element, '[data-testid="zitadel-account"]'));
-      expect(account.querySelector(".zl-card-account__value")?.textContent).toBe("alice@acme.com");
-    });
-
-    it("shows the avatar generated from the identifier as typed", async () => {
+    it("names it on the password step, with its avatar", async () => {
       const element = await mount(host);
       type(element, "email", "Alice@Acme.com");
       submit(element);
 
       const account = await waitFor(() => query(element, '[data-testid="zitadel-account"]'));
-      expect(account.querySelector("zl-avatar")?.getAttribute("seed")).toBe("Alice@Acme.com");
+      expect(account.getAttribute("identifier")).toBe("Alice@Acme.com");
+      expect(account.hasAttribute("avatar")).toBe(true);
     });
 
     it("changes it by going back to the step that collects it", async () => {
       const element = await mount(host);
       type(element, "email", "alice@acme.com");
       submit(element);
-      const change = await waitFor(() =>
-        query(element, '[data-testid="zitadel-action-change-account"]'),
-      );
-      // The whole chip is the control: named by the account and what it does.
-      expect(change.getAttribute("aria-label")).toBe("alice@acme.com, Use another account");
-      expect(change.querySelector(".zl-card-account__value")?.textContent).toBe("alice@acme.com");
+      const account = await waitFor(() => query(element, '[data-testid="zitadel-account"]'));
+      await (account as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete;
 
-      change.click();
+      account.shadowRoot?.querySelector("a")?.click();
 
       await waitFor(() => query(element, 'zl-field[name="email"]'));
       expect(submittedActions()).toEqual(["submit", "back"]);
