@@ -67,7 +67,9 @@
     "tsconfig.base.json",
     "biome.json",
     "vitest.shared.mjs",
-    "vitest.shared.d.mts"
+    "vitest.shared.d.mts",
+    "vite.shared.mjs",
+    "vite.shared.d.mts"
   ],
   "tasks": {
     // ---- The standard tasks of every TypeScript package (.moon/tasks/
@@ -149,6 +151,8 @@
         "scripts/release-manifest.mjs",
         "scripts/render-builtin-schemas.mjs",
         "scripts/render-builtin-schemas.test.mjs",
+        "vite.shared.mjs",
+        "vite.shared.test.mjs",
         "api/openapi/endpoints/schemas/*.json",
         "scripts/assert-file.mjs",
         "vitest.config.ts"

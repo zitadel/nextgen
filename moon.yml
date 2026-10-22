@@ -106,6 +106,8 @@ tasks:
       - "scripts/release-manifest.mjs"
       - "scripts/render-builtin-schemas.mjs"
       - "scripts/render-builtin-schemas.test.mjs"
+      - "vite.shared.mjs"
+      - "vite.shared.test.mjs"
       # Read by that test: it renders every built-in schema.
       - "api/openapi/endpoints/schemas/*.json"
       # The server's default schema namespace, which the renderer must match.

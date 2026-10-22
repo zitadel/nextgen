@@ -27,6 +27,9 @@ implicitInputs:
   # (and unselected by `moon ci`), running stale config.
   - "/vitest.shared.mjs"
   - "/vitest.shared.d.mts"
+  # The Vite build of the SDKs (`libraryBuild()`); every build task reads it.
+  - "/vite.shared.mjs"
+  - "/vite.shared.d.mts"
 
 tasks:
   # Single standardized linter + formatter for every TypeScript project: Biome
