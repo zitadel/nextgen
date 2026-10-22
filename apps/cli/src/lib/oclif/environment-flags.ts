@@ -1,4 +1,4 @@
-import { shellArg } from "../shell";
+import { shellOption } from "../shell";
 import { nonBlankString } from "./flags";
 import { asEnvironmentSelector, type EnvironmentSelector } from "../suggestion";
 
@@ -63,16 +63,16 @@ export function environmentSelectorSuffix(input: {
 }): EnvironmentSelector {
   const parts: string[] = [];
   if (input.envFile !== undefined) {
-    parts.push(`--env-file ${shellArg(input.envFile)}`);
+    parts.push(shellOption("--env-file", input.envFile));
   } else if (input.envName !== undefined) {
-    parts.push(`--env ${shellArg(input.envName)}`);
+    parts.push(shellOption("--env", input.envName));
   }
   if (input.server !== undefined) {
-    parts.push(`--server ${shellArg(input.server)}`);
+    parts.push(shellOption("--server", input.server));
   }
   // Last, as the least interesting part to read; flag order does not matter.
   if (input.cwd !== undefined) {
-    parts.push(`--cwd ${shellArg(input.cwd)}`);
+    parts.push(shellOption("--cwd", input.cwd));
   }
   return asEnvironmentSelector(parts.length === 0 ? "" : ` ${parts.join(" ")}`);
 }

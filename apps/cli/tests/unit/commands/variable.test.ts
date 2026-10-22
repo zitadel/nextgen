@@ -110,11 +110,17 @@ describe("variable list", () => {
       };
     };
     expect(json.status).toBe("ok");
-    expect(json.data.count).toBe(2);
+    expect(json.data.count).toBe(3);
     expect(json.data.next_page_token).toBeNull();
     expect(json.data.items).toEqual([
-      { name: "GOOGLE_CLIENT_ID", secret: false, value: "999-prod" },
+      {
+        name: "GOOGLE_CLIENT_ID",
+        secret: false,
+        value: "999-prod",
+        preview: { secret: false, value: "999-test" },
+      },
       { name: "GOOGLE_CLIENT_SECRET", secret: true },
+      { name: "PREVIEW_ONLY", secret: false, preview: { secret: false, value: "x" } },
     ]);
     // One owner, so the envelope states none: a permanent `null` would read as
     // a value the run could have chosen.
@@ -133,7 +139,7 @@ describe("variable list", () => {
     expect(json.data.items[0]).not.toHaveProperty("value");
   });
 
-  it("reads the primary values", async () => {
+  it("reads both kinds for the inventory, naming no kind", async () => {
     const cwd = await makeProject();
     let seen: string | null = "unset";
     server.use(
@@ -146,7 +152,7 @@ describe("variable list", () => {
     const res = await runCliForTest(["variable", "list", ...base(cwd)]);
 
     expect(res.exitCode).toBe(0);
-    expect(seen).toBe("primary");
+    expect(seen).toBeNull();
     const json = parseJson(res.stdout) as { data: { count: number } };
     expect(json.data.count).toBe(0);
   });
@@ -184,7 +190,7 @@ describe("variable list", () => {
     const empty = await runCliForTest(["variable", "list", ...plainArgs(cwd)]);
 
     expect(rows.exitCode).toBe(0);
-    expect(rows.stdout.trim().split("\n")).toEqual(["A\t(secret)", "B\ttwo"]);
+    expect(rows.stdout.trim().split("\n")).toEqual(["A\t(secret)\t-", "B\ttwo\t-"]);
     expect(empty.exitCode).toBe(0);
     expect(empty.stdout.trim()).toBe("");
   });
@@ -253,7 +259,7 @@ describe("variable list", () => {
     expect(piped.exitCode).toBe(0);
     expect(piped.stdout).not.toContain("Project   ");
     expect(piped.stdout).not.toContain("Server    ");
-    expect(piped.stdout.trim()).toBe("A\tb");
+    expect(piped.stdout.trim()).toBe("A\tb\t-");
     expect(terminal.stdout).toContain("proj_test");
     expect(terminal.stdout).toContain(DEFAULT_SERVER);
   });

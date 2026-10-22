@@ -1,4 +1,5 @@
 import { Args, Flags } from "@oclif/core";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
@@ -111,10 +112,19 @@ export default class VariableSet extends EnvironmentCommand {
     // would freeze the credential in the clear. A token that may not read the
     // primary values leaves the check to whoever can.
     if (flags.preview && !flags.secret) {
+      // Only a refusal is tolerated, and only because the check then belongs to
+      // whoever can read the primary values. Any other failure leaves the
+      // classification unknown, and writing on an unknown would be the one
+      // outcome this guard exists to prevent: a credential stored in the clear.
       const held = await client
         .getVariables({ project_id: projectId, kind: "primary" })
         .then((body) => body[name]?.primary)
-        .catch(() => undefined);
+        .catch((error: unknown) => {
+          if (error instanceof ApiError && error.status === 403) {
+            return undefined;
+          }
+          throw error;
+        });
       if (typeof held === "object" && held !== null) {
         throw new ZitadelError(
           "E_VALIDATION",

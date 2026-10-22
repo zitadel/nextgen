@@ -12,6 +12,7 @@ type Live = {
   targets: { origin: string; expires_at: string | null }[];
   sha?: string;
   release?: string;
+  dirty?: boolean;
 };
 
 let cwd: string;
@@ -39,7 +40,7 @@ function ctx(live: Live[], json = false): StepContext {
         deployments: live.map((deployment) => ({
           targets: deployment.targets,
           release_id: deployment.release ?? "rel_1",
-          release: { metadata: { git_sha: deployment.sha } },
+          release: { metadata: { git_sha: deployment.sha, git_dirty: deployment.dirty ?? false } },
         })),
       }),
     } as never,
@@ -69,6 +70,18 @@ describe("diffStep", () => {
     await diffStep.run(ctx([{ targets: [PRIMARY], sha: "0123456789abcdef" }]));
 
     expect(written.join("")).toContain("0123456789ab is not in this repository's history");
+  });
+
+  it("refuses to diff against a release built from an uncommitted tree", async () => {
+    await diffStep.run(ctx([{ targets: [PRIMARY], sha: "0123456789abcdef", dirty: true }]));
+
+    expect(written.join("")).toContain("No reliable diff available");
+  });
+
+  it("names the uncommitted baseline's commit, so the reader can check it", async () => {
+    await diffStep.run(ctx([{ targets: [PRIMARY], sha: "0123456789abcdef", dirty: true }]));
+
+    expect(written.join("")).toContain("0123456789ab");
   });
 
   it("never takes a live preview as the baseline", async () => {

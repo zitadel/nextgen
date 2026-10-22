@@ -88,4 +88,13 @@ describe("environmentSelectorSuffix", () => {
   it("quotes a value the shell would split", () => {
     expect(environmentSelectorSuffix({ cwd: "my app" })).toBe(" --cwd 'my app'");
   });
+
+  it.each([
+    ["an environment name", { envName: "--force" }, " --env=--force"],
+    ["an env file", { envFile: "--force" }, " --env-file=--force"],
+    ["a server", { server: "--force" }, " --server=--force"],
+    ["a directory", { cwd: "--force" }, " --cwd=--force"],
+  ])("joins a dash-prefixed %s to its flag, so the retry parses", (_name, input, expected) => {
+    expect(environmentSelectorSuffix(input)).toBe(expected);
+  });
 });

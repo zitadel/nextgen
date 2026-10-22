@@ -1,3 +1,4 @@
+import { brandingReferencePaths } from "../../branding";
 import { diffConfigAgainst } from "../git";
 import type { Step, StepContext } from "../pipeline";
 import { listLiveDeployments, servesPrimary } from "../deployment";
@@ -28,9 +29,19 @@ export const diffStep: Step = {
     });
     // What the primary origins serve: a live preview deployment is never the
     // baseline, even when it is the newest one in the project.
-    const sha = deployments.find(servesPrimary)?.release?.metadata?.git_sha;
+    const live = deployments.find(servesPrimary)?.release?.metadata;
+    const sha = live?.git_sha;
     if (!sha) {
       note("No diff available: nothing is deployed yet, or the live release has no commit.");
+      return;
+    }
+    // A release built from an uncommitted tree records the commit it was built
+    // from, not the content it pinned, so a diff against it can come back empty
+    // while this deploy would still change what is live.
+    if (live?.git_dirty) {
+      note(
+        `No reliable diff available: the live release was built from an uncommitted tree at ${sha.slice(0, 12)}.`,
+      );
       return;
     }
 
@@ -44,7 +55,10 @@ export const diffStep: Step = {
       );
     }
 
-    const diff = await diffConfigAgainst(ctx.cwd, sha, ctx.color);
+    const referenced = ctx.brandingSources.flatMap((descriptor) =>
+      brandingReferencePaths(ctx.cwd, descriptor),
+    );
+    const diff = await diffConfigAgainst(ctx.cwd, sha, ctx.color, referenced);
     if (diff === null) {
       note(`No diff available: ${sha.slice(0, 12)} is not in this repository's history.`);
       return;
