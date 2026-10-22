@@ -145,7 +145,11 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 	if connErr != nil {
 		return c.fail(ctx, projectID, check, connErr, domain.EventTypeAuthSSOExchangeFailed)
 	}
-	identity, err := c.exchange(ctx, projectID, in.Code, pending, conn)
+	deploymentID, err := c.deploymentID(ctx, projectID, check.AuthAttemptID)
+	if err != nil {
+		return c.fail(ctx, projectID, check, err, domain.EventTypeAuthSSOExchangeFailed)
+	}
+	identity, err := c.exchange(ctx, projectID, deploymentID, in.Code, pending, conn)
 	if err != nil {
 		return c.fail(ctx, projectID, check, err, domain.EventTypeAuthSSOExchangeFailed)
 	}
@@ -174,11 +178,25 @@ func (c *FlowSSOCallback) pinnedConnection(ctx context.Context, projectID string
 	return idp.ParseConnection(connection.RevisionID, connection.Document)
 }
 
-func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, code string, pending *domain.SSOStatePayload, conn idp.Connection) (idp.ExternalIdentity, error) {
-	if err := resolveSSOClientID(ctx, c.variables, projectID, &conn); err != nil {
+func (c *FlowSSOCallback) deploymentID(ctx context.Context, projectID, attemptID string) (string, error) {
+	if attemptID == "" {
+		return "", nil
+	}
+	attempt, err := c.attempts.GetByID(ctx, projectID, attemptID)
+	if err != nil {
+		return "", err
+	}
+	if attempt == nil {
+		return "", nil
+	}
+	return attempt.DeploymentID, nil
+}
+
+func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, deploymentID, code string, pending *domain.SSOStatePayload, conn idp.Connection) (idp.ExternalIdentity, error) {
+	if err := resolveSSOClientID(ctx, c.variables, projectID, deploymentID, &conn); err != nil {
 		return idp.ExternalIdentity{}, err
 	}
-	secret, err := c.resolveClientSecret(ctx, projectID, conn)
+	secret, err := c.resolveClientSecret(ctx, projectID, deploymentID, conn)
 	if err != nil {
 		return idp.ExternalIdentity{}, err
 	}
@@ -200,9 +218,10 @@ func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, code string, 
 	})
 }
 
-// resolveClientSecret reads the secret for the token exchange from the
-// project's variables.
-func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID string, conn idp.Connection) (string, error) {
+// resolveClientSecret reads the secret for the token exchange. A sealed
+// deployment reads the ciphertext its set froze and decrypts it. No sealed
+// deployment reads the live primary secret.
+func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID, deploymentID string, conn idp.Connection) (string, error) {
 	name, ok := domain.VariableReferenceName(conn.OIDC.ClientSecretRef)
 	if !ok {
 		// The schema accepts only a whole-value `${{ NAME }}` reference. The
@@ -210,18 +229,33 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID str
 		// logged.
 		return "", errors.New("client_secret is not a variable reference")
 	}
-	// The primary value, as the redirect resolved the client_id.
-	// TODO: take the kind from the origin the request came in on once the
-	// release runtime resolves it, so a preview sign-in reads preview values.
-	vars, err := c.variables.GetDecryptedVariables(ctx, domain.VariableOwner{ProjectID: projectID}, new(domain.DeploymentOriginKindPrimary), name)
-	if err != nil {
-		return "", err
-	}
 	secret := ""
-	// A plain variable is refused: it is readable through the variables
-	// surface, and refusing it makes the misconfiguration visible.
-	if len(vars) == 1 && vars[0].IsSecret {
-		secret, _ = vars[0].Value.(string)
+	if deploymentID != "" {
+		set, err := c.variables.GetDeploymentVariables(ctx, projectID, deploymentID)
+		if err != nil {
+			return "", err
+		}
+		if set == nil {
+			return "", errNoFrozenVariables
+		}
+		variable := set.Variables()[name]
+		// A plain variable is refused: it is readable through the variables
+		// surface, and refusing it makes the misconfiguration visible.
+		if variable != nil && variable.IsSecret {
+			plain, err := variable.GetDecryptedValue(decrypterOfWritingKey(ctx, c.keys))
+			if err != nil {
+				return "", err
+			}
+			secret, _ = plain.(string)
+		}
+	} else {
+		vars, err := c.variables.GetDecryptedVariables(ctx, domain.VariableOwner{ProjectID: projectID}, new(domain.DeploymentOriginKindPrimary), name)
+		if err != nil {
+			return "", err
+		}
+		if len(vars) == 1 && vars[0].IsSecret {
+			secret, _ = vars[0].Value.(string)
+		}
 	}
 	if secret == "" {
 		return "", fmt.Errorf("client_secret variable %q is missing, not a secret, or not a string", name)

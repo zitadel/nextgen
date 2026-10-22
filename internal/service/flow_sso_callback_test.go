@@ -512,3 +512,61 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 		})
 	}
 }
+
+func TestFlowSSOCallback_FrozenSecret(t *testing.T) {
+	t.Parallel()
+	const keyID = "key-1"
+	ciphertext, err := testCrypter(keyID).Encrypt(`"secret-1"`)
+	require.NoError(t, err)
+	set, err := domain.NewVariableSet("proj-1", []*domain.Variable{{
+		Name: "GOOGLE_SECRET", Value: ciphertext, IsSecret: true,
+	}})
+	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	doc, _ := ssoCallbackProvider(t)
+	connections := servicemocks.NewMockIDPConnectionService(ctrl)
+	connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+		Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: doc}, nil)
+	variables := servicemocks.NewMockVariableService(ctrl)
+	variables.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").Return(set, nil)
+	keys := servicemocks.NewMockKeyService(ctrl)
+	keys.EXPECT().GetCrypter(gomock.Any(), keyID, jose.A256GCM).Return(testCrypter(keyID), nil)
+	attempts := &fakeAuthAttempts{
+		consumeCheck:  &domain.SSOCallbackCheck{AuthAttemptID: "attempt-1", Pending: ssoCallbackPending()},
+		createAttempt: &domain.AuthAttempt{ID: "attempt-1", DeploymentID: "dep_1"},
+	}
+	svc := service.NewFlowSSOCallback(connections, attempts, keys, variables, &http.Client{})
+
+	out, err := svc.Process(t.Context(), service.FlowSSOCallbackInput{
+		ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code", BindingNonce: "bind-1",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://app.example.com/login?flow=flow-1", out.ReturnTarget)
+	require.NotNil(t, attempts.setResult)
+	assert.Equal(t, "user-1", attempts.setResult.Subject)
+	assert.Equal(t, "attempt-1", attempts.getByIDAttemptID)
+}
+
+func TestFlowSSOCallback_SealedDeploymentWithoutVariablesFailsTheStep(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	connections := servicemocks.NewMockIDPConnectionService(ctrl)
+	connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+		Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: ssoConnectionDocument(false)}, nil)
+	variables := servicemocks.NewMockVariableService(ctrl)
+	variables.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").
+		Return(nil, errors.New("deployment has no frozen variables"))
+	attempts := &fakeAuthAttempts{
+		consumeCheck:  &domain.SSOCallbackCheck{AuthAttemptID: "attempt-1", Pending: ssoCallbackPending()},
+		createAttempt: &domain.AuthAttempt{ID: "attempt-1", DeploymentID: "dep_1"},
+	}
+	svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), variables, &http.Client{Transport: tripwireTransport{t}})
+
+	out, err := svc.Process(t.Context(), service.FlowSSOCallbackInput{
+		ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code", BindingNonce: "bind-1",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.FlowStepErrorSSOFailed, attempts.setResult.ErrorKey)
+	assert.Equal(t, "https://app.example.com/login?flow=flow-1", out.ReturnTarget)
+}

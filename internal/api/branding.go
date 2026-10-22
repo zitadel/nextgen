@@ -62,30 +62,61 @@ func (h *Handler) ListBranding(ctx context.Context, params api.ListBrandingParam
 	return &resp, nil
 }
 
-// resolveBranding resolves the branding a flow response should carry: the
-// latest stored revision for the project, or the built-in default (ADR 040).
-// Resolution failures degrade to the default on purpose — a broken branding
-// lookup must never take the login down.
+// flowBrandingReader is the branding lookups a flow response needs. The
+// concrete service satisfies it; tests pass a fake.
+type flowBrandingReader interface {
+	Get(ctx context.Context, projectID, id string) (*domain.Branding, error)
+	GetLatest(ctx context.Context, projectID string) (*domain.Branding, error)
+}
+
+// resolveBranding resolves the branding a flow response should carry. A
+// release that pins a flow serves the branding revision it pins, or the
+// built-in default when it pins none. Otherwise the latest stored revision
+// is served, or the built-in default (ADR 040). Resolution failures degrade
+// to the default on purpose — a broken branding lookup must never take the
+// login down.
 func (h *Handler) resolveBranding(ctx context.Context, projectID string) api.Branding {
 	if h.brandingService == nil || projectID == "" {
 		return defaultBranding()
 	}
-	branding, err := h.brandingService.GetLatest(ctx, projectID)
+	return resolveFlowBranding(ctx, h.brandingService, projectID)
+}
+
+func resolveFlowBranding(ctx context.Context, reader flowBrandingReader, projectID string) api.Branding {
+	if service.ReleasePinsFlow(ctx) {
+		id, ok := service.PinsFor(service.ReleaseFromContext(ctx), domain.ReleasePointerKindBranding)[domain.ReleaseBrandingHandle]
+		if !ok {
+			return defaultBranding()
+		}
+		branding, err := reader.Get(ctx, projectID, id)
+		if err != nil || branding == nil {
+			if err != nil {
+				warnBrandingDegraded(ctx, projectID, err)
+			}
+			return defaultBranding()
+		}
+		return toAPIBranding(branding)
+	}
+	branding, err := reader.GetLatest(ctx, projectID)
 	if err != nil {
-		// Deliberate degrade, but never a silent one: without this line a
-		// flaky lookup presents as "my branding intermittently disappears"
-		// with nothing to grep for.
-		zlog.GetLoggingContext(ctx).Warn(
-			"branding resolution failed; serving default branding",
-			"project_id", projectID,
-			"err", err,
-		)
+		warnBrandingDegraded(ctx, projectID, err)
 		return defaultBranding()
 	}
 	if branding == nil {
 		return defaultBranding()
 	}
 	return toAPIBranding(branding)
+}
+
+func warnBrandingDegraded(ctx context.Context, projectID string, err error) {
+	// Deliberate degrade, but never a silent one: without this line a
+	// flaky lookup presents as "my branding intermittently disappears"
+	// with nothing to grep for.
+	zlog.GetLoggingContext(ctx).Warn(
+		"branding resolution failed; serving default branding",
+		"project_id", projectID,
+		"err", err,
+	)
 }
 
 // defaultBranding is the fallback when a project has no stored branding
