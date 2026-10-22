@@ -146,6 +146,14 @@ describe("env add", () => {
       }
     });
 
+    it("quotes the app-url placeholder a person reads, so a paste cannot redirect", async () => {
+      const cwd = await makeProject("next");
+
+      const out = await addRendered(cwd, "--project", "proj_existing");
+
+      expect(out).toContain("origin add '<your-app-url>' --kind primary");
+    });
+
     it("offers no origin add without an app URL to add", async () => {
       const cwd = await makeProject("next");
 
