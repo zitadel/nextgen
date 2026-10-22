@@ -26,8 +26,7 @@ const docs = defineDocs({
   docs: {
     schema: pageSchema,
     // Fumadocs' defaults, the code blocks in the console's colours.
-    mdxOptions: (environment) =>
-      applyMdxPreset({ rehypeCodeOptions: codeOptions })(environment),
+    mdxOptions: (environment) => applyMdxPreset({ rehypeCodeOptions: codeOptions })(environment),
     postprocess: {
       // An API tag's page lists the tag's operations with <Operations />,
       // which its Markdown renders as the page does (pageText).
