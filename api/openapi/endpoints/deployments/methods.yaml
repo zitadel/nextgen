@@ -1,5 +1,6 @@
 post:
   operationId: createDeployment
+  x-zitadel-cli: deployment create
   summary: Create a deployment
   description: |
     Makes a release live on its targets by recording a deployment,
@@ -237,6 +238,7 @@ post:
       $ref: createDeployment-error-response.yaml
 get:
   operationId: listDeployments
+  x-zitadel-cli: deployment list
   summary: List deployments
   description: |
     Lists what ran where, and when.

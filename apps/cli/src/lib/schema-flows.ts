@@ -33,8 +33,8 @@ function flowUsesSchema(
   if (typeof used !== "string") {
     return false;
   }
-  // The same order `plan` and `apply` resolve a flow's schema in
-  // (`pinnedSchemaPath` in lib/sync/sso-validation.ts): `objectType` first.
+  // The same order `deploy` resolves a flow's schema in
+  // (`pinnedSchemaPath` in lib/release/steps/sso-consistency.ts): `objectType` first.
   const objectType = schema.body.objectType;
   if (typeof objectType === "string" && used === objectType) {
     return true;
@@ -60,10 +60,9 @@ function flowUsesSchema(
 
 /**
  * The platform ids a local file is known by, from `.zitadel/state.json`: the
- * id it was last synced as, and the one it replaced. `apply` records the
- * replaced id before it re-pins the flows, so a flow left behind by an
- * interrupted run still names it, and must still count as this schema's flow.
- * Absent before the first `apply`, and absent entirely on a Project that has
+ * id it was last synced as, and the one it replaced. `setup` records them, and a
+ * flow left behind by an interrupted run may still name the replaced id, so it
+ * must still count as this schema's flow. Absent before the first sync, and absent entirely on a Project that has
  * never synced — both mean "fall back to matching on the scaffolded URL".
  *
  * Only a missing file falls back. A malformed or unreadable state file is the
@@ -104,7 +103,7 @@ async function publishedIdsOf(cwd: string, path: string): Promise<string[]> {
       {
         hint:
           "The file records which platform resource each local file was synced as. " +
-          "Fix or remove it and run `zitadel apply`, then run this command again.",
+          "Fix or remove it, then run this command again.",
         details: { file: ".zitadel/state.json" },
       },
     );

@@ -10,7 +10,7 @@ import { InlineCode } from "@/components/ui/inline-code";
 const CLI = "npx @zitadel/cli@latest";
 
 /** `apply`: writes the local definitions to the project. */
-export const CLI_APPLY = `${CLI} apply`;
+export const CLI_DEPLOY = `${CLI} deploy`;
 
 /**
  * The server the CLI targets when nothing names one: its hosted default

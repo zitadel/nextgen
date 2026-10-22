@@ -22,7 +22,7 @@ Both render every step of your login flow — sign-in, registration, passkey cer
 npx @zitadel/cli@latest branding eject
 ```
 
-`branding eject` offers the two starter designs above, then scaffolds `.zitadel/branding/` locally — nothing is uploaded until you apply:
+`branding eject` offers the two starter designs above, then scaffolds `.zitadel/branding/` locally — nothing is uploaded until you deploy:
 
 - `branding.json` — the descriptor: layout, brand asset URLs, and the template reference.
 - `login.liquid` — the LiquidJS template the login renders for every step.
@@ -30,7 +30,7 @@ npx @zitadel/cli@latest branding eject
 
 ## Add your branding
 
-Brand assets live in `branding.json` and must be hosted `https://` URLs. While you develop, images may also use `http://` on `localhost`, a `127.x.x.x` address, or `[::1]`; the login shows them only when its own page runs on one of those hosts. The CLI validates the URLs at plan time, and the server rejects anything else:
+Brand assets live in `branding.json` and must be hosted `https://` URLs. While you develop, images may also use `http://` on `localhost`, a `127.x.x.x` address, or `[::1]`; the login shows them only when its own page runs on one of those hosts. The CLI validates the URLs before it deploys, and the server rejects anything else:
 
 ```json
 {
@@ -45,7 +45,7 @@ Brand assets live in `branding.json` and must be hosted `https://` URLs. While y
 }
 ```
 
-Each design decides which images it shows: `centered` shows the logo, `minimal` shows none, and neither shows `hero_url`. A URL the design doesn't use is stored but not shown, and `plan` still checks it.
+Each design decides which images it shows: `centered` shows the logo, `minimal` shows none, and neither shows `hero_url`. A URL the design doesn't use is stored but not shown, and `deploy` still checks it.
 
 `typography.font_family` sets the typeface for body and headings; include a generic family as a fallback. `typography.font_url` is a stylesheet that loads the face. It needs a `font_family`, must be `https://`, and is loaded only when the login runs as `variant="page"`. Setup generates page-variant sign-in pages only when it creates the Next.js or Nuxt app itself, in an empty directory. In a Next.js or Nuxt app that already exists, even a new one, and in every SPA template, the login runs as a widget, so load the font from your own page there.
 
@@ -56,11 +56,11 @@ Without `font_url` the login loads no font of its own: it renders in Arimo where
 Branding follows the same loop as schemas and flows:
 
 ```sh
-npx @zitadel/cli@latest plan
-npx @zitadel/cli@latest apply
+npx @zitadel/cli@latest deploy --dry-run
+npx @zitadel/cli@latest deploy
 ```
 
-`plan` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the pending change; `apply` publishes it. Every publish creates an immutable revision — there is no in-place update, and rolling back means re-applying an earlier template. The live login picks up the newest revision on its next step response.
+`deploy --dry-run` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the diff; `deploy` publishes it as part of the release. Every publish creates an immutable revision — there is no in-place update, and rolling back means deploying an earlier release. The live login picks up the newest revision on its next step response.
 
 The scaffolded `README.md` in `.zitadel/branding/` documents the template rules (compose `zl-*` components, no `<script>` or `<style>` tags or inline event handlers, copy through translation keys).
 

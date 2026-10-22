@@ -231,7 +231,7 @@ describe("setup command", () => {
     });
     expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
     expect(json.data.next_commands[2]).toMatch(
-      /^npx @zitadel\/cli@\S+ plan --env-file \.env\.development\.local/,
+      /^npx @zitadel\/cli@\S+ deploy --dry-run --env-file \.env\.development\.local/,
     );
   });
 
@@ -551,7 +551,7 @@ describe("setup command", () => {
       expect(json.data.files_written).toContain(expectedFile);
       expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
       expect(json.data.next_commands[2]).toMatch(
-        /^npx @zitadel\/cli@\S+ plan --env-file \.env\.development\.local/,
+        /^npx @zitadel\/cli@\S+ deploy --dry-run --env-file \.env\.development\.local/,
       );
     },
   );

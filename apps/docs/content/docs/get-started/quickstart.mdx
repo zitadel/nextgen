@@ -96,11 +96,11 @@ npx @zitadel/cli@latest console
 Setup scaffolded editable copies of your user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/` — each folder has a README explaining what you can change. Edit the files, then preview and publish:
 
 ```sh
-npx @zitadel/cli@latest plan
-npx @zitadel/cli@latest apply
+npx @zitadel/cli@latest deploy --dry-run
+npx @zitadel/cli@latest deploy
 ```
 
-[Edit the login flow and schema](/docs/guides/plan-apply) walks through adding a `company` field to registration.
+See [Deploy](/docs/guides/deploy) for a walkthrough that adds a `company` field to registration.
 
 ## Stop or reset
 

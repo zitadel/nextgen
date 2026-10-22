@@ -101,7 +101,7 @@ export function normalizePublicCliCommands<T extends string>(
  * command — that is the canonical, readable spelling — but the CLI is not a
  * dependency of the scaffolded app, so the bare command does not exist on
  * the user's PATH (and `npx zitadel` would fetch an unrelated npm package).
- * Covers inline code spans (`` `zitadel plan` ``) and fenced-block lines
+ * Covers inline code spans (`` `zitadel deploy` ``) and fenced-block lines
  * that start with `zitadel `; prose file names like `zitadel.json` and
  * `zitadel.db` don't match because the word must end the span or be
  * followed by a space.

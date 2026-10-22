@@ -6,8 +6,7 @@ import { BlockList, isIP } from "node:net";
 import { consola } from "consola";
 import { Agent, type Dispatcher } from "undici";
 
-import { userAgentInterceptor } from "../user-agent";
-import type { SyncAction, SyncActionWarning } from "./types.js";
+import { userAgentInterceptor } from "../../user-agent";
 
 /**
  * Branding descriptor fields whose value is a URL the login page fetches as
@@ -18,7 +17,7 @@ const ASSET_FIELDS = ["logo_url", "hero_url"] as const;
 
 /**
  * Per-URL probe budget. Short on purpose: this runs on the critical path of
- * every `plan` and `apply`, and a dead host that never answers must cost a
+ * every `deploy` and `preview`, and a dead host that never answers must cost a
  * couple of seconds, not a hung command.
  */
 const DEFAULT_TIMEOUT_MS = 2500;
@@ -30,7 +29,7 @@ const MAX_REDIRECTS = 5;
  * Addresses an untrusted descriptor must never make the planning host contact.
  * The browser-side render gate still supports canonical loopback HTTP for local
  * development; the CLI probe deliberately leaves those URLs inconclusive
- * instead of turning `plan` over repo content into a localhost/network scanner.
+ * instead of turning `deploy` over repo content into a localhost/network scanner.
  */
 const UNSAFE_IPV4_ADDRESSES = new BlockList();
 for (const [network, prefix] of [
@@ -81,52 +80,36 @@ export type AssetProbeVerdict =
   | { kind: "content-type"; contentType: string };
 
 /**
- * Annotate every branding action in a plan with warnings for asset URLs that
- * are well-formed but will not render: an unreachable host, a non-2xx status,
- * or a response that is not an image.
+ * Probe every asset URL the bundle's branding descriptors carry and return one
+ * warning line per URL that is well-formed but will not render: an unreachable
+ * host, a non-2xx status, or a response that is not an image.
  *
  * Why the CLI probes at all: a bad `logo_url` clears every gate on the way in
  * (the CLI's Zod shape check, the server's save gate) and then fails silently
- * in the browser as a 0×0 `<img>` — no plan output, no apply output, no
- * console error. The probe is the only place in the pipeline that can see it.
+ * in the browser as a 0×0 `<img>` — no deploy output, no console error. The
+ * probe is the only place in the pipeline that can see it.
  *
  * Deliberately non-fatal and best-effort. A developer on a plane, behind a
  * proxy, or pointing at a CDN that only resolves from production gets a
- * warning, never a failed plan — the machine running `plan` is not
+ * warning, never a failed deploy — the machine running `deploy` is not
  * necessarily the machine that renders the login page. Set
  * `ZITADEL_SKIP_ASSET_PROBE` to turn it off entirely, and
  * `ZITADEL_ASSET_PROBE_TIMEOUT_MS` to retune the per-URL budget. Only public
  * HTTPS destinations are contacted: loopback/private/internal targets and
- * redirects to them stay inconclusive so repo config cannot scan the planning
+ * redirects to them stay inconclusive so repo config cannot scan the running
  * host's network.
- *
- * Mutates `actions` in place, like {@link validatePlannedFlows} — the caller
- * (`buildSyncPlan`) owns the array it just built.
  */
-export async function annotateAssetWarnings(actions: SyncAction[]): Promise<void> {
+export async function brandingAssetWarnings(brandings: ReadonlyArray<object>): Promise<string[]> {
   if (process.env.ZITADEL_SKIP_ASSET_PROBE) {
     consola.debug("Branding asset probe skipped (ZITADEL_SKIP_ASSET_PROBE is set)");
-    return;
-  }
-
-  const targets = actions.filter(
-    (action): action is Extract<SyncAction, { kind: "create" | "update" | "revise" }> =>
-      (action.kind === "create" || action.kind === "update" || action.kind === "revise") &&
-      action.syncer.kind === "branding",
-  );
-  if (targets.length === 0) {
-    return;
+    return [];
   }
 
   // One probe per distinct URL: the same logo referenced twice is one request.
-  const urls = new Set<string>();
-  for (const action of targets) {
-    for (const { url } of assetUrlsOf(action.content)) {
-      urls.add(url);
-    }
-  }
+  const fields = brandings.flatMap((branding) => assetUrlsOf(branding));
+  const urls = new Set(fields.map(({ url }) => url));
   if (urls.size === 0) {
-    return;
+    return [];
   }
 
   const timeoutMs = probeTimeoutMs();
@@ -141,18 +124,14 @@ export async function annotateAssetWarnings(actions: SyncAction[]): Promise<void
     ),
   );
 
-  for (const action of targets) {
-    const warnings: SyncActionWarning[] = [];
-    for (const { field, url } of assetUrlsOf(action.content)) {
-      const warning = describeVerdict(field, url, verdicts.get(url) ?? { kind: "inconclusive" });
-      if (warning) {
-        warnings.push(warning);
-      }
-    }
-    if (warnings.length > 0) {
-      action.warnings = [...(action.warnings ?? []), ...warnings];
+  const warnings: string[] = [];
+  for (const { field, url } of fields) {
+    const warning = describeVerdict(field, url, verdicts.get(url) ?? { kind: "inconclusive" });
+    if (warning) {
+      warnings.push(warning);
     }
   }
+  return warnings;
 }
 
 /**
@@ -356,40 +335,32 @@ function describeVerdict(
   field: string,
   url: string,
   verdict: AssetProbeVerdict,
-): SyncActionWarning | undefined {
+): string | undefined {
   switch (verdict.kind) {
     case "ok":
     case "inconclusive":
       return undefined;
     case "status":
-      return {
-        rule: "warn/asset-unreachable",
-        message:
-          `${field} ${url} returned HTTP ${verdict.status} — the login page renders a ` +
-          `well-formed URL that serves nothing as a 0×0 image, with no error anywhere.`,
-      };
+      return (
+        `${field} ${url} returned HTTP ${verdict.status} — the login page renders a ` +
+        `well-formed URL that serves nothing as a 0×0 image, with no error anywhere.`
+      );
     case "empty":
-      return {
-        rule: "warn/asset-unreachable",
-        message:
-          `${field} ${url} returned HTTP ${verdict.status} with no representation — the login ` +
-          `page has no image bytes to render.`,
-      };
+      return (
+        `${field} ${url} returned HTTP ${verdict.status} with no representation — the login ` +
+        `page has no image bytes to render.`
+      );
     case "unreachable":
-      return {
-        rule: "warn/asset-unreachable",
-        message:
-          `${field} ${url} could not be reached (${verdict.detail}) — the login page renders ` +
-          `an unreachable URL as a 0×0 image. Ignore this if the host is only reachable from ` +
-          `where the login page renders; set ZITADEL_SKIP_ASSET_PROBE to stop checking.`,
-      };
+      return (
+        `${field} ${url} could not be reached (${verdict.detail}) — the login page renders ` +
+        `an unreachable URL as a 0×0 image. Ignore this if the host is only reachable from ` +
+        `where the login page renders; set ZITADEL_SKIP_ASSET_PROBE to stop checking.`
+      );
     case "content-type":
-      return {
-        rule: "warn/asset-content-type",
-        message:
-          `${field} ${url} responded with content-type "${verdict.contentType}", not an image — ` +
-          `the login page renders a non-image response as a 0×0 image.`,
-      };
+      return (
+        `${field} ${url} responded with content-type "${verdict.contentType}", not an image — ` +
+        `the login page renders a non-image response as a 0×0 image.`
+      );
   }
 }
 

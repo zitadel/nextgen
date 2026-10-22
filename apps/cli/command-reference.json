@@ -561,11 +561,17 @@
       ]
     },
     {
-      "id": "plan",
+      "id": "deploy",
       "group": "Configuration commands",
-      "description": "Validate config without mutation and preview the sync diff.",
+      "description": "Build a release from .zitadel/ and deploy it to the project.",
       "args": [],
       "flags": [
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of what this release changes.",
+          "type": "option"
+        },
         {
           "name": "env",
           "char": "e",
@@ -578,27 +584,14 @@
           "type": "option"
         }
       ],
-      "examples": []
-    },
-    {
-      "id": "apply",
-      "group": "Configuration commands",
-      "description": "Validate and upload repo config to the platform.",
-      "args": [],
-      "flags": [
+      "examples": [
         {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
+          "command": "deploy -m 'add phone_number to human-user'"
         },
         {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
-          "type": "option"
+          "command": "deploy --dry-run"
         }
-      ],
-      "examples": []
+      ]
     },
     {
       "id": "branding eject",
@@ -896,6 +889,182 @@
       ]
     },
     {
+      "id": "deployment create",
+      "group": "Configuration commands",
+      "description": "Deploy an existing release to the project's origins.",
+      "args": [],
+      "flags": [
+        {
+          "name": "release",
+          "description": "The release id to deploy.",
+          "type": "option",
+          "required": true
+        },
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of why this deploys.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
+        }
+      ]
+    },
+    {
+      "id": "deployment get",
+      "group": "Configuration commands",
+      "description": "Read one deployment by id.",
+      "args": [
+        {
+          "name": "deployment_id",
+          "description": "The deployment to read.",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "deployment get dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
+        }
+      ]
+    },
+    {
+      "id": "deployment list",
+      "group": "Configuration commands",
+      "description": "List the project's deployments, newest first.",
+      "args": [],
+      "flags": [
+        {
+          "name": "origin",
+          "description": "Only deployments that targeted this origin.",
+          "type": "option"
+        },
+        {
+          "name": "live",
+          "description": "What each target serves now, not the full history.",
+          "type": "boolean"
+        },
+        {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "deployment list"
+        },
+        {
+          "command": "deployment list --all"
+        },
+        {
+          "command": "deployment list --live"
+        },
+        {
+          "command": "deployment list --origin https://app.acme.com"
+        }
+      ]
+    },
+    {
+      "id": "deployment rollback",
+      "group": "Configuration commands",
+      "description": "Roll back to an earlier deployment.",
+      "args": [
+        {
+          "name": "deployment_id",
+          "description": "The deployment to re-apply. Omit to undo the last deploy."
+        }
+      ],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Roll back without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "deployment rollback"
+        },
+        {
+          "command": "deployment rollback dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
+        },
+        {
+          "command": "deployment rollback --force"
+        }
+      ]
+    },
+    {
       "id": "flow-definitions get",
       "group": "Configuration commands",
       "description": "Get one flow definition by id.",
@@ -1115,7 +1284,40 @@
       ]
     },
     {
-      "id": "releases get",
+      "id": "release create",
+      "group": "Configuration commands",
+      "description": "Build a release from .zitadel/ without deploying it.",
+      "args": [],
+      "flags": [
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of what this release changes.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "release create"
+        },
+        {
+          "command": "release create -m 'add phone_number to human-user'"
+        }
+      ]
+    },
+    {
+      "id": "release get",
       "group": "Configuration commands",
       "description": "Get one release by id.",
       "args": [
@@ -1145,17 +1347,17 @@
       ],
       "examples": [
         {
-          "command": "releases get <id>"
+          "command": "release get <id>"
         },
         {
-          "command": "releases get <id> --json"
+          "command": "release get <id> --json"
         }
       ]
     },
     {
-      "id": "releases list",
+      "id": "release list",
       "group": "Configuration commands",
-      "description": "List releases.",
+      "description": "List release.",
       "args": [],
       "flags": [
         {
@@ -1203,10 +1405,49 @@
       ],
       "examples": [
         {
-          "command": "releases list --json"
+          "command": "release list --json"
         },
         {
-          "command": "releases list --all --json"
+          "command": "release list --all --json"
+        }
+      ]
+    },
+    {
+      "id": "release revoke",
+      "group": "Configuration commands",
+      "description": "Revoke a release so its content is never served again.",
+      "args": [
+        {
+          "name": "release_id",
+          "description": "The release to revoke.",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Revoke without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
+        },
+        {
+          "command": "release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --force"
         }
       ]
     },

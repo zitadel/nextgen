@@ -44,11 +44,23 @@ export interface Envelope<T = Record<string, unknown>> {
   readonly data: T;
 }
 
-export interface PlanTotals {
-  readonly creates: number;
-  readonly updates: number;
-  readonly deletes: number;
-  readonly total: number;
+/**
+ * A non-interactive `deploy` needs a `-m` message, so the helpers default one
+ * unless the spec already supplied its own.
+ */
+function withDeployMessage(extraArgs: readonly string[]): string[] {
+  const hasMessage = extraArgs.some((arg) => arg === "-m" || arg === "--message");
+  return hasMessage ? [...extraArgs] : ["-m", "test deploy", ...extraArgs];
+}
+
+/** The data a `deploy` envelope carries, for a deploy expected to succeed. */
+export interface DeployResult {
+  readonly content_hash?: string;
+  readonly release_id?: string;
+  readonly deployment_id?: string;
+  readonly resources?: number;
+  readonly origins?: string[];
+  readonly dry_run?: boolean;
 }
 
 export interface FlowStep {
@@ -553,25 +565,55 @@ export class ScaffoldedApp {
     return this.cli(["status", "--json", ...extraArgs]);
   }
 
-  apply(extraArgs: string[] = []): Promise<CliResult> {
-    return this.cli(["apply", "--non-interactive", "--json", ...extraArgs]);
+  /** Add a primary origin, so a deploy to `primary` has somewhere to land. */
+  async addPrimaryOrigin(pattern = "https://app.example.com"): Promise<void> {
+    const result = await this.cli([
+      "origin",
+      "add",
+      pattern,
+      "--kind",
+      "primary",
+      "--non-interactive",
+      "--json",
+    ]);
+    expect(result, "origin add should have succeeded").toSucceed();
   }
 
-  /** The totals `plan` reports, for a plan expected to succeed. */
-  async plan(): Promise<PlanTotals> {
-    const result = await this.planAttempt();
-    expect(result, "plan should have succeeded").toSucceed();
-    return this.envelopeOf<PlanTotals>(result).data;
+  /** Build a release from `.zitadel/` and deploy it to every primary origin. */
+  deploy(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["deploy", "--non-interactive", "--json", ...withDeployMessage(extraArgs)]);
   }
 
-  /** `plan` as a raw result, for a spec asserting a refusal. */
-  planAttempt(): Promise<CliResult> {
-    return this.cli(["plan", "--non-interactive", "--json"]);
+  /**
+   * What `apply` was for a set-up project: gives it the primary origin a deploy
+   * needs, then deploys.
+   */
+  async publish(): Promise<CliResult> {
+    await this.addPrimaryOrigin();
+    return this.deploy();
   }
 
-  /** `plan` without `--json`, for a spec asserting what the developer reads. */
-  planRendered(): Promise<CliResult> {
-    return this.cli(["plan", "--non-interactive"]);
+  /** {@link publish}, failing the arrange if the deploy does not succeed. */
+  async publishData(): Promise<DeployResult> {
+    await this.addPrimaryOrigin();
+    return this.deployData();
+  }
+
+  /** The envelope data of a deploy expected to succeed (its content digest). */
+  async deployData(extraArgs: string[] = []): Promise<DeployResult> {
+    const result = await this.deploy(extraArgs);
+    expect(result, "deploy should have succeeded").toSucceed();
+    return this.envelopeOf<DeployResult>(result).data;
+  }
+
+  /** `deploy --dry-run`: validates and shows the diff without writing. */
+  deployDryRun(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["deploy", "--dry-run", "--non-interactive", "--json", ...extraArgs]);
+  }
+
+  /** `deploy` without `--json`, for a spec asserting what the developer reads. */
+  deployRendered(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["deploy", "--non-interactive", ...withDeployMessage(extraArgs)]);
   }
 
   run(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {

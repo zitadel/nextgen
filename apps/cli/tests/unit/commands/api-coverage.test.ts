@@ -75,23 +75,27 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // generated surface; recorded as a question rather than implied to be owned.
   completeClaim: "part of the claim flow, but currently called by no command — unresolved",
   getClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
+  // The frozen variable set of one deployment is read where a variable is
+  // resolved, which is a later change.
+  getDeploymentVariables:
+    "read by `zitadel variable resolve`, which arrives with the variable commands",
   // A preview exists only through a deployment to it, so it has no create to
   // offer; listing and removing it are `zitadel preview`'s.
   listPreviews: "previews are listed by `zitadel preview` (#1312)",
   removePreview: "previews are removed by `zitadel preview` (#1312)",
 
-  // Configuration is written declaratively (ADR 035), never imperatively here.
-  createSchema: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
-  createBranding:
-    "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
-  createRelease: "a release is constructed by `zitadel deploy` (ADR 035)",
-  buildRelease: "a release is built from .zitadel/ by `zitadel deploy` (ADR 035)",
-  revokeRelease: "an operator's hard stop; `zitadel release revoke` owns it (#539)",
-  createDeployment: "a release goes live through `zitadel deploy` orchestration (ADR 035, #529)",
-  getDeploymentById: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
-  listDeployments: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
+  // Individual resource writes are not made here: `deploy` sends the whole
+  // `.zitadel/` as one release bundle (ADR 035), so the per-kind create
+  // endpoints are never called by the CLI.
+  createSchema: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
+  createBranding: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
+  // `deploy` builds a release from the `.zitadel/` bundle via `buildRelease`
+  // (`POST /releases/build`); pinning pre-existing revision ids with
+  // `createRelease` is not a CLI flow.
+  createRelease:
+    "the CLI builds from a bundle via buildRelease, not by pinning revision ids (ADR 035)",
   createFlowDefinition:
-    "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
+    "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
 
   // End-user self-service, authenticated as that user. The CLI holds an
   // operator credential (ADR 036), so these are not its to call.
@@ -188,30 +192,60 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
   // have no `/origins/query` grammar; the hand-written commands add, list (off
   // the project) and remove one pattern at a time.
   origin: ["origin/add", "origin/list", "origin/rm"],
+  // A release is built from `.zitadel/` and posted as one bundle (`deploy`,
+  // `release create`), looked up and revoked by id. The registry serves
+  // `release list`/`get`; the acts of building and revoking are these.
+  releases: ["deploy", "release/create", "release/revoke"],
+  // A deployment is an act, not a file: `deploy` and `deployment create` make a
+  // release live, `deployment list`/`get` read the history, `deployment
+  // rollback` re-applies one. The operations live in the `lib/release` wrappers
+  // these commands call, which {@link standaloneOperations} scans too.
+  deployments: ["deployment/create", "deployment/list", "deployment/get", "deployment/rollback"],
 };
+
+/**
+ * The publish-pipeline modules the deploy/release/deployment commands call into.
+ * Their `client.<operation>(` call sites are the evidence those commands reach
+ * the release and deployment operations, the same way a command's own call site
+ * is for the registry.
+ */
+const PIPELINE_SOURCES: readonly string[] = [
+  "lib/release/release.ts",
+  "lib/release/deployment.ts",
+  "lib/release/steps/diff.ts",
+  "lib/release/steps/idp-checks.ts",
+];
 
 /**
  * The client operations each standalone command calls, read from its source
  * and keyed by its command (`variables set`). The registry's evidence is which
  * client properties its verbs touch; a `client.<operation>(` call site is the
  * same evidence, so a command that stops calling an operation leaves that
- * operation unaccounted and this test fails.
+ * operation unaccounted and this test fails. The release and deployment
+ * commands reach their operations through the pipeline modules above.
  */
-const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> =>
-  new Map(
+const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> => {
+  const callsIn = async (path: string): Promise<string[]> =>
+    [...(await readFile(path, "utf8")).matchAll(/\bclient\.(\w+)\(/g)].map((m) => m[1] as string);
+  const pipeline = (
     await Promise.all(
-      Object.values(STANDALONE)
-        .flat()
-        .map(async (command): Promise<[string, ReadonlySet<string>]> => {
-          const source = await readFile(
+      PIPELINE_SOURCES.map((file) => callsIn(join(import.meta.dirname, "../../../src", file))),
+    )
+  ).flat();
+  return new Map(
+    await Promise.all(
+      Object.entries(STANDALONE).flatMap(([group, commands]) =>
+        commands.map(async (command): Promise<[string, ReadonlySet<string>]> => {
+          const own = await callsIn(
             join(import.meta.dirname, "../../../src/commands", `${command}.ts`),
-            "utf8",
           );
-          const called = [...source.matchAll(/\bclient\.(\w+)\(/g)].map((m) => m[1] as string);
-          return [command.replaceAll("/", " "), new Set(called)];
+          const viaPipeline = group === "releases" || group === "deployments" ? pipeline : [];
+          return [command.replaceAll("/", " "), new Set([...own, ...viaPipeline])];
         }),
+      ),
     ),
   );
+};
 
 /** The client operations the standalone commands call. */
 const standaloneOperations = async (): Promise<ReadonlySet<string>> =>
@@ -392,6 +426,9 @@ describe("the CLI covers the API client", () => {
  * entry cannot outlive the sharing that justifies it.
  */
 const SHARES_OPERATION: Readonly<Record<string, string>> = {
+  // Builds a release from `.zitadel/` exactly as `deploy` does, without
+  // deploying it, so `POST /releases/build` names `deploy`.
+  "release create": "deploy",
   // Reads the project to report its origin patterns; `projects get` is the
   // command the reference shows for `GET /projects/{id}`.
   "origin list": "projects get",

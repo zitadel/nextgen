@@ -203,7 +203,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const flows = targetFlows(schema, candidates);
     // The schema and flow edits are worked out now, before the dry-run return
     // and before the connection is written or a credential published, so a
-    // refusal (an edit the editors cannot make, or a flow `plan` would then
+    // refusal (an edit the editors cannot make, or a flow `deploy` would then
     // reject) stops the run with nothing changed (ADR 070 §3).
     const edits = planEdits(schema, plan.slug, flows);
     refuseBrokenFlows(
@@ -358,7 +358,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       });
       // A connection is scaffolded with the properties the provider maps by
       // default, narrowed to what the schema defines. A schema that defines none
-      // of them leaves it with no mapping, and `plan` refuses a connection that
+      // of them leaves it with no mapping, and `deploy` refuses a connection that
       // fills nothing, so say so now and not on the next command.
       if (!("claim_mapping" in connection)) {
         reportWarning(
@@ -426,7 +426,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // `variables set` first, for a credential that did not reach the project:
     // the connection references it as `${{ NAME }}` and the engine resolves
     // that from the project's variables, so a button whose credential never
-    // arrived fails at token exchange. Then plan and apply, when a file
+    // arrived fails at token exchange. Then deploy, when a file
     // changed. All carry --cwd when the run did.
     const recovery = republishArgs(
       [
@@ -551,7 +551,7 @@ type ProjectContext = {
  * The provider to enable and the Project it is enabled for, or a refusal.
  *
  * The provider and a custom connection's settings are checked first, before
- * the Project is read: a name or issuer the server would refuse on apply is
+ * the Project is read: a name or issuer the server would refuse on deploy is
  * refused here, where it was typed. The Project is read before anything is
  * asked for: being turned away after typing a secret would mean typing it
  * again.
@@ -593,9 +593,9 @@ async function readProject(
  *
  * Called before the connection is written and before either credential is
  * published, because no flow means no button however well everything else
- * went: `plan` and `apply` both succeed and the sign-in screen simply never
- * offers the provider. Failing afterwards would leave a connection file and
- * two published variables behind for a provider that cannot be shown.
+ * went: `deploy` succeeds and the sign-in screen simply never offers the
+ * provider. Failing afterwards would leave a connection file and two
+ * published variables behind for a provider that cannot be shown.
  *
  * @param schema - The schema the provider is enabled for.
  * @param flows - The flows that run against it.
@@ -605,8 +605,7 @@ function targetFlows(schema: SchemaFile, flows: FlowFile[]): FlowFile[] {
     throw new ZitadelError("E_NOT_FOUND", `No login flow runs against ${schema.name}`, {
       hint:
         "The provider is offered by a flow, and none of the files under .zitadel/flows/ " +
-        "names this schema. Check the flow's user_schema, or run `zitadel apply` first so the " +
-        "schema's published id is recorded in .zitadel/state.json.",
+        "names this schema. Check that the flow's user_schema names the schema's objectType.",
       details: { schema: schema.path },
     });
   }

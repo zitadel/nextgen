@@ -759,7 +759,7 @@ describe("auth-method sso enable preflight", () => {
     );
   });
 
-  it("lists plan and apply, with --cwd, as next_args", async () => {
+  it("lists a dry run and a deploy, with --cwd, as next_args", async () => {
     const cwd = await setUpProject();
 
     const result = await enable(cwd, "--client-id", "abc");
@@ -767,8 +767,8 @@ describe("auth-method sso enable preflight", () => {
     const { data } = parseJson(result.stdout) as { data: { next_args: string[][] } };
     expect(data.next_args).toEqual(
       expect.arrayContaining([
-        ["plan", "--cwd", expect.any(String)],
-        ["apply", "--cwd", expect.any(String)],
+        ["deploy", "--dry-run", "--cwd", expect.any(String)],
+        ["deploy", "-m", "<what changed>", "--cwd", expect.any(String)],
       ]),
     );
     for (const args of data.next_args) {

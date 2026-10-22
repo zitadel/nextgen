@@ -95,7 +95,7 @@ const EVENT_CATEGORIES = ["request", "auth", "session", "admin", "entity", "sign
 /**
  * The runtime resources the CLI manages imperatively — one entry per topic.
  * Config resources (schemas, flows, branding, releases) are deliberately
- * absent: they reconcile from `.zitadel/**` through `plan` / `apply`
+ * absent: they are published from `.zitadel/**` through `deploy`
  * (ADR 007, ADR 035), and an imperative write path would fork that source of
  * truth. Adding a backend resource is adding an entry here.
  */
@@ -423,13 +423,21 @@ export const RESOURCES = {
     },
   },
 
-  releases: {
+  release: {
     group: CommandGroups.configuration,
     singular: "release",
     idField: "id",
-    columns: ["id", "metadata.message", "metadata.git_sha"],
+    columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at"],
     heading: "id",
-    detail: ["id", "project_id", "metadata.message", "metadata.git_sha", "metadata.git_dirty"],
+    detail: [
+      "id",
+      "project_id",
+      "content_hash",
+      "revoked_at",
+      "metadata.message",
+      "metadata.git_sha",
+      "metadata.git_dirty",
+    ],
     list: {
       items: "releases",
       response: ListReleasesResponse,
