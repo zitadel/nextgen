@@ -10,8 +10,8 @@
 // Env: V4_PORT (58080), V4_URL (http://localhost:$V4_PORT),
 //      V4_DATA_DIR (${TMPDIR:-/tmp}/zitadel-v4demo), V4_PAT_FILE
 //      ($V4_DATA_DIR/admin.pat).
-// Progress goes to stderr; the JSON summary goes to stdout and to
-// $V4_DATA_DIR/seed-summary.json.
+// Progress goes to stderr. The JSON summary, demo passwords included, goes to
+// $V4_DATA_DIR/seed-summary.json only; stdout gets its path and counts.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -31,7 +31,8 @@ const MASTER_KEY = "MasterkeyNeedsToHave32Characters";
 const HASHES = {
   argon2id: {
     format: "argon2id (m=4096, t=3, p=1)",
-    encoded: "$argon2id$v=19$m=4096,t=3,p=1$cmFuZG9tc2FsdGlzaGFyZA$DYojYpnUWSMmTtrkVXyaNWVGxLmGe1n8VJBPDdFkbjU",
+    encoded:
+      "$argon2id$v=19$m=4096,t=3,p=1$cmFuZG9tc2FsdGlzaGFyZA$DYojYpnUWSMmTtrkVXyaNWVGxLmGe1n8VJBPDdFkbjU",
     plaintext: "password",
   },
   pbkdf2: {
@@ -52,7 +53,8 @@ const HASHES = {
   },
   scrypt: {
     format: "scrypt (ln=16, r=8, p=1)",
-    encoded: "$scrypt$ln=16,r=8,p=1$cmFuZG9tc2FsdGlzaGFyZA$Rh+NnJNo1I6nRwaNqbDm6kmADswD1+7FTKZ7Ln9D8nQ",
+    encoded:
+      "$scrypt$ln=16,r=8,p=1$cmFuZG9tc2FsdGlzaGFyZA$Rh+NnJNo1I6nRwaNqbDm6kmADswD1+7FTKZ7Ln9D8nQ",
     plaintext: "password",
   },
   md5crypt: {
@@ -90,135 +92,303 @@ const ORGS = [
 // links: [idp name, external user id, external user name].
 const HUMANS = [
   {
-    key: "alice@Acme", org: "Acme", username: "alice", given: "Alice", family: "Anderson",
-    display: "Alice Anderson", nick: "Ali", lang: "en", gender: "GENDER_FEMALE",
-    email: "alice@acme.example.com", emailVerified: true, phone: "+41791234567",
+    key: "alice@Acme",
+    org: "Acme",
+    username: "alice",
+    given: "Alice",
+    family: "Anderson",
+    display: "Alice Anderson",
+    nick: "Ali",
+    lang: "en",
+    gender: "GENDER_FEMALE",
+    email: "alice@acme.example.com",
+    emailVerified: true,
+    phone: "+41791234567",
     password: "Alice-Passw0rd!",
     metadata: { department: "Engineering", employee_id: "E-1001" },
     links: [["Corporate SSO", "sso-sub-alice", "alice@sso.example.com"]],
     notes: "verified phone, metadata, authorization on project Shop",
   },
   {
-    key: "bob@Acme", org: "Acme", username: "bob", given: "Bob", family: "Brown",
-    display: "Bob Brown", lang: "de", gender: "GENDER_MALE",
-    email: "bob@acme.example.com", emailVerified: false,
+    key: "bob@Acme",
+    org: "Acme",
+    username: "bob",
+    given: "Bob",
+    family: "Brown",
+    display: "Bob Brown",
+    lang: "de",
+    gender: "GENDER_MALE",
+    email: "bob@acme.example.com",
+    emailVerified: false,
     password: "Bob-Passw0rd!",
     links: [["Corporate SSO", "sso-sub-bob", "bob@sso.example.com"]],
     notes: "unverified email",
   },
   {
-    key: "erin@Acme", org: "Acme", username: "erin", given: "Erin", family: "Evans",
-    display: "Erin Evans", lang: "en", email: "erin@acme.example.com", emailVerified: true,
+    key: "erin@Acme",
+    org: "Acme",
+    username: "erin",
+    given: "Erin",
+    family: "Evans",
+    display: "Erin Evans",
+    lang: "en",
+    email: "erin@acme.example.com",
+    emailVerified: true,
     hash: "argon2id",
   },
   {
-    key: "frank@Acme", org: "Acme", username: "frank", given: "Frank", family: "Fischer",
-    display: "Frank Fischer", lang: "de", email: "frank@acme.example.com", emailVerified: true,
+    key: "frank@Acme",
+    org: "Acme",
+    username: "frank",
+    given: "Frank",
+    family: "Fischer",
+    display: "Frank Fischer",
+    lang: "de",
+    email: "frank@acme.example.com",
+    emailVerified: true,
     hash: "pbkdf2",
   },
   {
-    key: "samantha@Acme", org: "Acme", username: "samantha", given: "Samantha", family: "Smith",
-    display: "Samantha Smith", lang: "en", email: "shared@example.com", emailVerified: true,
+    key: "samantha@Acme",
+    org: "Acme",
+    username: "samantha",
+    given: "Samantha",
+    family: "Smith",
+    display: "Samantha Smith",
+    lang: "en",
+    email: "shared@example.com",
+    emailVerified: true,
     password: "Samantha-Passw0rd!",
     notes: "same email as sam@Default, different case",
   },
   {
-    key: "lars@Acme", org: "Acme", username: "lars", given: "Lars", family: "Larsen",
-    display: "Lars Larsen", lang: "en", email: "lars@acme.example.com", emailVerified: true,
-    password: "Lars-Passw0rd!", finally: "lock",
+    key: "lars@Acme",
+    org: "Acme",
+    username: "lars",
+    given: "Lars",
+    family: "Larsen",
+    display: "Lars Larsen",
+    lang: "en",
+    email: "lars@acme.example.com",
+    emailVerified: true,
+    password: "Lars-Passw0rd!",
+    finally: "lock",
   },
   {
-    key: "oscar@Acme", org: "Acme", username: "oscar", given: "Oscar", family: "Olsen",
-    display: "Oscar Olsen", lang: "en", email: "oscar@acme.example.com", emailVerified: true,
+    key: "oscar@Acme",
+    org: "Acme",
+    username: "oscar",
+    given: "Oscar",
+    family: "Olsen",
+    display: "Oscar Olsen",
+    lang: "en",
+    email: "oscar@acme.example.com",
+    emailVerified: true,
     createLinks: [["Acme Okta", "okta-sub-1", "oscar@acme.okta.example.com"]],
     notes: "no password; created with its IdP link (federated-only user)",
   },
   {
-    key: "carol@Globex", org: "Globex", username: "carol", given: "Carol", family: "Clark",
-    display: "Carol Clark", lang: "fr", gender: "GENDER_DIVERSE",
-    email: "carol@globex.example.com", emailVerified: true,
-    password: "Carol-Passw0rd!", otpEmail: true,
+    key: "carol@Globex",
+    org: "Globex",
+    username: "carol",
+    given: "Carol",
+    family: "Clark",
+    display: "Carol Clark",
+    lang: "fr",
+    gender: "GENDER_DIVERSE",
+    email: "carol@globex.example.com",
+    emailVerified: true,
+    password: "Carol-Passw0rd!",
+    otpEmail: true,
     links: [["Google", "google-sub-carol", "carol@gmail.example.com"]],
     notes: "OTP via email enabled",
   },
   {
-    key: "alice@Globex", org: "Globex", username: "alice", given: "Alice", family: "Garcia",
-    display: "Alice Garcia", lang: "es", email: "alice@globex.example.com", emailVerified: true,
+    key: "alice@Globex",
+    org: "Globex",
+    username: "alice",
+    given: "Alice",
+    family: "Garcia",
+    display: "Alice Garcia",
+    lang: "es",
+    email: "alice@globex.example.com",
+    emailVerified: true,
     password: "AliceG-Passw0rd!",
     notes: "same username as alice@Acme; unique only within Globex (userLoginMustBeDomain)",
   },
   {
-    key: "grace@Globex", org: "Globex", username: "grace", given: "Grace", family: "Green",
-    display: "Grace Green", lang: "en", email: "grace@globex.example.com", emailVerified: true,
+    key: "grace@Globex",
+    org: "Globex",
+    username: "grace",
+    given: "Grace",
+    family: "Green",
+    display: "Grace Green",
+    lang: "en",
+    email: "grace@globex.example.com",
+    emailVerified: true,
     hash: "md5plain",
   },
   {
-    key: "niaj@Globex", org: "Globex", username: "niaj", given: "Niaj", family: "Nakamura",
-    display: "Niaj Nakamura", lang: "ja", email: "niaj@globex.example.com", emailVerified: true,
+    key: "niaj@Globex",
+    org: "Globex",
+    username: "niaj",
+    given: "Niaj",
+    family: "Nakamura",
+    display: "Niaj Nakamura",
+    lang: "ja",
+    email: "niaj@globex.example.com",
+    emailVerified: true,
     hash: "md5crypt",
   },
   {
-    key: "dana@Globex", org: "Globex", username: "dana", given: "Dana", family: "Diaz",
-    display: "Dana Diaz", lang: "en", email: "dana@globex.example.com", emailVerified: true,
-    password: "Dana-Passw0rd!", finally: "deactivate",
+    key: "dana@Globex",
+    org: "Globex",
+    username: "dana",
+    given: "Dana",
+    family: "Diaz",
+    display: "Dana Diaz",
+    lang: "en",
+    email: "dana@globex.example.com",
+    emailVerified: true,
+    password: "Dana-Passw0rd!",
+    finally: "deactivate",
   },
   {
-    key: "dave@Default", org: "Default", username: "dave", given: "Dave", family: "Davis",
-    display: "Dave Davis", lang: "it", email: "dave@example.com", emailVerified: true,
+    key: "dave@Default",
+    org: "Default",
+    username: "dave",
+    given: "Dave",
+    family: "Davis",
+    display: "Dave Davis",
+    lang: "it",
+    email: "dave@example.com",
+    emailVerified: true,
     password: "Dave-Passw0rd!",
     links: [["GitHub", "12345", "dave-gh"]],
     notes: "linked to GitHub, an IdP type outside the migration scope",
   },
   {
-    key: "heidi@Default", org: "Default", username: "heidi", given: "Heidi", family: "Hoffmann",
-    display: "Heidi Hoffmann", lang: "de", email: "heidi@example.com", emailVerified: true,
+    key: "heidi@Default",
+    org: "Default",
+    username: "heidi",
+    given: "Heidi",
+    family: "Hoffmann",
+    display: "Heidi Hoffmann",
+    lang: "de",
+    email: "heidi@example.com",
+    emailVerified: true,
     hash: "sha512crypt",
   },
   {
-    key: "mallory@Default", org: "Default", username: "mallory", given: "Mallory", family: "Moore",
-    display: "Mallory Moore", lang: "en", email: "mallory@example.com", emailVerified: true,
+    key: "mallory@Default",
+    org: "Default",
+    username: "mallory",
+    given: "Mallory",
+    family: "Moore",
+    display: "Mallory Moore",
+    lang: "en",
+    email: "mallory@example.com",
+    emailVerified: true,
     hash: "phpass",
   },
   {
-    key: "olivia@Default", org: "Default", username: "olivia", given: "Olivia", family: "Ortiz",
-    display: "Olivia Ortiz", lang: "en", email: "olivia@example.com", emailVerified: true,
+    key: "olivia@Default",
+    org: "Default",
+    username: "olivia",
+    given: "Olivia",
+    family: "Ortiz",
+    display: "Olivia Ortiz",
+    lang: "en",
+    email: "olivia@example.com",
+    emailVerified: true,
     hash: "md5salted",
   },
   {
-    key: "peggy@Default", org: "Default", username: "peggy", given: "Peggy", family: "Parker",
-    display: "Peggy Parker", lang: "en", email: "peggy@example.com", emailVerified: true,
+    key: "peggy@Default",
+    org: "Default",
+    username: "peggy",
+    given: "Peggy",
+    family: "Parker",
+    display: "Peggy Parker",
+    lang: "en",
+    email: "peggy@example.com",
+    emailVerified: true,
     hash: "bcrypt2y",
   },
   {
-    key: "sam@Default", org: "Default", username: "sam", given: "Sam", family: "Shaw",
-    display: "Sam Shaw", lang: "en", email: "Shared@Example.com", emailVerified: true,
-    password: "Sam-Passw0rd!", changeRequired: true,
+    key: "sam@Default",
+    org: "Default",
+    username: "sam",
+    given: "Sam",
+    family: "Shaw",
+    display: "Sam Shaw",
+    lang: "en",
+    email: "Shared@Example.com",
+    emailVerified: true,
+    password: "Sam-Passw0rd!",
+    changeRequired: true,
     notes: "same email as samantha@Acme, different case; password change required",
   },
   {
-    key: "ian@Default", org: "Default", username: "ian", given: "Ian", family: "Ingram",
-    display: "Ian Ingram", lang: "en", email: "ian@example.com", emailVerified: false,
+    key: "ian@Default",
+    org: "Default",
+    username: "ian",
+    given: "Ian",
+    family: "Ingram",
+    display: "Ian Ingram",
+    lang: "en",
+    email: "ian@example.com",
+    emailVerified: false,
     v1NoPassword: true,
     notes: "created with the v1 API without password: v4 keeps it in the initial state",
   },
   {
-    key: "rita@Default", org: "Default", username: "rita", given: "Rita", family: "Russo",
-    display: "Rita Russo", lang: "it", email: "rita@example.com", emailVerified: true,
-    password: "Rita-Passw0rd!", finally: "delete",
+    key: "rita@Default",
+    org: "Default",
+    username: "rita",
+    given: "Rita",
+    family: "Russo",
+    display: "Rita Russo",
+    lang: "it",
+    email: "rita@example.com",
+    emailVerified: true,
+    password: "Rita-Passw0rd!",
+    finally: "delete",
   },
   {
-    key: "ivan@Initech", org: "Initech", username: "ivan", given: "Ivan", family: "Ivanov",
-    display: "Ivan Ivanov", lang: "en", email: "ivan@initech.example.com", emailVerified: true,
+    key: "ivan@Initech",
+    org: "Initech",
+    username: "ivan",
+    given: "Ivan",
+    family: "Ivanov",
+    display: "Ivan Ivanov",
+    lang: "en",
+    email: "ivan@initech.example.com",
+    emailVerified: true,
     hash: "scrypt",
   },
   {
-    key: "judy@Initech", org: "Initech", username: "judy", given: "Judy", family: "Jones",
-    display: "Judy Jones", lang: "en", email: "judy@initech.example.com", emailVerified: true,
+    key: "judy@Initech",
+    org: "Initech",
+    username: "judy",
+    given: "Judy",
+    family: "Jones",
+    display: "Judy Jones",
+    lang: "en",
+    email: "judy@initech.example.com",
+    emailVerified: true,
     password: "Judy-Passw0rd!",
   },
   {
-    key: "albert@Umbrella", org: "Umbrella", username: "albert", given: "Albert", family: "Wesker",
-    display: "Albert Wesker", lang: "en", email: "albert@umbrella.example.com", emailVerified: true,
+    key: "albert@Umbrella",
+    org: "Umbrella",
+    username: "albert",
+    given: "Albert",
+    family: "Wesker",
+    display: "Albert Wesker",
+    lang: "en",
+    email: "albert@umbrella.example.com",
+    emailVerified: true,
     password: "Albert-Passw0rd!",
   },
 ];
@@ -236,29 +406,40 @@ class ApiError extends Error {
   }
 }
 
-const pat = (await readFile(patFile, "utf8").catch((err) => {
-  console.error(`cannot read the admin PAT at ${patFile}: ${err.message}`);
-  console.error("start v4 with start-v4.sh first (same V4_DATA_DIR), or set V4_PAT_FILE");
-  process.exit(1);
-})).trim();
+const pat = (
+  await readFile(patFile, "utf8").catch((err) => {
+    console.error(`cannot read the admin PAT at ${patFile}: ${err.message}`);
+    console.error("start v4 with start-v4.sh first (same V4_DATA_DIR), or set V4_PAT_FILE");
+    process.exit(1);
+  })
+).trim();
 
 async function api(method, path, body, { orgId, connect = false } = {}) {
   const headers = { authorization: `Bearer ${pat}`, accept: "application/json" };
   if (body !== undefined) headers["content-type"] = "application/json";
   if (connect) headers["connect-protocol-version"] = "1";
   if (orgId) headers["x-zitadel-orgid"] = orgId;
-  const res = await fetch(baseUrl + path, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new ApiError(method, path, res.status, text);
-  return text ? JSON.parse(text) : {};
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(baseUrl + path, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const text = await res.text();
+    // For a moment after /debug/ready, v4's REST gateway answers 503 while it
+    // still dials its own gRPC server; such a request never reached v4.
+    if (res.status === 503 && attempt < 20) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      continue;
+    }
+    if (!res.ok) throw new ApiError(method, path, res.status, text);
+    return text ? JSON.parse(text) : {};
+  }
 }
 
 // v2 services without REST routes in v4 are served over the Connect protocol.
-const rpc = (service, method, body) => api("POST", `/${service}/${method}`, body, { connect: true });
+const rpc = (service, method, body) =>
+  api("POST", `/${service}/${method}`, body, { connect: true });
 
 // Retries a read until the projection behind it caught up.
 async function eventually(read, attempts = 40) {
@@ -290,7 +471,9 @@ async function main() {
 
   const { instance } = await api("GET", "/admin/v1/instances/me");
   const defaultOrg = (await api("GET", "/admin/v1/orgs/default")).org;
-  log(`instance ${instance.id} (${instance.name}), default org ${defaultOrg.id} (${defaultOrg.name})`);
+  log(
+    `instance ${instance.id} (${instance.name}), default org ${defaultOrg.id} (${defaultOrg.name})`,
+  );
 
   // Orgs.
   const orgs = { Default: { name: defaultOrg.name, id: defaultOrg.id, expectedState: "active" } };
@@ -391,7 +574,11 @@ async function main() {
       client_id: "google-client",
       client_secret: "google-secret-789",
       scopes,
-      provider_options: { is_creation_allowed: true, is_linking_allowed: true, is_auto_update: true },
+      provider_options: {
+        is_creation_allowed: true,
+        is_linking_allowed: true,
+        is_auto_update: true,
+      },
     },
     "instance",
   );
@@ -412,8 +599,9 @@ async function main() {
   // org login policy (a copy of the default) offering Corporate SSO and Acme Okta.
   await api("POST", "/admin/v1/policies/login/idps", { idp_id: idps["Corporate SSO"].id });
   idps["Corporate SSO"].loginPolicies = ["instance", "Acme"];
-  const def = (await api("GET", "/management/v1/policies/default/login", undefined, { orgId: orgs.Acme.id }))
-    .policy;
+  const def = (
+    await api("GET", "/management/v1/policies/default/login", undefined, { orgId: orgs.Acme.id })
+  ).policy;
   await api(
     "POST",
     "/management/v1/policies/login",
@@ -446,7 +634,9 @@ async function main() {
   );
   idps["Acme Okta"].loginPolicies = ["Acme"];
   orgs.Acme.loginPolicy = "custom org login policy: Corporate SSO + Acme Okta";
-  log("login policies: instance += Corporate SSO; Acme custom policy with Corporate SSO + Acme Okta");
+  log(
+    "login policies: instance += Corporate SSO; Acme custom policy with Corporate SSO + Acme Okta",
+  );
 
   // Human users.
   const users = [];
@@ -501,7 +691,11 @@ async function main() {
           user_name: userName,
         }));
       }
-      const res = await api("POST", "/v2/users/new", { organization_id: orgId, username: spec.username, human });
+      const res = await api("POST", "/v2/users/new", {
+        organization_id: orgId,
+        username: spec.username,
+        human,
+      });
       id = res.id;
     }
     const user = {
@@ -535,7 +729,12 @@ async function main() {
       notes: spec.notes ?? null,
     };
     for (const [idp, userId, userName] of spec.createLinks ?? []) {
-      user.links.push({ idp, idpId: idps[idp].id, externalUserId: userId, externalUserName: userName });
+      user.links.push({
+        idp,
+        idpId: idps[idp].id,
+        externalUserId: userId,
+        externalUserName: userName,
+      });
     }
     users.push(user);
     log(`user ${spec.key}: ${id}`);
@@ -561,7 +760,12 @@ async function main() {
       await api("POST", `/v2/users/${user.id}/links`, {
         idp_link: { idp_id: idps[idp].id, user_id: userId, user_name: userName },
       });
-      user.links.push({ idp, idpId: idps[idp].id, externalUserId: userId, externalUserName: userName });
+      user.links.push({
+        idp,
+        idpId: idps[idp].id,
+        externalUserId: userId,
+        externalUserName: userName,
+      });
       log(`user ${spec.key}: linked to ${idp} as ${userId}`);
     }
   }
@@ -571,9 +775,15 @@ async function main() {
   const ciBot = await api("POST", "/v2/users/new", {
     organization_id: orgs.Acme.id,
     username: "ci-bot",
-    machine: { name: "CI Bot", description: "Deploys the shop", access_token_type: "ACCESS_TOKEN_TYPE_BEARER" },
+    machine: {
+      name: "CI Bot",
+      description: "Deploys the shop",
+      access_token_type: "ACCESS_TOKEN_TYPE_BEARER",
+    },
   });
-  const ciBotPat = await api("POST", `/v2/users/${ciBot.id}/pats`, { expiration_date: "2030-01-01T00:00:00Z" });
+  const ciBotPat = await api("POST", `/v2/users/${ciBot.id}/pats`, {
+    expiration_date: "2030-01-01T00:00:00Z",
+  });
   log(`machine user ci-bot@Acme: ${ciBot.id}, PAT ${ciBotPat.tokenId}`);
 
   const project = await rpc("zitadel.project.v2.ProjectService", "CreateProject", {
@@ -602,13 +812,19 @@ async function main() {
       development_mode: true,
     },
   });
-  const authorization = await rpc("zitadel.authorization.v2.AuthorizationService", "CreateAuthorization", {
-    user_id: byKey["alice@Acme"].id,
-    project_id: project.projectId,
-    organization_id: orgs.Acme.id,
-    role_keys: ["customer"],
-  });
-  log(`project Shop: ${project.projectId}, app ${app.applicationId}, authorization ${authorization.id}`);
+  const authorization = await rpc(
+    "zitadel.authorization.v2.AuthorizationService",
+    "CreateAuthorization",
+    {
+      user_id: byKey["alice@Acme"].id,
+      project_id: project.projectId,
+      organization_id: orgs.Acme.id,
+      role_keys: ["customer"],
+    },
+  );
+  log(
+    `project Shop: ${project.projectId}, app ${app.applicationId}, authorization ${authorization.id}`,
+  );
   // v4 resolves the endpoint and refuses hosts that do not resolve or resolve
   // to private addresses, so the target needs DNS; skip it when offline.
   let target = null;
@@ -753,20 +969,40 @@ async function main() {
     links: users.flatMap((u) => u.links.map((l) => ({ user: u.key, userId: u.id, ...l }))),
     inventory: {
       project: { name: "Shop", id: project.projectId, org: "Acme", roles: ["customer"] },
-      app: { name: "Shop Web", id: app.applicationId, clientId: app.oidcConfiguration?.clientId ?? null },
-      authorization: { id: authorization.id, user: "alice@Acme", project: "Shop", roles: ["customer"] },
+      app: {
+        name: "Shop Web",
+        id: app.applicationId,
+        clientId: app.oidcConfiguration?.clientId ?? null,
+      },
+      authorization: {
+        id: authorization.id,
+        user: "alice@Acme",
+        project: "Shop",
+        roles: ["customer"],
+      },
       actionTarget: target,
     },
   };
-  const json = JSON.stringify(summary, null, 2);
   await mkdir(dataDir, { recursive: true });
-  await writeFile(summaryFile, `${json}\n`);
+  await writeFile(summaryFile, `${JSON.stringify(summary, null, 2)}\n`);
   log(`summary written to ${summaryFile}`);
-  console.log(json);
+  // The summary holds the demo users' passwords and the master key: it goes
+  // to the file only, never to a terminal or a CI log.
+  console.log(
+    JSON.stringify({
+      summaryFile,
+      instanceId: instance.id,
+      orgs: Object.keys(orgs).length,
+      users: users.length + (admin ? 1 : 0),
+      idps: Object.keys(idps).length,
+    }),
+  );
 }
 
 main().catch((err) => {
   console.error(`[seed] FAILED: ${err.message}`);
-  console.error("[seed] the instance is now partly seeded; reset the database before running again (README.md)");
+  console.error(
+    "[seed] the instance is now partly seeded; reset the database before running again (README.md)",
+  );
   process.exit(1);
 });

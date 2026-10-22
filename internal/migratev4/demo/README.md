@@ -16,7 +16,7 @@ APIs, for testing and demoing the v4 to nextgen migration.
 export ZITADEL_BIN=/path/to/zitadel V4_DATA_DIR=/tmp/zitadel-v4demo
 ./start-v4.sh &   # first run creates database v4demo and the instance
 until curl -fsS http://localhost:58080/debug/ready; do sleep 1; done
-node seed-v4.mjs  # once per database; JSON summary on stdout
+node seed-v4.mjs  # once per database; the summary goes to $V4_DATA_DIR/seed-summary.json
 ```
 
 `kill %1` stops v4 cleanly; the database stays. Run `./start-v4.sh` again to
