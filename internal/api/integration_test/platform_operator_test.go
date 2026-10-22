@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,18 +51,15 @@ func grantPlatformOperator(t *testing.T, userID string) {
 	t.Cleanup(func() { _ = stmts.RevokeAuthzAssignment(context.Background(), platform.ID, grant.ID) })
 }
 
-// searchesFor pages queryProjects with the session until it finds projectID,
+// listsProject pages listMyProjects with the session until it finds projectID,
 // and reports whether it did. The test database holds every project the
-// package's tests created, so the target is rarely on the first page.
-func searchesFor(t *testing.T, cookie *http.Cookie, projectID string) bool {
+// package's tests created, so for an operator the target is rarely on the
+// first page.
+func listsProject(t *testing.T, cookie *http.Cookie, projectID string) bool {
 	t.Helper()
-	token := ""
-	for range 200 {
-		body := `{"limit":100}`
-		if token != "" {
-			body = `{"limit":100,"page_token":"` + token + `"}`
-		}
-		status, raw := consoleCall(t, cookie, http.MethodPost, "/projects/query", body)
+	path := "/users/me/projects?limit=100"
+	for range 500 {
+		status, raw := consoleCall(t, cookie, http.MethodGet, path, "")
 		require.Equal(t, http.StatusOK, status, raw)
 		var page struct {
 			Projects []struct {
@@ -78,17 +76,17 @@ func searchesFor(t *testing.T, cookie *http.Cookie, projectID string) bool {
 		if page.NextPageToken == "" {
 			return false
 		}
-		token = page.NextPageToken
+		path = "/users/me/projects?limit=100&page_token=" + url.QueryEscape(page.NextPageToken)
 	}
-	t.Fatal("queryProjects did not end")
+	t.Fatal("listMyProjects did not end")
 	return false
 }
 
 // TestPlatformOperatorConsoleSession pins ADR 075 end to end. A platform
-// operator's Console session manages a project nobody granted it, searches
-// every project, and its writes are marked in the customer's own events.
-// Nobody else in the platform project gets any of that, an administrator of
-// the platform project included (ADR 053 §9).
+// operator's Console session manages a project nobody granted it, finds it
+// among the projects it can act on, and its writes are marked in the
+// customer's own events. Nobody else in the platform project gets any of that,
+// an administrator of the platform project included (ADR 053 §9).
 func TestPlatformOperatorConsoleSession(t *testing.T) {
 	t.Parallel()
 
@@ -137,18 +135,8 @@ func TestPlatformOperatorConsoleSession(t *testing.T) {
 		}
 	})
 
-	t.Run("an operator searches every project", func(t *testing.T) {
-		assert.True(t, searchesFor(t, operator, customer.ID))
-	})
-
-	t.Run("the Console learns who is an operator", func(t *testing.T) {
-		status, body := consoleCall(t, operator, http.MethodGet, "/users/me/platform_access", "")
-		require.Equal(t, http.StatusOK, status, body)
-		assert.JSONEq(t, `{"relations":["operator"]}`, body)
-
-		status, body = consoleCall(t, peer, http.MethodGet, "/users/me/platform_access", "")
-		require.Equal(t, http.StatusOK, status, body)
-		assert.JSONEq(t, `{"relations":[]}`, body)
+	t.Run("an operator's projects are every project", func(t *testing.T) {
+		assert.True(t, listsProject(t, operator, customer.ID))
 	})
 
 	for name, cookie := range map[string]*http.Cookie{
@@ -158,10 +146,7 @@ func TestPlatformOperatorConsoleSession(t *testing.T) {
 		t.Run(name+" gets none of it", func(t *testing.T) {
 			status, body := consoleCall(t, cookie, http.MethodGet, "/projects/"+customer.ID, "")
 			assert.Equal(t, http.StatusNotFound, status, body)
-
-			status, body = consoleCall(t, cookie, http.MethodPost, "/projects/query", `{}`)
-			assert.Equal(t, http.StatusForbidden, status, body)
-			assert.Contains(t, body, domain.ErrProjectPermissionDenied().Code)
+			assert.False(t, listsProject(t, cookie, customer.ID))
 		})
 	}
 

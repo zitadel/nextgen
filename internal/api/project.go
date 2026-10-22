@@ -84,30 +84,16 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 	return projectResponse(project), nil
 }
 
-// QueryProjects has no project parameter. A project secret's results are
-// restricted to its own project: the authz gate rejects an unbound /
-// no-foothold scope, so the ProjectID passed on is always set. A session is a
-// platform operator's search across every project (ADR 075 §6), and any other
-// session is refused; its projects come from listMyProjects.
+// QueryProjects has no project parameter: results are restricted to the
+// caller's project. The authz gate rejects an unbound / no-foothold scope, so the
+// ProjectID passed on is always set.
 func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsRequest) (api.QueryProjectsRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
-	svcReq := mapQueryProjectsToService(scopeCtx.ProjectID, req)
-	if scopeCtx.PrincipalType == domain.AuthzPrincipalTypeUser {
-		operator, err := h.platformOperator(ctx, scopeCtx)
-		if err != nil {
-			return nil, err
-		}
-		if !operator {
-			return nil, domain.ErrProjectPermissionDenied()
-		}
-		markPlatformOperator(ctx, scopeCtx)
-		svcReq.ProjectID = ""
-		svcReq.AllProjects = true
-	} else if err := h.requireProjectAccess(ctx, scopeCtx.ProjectID, projectAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, scopeCtx.ProjectID, projectAccess, opRead); err != nil {
 		return nil, err
 	}
 
-	listed, err := h.projectService.List(ctx, svcReq)
+	listed, err := h.projectService.List(ctx, mapQueryProjectsToService(scopeCtx.ProjectID, req))
 	if err != nil {
 		return nil, err
 	}
@@ -126,16 +112,27 @@ func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsReque
 // ListMyProjects answers "which projects can the person behind this session act
 // on". There is no requireProjectAccess here on purpose: the query is itself the
 // authorization, so a caller with no grants gets an empty page rather than a 403.
-// The session is held to project_id when the caller names one (requireSelf).
+// A platform operator can act on every project of the deployment, so the answer
+// is all of them, listed like anyone's (ADR 075 §6). The session is held to
+// project_id when the caller names one (requireSelf).
 func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsParams) (api.ListMyProjectsRes, error) {
 	self, err := requireSelf(ctx, params.ProjectID)
 	if err != nil {
 		return nil, err
 	}
+	scope, _ := GetScopeContext(ctx)
+	operator, err := h.platformOperator(ctx, scope)
+	if err != nil {
+		return nil, err
+	}
+	if operator {
+		markPlatformOperator(ctx, scope)
+	}
 
 	listed, err := h.projectService.ListAuthorized(ctx, service.ListAuthorizedProjectsRequest{
 		HomeProjectID: self.ProjectID(),
 		UserID:        self.UserID(),
+		EveryProject:  operator,
 		Limit:         int(params.Limit.Value),
 		PageToken:     string(params.PageToken.Value),
 	})

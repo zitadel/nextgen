@@ -444,9 +444,10 @@ func markPlatformOperator(ctx context.Context, scope ScopeContext) {
 	})
 }
 
-// platformOperator reports whether the credential is a platform operator who
-// may read every project (ADR 075 §3). Only a session of a user homed in the
-// platform project can be one; everyone else is answered without a query.
+// platformOperator reports whether the credential is a platform operator, who
+// can read every project (ADR 075 §3), which is the question listMyProjects
+// asks without a target project. Only a session of a user homed in the platform
+// project can be one; everyone else is answered without a query.
 func (h *Handler) platformOperator(ctx context.Context, scope ScopeContext) (bool, error) {
 	if scope.PlatformProjectID == "" || scope.PrincipalType != domain.AuthzPrincipalTypeUser {
 		return false, nil

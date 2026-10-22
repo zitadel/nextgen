@@ -661,22 +661,6 @@ func (UnimplementedHandler) GetMyPasswordState(ctx context.Context, params GetMy
 	return r, ht.ErrNotImplemented
 }
 
-// GetMyPlatformAccess implements getMyPlatformAccess operation.
-//
-// The platform relations the signed-in user holds on the deployment
-// (ADR 075). A platform operator administers every project of the
-// deployment and may search them all with `queryProjects`.
-// Only a user of the deployment's platform project can hold one; for
-// everyone else `relations` is empty. Being a user of the platform project,
-// or an administrator of it, grants none.
-// With `project_id`, the relations are read only when the session belongs to
-// that project.
-//
-// GET /users/me/platform_access
-func (UnimplementedHandler) GetMyPlatformAccess(ctx context.Context, params GetMyPlatformAccessParams) (r GetMyPlatformAccessRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // GetMySession implements getMySession operation.
 //
 // Returns the current state of the current session including its factors and all currently
@@ -990,9 +974,10 @@ func (UnimplementedHandler) ListMyPasskeys(ctx context.Context, params ListMyPas
 
 // ListMyProjects implements listMyProjects operation.
 //
-// The projects the signed-in user holds an active grant on, either directly or
-// through a team they are a member of. Ordered by project id and paged with an
-// opaque cursor.
+// The projects the signed-in user can act on: those they hold an active grant
+// on, either directly or through a team they are a member of. For a platform
+// operator (ADR 075) that is every project of the deployment. Ordered by
+// project id and paged with an opaque cursor.
 // This is not the same question as `queryProjects`, which answers with the one
 // project the calling credential is bound to. Here the session is the caller
 // and the grants are the answer, so the list spans projects.
@@ -1177,13 +1162,11 @@ func (UnimplementedHandler) QueryIdps(ctx context.Context, req *QueryIdpsRequest
 
 // QueryProjects implements queryProjects operation.
 //
-// With a project secret, returns the project the secret belongs to, as a page
-// of at most one project. A credential is scoped to one project until ADR 036
-// widens it, so the filters and sorting apply to that project alone.
-// With the Console session of a platform operator (ADR 075), searches every
-// project of the deployment, with the same filters, sorting and paging. Any
-// other session is refused with `403`: the projects a signed-in person can act
-// on are listed by `GET /users/me/projects`.
+// Returns the project the project secret belongs to, as a page of at most one
+// project.
+// A credential is scoped to one project until ADR 036 widens it, so the filters
+// and sorting apply to that project alone. The projects a signed-in person can
+// act on are listed by `GET /users/me/projects`.
 //
 // POST /projects/query
 func (UnimplementedHandler) QueryProjects(ctx context.Context, req *QueryProjectsRequest) (r QueryProjectsRes, _ error) {

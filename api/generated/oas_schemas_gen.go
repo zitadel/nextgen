@@ -6678,7 +6678,6 @@ func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
 
 func (*AuthUnauthorized) completeClaimRes()       {}
 func (*AuthUnauthorized) getMyPasswordStateRes()  {}
-func (*AuthUnauthorized) getMyPlatformAccessRes() {}
 func (*AuthUnauthorized) getMyUserSchemaRes()     {}
 func (*AuthUnauthorized) listMyIdentityLinksRes() {}
 func (*AuthUnauthorized) listMyPasskeysRes()      {}
@@ -21133,7 +21132,6 @@ func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
 func (*ErrorDetails) getAuthAttemptRes()       {}
 func (*ErrorDetails) getBrandingByIdRes()      {}
-func (*ErrorDetails) getMyPlatformAccessRes()  {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
 func (*ErrorDetails) issueChallengeRes()       {}
@@ -32388,158 +32386,6 @@ func (s *GetMyPasswordStateErrorResponseStatusCode) SetResponse(val GetMyPasswor
 }
 
 func (*GetMyPasswordStateErrorResponseStatusCode) getMyPasswordStateRes() {}
-
-// GetMyPlatformAccessErrorResponse represents sum type.
-type GetMyPlatformAccessErrorResponse struct {
-	Type                GetMyPlatformAccessErrorResponseType // switch on this field
-	AuthUnauthorized    AuthUnauthorized
-	Internal            Internal
-	ReqInvalid          ReqInvalid
-	SessProjectMismatch SessProjectMismatch
-}
-
-// GetMyPlatformAccessErrorResponseType is oneOf type of GetMyPlatformAccessErrorResponse.
-type GetMyPlatformAccessErrorResponseType string
-
-// Possible values for GetMyPlatformAccessErrorResponseType.
-const (
-	AuthUnauthorizedGetMyPlatformAccessErrorResponse    GetMyPlatformAccessErrorResponseType = "auth.unauthorized"
-	InternalGetMyPlatformAccessErrorResponse            GetMyPlatformAccessErrorResponseType = "internal"
-	ReqInvalidGetMyPlatformAccessErrorResponse          GetMyPlatformAccessErrorResponseType = "req.invalid"
-	SessProjectMismatchGetMyPlatformAccessErrorResponse GetMyPlatformAccessErrorResponseType = "sess.project_mismatch"
-)
-
-// IsAuthUnauthorized reports whether GetMyPlatformAccessErrorResponse is AuthUnauthorized.
-func (s GetMyPlatformAccessErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedGetMyPlatformAccessErrorResponse
-}
-
-// IsInternal reports whether GetMyPlatformAccessErrorResponse is Internal.
-func (s GetMyPlatformAccessErrorResponse) IsInternal() bool {
-	return s.Type == InternalGetMyPlatformAccessErrorResponse
-}
-
-// IsReqInvalid reports whether GetMyPlatformAccessErrorResponse is ReqInvalid.
-func (s GetMyPlatformAccessErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidGetMyPlatformAccessErrorResponse
-}
-
-// IsSessProjectMismatch reports whether GetMyPlatformAccessErrorResponse is SessProjectMismatch.
-func (s GetMyPlatformAccessErrorResponse) IsSessProjectMismatch() bool {
-	return s.Type == SessProjectMismatchGetMyPlatformAccessErrorResponse
-}
-
-// SetAuthUnauthorized sets GetMyPlatformAccessErrorResponse to AuthUnauthorized.
-func (s *GetMyPlatformAccessErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedGetMyPlatformAccessErrorResponse
-	s.AuthUnauthorized = v
-}
-
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetMyPlatformAccessErrorResponse is AuthUnauthorized.
-func (s GetMyPlatformAccessErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
-	if !s.IsAuthUnauthorized() {
-		return v, false
-	}
-	return s.AuthUnauthorized, true
-}
-
-// NewAuthUnauthorizedGetMyPlatformAccessErrorResponse returns new GetMyPlatformAccessErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedGetMyPlatformAccessErrorResponse(v AuthUnauthorized) GetMyPlatformAccessErrorResponse {
-	var s GetMyPlatformAccessErrorResponse
-	s.SetAuthUnauthorized(v)
-	return s
-}
-
-// SetInternal sets GetMyPlatformAccessErrorResponse to Internal.
-func (s *GetMyPlatformAccessErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalGetMyPlatformAccessErrorResponse
-	s.Internal = v
-}
-
-// GetInternal returns Internal and true boolean if GetMyPlatformAccessErrorResponse is Internal.
-func (s GetMyPlatformAccessErrorResponse) GetInternal() (v Internal, ok bool) {
-	if !s.IsInternal() {
-		return v, false
-	}
-	return s.Internal, true
-}
-
-// NewInternalGetMyPlatformAccessErrorResponse returns new GetMyPlatformAccessErrorResponse from Internal.
-func NewInternalGetMyPlatformAccessErrorResponse(v Internal) GetMyPlatformAccessErrorResponse {
-	var s GetMyPlatformAccessErrorResponse
-	s.SetInternal(v)
-	return s
-}
-
-// SetReqInvalid sets GetMyPlatformAccessErrorResponse to ReqInvalid.
-func (s *GetMyPlatformAccessErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidGetMyPlatformAccessErrorResponse
-	s.ReqInvalid = v
-}
-
-// GetReqInvalid returns ReqInvalid and true boolean if GetMyPlatformAccessErrorResponse is ReqInvalid.
-func (s GetMyPlatformAccessErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
-	if !s.IsReqInvalid() {
-		return v, false
-	}
-	return s.ReqInvalid, true
-}
-
-// NewReqInvalidGetMyPlatformAccessErrorResponse returns new GetMyPlatformAccessErrorResponse from ReqInvalid.
-func NewReqInvalidGetMyPlatformAccessErrorResponse(v ReqInvalid) GetMyPlatformAccessErrorResponse {
-	var s GetMyPlatformAccessErrorResponse
-	s.SetReqInvalid(v)
-	return s
-}
-
-// SetSessProjectMismatch sets GetMyPlatformAccessErrorResponse to SessProjectMismatch.
-func (s *GetMyPlatformAccessErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
-	s.Type = SessProjectMismatchGetMyPlatformAccessErrorResponse
-	s.SessProjectMismatch = v
-}
-
-// GetSessProjectMismatch returns SessProjectMismatch and true boolean if GetMyPlatformAccessErrorResponse is SessProjectMismatch.
-func (s GetMyPlatformAccessErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
-	if !s.IsSessProjectMismatch() {
-		return v, false
-	}
-	return s.SessProjectMismatch, true
-}
-
-// NewSessProjectMismatchGetMyPlatformAccessErrorResponse returns new GetMyPlatformAccessErrorResponse from SessProjectMismatch.
-func NewSessProjectMismatchGetMyPlatformAccessErrorResponse(v SessProjectMismatch) GetMyPlatformAccessErrorResponse {
-	var s GetMyPlatformAccessErrorResponse
-	s.SetSessProjectMismatch(v)
-	return s
-}
-
-// GetMyPlatformAccessErrorResponseStatusCode wraps GetMyPlatformAccessErrorResponse with StatusCode.
-type GetMyPlatformAccessErrorResponseStatusCode struct {
-	StatusCode int
-	Response   GetMyPlatformAccessErrorResponse
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *GetMyPlatformAccessErrorResponseStatusCode) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// GetResponse returns the value of Response.
-func (s *GetMyPlatformAccessErrorResponseStatusCode) GetResponse() GetMyPlatformAccessErrorResponse {
-	return s.Response
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *GetMyPlatformAccessErrorResponseStatusCode) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-// SetResponse sets the value of Response.
-func (s *GetMyPlatformAccessErrorResponseStatusCode) SetResponse(val GetMyPlatformAccessErrorResponse) {
-	s.Response = val
-}
-
-func (*GetMyPlatformAccessErrorResponseStatusCode) getMyPlatformAccessRes() {}
 
 // GetMySessionCsrfTokenErrorResponse represents sum type.
 type GetMySessionCsrfTokenErrorResponse struct {
@@ -63325,86 +63171,6 @@ func (s *PatchUserRequestAttributes) init() PatchUserRequestAttributes {
 	return m
 }
 
-// The platform relations the signed-in user holds (ADR 075).
-// Ref: #
-type PlatformAccessResponse struct {
-	// Each relation the user holds on the deployment's platform. `operator`
-	// administers every project. Empty for everyone else.
-	Relations []PlatformAccessResponseRelationsItem `json:"relations"`
-}
-
-// GetRelations returns the value of Relations.
-func (s *PlatformAccessResponse) GetRelations() []PlatformAccessResponseRelationsItem {
-	return s.Relations
-}
-
-// SetRelations sets the value of Relations.
-func (s *PlatformAccessResponse) SetRelations(val []PlatformAccessResponseRelationsItem) {
-	s.Relations = val
-}
-
-// PlatformAccessResponseHeaders wraps PlatformAccessResponse with response headers.
-type PlatformAccessResponseHeaders struct {
-	CacheControl OptString
-	Response     PlatformAccessResponse
-}
-
-// GetCacheControl returns the value of CacheControl.
-func (s *PlatformAccessResponseHeaders) GetCacheControl() OptString {
-	return s.CacheControl
-}
-
-// GetResponse returns the value of Response.
-func (s *PlatformAccessResponseHeaders) GetResponse() PlatformAccessResponse {
-	return s.Response
-}
-
-// SetCacheControl sets the value of CacheControl.
-func (s *PlatformAccessResponseHeaders) SetCacheControl(val OptString) {
-	s.CacheControl = val
-}
-
-// SetResponse sets the value of Response.
-func (s *PlatformAccessResponseHeaders) SetResponse(val PlatformAccessResponse) {
-	s.Response = val
-}
-
-func (*PlatformAccessResponseHeaders) getMyPlatformAccessRes() {}
-
-type PlatformAccessResponseRelationsItem string
-
-const (
-	PlatformAccessResponseRelationsItemOperator PlatformAccessResponseRelationsItem = "operator"
-)
-
-// AllValues returns all PlatformAccessResponseRelationsItem values.
-func (PlatformAccessResponseRelationsItem) AllValues() []PlatformAccessResponseRelationsItem {
-	return []PlatformAccessResponseRelationsItem{
-		PlatformAccessResponseRelationsItemOperator,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s PlatformAccessResponseRelationsItem) MarshalText() ([]byte, error) {
-	switch s {
-	case PlatformAccessResponseRelationsItemOperator:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *PlatformAccessResponseRelationsItem) UnmarshalText(data []byte) error {
-	switch PlatformAccessResponseRelationsItem(data) {
-	case PlatformAccessResponseRelationsItemOperator:
-		*s = PlatformAccessResponseRelationsItemOperator
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
 // Merged schema.
 // Ref: #
 type PolInvalid struct {
@@ -68176,7 +67942,6 @@ func (*QueryProjectsBadRequest) queryProjectsRes() {}
 // QueryProjectsErrorResponse represents sum type.
 type QueryProjectsErrorResponse struct {
 	Type                 QueryProjectsErrorResponseType // switch on this field
-	AuthCsrfInvalid      AuthCsrfInvalid
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
 	NotImplemented       NotImplemented
@@ -68191,7 +67956,6 @@ type QueryProjectsErrorResponseType string
 
 // Possible values for QueryProjectsErrorResponseType.
 const (
-	AuthCsrfInvalidQueryProjectsErrorResponse      QueryProjectsErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedQueryProjectsErrorResponse     QueryProjectsErrorResponseType = "auth.unauthorized"
 	InternalQueryProjectsErrorResponse             QueryProjectsErrorResponseType = "internal"
 	NotImplementedQueryProjectsErrorResponse       QueryProjectsErrorResponseType = "not_implemented"
@@ -68200,11 +67964,6 @@ const (
 	ProjPermissionDeniedQueryProjectsErrorResponse QueryProjectsErrorResponseType = "proj.permission_denied"
 	ReqInvalidQueryProjectsErrorResponse           QueryProjectsErrorResponseType = "req.invalid"
 )
-
-// IsAuthCsrfInvalid reports whether QueryProjectsErrorResponse is AuthCsrfInvalid.
-func (s QueryProjectsErrorResponse) IsAuthCsrfInvalid() bool {
-	return s.Type == AuthCsrfInvalidQueryProjectsErrorResponse
-}
 
 // IsAuthUnauthorized reports whether QueryProjectsErrorResponse is AuthUnauthorized.
 func (s QueryProjectsErrorResponse) IsAuthUnauthorized() bool {
@@ -68239,27 +67998,6 @@ func (s QueryProjectsErrorResponse) IsProjPermissionDenied() bool {
 // IsReqInvalid reports whether QueryProjectsErrorResponse is ReqInvalid.
 func (s QueryProjectsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidQueryProjectsErrorResponse
-}
-
-// SetAuthCsrfInvalid sets QueryProjectsErrorResponse to AuthCsrfInvalid.
-func (s *QueryProjectsErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
-	s.Type = AuthCsrfInvalidQueryProjectsErrorResponse
-	s.AuthCsrfInvalid = v
-}
-
-// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if QueryProjectsErrorResponse is AuthCsrfInvalid.
-func (s QueryProjectsErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
-	if !s.IsAuthCsrfInvalid() {
-		return v, false
-	}
-	return s.AuthCsrfInvalid, true
-}
-
-// NewAuthCsrfInvalidQueryProjectsErrorResponse returns new QueryProjectsErrorResponse from AuthCsrfInvalid.
-func NewAuthCsrfInvalidQueryProjectsErrorResponse(v AuthCsrfInvalid) QueryProjectsErrorResponse {
-	var s QueryProjectsErrorResponse
-	s.SetAuthCsrfInvalid(v)
-	return s
 }
 
 // SetAuthUnauthorized sets QueryProjectsErrorResponse to AuthUnauthorized.
@@ -76040,7 +75778,6 @@ func (s *SessProjectMismatch) SetDetails(val OptSessProjectMismatchDetails) {
 }
 
 func (*SessProjectMismatch) getMyPasswordStateRes()  {}
-func (*SessProjectMismatch) getMyPlatformAccessRes() {}
 func (*SessProjectMismatch) getMyUserRes()           {}
 func (*SessProjectMismatch) getMyUserSchemaRes()     {}
 func (*SessProjectMismatch) listMyIdentityLinksRes() {}

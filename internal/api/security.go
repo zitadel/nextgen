@@ -169,7 +169,6 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.ListMyPasskeysOperation:        true,
 	api.ListMyIdentityLinksOperation:   true,
 	api.GetMyPasswordStateOperation:    true,
-	api.GetMyPlatformAccessOperation:   true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous
@@ -192,9 +191,6 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.GetMyPasswordStateOperation:  true,
 	api.GetProjectOperation:          true,
 	api.PatchProjectOperation:        true,
-	// A platform operator's view of the deployment (ADR 075 §6).
-	api.QueryProjectsOperation:       true,
-	api.GetMyPlatformAccessOperation: true,
 	// Console management screens (#1300 §1). Their writes need the CSRF token
 	// (ADR 053 §5, csrf.go).
 	api.CreateUserOperation:            true,

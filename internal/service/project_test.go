@@ -647,32 +647,6 @@ func TestProjectService_List(t *testing.T) {
 			},
 		},
 		{
-			// A platform operator's search (ADR 075 §6): no project filter at
-			// all, not an empty one, which would still open a WHERE clause.
-			name:   "all projects drop the project filter",
-			req:    service.ListProjectsRequest{AllProjects: true},
-			result: &database.ListResult[*domain.Project]{Items: []*domain.Project{{ID: "proj_a"}, {ID: "proj_b"}}},
-			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
-				assert.Nil(t, opts.Filter)
-			},
-			checkResp: func(t *testing.T, resp *service.ListProjectsResponse) {
-				assert.Len(t, resp.Projects, 2)
-			},
-		},
-		{
-			name: "all projects keep the caller's filters",
-			req: service.ListProjectsRequest{
-				AllProjects: true,
-				Filters:     []service.Filter{{Field: "created_at", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)}},
-			},
-			result: &database.ListResult[*domain.Project]{},
-			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
-				require.NotNil(t, opts.Filter)
-				assert.False(t, opts.Filter.Restricts(database.Col(domain.ProjectFieldID)), "no project id filter")
-				assert.True(t, opts.Filter.Restricts(database.Col(domain.ProjectFieldCreatedAt)))
-			},
-		},
-		{
 			name:   "limit clamped to max",
 			req:    service.ListProjectsRequest{ProjectID: "proj_a", Limit: 500},
 			result: &database.ListResult[*domain.Project]{},
@@ -838,11 +812,6 @@ func TestProjectService_List_ValidationErrors(t *testing.T) {
 			name:    "missing project id is refused",
 			req:     service.ListProjectsRequest{},
 			wantErr: domain.ErrProjectMissingID(),
-		},
-		{
-			name:    "a project id and all projects at once is a caller bug",
-			req:     service.ListProjectsRequest{ProjectID: "proj_a", AllProjects: true},
-			wantErr: domain.ErrInternal(nil),
 		},
 		{
 			name: "unsupported operation not implemented",
@@ -1158,6 +1127,41 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A platform operator can act on every project (ADR 075 §6): the listing pages
+// all of them, in the same order and with the same cursor as the grant query,
+// and never asks the grant query.
+func TestProjectService_ListAuthorizedEveryProject(t *testing.T) {
+	t.Parallel()
+
+	svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+	expectActiveSessionUser(statements)
+	statements.EXPECT().ListAuthorizedProjects(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+			assert.Nil(t, opts.Filter, "every project: no filter")
+			assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
+			assert.Equal(t, uint32(20), opts.Pagination.Limit)
+			assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
+			assert.Equal(t, []database.Column[domain.ProjectField]{
+				database.Col(domain.ProjectFieldID),
+			}, opts.Pagination.OrderBy.Columns)
+			return &database.ListResult[*domain.Project]{
+				Items:      []*domain.Project{{ID: "proj_a"}, {ID: "proj_b"}},
+				NextCursor: []byte("next"),
+			}, nil
+		})
+
+	resp, err := svc.ListAuthorized(context.Background(), service.ListAuthorizedProjectsRequest{
+		HomeProjectID: "proj_platform",
+		UserID:        "user_a",
+		EveryProject:  true,
+		PageToken:     "tok",
+	})
+	require.NoError(t, err)
+	assert.Len(t, resp.Projects, 2)
+	assert.Equal(t, "next", resp.NextPageToken)
 }
 
 // An empty user or home project must never reach storage: the predicate would

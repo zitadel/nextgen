@@ -229,10 +229,6 @@ type GetMyPasswordStateRes interface {
 	getMyPasswordStateRes()
 }
 
-type GetMyPlatformAccessRes interface {
-	getMyPlatformAccessRes()
-}
-
 type GetMySessionCsrfTokenRes interface {
 	getMySessionCsrfTokenRes()
 }

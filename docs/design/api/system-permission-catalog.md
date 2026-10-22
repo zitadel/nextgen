@@ -240,7 +240,7 @@ grant them via `team.write`.
 
 | Permission | Intended operations | Notes |
 |---|---|---|
-| `platform.operator` | Every operation `project.admin` allows, on every project of the deployment; `POST /projects/query` across all projects; `GET /users/me/platform_access` lists it | [ADR 075](../../adrs/075-platform-operators.md). Users of the platform project only, never a team or a secret; issued only by the `platform.operators` configuration. Not a role on the platform project: `project.admin` there grants none of it ([ADR 053 §9](../../adrs/053-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)). |
+| `platform.operator` | Every operation `project.admin` allows, on every project of the deployment; `GET /users/me/projects` lists every project | [ADR 075](../../adrs/075-platform-operators.md). Users of the platform project only, never a team or a secret; issued only by the `platform.operators` configuration. Not a role on the platform project: `project.admin` there grants none of it ([ADR 053 §9](../../adrs/053-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)). |
 
 ### Apps
 

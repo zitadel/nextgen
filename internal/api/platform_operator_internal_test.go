@@ -169,57 +169,12 @@ func operatorHandler(t *testing.T, operator *bool) (Handler, *servicemocks.MockP
 	return Handler{pool: service.NewPool(pool), projectService: projects}, projects
 }
 
-func TestQueryProjects_Session(t *testing.T) {
-	t.Parallel()
-
-	t.Run("an operator searches every project", func(t *testing.T) {
-		t.Parallel()
-		h, projects := operatorHandler(t, new(true))
-		projects.EXPECT().List(gomock.Any(), gomock.Any()).DoAndReturn(
-			func(_ context.Context, req service.ListProjectsRequest) (*service.ListProjectsResponse, error) {
-				assert.True(t, req.AllProjects)
-				assert.Empty(t, req.ProjectID)
-				return &service.ListProjectsResponse{Projects: []*domain.Project{{ID: "proj_a"}, {ID: "proj_b"}}}, nil
-			})
-		ctx := WithScopeContext(audit.WithActorSlot(t.Context()), operatorScope)
-
-		res, err := h.QueryProjects(ctx, &api.QueryProjectsRequest{})
-		require.NoError(t, err)
-		resp, ok := res.(*api.QueryProjectsResponse)
-		require.True(t, ok, "got %T", res)
-		require.Len(t, resp.Projects, 2)
-		assert.Equal(t, "proj_a", resp.Projects[0].ID)
-
-		slot, ok := audit.ActorSlotFromContext(ctx)
-		require.True(t, ok)
-		require.NotNil(t, slot.Authorization)
-		assert.Equal(t, domain.EventAuthorizationPathPlatformOperator, slot.Authorization.Path)
-	})
-
-	t.Run("any other platform session is refused", func(t *testing.T) {
-		t.Parallel()
-		h, _ := operatorHandler(t, new(false))
-		_, err := h.QueryProjects(WithScopeContext(t.Context(), operatorScope), &api.QueryProjectsRequest{})
-		assertDomainCode(t, err, domain.ErrProjectPermissionDenied().Code)
-	})
-
-	t.Run("a session homed elsewhere is refused without asking", func(t *testing.T) {
-		t.Parallel()
-		h, _ := operatorHandler(t, nil)
-		customer := operatorScope
-		customer.ProjectID = "proj_customer"
-		customer.PlatformProjectID = ""
-		_, err := h.QueryProjects(WithScopeContext(t.Context(), customer), &api.QueryProjectsRequest{})
-		assertDomainCode(t, err, domain.ErrProjectPermissionDenied().Code)
-	})
-}
-
-func TestGetMyPlatformAccess(t *testing.T) {
+func TestListMyProjects_PlatformOperator(t *testing.T) {
 	t.Parallel()
 
 	session := func(t *testing.T, scope ScopeContext) context.Context {
 		t.Helper()
-		ctx := context.WithValue(t.Context(), sessionTokenKey{}, &domain.Token{
+		ctx := context.WithValue(audit.WithActorSlot(t.Context()), sessionTokenKey{}, &domain.Token{
 			Type:      domain.TokenTypeSessionToken,
 			ProjectID: scope.ProjectID,
 			UserID:    scope.PrincipalID,
@@ -228,38 +183,55 @@ func TestGetMyPlatformAccess(t *testing.T) {
 		})
 		return WithScopeContext(ctx, scope)
 	}
-	relations := func(t *testing.T, res api.GetMyPlatformAccessRes) []api.PlatformAccessResponseRelationsItem {
+	listsEveryProject := func(t *testing.T, projects *servicemocks.MockProjectService, every bool) {
 		t.Helper()
-		resp, ok := res.(*api.PlatformAccessResponseHeaders)
-		require.True(t, ok, "got %T", res)
-		assert.Equal(t, sessionStateCacheControl, resp.CacheControl.Value)
-		return resp.Response.Relations
+		projects.EXPECT().ListAuthorized(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, req service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
+				assert.Equal(t, every, req.EveryProject)
+				return &service.ListProjectsResponse{Projects: []*domain.Project{{ID: "proj_a"}}}, nil
+			})
+	}
+	marked := func(t *testing.T, ctx context.Context) bool {
+		t.Helper()
+		slot, ok := audit.ActorSlotFromContext(ctx)
+		require.True(t, ok)
+		return slot.Authorization != nil
 	}
 
-	t.Run("an operator", func(t *testing.T) {
+	t.Run("an operator's projects are every project, and the request is marked", func(t *testing.T) {
 		t.Parallel()
-		h, _ := operatorHandler(t, new(true))
-		res, err := h.GetMyPlatformAccess(session(t, operatorScope), api.GetMyPlatformAccessParams{})
+		h, projects := operatorHandler(t, new(true))
+		listsEveryProject(t, projects, true)
+		ctx := session(t, operatorScope)
+
+		res, err := h.ListMyProjects(ctx, api.ListMyProjectsParams{})
 		require.NoError(t, err)
-		assert.Equal(t, []api.PlatformAccessResponseRelationsItem{api.PlatformAccessResponseRelationsItemOperator}, relations(t, res))
+		resp, ok := res.(*api.ListMyProjectsResponseHeaders)
+		require.True(t, ok, "got %T", res)
+		assert.Len(t, resp.Response.Projects, 1)
+		assert.True(t, marked(t, ctx))
 	})
 
-	t.Run("anyone else gets an empty list", func(t *testing.T) {
+	t.Run("anyone else gets the projects they hold grants on", func(t *testing.T) {
 		t.Parallel()
-		h, _ := operatorHandler(t, new(false))
-		res, err := h.GetMyPlatformAccess(session(t, operatorScope), api.GetMyPlatformAccessParams{})
+		h, projects := operatorHandler(t, new(false))
+		listsEveryProject(t, projects, false)
+		ctx := session(t, operatorScope)
+
+		_, err := h.ListMyProjects(ctx, api.ListMyProjectsParams{})
 		require.NoError(t, err)
-		assert.Empty(t, relations(t, res))
+		assert.False(t, marked(t, ctx))
 	})
 
 	t.Run("a user homed elsewhere is answered without asking", func(t *testing.T) {
 		t.Parallel()
-		h, _ := operatorHandler(t, nil)
+		h, projects := operatorHandler(t, nil)
+		listsEveryProject(t, projects, false)
 		customer := operatorScope
 		customer.ProjectID = "proj_customer"
 		customer.PlatformProjectID = ""
-		res, err := h.GetMyPlatformAccess(session(t, customer), api.GetMyPlatformAccessParams{})
+
+		_, err := h.ListMyProjects(session(t, customer), api.ListMyProjectsParams{})
 		require.NoError(t, err)
-		assert.Empty(t, relations(t, res))
 	})
 }

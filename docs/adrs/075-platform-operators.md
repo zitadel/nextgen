@@ -146,18 +146,19 @@ The request's `request.api` event lands in the operator's home project and
 carries the same block. Operator reads are not yet recorded in the customer's
 stream.
 
-### 6. Discovery
+### 6. Discovery is access-based enumeration
 
-- `queryProjects` accepts the Console session. For an operator it searches
-  every project of the deployment with its usual filters, sorting and paging.
-  Any other session is refused with `403 proj.permission_denied`; its
-  projects are listed by `listMyProjects`.
-- `GET /users/me/platform_access` lists the platform relations the signed-in
-  user holds, so the Console derives the capability instead of probing
-  (ADR 054 §10).
-- `listMyProjects` keeps meaning the projects a user holds grants on. Mixing
-  every project into it would change the Console's auto-selection and its
-  project switcher.
+`listMyProjects` lists the projects a user can act on. For an operator, that is
+every project of the deployment, listed in the same order and with the same
+paging as anyone's. ADR 053 §6 already puts every path of the active catalog
+into that set, and `operator from platform` is one of them.
+
+Operators therefore get no listing, label or Console view of their own: the
+Console shows what a person can access, however they reach it. Nothing in it
+depends on knowing who is an operator, so there is no capability read either;
+ADR 054 §10's rule applies once an operator-only surface exists. An operator
+lives with the size of their list as any account with many projects does, and
+server-side search on `listMyProjects` is the shared answer.
 
 ### 7. Self-hosted
 
@@ -169,8 +170,9 @@ has a platform project and names an operator. With neither, nothing changes.
 
 ### Positive
 
-- Cloud admins and support staff reach every project without a grant per
-  project, and without widening what the platform project's own roles mean.
+- Cloud admins and support staff reach and list every project without a
+  grant per project, and without widening what the platform project's own
+  roles mean.
 - Every management handler gains the operator path through the one gate they
   share, with no change per handler.
 - Customers can see in their events when an operator changed something.
@@ -199,6 +201,13 @@ project.
 ### Naming operators by email in configuration
 
 Whoever first registers a configured address would become an operator.
+
+### A separate listing and a capability read for operators
+
+An operator-only search over every project, and an endpoint telling the
+Console who is an operator, would make operators a special case of the
+question every user asks: which projects can I act on. The hierarchy already
+answers it.
 
 ### Folding the operator path into `CheckAuthz`
 
