@@ -19,7 +19,7 @@ import {
 import { PUBLIC_PROJECT_ID_VARIABLE } from "../../lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "../../lib/project";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "../../lib/server";
-import { shellArg } from "../../lib/shell";
+import { shellArg, shellOption } from "../../lib/shell";
 import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { nextCommandsData } from "../../lib/oclif/envelope";
 import { projectCommand } from "../../lib/suggestion";
@@ -110,10 +110,10 @@ export default class EnvAdd extends BaseCommand {
             [
               `env add ${shellArg(name)}`,
               "--server https://api.zitadel.cloud",
-              ...(flags.project === undefined ? [] : [`--project ${shellArg(flags.project)}`]),
+              ...(flags.project === undefined ? [] : [shellOption("--project", flags.project)]),
               ...(flags["app-url"] === undefined
                 ? []
-                : [`--app-url ${shellArg(flags["app-url"])}`]),
+                : [shellOption("--app-url", flags["app-url"])]),
               ...(flags.force ? ["--force"] : []),
             ].join(" "),
           ),
@@ -252,7 +252,7 @@ export default class EnvAdd extends BaseCommand {
       pretty: [
         `Wrote ${file} with ${Object.keys(values).join(", ")}`,
         "",
-        `Check what resolves: zitadel env --env ${shellArg(name)}${typeof flags.cwd === "string" ? ` --cwd ${shellArg(flags.cwd)}` : ""}`,
+        `Check what resolves: zitadel env ${shellOption("--env", name)}${typeof flags.cwd === "string" ? ` ${shellOption("--cwd", flags.cwd)}` : ""}`,
         "",
         "The deployed app never reads that file. Set these where it is built and run.",
         "",

@@ -11,8 +11,12 @@ import {
   type PackageCommand,
   type PackageManager,
 } from "../../lib/package-manager";
-import { shellCommand, type SuggestedCommand, unscopedCommand } from "../../lib/suggestion";
-import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
+import {
+  type EnvironmentSelector,
+  projectCommand,
+  shellCommand,
+  type SuggestedCommand,
+} from "../../lib/suggestion";
 
 type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
 
@@ -47,6 +51,14 @@ export type SetupInstallInput = {
   env: NodeJS.ProcessEnv;
   issuer: string;
   json: boolean;
+  /**
+   * The selector pinning the project setup just created, for the follow-ups
+   * below. Without it a bare `status`/`deploy` resolves the environment as the
+   * next shell does, where the process environment outranks the `.env` files:
+   * in a shell holding production values the follow-up would read — or publish
+   * to — another project.
+   */
+  selector: EnvironmentSelector;
   scaffoldedFramework: boolean;
   skipInstall: boolean;
   run?: typeof runPackageCommand;
@@ -71,6 +83,7 @@ export async function installDependenciesForSetup(
       devCommand: devCommand.display,
       cliVersion: input.cliVersion,
       issuer: input.issuer,
+      selector: input.selector,
       includeInstallCommand: false,
     });
   }
@@ -86,6 +99,7 @@ export async function installDependenciesForSetup(
       devCommand: devCommand.display,
       cliVersion: input.cliVersion,
       issuer: input.issuer,
+      selector: input.selector,
       includeInstallCommand: true,
     });
   }
@@ -111,6 +125,7 @@ export async function installDependenciesForSetup(
     devCommand: devCommand.display,
     cliVersion: input.cliVersion,
     issuer: input.issuer,
+    selector: input.selector,
     includeInstallCommand: false,
   });
 }
@@ -120,10 +135,11 @@ function outcome(input: {
   devCommand: string;
   cliVersion: string;
   issuer: string;
+  selector: EnvironmentSelector;
   includeInstallCommand: boolean;
 }): SetupInstallOutcome {
-  const planCommand = unscopedCommand("plan", input.cliVersion);
-  const statusCommand = unscopedCommand("status", input.cliVersion);
+  const planCommand = projectCommand("plan", input.selector, input.cliVersion);
+  const statusCommand = projectCommand("status", input.selector, input.cliVersion);
   const verifyActions = [
     ...(input.includeInstallCommand ? [`Install dependencies: ${input.install.command}`] : []),
     `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`,
@@ -149,10 +165,9 @@ function outcome(input: {
     install: input.install,
     devCommand: input.devCommand,
     boxActions,
-    // Setup's project is the default environment's, which needs no selector.
     nextActions: [
       ...verifyActions,
-      ...customizeAndPublishActions(input.cliVersion, environmentSelectorSuffix({})),
+      ...customizeAndPublishActions(input.cliVersion, input.selector),
     ],
     nextCommands: input.includeInstallCommand
       ? [shellCommand(input.install.command), shellCommand(input.devCommand), planCommand]

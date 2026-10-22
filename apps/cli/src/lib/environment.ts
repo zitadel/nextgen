@@ -8,7 +8,7 @@ import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { appendManagedEnvValue } from "./fs-safe";
 import { parseServer, resolveServer, serverOrigin } from "./server";
 import { unscopedCommand } from "./suggestion";
-import { shellArg } from "./shell";
+import { shellOption } from "./shell";
 
 /**
  * The values a command reads from an environment. Each resolves on its own, so
@@ -317,7 +317,7 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
           nextCommands: [
             unscopedCommand(
               `${name === "development" ? "setup" : `env add ${name}`}${
-                environment.cwd === process.cwd() ? "" : ` --cwd ${shellArg(environment.cwd)}`
+                environment.cwd === process.cwd() ? "" : ` ${shellOption("--cwd", environment.cwd)}`
               }`,
             ),
           ],

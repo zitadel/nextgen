@@ -119,7 +119,7 @@ import {
   type Row,
   type Section,
 } from "./summary";
-import { shellArg } from "../../lib/shell";
+import { shellOption } from "../../lib/shell";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 import {
@@ -753,6 +753,7 @@ export default class Setup extends BaseCommand {
       env: this.meta.env,
       issuer,
       json: this.jsonEnabled(),
+      selector: recoverySelector(flags.cwd),
       scaffoldedFramework,
       skipInstall: Boolean(flags["skip-install"]),
     });
@@ -1529,7 +1530,7 @@ function ssoCredentialPublisher(
  */
 /** `--cwd` for a suggested command, when setup was pointed at a directory. */
 function cwdArg(retry: SetupRetryOptions): string {
-  return retry.cwd === undefined ? "" : ` --cwd ${shellArg(retry.cwd)}`;
+  return retry.cwd === undefined ? "" : ` ${shellOption("--cwd", retry.cwd)}`;
 }
 
 function ssoRecovery(
@@ -1683,7 +1684,7 @@ async function assertLocalServerVersion(
         `halfway. Run start to restart it on ${expected}; its data stays. ${where}` +
         "Then rerun setup.",
       nextCommands: [
-        unscopedCommand(`start --cwd ${shellArg(nearest.dir)}`, cliVersion),
+        unscopedCommand(`start ${shellOption("--cwd", nearest.dir)}`, cliVersion),
         unscopedCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
       ],
       details: {
