@@ -24,7 +24,6 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errreport"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog/extractors"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
@@ -732,14 +731,9 @@ func (h errorStubHandler) GetHealth(context.Context) (api.GetHealthRes, error) {
 // on. Not parallel: it changes globals.
 func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenService, req *http.Request) (*httptest.ResponseRecorder, []map[string]any) {
 	t.Helper()
-	errreport.EnableLocation(true)
-	errreport.EnableStack(true)
+	enableErrorOrigins(t)
 	defaultLogger := slog.Default()
-	t.Cleanup(func() {
-		errreport.EnableLocation(false)
-		errreport.EnableStack(false)
-		slog.SetDefault(defaultLogger)
-	})
+	t.Cleanup(func() { slog.SetDefault(defaultLogger) })
 
 	var logs bytes.Buffer
 	logger := slog.New(slogctx.NewHandler(slog.NewJSONHandler(&logs, nil), &slogctx.HandlerOptions{
@@ -755,7 +749,6 @@ func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenS
 
 	ctx := middleware.WithRequestIDContext(req.Context(), "req_1")
 	ctx = middleware.WithOperationIDContext(ctx, "")
-	ctx = zlog.WithLoggingContext(ctx, logger)
 	rec := httptest.NewRecorder()
 	WithRecover(srv).ServeHTTP(rec, req.WithContext(ctx))
 
@@ -766,6 +759,18 @@ func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenS
 		records = append(records, record)
 	}
 	return rec, records
+}
+
+// enableErrorOrigins turns on location and stack capture for the errors the
+// test builds, and turns it off again afterwards.
+func enableErrorOrigins(t *testing.T) {
+	t.Helper()
+	errreport.EnableLocation(true)
+	errreport.EnableStack(true)
+	t.Cleanup(func() {
+		errreport.EnableLocation(false)
+		errreport.EnableStack(false)
+	})
 }
 
 // A handler error answered with a 5xx is logged once, at Error, with the
@@ -791,16 +796,32 @@ func TestOgenErrorHandlerLogsServerFaultOnce(t *testing.T) {
 	require.NotEmpty(t, logged["stackTrace"])
 }
 
-// A handler error answered with a 4xx is logged once, at Info.
+// A handler error answered with a 4xx is logged once, at Info, with its code,
+// message and cause but without the location and stack it captured.
 func TestOgenErrorHandlerLogsClientErrorAtInfo(t *testing.T) {
-	rec, records := serveAndRecordLogs(t, errorStubHandler{err: domain.ErrProjectNotFound()}, nil,
+	enableErrorOrigins(t)
+	err := domain.ErrProjectNotFound().WithParent(errors.New("no rows in result set"))
+	rec, records := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
 		httptest.NewRequest(http.MethodGet, "/healthz", nil))
 
 	require.Equal(t, http.StatusNotFound, rec.Code)
 	require.Len(t, records, 1)
 	require.Equal(t, "INFO", records[0]["level"])
 	require.EqualValues(t, http.StatusNotFound, records[0]["status"])
-	require.Equal(t, domain.ErrProjectNotFound().Code, records[0]["error"].(map[string]any)["code"])
+	requireBriefError(t, records[0], err.Code, err.Message, "no rows in result set")
+}
+
+// requireBriefError asserts the record logs the error without its location
+// and stack, as every line below Error level does.
+func requireBriefError(t *testing.T, record map[string]any, code, message, parent string) {
+	t.Helper()
+	logged, ok := record["error"].(map[string]any)
+	require.True(t, ok, "error must be logged as a group: %v", record["error"])
+	require.Equal(t, code, logged["code"])
+	require.Equal(t, message, logged["message"])
+	require.Contains(t, logged["parent"], parent)
+	require.NotContains(t, logged, "reportLocation")
+	require.NotContains(t, logged, "stackTrace")
 }
 
 // A body ogen cannot decode is logged with ogen's reason, which the client
@@ -814,6 +835,7 @@ func TestOgenErrorHandlerLogsDecodeReason(t *testing.T) {
 	require.JSONEq(t, `{"code":"req.invalid","message":`+fmt.Sprintf("%q", domain.ErrRequestInvalid().Message)+`}`, rec.Body.String())
 	require.Len(t, records, 1)
 	require.Equal(t, "INFO", records[0]["level"])
+	require.Equal(t, "createProject", records[0]["operation_id"], "ogen fails before its middleware names the operation")
 	logged := records[0]["error"].(map[string]any)
 	require.Equal(t, "req.invalid", logged["code"])
 	require.Contains(t, logged["parent"], "unexpected EOF")
@@ -852,6 +874,7 @@ func TestOgenErrorHandlerLogsSecurityInternalErrorOnce(t *testing.T) {
 	record := records[0]
 	require.Equal(t, "ERROR", record["level"])
 	require.Equal(t, "api error", record["msg"])
+	require.Equal(t, "getMySession", record["operation_id"])
 	logged := record["error"].(map[string]any)
 	require.Equal(t, "internal", logged["code"])
 	require.Equal(t, "failed to read token record", logged["message"])
@@ -860,9 +883,8 @@ func TestOgenErrorHandlerLogsSecurityInternalErrorOnce(t *testing.T) {
 
 // A request the client gave up on is logged at Warn, not as a server fault,
 // though it still answers 500. A cancel the server caused itself stays an
-// Error.
+// Error. Only the Error line carries the location and stack.
 func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
-	err := domain.ErrInternal(fmt.Errorf("query projects: %w", context.Canceled))
 	for _, tc := range []struct {
 		name      string
 		canceled  bool
@@ -872,6 +894,8 @@ func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
 		{"request alive", false, "ERROR"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			enableErrorOrigins(t)
+			err := domain.ErrInternal(fmt.Errorf("query projects: %w", context.Canceled))
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			if tc.canceled {
@@ -884,6 +908,11 @@ func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
 			require.Len(t, records, 1)
 			require.Equal(t, tc.wantLevel, records[0]["level"])
 			require.EqualValues(t, http.StatusInternalServerError, records[0]["status"])
+			if tc.canceled {
+				requireBriefError(t, records[0], err.Code, err.Message, "query projects: context canceled")
+			} else {
+				require.Contains(t, records[0]["error"], "stackTrace")
+			}
 		})
 	}
 }

@@ -27,6 +27,27 @@ func TestWithRecoverAnswersPanicWithInternalError(t *testing.T) {
 	require.Equal(t, "req_1", record["request_id"])
 }
 
+// A flushed response has started: a later panic must not write a second
+// status.
+func TestHeaderTrackingWriterFlushStartsTheResponse(t *testing.T) {
+	t.Parallel()
+	rec := httptest.NewRecorder()
+	w := &headerTrackingWriter{ResponseWriter: rec}
+
+	w.Flush()
+
+	require.True(t, w.wroteHeader)
+	require.True(t, rec.Flushed)
+}
+
+// http.NewResponseController reaches the writer underneath.
+func TestHeaderTrackingWriterUnwrapsTheInnerWriter(t *testing.T) {
+	t.Parallel()
+	rec := httptest.NewRecorder()
+
+	require.Equal(t, http.ResponseWriter(rec), (&headerTrackingWriter{ResponseWriter: rec}).Unwrap())
+}
+
 // net/http aborts a response with http.ErrAbortHandler and expects to see it.
 func TestWithRecoverRepanicsAbortHandler(t *testing.T) {
 	t.Parallel()

@@ -242,6 +242,15 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 		details = resp.Response
 	}
 
+	// Decode and security fail before ogen's middleware names the operation.
+	// Their errors carry it, and filling the holder lets the access line and
+	// the audit middleware see it too.
+	if operationID, _ := middleware.GetOperationIDContext(ctx); operationID == "" {
+		var oc interface{ OperationID() string }
+		if errors.As(err, &oc) {
+			ctx = middleware.WithOperationIDContext(ctx, oc.OperationID())
+		}
+	}
 	logAPIError(ctx, status, logged)
 	writeErrorDetails(w, status, details)
 }
@@ -255,11 +264,15 @@ func logAPIError(ctx context.Context, status int, err domain.Error) {
 	case status >= http.StatusInternalServerError:
 		level = slog.LevelError
 	}
+	logged := slog.Attr{Key: zlog.ErrorAttributeKey, Value: err.BriefLogValue()}
+	if level == slog.LevelError {
+		logged = slog.Any(zlog.ErrorAttributeKey, err)
+	}
 	operationID, _ := middleware.GetOperationIDContext(ctx)
 	zlog.Log(ctx, level, "api error",
 		slog.Int("status", status),
 		slog.String("operation_id", operationID),
-		slog.Any(zlog.ErrorAttributeKey, err),
+		logged,
 	)
 }
 

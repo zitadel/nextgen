@@ -57,3 +57,15 @@ func (w *headerTrackingWriter) Write(b []byte) (int, error) {
 	w.wroteHeader = true
 	return w.ResponseWriter.Write(b)
 }
+
+// Flush keeps streaming working through the wrapper; flushing sends the
+// headers.
+func (w *headerTrackingWriter) Flush() {
+	w.wroteHeader = true
+	_ = http.NewResponseController(w.ResponseWriter).Flush()
+}
+
+// Unwrap lets http.NewResponseController reach the writer underneath.
+func (w *headerTrackingWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
