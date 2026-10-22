@@ -258,9 +258,9 @@ tasks:
     # was nearly read off a run that never happened.
     #
     # -parallel is deliberately NOT pinned to 1. Tests running concurrently
-    # within a package put transactions in contention, which is what drives
-    # aborts through the retry path (#788); pinning it hid a missing retry
-    # rather than fixing it. Do not put it back.
+    # within a package put transactions in real contention, on top of the
+    # aborts a spanner_integration build injects on purpose (#788); pinning it
+    # hid a missing retry rather than fixing it. Do not put it back.
     #
     # -p is left at its default, so the three packages run at once. Each still
     # gets its own database: with ZITADEL_TEST_SPANNER_INSTANCE set (spanner.yml

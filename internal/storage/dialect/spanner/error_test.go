@@ -163,10 +163,9 @@ func TestBoundRetry(t *testing.T) {
 
 		deadline, ok := ctx.Deadline()
 		require.True(t, ok, "an unbounded conflict loop would spin forever")
-		// retryBudget, not maxRetryDuration: under -tags spanner_integration
-		// TestMain sets SPANNER_EMULATOR_HOST, which selects the looser bound.
-		// Which value each environment gets is pinned by TestRetryBudget.
-		assert.WithinDuration(t, time.Now().Add(retryBudget()), deadline, time.Second)
+		// The same bound under -tags spanner_integration, where
+		// SPANNER_EMULATOR_HOST is set: tests run under the production budget.
+		assert.WithinDuration(t, time.Now().Add(maxRetryDuration), deadline, time.Second)
 	})
 
 	t.Run("keeps a deadline the caller already set", func(t *testing.T) {
@@ -198,19 +197,6 @@ func TestWrapErrorKeepsAbortedRetryable(t *testing.T) {
 	assert.Equal(t, codes.Aborted, status.Code(got),
 		"ABORTED was stripped; ReadWriteTransaction will not retry")
 	assert.ErrorAs(t, got, new(*spanner.Error))
-}
-
-// TestRetryBudget cannot be parallel: t.Setenv forbids it, and the branch under
-// test is selected by process environment.
-func TestRetryBudget(t *testing.T) {
-	t.Setenv("SPANNER_EMULATOR_HOST", "")
-	assert.Equal(t, maxRetryDuration, retryBudget(),
-		"production must keep the tight bound; a hot row should fail fast")
-
-	t.Setenv("SPANNER_EMULATOR_HOST", "localhost:9010")
-	assert.Equal(t, emulatorRetryDuration, retryBudget(),
-		"the emulator serialises transactions process-wide and starves long ones, "+
-			"so the production bound turns test contention into a failed request")
 }
 
 // runBounded must report a spent budget. Without it the only trace is a
