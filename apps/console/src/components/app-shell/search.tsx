@@ -57,9 +57,14 @@ export function useSearchShortcut(): [boolean, (open: boolean) => void] {
       // A held key toggles once, not on every repeat.
       if (event.repeat) return;
       setOpen((current) => {
-        // Not over another open dialog or sheet (the palette's own is
-        // fine: the shortcut closes it).
-        if (!current && document.querySelector('[role="dialog"][data-state="open"]')) {
+        // Not over another open dialog, sheet or confirmation (the
+        // palette's own is fine: the shortcut closes it).
+        if (
+          !current &&
+          document.querySelector(
+            '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]',
+          )
+        ) {
           return current;
         }
         return !current;

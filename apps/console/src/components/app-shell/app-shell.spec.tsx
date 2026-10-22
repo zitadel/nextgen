@@ -550,7 +550,7 @@ describe("search", () => {
     );
   });
 
-  it("toggles once for a held shortcut, and not over another open dialog", async () => {
+  it("toggles once for a held shortcut, and not over another open dialog or confirmation", async () => {
     renderShell();
     await screen.findByRole("link", { name: /^Users/ });
     // A held key: one press, then auto-repeats. It opens once and stays open.
@@ -563,16 +563,18 @@ describe("search", () => {
       expect(screen.queryByRole("dialog", { name: "Go to" })).not.toBeInTheDocument(),
     );
 
-    // Another dialog open: the shortcut leaves it alone.
-    const other = document.createElement("div");
-    other.setAttribute("role", "dialog");
-    other.dataset.state = "open";
-    document.body.append(other);
-    try {
-      fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-      expect(screen.queryByRole("dialog", { name: "Go to" })).not.toBeInTheDocument();
-    } finally {
-      other.remove();
+    // Another dialog or a confirmation open: the shortcut leaves it alone.
+    for (const role of ["dialog", "alertdialog"]) {
+      const other = document.createElement("div");
+      other.setAttribute("role", role);
+      other.dataset.state = "open";
+      document.body.append(other);
+      try {
+        fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+        expect(screen.queryByRole("dialog", { name: "Go to" })).not.toBeInTheDocument();
+      } finally {
+        other.remove();
+      }
     }
   });
 
