@@ -10,7 +10,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/zitadel/nextgen/api/client"
-	api "github.com/zitadel/nextgen/api/generated"
+	api "github.com/zitadel/nextgen/internal/api/generated"
 )
 
 // Router is a generated server as MountAPI mounts it: it serves a request,

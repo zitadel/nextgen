@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 export const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 export const GENERATED_GLOBS = [
-  "apps/api/api/generated/**/*.go",
+  "apps/api/internal/api/generated/**/*.go",
   "apps/api/api/openapi/components/schemas/errors/**/*.yaml",
   "apps/api/api/openapi/endpoints/**/*-error-response.yaml",
   // gen_event_schemas: the Event union, a schema per event type, and a
@@ -50,7 +50,7 @@ const HEADER_BYTES = 512;
 
 export function hasGeneratedMarker(absPath) {
   // Read from a descriptor rather than whole-file: the marker is always in the
-  // header, and api/generated alone is megabytes of ogen output to slurp for a
+  // header, and the ogen output alone is megabytes to slurp for a
   // line that cannot be below the first few. A multi-byte rune split at the
   // boundary decodes to a replacement char, which the marker never contains.
   const fd = openSync(absPath, "r");
@@ -87,7 +87,7 @@ function globToRegExp(pattern) {
 /** Every file under a repo-relative directory, itself repo-relative. */
 function filesUnder(dir) {
   const absolute = join(ROOT, dir);
-  // api/generated is gone on a pruned tree, and internal/** always exists.
+  // The ogen output is gone on a pruned tree, and internal/** always exists.
   if (!existsSync(absolute)) {
     return [];
   }
