@@ -1,7 +1,8 @@
 # Runbook: hosted cloud (Vercel + PlanetScale Postgres)
 
-> **Code:** [`apps/cloud/`](../../apps/cloud/) and the repo-root
-> [`vercel.json`](../../vercel.json)
+> **Code:** [`apps/cloud/`](../../apps/cloud/), the launcher in
+> [`apps/api/cmd/cloud-launcher/`](../../apps/api/cmd/cloud-launcher/) and the
+> repo-root [`vercel.json`](../../vercel.json)
 > **Vercel project:** `zitadel/cloud` (renamed from `nextgen-preview-cloud`).
 > Production answers at `preview.zitadel.com`, the docs' address that
 > [`skills/zitadel/SKILL.md`](../../skills/zitadel/SKILL.md) gives agents;
@@ -26,8 +27,8 @@ One Vercel deployment, six [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; the build command installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/events-retention` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
-| `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, adds the unlisted sign-up page `/console/signup`, and adds Billing and Support to Settings, which until their systems are live say the cloud is free during the preview and point to GitHub issues, starts onboarding on each signed-in page and on the CLI's claim page, and reports `signup_completed` when the sign-in widget makes an account; in previews it also adds Email and sends the sign-in widget's calls through BotID's check in `cloud-functions`; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
+| `server` | Go preset, rooted at the Go module `apps/api`; the build command enters the repo root and installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/api/cmd/cloud-launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/events-retention` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
+| `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, adds the unlisted sign-up page `/console/signup`, and adds Billing and Support to Settings, which until their systems are live say the cloud is free during the preview and point to GitHub issues, starts onboarding on each signed-in page and on the CLI's claim page, and reports `signup_completed` when the sign-in widget makes an account; in previews it also adds Email and sends the sign-in widget's calls through BotID's check in `cloud-functions`; the service serves the build where it lands, `apps/api/internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache; never moon, which cannot archive the symlinks Vercel's Next.js adapter writes | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link; and every path no other service claims, which its 404 answers ([ADR 076](../adrs/076-error-pages-and-unmatched-routes.md)) |
 | `cloud-functions` | Next.js; `turbo run build --filter=@zitadel/cloud-functions`, route handlers and the Workflow SDK's routes, no pages ([`apps/cloud-functions`](../../apps/cloud-functions/AGENTS.md), [ADR 084](../adrs/084-hosted-cloud-business-systems.md)); keyed by the deployment's ID, as the website's. It reads Zitadel live; Stripe and HubSpot are mocks, which send nothing. Production runs onboarding on them and answers everything else `503 cloud.not_live` | `/cloud/*`: the console add-on's calls (`/cloud/api/*`), the sign-in widget's calls through BotID's check (`/cloud/zitadel/*`), Stripe's webhooks (`/cloud/hooks/stripe`) and its cron routes (`/cloud/cron/*`, none scheduled yet) |
@@ -150,7 +151,7 @@ migrates through, because migrations hold a session advisory lock.
   URLs name its `postgres` database with a role that may create databases;
   the launcher swaps in the preview's own: one per Git branch, named
   `preview_<branch>_<hash>`
-  ([`database.go`](../../apps/cloud/launcher/database.go)). The build
+  ([`database.go`](../../apps/api/cmd/cloud-launcher/database.go)). The build
   creates it when it is missing, stamps it with the branch and the time of
   the deployment (a database comment), and migrates it; the function serves
   from it. Previews start empty and never see production data.
@@ -481,7 +482,7 @@ the deployment as the CLI's does, a status in `production-checks.yml`'s
 http://localhost:3000: `vercel dev -L` over `vercel.json`, every service behind
 the deployment's own routes on one origin, the server on SQLite. No Vercel
 account, link or secret is involved, and Go need not be installed: Vercel's Go
-builder downloads the version `go.mod` names. `CLOUD_DEV_PORT` moves the port;
+builder downloads the version `apps/api/go.mod` names. `CLOUD_DEV_PORT` moves the port;
 `CLOUD_DEV_DEBUG=1` shows why a service did not start, which `vercel dev` logs
 only at debug level.
 
@@ -497,8 +498,9 @@ restart keeps its state; deleting the directory starts over.
 `--local-config`), so what it needs lives there, in fields a deployment does
 not use:
 
-- The `server` service's `entrypoint` names `apps/cloud/launcher`. In dev,
-  Vercel's Go builder builds that package and starts it on `$PORT`; a
+- The `server` service is rooted at the Go module, `apps/api`, and its
+  `entrypoint` names `cmd/cloud-launcher/main.go` there. In dev, Vercel's Go
+  builder builds that package and starts it on `$PORT`; a
   deployment's build command compiles the same package through turbo, and
   the builder takes that binary instead. Without
   `CLOUD_DATABASE_URL` and outside a deployment, the launcher serves from
@@ -735,7 +737,7 @@ project and imports the root admin.
   from and installs when they differ. Go would keep each rebuild's compiled
   packages for five days, so `build-launcher.sh` drops those no build used
   in the last two hours. A new Go version starts the Go caches over: when the
-  toolchain Vercel picks from `go.mod`'s `toolchain` line differs from the
+  toolchain Vercel picks from `apps/api/go.mod`'s `toolchain` line differs from the
   restored one, its Go builder downloads it and deletes
   `.vercel/cache/golang`, module cache included. The next build of each
   branch then downloads every module and compiles the server from nothing:

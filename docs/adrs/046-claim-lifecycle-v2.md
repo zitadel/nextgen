@@ -142,7 +142,7 @@ embedded in the `claim_url` the browser opens and in the `?challenge_id=` the CL
 polls with.
 
 It is therefore minted like a **handoff token**
-([`internal/domain/handoff_token.go`](../../internal/domain/handoff_token.go)):
+([`internal/domain/handoff_token.go`](../../apps/api/internal/domain/handoff_token.go)):
 128 bits from `crypto/rand`, a distinct prefix, base64url-encoded, with the
 server storing only the SHA-256 hash. It is not a managed prefixed resource ID,
 and it is not an encrypted opaque token: the challenge row exists regardless for

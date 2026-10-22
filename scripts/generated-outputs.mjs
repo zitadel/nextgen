@@ -3,7 +3,7 @@
  *
  * These globs mirror the `outputs` of the `server:generate` Moon task — keep
  * the two in sync. They are deliberately file-precise rather than
- * directory-wide: `internal/domain` holds hand-written code alongside its
+ * directory-wide: `apps/api/internal/domain` holds hand-written code alongside its
  * generated `*_enumer.go`, so a directory-level pattern here would be a
  * destructive mistake waiting to happen.
  */
@@ -14,21 +14,21 @@ import { fileURLToPath } from "node:url";
 export const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 export const GENERATED_GLOBS = [
-  "api/generated/**/*.go",
-  "api/openapi/components/schemas/errors/**/*.yaml",
-  "api/openapi/endpoints/**/*-error-response.yaml",
+  "apps/api/api/generated/**/*.go",
+  "apps/api/api/openapi/components/schemas/errors/**/*.yaml",
+  "apps/api/api/openapi/endpoints/**/*-error-response.yaml",
   // gen_event_schemas: the Event union, a schema per event type, and a
   // webhook per event type. The payloads and event-base.yaml beside them are
   // hand-written.
-  "api/openapi/endpoints/events/event.yaml",
-  "api/openapi/endpoints/events/types/*.yaml",
-  "api/openapi/endpoints/events/webhooks/*.yaml",
+  "apps/api/api/openapi/endpoints/events/event.yaml",
+  "apps/api/api/openapi/endpoints/events/types/*.yaml",
+  "apps/api/api/openapi/endpoints/events/webhooks/*.yaml",
   // JSON meta-schemas, generated from the OpenAPI YAML next to them by
   // scripts/generate-meta-schemas.ts. Single-segment `*` on purpose: the
   // `examples/` subdirectory holds hand-written documents.
-  "api/openapi/endpoints/schemas/*.json",
-  "internal/**/*_enumer.go",
-  "internal/**/*.mock.go",
+  "apps/api/api/openapi/endpoints/schemas/*.json",
+  "apps/api/internal/**/*_enumer.go",
+  "apps/api/internal/**/*.mock.go",
 ];
 
 /**
