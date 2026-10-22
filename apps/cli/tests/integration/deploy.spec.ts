@@ -117,6 +117,34 @@ describe("deploy", () => {
         expect(await app.registeredIdps()).toEqual([]);
       });
 
+      it("registers a sign-in provider through the release, not before it", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.enableSso("google", {
+          clientId: "1234-abc.apps.googleusercontent.com",
+          secret: "the-client-secret",
+        });
+
+        await app.deployData();
+
+        expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
+      });
+
+      it("writes no connection when the deploy never reaches the release", async () => {
+        const app = await aSetUpApp();
+        await app.enableSso("google", {
+          clientId: "1234-abc.apps.googleusercontent.com",
+          secret: "the-client-secret",
+        });
+        await app.deleteVariable("GOOGLE_CLIENT_SECRET");
+        await app.removeOrigin(SETUP_ORIGIN.pattern);
+
+        const result = await app.deploy();
+
+        expect(result).toFail();
+        expect(await app.registeredIdps()).toEqual([]);
+      });
+
       it("refuses a connection whose secret variable the project does not hold", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

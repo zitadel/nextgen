@@ -5,7 +5,6 @@ import {
   buildBundle,
   createReleaseFromBundle,
   headSha,
-  idpConnectionsStep,
   runSteps,
   type StepContext,
   validateStep,
@@ -44,7 +43,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
     const json = this.jsonEnabled();
 
     const { client, projectId } = await this.connect();
-    const { bundle, resourceCount, brandingSources } = await buildBundle(cwd);
+    const { bundle, resourceCount, brandingSources, idpFiles } = await buildBundle(cwd);
 
     const ctx: StepContext = {
       cwd,
@@ -57,12 +56,13 @@ export default class ReleaseCreate extends EnvironmentCommand {
       color: !json && isTTY && flags.color !== false && !process.env.NO_COLOR,
       bundle,
       brandingSources,
+      idpFiles,
       suggest: (args) => this.suggest(args),
     };
     // The IdP connections sync before the build, as `deploy` does: a release
     // names its connections by slug, and the server refuses to build one
     // that names a slug the project does not hold yet.
-    await runSteps([validateStep, idpConnectionsStep], ctx);
+    await runSteps([validateStep], ctx);
 
     // `release create` carries the same no-mutation promise every command does
     // under `--dry-run`: validate the bundle the same way, then stop before the

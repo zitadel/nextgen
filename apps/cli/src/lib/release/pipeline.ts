@@ -28,6 +28,11 @@ export interface StepContext {
    */
   readonly brandingSources: readonly Record<string, unknown>[];
   /**
+   * The connection files' names, positional with `bundle.idps`, so a check can
+   * name the file a bad connection came from.
+   */
+  readonly idpFiles: readonly string[];
+  /**
    * A command against the project this run addresses, carrying its
    * environment selector, for a step's error to suggest its own fix.
    */
