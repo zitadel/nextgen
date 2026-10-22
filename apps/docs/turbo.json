@@ -18,7 +18,7 @@
       "env": ["!NEXT_*"],
       "inputs": [
         "$TURBO_EXTENDS$",
-        "$TURBO_ROOT$/api/openapi/**/*.yaml",
+        "$TURBO_ROOT$/apps/api/api/openapi/**/*.yaml",
         "$TURBO_ROOT$/redocly.yaml",
         "$TURBO_ROOT$/apps/cli/command-reference.json",
         "$TURBO_ROOT$/apps/cli/CHANGELOG.md"

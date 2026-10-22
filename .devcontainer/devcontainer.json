@@ -12,7 +12,7 @@
       "enableNonRootDocker": "true"
     }
   },
-  "postCreateCommand": "go mod download",
+  "postCreateCommand": "go -C apps/api mod download",
   "customizations": {
     "vscode": {
       "extensions": [

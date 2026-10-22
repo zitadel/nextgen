@@ -4,7 +4,7 @@
   // The hosted cloud on Vercel: what the repo-root vercel.json's `server` and
   // `schemas` services build. Moon has no project for it (moon's
   // workspace:cloud is this package's `dev`), and the launcher's Go tests run
-  // in @zitadel/server#test (`go test ./...`).
+  // in @zitadel/server#test (`go -C apps/api test ./...`).
   "tasks": {
     // The `server` service's function binary (build-launcher.sh), which
     // `migrate` runs and `deploy` hands to Vercel. Never cached: it runs with
@@ -27,15 +27,17 @@
       "passThroughEnv": ["GOFLAGS", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/**/*.sql",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/**/*.json",
+        "$TURBO_ROOT$/apps/api/**/*.go",
+        "$TURBO_ROOT$/apps/api/**/*.sql",
+        "$TURBO_ROOT$/apps/api/go.mod",
+        "$TURBO_ROOT$/apps/api/go.sum",
+        "$TURBO_ROOT$/apps/api/api/**/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**",
-        "$TURBO_ROOT$/internal/errorpage/*",
+        "$TURBO_ROOT$/packages/design-tokens/*.go",
+        "$TURBO_ROOT$/packages/design-tokens/go.mod",
+        "$TURBO_ROOT$/apps/api/internal/errorpage/*",
         "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
-        "$TURBO_ROOT$/internal/**/*.json",
+        "$TURBO_ROOT$/apps/api/internal/**/*.json",
         "$TURBO_ROOT$/apps/server/package.json",
         "!$TURBO_ROOT$/**/node_modules/**",
         "!$TURBO_ROOT$/.claude/**",
@@ -49,16 +51,14 @@
         "!$TURBO_ROOT$/tmp/**",
         "!$TURBO_ROOT$/.tmp/**",
         "!$TURBO_ROOT$/dist/**",
-        "!$TURBO_ROOT$/tools/bench/**",
-        "!$TURBO_ROOT$/tools/oidc-mock/**",
-        "!$TURBO_ROOT$/**/*_test.go",
-        "!$TURBO_ROOT$/**/testdata/**",
+        "!$TURBO_ROOT$/apps/api/**/*_test.go",
+        "!$TURBO_ROOT$/apps/api/**/testdata/**",
         "!**/*_test.go"
       ],
       "outputs": ["dist/nextgen-launcher"]
     },
     // The deployment's database: `launcher migrate` creates a preview's when
-    // it is missing (launcher/database.go) and migrates it. Migrations run
+    // it is missing (apps/api/cmd/cloud-launcher/database.go) and migrates it. Migrations run
     // here, before the deployment goes live, never when a function starts,
     // and never from the cache. A failed migration fails the build and the
     // previous deployment keeps serving, so every migration must leave the
@@ -90,7 +90,7 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/scripts/render-builtin-schemas.mjs",
-        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json"
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json"
       ],
       "outputs": ["dist/cloud-schemas/**"]
     },
