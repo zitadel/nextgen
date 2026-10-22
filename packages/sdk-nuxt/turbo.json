@@ -12,18 +12,31 @@
     // build never shares an invocation with demo-nuxt (see the release order
     // in tools/release/turbo.json).
     "build": {
-      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+      "dependsOn": [
+        "@zitadel/components#build",
+        "@zitadel/sdk-core#build",
+        "vite-plugin-nuxt-module#build"
+      ]
     },
+    // The private build plugin has no release build; its normal build is what vite.config.ts loads.
     "build-release": {
-      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release"]
+      "dependsOn": [
+        "@zitadel/components#build-release",
+        "@zitadel/sdk-core#build-release",
+        "vite-plugin-nuxt-module#build"
+      ]
     },
     "test": {
       "dependsOn": ["build"]
     },
-    // tsup's declaration pass resolves the workspace packages, which need
+    // The declaration pass resolves the workspace packages, which need
     // api's generated client and the built dependencies.
     "dev": {
-      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+      "dependsOn": [
+        "@zitadel/components#build",
+        "@zitadel/sdk-core#build",
+        "vite-plugin-nuxt-module#build"
+      ]
     }
   }
 }

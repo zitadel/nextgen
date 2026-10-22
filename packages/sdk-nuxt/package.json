@@ -34,8 +34,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup --tsconfig tsconfig.lib.json src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean --external '#imports' && tsup --tsconfig tsconfig.lib.json src/runtime/plugin.ts src/runtime/components.client.ts 'src/runtime/composables/*.ts' src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports' && tsup --tsconfig tsconfig.lib.json src/module.ts 'src/runtime/composables/*.ts' --format esm --dts-only --no-clean --external @nuxt/kit --external '#imports'",
-    "dev": "tsup src/index.ts src/server.ts --format esm --dts --watch",
+    "build": "vite build",
+    "dev": "vite build --watch",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test",
@@ -59,10 +59,11 @@
     "@nuxt/schema": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "h3": "^1.15.3",
+    "h3": "catalog:",
     "nuxt": "catalog:",
-    "tsup": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-nuxt-module": "workspace:*",
     "vitest": "catalog:"
   }
 }

@@ -6,6 +6,7 @@ dependsOn:
   - "api"
   - "components"
   - "sdk-core"
+  - "vite-plugin-nuxt-module"
 
 tasks:
   typecheck:
@@ -17,6 +18,7 @@ tasks:
     deps:
       - "components:build"
       - "sdk-core:build"
+      - "vite-plugin-nuxt-module:build"
     options:
       mutex: "sdk-nuxt-dist"
 
@@ -27,6 +29,8 @@ tasks:
     deps:
       - "components:build-release"
       - "sdk-core:build-release"
+      # The private build plugin has no release build; its normal build is what vite.config.ts loads.
+      - "vite-plugin-nuxt-module:build"
     outputs:
       - "dist/**/*"
     options:
@@ -44,13 +48,14 @@ tasks:
     deps:
       - "build"
 
-  # The same deps as build: tsup's declaration pass resolves the workspace
+  # The same deps as build: the declaration pass resolves the workspace
   # packages, which need api's generated client and the built dependencies.
   dev:
     command: "corepack pnpm run dev"
     deps:
       - "components:build"
       - "sdk-core:build"
+      - "vite-plugin-nuxt-module:build"
     options:
       persistent: true
       runInCI: false
