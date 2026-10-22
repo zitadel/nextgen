@@ -2,6 +2,7 @@ package spannerabort
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"slices"
 	"strings"
@@ -136,8 +137,11 @@ func TestDecide(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Rate 1 aborts every eligible call, so only eligibility decides.
-			v := New(1, 1).decide(service+tt.method, tt.req)
+			// Rate 1 picks every transaction and depth 1 aborts it at its first
+			// eligible call, so only eligibility decides.
+			in := New(1, 1)
+			in.depth = 1
+			v := in.decide(service+tt.method, tt.req)
 			if !tt.wantAbort {
 				assert.NoError(t, v.err)
 				return
@@ -165,27 +169,97 @@ func TestDecideAtRateZeroAbortsNothing(t *testing.T) {
 	}
 }
 
-// After an injected abort the transaction is over, as it is after a real one:
-// every later call in it fails the same way and nothing is rolled back twice.
-func TestAbortedTransactionStaysAborted(t *testing.T) {
+// runTransaction drives one transaction of writes then a commit through the
+// injector the way the client does: it stops at the first abort, which ends the
+// attempt. It reports which call was aborted, 0 for none; writes+1 is the
+// commit.
+func runTransaction(in *Injector, id []byte, writes int) int {
+	for i := 1; i <= writes; i++ {
+		dml := &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: inTransaction(id), Sql: "UPDATE t SET a = 1", Seqno: int64(i)}
+		if in.decide(service+"ExecuteSql", dml).err != nil {
+			return i
+		}
+	}
+	commit := &spannerpb.CommitRequest{Session: testSession, Transaction: &spannerpb.CommitRequest_TransactionId{TransactionId: id}}
+	if in.decide(service+"Commit", commit).err != nil {
+		return writes + 1
+	}
+	return 0
+}
+
+func TestATransactionIsAbortedAtMostOnce(t *testing.T) {
 	t.Parallel()
 
-	in := New(1, 1)
+	t.Run("a picked transaction aborts within its first writes", func(t *testing.T) {
+		t.Parallel()
+		in := New(1, 3) // rate 1 picks every transaction
+		for i := range 200 {
+			at := runTransaction(in, fmt.Appendf(nil, "tx-%d", i), 10)
+			assert.True(t, at >= 1 && at <= maxDepth, "aborted at call %d", at)
+		}
+	})
+
+	t.Run("one that ends sooner aborts at its commit", func(t *testing.T) {
+		t.Parallel()
+		in := New(1, 3)
+		for i := range 200 {
+			at := runTransaction(in, fmt.Appendf(nil, "tx-%d", i), 1)
+			assert.True(t, at == 1 || at == 2, "aborted at call %d", at)
+		}
+	})
+
+	t.Run("nothing more is injected in an aborted transaction", func(t *testing.T) {
+		t.Parallel()
+		in := New(1, 3)
+		in.depth = 1
+		dml := &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: inTransaction(testTx), Sql: "UPDATE t SET a = 1", Seqno: 1}
+		require.Error(t, in.decide(service+"ExecuteSql", dml).err)
+
+		// A callback that swallowed the abort goes on; the server, not the
+		// injector, refuses the rolled-back transaction.
+		dml.Seqno = 2
+		assert.NoError(t, in.decide(service+"ExecuteSql", dml).err)
+		commit := &spannerpb.CommitRequest{Session: testSession, Transaction: &spannerpb.CommitRequest_TransactionId{TransactionId: testTx}}
+		assert.NoError(t, in.decide(service+"Commit", commit).err)
+		assert.Empty(t, in.plan, "the commit ends what the injector knows about it")
+	})
+}
+
+// The chance that a transaction is aborted does not grow with its writes. When
+// every write was a draw of its own, a transaction of dozens of writes almost
+// never committed inside its 30-second retry budget.
+func TestLongTransactionsAreNotStarved(t *testing.T) {
+	t.Parallel()
+
+	in := New(0.1, 11)
+	const transactions, writes = 4000, 60
+	aborted, abortedAtWrite := 0, 0
+	for i := range transactions {
+		switch at := runTransaction(in, fmt.Appendf(nil, "tx-%d", i), writes); {
+		case at == 0:
+		case at <= writes:
+			aborted++
+			abortedAtWrite++
+		default:
+			aborted++
+		}
+	}
+	assert.InDelta(t, 0.1, float64(aborted)/transactions, 0.02)
+	// A commit ends what the injector knows about a transaction. One aborted at
+	// a write stays marked, because the client never commits it.
+	assert.Len(t, in.plan, abortedAtWrite)
+}
+
+func TestARollbackForgetsTheTransaction(t *testing.T) {
+	t.Parallel()
+
+	in := New(0, 1)
 	dml := &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: inTransaction(testTx), Sql: "UPDATE t SET a = 1", Seqno: 1}
-	require.Equal(t, testTx, in.decide(service+"ExecuteSql", dml).rollback)
+	require.NoError(t, in.decide(service+"ExecuteSql", dml).err)
+	require.Contains(t, in.plan, string(testTx))
 
-	in.rate = 0 // from here on only the earlier abort can fail a call
-	query := &spannerpb.ExecuteSqlRequest{Session: testSession, Transaction: inTransaction(testTx), Sql: "SELECT 1"}
-	v := in.decide(service+"ExecuteStreamingSql", query)
-	assert.Equal(t, codes.Aborted, status.Code(v.err), "a later query in the aborted transaction")
-	assert.Nil(t, v.rollback)
-
-	commit := &spannerpb.CommitRequest{Session: testSession, Transaction: &spannerpb.CommitRequest_TransactionId{TransactionId: testTx}}
-	v = in.decide(service+"Commit", commit)
-	assert.Equal(t, codes.Aborted, status.Code(v.err), "the commit of the aborted transaction")
-	assert.Nil(t, v.rollback)
-
-	assert.NoError(t, in.decide(service+"Commit", commit).err, "the commit ended the aborted transaction")
+	in.decide(service+"Rollback", &spannerpb.RollbackRequest{Session: testSession, TransactionId: testTx})
+	assert.Empty(t, in.plan)
 }
 
 func TestSeedReplaysDecisions(t *testing.T) {
@@ -315,7 +389,9 @@ func TestInterceptors(t *testing.T) {
 
 	t.Run("an aborted DML statement rolls its transaction back", func(t *testing.T) {
 		t.Parallel()
-		client, rec := dial(t, New(1, 1))
+		in := New(1, 1)
+		in.depth = 1
+		client, rec := dial(t, in)
 
 		stream, err := client.ExecuteStreamingSql(t.Context(), &spannerpb.ExecuteSqlRequest{
 			Session: testSession, Transaction: inTransaction(testTx), Sql: "UPDATE t SET a = 1 THEN RETURN a", Seqno: 1,
@@ -324,6 +400,8 @@ func TestInterceptors(t *testing.T) {
 		_, err = stream.Recv()
 		assert.Equal(t, codes.Aborted, status.Code(err))
 		assert.Equal(t, []string{"Rollback"}, rec.seen())
+		assert.Equal(t, spared, in.plan[string(testTx)],
+			"the injector's own rollback must not clear the abort it just made")
 	})
 
 	t.Run("a single-use query passes through", func(t *testing.T) {

@@ -24,10 +24,10 @@ const (
 )
 
 // clientOptions gives every Spanner client in an integration build the abort
-// injector, which aborts a seeded share of read-write calls so that test
-// transactions go through the retry path whatever engine they run against
-// (#788). A transaction makes several eligible calls, so at the default rate
-// roughly a quarter to a third of them are retried at least once.
+// injector, which aborts a seeded share of read-write transactions so that they
+// go through the retry path whatever engine they run against (#788). An attempt
+// gets at most two draws, so at the default rate about one in five is aborted,
+// however many statements it runs.
 func clientOptions() ([]option.ClientOption, error) {
 	in, err := abortInjector()
 	if err != nil || in == nil {

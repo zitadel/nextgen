@@ -5,14 +5,15 @@
 // which a test suite produces too rarely to catch a callback that drops the
 // status or cannot be replayed (#788).
 //
-// Three kinds of call can be aborted:
+// Two draws can abort an attempt at a read-write transaction:
 //
-//   - A statement that begins a read-write transaction (inline begin). It is
-//     never sent, so the server has nothing to undo.
-//   - A DML statement inside a read-write transaction. The transaction is
-//     rolled back on the server first, as a real abort ends it, and every later
-//     call in it is aborted too.
-//   - A commit. The transaction is rolled back on the server first.
+//   - The statement that begins it (inline begin). An aborted one is never
+//     sent, so the server has nothing to undo.
+//   - The transaction itself, drawn once at its first write or its commit. A
+//     transaction it picks is aborted at one of its first few writes, or at its
+//     commit if it ends sooner, after a rollback on the server, as a real abort
+//     ends it. It is never aborted twice, so a long transaction is no less
+//     likely to commit than a short one.
 //
 // Reads later in a transaction, single-use reads and single-use commits are
 // never aborted: their requests do not say whether a read-write transaction is
@@ -41,27 +42,37 @@ const service = "/google.spanner.v1.Spanner/"
 // last until Spanner's idle timeout instead.
 const rollbackTimeout = 10 * time.Second
 
+// maxDepth is how many writes into a transaction its abort can land: on one of
+// the first maxDepth, or on its commit if it ends sooner.
+const maxDepth = 4
+
+// spared marks a transaction the injector has decided to leave alone, or has
+// already aborted.
+const spared = -1
+
 // Injector decides which calls to abort. It is safe for concurrent use.
 type Injector struct {
-	rate float64
-	seed uint64
+	rate  float64
+	seed  uint64
+	depth int
 
-	mu      sync.Mutex
-	rng     *rand.Rand
-	aborted map[string]struct{} // transactions an injected abort ended, by ID
+	mu   sync.Mutex
+	rng  *rand.Rand
+	plan map[string]int // by transaction ID: writes left until its abort, or spared
 }
 
-// New returns an Injector that aborts each eligible call with probability
-// rate, drawing from a generator seeded with seed. The seed fixes the sequence
-// of draws, not which call gets each one: with tests running in parallel the
+// New returns an Injector that aborts with probability rate at each draw,
+// drawing from a generator seeded with seed. The seed fixes the sequence of
+// draws, not which call gets each one: with tests running in parallel the
 // order of calls varies between runs, so a seed replays a failure most reliably
 // for a single test run on its own.
 func New(rate float64, seed uint64) *Injector {
 	return &Injector{
-		rate:    rate,
-		seed:    seed,
-		rng:     rand.New(rand.NewPCG(seed, seed)),
-		aborted: map[string]struct{}{},
+		rate:  rate,
+		seed:  seed,
+		depth: maxDepth,
+		rng:   rand.New(rand.NewPCG(seed, seed)),
+		plan:  map[string]int{},
 	}
 }
 
@@ -87,16 +98,22 @@ func (in *Injector) decide(method string, req any) verdict {
 		sel     *spannerpb.TransactionSelector
 		session string
 		sql     string
-		dml     bool
+		write   bool
 	)
 	switch r := req.(type) {
 	case *spannerpb.CommitRequest:
-		return in.decideCommit(call, r)
+		if id := r.GetTransactionId(); id != nil && in.abortInTransaction(id, true) {
+			return verdict{err: in.status(call, ""), session: r.GetSession(), rollback: id}
+		}
+		return verdict{}
+	case *spannerpb.RollbackRequest:
+		in.forget(r.GetTransactionId())
+		return verdict{}
 	case *spannerpb.ExecuteSqlRequest:
 		// A read-write transaction numbers its DML; a query carries no seqno.
-		sel, session, sql, dml = r.GetTransaction(), r.GetSession(), r.GetSql(), r.GetSeqno() != 0
+		sel, session, sql, write = r.GetTransaction(), r.GetSession(), r.GetSql(), r.GetSeqno() != 0
 	case *spannerpb.ExecuteBatchDmlRequest:
-		sel, session, dml = r.GetTransaction(), r.GetSession(), true
+		sel, session, write = r.GetTransaction(), r.GetSession(), true
 		if statements := r.GetStatements(); len(statements) > 0 {
 			sql = statements[0].GetSql()
 		}
@@ -106,41 +123,65 @@ func (in *Injector) decide(method string, req any) verdict {
 		return verdict{}
 	}
 
-	in.mu.Lock()
-	defer in.mu.Unlock()
 	switch {
 	case sel.GetBegin().GetReadWrite() != nil:
-		if in.roll() {
+		in.mu.Lock()
+		hit := in.roll()
+		in.mu.Unlock()
+		if hit {
 			return verdict{err: in.status(call, sql)}
 		}
-	case sel.GetId() != nil:
-		id := sel.GetId()
-		if _, ok := in.aborted[string(id)]; ok {
-			return verdict{err: in.status(call, sql)}
-		}
-		if dml && in.roll() {
-			in.aborted[string(id)] = struct{}{}
+	case write && sel.GetId() != nil:
+		if id := sel.GetId(); in.abortInTransaction(id, false) {
 			return verdict{err: in.status(call, sql), session: session, rollback: id}
 		}
 	}
 	return verdict{}
 }
 
-func (in *Injector) decideCommit(call string, r *spannerpb.CommitRequest) verdict {
-	id := r.GetTransactionId()
+// abortInTransaction reports whether to abort this write or commit in an open
+// read-write transaction. The transaction is drawn once, at its first such
+// call; see the package documentation.
+func (in *Injector) abortInTransaction(id []byte, commit bool) bool {
+	in.mu.Lock()
+	defer in.mu.Unlock()
+
+	key := string(id)
+	left, drawn := in.plan[key]
+	if !drawn {
+		left = spared
+		if in.roll() {
+			left = 1 + in.rng.IntN(in.depth)
+		}
+	}
+	if commit {
+		// The commit ends the transaction: an abort its writes did not reach
+		// lands here.
+		delete(in.plan, key)
+		return left != spared
+	}
+	switch left {
+	case spared:
+		in.plan[key] = spared
+		return false
+	case 1:
+		in.plan[key] = spared
+		return true
+	default:
+		in.plan[key] = left - 1
+		return false
+	}
+}
+
+// forget drops what the injector knows about a transaction the client rolled
+// back itself.
+func (in *Injector) forget(id []byte) {
 	if id == nil {
-		return verdict{}
+		return
 	}
 	in.mu.Lock()
 	defer in.mu.Unlock()
-	if _, ok := in.aborted[string(id)]; ok {
-		delete(in.aborted, string(id))
-		return verdict{err: in.status(call, "")}
-	}
-	if in.roll() {
-		return verdict{err: in.status(call, ""), session: r.GetSession(), rollback: id}
-	}
-	return verdict{}
+	delete(in.plan, string(id))
 }
 
 // roll draws once from the generator. Callers hold mu.
@@ -166,7 +207,14 @@ func abbreviate(sql string) string {
 	return string(runes[:limit-3]) + "..."
 }
 
+// ownRollback marks the rollbacks the injector sends itself, which its own
+// interceptor lets through untouched: the transaction stays marked as aborted.
+type ownRollback struct{}
+
 func (in *Injector) interceptUnary(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+	if ctx.Value(ownRollback{}) != nil {
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
 	v := in.decide(method, req)
 	if v.err == nil {
 		return invoker(ctx, method, req, reply, cc, opts...)
@@ -189,7 +237,7 @@ func (in *Injector) interceptStream(ctx context.Context, desc *grpc.StreamDesc, 
 // it, releasing its locks as a real abort would. Best effort; see
 // [rollbackTimeout].
 func rollback(ctx context.Context, cc *grpc.ClientConn, session string, tx []byte) {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
+	ctx, cancel := context.WithTimeout(context.WithValue(context.WithoutCancel(ctx), ownRollback{}, true), rollbackTimeout)
 	defer cancel()
 	_, _ = spannerpb.NewSpannerClient(cc).Rollback(ctx, &spannerpb.RollbackRequest{Session: session, TransactionId: tx})
 }

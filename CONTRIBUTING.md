@@ -401,10 +401,11 @@ create the `zitadel_nextgen` schema.
 Spanner aborts read-write transactions under contention in production, and a
 test suite produces too little contention to catch a missing retry on its own.
 So under the `spanner_integration` tag the Spanner dialect aborts a seeded share
-of read-write calls on purpose, whatever engine the suite runs against
-(`ZITADEL_TEST_SPANNER_ABORT_RATE`, default `0.1`). The suite also runs at full
-parallelism, and `TestTransactionContention` asserts that concurrent writers to
-one row all commit. Each test package logs its seed
+of read-write transactions on purpose, whatever engine the suite runs against
+(`ZITADEL_TEST_SPANNER_ABORT_RATE`, default `0.1`: about one attempt in five,
+and never one transaction twice, however many statements it runs). The suite
+also runs at full parallelism, and `TestTransactionContention` asserts that
+concurrent writers to one row all commit. Each test package logs its seed
 (`spanner abort injection on … seed=…`). Set `ZITADEL_TEST_SPANNER_ABORT_SEED`
 to replay a failure, most reliably with `-run` on the one test, or
 `ZITADEL_TEST_SPANNER_ABORT_RATE=0` to turn the injection off.
