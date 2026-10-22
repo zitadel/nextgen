@@ -56880,6 +56880,38 @@ func (s GetPolicyErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case PolNotFoundGetPolicyErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.not_found")
+		{
+			s := s.PolNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case PolPermissionDeniedGetPolicyErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.permission_denied")
+		{
+			s := s.PolPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetPolicyErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -56947,6 +56979,12 @@ func (s *GetPolicyErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedGetPolicyErrorResponse
 					found = true
+				case "pol.not_found":
+					s.Type = PolNotFoundGetPolicyErrorResponse
+					found = true
+				case "pol.permission_denied":
+					s.Type = PolPermissionDeniedGetPolicyErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetPolicyErrorResponse
 					found = true
@@ -56977,6 +57015,14 @@ func (s *GetPolicyErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedGetPolicyErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case PolNotFoundGetPolicyErrorResponse:
+		if err := s.PolNotFound.Decode(d); err != nil {
+			return err
+		}
+	case PolPermissionDeniedGetPolicyErrorResponse:
+		if err := s.PolPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidGetPolicyErrorResponse:
@@ -71080,6 +71126,38 @@ func (s ListPoliciesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case PolNotFoundListPoliciesErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.not_found")
+		{
+			s := s.PolNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case PolPermissionDeniedListPoliciesErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.permission_denied")
+		{
+			s := s.PolPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListPoliciesErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -71147,6 +71225,12 @@ func (s *ListPoliciesErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedListPoliciesErrorResponse
 					found = true
+				case "pol.not_found":
+					s.Type = PolNotFoundListPoliciesErrorResponse
+					found = true
+				case "pol.permission_denied":
+					s.Type = PolPermissionDeniedListPoliciesErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListPoliciesErrorResponse
 					found = true
@@ -71177,6 +71261,14 @@ func (s *ListPoliciesErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedListPoliciesErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case PolNotFoundListPoliciesErrorResponse:
+		if err := s.PolNotFound.Decode(d); err != nil {
+			return err
+		}
+	case PolPermissionDeniedListPoliciesErrorResponse:
+		if err := s.PolPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidListPoliciesErrorResponse:
@@ -71386,6 +71478,38 @@ func (s ListPolicyRevisionsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case PolNotFoundListPolicyRevisionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.not_found")
+		{
+			s := s.PolNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case PolPermissionDeniedListPolicyRevisionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.permission_denied")
+		{
+			s := s.PolPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListPolicyRevisionsErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -71453,6 +71577,12 @@ func (s *ListPolicyRevisionsErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedListPolicyRevisionsErrorResponse
 					found = true
+				case "pol.not_found":
+					s.Type = PolNotFoundListPolicyRevisionsErrorResponse
+					found = true
+				case "pol.permission_denied":
+					s.Type = PolPermissionDeniedListPolicyRevisionsErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListPolicyRevisionsErrorResponse
 					found = true
@@ -71483,6 +71613,14 @@ func (s *ListPolicyRevisionsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedListPolicyRevisionsErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case PolNotFoundListPolicyRevisionsErrorResponse:
+		if err := s.PolNotFound.Decode(d); err != nil {
+			return err
+		}
+	case PolPermissionDeniedListPolicyRevisionsErrorResponse:
+		if err := s.PolPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidListPolicyRevisionsErrorResponse:

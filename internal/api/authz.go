@@ -119,8 +119,9 @@ var brandingAccess = resourceAccess{
 }
 
 // policyAccess gates operation policies (ADR 066). Publish and the revision
-// read are project-scoped like releases: both carry a project_id and filter by
-// it, so no route resolves a path id through RSI.
+// read are project-scoped like releases: a revision has no index row. A
+// policy's own id resolves through RSI in the named project, like an IdP
+// connection's, so a grant on one policy reaches it and its revisions list.
 var policyAccess = resourceAccess{
 	kind:     domain.ResourceKindPolicy,
 	readMiss: domain.ErrPolicyNotFound,
@@ -330,6 +331,12 @@ func requireResourceAccessAmong(ctx context.Context, stmts resourceAccessStmts, 
 	}
 	if res.kind != "" && scope.ResourceKind != res.kind {
 		// Wrong kind for this route: same anti-oracle shape as unknown id.
+		return "", res.readMiss()
+	}
+	if projectHint != "" && scope.ProjectID != projectHint {
+		// A project secret looks its own project up whatever the hint says
+		// (lookupResourceScope); a route scoped to the project the caller
+		// named must still not answer from another one.
 		return "", res.readMiss()
 	}
 	if err := requireProjectAccessAfterRSI(ctx, stmts, scope, res, op); err != nil {
