@@ -229,4 +229,3 @@ func TestMapFlowDefinitionRequest_NullTransitionActionAndPurpose(t *testing.T) {
 	require.NotNil(t, purposed.Purpose)
 	require.Equal(t, domain.FlowDefinitionPurposeRegister, *purposed.Purpose)
 }
-
