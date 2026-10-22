@@ -108,10 +108,8 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 	if len(pinned) > 0 {
 		return s.resolvePinned(ctx, req, pinned)
 	}
-	// TODO(#1616): a request with no release still reads the newest flow. A
-	// release that pins no flow definition keeps this same fallback, and the
-	// schema, branding, and IdP reads stay on newest with it. Drop the
-	// fallback once every public request resolves to a release.
+	// TODO(#1616): a request with no release still reads the newest revisions.
+	// A release that pins no flow definition keeps this path.
 	if req.Name != nil {
 		return s.resolveByName(ctx, req)
 	}
