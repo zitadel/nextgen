@@ -272,7 +272,7 @@ run on GitHub-hosted runners without the Depot cache credential.
 [`scripts/check.mjs`](scripts/check.mjs): the OpenAPI lint, the Go generate
 check and tests with the Postgres and Spanner lanes, the workspace gate, the
 release tarballs and snapshot, and the fresh-app journey. That comes close to
-`full-pr` but does not mirror it: CI runs Spanner only nightly, and adds the
+`full-pr` but does not mirror it: CI runs Spanner only weekly, and adds the
 SQLite lane, a few repository checks and every other e2e lane
 (`moon run e2e:all`). Rerun one phase with
 `moon run workspace:check -- --only <phase>`, one task with
@@ -341,10 +341,11 @@ complete run — and when the query returns an empty affected set, the run is
 only skipped if every changed file is on a narrow explicitly-inert allowlist
 (`docs/`, root agent notes), because unclaimed files are not assumed inert.
 
-The Spanner emulator suite (`moon run server:test-spanner`) is not part of
-`full-pr`. It runs in the separate `spanner` workflow, nightly on `main` and on
-demand, and is not a required check. To run it against a branch, use
-`gh workflow run spanner.yml --ref <branch>`, or run the Moon task locally.
+The Spanner suite (`moon run server:test-spanner`) is not part of `full-pr`.
+It runs in the separate `spanner` workflow against Spanner Omni, weekly on
+`main` and on demand, and is not a required check. To run it against a branch,
+use `gh workflow run spanner.yml --ref <branch>`, or run the Moon task locally,
+where it still starts the Spanner emulator.
 
 The PR title check is not part of `full-pr` either. It runs in the separate
 `pr-title` workflow, which a title edit starts on its own; see

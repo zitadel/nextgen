@@ -2,7 +2,7 @@ name: spanner
 
 # The Spanner suite, split out of ci.yml's required `full-pr` job. Spanner
 # support is not on the critical path at this stage, so the lane runs here
-# instead: nightly on main, on demand against any branch
+# instead: weekly on main (Mondays, 03:00 UTC), on demand against any branch
 # (`gh workflow run spanner.yml --ref <branch>`), and on PRs that change this
 # file. It is not a required check.
 #
@@ -11,7 +11,7 @@ name: spanner
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *"
+    - cron: "0 3 * * 1"
   pull_request:
     paths:
       - .github/workflows/spanner.yml
