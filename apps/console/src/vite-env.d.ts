@@ -26,6 +26,12 @@ interface ImportMetaEnv {
    * sampling.
    */
   readonly CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE: string;
+  /**
+   * The Zitadel server's origin under the dev loop, where the page runs on
+   * Vite's origin and reaches the server through its proxy. Inlined by
+   * vite.config.ts through `define`; an empty string in a build.
+   */
+  readonly CONSOLE_SERVER_ORIGIN: string;
 }
 
 interface ImportMeta {

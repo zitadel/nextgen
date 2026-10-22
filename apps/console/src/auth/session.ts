@@ -117,8 +117,7 @@ async function readSession(): Promise<ConsoleSession | null> {
 
 /**
  * The `project_id` the calls on the cookie's session and its user hold that
- * session to: the token read, sign-out, `GET /users/me` and
- * `GET /users/me/projects`. It is the console's, once the runtime document
+ * session to: the token read, sign-out, and every `/users/me` call. It is the console's, once the runtime document
  * names it, and the server refuses an app's session there too
  * (`403 sess.project_mismatch`). It is not a management scope: those name the
  * selected project (`lib/project-scope.ts`).

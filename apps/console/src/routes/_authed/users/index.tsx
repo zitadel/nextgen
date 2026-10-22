@@ -14,14 +14,13 @@ import {
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
-  ResourcePage,
   ResourceRow,
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
+import { USER_CLAMP, UserIdCell, UserIdentityCell } from "@/components/user-cells";
 import { Button } from "@/components/ui/button";
-import { CopyButton } from "@/components/ui/copy-button";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
@@ -33,6 +32,7 @@ import {
 import type { SchemaField } from "@/lib/schema";
 import type { UserTeam } from "@/lib/user";
 import { columnsBeyondIdentity, columnsForUsers, fetchUsers, toUserRow } from "@/lib/user-list";
+import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the single-person glyph. The plural two-person one
@@ -60,13 +60,6 @@ interface UsersPage {
   columns: SchemaField[];
   teamsExpanded: boolean;
 }
-
-/** The User and schema-driven cells clamp at 280px and truncate. */
-const CLAMP = "max-w-70";
-// The row's copy button rests hidden and shows on the row's hover or its own
-// focus, so a keyboard reaches it; where there is no hover it always shows.
-const ROW_COPY =
-  "shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100";
 
 function UsersScreen() {
   const projectId = useRequiredProjectScope();
@@ -114,7 +107,7 @@ function UsersScreen() {
   const shown = useMemo(() => columnsBeyondIdentity(columns, rows), [columns, rows]);
 
   return (
-    <ResourcePage>
+    <Page>
       {/* No search beside the title: it is out of the page headers until there
           is a console-wide solution (D19). */}
       <ResourceTitle
@@ -158,33 +151,9 @@ function UsersScreen() {
             ) : (
               rows.map((user) => (
                 <ResourceRow key={user.id} className="group">
-                  {/* The User column renders the server-resolved identity
-                      (display → identifier → id, ADR 058 §3a) and carries the
-                      link to the detail screen — schema-driven columns cannot
-                      promise a meaningful leading value, this cell always can.
-                      The designated identifier (x-identifier) sits under a
-                      display name rather than in a column of its own, so a
-                      mixed-schema list still reads it down one column; its
-                      tooltip names the property it came from. */}
-                  <TableCell className={`${RESOURCE_CELL} ${CLAMP} text-sm`}>
-                    <Link
-                      to="/users/$userId"
-                      params={{ userId: user.id }}
-                      className="text-foreground block truncate font-medium underline-offset-2 hover:underline"
-                    >
-                      {user.name}
-                    </Link>
-                    {user.secondary && (
-                      <span
-                        className="text-muted-foreground block truncate text-xs"
-                        title={user.identifierProperty}
-                      >
-                        {user.secondary}
-                      </span>
-                    )}
-                  </TableCell>
+                  <UserIdentityCell user={user} />
                   {shown.map((column) => (
-                    <TableCell key={column.key} className={`${RESOURCE_CELL_MUTED} ${CLAMP}`}>
+                    <TableCell key={column.key} className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
                       {user.values[column.key] ?? "—"}
                     </TableCell>
                   ))}
@@ -192,27 +161,11 @@ function UsersScreen() {
                     <StatusBadge status={user.status} />
                   </TableCell>
                   {teamsExpanded && (
-                    <TableCell className={`${RESOURCE_CELL_MUTED} ${CLAMP}`}>
+                    <TableCell className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
                       <TeamCell teams={user.teams} truncated={user.teamsTruncated} />
                     </TableCell>
                   )}
-                  {/* The ID takes whatever width the other columns leave
-                      (`w-full max-w-0`) and truncates inside it, so the
-                      default schema's table fits a 1024px window without
-                      scrolling. The tooltip keeps the whole id, and the copy
-                      button copies it however much of it shows. */}
-                  <TableCell className={`${RESOURCE_CELL} w-full max-w-0 min-w-40`}>
-                    <span className="flex items-center gap-1">
-                      <span className="text-foreground min-w-0 truncate text-sm" title={user.id}>
-                        {user.id}
-                      </span>
-                      <CopyButton
-                        value={user.id}
-                        label={`Copy the ID of ${user.name}`}
-                        className={ROW_COPY}
-                      />
-                    </span>
-                  </TableCell>
+                  <UserIdCell user={user} />
                   <TableCell className={RESOURCE_CELL}>
                     <RowActions
                       userId={user.id}
@@ -228,7 +181,7 @@ function UsersScreen() {
       </div>
       {/* Full width and `secondary`, 24px under the table, not a centred pill. */}
       <LoadMore paging={paging} />
-    </ResourcePage>
+    </Page>
   );
 }
 
