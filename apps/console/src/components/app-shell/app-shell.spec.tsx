@@ -109,9 +109,9 @@ describe("app shell navigation", () => {
     );
     const router = renderShell();
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
-    // The list is where a project is chosen, so the bar carries no pill there.
-    await screen.findByRole("navigation", { name: "Context" });
-    expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
+    // The bar keeps its pill on Projects too (D21), asking for a selection.
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
 
     const nav = within(screen.getByRole("navigation", { name: "Primary" }));
     const links = nav.queryAllByRole("link");
@@ -731,7 +731,7 @@ describe("project pill", () => {
       http.get(MY_PROJECTS, () => HttpResponse.json({ projects: [] })),
       http.get(HEALTH, () => HttpResponse.json({ status: "ok" })),
     );
-    // Not `/`: with nothing to select it lands on Projects, which has no pill.
+    // System, which reads no list of its own, so the pill is all that answers.
     renderShell("/system");
 
     const { list } = await openList("No projects");

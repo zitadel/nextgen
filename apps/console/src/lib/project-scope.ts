@@ -116,7 +116,7 @@ function toProjectRef({ id, name, origins }: ProjectRead): ProjectRef {
  * which names no host. So is the local machine, which many projects list for
  * development and so tells none of them apart.
  */
-function primaryHost(origins: ProjectRead["origins"]): string | undefined {
+export function primaryHost(origins: ProjectRead["origins"]): string | undefined {
   for (const origin of origins ?? []) {
     if (origin.kind !== "primary") continue;
     try {
@@ -142,6 +142,16 @@ function isLoopback(hostname: string): boolean {
     name.endsWith(".localhost") ||
     name === "::1" ||
     /^127(?:\.\d{1,3}){3}$/.test(name)
+  );
+}
+
+/** Names as a reader orders them: any case, and `app-2` before `app-10`. */
+const NAME_ORDER = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+/** By name, then by id, so two projects of one name keep their places. */
+export function byName<T extends { id: string; name: string }>(projects: readonly T[]): T[] {
+  return [...projects].sort(
+    (a, b) => NAME_ORDER.compare(a.name, b.name) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
 }
 

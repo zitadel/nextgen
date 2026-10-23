@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { queryActiveTeams } from "@/lib/teams";
 import { useAsync } from "@/hooks/use-async";
 import {
+  byName,
   type ProjectRef,
   type SelectedProject,
   useMyProjects,
@@ -100,13 +101,12 @@ export function ContextSwitcher({ userId }: { userId?: string }) {
   useRememberRecentProject(userId, current);
   const selected = useProjectScope();
   const teamId = useParams({ strict: false, select: (params) => params.teamId });
-  // The Projects list is where a project is chosen, and it marks the selected
-  // one, so the pill would only repeat it: no switcher there.
-  const onProjects = useMatch({ from: "/_authed/projects/", shouldThrow: false });
 
   return (
     <nav aria-label="Context" className="flex min-w-0 items-center gap-2">
-      {!onProjects && <ProjectSwitcher userId={userId} current={current} />}
+      {/* On every screen, Projects included: the bar keeps its shape and
+          names the selected project wherever the person is (D21). */}
+      <ProjectSwitcher userId={userId} current={current} />
       {/* The team switcher joins the bar once a team is open — the team is the
           context then, and following another team from the list switches it.
           Teams are not a standing selection the way projects are: no screen
@@ -258,16 +258,6 @@ function openingList(
     ? []
     : byName(mine.projects.filter((project) => !recent.some((shown) => shown.id === project.id)));
   return { recent, rest };
-}
-
-/** Names as a reader orders them: any case, and `app-2` before `app-10`. */
-const NAME_ORDER = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-
-/** By name, then by id, so two projects of one name keep their places. */
-function byName(projects: ProjectRef[]): ProjectRef[] {
-  return [...projects].sort(
-    (a, b) => NAME_ORDER.compare(a.name, b.name) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-  );
 }
 
 /**
