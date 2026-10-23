@@ -946,6 +946,24 @@
       ]
     },
     {
+      "id": "test sign-in",
+      "group": "Configuration commands",
+      "description": "Check that a sign-in provider is set up correctly.",
+      "args": [],
+      "flags": [
+        {
+          "name": "provider",
+          "description": "Connection to check. Defaults to every connection the Project has.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "test sign-in --provider google"
+        }
+      ]
+    },
+    {
       "id": "variables delete",
       "group": "Configuration commands",
       "description": "Delete one variable from the project.",

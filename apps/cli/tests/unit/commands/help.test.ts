@@ -50,6 +50,7 @@ Configuration commands
   releases list:                List releases
   schemas get:                  Get one schema by id
   schemas list:                 List schemas
+  test sign-in:                 Check that a sign-in provider is set up correctly
   variables delete:             Delete one variable from the project
   variables get:                Get one variable from the project
   variables list:               List the variables entered on the project
