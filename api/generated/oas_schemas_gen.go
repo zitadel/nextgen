@@ -22337,6 +22337,7 @@ type Event struct {
 	OriginRemovedEvent              OriginRemovedEvent
 	PolicyCreatedEvent              PolicyCreatedEvent
 	PolicyUpdatedEvent              PolicyUpdatedEvent
+	PreviewRemovedEvent             PreviewRemovedEvent
 	ProjectCreatedEvent             ProjectCreatedEvent
 	ProjectDeletedEvent             ProjectDeletedEvent
 	ProjectUpdatedEvent             ProjectUpdatedEvent
@@ -22387,6 +22388,7 @@ const (
 	OriginRemovedEventEvent              EventType = "origin.removed"
 	PolicyCreatedEventEvent              EventType = "policy.created"
 	PolicyUpdatedEventEvent              EventType = "policy.updated"
+	PreviewRemovedEventEvent             EventType = "preview.removed"
 	ProjectCreatedEventEvent             EventType = "project.created"
 	ProjectDeletedEventEvent             EventType = "project.deleted"
 	ProjectUpdatedEventEvent             EventType = "project.updated"
@@ -22489,6 +22491,9 @@ func (s Event) IsPolicyCreatedEvent() bool { return s.Type == PolicyCreatedEvent
 
 // IsPolicyUpdatedEvent reports whether Event is PolicyUpdatedEvent.
 func (s Event) IsPolicyUpdatedEvent() bool { return s.Type == PolicyUpdatedEventEvent }
+
+// IsPreviewRemovedEvent reports whether Event is PreviewRemovedEvent.
+func (s Event) IsPreviewRemovedEvent() bool { return s.Type == PreviewRemovedEventEvent }
 
 // IsProjectCreatedEvent reports whether Event is ProjectCreatedEvent.
 func (s Event) IsProjectCreatedEvent() bool { return s.Type == ProjectCreatedEventEvent }
@@ -23066,6 +23071,27 @@ func (s Event) GetPolicyUpdatedEvent() (v PolicyUpdatedEvent, ok bool) {
 func NewPolicyUpdatedEventEvent(v PolicyUpdatedEvent) Event {
 	var s Event
 	s.SetPolicyUpdatedEvent(v)
+	return s
+}
+
+// SetPreviewRemovedEvent sets Event to PreviewRemovedEvent.
+func (s *Event) SetPreviewRemovedEvent(v PreviewRemovedEvent) {
+	s.Type = PreviewRemovedEventEvent
+	s.PreviewRemovedEvent = v
+}
+
+// GetPreviewRemovedEvent returns PreviewRemovedEvent and true boolean if Event is PreviewRemovedEvent.
+func (s Event) GetPreviewRemovedEvent() (v PreviewRemovedEvent, ok bool) {
+	if !s.IsPreviewRemovedEvent() {
+		return v, false
+	}
+	return s.PreviewRemovedEvent, true
+}
+
+// NewPreviewRemovedEventEvent returns new Event from PreviewRemovedEvent.
+func NewPreviewRemovedEventEvent(v PreviewRemovedEvent) Event {
+	var s Event
+	s.SetPreviewRemovedEvent(v)
 	return s
 }
 
@@ -56482,6 +56508,69 @@ func (o OptNilPolicyUpdatedEventActorType) Or(d PolicyUpdatedEventActorType) Pol
 	return d
 }
 
+// NewOptNilPreviewRemovedEventActorType returns new OptNilPreviewRemovedEventActorType with value set to v.
+func NewOptNilPreviewRemovedEventActorType(v PreviewRemovedEventActorType) OptNilPreviewRemovedEventActorType {
+	return OptNilPreviewRemovedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilPreviewRemovedEventActorType is optional nullable PreviewRemovedEventActorType.
+type OptNilPreviewRemovedEventActorType struct {
+	Value PreviewRemovedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilPreviewRemovedEventActorType was set.
+func (o OptNilPreviewRemovedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilPreviewRemovedEventActorType) Reset() {
+	var v PreviewRemovedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilPreviewRemovedEventActorType) SetTo(v PreviewRemovedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilPreviewRemovedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilPreviewRemovedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v PreviewRemovedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilPreviewRemovedEventActorType) Get() (v PreviewRemovedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilPreviewRemovedEventActorType) Or(d PreviewRemovedEventActorType) PreviewRemovedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilProjectCreatedEventActorType returns new OptNilProjectCreatedEventActorType with value set to v.
 func NewOptNilProjectCreatedEventActorType(v ProjectCreatedEventActorType) OptNilProjectCreatedEventActorType {
 	return OptNilProjectCreatedEventActorType{
@@ -59143,6 +59232,52 @@ func (o OptPolicyUpdatedEventDelegationType) Get() (v PolicyUpdatedEventDelegati
 
 // Or returns value if set, or given parameter if does not.
 func (o OptPolicyUpdatedEventDelegationType) Or(d PolicyUpdatedEventDelegationType) PolicyUpdatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptPreviewRemovedEventDelegationType returns new OptPreviewRemovedEventDelegationType with value set to v.
+func NewOptPreviewRemovedEventDelegationType(v PreviewRemovedEventDelegationType) OptPreviewRemovedEventDelegationType {
+	return OptPreviewRemovedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPreviewRemovedEventDelegationType is optional PreviewRemovedEventDelegationType.
+type OptPreviewRemovedEventDelegationType struct {
+	Value PreviewRemovedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptPreviewRemovedEventDelegationType was set.
+func (o OptPreviewRemovedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPreviewRemovedEventDelegationType) Reset() {
+	var v PreviewRemovedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPreviewRemovedEventDelegationType) SetTo(v PreviewRemovedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPreviewRemovedEventDelegationType) Get() (v PreviewRemovedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPreviewRemovedEventDelegationType) Or(d PreviewRemovedEventDelegationType) PreviewRemovedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -69274,6 +69409,485 @@ func (s *Preview) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
 
+// PreviewRemoved2XX is 2XX pattern response for PreviewRemoved operation.
+type PreviewRemoved2XX struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *PreviewRemoved2XX) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *PreviewRemoved2XX) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*PreviewRemoved2XX) previewRemovedRes() {}
+
+// PreviewRemovedDef is default response for PreviewRemoved operation.
+type PreviewRemovedDef struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *PreviewRemovedDef) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *PreviewRemovedDef) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*PreviewRemovedDef) previewRemovedRes() {}
+
+// Merged schema.
+// Ref: #
+type PreviewRemovedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category PreviewRemovedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilPreviewRemovedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptPreviewRemovedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                            `json:"delegation_id"`
+	Grantor        OptString                            `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *PreviewRemovedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *PreviewRemovedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *PreviewRemovedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *PreviewRemovedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *PreviewRemovedEvent) GetCategory() PreviewRemovedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *PreviewRemovedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *PreviewRemovedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *PreviewRemovedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *PreviewRemovedEvent) GetActorType() OptNilPreviewRemovedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *PreviewRemovedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *PreviewRemovedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *PreviewRemovedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *PreviewRemovedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *PreviewRemovedEvent) GetDelegationType() OptPreviewRemovedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *PreviewRemovedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *PreviewRemovedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *PreviewRemovedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *PreviewRemovedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *PreviewRemovedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *PreviewRemovedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *PreviewRemovedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *PreviewRemovedEvent) GetPayload() EmptyEventPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *PreviewRemovedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *PreviewRemovedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *PreviewRemovedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *PreviewRemovedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *PreviewRemovedEvent) SetCategory(val PreviewRemovedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *PreviewRemovedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *PreviewRemovedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *PreviewRemovedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *PreviewRemovedEvent) SetActorType(val OptNilPreviewRemovedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *PreviewRemovedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *PreviewRemovedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *PreviewRemovedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *PreviewRemovedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *PreviewRemovedEvent) SetDelegationType(val OptPreviewRemovedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *PreviewRemovedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *PreviewRemovedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *PreviewRemovedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *PreviewRemovedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *PreviewRemovedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *PreviewRemovedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *PreviewRemovedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *PreviewRemovedEvent) SetPayload(val EmptyEventPayload) {
+	s.Payload = val
+}
+
+type PreviewRemovedEventActorType string
+
+const (
+	PreviewRemovedEventActorTypeHuman   PreviewRemovedEventActorType = "human"
+	PreviewRemovedEventActorTypeService PreviewRemovedEventActorType = "service"
+	PreviewRemovedEventActorTypeSystem  PreviewRemovedEventActorType = "system"
+	PreviewRemovedEventActorTypeAgent   PreviewRemovedEventActorType = "agent"
+)
+
+// AllValues returns all PreviewRemovedEventActorType values.
+func (PreviewRemovedEventActorType) AllValues() []PreviewRemovedEventActorType {
+	return []PreviewRemovedEventActorType{
+		PreviewRemovedEventActorTypeHuman,
+		PreviewRemovedEventActorTypeService,
+		PreviewRemovedEventActorTypeSystem,
+		PreviewRemovedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PreviewRemovedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case PreviewRemovedEventActorTypeHuman:
+		return []byte(s), nil
+	case PreviewRemovedEventActorTypeService:
+		return []byte(s), nil
+	case PreviewRemovedEventActorTypeSystem:
+		return []byte(s), nil
+	case PreviewRemovedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PreviewRemovedEventActorType) UnmarshalText(data []byte) error {
+	switch PreviewRemovedEventActorType(data) {
+	case PreviewRemovedEventActorTypeHuman:
+		*s = PreviewRemovedEventActorTypeHuman
+		return nil
+	case PreviewRemovedEventActorTypeService:
+		*s = PreviewRemovedEventActorTypeService
+		return nil
+	case PreviewRemovedEventActorTypeSystem:
+		*s = PreviewRemovedEventActorTypeSystem
+		return nil
+	case PreviewRemovedEventActorTypeAgent:
+		*s = PreviewRemovedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type PreviewRemovedEventCategory string
+
+const (
+	PreviewRemovedEventCategoryRequest PreviewRemovedEventCategory = "request"
+	PreviewRemovedEventCategoryAuth    PreviewRemovedEventCategory = "auth"
+	PreviewRemovedEventCategorySession PreviewRemovedEventCategory = "session"
+	PreviewRemovedEventCategoryAdmin   PreviewRemovedEventCategory = "admin"
+	PreviewRemovedEventCategoryEntity  PreviewRemovedEventCategory = "entity"
+	PreviewRemovedEventCategorySignal  PreviewRemovedEventCategory = "signal"
+)
+
+// AllValues returns all PreviewRemovedEventCategory values.
+func (PreviewRemovedEventCategory) AllValues() []PreviewRemovedEventCategory {
+	return []PreviewRemovedEventCategory{
+		PreviewRemovedEventCategoryRequest,
+		PreviewRemovedEventCategoryAuth,
+		PreviewRemovedEventCategorySession,
+		PreviewRemovedEventCategoryAdmin,
+		PreviewRemovedEventCategoryEntity,
+		PreviewRemovedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PreviewRemovedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case PreviewRemovedEventCategoryRequest:
+		return []byte(s), nil
+	case PreviewRemovedEventCategoryAuth:
+		return []byte(s), nil
+	case PreviewRemovedEventCategorySession:
+		return []byte(s), nil
+	case PreviewRemovedEventCategoryAdmin:
+		return []byte(s), nil
+	case PreviewRemovedEventCategoryEntity:
+		return []byte(s), nil
+	case PreviewRemovedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PreviewRemovedEventCategory) UnmarshalText(data []byte) error {
+	switch PreviewRemovedEventCategory(data) {
+	case PreviewRemovedEventCategoryRequest:
+		*s = PreviewRemovedEventCategoryRequest
+		return nil
+	case PreviewRemovedEventCategoryAuth:
+		*s = PreviewRemovedEventCategoryAuth
+		return nil
+	case PreviewRemovedEventCategorySession:
+		*s = PreviewRemovedEventCategorySession
+		return nil
+	case PreviewRemovedEventCategoryAdmin:
+		*s = PreviewRemovedEventCategoryAdmin
+		return nil
+	case PreviewRemovedEventCategoryEntity:
+		*s = PreviewRemovedEventCategoryEntity
+		return nil
+	case PreviewRemovedEventCategorySignal:
+		*s = PreviewRemovedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type PreviewRemovedEventDelegationType string
+
+const (
+	PreviewRemovedEventDelegationTypeDirect    PreviewRemovedEventDelegationType = "direct"
+	PreviewRemovedEventDelegationTypeDelegated PreviewRemovedEventDelegationType = "delegated"
+	PreviewRemovedEventDelegationTypePatShared PreviewRemovedEventDelegationType = "pat_shared"
+	PreviewRemovedEventDelegationTypeExchanged PreviewRemovedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all PreviewRemovedEventDelegationType values.
+func (PreviewRemovedEventDelegationType) AllValues() []PreviewRemovedEventDelegationType {
+	return []PreviewRemovedEventDelegationType{
+		PreviewRemovedEventDelegationTypeDirect,
+		PreviewRemovedEventDelegationTypeDelegated,
+		PreviewRemovedEventDelegationTypePatShared,
+		PreviewRemovedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PreviewRemovedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case PreviewRemovedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case PreviewRemovedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case PreviewRemovedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case PreviewRemovedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PreviewRemovedEventDelegationType) UnmarshalText(data []byte) error {
+	switch PreviewRemovedEventDelegationType(data) {
+	case PreviewRemovedEventDelegationTypeDirect:
+		*s = PreviewRemovedEventDelegationTypeDirect
+		return nil
+	case PreviewRemovedEventDelegationTypeDelegated:
+		*s = PreviewRemovedEventDelegationTypeDelegated
+		return nil
+	case PreviewRemovedEventDelegationTypePatShared:
+		*s = PreviewRemovedEventDelegationTypePatShared
+		return nil
+	case PreviewRemovedEventDelegationTypeExchanged:
+		*s = PreviewRemovedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type PreviewTTL string
 
 // Merged schema.
@@ -76921,6 +77535,7 @@ type RemovePreviewErrorResponse struct {
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	EnvProjectNotFound  EnvProjectNotFound
+	EvtInvalid          EvtInvalid
 	Internal            Internal
 	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
@@ -76936,6 +77551,7 @@ const (
 	DepNotFoundRemovePreviewErrorResponse         RemovePreviewErrorResponseType = "dep.not_found"
 	DepPermissionDeniedRemovePreviewErrorResponse RemovePreviewErrorResponseType = "dep.permission_denied"
 	EnvProjectNotFoundRemovePreviewErrorResponse  RemovePreviewErrorResponseType = "env.project_not_found"
+	EvtInvalidRemovePreviewErrorResponse          RemovePreviewErrorResponseType = "evt.invalid"
 	InternalRemovePreviewErrorResponse            RemovePreviewErrorResponseType = "internal"
 	NotImplementedRemovePreviewErrorResponse      RemovePreviewErrorResponseType = "not_implemented"
 	ReqInvalidRemovePreviewErrorResponse          RemovePreviewErrorResponseType = "req.invalid"
@@ -76960,6 +77576,11 @@ func (s RemovePreviewErrorResponse) IsDepPermissionDenied() bool {
 // IsEnvProjectNotFound reports whether RemovePreviewErrorResponse is EnvProjectNotFound.
 func (s RemovePreviewErrorResponse) IsEnvProjectNotFound() bool {
 	return s.Type == EnvProjectNotFoundRemovePreviewErrorResponse
+}
+
+// IsEvtInvalid reports whether RemovePreviewErrorResponse is EvtInvalid.
+func (s RemovePreviewErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidRemovePreviewErrorResponse
 }
 
 // IsInternal reports whether RemovePreviewErrorResponse is Internal.
@@ -77063,6 +77684,27 @@ func (s RemovePreviewErrorResponse) GetEnvProjectNotFound() (v EnvProjectNotFoun
 func NewEnvProjectNotFoundRemovePreviewErrorResponse(v EnvProjectNotFound) RemovePreviewErrorResponse {
 	var s RemovePreviewErrorResponse
 	s.SetEnvProjectNotFound(v)
+	return s
+}
+
+// SetEvtInvalid sets RemovePreviewErrorResponse to EvtInvalid.
+func (s *RemovePreviewErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidRemovePreviewErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if RemovePreviewErrorResponse is EvtInvalid.
+func (s RemovePreviewErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from EvtInvalid.
+func NewEvtInvalidRemovePreviewErrorResponse(v EvtInvalid) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 
