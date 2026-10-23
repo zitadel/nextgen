@@ -4448,12 +4448,33 @@ func (s *AuthCheckPayload) encodeFields(e *jx.Encoder) {
 			s.AuthAttemptID.Encode(e)
 		}
 	}
+	{
+		if s.ConnectionSlug.Set {
+			e.FieldStart("connection_slug")
+			s.ConnectionSlug.Encode(e)
+		}
+	}
+	{
+		if s.Reason.Set {
+			e.FieldStart("reason")
+			s.Reason.Encode(e)
+		}
+	}
+	{
+		if s.Side.Set {
+			e.FieldStart("side")
+			s.Side.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfAuthCheckPayload = [3]string{
+var jsonFieldsNameOfAuthCheckPayload = [6]string{
 	0: "check_id",
 	1: "check_type",
 	2: "auth_attempt_id",
+	3: "connection_slug",
+	4: "reason",
+	5: "side",
 }
 
 // Decode decodes AuthCheckPayload from json.
@@ -4496,6 +4517,36 @@ func (s *AuthCheckPayload) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"auth_attempt_id\"")
+			}
+		case "connection_slug":
+			if err := func() error {
+				s.ConnectionSlug.Reset()
+				if err := s.ConnectionSlug.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"connection_slug\"")
+			}
+		case "reason":
+			if err := func() error {
+				s.Reason.Reset()
+				if err := s.Reason.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"reason\"")
+			}
+		case "side":
+			if err := func() error {
+				s.Side.Reset()
+				if err := s.Side.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"side\"")
 			}
 		default:
 			return d.Skip()
@@ -4549,6 +4600,118 @@ func (s *AuthCheckPayload) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *AuthCheckPayload) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AuthCheckPayloadReason as json.
+func (s AuthCheckPayloadReason) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AuthCheckPayloadReason from json.
+func (s *AuthCheckPayloadReason) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthCheckPayloadReason to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AuthCheckPayloadReason(v) {
+	case AuthCheckPayloadReasonProviderDenied:
+		*s = AuthCheckPayloadReasonProviderDenied
+	case AuthCheckPayloadReasonProviderError:
+		*s = AuthCheckPayloadReasonProviderError
+	case AuthCheckPayloadReasonDiscoveryFailed:
+		*s = AuthCheckPayloadReasonDiscoveryFailed
+	case AuthCheckPayloadReasonExchangeFailed:
+		*s = AuthCheckPayloadReasonExchangeFailed
+	case AuthCheckPayloadReasonIDTokenInvalid:
+		*s = AuthCheckPayloadReasonIDTokenInvalid
+	case AuthCheckPayloadReasonUserinfoFailed:
+		*s = AuthCheckPayloadReasonUserinfoFailed
+	case AuthCheckPayloadReasonStateMismatch:
+		*s = AuthCheckPayloadReasonStateMismatch
+	case AuthCheckPayloadReasonNoCode:
+		*s = AuthCheckPayloadReasonNoCode
+	case AuthCheckPayloadReasonConnectionInvalid:
+		*s = AuthCheckPayloadReasonConnectionInvalid
+	case AuthCheckPayloadReasonSecretUnavailable:
+		*s = AuthCheckPayloadReasonSecretUnavailable
+	case AuthCheckPayloadReasonSubjectInvalid:
+		*s = AuthCheckPayloadReasonSubjectInvalid
+	case AuthCheckPayloadReasonCreationDisabled:
+		*s = AuthCheckPayloadReasonCreationDisabled
+	case AuthCheckPayloadReasonClaimRejected:
+		*s = AuthCheckPayloadReasonClaimRejected
+	case AuthCheckPayloadReasonUnroutable:
+		*s = AuthCheckPayloadReasonUnroutable
+	case AuthCheckPayloadReasonUserInvalid:
+		*s = AuthCheckPayloadReasonUserInvalid
+	case AuthCheckPayloadReasonOtherSchema:
+		*s = AuthCheckPayloadReasonOtherSchema
+	case AuthCheckPayloadReasonHandoffFailed:
+		*s = AuthCheckPayloadReasonHandoffFailed
+	case AuthCheckPayloadReasonInternal:
+		*s = AuthCheckPayloadReasonInternal
+	default:
+		*s = AuthCheckPayloadReason(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AuthCheckPayloadReason) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthCheckPayloadReason) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AuthCheckPayloadSide as json.
+func (s AuthCheckPayloadSide) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AuthCheckPayloadSide from json.
+func (s *AuthCheckPayloadSide) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthCheckPayloadSide to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AuthCheckPayloadSide(v) {
+	case AuthCheckPayloadSideProvider:
+		*s = AuthCheckPayloadSideProvider
+	case AuthCheckPayloadSideJourney:
+		*s = AuthCheckPayloadSideJourney
+	default:
+		*s = AuthCheckPayloadSide(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AuthCheckPayloadSide) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthCheckPayloadSide) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -8598,6 +8761,903 @@ func (s AuthSSOExchangeSucceededEventDelegationType) MarshalJSON() ([]byte, erro
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *AuthSSOExchangeSucceededEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AuthSSOFailurePayload) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AuthSSOFailurePayload) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("auth_attempt_id")
+		e.Str(s.AuthAttemptID)
+	}
+	{
+		e.FieldStart("connection_slug")
+		e.Str(s.ConnectionSlug)
+	}
+	{
+		e.FieldStart("phase")
+		s.Phase.Encode(e)
+	}
+	{
+		e.FieldStart("reason")
+		s.Reason.Encode(e)
+	}
+	{
+		e.FieldStart("side")
+		s.Side.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfAuthSSOFailurePayload = [5]string{
+	0: "auth_attempt_id",
+	1: "connection_slug",
+	2: "phase",
+	3: "reason",
+	4: "side",
+}
+
+// Decode decodes AuthSSOFailurePayload from json.
+func (s *AuthSSOFailurePayload) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthSSOFailurePayload to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "auth_attempt_id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.AuthAttemptID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"auth_attempt_id\"")
+			}
+		case "connection_slug":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.ConnectionSlug = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"connection_slug\"")
+			}
+		case "phase":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				if err := s.Phase.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"phase\"")
+			}
+		case "reason":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				if err := s.Reason.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"reason\"")
+			}
+		case "side":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Side.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"side\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AuthSSOFailurePayload")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00011111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAuthSSOFailurePayload) {
+					name = jsonFieldsNameOfAuthSSOFailurePayload[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AuthSSOFailurePayload) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthSSOFailurePayload) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AuthSSOFailurePayloadPhase as json.
+func (s AuthSSOFailurePayloadPhase) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AuthSSOFailurePayloadPhase from json.
+func (s *AuthSSOFailurePayloadPhase) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthSSOFailurePayloadPhase to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AuthSSOFailurePayloadPhase(v) {
+	case AuthSSOFailurePayloadPhaseResolved:
+		*s = AuthSSOFailurePayloadPhaseResolved
+	case AuthSSOFailurePayloadPhaseUserCreated:
+		*s = AuthSSOFailurePayloadPhaseUserCreated
+	case AuthSSOFailurePayloadPhaseHandedOff:
+		*s = AuthSSOFailurePayloadPhaseHandedOff
+	default:
+		*s = AuthSSOFailurePayloadPhase(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AuthSSOFailurePayloadPhase) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthSSOFailurePayloadPhase) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AuthSSOFailurePayloadReason as json.
+func (s AuthSSOFailurePayloadReason) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AuthSSOFailurePayloadReason from json.
+func (s *AuthSSOFailurePayloadReason) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthSSOFailurePayloadReason to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AuthSSOFailurePayloadReason(v) {
+	case AuthSSOFailurePayloadReasonProviderDenied:
+		*s = AuthSSOFailurePayloadReasonProviderDenied
+	case AuthSSOFailurePayloadReasonProviderError:
+		*s = AuthSSOFailurePayloadReasonProviderError
+	case AuthSSOFailurePayloadReasonDiscoveryFailed:
+		*s = AuthSSOFailurePayloadReasonDiscoveryFailed
+	case AuthSSOFailurePayloadReasonExchangeFailed:
+		*s = AuthSSOFailurePayloadReasonExchangeFailed
+	case AuthSSOFailurePayloadReasonIDTokenInvalid:
+		*s = AuthSSOFailurePayloadReasonIDTokenInvalid
+	case AuthSSOFailurePayloadReasonUserinfoFailed:
+		*s = AuthSSOFailurePayloadReasonUserinfoFailed
+	case AuthSSOFailurePayloadReasonStateMismatch:
+		*s = AuthSSOFailurePayloadReasonStateMismatch
+	case AuthSSOFailurePayloadReasonNoCode:
+		*s = AuthSSOFailurePayloadReasonNoCode
+	case AuthSSOFailurePayloadReasonConnectionInvalid:
+		*s = AuthSSOFailurePayloadReasonConnectionInvalid
+	case AuthSSOFailurePayloadReasonSecretUnavailable:
+		*s = AuthSSOFailurePayloadReasonSecretUnavailable
+	case AuthSSOFailurePayloadReasonSubjectInvalid:
+		*s = AuthSSOFailurePayloadReasonSubjectInvalid
+	case AuthSSOFailurePayloadReasonCreationDisabled:
+		*s = AuthSSOFailurePayloadReasonCreationDisabled
+	case AuthSSOFailurePayloadReasonClaimRejected:
+		*s = AuthSSOFailurePayloadReasonClaimRejected
+	case AuthSSOFailurePayloadReasonUnroutable:
+		*s = AuthSSOFailurePayloadReasonUnroutable
+	case AuthSSOFailurePayloadReasonUserInvalid:
+		*s = AuthSSOFailurePayloadReasonUserInvalid
+	case AuthSSOFailurePayloadReasonOtherSchema:
+		*s = AuthSSOFailurePayloadReasonOtherSchema
+	case AuthSSOFailurePayloadReasonHandoffFailed:
+		*s = AuthSSOFailurePayloadReasonHandoffFailed
+	case AuthSSOFailurePayloadReasonInternal:
+		*s = AuthSSOFailurePayloadReasonInternal
+	default:
+		*s = AuthSSOFailurePayloadReason(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AuthSSOFailurePayloadReason) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthSSOFailurePayloadReason) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AuthSSOFailurePayloadSide as json.
+func (s AuthSSOFailurePayloadSide) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AuthSSOFailurePayloadSide from json.
+func (s *AuthSSOFailurePayloadSide) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthSSOFailurePayloadSide to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AuthSSOFailurePayloadSide(v) {
+	case AuthSSOFailurePayloadSideProvider:
+		*s = AuthSSOFailurePayloadSideProvider
+	case AuthSSOFailurePayloadSideJourney:
+		*s = AuthSSOFailurePayloadSideJourney
+	default:
+		*s = AuthSSOFailurePayloadSide(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AuthSSOFailurePayloadSide) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthSSOFailurePayloadSide) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AuthSSOResolutionFailedEvent) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AuthSSOResolutionFailedEvent) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		if s.TeamID.Set {
+			e.FieldStart("team_id")
+			s.TeamID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("event_type")
+		e.Str("auth.sso.resolution.failed")
+	}
+	{
+		e.FieldStart("category")
+		s.Category.Encode(e)
+	}
+	{
+		e.FieldStart("occurred_at")
+		json.EncodeDateTime(e, s.OccurredAt)
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		if s.ActorID.Set {
+			e.FieldStart("actor_id")
+			s.ActorID.Encode(e)
+		}
+	}
+	{
+		if s.ActorType.Set {
+			e.FieldStart("actor_type")
+			s.ActorType.Encode(e)
+		}
+	}
+	{
+		if s.EntityType.Set {
+			e.FieldStart("entity_type")
+			s.EntityType.Encode(e)
+		}
+	}
+	{
+		if s.EntityID.Set {
+			e.FieldStart("entity_id")
+			s.EntityID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		if s.TokenID.Set {
+			e.FieldStart("token_id")
+			s.TokenID.Encode(e)
+		}
+	}
+	{
+		if s.DelegationType.Set {
+			e.FieldStart("delegation_type")
+			s.DelegationType.Encode(e)
+		}
+	}
+	{
+		if s.DelegationID.Set {
+			e.FieldStart("delegation_id")
+			s.DelegationID.Encode(e)
+		}
+	}
+	{
+		if s.Grantor.Set {
+			e.FieldStart("grantor")
+			s.Grantor.Encode(e)
+		}
+	}
+	{
+		if s.Fingerprint.Set {
+			e.FieldStart("fingerprint")
+			s.Fingerprint.Encode(e)
+		}
+	}
+	{
+		if s.RequestID.Set {
+			e.FieldStart("request_id")
+			s.RequestID.Encode(e)
+		}
+	}
+	{
+		if s.SessionID.Set {
+			e.FieldStart("session_id")
+			s.SessionID.Encode(e)
+		}
+	}
+	{
+		if s.FlowID.Set {
+			e.FieldStart("flow_id")
+			s.FlowID.Encode(e)
+		}
+	}
+	{
+		if s.Metadata.Set {
+			e.FieldStart("metadata")
+			s.Metadata.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("payload")
+		s.Payload.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfAuthSSOResolutionFailedEvent = [22]string{
+	0:  "id",
+	1:  "project_id",
+	2:  "team_id",
+	3:  "event_type",
+	4:  "category",
+	5:  "occurred_at",
+	6:  "created_at",
+	7:  "actor_id",
+	8:  "actor_type",
+	9:  "entity_type",
+	10: "entity_id",
+	11: "client_id",
+	12: "token_id",
+	13: "delegation_type",
+	14: "delegation_id",
+	15: "grantor",
+	16: "fingerprint",
+	17: "request_id",
+	18: "session_id",
+	19: "flow_id",
+	20: "metadata",
+	21: "payload",
+}
+
+// Decode decodes AuthSSOResolutionFailedEvent from json.
+func (s *AuthSSOResolutionFailedEvent) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthSSOResolutionFailedEvent to nil")
+	}
+	var requiredBitSet [3]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "team_id":
+			if err := func() error {
+				s.TeamID.Reset()
+				if err := s.TeamID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_id\"")
+			}
+		case "event_type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.EventType = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"event_type\"")
+			}
+		case "category":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Category.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"category\"")
+			}
+		case "occurred_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.OccurredAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"occurred_at\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "actor_id":
+			if err := func() error {
+				s.ActorID.Reset()
+				if err := s.ActorID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_id\"")
+			}
+		case "actor_type":
+			if err := func() error {
+				s.ActorType.Reset()
+				if err := s.ActorType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_type\"")
+			}
+		case "entity_type":
+			if err := func() error {
+				s.EntityType.Reset()
+				if err := s.EntityType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_type\"")
+			}
+		case "entity_id":
+			if err := func() error {
+				s.EntityID.Reset()
+				if err := s.EntityID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_id\"")
+			}
+		case "client_id":
+			requiredBitSet[1] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "token_id":
+			if err := func() error {
+				s.TokenID.Reset()
+				if err := s.TokenID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"token_id\"")
+			}
+		case "delegation_type":
+			if err := func() error {
+				s.DelegationType.Reset()
+				if err := s.DelegationType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_type\"")
+			}
+		case "delegation_id":
+			if err := func() error {
+				s.DelegationID.Reset()
+				if err := s.DelegationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_id\"")
+			}
+		case "grantor":
+			if err := func() error {
+				s.Grantor.Reset()
+				if err := s.Grantor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"grantor\"")
+			}
+		case "fingerprint":
+			if err := func() error {
+				s.Fingerprint.Reset()
+				if err := s.Fingerprint.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"fingerprint\"")
+			}
+		case "request_id":
+			if err := func() error {
+				s.RequestID.Reset()
+				if err := s.RequestID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"request_id\"")
+			}
+		case "session_id":
+			if err := func() error {
+				s.SessionID.Reset()
+				if err := s.SessionID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "flow_id":
+			if err := func() error {
+				s.FlowID.Reset()
+				if err := s.FlowID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"flow_id\"")
+			}
+		case "metadata":
+			if err := func() error {
+				s.Metadata.Reset()
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "payload":
+			requiredBitSet[2] |= 1 << 5
+			if err := func() error {
+				if err := s.Payload.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"payload\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AuthSSOResolutionFailedEvent")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [3]uint8{
+		0b01111011,
+		0b00001000,
+		0b00100000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAuthSSOResolutionFailedEvent) {
+					name = jsonFieldsNameOfAuthSSOResolutionFailedEvent[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AuthSSOResolutionFailedEvent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthSSOResolutionFailedEvent) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AuthSSOResolutionFailedEventActorType as json.
+func (s AuthSSOResolutionFailedEventActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AuthSSOResolutionFailedEventActorType from json.
+func (s *AuthSSOResolutionFailedEventActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthSSOResolutionFailedEventActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AuthSSOResolutionFailedEventActorType(v) {
+	case AuthSSOResolutionFailedEventActorTypeHuman:
+		*s = AuthSSOResolutionFailedEventActorTypeHuman
+	case AuthSSOResolutionFailedEventActorTypeService:
+		*s = AuthSSOResolutionFailedEventActorTypeService
+	case AuthSSOResolutionFailedEventActorTypeSystem:
+		*s = AuthSSOResolutionFailedEventActorTypeSystem
+	case AuthSSOResolutionFailedEventActorTypeAgent:
+		*s = AuthSSOResolutionFailedEventActorTypeAgent
+	default:
+		*s = AuthSSOResolutionFailedEventActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AuthSSOResolutionFailedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthSSOResolutionFailedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AuthSSOResolutionFailedEventCategory as json.
+func (s AuthSSOResolutionFailedEventCategory) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AuthSSOResolutionFailedEventCategory from json.
+func (s *AuthSSOResolutionFailedEventCategory) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthSSOResolutionFailedEventCategory to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AuthSSOResolutionFailedEventCategory(v) {
+	case AuthSSOResolutionFailedEventCategoryRequest:
+		*s = AuthSSOResolutionFailedEventCategoryRequest
+	case AuthSSOResolutionFailedEventCategoryAuth:
+		*s = AuthSSOResolutionFailedEventCategoryAuth
+	case AuthSSOResolutionFailedEventCategorySession:
+		*s = AuthSSOResolutionFailedEventCategorySession
+	case AuthSSOResolutionFailedEventCategoryAdmin:
+		*s = AuthSSOResolutionFailedEventCategoryAdmin
+	case AuthSSOResolutionFailedEventCategoryEntity:
+		*s = AuthSSOResolutionFailedEventCategoryEntity
+	case AuthSSOResolutionFailedEventCategorySignal:
+		*s = AuthSSOResolutionFailedEventCategorySignal
+	default:
+		*s = AuthSSOResolutionFailedEventCategory(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AuthSSOResolutionFailedEventCategory) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthSSOResolutionFailedEventCategory) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AuthSSOResolutionFailedEventDelegationType as json.
+func (s AuthSSOResolutionFailedEventDelegationType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AuthSSOResolutionFailedEventDelegationType from json.
+func (s *AuthSSOResolutionFailedEventDelegationType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthSSOResolutionFailedEventDelegationType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AuthSSOResolutionFailedEventDelegationType(v) {
+	case AuthSSOResolutionFailedEventDelegationTypeDirect:
+		*s = AuthSSOResolutionFailedEventDelegationTypeDirect
+	case AuthSSOResolutionFailedEventDelegationTypeDelegated:
+		*s = AuthSSOResolutionFailedEventDelegationTypeDelegated
+	case AuthSSOResolutionFailedEventDelegationTypePatShared:
+		*s = AuthSSOResolutionFailedEventDelegationTypePatShared
+	case AuthSSOResolutionFailedEventDelegationTypeExchanged:
+		*s = AuthSSOResolutionFailedEventDelegationTypeExchanged
+	default:
+		*s = AuthSSOResolutionFailedEventDelegationType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AuthSSOResolutionFailedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthSSOResolutionFailedEventDelegationType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -34109,6 +35169,124 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				s.Payload.Encode(e)
 			}
 		}
+	case AuthSSOResolutionFailedEventEvent:
+		e.FieldStart("event_type")
+		e.Str("auth.sso.resolution.failed")
+		{
+			s := s.AuthSSOResolutionFailedEvent
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				if s.TeamID.Set {
+					e.FieldStart("team_id")
+					s.TeamID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("category")
+				s.Category.Encode(e)
+			}
+			{
+				e.FieldStart("occurred_at")
+				json.EncodeDateTime(e, s.OccurredAt)
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeDateTime(e, s.CreatedAt)
+			}
+			{
+				if s.ActorID.Set {
+					e.FieldStart("actor_id")
+					s.ActorID.Encode(e)
+				}
+			}
+			{
+				if s.ActorType.Set {
+					e.FieldStart("actor_type")
+					s.ActorType.Encode(e)
+				}
+			}
+			{
+				if s.EntityType.Set {
+					e.FieldStart("entity_type")
+					s.EntityType.Encode(e)
+				}
+			}
+			{
+				if s.EntityID.Set {
+					e.FieldStart("entity_id")
+					s.EntityID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("client_id")
+				e.Str(s.ClientID)
+			}
+			{
+				if s.TokenID.Set {
+					e.FieldStart("token_id")
+					s.TokenID.Encode(e)
+				}
+			}
+			{
+				if s.DelegationType.Set {
+					e.FieldStart("delegation_type")
+					s.DelegationType.Encode(e)
+				}
+			}
+			{
+				if s.DelegationID.Set {
+					e.FieldStart("delegation_id")
+					s.DelegationID.Encode(e)
+				}
+			}
+			{
+				if s.Grantor.Set {
+					e.FieldStart("grantor")
+					s.Grantor.Encode(e)
+				}
+			}
+			{
+				if s.Fingerprint.Set {
+					e.FieldStart("fingerprint")
+					s.Fingerprint.Encode(e)
+				}
+			}
+			{
+				if s.RequestID.Set {
+					e.FieldStart("request_id")
+					s.RequestID.Encode(e)
+				}
+			}
+			{
+				if s.SessionID.Set {
+					e.FieldStart("session_id")
+					s.SessionID.Encode(e)
+				}
+			}
+			{
+				if s.FlowID.Set {
+					e.FieldStart("flow_id")
+					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.Metadata.Set {
+					e.FieldStart("metadata")
+					s.Metadata.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("payload")
+				s.Payload.Encode(e)
+			}
+		}
 	case AuthTokenIssuedEventEvent:
 		e.FieldStart("event_type")
 		e.Str("auth.token.issued")
@@ -38174,6 +39352,9 @@ func (s *Event) Decode(d *jx.Decoder) error {
 				case "auth.sso.exchange.succeeded":
 					s.Type = AuthSSOExchangeSucceededEventEvent
 					found = true
+				case "auth.sso.resolution.failed":
+					s.Type = AuthSSOResolutionFailedEventEvent
+					found = true
 				case "auth.token.issued":
 					s.Type = AuthTokenIssuedEventEvent
 					found = true
@@ -38324,6 +39505,10 @@ func (s *Event) Decode(d *jx.Decoder) error {
 		}
 	case AuthSSOExchangeSucceededEventEvent:
 		if err := s.AuthSSOExchangeSucceededEvent.Decode(d); err != nil {
+			return err
+		}
+	case AuthSSOResolutionFailedEventEvent:
+		if err := s.AuthSSOResolutionFailedEvent.Decode(d); err != nil {
 			return err
 		}
 	case AuthTokenIssuedEventEvent:
@@ -71426,6 +72611,72 @@ func (s *OptAuthCheckFailedEventDelegationType) UnmarshalJSON(data []byte) error
 	return s.Decode(d)
 }
 
+// Encode encodes AuthCheckPayloadReason as json.
+func (o OptAuthCheckPayloadReason) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AuthCheckPayloadReason from json.
+func (o *OptAuthCheckPayloadReason) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAuthCheckPayloadReason to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAuthCheckPayloadReason) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAuthCheckPayloadReason) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AuthCheckPayloadSide as json.
+func (o OptAuthCheckPayloadSide) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AuthCheckPayloadSide from json.
+func (o *OptAuthCheckPayloadSide) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAuthCheckPayloadSide to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAuthCheckPayloadSide) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAuthCheckPayloadSide) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes AuthCheckSucceededEventDelegationType as json.
 func (o OptAuthCheckSucceededEventDelegationType) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -71687,6 +72938,39 @@ func (s OptAuthSSOExchangeSucceededEventDelegationType) MarshalJSON() ([]byte, e
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptAuthSSOExchangeSucceededEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AuthSSOResolutionFailedEventDelegationType as json.
+func (o OptAuthSSOResolutionFailedEventDelegationType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AuthSSOResolutionFailedEventDelegationType from json.
+func (o *OptAuthSSOResolutionFailedEventDelegationType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAuthSSOResolutionFailedEventDelegationType to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAuthSSOResolutionFailedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAuthSSOResolutionFailedEventDelegationType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -76295,6 +77579,55 @@ func (s OptNilAuthSSOExchangeSucceededEventActorType) MarshalJSON() ([]byte, err
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptNilAuthSSOExchangeSucceededEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AuthSSOResolutionFailedEventActorType as json.
+func (o OptNilAuthSSOResolutionFailedEventActorType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AuthSSOResolutionFailedEventActorType from json.
+func (o *OptNilAuthSSOResolutionFailedEventActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilAuthSSOResolutionFailedEventActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v AuthSSOResolutionFailedEventActorType
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilAuthSSOResolutionFailedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilAuthSSOResolutionFailedEventActorType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

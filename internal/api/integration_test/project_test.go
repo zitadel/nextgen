@@ -87,6 +87,10 @@ func (s *stubAuthAttemptService) SetSSOCallbackResult(ctx context.Context, proje
 	return nil
 }
 
+func (s *stubAuthAttemptService) RecordSSOFailure(ctx context.Context, in domain.FlowSSOFailureInput) error {
+	return nil
+}
+
 // VerifyProof implements [service.AuthAttemptService].
 func (s *stubAuthAttemptService) VerifyProof(ctx context.Context, input service.VerifyProofInput) (*domain.AuthAttempt, error) {
 	return nil, nil

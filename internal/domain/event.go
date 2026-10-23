@@ -71,6 +71,11 @@ const (
 	EventTypeAuthSSOAuthorizationFailed EventType = "auth.sso.authorization.failed"
 	EventTypeAuthSSOExchangeSucceeded   EventType = "auth.sso.exchange.succeeded"
 	EventTypeAuthSSOExchangeFailed      EventType = "auth.sso.exchange.failed"
+	// A sign-in that failed after its exchange: the identity could not be
+	// matched to a user or the user created, or the attempt could not be
+	// handed off. The identity provider is not at fault, so the exchange's
+	// events never cover it.
+	EventTypeAuthSSOResolutionFailed EventType = "auth.sso.resolution.failed"
 
 	EventTypeFlowdefCreated EventType = "flowdef.created"
 	// Retired, no producer. Kept so stored rows decode.

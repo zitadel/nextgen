@@ -16,6 +16,7 @@ import (
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
+	"github.com/zitadel/nextgen/internal/instrumentation/ssoevent"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -104,7 +105,7 @@ func (f *ssoResolverFixture) expectAttempt(attempt *domain.AuthAttempt) *service
 
 func (f *ssoResolverFixture) expectRevision(document string) {
 	f.connections.EXPECT().GetRevision(gomock.Any(), ssoProjectID, ssoRevisionID).
-		Return(&domain.IDPConnection{ProjectID: ssoProjectID, ID: "idp-1", RevisionID: ssoRevisionID, Document: []byte(document)}, nil)
+		Return(&domain.IDPConnection{ProjectID: ssoProjectID, ID: "idp-1", Slug: "google", RevisionID: ssoRevisionID, Document: []byte(document)}, nil)
 }
 
 func (f *ssoResolverFixture) expectNoRevisionOrLinkRead() {
@@ -287,6 +288,23 @@ func TestFlowSSOIdentityResolver_LoadParked_BoundAttemptReportsUser(t *testing.T
 	f := newSSOResolverFixture(t)
 	f.expectAttempt(boundAttempt())
 	f.expectNoRevisionOrLinkRead()
+	f.connections.EXPECT().Get(gomock.Any(), ssoProjectID, "idp-1").
+		Return(&domain.IDPConnection{ID: "idp-1", Slug: "google"}, nil)
+
+	got, err := f.resolver.LoadParked(t.Context(), loadInput())
+	require.NoError(t, err)
+	assert.Equal(t, &domain.FlowSSOParkedIdentity{BoundUserID: "user-1", AttemptUserID: "user-1", ProviderSlug: "google"}, got)
+}
+
+// A request that lost its cookie still says which connection the bind used, so
+// a handoff that fails then is told of by that connection; if the connection
+// cannot be read the load still succeeds, only unlabelled.
+func TestFlowSSOIdentityResolver_LoadParked_BoundConnectionIsBestEffort(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.expectAttempt(boundAttempt())
+	f.expectNoRevisionOrLinkRead()
+	f.connections.EXPECT().Get(gomock.Any(), ssoProjectID, "idp-1").Return(nil, errors.New("store unavailable"))
 
 	got, err := f.resolver.LoadParked(t.Context(), loadInput())
 	require.NoError(t, err)
@@ -359,6 +377,7 @@ func TestFlowSSOIdentityResolver_LoadParked_LinkFound(t *testing.T) {
 	assert.Equal(t, &domain.FlowSSOParkedIdentity{
 		CheckID:          "ch-1",
 		ConnectionID:     "idp-1",
+		ProviderSlug:     "google",
 		Subject:          "sub-1",
 		Claims:           map[string]any{"email": "alice@example.com"},
 		Verified:         map[string]bool{"email": true},
@@ -392,6 +411,10 @@ func TestFlowSSOIdentityResolver_LoadParked_OtherSchemaRestartsAndLogsBoth(t *te
 
 	_, err := f.resolver.LoadParked(ctx, loadInput())
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+	failure, ok := errors.AsType[*domain.SSOLoadFailure](err)
+	require.True(t, ok, "the failure names the connection and the reason for the audit trail")
+	assert.Equal(t, ssoevent.ReasonOtherSchema, failure.Reason)
+	assert.Equal(t, "google", failure.ProviderSlug)
 	assert.Contains(t, logged.String(), ssoSchemaURL)
 	assert.Contains(t, logged.String(), otherSchemaURL)
 	assert.NotContains(t, err.Error(), ssoSchemaURL)
@@ -530,6 +553,7 @@ func TestFlowSSOIdentityResolver_LoadCollected_ReadsResolvedRow(t *testing.T) {
 	assert.Equal(t, &domain.FlowSSOParkedIdentity{
 		CheckID:      "ch-1",
 		ConnectionID: "idp-1",
+		ProviderSlug: "google",
 		Subject:      "sub-1",
 		Claims:       map[string]any{"email": "alice@example.com"},
 		Verified:     map[string]bool{"email": true},

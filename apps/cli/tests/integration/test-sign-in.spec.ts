@@ -223,6 +223,199 @@ describe("test sign-in", () => {
 
         expect(result).toExplain("No connection named google");
       });
+
+      it("refuses a live sign-in when the client secret variable is not set", async () => {
+        const app = await aSetUpApp();
+        await app.enableSso("google", CREDENTIALS);
+        await app.deleteVariable("GOOGLE_CLIENT_SECRET");
+        await app.markClaimed();
+        platform.hasGoogle();
+
+        const result = await app.run([
+          "test",
+          "sign-in",
+          "--provider",
+          "google",
+          "--live",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_CREDENTIAL_MISSING");
+      });
+
+      it("refuses a live sign-in when the client secret variable is not a secret", async () => {
+        const app = await aSetUpApp();
+        await app.enableSso("google", CREDENTIALS);
+        await app.setVariable("GOOGLE_CLIENT_SECRET", "42");
+        await app.markClaimed();
+        platform.hasGoogle();
+
+        const result = await app.run([
+          "test",
+          "sign-in",
+          "--provider",
+          "google",
+          "--live",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_CREDENTIAL_MISSING");
+      });
+    });
+
+    describe("--live", () => {
+      const ATTEMPT = { auth_attempt_id: "att_1", connection_slug: "google" };
+      const LIVE = [
+        "test",
+        "sign-in",
+        "--provider",
+        "google",
+        "--live",
+        "--timeout",
+        "10",
+        "--json",
+      ];
+
+      async function anUnclaimedApp() {
+        const app = await aSetUpApp();
+        await app.enableSso("google", CREDENTIALS);
+        await app.apply();
+        platform.hasGoogle();
+        return app;
+      }
+
+      async function aSignedUpApp() {
+        const app = await anUnclaimedApp();
+        await app.markClaimed();
+        return app;
+      }
+
+      it("passes once the attempt has been handed off", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([
+          { event_type: "auth.attempt.created", entity_id: "att_1" },
+          { event_type: "auth.sso.exchange.succeeded", payload: ATTEMPT },
+          { event_type: "auth.attempt.handed_off", entity_id: "att_1" },
+        ]);
+
+        const result = await app.run(LIVE, { BROWSER: "none" });
+
+        expect(result).toSucceed();
+      });
+
+      it("gives the attempt and its phases as data in the JSON", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([
+          { event_type: "auth.attempt.created", entity_id: "att_1" },
+          { event_type: "auth.sso.exchange.succeeded", payload: ATTEMPT },
+          { event_type: "auth.attempt.handed_off", entity_id: "att_1" },
+        ]);
+
+        const result = await app.run(LIVE, { BROWSER: "none" });
+
+        expect(result.stdout).toContain('"attempt_id": "att_1"');
+      });
+
+      it("fails a sign-in the provider refused, naming the callback URI to check", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([
+          { event_type: "auth.attempt.created", entity_id: "att_1" },
+          {
+            event_type: "auth.sso.authorization.failed",
+            payload: { ...ATTEMPT, reason: "provider_denied", side: "provider" },
+          },
+        ]);
+
+        const result = await app.run(LIVE, { BROWSER: "none" });
+
+        expect(result).toHintAt(CALLBACK_URI);
+      });
+
+      it("fails a handoff that did not happen, as the journey's", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([
+          { event_type: "auth.attempt.created", entity_id: "att_1" },
+          {
+            event_type: "auth.sso.resolution.failed",
+            payload: {
+              ...ATTEMPT,
+              phase: "handed_off",
+              reason: "handoff_failed",
+              side: "journey",
+            },
+          },
+        ]);
+
+        const result = await app.run(LIVE, { BROWSER: "none" });
+
+        expect(result).toHintAt("zitadel events list");
+      });
+
+      it("fails when nobody signs in, pointing at the events", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([]);
+
+        const result = await app.run(
+          ["test", "sign-in", "--provider", "google", "--live", "--timeout", "1", "--json"],
+          { BROWSER: "none" },
+        );
+
+        expect(result).toHintAt("zitadel events list");
+      });
+
+      it("refuses an unclaimed project, whose events are hidden, before it opens anything", async () => {
+        const app = await anUnclaimedApp();
+        platform.recordsSignIn([]);
+
+        const result = await app.run(LIVE, { BROWSER: "none" });
+
+        expect(result).toHintAt("Claim it");
+      });
+
+      it("refuses a dry run of a live sign-in that a real one would refuse", async () => {
+        const app = await anAppWithTwoProviders();
+        await app.markClaimed();
+
+        const result = await app.run(["test", "sign-in", "--live", "--dry-run", "--json"]);
+
+        expect(result).toHintAt("--provider");
+      });
+
+      it("starts nothing on a dry run, since a sign-in can create a user", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([]);
+
+        const result = await app.run([...LIVE, "--dry-run"], { BROWSER: "none" });
+
+        expect(result).toBeSkipped();
+      });
+
+      it("does not take a password login for a sign-in with the connection", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([
+          { event_type: "auth.attempt.created", entity_id: "att_1" },
+          { event_type: "auth.attempt.handed_off", entity_id: "att_1" },
+        ]);
+
+        const result = await app.run(
+          ["test", "sign-in", "--provider", "google", "--live", "--timeout", "2", "--json"],
+          { BROWSER: "none" },
+        );
+
+        expect(result).toHintAt("zitadel events list");
+      });
+
+      it("shows the login URL on stderr while it waits, so an agent can pass it on", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([]);
+
+        const result = await app.run(
+          ["test", "sign-in", "--provider", "google", "--live", "--timeout", "1", "--json"],
+          { BROWSER: "none" },
+        );
+
+        expect(result.stderr).toContain("/login");
+      });
     });
 
     describe("with several providers", () => {
@@ -250,6 +443,14 @@ describe("test sign-in", () => {
         const result = await app.run(["test", "sign-in", "--provider", ACME.slug]);
 
         expect(`${result.stdout}${result.stderr}`).not.toContain("accounts.google.com");
+      });
+
+      it("refuses a live sign-in, which is one provider's, without a name", async () => {
+        const app = await anAppWithTwoProviders();
+
+        const result = await app.run(["test", "sign-in", "--live", "--json"]);
+
+        expect(result).toHintAt("--provider");
       });
 
       it("shows each provider under its own heading", async () => {
@@ -304,6 +505,16 @@ describe("test sign-in", () => {
         const result = await app.run(["test", "sign-in", "--provider", "google"]);
 
         expect(`${result.stdout}${result.stderr}`).not.toContain("\u001b]0;");
+      });
+
+      it("says the browser sign-in was not asked for", async () => {
+        const app = await aSetUpApp();
+        await app.enableSso("google", CREDENTIALS);
+        platform.hasGoogle();
+
+        const result = await app.run(["test", "sign-in", "--provider", "google"]);
+
+        expect(result).toPrint("a browser sign-in was not asked for");
       });
     });
   });

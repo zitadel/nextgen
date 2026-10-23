@@ -107,6 +107,7 @@ const (
 	AuthSsoAuthorizationFailedOperation    OperationName = "AuthSsoAuthorizationFailed"
 	AuthSsoExchangeFailedOperation         OperationName = "AuthSsoExchangeFailed"
 	AuthSsoExchangeSucceededOperation      OperationName = "AuthSsoExchangeSucceeded"
+	AuthSsoResolutionFailedOperation       OperationName = "AuthSsoResolutionFailed"
 	AuthTokenIssuedOperation               OperationName = "AuthTokenIssued"
 	AuthTokenRevokedOperation              OperationName = "AuthTokenRevoked"
 	AuthzGrantedOperation                  OperationName = "AuthzGranted"

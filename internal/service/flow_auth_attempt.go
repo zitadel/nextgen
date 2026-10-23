@@ -62,6 +62,10 @@ func (a *FlowAuthAttemptAdapter) SubmitIdentifier(ctx context.Context, in domain
 	return factor.UserID, nil
 }
 
+func (a *FlowAuthAttemptAdapter) RecordSSOFailure(ctx context.Context, in domain.FlowSSOFailureInput) error {
+	return a.attempts.RecordSSOFailure(ctx, in)
+}
+
 func (a *FlowAuthAttemptAdapter) Handoff(ctx context.Context, in domain.FlowHandoffInput) (domain.FlowHandoffOutput, error) {
 	attempt, err := a.attempts.Handoff(ctx, HandoffInput{
 		ProjectID: in.ProjectID,

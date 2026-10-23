@@ -458,6 +458,16 @@ export class ScaffoldedApp {
     return details?.suggested_args ?? [];
   }
 
+  /** Records that a team owns this project, as `zitadel claim` leaves it. */
+  async markClaimed(): Promise<void> {
+    const path = join(this.path, ".zitadel/secret");
+    const secret = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+    await writeFile(
+      path,
+      JSON.stringify({ ...secret, claimed_at: "2026-01-01T00:00:00.000Z", team_id: "team_1" }),
+    );
+  }
+
   /** Leaves this directory with the record of a local server that is not running. */
   async writeStoppedServerRecord(): Promise<void> {
     await mkdir(join(this.path, ".zitadel/local"), { recursive: true });

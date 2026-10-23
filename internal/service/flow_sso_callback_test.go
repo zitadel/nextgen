@@ -21,6 +21,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/ssoevent"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -276,7 +277,14 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 
 			out, err := svc.Process(t.Context(), tt.in)
 
-			assert.Equal(t, tt.wantResult, attempts.setResult)
+			// The reason is asserted where each failure is listed, below.
+			var stored *domain.SSOCallbackResult
+			if attempts.setResult != nil {
+				withoutReason := *attempts.setResult
+				withoutReason.FailureReason = ""
+				stored = &withoutReason
+			}
+			assert.Equal(t, tt.wantResult, stored)
 			assert.Equal(t, tt.wantEvent, attempts.setResultEvent)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
@@ -511,4 +519,250 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 			assert.Equal(t, "https://app.example.com/login?flow=flow-1", out.ReturnTarget)
 		})
 	}
+}
+
+// Canary values: each stands for something the log must never carry. Every
+// one is planted where the callback reads or the provider answers.
+const (
+	canaryCode   = "CANARY-AUTH-CODE"
+	canaryState  = "proj-1.CANARY-STATE"
+	canarySecret = "CANARY-CLIENT-SECRET"
+	canaryToken  = "CANARY-ACCESS-TOKEN"
+	canaryClaim  = "canary-claim@example.test"
+	canaryText   = "CANARY-PROVIDER-TEXT"
+)
+
+// ssoCanaryProvider is a fake provider whose token endpoint either fails with
+// canary text or answers a signed id_token that carries the canary claim and
+// the canary access token. The connection maps the email claim.
+func ssoCanaryProvider(t *testing.T, failExchange bool) []byte {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/keys":
+			_ = json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{
+				{Key: &key.PublicKey, KeyID: "k1", Algorithm: "RS256", Use: "sig"},
+			}})
+		case "/token":
+			if failExchange {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = fmt.Fprintf(w, `{"error":"invalid_grant","error_description":"%s %s %s"}`, canaryText, canaryCode, canarySecret)
+				return
+			}
+			now := time.Now()
+			payload, err := json.Marshal(map[string]any{
+				"iss": srv.URL, "aud": "client-1", "sub": "user-1", "email": canaryClaim,
+				"exp": now.Add(time.Hour).Unix(), "iat": now.Unix(), "nonce": "the-nonce",
+			})
+			require.NoError(t, err)
+			signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: key}, (&jose.SignerOptions{}).WithHeader("kid", "k1"))
+			require.NoError(t, err)
+			jws, err := signer.Sign(payload)
+			require.NoError(t, err)
+			token, err := jws.CompactSerialize()
+			require.NoError(t, err)
+			_, _ = fmt.Fprintf(w, `{"access_token":%q,"token_type":"bearer","id_token":%q}`, canaryToken, token)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return []byte(`{
+		"slug": "google", "protocol": "oidc", "display_name": "Google",
+		"claim_mapping": {"email": "email"},
+		"oidc": {
+			"issuer": "` + srv.URL + `", "client_id": "client-1", "client_secret": "${{ GOOGLE_SECRET }}",
+			"scopes": ["openid"], "id_token_mapping": true, "pkce_enabled": false,
+			"authorization_endpoint": "` + srv.URL + `/authorize", "token_endpoint": "` + srv.URL + `/token",
+			"userinfo_endpoint": "` + srv.URL + `/userinfo", "jwks_uri": "` + srv.URL + `/keys"
+		}
+	}`)
+}
+
+// Every way a callback fails records why in the event its result write emits:
+// the type says whether a code arrived, and the reason says which failure it
+// was, from a closed set.
+func TestFlowSSOCallback_Process_RecordsWhyItFailed(t *testing.T) {
+	t.Parallel()
+	secret := &domain.Variable{Name: "GOOGLE_SECRET", Value: canarySecret, IsSecret: true}
+	tests := []struct {
+		name       string
+		in         service.FlowSSOCallbackInput
+		consumeErr error
+		// revision is how the pinned revision is read; nil means it is not.
+		revision   *revisionRead
+		wantEvent  domain.EventType
+		wantReason ssoevent.Reason
+	}{
+		{
+			name:      "a completed exchange records no failure",
+			in:        service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
+			revision:  &revisionRead{secret: secret},
+			wantEvent: domain.EventTypeAuthSSOExchangeSucceeded,
+		},
+		{
+			name:       "access_denied is the provider's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied"},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+			wantReason: ssoevent.ReasonProviderDenied,
+		},
+		{
+			name:       "any other provider error is the provider's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "server_error"},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+			wantReason: ssoevent.ReasonProviderError,
+		},
+		{
+			name:       "a callback with neither code nor error is the journey's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+			wantReason: ssoevent.ReasonNoCode,
+		},
+		{
+			name:       "another connection's path is the journey's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: "other", State: ssoCallbackState, Code: "the-code"},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
+			wantReason: ssoevent.ReasonStateMismatch,
+		},
+		{
+			name:       "a refused code exchange is the provider's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
+			revision:   &revisionRead{failToken: true, secret: secret},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
+			wantReason: ssoevent.ReasonExchangeFailed,
+		},
+		{
+			name:       "a secret that is not a secret variable is the journey's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
+			revision:   &revisionRead{secret: &domain.Variable{Name: "GOOGLE_SECRET", Value: "plain"}},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
+			wantReason: ssoevent.ReasonSecretMissing,
+		},
+		{
+			name:       "a connection revision that cannot be read is the journey's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
+			revision:   &revisionRead{err: errors.New("gone")},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
+			wantReason: ssoevent.ReasonConnectionBroken,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			svc, attempts := newCallbackWithRevision(t, tt.revision, tt.consumeErr)
+
+			_, _ = svc.Process(t.Context(), tt.in)
+
+			require.NotNil(t, attempts.setResult)
+			assert.Equal(t, tt.wantEvent, attempts.setResultEvent)
+			assert.Equal(t, tt.wantReason, attempts.setResult.FailureReason)
+		})
+	}
+}
+
+// A state the engine does not know has no attempt to attach an event to, so a
+// request that merely guesses one writes nothing.
+func TestFlowSSOCallback_Process_WritesNothingForAnUnknownState(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		in         service.FlowSSOCallbackInput
+		consumeErr error
+	}{
+		{
+			name:       "a state the store does not hold",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
+			consumeErr: domain.ErrSSOStateInvalid(),
+		},
+		{
+			name: "a state without a project",
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: "no-separator", Code: "the-code"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			svc, attempts := newCallbackWithRevision(t, nil, tt.consumeErr)
+
+			_, err := svc.Process(t.Context(), tt.in)
+
+			require.Error(t, err)
+			assert.Nil(t, attempts.setResult)
+		})
+	}
+}
+
+// What a failed callback stores and emits is the error key and a reason from a
+// closed set: nothing the provider or the request said reaches it.
+func TestFlowSSOCallback_Process_FailureCarriesNoSecrets(t *testing.T) {
+	t.Parallel()
+	secret := &domain.Variable{Name: "GOOGLE_SECRET", Value: canarySecret, IsSecret: true}
+	tests := []struct {
+		name     string
+		in       service.FlowSSOCallbackInput
+		revision *revisionRead
+	}{
+		{
+			name:     "a refused exchange whose answer echoes the code and the secret",
+			in:       service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: canaryCode},
+			revision: &revisionRead{failToken: true, secret: secret},
+		},
+		{
+			name: "a provider error with its description and uri",
+			in: service.FlowSSOCallbackInput{
+				ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied",
+				ErrorDescription: canaryText + canaryCode, ErrorURI: "https://provider.example.test/?code=" + canaryCode,
+			},
+		},
+		{
+			name: "a callback on another connection's path",
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: "other", State: ssoCallbackState, Code: canaryCode, Issuer: "https://evil.example.test/?q=" + canaryText},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			svc, attempts := newCallbackWithRevision(t, tt.revision, nil)
+
+			_, _ = svc.Process(t.Context(), tt.in)
+
+			require.NotNil(t, attempts.setResult)
+			stored := fmt.Sprintf("%+v", *attempts.setResult)
+			for _, canary := range []string{canaryCode, canaryState, canarySecret, canaryToken, canaryClaim, canaryText} {
+				assert.NotContains(t, stored, canary)
+			}
+			assert.Empty(t, attempts.setResult.Subject)
+			assert.Empty(t, attempts.setResult.Claims)
+		})
+	}
+}
+
+// revisionRead describes the pinned connection revision a callback reads: the
+// canary provider behind it, the secret variable it resolves, or the error the
+// read fails with.
+type revisionRead struct {
+	failToken bool
+	secret    *domain.Variable
+	err       error
+}
+
+func newCallbackWithRevision(t *testing.T, rev *revisionRead, consumeErr error) (*service.FlowSSOCallback, *fakeAuthAttempts) {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	connections := servicemocks.NewMockIDPConnectionService(ctrl)
+	variables := servicemocks.NewMockVariableService(ctrl)
+	if rev != nil && rev.err != nil {
+		connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, rev.err)
+	} else if rev != nil {
+		connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+			Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: ssoCanaryProvider(t, rev.failToken)}, nil)
+		variables.EXPECT().GetDecryptedVariables(gomock.Any(), gomock.Any(), gomock.Any(), "GOOGLE_SECRET").Return([]*domain.Variable{rev.secret}, nil)
+	}
+	attempts := &fakeAuthAttempts{
+		consumeCheck: &domain.SSOCallbackCheck{AuthAttemptID: "att_1", Pending: ssoCallbackPending()},
+		consumeErr:   consumeErr,
+	}
+	return service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), variables, &http.Client{}), attempts
 }

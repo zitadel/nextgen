@@ -5,6 +5,8 @@ description: |
   `auth.sso.authorization.failed`, and `auth.sso.exchange.failed` /
   `auth.sso.exchange.succeeded`.
   `auth_attempt_id` joins the check to its attempt for SIEM correlation.
+  The `auth.sso.*` events also carry `connection_slug`, and a failed one the
+  `reason` and whose `side` it was.
 required:
   - check_id
 properties:
@@ -14,3 +16,34 @@ properties:
     type: string
   auth_attempt_id:
     type: string
+  connection_slug:
+    type: string
+    description: The identity provider connection of an `auth.sso.*` event.
+  reason:
+    type: string
+    description: Why an `auth.sso.*` event failed. Never the provider's own text.
+    enum:
+      - provider_denied
+      - provider_error
+      - discovery_failed
+      - exchange_failed
+      - id_token_invalid
+      - userinfo_failed
+      - state_mismatch
+      - no_code
+      - connection_invalid
+      - secret_unavailable
+      - subject_invalid
+      - creation_disabled
+      - claim_rejected
+      - unroutable
+      - user_invalid
+      - other_schema
+      - handoff_failed
+      - internal
+  side:
+    type: string
+    description: Whose side a failed `auth.sso.*` event was.
+    enum:
+      - provider
+      - journey
