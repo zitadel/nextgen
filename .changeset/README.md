@@ -18,7 +18,7 @@ A change needs a changeset if it changes what the shipped product does —
 **release intent is product-level, not path-level.** The Go server, its API
 surface (`apps/api/api/openapi/**`), and the SDKs all ship as one versioned
 bundle, so a server or API change needs one (list `@zitadel/server`) — even from
-`apps/api/internal/` or `apps/api/api/generated/**` — because it ships new server
+`apps/api/internal/` or `apps/api/internal/api/generated/**` — because it ships new server
 and SDK versions that belong in the release notes.
 
 The console (`apps/console/**`) and login UI (`apps/login-ui/**`) are embedded in

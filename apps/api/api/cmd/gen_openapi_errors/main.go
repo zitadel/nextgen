@@ -9,24 +9,24 @@
 // # Bootstrapping a pruned tree
 //
 // That inference type-loads the module, and the module does not type-check
-// until ogen has written api/generated — which ogen produces from a spec whose
+// until ogen has written internal/api/generated — which ogen produces from a spec whose
 // endpoints $ref the very files written here. On a tree that still holds its
 // generated output the cycle is invisible; on a pruned one no directive order
 // resolves it, because it closes through this generator's own chain.
 //
 // So the generator breaks it itself, rather than leaving it to whoever invokes
-// it. When api/generated is absent it runs two prerequisites before analyzing:
+// it. When the ogen output is absent it runs two prerequisites before analyzing:
 //
 //   - the enumer directives, because the analysis also needs their output and
 //     `go generate ./...` reaches internal/ only after api/;
-//   - the ogen directive, over a placeholder spec written here that gives every
+//   - the ogen directives, over a placeholder spec written here that gives every
 //     operation every known error code. That spec is wrong but complete, which
 //     is all ogen needs, and it is deliberately a superset: whatever types the
 //     honest pass makes ogen generate, the placeholder made it generate too.
 //
 // The analysis then runs against a module that compiles, the real sets
-// overwrite the placeholders, and the ogen directive that follows this one in
-// api/generate.go regenerates the client from them. Both prerequisites shell
+// overwrite the placeholders, and the ogen directives that follow this one in
+// api/generate.go regenerate the server stubs and the public client from them. Both prerequisites shell
 // out to `go generate -run`, so their commands stay declared in one place
 // instead of being copied here.
 //
@@ -169,8 +169,8 @@ func main() {
 	// module does not type-check until ogen has run, and ogen cannot run until
 	// this generator has written a spec. Break the cycle with a placeholder
 	// pass; see the package comment.
-	if !generatedClientExists(moduleRoot) {
-		bootstrapGeneratedClient(moduleRoot, apiDir, func() {
+	if !ogenOutputExists(moduleRoot) {
+		bootstrapOgenOutput(moduleRoot, apiDir, func() {
 			allErrorFuncs := slices.Sorted(maps.Keys(errorMapping))
 			writeErrorResponses(endpoints, tmpl, errorMapping, openapiBasePath,
 				func(endpointOperation) []string { return allErrorFuncs })
@@ -182,11 +182,11 @@ func main() {
 	analyzed, err := erroranalysis.Analyze(erroranalysis.Config{Dir: moduleRoot})
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "❌ Error analyzing service error paths: %v\n", err)
-		if !generatedClientExists(moduleRoot) {
+		if !ogenOutputExists(moduleRoot) {
 			_, _ = fmt.Fprintf(os.Stderr,
-				"\napi/generated is still missing, so the module cannot type-check and this\n"+
-					"analysis cannot run. The bootstrap pass should have written it — check that\n"+
-					"the ogen directive in api/generate.go still matches the %q filter.\n", ogenDirective)
+				"\ninternal/api/generated or packages/go/api is still missing, so the module cannot\n"+
+					"type-check and this analysis cannot run. The bootstrap pass should have written\n"+
+					"them — check that the ogen directives in api/generate.go still match the %q filter.\n", ogenDirective)
 		}
 		os.Exit(1)
 	}
@@ -349,18 +349,20 @@ func writeErrorResponses(
 	}
 }
 
-// bootstrapGeneratedClient produces the api/generated the error analysis needs
-// before that analysis is possible — the pruned-tree cycle described in the
-// package comment. writePlaceholderSpec fills every operation's error response
-// with every known code, which is wrong but complete, and is the only spec
-// available to generate a client from at this point.
+// bootstrapOgenOutput produces the ogen output the error analysis needs before
+// that analysis is possible — the pruned-tree cycle described in the package
+// comment: the server stubs (internal/api/generated) and the public client
+// (packages/go/api), which internal/api/integration_test/helpers imports.
+// writePlaceholderSpec fills every operation's error response with every known
+// code, which is wrong but complete, and is the only spec available to
+// generate from at this point.
 //
 // Nothing here is conditional on what is already on disk: both prerequisites
 // are idempotent, and keeping the path single means `moon run server:generate`
 // walks exactly the one `go generate ./...` does, so the standing pruned-tree
 // check (server:check-generate-pruned) covers both. The cost is one redundant
 // enumer run under the Moon runner, on the rare pruned path only.
-func bootstrapGeneratedClient(moduleRoot, apiDir string, writePlaceholderSpec func()) {
+func bootstrapOgenOutput(moduleRoot, apiDir string, writePlaceholderSpec func()) {
 	if os.Getenv(bootstrapGuardEnv) != "" {
 		_, _ = fmt.Fprintf(os.Stderr,
 			"❌ Bootstrapping recursively: a nested `go generate` re-entered this generator.\n"+
@@ -369,7 +371,7 @@ func bootstrapGeneratedClient(moduleRoot, apiDir string, writePlaceholderSpec fu
 		os.Exit(1)
 	}
 
-	fmt.Println("🥾 api/generated is missing: bootstrapping it so the module type-checks.")
+	fmt.Println("🥾 The ogen output is missing: bootstrapping it so the module type-checks.")
 
 	// The analysis type-loads internal/domain, which does not compile without
 	// its enumer output. `go generate ./...` walks api before internal, so that
@@ -380,7 +382,7 @@ func bootstrapGeneratedClient(moduleRoot, apiDir string, writePlaceholderSpec fu
 
 	runDirectives(apiDir, ogenDirective, ".")
 
-	fmt.Println("🥾 Bootstrap client generated; inferring the real error sets.")
+	fmt.Println("🥾 Bootstrap stubs and client generated; inferring the real error sets.")
 }
 
 // runDirectives re-runs a subset of the module's own //go:generate directives.
@@ -401,16 +403,16 @@ func runDirectives(dir, filter, pattern string) {
 	}
 }
 
-// generatedClientExists reports whether ogen has written its output yet. It
+// ogenOutputExists reports whether ogen has written its output yet. It
 // separates "the analysis failed" from "the analysis could not have run" — the
 // second is the pruned-tree case the bootstrap pass exists for.
 //
-// Both ogen outputs count: the server's api/generated and the public client
-// (packages/go/api), which internal/api/integration_test/helpers imports. The
-// bootstrap's `go generate -run "go tool ogen"` writes both.
-func generatedClientExists(moduleRoot string) bool {
+// Both ogen outputs count: the server stubs (internal/api/generated) and the
+// public client (packages/go/api), which internal/api/integration_test/helpers
+// imports. The bootstrap's `go generate -run "go tool ogen"` writes both.
+func ogenOutputExists(moduleRoot string) bool {
 	for _, dir := range [][]string{
-		{moduleRoot, "api", "generated"},
+		{moduleRoot, "internal", "api", "generated"},
 		{moduleRoot, "..", "..", "packages", "go", "api"},
 	} {
 		matches, err := filepath.Glob(filepath.Join(append(dir, "*.go")...))
