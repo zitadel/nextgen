@@ -167,6 +167,14 @@ the user exists, so the password 1Password holds stays valid. Every preview
 database starts empty and imports the preview root admin on its first start:
 one login opens every preview.
 
+The launcher names the root admin (the document's `header.id`) the
+deployment's platform operator, who administers every project
+([ADR 075](../adrs/075-platform-operators.md)), and refuses to start with a
+document that names no user id.
+To name others, such as support staff, set `NEXTGEN_PLATFORM_OPERATORS` to
+their platform-project user ids, comma-separated and the root admin included;
+the server grants and revokes to match at its next start.
+
 ### 3. Vercel project
 
 Settings: no Root Directory (the repository root holds `vercel.json`),
@@ -195,6 +203,7 @@ Environment variables (add secrets with
 | `WEBSITE_GITHUB_TOKEN` | Production, Preview; sensitive | a fine-grained GitHub token with no permissions: the website's changelog reads the GitHub Releases with it, at 5,000 requests an hour instead of the 60 that each of Vercel's shared IP addresses gets without one |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive | production's `admin-user.b64`: the root admin document |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Preview; sensitive | preview's `admin-user.b64` |
+| `NEXTGEN_PLATFORM_OPERATORS` | Production or Preview; optional | the platform operators' user ids, comma-separated; unset means the root admin alone |
 | `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
 | `TURBO_TELEMETRY_DISABLED` | Production, Preview | `1`: turbo sends no telemetry from the builds, as in CI |
 | `TURBO_PLATFORM_ENV_DISABLED` | Production, Preview | `1`: stops turbo listing, under every task, each project variable `turbo.json` does not pass; the JS builds are not meant to see them (strict environment mode) |

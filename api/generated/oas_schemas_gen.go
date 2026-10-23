@@ -23480,9 +23480,17 @@ func (*Event) getEventRes() {}
 // live risk-evaluator input.
 // Ref: #
 type EventMetadata struct {
+	// What authorized the request, when it was not a grant on the event's
+	// project (ADR 053 §8). Every event of such a request carries it.
+	Authorization OptEventMetadataAuthorization `json:"authorization"`
 	// Observed HTTP requestor context on Path A request.api only.
 	Client          OptEventMetadataClient `json:"client"`
 	AdditionalProps EventMetadataAdditional
+}
+
+// GetAuthorization returns the value of Authorization.
+func (s *EventMetadata) GetAuthorization() OptEventMetadataAuthorization {
+	return s.Authorization
 }
 
 // GetClient returns the value of Client.
@@ -23493,6 +23501,11 @@ func (s *EventMetadata) GetClient() OptEventMetadataClient {
 // GetAdditionalProps returns the value of AdditionalProps.
 func (s *EventMetadata) GetAdditionalProps() EventMetadataAdditional {
 	return s.AdditionalProps
+}
+
+// SetAuthorization sets the value of Authorization.
+func (s *EventMetadata) SetAuthorization(val OptEventMetadataAuthorization) {
+	s.Authorization = val
 }
 
 // SetClient sets the value of Client.
@@ -23514,6 +23527,72 @@ func (s *EventMetadataAdditional) init() EventMetadataAdditional {
 		*s = m
 	}
 	return m
+}
+
+// What authorized the request, when it was not a grant on the event's
+// project (ADR 053 §8). Every event of such a request carries it.
+type EventMetadataAuthorization struct {
+	// `platform_operator`: the deployment's platform operator relation
+	// (ADR 075), which administers every project.
+	Path EventMetadataAuthorizationPath `json:"path"`
+	// The project the actor's user belongs to.
+	ActorHomeProjectID OptString `json:"actor_home_project_id"`
+}
+
+// GetPath returns the value of Path.
+func (s *EventMetadataAuthorization) GetPath() EventMetadataAuthorizationPath {
+	return s.Path
+}
+
+// GetActorHomeProjectID returns the value of ActorHomeProjectID.
+func (s *EventMetadataAuthorization) GetActorHomeProjectID() OptString {
+	return s.ActorHomeProjectID
+}
+
+// SetPath sets the value of Path.
+func (s *EventMetadataAuthorization) SetPath(val EventMetadataAuthorizationPath) {
+	s.Path = val
+}
+
+// SetActorHomeProjectID sets the value of ActorHomeProjectID.
+func (s *EventMetadataAuthorization) SetActorHomeProjectID(val OptString) {
+	s.ActorHomeProjectID = val
+}
+
+// `platform_operator`: the deployment's platform operator relation
+// (ADR 075), which administers every project.
+type EventMetadataAuthorizationPath string
+
+const (
+	EventMetadataAuthorizationPathPlatformOperator EventMetadataAuthorizationPath = "platform_operator"
+)
+
+// AllValues returns all EventMetadataAuthorizationPath values.
+func (EventMetadataAuthorizationPath) AllValues() []EventMetadataAuthorizationPath {
+	return []EventMetadataAuthorizationPath{
+		EventMetadataAuthorizationPathPlatformOperator,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s EventMetadataAuthorizationPath) MarshalText() ([]byte, error) {
+	switch s {
+	case EventMetadataAuthorizationPathPlatformOperator:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *EventMetadataAuthorizationPath) UnmarshalText(data []byte) error {
+	switch EventMetadataAuthorizationPath(data) {
+	case EventMetadataAuthorizationPathPlatformOperator:
+		*s = EventMetadataAuthorizationPathPlatformOperator
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Observed HTTP requestor context on Path A request.api only.
@@ -50635,6 +50714,52 @@ func (o OptEventMetadata) Get() (v EventMetadata, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEventMetadata) Or(d EventMetadata) EventMetadata {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEventMetadataAuthorization returns new OptEventMetadataAuthorization with value set to v.
+func NewOptEventMetadataAuthorization(v EventMetadataAuthorization) OptEventMetadataAuthorization {
+	return OptEventMetadataAuthorization{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEventMetadataAuthorization is optional EventMetadataAuthorization.
+type OptEventMetadataAuthorization struct {
+	Value EventMetadataAuthorization
+	Set   bool
+}
+
+// IsSet returns true if OptEventMetadataAuthorization was set.
+func (o OptEventMetadataAuthorization) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEventMetadataAuthorization) Reset() {
+	var v EventMetadataAuthorization
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEventMetadataAuthorization) SetTo(v EventMetadataAuthorization) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEventMetadataAuthorization) Get() (v EventMetadataAuthorization, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEventMetadataAuthorization) Or(d EventMetadataAuthorization) EventMetadataAuthorization {
 	if v, ok := o.Get(); ok {
 		return v
 	}

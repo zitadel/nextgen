@@ -10,12 +10,22 @@ import (
 // permission is minted with project scope.
 var ErrSKTeamProjectScope = errors.New("authz: sk_team grants for team-bound permissions must be team-scoped")
 
+// ErrPlatformAssignmentShape is returned when a platform assignment names
+// anything but a user at project scope (ADR 075 §2): a team holding it would
+// make whoever manages that team's roster an operator issuer.
+var ErrPlatformAssignmentShape = errors.New("authz: platform assignments must name a user at project scope")
+
 // ValidateAssignment rejects sk_team_ + project-scope grants for team-bound
-// object types (user, team, team_membership, event). Call from every dialect's
+// object types (user, team, team_membership, event), and platform grants to
+// anything but a user at project scope. Call from every dialect's
 // CreateAuthzAssignment before INSERT.
 func ValidateAssignment(a *domain.AuthzAssignment) error {
 	if a == nil {
 		return nil
+	}
+	if a.ObjectType == domain.AuthzObjectTypePlatform &&
+		(a.PrincipalType != domain.AuthzPrincipalTypeUser || a.ScopeKind != domain.AuthzScopeKindProject) {
+		return ErrPlatformAssignmentShape
 	}
 	if a.PrincipalType != domain.AuthzPrincipalTypeSKTeam {
 		return nil

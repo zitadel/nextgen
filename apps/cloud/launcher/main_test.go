@@ -39,6 +39,7 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"NEXTGEN_DATABASE_POSTGRES",
 		"NEXTGEN_INSTRUMENTATION_LOG_FORMAT",
 		"NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT",
+		"NEXTGEN_PLATFORM_OPERATORS",
 		"NEXTGEN_SERVER_ADDRESS",
 		"NEXTGEN_SERVER_CONSOLE_ENABLED",
 		"NEXTGEN_SERVER_CONSOLE_PATH",
@@ -360,7 +361,7 @@ func TestPublicBase(t *testing.T) {
 func TestPrepareServerRendersTheBootstrapAdminDocument(t *testing.T) {
 	dataDir := t.TempDir()
 	setLauncherEnv(t, dataDir)
-	doc := `{"header":{"version":1},"authenticators":[]}`
+	doc := `{"header":{"version":1,"id":"user_platformadmin"},"authenticators":{}}`
 	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(doc)))
 
 	args, err := prepareServer([]string{"--disable-master-key-generation"})
@@ -372,6 +373,35 @@ func TestPrepareServerRendersTheBootstrapAdminDocument(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, doc, string(written))
 	assert.Empty(t, os.Getenv("BOOTSTRAP_ADMIN_USER_JSON_B64"))
+}
+
+func TestPrepareServerMakesTheBootstrapAdminAnOperator(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	doc := `{"header":{"version":1,"project_id":"proj_platform","id":"user_platformadmin"},"authenticators":{}}`
+	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(doc)))
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "user_platformadmin", os.Getenv("NEXTGEN_PLATFORM_OPERATORS"))
+}
+
+func TestPrepareServerKeepsConfiguredOperators(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	doc := `{"header":{"version":1,"id":"user_platformadmin"},"authenticators":{}}`
+	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(doc)))
+	t.Setenv("NEXTGEN_PLATFORM_OPERATORS", "user_support")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "user_support", os.Getenv("NEXTGEN_PLATFORM_OPERATORS"))
+}
+
+func TestPrepareServerNamesNoOperatorWithoutABootstrapAdmin(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+	assert.Empty(t, os.Getenv("NEXTGEN_PLATFORM_OPERATORS"))
 }
 
 func TestPrepareServerLocallyKeepsTheConfiguredDatabase(t *testing.T) {
@@ -452,6 +482,16 @@ func TestPrepareServerRefusesBadInput(t *testing.T) {
 			t.Setenv("CLOUD_DATABASE_URL", pooledURL)
 			_, err := prepareServer(nil)
 			assert.ErrorContains(t, err, "needs its Git branch")
+		},
+		"a bootstrap admin document without a user id, which would start the cloud without an operator": func(t *testing.T) {
+			t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(`{"header":{"version":1},"authenticators":{}}`)))
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "names no user id")
+		},
+		"a bootstrap admin document that does not decode": func(t *testing.T) {
+			t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(`{"header":"x","authenticators":{}}`)))
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "does not decode to a bootstrap user document")
 		},
 		"a database URL that is not a postgres URL": func(t *testing.T) {
 			t.Setenv("CLOUD_DATABASE_URL", "host=db user=u")

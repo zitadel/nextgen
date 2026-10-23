@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
@@ -17,6 +17,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // with the session cookie (#1237). Not `POST /projects/query`, which the server
 // pins to the calling credential's one home project.
 const PROJECTS_URL = "http://localhost/api/users/me/projects";
+
+/** A project as `GET /users/me/projects` lists it. */
+function listed(id: string, name: string) {
+  return { id, name, created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" };
+}
 
 /** The same locale-derived string the screen renders, rather than one locale's output. */
 function expectedDate(value: string): string {
@@ -294,6 +299,147 @@ describe("projects screen", () => {
     // Absent rather than disabled: its absence is how the screen says the list
     // is complete (design decisions log D5 — no total count to show instead).
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("has no search while the list fits on one page", async () => {
+    server.use(
+      http.get(PROJECTS_URL, () => HttpResponse.json({ projects: [listed("proj_1", "River")] })),
+    );
+    await renderProjects();
+
+    expect(await screen.findByRole("link", { name: "River" })).toBeInTheDocument();
+    expect(screen.queryByRole("searchbox", { name: "Search projects" })).not.toBeInTheDocument();
+  });
+
+  it("searches every project on the server once the list runs past one page", async () => {
+    const searched: URLSearchParams[] = [];
+    server.use(
+      http.get(PROJECTS_URL, ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        if (!params.has("name_contains")) {
+          return HttpResponse.json({
+            projects: [listed("proj_1", "River"), listed("proj_2", "Delta")],
+            next_page_token: "page-2",
+          });
+        }
+        searched.push(params);
+        // Past the loaded rows: only the server can find it.
+        return HttpResponse.json({ projects: [listed("proj_9", "Zephyr")] });
+      }),
+    );
+    const router = await renderProjects();
+
+    await userEvent.type(await screen.findByRole("searchbox", { name: "Search projects" }), "zep");
+
+    expect(await screen.findByRole("link", { name: "Zephyr" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "River" })).not.toBeInTheDocument();
+    // One read per pause in typing, at the screen's page size.
+    expect(searched.map((params) => [params.get("name_contains"), params.get("limit")])).toEqual([
+      ["zep", "25"],
+    ]);
+    // The search is in the URL, and the screen's own navigation leaves the
+    // field as it was typed.
+    await waitFor(() => expect(router.state.resolvedLocation?.search).toMatchObject({ q: "zep" }));
+    expect(screen.getByRole("searchbox", { name: "Search projects" })).toHaveValue("zep");
+  });
+
+  it("offers the search to the people the project switcher offers it to", async () => {
+    // The switcher's first page (the shared read, no `limit`) runs past one
+    // page, while this screen's larger page holds every project: both ask the
+    // same read whether to search, so the field is here too.
+    server.use(
+      http.get(PROJECTS_URL, ({ request }) => {
+        const shared = !new URL(request.url).searchParams.has("limit");
+        return HttpResponse.json({
+          projects: [listed("proj_1", "River"), listed("proj_2", "Delta")],
+          next_page_token: shared ? "page-2" : undefined,
+        });
+      }),
+    );
+    await renderProjects();
+
+    expect(await screen.findByRole("searchbox", { name: "Search projects" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the field while a cleared search reloads the list", async () => {
+    // A short list opened on a search: clearing it drops `?q=`, and the field
+    // stays rather than leaving with it.
+    server.use(
+      http.get(PROJECTS_URL, () => HttpResponse.json({ projects: [listed("proj_1", "River")] })),
+    );
+    const router = await renderProjects("/projects?q=riv");
+
+    const field = await screen.findByRole("searchbox", { name: "Search projects" });
+    await userEvent.clear(field);
+
+    await waitFor(() => expect(router.state.resolvedLocation?.search.q).toBeUndefined());
+    expect(screen.getByRole("searchbox", { name: "Search projects" })).toHaveValue("");
+    expect(screen.getByRole("link", { name: "River" })).toBeInTheDocument();
+  });
+
+  it("keeps the search when loading more", async () => {
+    const reads: URLSearchParams[] = [];
+    server.use(
+      http.get(PROJECTS_URL, ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        reads.push(params);
+        if (params.get("page_token") === "zep-2") {
+          return HttpResponse.json({ projects: [listed("proj_10", "Zephyr Two")] });
+        }
+        return HttpResponse.json({
+          projects: [listed("proj_9", "Zephyr")],
+          next_page_token: "zep-2",
+        });
+      }),
+    );
+    await renderProjects("/projects?q=zep");
+
+    expect(await screen.findByRole("searchbox", { name: "Search projects" })).toHaveValue("zep");
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    expect(await screen.findByRole("link", { name: "Zephyr Two" })).toBeInTheDocument();
+
+    // The loader's read and Load more both carry the search: a page token
+    // continues the list it came from.
+    const searched = reads.filter((params) => params.get("limit") === "25");
+    expect(searched.map((params) => params.get("name_contains"))).toEqual(["zep", "zep"]);
+    expect(searched.map((params) => params.get("page_token"))).toEqual([null, "zep-2"]);
+  });
+
+  it("says when a search matches nothing", async () => {
+    server.use(
+      http.get(PROJECTS_URL, ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.has("name_contains")
+            ? { projects: [] }
+            : { projects: [listed("proj_1", "River")], next_page_token: "page-2" },
+        ),
+      ),
+    );
+    await renderProjects("/projects?q=zzz");
+
+    expect(await screen.findByText("No projects match “zzz”.")).toBeInTheDocument();
+  });
+
+  it("clears the search when Projects is opened from the sidebar", async () => {
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [listed("proj_1", "River"), listed("proj_2", "Delta")],
+          next_page_token: "page-2",
+        }),
+      ),
+    );
+    const router = await renderProjects("/projects?q=zep");
+    expect(await screen.findByRole("searchbox", { name: "Search projects" })).toHaveValue("zep");
+
+    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
+    await userEvent.click(nav.getByRole("link", { name: "Projects" }));
+
+    await waitFor(() => expect(router.state.resolvedLocation?.search.q).toBeUndefined());
+    await waitFor(() =>
+      expect(screen.getByRole("searchbox", { name: "Search projects" })).toHaveValue(""),
+    );
   });
 
   // On localhost the cookie may hold an app's session. Every read of the list
