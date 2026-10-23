@@ -13,6 +13,7 @@ import {
   FrameworkCheck,
   GitignoreCheck,
   ManagedFilesCheck,
+  MetaSchemasCheck,
   ProjectMatchCheck,
   SchemaCheck,
   SecretCheck,
@@ -23,6 +24,7 @@ import { loadPatchContext } from "../../../../src/commands/doctor/patch-context"
 import { createOrca } from "../../../../src/lib/orca";
 import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
 import { bearerOnlyProxyConf } from "../../../helpers/proxy-conf";
+import { projectMetaSchemas } from "../../../../src/lib/meta-schemas";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
 import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
 import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
@@ -338,6 +340,96 @@ describe("GitignoreCheck", () => {
     const check = new GitignoreCheck();
     await check.fix(ctxFor(cwd, true));
     expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+  });
+});
+
+describe("MetaSchemasCheck", () => {
+  /** Writes every meta-schema as setup does for `cliVersion`. */
+  async function writeMetaSchemas(cwd: string, cliVersion = ctxFor(cwd).cliVersion): Promise<void> {
+    for (const file of projectMetaSchemas(cliVersion)) {
+      await mkdir(join(cwd, file.path, ".."), { recursive: true });
+      await writeFile(join(cwd, file.path), file.contents);
+    }
+  }
+
+  /** A meta-schema file the project holds, by name. */
+  const metaFile = (name: string) => `.zitadel/meta/${name}`;
+
+  it("passes when the project holds this CLI's schemas", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+
+    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("warns on a missing schema with the doctor --fix remedy", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await rm(join(cwd, metaFile("branding.json")));
+
+    const outcome = await new MetaSchemasCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toEqual({
+      missing: [metaFile("branding.json")],
+      outdated: [],
+      remedy_command: expect.stringMatching(/^npx @zitadel\/cli@\S+ doctor --fix$/),
+    });
+  });
+
+  it("warns on a schema that differs from this CLI's", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await writeFile(join(cwd, metaFile("flow-definition.json")), '{"title": "an older dialect"}\n');
+
+    const outcome = await new MetaSchemasCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toMatchObject({ outdated: [metaFile("flow-definition.json")] });
+  });
+
+  it("passes a schema that only differs in key order or formatting", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    const file = projectMetaSchemas(ctxFor(cwd).cliVersion).find(
+      (meta) => meta.path === metaFile("branding.json"),
+    );
+    const reordered = Object.fromEntries(Object.entries(file?.body ?? {}).reverse());
+    await writeFile(join(cwd, metaFile("branding.json")), JSON.stringify(reordered));
+
+    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fix writes the missing and outdated schemas and leaves other files alone", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await rm(join(cwd, metaFile("branding.json")));
+    await writeFile(join(cwd, metaFile("flow-definition.json")), "{}\n");
+    await writeFile(join(cwd, metaFile("mine.json")), '{"kept": true}\n');
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+    expect(await readFile(join(cwd, metaFile("mine.json")), "utf8")).toBe('{"kept": true}\n');
+  });
+
+  it("fix creates .zitadel/meta/ when the project has none", async () => {
+    const cwd = await makeProject();
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fix is a no-op under dryRun", async () => {
+    const cwd = await makeProject();
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd, true));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("warn");
   });
 });
 

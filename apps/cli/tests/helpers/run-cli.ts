@@ -147,6 +147,11 @@ export function expectedPublicCliCommand(args: string): string {
   return publicCliCommand(args, cliVersion.version);
 }
 
+/** The version the built CLI reports, which it stamps into the files it writes. */
+export function builtCliVersion(): string {
+  return cliVersion.version;
+}
+
 /**
  * Presses Ctrl-C in the running command. Emitting the signal rather than
  * sending it keeps the keypress inside this process, where the command runs.

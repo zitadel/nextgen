@@ -7,11 +7,13 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { failureAdvice } from "../../../src/commands/doctor";
 import type { LocalServers } from "../../../src/lib/local-server/processes";
+import { projectMetaSchemas } from "../../../src/lib/meta-schemas";
 import { publicCliCommand } from "../../../src/lib/public-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
 import { nextPort } from "../../helpers/ports";
 import {
   aMachineRunning,
+  builtCliVersion,
   expectedPublicCliCommand,
   parseJson,
   runCliForTest,
@@ -56,14 +58,18 @@ async function doctor(cwd: string, extra: string[] = []) {
  * Builds a well-formed managed project that should pass every doctor check
  * runnable without the platform: config/secret parse + match, 0600 secret,
  * gitignore + env.example coverage, a Next.js framework signature, a valid
- * user schema, a Zitadel SDK dependency, and an owning team recorded by
- * `zitadel claim` (without it the claim check warns, which is its own test
- * below).
+ * user schema, a Zitadel SDK dependency, the editor meta-schemas this CLI
+ * writes, and an owning team recorded by `zitadel claim` (without it the
+ * claim check warns, which is its own test below).
  */
 async function makeHealthyProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-doctor-"));
   tempDirs.push(cwd);
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
+  await mkdir(join(cwd, ".zitadel/meta"), { recursive: true });
+  for (const file of projectMetaSchemas(builtCliVersion())) {
+    await writeFile(join(cwd, file.path), file.contents);
+  }
   await mkdir(join(cwd, "app/login"), { recursive: true });
   await mkdir(join(cwd, "app/register"), { recursive: true });
   await mkdir(join(cwd, "app/profile"), { recursive: true });

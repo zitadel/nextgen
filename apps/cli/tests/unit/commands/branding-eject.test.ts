@@ -11,7 +11,8 @@ import { cancel, isCancel, select } from "@clack/prompts";
 import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 
 import BrandingEject from "../../../src/commands/branding/eject";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { projectMetaSchemas } from "../../../src/lib/meta-schemas";
+import { builtCliVersion, parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
@@ -81,6 +82,18 @@ describe("branding eject", () => {
     const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");
     expect(meta).toContain("npx @zitadel/cli@");
     expect(meta).not.toMatch(/`zitadel /);
+  });
+
+  it("writes the dialect meta-schema byte for byte as setup does", async () => {
+    const cwd = await makeProject();
+
+    await eject(cwd);
+
+    const expected = projectMetaSchemas(builtCliVersion()).find(
+      (file) => file.path === ".zitadel/meta/branding.json",
+    );
+    const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");
+    expect(meta).toBe(expected?.contents);
   });
 
   it("--design minimal writes the card-less template on the centered layout", async () => {

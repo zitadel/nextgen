@@ -339,6 +339,16 @@ function advisoryForWarnings(
     nextCommands.push(dependencyRemedy);
   }
 
+  const metaSchemasRemedy = remedyCommandOf(
+    warnings.find((check) => check.name === "meta-schemas"),
+  );
+  if (metaSchemasRemedy !== undefined) {
+    nextActions.push(
+      "Write this CLI version's editor schemas into .zitadel/meta/; editors and agents read the dialect from there.",
+    );
+    nextCommands.push(metaSchemasRemedy);
+  }
+
   if (nextActions.length === 0 && nextCommands.length === 0) {
     return undefined;
   }
@@ -552,7 +562,8 @@ function formatListeners(listeners: Awaited<ReturnType<typeof listenersForPort>>
 
 /**
  * A warning may carry its own repair as `details.remedy_command` (today: the
- * dependency-version check's package-manager-aware exact-pin install).
+ * dependency-version check's package-manager-aware exact-pin install, and the
+ * meta-schemas check's `doctor --fix`).
  * Surfacing that string keeps the structured advisory identical to the
  * command quoted in the warning's prose.
  */

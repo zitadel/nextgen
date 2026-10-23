@@ -12,11 +12,7 @@ import {
   brandingReadmeContent,
   getDefaultBrandingConfig,
 } from "@zitadel/config/defaults";
-import {
-  BRANDING_FILE_SCHEMA_REF,
-  META_SCHEMA_DIR,
-  metaSchemaFiles,
-} from "@zitadel/config/meta-schemas";
+import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
 import { BRANDING_DIR } from "../../lib/branding";
 import { BRANDING_DESIGN_INFO, resolveBrandingDesign } from "../../lib/branding/designs";
@@ -24,11 +20,8 @@ import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { hasZitadelConfig } from "../../lib/project";
-import {
-  normalizePublicCliJson,
-  normalizePublicCliProse,
-  publicCliCommand,
-} from "../../lib/public-cli";
+import { projectMetaSchemas } from "../../lib/meta-schemas";
+import { normalizePublicCliProse, publicCliCommand } from "../../lib/public-cli";
 
 /**
  * The `branding eject` command — take ownership of the login template.
@@ -107,13 +100,11 @@ export default class BrandingEject extends BaseCommand {
       normalizePublicCliProse(brandingReadmeContent(), this.meta.cliVersion),
       false,
     ).catch(swallowConflict);
-    const brandingMeta = metaSchemaFiles().find((f) => f.name === "branding.json");
+    const brandingMeta = projectMetaSchemas(this.meta.cliVersion).find(
+      (file) => file.path === `${META_SCHEMA_DIR}/branding.json`,
+    );
     if (brandingMeta) {
-      await write(
-        join(META_SCHEMA_DIR, brandingMeta.name),
-        `${stableStringify(normalizePublicCliJson(brandingMeta.body, this.meta.cliVersion))}\n`,
-        false,
-      ).catch(swallowConflict);
+      await write(brandingMeta.path, brandingMeta.contents, false).catch(swallowConflict);
     }
 
     for (const file of filesWritten) {

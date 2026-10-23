@@ -1,14 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import {
-  metaSchemaFiles,
-  META_SCHEMA_DIR,
-  PROJECT_FILE_SCHEMA_REF,
-} from "@zitadel/config/meta-schemas";
+import { META_SCHEMA_DIR, PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
 import { stableStringify } from "../../../json";
-import { normalizePublicCliJson } from "../../../public-cli";
+import { projectMetaSchemas } from "../../../meta-schemas";
 import { DEFAULT_SERVER } from "../../../server";
 import { portFromIssuer } from "../../detectors/port";
 import { configIssuerOp, envIssuerOp } from "./dev-port-move";
@@ -336,12 +332,8 @@ export abstract class AbstractRulePatcher implements Patcher {
       // `zitadel …` mentions are rewritten to the runnable public form on the
       // way out — the shared source keeps the bare spelling the server wants.
       { kind: "mkdir", path: META_SCHEMA_DIR },
-      ...metaSchemaFiles().map(
-        (file): FileOp => ({
-          kind: "write",
-          path: `${META_SCHEMA_DIR}/${file.name}`,
-          contents: `${JSON.stringify(normalizePublicCliJson(file.body, ctx.cliVersion), null, 2)}\n`,
-        }),
+      ...projectMetaSchemas(ctx.cliVersion).map(
+        (file): FileOp => ({ kind: "write", path: file.path, contents: file.contents }),
       ),
       ...guidanceOps(ctx),
     ];

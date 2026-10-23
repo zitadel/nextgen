@@ -124,6 +124,17 @@ describe("doctor", () => {
         expect((await before.changes()).added).toContain("app/login/page.tsx");
       });
 
+      it("restores an editor schema the project lacks", async () => {
+        const app = await aSetUpApp();
+        await app.deleteProjectFile(".zitadel/meta/branding.json");
+        const before = await app.snapshot();
+
+        const result = await app.doctor(["--fix"]);
+
+        expect(result).toSucceed();
+        expect((await before.changes()).added).toContain(".zitadel/meta/branding.json");
+      });
+
       it("removes nothing while repairing", async () => {
         const app = await aSetUpApp();
         await app.deleteProjectFile("app/login/page.tsx");
