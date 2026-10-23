@@ -265,8 +265,11 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
-		// TODO(#1781): resolve the variable set before DeploymentsEqual, from
-		// RollbackTo's frozen set or else the current values, and link it here.
+		// TODO(#1781): resolve the set before DeploymentsEqual, from RollbackTo's
+		// frozen set. This copies the current values.
+		if _, err := stmts.FreezeDeploymentVariables(ctx, written.ProjectID, written.ID); err != nil {
+			return err
+		}
 		if written.OriginKind == domain.DeploymentOriginKindPreview {
 			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
 				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {
