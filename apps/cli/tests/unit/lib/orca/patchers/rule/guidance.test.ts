@@ -196,6 +196,26 @@ describe("guidance content", () => {
     expect(widget).toContain("@zitadel/sdk-next/jsx");
   });
 
+  it("leaves the generated files to the app, as doctor does (ADR 042)", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain("The app files setup generated are yours to change");
+    expect(agents).toContain("as `edited`, or as `adopted`");
+    expect(agents).toContain("`doctor --fix` restores only a missing file, never one you changed");
+    expect(agents).not.toContain("never change auth behavior");
+  });
+
+  it("points theming at the stable tokens and the forwarded parts, not a copy of them", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain("the stable `--zl-*` design tokens");
+    expect(agents).toContain("`zitadel-login::part(<atom>-<part>)`");
+    expect(agents).toContain(
+      "https://preview.zitadel.com/docs/guides/customize-design#style-the-login-from-your-app",
+    );
+    expect(agents).not.toContain("`--zl-font-family-heading`");
+  });
+
   it("names the presentation knobs and, on Next, the shipped JSX types", () => {
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain('variant="widget"');
