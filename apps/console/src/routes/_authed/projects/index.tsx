@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { consoleSessionProject, validateNextSearch } from "@/auth/session";
+import { useNavItems, useRequestedNavItem } from "@/components/app-shell/use-nav-items";
 import { NewProjectSheet } from "@/components/new-project-sheet";
 import { ProjectMark } from "@/components/project-mark";
 import {
@@ -35,12 +36,12 @@ import { Page } from "@/components/layout";
 /**
  * Projects overview — every project the person can act on.
  *
- * The sidebar's first entry, above the selected project's contents. It is not
- * scoped (`staticData.scope`), so it is listed with or without a selection and
- * is the one entry while nothing is selected. It is where the console lands
- * when there are several projects and none is selected yet
- * (`routes/_authed.tsx`). The guard then passes the screen it was asked for as
- * `?next=`, and a row goes back there with the project selected.
+ * The sidebar's first entry, above the project's screens. It is where the
+ * console lands when there are several projects and none is selected yet
+ * (`routes/_authed/index.tsx`), and where the `_authed` guard sends a screen
+ * that needs a project while none is selected, passing it as `?next=`. The
+ * page is then the way to that screen — `Continue to Teams`, with Teams marked
+ * in the sidebar (D22) — and a row goes on there with the project selected.
  *
  * A row opens the project — selects it and goes to its first screen — rather
  * than a detail page: the project's own page is `Project settings` in the
@@ -98,6 +99,9 @@ function ProjectsScreen() {
   const navigate = useNavigate({ from: Route.fullPath });
   const selected = useProjectScope();
   const selectTarget = useSelectProjectTarget();
+  // Opened on the way to a screen that needs a project (`?next=`), the page
+  // names that screen, as the sidebar marks it (D22).
+  const requested = useRequestedNavItem(useNavItems());
   const search = Route.useSearch();
   const onSearch = useCallback(
     (q: string) =>
@@ -147,13 +151,16 @@ function ProjectsScreen() {
           </NewProjectSheet>
         }
       >
-        Projects
+        {requested ? `Continue to ${requested.nav.label}` : "Projects"}
       </ResourceTitle>
-      {/* Until a project is selected the sidebar lists only this screen, so the
-          page says why and what to do about it. */}
-      {!selected && projects.length > 0 && (
+      {/* Until a project is selected the project's screens ask for one first,
+          so the page says what choosing one is for, or, on the way to one of
+          them, that choosing goes on there. */}
+      {projects.length > 0 && (requested || !selected) && (
         <p className={`${RESOURCE_HEADER} text-muted-foreground mt-2 text-sm`}>
-          Select a project to manage its teams, users and login flows.
+          {requested
+            ? "Choose a project to continue."
+            : "Select a project to manage its teams, users and login flows."}
         </p>
       )}
       {searchable && (

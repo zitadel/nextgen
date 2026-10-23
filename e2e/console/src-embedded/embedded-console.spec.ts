@@ -53,8 +53,8 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // `/` has no screen of its own and lands on Users, which acts on a selected
   // project. The seeded user holds no grant, so `GET /users/me/projects` lists
   // nothing and there is no project to select for them
-  // (`resolveDefaultProjectScope`): the guard sends them to Projects instead,
-  // never to the project the console signed into, which they could not manage.
+  // (`resolveDefaultProjectScope`): `/` lands on Projects instead, never on the
+  // project the console signed into, which they could not manage.
   // That read is authenticated by the session cookie alone (#1237), so it
   // answering 200 is what proves the base and the cookie are right.
   expect((await myProjects).status()).toBe(200);

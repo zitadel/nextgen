@@ -95,7 +95,7 @@ describe("app shell navigation", () => {
     expect(linkedRows).toHaveLength(NAV_ORDER.length);
   });
 
-  it("lists only Projects until a project is selected", async () => {
+  it("lists every screen before a project is selected", async () => {
     // Several to choose from, so `/` lands on Projects with nothing selected.
     server.use(
       http.get(MY_PROJECTS, () =>
@@ -109,14 +109,48 @@ describe("app shell navigation", () => {
     );
     const router = renderShell();
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    // Projects itself, not on the way to Users: nothing asked for a screen.
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("next");
+    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
     // The bar keeps its pill on Projects too (D21), asking for a selection.
     const pill = await screen.findByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
 
+    // The project's screens are listed before one is chosen (D22).
     const nav = within(screen.getByRole("navigation", { name: "Primary" }));
-    const links = nav.queryAllByRole("link");
-    expect(links.map((link) => link.textContent?.trim())).toEqual(["Projects"]);
-    expect(links[0]).toHaveAttribute("href", "/projects");
+    expect(nav.queryAllByRole("link").map((link) => link.textContent?.trim())).toEqual(NAV_ORDER);
+    expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "true");
+  });
+
+  it("asks for a project on the way to a screen, then goes on there", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+    );
+    const router = renderShell();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+
+    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
+    await userEvent.click(nav.getByRole("link", { name: "Teams" }));
+
+    // Teams needs a project, so the guard sends it to Projects, which names
+    // the screen it is the way to; the sidebar marks Teams, as Vercel does.
+    // Teams' own default filter rides along (`?status=active`).
+    await waitFor(() => expect(router.state.resolvedLocation?.search.next).toMatch(/^\/teams\b/));
+    expect(await screen.findByRole("heading", { name: "Continue to Teams" })).toBeInTheDocument();
+    expect(screen.getByText("Choose a project to continue.")).toBeInTheDocument();
+    expect(nav.getByRole("link", { name: "Teams" })).toHaveAttribute("data-active", "true");
+    expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "false");
+
+    await userEvent.click(await screen.findByRole("link", { name: "Delta" }));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" });
   });
 
   it("does not advertise screens that have no endpoint behind them", async () => {

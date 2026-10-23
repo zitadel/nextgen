@@ -237,8 +237,8 @@ describe("projects screen", () => {
   });
 
   it("asks for a selection while none is made", async () => {
-    // Until a project is selected the sidebar lists only Projects, so this
-    // page is the one that explains what to do. Two projects: with one, the
+    // Until a project is selected the project's screens ask for one first, so
+    // this page says what choosing one is for. Two projects: with one, the
     // `_authed` guard would select it.
     server.use(
       http.get(PROJECTS_URL, () =>
@@ -290,6 +290,9 @@ describe("projects screen", () => {
     );
     await renderProjects(`/projects?next=${encodeURIComponent("/teams?status=deactivated")}`);
 
+    // On the way to Teams, the page is named for it (D22).
+    expect(await screen.findByRole("heading", { name: "Continue to Teams" })).toBeInTheDocument();
+    expect(await screen.findByText("Choose a project to continue.")).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "Delta" })).toHaveAttribute(
       "href",
       "/teams?status=deactivated&project=proj_2",

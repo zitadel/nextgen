@@ -20,10 +20,10 @@ import { sessionCached } from "./session-cache";
  *
  * Any screen opened without a selection gets the default one from the `_authed`
  * guard (`resolveDefaultProjectScope`). Screens that act on one project declare
- * `staticData.scope: "project"`. That flag does two things: the sidebar lists
- * the screen only while a project is selected (`use-nav-items.ts`), and with no
- * default to fill in, the guard sends it to Projects with the requested
- * location in `?next=` (`useSelectProjectTarget`).
+ * `staticData.scope: "project"`: with no default to fill in, the guard sends
+ * such a screen to Projects with the requested location in `?next=`
+ * (`useSelectProjectTarget`), which asks for a project before going on there.
+ * The sidebar lists it either way (`use-nav-items.ts`, D22).
  */
 
 /** The search param that carries the selected project id. */

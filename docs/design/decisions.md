@@ -16,6 +16,9 @@
 
 ## Decisions
 
+### D22 · The sidebar lists every screen, and asks for a project when one is needed — 2026-10-23 · [standing]
+As in Vercel, the sidebar lists the project's screens before a project is selected, rather than Projects alone. Opening one without a selection goes to Projects first: the page is headed "Continue to Teams" (or whichever screen), that screen's entry is the one marked in the sidebar, and choosing a project goes on to it. Arriving at the console (`/`) with nothing selected lands on Projects itself, not on the way to Users, since it asked for no screen. Amends Console ADR 0001.
+
 ### D21 · The Projects list tells many projects apart — 2026-10-23 · [standing]
 Projects is where the console lands whenever several projects can be chosen, and a platform operator acts on every project of the deployment, so the one-project list of D11 no longer fits. Each row carries the project's generated mark (the project switcher's), its name with its site's host under it (D20's pattern), its ID, which takes the slack and copies, and its created date. A list that fits on one page reads by name; a longer one keeps the server's order and is found by search, which shows as soon as there is a project. New project sits beside the title (D19) and opens a drawer (D15) with the CLI's setup command, since a project is created from the app it connects. The project switcher stays in the top bar on Projects as on every screen. Supersedes the list half of D11.
 
