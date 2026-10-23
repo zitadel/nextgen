@@ -7,20 +7,24 @@ content:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
+        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/team-team_not_found.yaml'
         - $ref: '../../../components/schemas/errors/team-owns_project.yaml'
         - $ref: '../../../components/schemas/errors/team-permission_denied.yaml'
+        - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
+          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           team.team_not_found: '../../../components/schemas/errors/team-team_not_found.yaml'
           team.owns_project: '../../../components/schemas/errors/team-owns_project.yaml'
           team.permission_denied: '../../../components/schemas/errors/team-permission_denied.yaml'
+          unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.unauthorized:
         summary: auth.unauthorized
@@ -37,6 +41,11 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
       req.invalid:
         summary: req.invalid
         value:
@@ -57,3 +66,8 @@ content:
         value:
           code: team.permission_denied
           message: 'the team management API requires the project secret'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'

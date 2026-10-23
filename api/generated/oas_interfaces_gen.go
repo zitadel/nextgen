@@ -245,6 +245,10 @@ type GetMyUserSchemaRes interface {
 	getMyUserSchemaRes()
 }
 
+type GetPolicyRes interface {
+	getPolicyRes()
+}
+
 type GetPolicyRevisionRes interface {
 	getPolicyRevisionRes()
 }
@@ -343,6 +347,14 @@ type ListMyProjectsRes interface {
 
 type ListMyTeamsRes interface {
 	listMyTeamsRes()
+}
+
+type ListPoliciesRes interface {
+	listPoliciesRes()
+}
+
+type ListPolicyRevisionsRes interface {
+	listPolicyRevisionsRes()
 }
 
 type ListPreviewsRes interface {

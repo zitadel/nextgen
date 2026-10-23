@@ -256,6 +256,31 @@ func TestGetSchema(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
 
+		t.Run("a schema read naming another project", func(t *testing.T) {
+			t.Parallel()
+
+			schemaJSON := []byte(harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+			var schemaObj map[string]any
+			require.NoError(t, json.Unmarshal(schemaJSON, &schemaObj))
+			delete(schemaObj, "$id")
+			schemaJSON, err := json.Marshal(schemaObj)
+			require.NoError(t, err)
+			schemaID := harness.CreateUserSchema(t, project, string(schemaJSON))
+
+			other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+			require.NoError(t, err)
+
+			// The project's own secret may read the schema, but not as part of
+			// another project.
+			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
+				ID:        schemaID,
+				ProjectID: api.NewOptProjectID(api.ProjectID(other.ID)),
+			})
+			assert.NoError(t, err)
+			require.IsType(t, &api.GetSchemaByIdErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusNotFound, resp.(*api.GetSchemaByIdErrorResponseStatusCode).StatusCode)
+		})
+
 		t.Run("schema not found", func(t *testing.T) {
 			t.Parallel()
 

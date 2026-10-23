@@ -175,6 +175,20 @@ func serverFaultResponse(err error) *api.ErrorDetailsStatusCode {
 	}
 }
 
+// genericServerFault is the bare sentinel for the status serverFaultResponse
+// gives fault, so the client learns that status without the message or parent
+// the fault was raised with.
+func genericServerFault(fault domain.Error) domain.Error {
+	switch fault.Code {
+	case domain.ErrNotImplemented().Code:
+		return domain.ErrNotImplemented()
+	case domain.ErrUnavailable().Code:
+		return domain.ErrUnavailable()
+	default:
+		return domain.ErrInternal(nil)
+	}
+}
+
 // errorResponse is a convenience helper for the common case where the caller
 // knows exactly which HTTP status to use for this operation.
 func errorResponseWithStatusCode(status int, err error) *api.ErrorDetailsStatusCode {
@@ -201,15 +215,17 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 	)
 
 	switch {
-	case isSecurityInternalError(err):
+	case isSecurityServerFault(err):
 		// The security handler could not decide (CSRF request state missing, or
-		// the token store unreachable while introspecting the credential): a
-		// server fault, not a refused credential. The client gets the generic
-		// internal answer; the cause goes to the log, where a wiring mistake
-		// that makes every cookie request fail has to be findable.
+		// the token or key store failing while introspecting the credential): a
+		// server fault, not a refused credential. The client gets the status
+		// serverFaultResponse gives the fault (500, 501 or 503) with that
+		// status's generic answer; the cause goes to the log, where a wiring
+		// mistake that makes every cookie request fail has to be findable.
 		_ = errors.As(err, &logged)
-		status = http.StatusInternalServerError
-		details = domainErrorDetails(domain.ErrInternal(nil))
+		resp := serverFaultResponse(genericServerFault(logged))
+		status = resp.StatusCode
+		details = resp.Response
 
 	case isCSRFError(err):
 		status = http.StatusForbidden
@@ -288,12 +304,9 @@ func writeErrorDetails(w http.ResponseWriter, status int, details api.ErrorDetai
 	}
 }
 
-// Codes compared on every error response, read once: building a domain.Error
-// captures its origin.
-var (
-	csrfInvalidCode = domain.ErrAuthCSRFInvalid().Code
-	internalCode    = domain.ErrInternal(nil).Code
-)
+// csrfInvalidCode is compared on every error response, so it is read once:
+// building a domain.Error captures its origin.
+var csrfInvalidCode = domain.ErrAuthCSRFInvalid().Code
 
 // isCSRFError reports a session-cookie request refused by the CSRF checks. It
 // arrives wrapped in ogen's SecurityError, but it is a refusal of an
@@ -303,11 +316,14 @@ func isCSRFError(err error) bool {
 	return errors.As(err, &e) && e.Code == csrfInvalidCode
 }
 
-// isSecurityInternalError reports a security handler that failed to reach a
-// decision, as opposed to one that refused the credential.
-func isSecurityInternalError(err error) bool {
+// isSecurityServerFault reports a security handler that failed to reach a
+// decision, as opposed to one that refused the credential: the error it
+// returned carries a domain error whose code is a server fault. An error with
+// no domain code, such as ogenerrors.ErrSecurityRequirementIsNotSatisfied, is
+// a refusal.
+func isSecurityServerFault(err error) bool {
 	var e domain.Error
-	return isSecurityError(err) && errors.As(err, &e) && e.Code == internalCode
+	return isSecurityError(err) && errors.As(err, &e) && domain.IsServerFault(e)
 }
 
 func isSecurityError(err error) bool {

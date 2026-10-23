@@ -64,8 +64,14 @@ the password is verified instead (a login), the field carries no length
 rules: a stored password that predates a stricter policy must still sign in.
 The field validator re-checks the rules on submit, counting the NFC-normalized
 candidate in code points, before the domain operation and the full policy
-evaluation run. The wiring is tracked in
-[#1449](https://github.com/zitadel/nextgen/issues/1449).
+evaluation run, so a candidate below the minimum is refused on the step that
+collects it. The flow engine reads the bounds through `domain.FlowPasswordPolicy`
+(`service.PasswordPolicy.PasswordLengthBounds`) when it resolves a step's
+fields, at render and at submit. Whether the user chooses the password there
+is the `chooses` field of the purpose's entry in `passwordPurposes` (register
+and recovery choose, sign-in does not); the autocomplete token beside it only
+tells a password manager what the form asks for. What the bounds disclose is
+in [ADR 066](../../adrs/066-operation-policies.md#what-a-step-discloses).
 
 ## The read endpoint (not built yet)
 

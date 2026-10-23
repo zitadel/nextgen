@@ -201,6 +201,44 @@ func TestBuildRelease(t *testing.T) {
 		assert.Equal(t, v1.ID, reused.ID)
 		assert.Equal(t, brndV1, reused.Pointers[indexOfKind(reused.Pointers, api.ReleasePointerKindBranding)].RevisionID)
 	})
+
+	t.Run("allocates a new idp revision only when content changes", func(t *testing.T) {
+		own, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, ownClient, own)
+		ownParams := api.BuildReleaseParams{ProjectID: api.ProjectID(own.ID)}
+
+		original := helpers.OIDCConnection("google")
+		edited := helpers.OIDCConnection("google")
+		edited.DisplayName = "Google Workspace"
+		build := func(t *testing.T, connection api.IdpConnection) api.BuildReleaseRes {
+			t.Helper()
+			resp, err := ownClient.BuildRelease(t.Context(), &api.BuildReleaseRequest{
+				Bundle: api.ConfigurationBundle{Idps: []api.IdpConnection{connection}},
+			}, ownParams)
+			require.NoError(t, err)
+			return resp
+		}
+
+		first := build(t, original)
+		require.IsType(t, &api.BuildReleaseCreated{}, first, helpers.MustMarshal(t, first))
+		v1 := api.Release(*first.(*api.BuildReleaseCreated))
+		idpV1 := v1.Pointers[indexOfKind(v1.Pointers, api.ReleasePointerKindIdp)].RevisionID
+
+		changed := build(t, edited)
+		require.IsType(t, &api.BuildReleaseCreated{}, changed, helpers.MustMarshal(t, changed))
+		v2 := api.Release(*changed.(*api.BuildReleaseCreated))
+		assert.NotEqual(t, idpV1, v2.Pointers[indexOfKind(v2.Pointers, api.ReleasePointerKindIdp)].RevisionID)
+
+		// A→B→A walks the connection's revision history to reuse the first one.
+		again := build(t, original)
+		require.IsType(t, &api.BuildReleaseOK{}, again, helpers.MustMarshal(t, again))
+		reused := api.Release(*again.(*api.BuildReleaseOK))
+		assert.Equal(t, v1.ID, reused.ID)
+		assert.Equal(t, idpV1, reused.Pointers[indexOfKind(reused.Pointers, api.ReleasePointerKindIdp)].RevisionID)
+	})
 }
 
 func indexOfKind(pointers []api.ReleasePointer, kind api.ReleasePointerKind) int {

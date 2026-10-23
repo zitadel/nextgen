@@ -158,9 +158,10 @@ func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepNam
 		Type:      fieldType,
 		Challenge: challenge,
 		Required:  true,
-		Validation: &FlowFieldValidation{
-			MinLength: 8, // TODO: should come from policy or user-schema
-		},
+		// No length rule here: whether the user chooses the password depends
+		// on the purpose on the flow state, which the step's fields are
+		// resolved against at render and at submit alike (see
+		// FlowStateMachineRuntime.applyPasswordPolicy).
 	}, nil
 }
 

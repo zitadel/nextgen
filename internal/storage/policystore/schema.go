@@ -53,12 +53,89 @@ func ByOperation(projectID, operation string) database.Filter[domain.PolicyField
 	)
 }
 
+// ByID filters one policy in one project.
+func ByID(projectID, id string) database.Filter[domain.PolicyField] {
+	return database.And(
+		database.Equal(database.Col(domain.PolicyFieldProjectID), projectID),
+		database.Equal(database.Col(domain.PolicyFieldID), id),
+	)
+}
+
 // ByRevision filters one revision in one project.
 func ByRevision(projectID, revisionID string) database.Filter[domain.PolicyField] {
 	return database.And(
 		database.Equal(database.Col(domain.PolicyFieldProjectID), projectID),
 		database.Equal(database.Col(domain.PolicyFieldRevisionID), revisionID),
 	)
+}
+
+// FirstPublishedFirst orders policies by their first publish, oldest first;
+// id breaks ties between policies published in the same instant.
+func FirstPublishedFirst() database.OrderBy[domain.PolicyField] {
+	return database.OrderBy[domain.PolicyField]{
+		Columns: []database.Column[domain.PolicyField]{
+			database.Col(domain.PolicyFieldCreatedAt),
+			database.Col(domain.PolicyFieldID),
+		},
+		Direction: database.OrderAsc,
+	}
+}
+
+// NewestRevisionFirst orders the revisions of one policy newest first. The
+// unique index on (project_id, policy_id, created_at) already makes the order
+// total; the revision id keeps the cursor's keyset unique.
+func NewestRevisionFirst() database.OrderBy[domain.PolicyField] {
+	return database.OrderBy[domain.PolicyField]{
+		Columns: []database.Column[domain.PolicyField]{
+			database.Col(domain.PolicyFieldUpdatedAt),
+			database.Col(domain.PolicyFieldRevisionID),
+		},
+		Direction: database.OrderDesc,
+	}
+}
+
+// ListOptions lists a project's policies, capped at limit, first published
+// first. A non-empty operation narrows the list to that operation's policy.
+func ListOptions(projectID, operation string, limit uint32) *database.ListOptions[domain.PolicyField] {
+	var filter database.Filter[domain.PolicyField] = database.Equal(database.Col(domain.PolicyFieldProjectID), projectID)
+	if operation != "" {
+		filter = ByOperation(projectID, operation)
+	}
+	return &database.ListOptions[domain.PolicyField]{
+		Filter: filter,
+		Pagination: database.Page[domain.PolicyField]{
+			Limit:   limit,
+			OrderBy: FirstPublishedFirst(),
+		},
+	}
+}
+
+// RevisionListOptions lists the revisions of one policy. A page that names
+// no order columns takes NewestRevisionFirst, direction included; a caller
+// that flips the direction passes the columns too.
+func RevisionListOptions(projectID, policyID string, page database.Page[domain.PolicyField]) *database.ListOptions[domain.PolicyField] {
+	if len(page.OrderBy.Columns) == 0 {
+		page.OrderBy = NewestRevisionFirst()
+	}
+	return &database.ListOptions[domain.PolicyField]{
+		Filter:     ByID(projectID, policyID),
+		Pagination: page,
+	}
+}
+
+// WithDefaultOrder completes options for ListPolicies: the first-publish
+// order when they name none, so a page always has an ORDER BY and a cursor.
+// Options are required: a list without them would read every project.
+func WithDefaultOrder(opts *database.ListOptions[domain.PolicyField]) (*database.ListOptions[domain.PolicyField], error) {
+	if opts == nil {
+		return nil, errors.New("policystore: list options are required")
+	}
+	if len(opts.Pagination.OrderBy.Columns) > 0 {
+		return opts, nil
+	}
+	out := *opts
+	out.Pagination.OrderBy = FirstPublishedFirst()
+	return &out, nil
 }
 
 // ReviseNotFound turns the foreign-key failure of a revise against a policy

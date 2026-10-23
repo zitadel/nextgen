@@ -52,10 +52,23 @@ export function useSearchShortcut(): [boolean, (open: boolean) => void] {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setOpen((current) => !current);
-      }
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+      event.preventDefault();
+      // A held key toggles once, not on every repeat.
+      if (event.repeat) return;
+      setOpen((current) => {
+        // Not over another open dialog, sheet or confirmation (the
+        // palette's own is fine: the shortcut closes it).
+        if (
+          !current &&
+          document.querySelector(
+            '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]',
+          )
+        ) {
+          return current;
+        }
+        return !current;
+      });
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -122,13 +135,17 @@ export function SearchDialog({
           go: close(() => void navigate({ to: item.to })),
         }));
 
-    const teamResults: Result[] = (q ? (teams ?? []) : []).map((team) => ({
-      id: `team:${team.id}`,
-      icon: Box,
-      label: team.name,
-      context: projectName,
-      go: close(() => void navigate({ to: "/teams/$teamId", params: { teamId: team.id } })),
-    }));
+    // Re-filtered against the live query: until the next debounced read lands,
+    // the last one's answer can name teams the typing has already ruled out.
+    const teamResults: Result[] = (q ? (teams ?? []) : [])
+      .filter((team) => matches(team.name))
+      .map((team) => ({
+        id: `team:${team.id}`,
+        icon: Box,
+        label: team.name,
+        context: projectName,
+        go: close(() => void navigate({ to: "/teams/$teamId", params: { teamId: team.id } })),
+      }));
 
     const projectResults: Result[] = (projects ?? [])
       .filter((project) => matches(project.name))
