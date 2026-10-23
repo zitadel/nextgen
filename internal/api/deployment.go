@@ -48,6 +48,9 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 	if conflict, ok := deploymentConflictResponse(err); ok {
 		return conflict, nil
 	}
+	if missing, ok := deploymentVariablesMissingResponse(err); ok {
+		return missing, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +118,19 @@ func (h *Handler) GetDeploymentVariables(ctx context.Context, params api.GetDepl
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), variableAccess, opRead); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+	set, err := h.deploymentService.Variables(ctx, string(params.ProjectID), string(params.DeploymentID))
+	if err != nil {
+		return nil, err
+	}
+	out := make(api.Variables, len(set.Entries))
+	for _, variable := range set.Variables() {
+		rendered, err := toAPIVariable(variable)
+		if err != nil {
+			return nil, err
+		}
+		out[variable.Name] = rendered
+	}
+	return &out, nil
 }
 
 func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeploymentsParams) (api.ListDeploymentsRes, error) {
@@ -201,6 +216,29 @@ func deploymentConflictResponse(err error) (*api.DeploymentConflict, bool) {
 	return &resp, true
 }
 
+// deploymentVariablesMissingResponse answers dep.variables_missing with the
+// typed 400, whose details.kind and details.names sit on the body. Through
+// NewError the details would nest under details.details.
+func deploymentVariablesMissingResponse(err error) (*api.CreateDeploymentBadRequest, bool) {
+	de, ok := errors.AsType[domain.Error](err)
+	if !ok || de.Code != domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code {
+		return nil, false
+	}
+	details, ok := de.Details.(domain.DeploymentVariablesMissingDetails)
+	if !ok {
+		return nil, false
+	}
+	resp := api.NewDeploymentVariablesMissingCreateDeploymentBadRequest(api.DeploymentVariablesMissing{
+		Code:    de.Code,
+		Message: de.Message,
+		Details: api.DeploymentVariablesMissingDetails{
+			Kind:  api.DeploymentKind(details.Kind),
+			Names: details.Names,
+		},
+	})
+	return &resp, true
+}
+
 // deploymentErrorResponse maps the deployment error codes onto statuses.
 // dep.conflict is the failed expected_deployment_id check: the 409 details
 // carry the deployment the write would replace.
@@ -210,7 +248,7 @@ func deploymentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
-	case domain.ErrDeploymentInvalid().Code:
+	case domain.ErrDeploymentInvalid().Code, domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrDeploymentPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)

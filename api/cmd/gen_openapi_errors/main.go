@@ -767,10 +767,7 @@ func buildErrorMapping(domainPath string) map[string]errorInfo {
 						if ident, ok := callExpr.Fun.(*ast.Ident); ok && ident.Name == "newError" {
 							if len(callExpr.Args) >= 2 {
 								code := extractCodeArgument(callExpr.Args[0], prefixes)
-								message := ""
-								if msgLit, ok := callExpr.Args[1].(*ast.BasicLit); ok {
-									message = strings.Trim(msgLit.Value, `"`)
-								}
+								message := extractMessage(callExpr.Args[1])
 								if code != "" {
 									mapping["domain."+funcDecl.Name.Name] = errorInfo{
 										code:    code,
@@ -853,6 +850,28 @@ func extractCodeArgument(arg ast.Expr, prefixes map[string]string) string {
 	}
 
 	return ""
+}
+
+// extractMessage is the text newError records. A string literal is itself. A
+// fmt.Sprintf call contributes its format string, which is what stays stable
+// across calls.
+func extractMessage(arg ast.Expr) string {
+	if lit, ok := arg.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+		return strings.Trim(lit.Value, `"`)
+	}
+	call, ok := arg.(*ast.CallExpr)
+	if !ok || len(call.Args) == 0 {
+		return ""
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != "Sprintf" {
+		return ""
+	}
+	lit, ok := call.Args[0].(*ast.BasicLit)
+	if !ok || lit.Kind != token.STRING {
+		return ""
+	}
+	return strings.Trim(lit.Value, `"`)
 }
 
 type serviceMethod struct {

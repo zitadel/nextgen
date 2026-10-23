@@ -21,6 +21,7 @@ func TestDeploymentErrorResponseStatuses(t *testing.T) {
 		{domain.ErrDeploymentNotFound(), http.StatusNotFound},
 		{domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}), http.StatusConflict},
 		{domain.ErrDeploymentInvalid().WithMessage("bad"), http.StatusBadRequest},
+		{domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, []string{"GONE"}), http.StatusBadRequest},
 		{domain.ErrDeploymentPermissionDenied(), http.StatusForbidden},
 	}
 	for _, tc := range cases {
@@ -82,6 +83,26 @@ func TestDeploymentConflictRendersARevokedRelease(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, api.ReleaseRevokedConflictDeploymentConflict, resp.Type)
 	assert.Equal(t, domain.ErrReleaseRevoked().Code, resp.ReleaseRevokedConflict.Code)
+}
+
+// The 400 names the kind and every missing variable on details, sorted.
+func TestDeploymentVariablesMissingResponse(t *testing.T) {
+	err := domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPreview, []string{"GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_ID"})
+	resp, ok := deploymentVariablesMissingResponse(err)
+	require.True(t, ok)
+	body, isMissing := resp.GetDeploymentVariablesMissing()
+	require.True(t, isMissing)
+	assert.Equal(t, err.Code, body.Code)
+	assert.Equal(t, err.Message, body.Message)
+	assert.Equal(t, api.DeploymentVariablesMissingDetails{
+		Kind:  api.DeploymentKindPreview,
+		Names: []string{"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"},
+	}, body.Details)
+}
+
+func TestDeploymentVariablesMissingResponseIgnoresOtherErrors(t *testing.T) {
+	_, ok := deploymentVariablesMissingResponse(domain.ErrDeploymentInvalid())
+	assert.False(t, ok)
 }
 
 // Any other error is left to NewError.

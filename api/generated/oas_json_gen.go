@@ -20516,6 +20516,22 @@ func (s CreateDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case DepVariablesMissingCreateDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("dep.variables_missing")
+		{
+			s := s.DepVariablesMissing
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case EnvProjectNotFoundCreateDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("env.project_not_found")
@@ -20676,6 +20692,22 @@ func (s CreateDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case VarDocumentTooDeepCreateDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.document_too_deep")
+		{
+			s := s.VarDocumentTooDeep
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -20717,6 +20749,9 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "dep.permission_denied":
 					s.Type = DepPermissionDeniedCreateDeploymentErrorResponse
 					found = true
+				case "dep.variables_missing":
+					s.Type = DepVariablesMissingCreateDeploymentErrorResponse
+					found = true
 				case "env.project_not_found":
 					s.Type = EnvProjectNotFoundCreateDeploymentErrorResponse
 					found = true
@@ -20746,6 +20781,9 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "unavailable":
 					s.Type = UnavailableCreateDeploymentErrorResponse
+					found = true
+				case "var.document_too_deep":
+					s.Type = VarDocumentTooDeepCreateDeploymentErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -20779,6 +20817,10 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case DepPermissionDeniedCreateDeploymentErrorResponse:
 		if err := s.DepPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case DepVariablesMissingCreateDeploymentErrorResponse:
+		if err := s.DepVariablesMissing.Decode(d); err != nil {
 			return err
 		}
 	case EnvProjectNotFoundCreateDeploymentErrorResponse:
@@ -20819,6 +20861,10 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UnavailableCreateDeploymentErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	case VarDocumentTooDeepCreateDeploymentErrorResponse:
+		if err := s.VarDocumentTooDeep.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -30676,6 +30722,194 @@ func (s DepPermissionDeniedDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *DepPermissionDeniedDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *DepVariablesMissing) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *DepVariablesMissing) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("dep.variables_missing")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfDepVariablesMissing = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes DepVariablesMissing from json.
+func (s *DepVariablesMissing) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DepVariablesMissing to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode DepVariablesMissing")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfDepVariablesMissing) {
+					name = jsonFieldsNameOfDepVariablesMissing[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *DepVariablesMissing) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DepVariablesMissing) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s DepVariablesMissingDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s DepVariablesMissingDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes DepVariablesMissingDetails from json.
+func (s *DepVariablesMissingDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DepVariablesMissingDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode DepVariablesMissingDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s DepVariablesMissingDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DepVariablesMissingDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -76761,6 +76995,40 @@ func (s *OptDepPermissionDeniedDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes DepVariablesMissingDetails as json.
+func (o OptDepVariablesMissingDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes DepVariablesMissingDetails from json.
+func (o *OptDepVariablesMissingDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptDepVariablesMissingDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(DepVariablesMissingDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptDepVariablesMissingDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptDepVariablesMissingDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes DeploymentCreatedEventDelegationType as json.
 func (o OptDeploymentCreatedEventDelegationType) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -86583,6 +86851,40 @@ func (s OptUserUpdatedPayloadAttributes) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptUserUpdatedPayloadAttributes) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes VarDocumentTooDeepDetails as json.
+func (o OptVarDocumentTooDeepDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes VarDocumentTooDeepDetails from json.
+func (o *OptVarDocumentTooDeepDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptVarDocumentTooDeepDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(VarDocumentTooDeepDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptVarDocumentTooDeepDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptVarDocumentTooDeepDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -112999,6 +113301,22 @@ func (s RollbackDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case DepVariablesMissingRollbackDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("dep.variables_missing")
+		{
+			s := s.DepVariablesMissing
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case EnvProjectNotFoundRollbackDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("env.project_not_found")
@@ -113159,6 +113477,22 @@ func (s RollbackDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case VarDocumentTooDeepRollbackDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.document_too_deep")
+		{
+			s := s.VarDocumentTooDeep
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -113200,6 +113534,9 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "dep.permission_denied":
 					s.Type = DepPermissionDeniedRollbackDeploymentErrorResponse
 					found = true
+				case "dep.variables_missing":
+					s.Type = DepVariablesMissingRollbackDeploymentErrorResponse
+					found = true
 				case "env.project_not_found":
 					s.Type = EnvProjectNotFoundRollbackDeploymentErrorResponse
 					found = true
@@ -113229,6 +113566,9 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "unavailable":
 					s.Type = UnavailableRollbackDeploymentErrorResponse
+					found = true
+				case "var.document_too_deep":
+					s.Type = VarDocumentTooDeepRollbackDeploymentErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -113262,6 +113602,10 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case DepPermissionDeniedRollbackDeploymentErrorResponse:
 		if err := s.DepPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case DepVariablesMissingRollbackDeploymentErrorResponse:
+		if err := s.DepVariablesMissing.Decode(d); err != nil {
 			return err
 		}
 	case EnvProjectNotFoundRollbackDeploymentErrorResponse:
@@ -113302,6 +113646,10 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UnavailableRollbackDeploymentErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	case VarDocumentTooDeepRollbackDeploymentErrorResponse:
+		if err := s.VarDocumentTooDeep.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -133296,6 +133644,194 @@ func (s UserUpdatedPayloadAttributes) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *UserUpdatedPayloadAttributes) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *VarDocumentTooDeep) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *VarDocumentTooDeep) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("var.document_too_deep")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfVarDocumentTooDeep = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes VarDocumentTooDeep from json.
+func (s *VarDocumentTooDeep) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode VarDocumentTooDeep to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode VarDocumentTooDeep")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfVarDocumentTooDeep) {
+					name = jsonFieldsNameOfVarDocumentTooDeep[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *VarDocumentTooDeep) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *VarDocumentTooDeep) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s VarDocumentTooDeepDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s VarDocumentTooDeepDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes VarDocumentTooDeepDetails from json.
+func (s *VarDocumentTooDeepDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode VarDocumentTooDeepDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode VarDocumentTooDeepDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s VarDocumentTooDeepDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *VarDocumentTooDeepDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
