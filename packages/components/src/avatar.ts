@@ -28,7 +28,7 @@ function hash(seed: string): number {
 
 /** The custom properties `.zl-avatar` (`avatar.css`) paints with. */
 export type AvatarVars = Record<
-  "--avatar-from" | "--avatar-to" | "--avatar-base" | "--avatar-phase",
+  "--zl-avatar-from" | "--zl-avatar-to" | "--zl-avatar-base" | "--zl-avatar-phase",
   string
 >;
 
@@ -48,12 +48,12 @@ export function avatarVars(seed: string): AvatarVars {
   // The second colour is drawn from the other four, so the two never match.
   const to = (from + 1 + ((h >>> 8) % (STARTS.length - 1))) % STARTS.length;
   return {
-    "--avatar-from": `var(${STARTS[from]})`,
-    "--avatar-to": `var(${STARTS[to]})`,
-    "--avatar-base": `${(h >>> 16) % 360}deg`,
+    "--zl-avatar-from": `var(${STARTS[from]})`,
+    "--zl-avatar-to": `var(${STARTS[to]})`,
+    "--zl-avatar-base": `${(h >>> 16) % 360}deg`,
     // A negative delay starts the motion part-way through. The three
     // periods (18, 26 and 60s) only line up again after over an hour.
-    "--avatar-phase": `-${(h >>> 4) % 1200}s`,
+    "--zl-avatar-phase": `-${(h >>> 4) % 1200}s`,
   };
 }
 
@@ -67,21 +67,4 @@ export function avatarVars(seed: string): AvatarVars {
  */
 export function avatarSeed(user: { userId?: string; identifier?: string } | undefined): string {
   return user?.identifier?.trim() || user?.userId || "";
-}
-
-/**
- * Registers the angles `avatar.css` animates, so they interpolate. A
- * document-level `@property` rule does the same, but one inside a shadow root
- * is ignored, so `<zl-avatar>` registers them from script. Registering twice
- * throws; the first registration stands.
- */
-export function registerAvatarProperties(): void {
-  if (typeof CSS === "undefined" || typeof CSS.registerProperty !== "function") return;
-  for (const name of ["--avatar-turn", "--avatar-sway-a", "--avatar-sway-b"]) {
-    try {
-      CSS.registerProperty({ name, syntax: "<angle>", inherits: false, initialValue: "0deg" });
-    } catch {
-      // Already registered.
-    }
-  }
 }

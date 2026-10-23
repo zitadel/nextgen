@@ -13,7 +13,6 @@ import minimalTemplate from "@zitadel/config/defaults/branding/minimal/login.liq
 import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
 import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
 import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
-import ejectedAccountRowTemplate from "./__fixtures__/ejected-account-row.liquid";
 import type { ZitadelLogin } from "./zitadel-login.js";
 
 /**
@@ -79,6 +78,18 @@ const fieldlessStep: CreateFlow201 = {
     ],
   },
 };
+
+/**
+ * The account row a template ejected before `<zl-account>` still carries, as
+ * the bundled template drew it: layout-chrome.css keeps its styles.
+ */
+const ejectedAccountRowTemplate = `<zl-page-shell data-zl-template-root><zl-card>
+  <p class="zl-card-account" data-testid="zitadel-account">
+    <span class="zl-card-account__value">{{ identifier.value }}</span>
+    <a href="#" class="zl-card-nav__link" data-action="back">Use another account</a>
+  </p>
+  <zl-field name="password" type="password" label="Password"></zl-field>
+</zl-card></zl-page-shell>`;
 
 /**
  * A branding asset URL that genuinely loads in the test browser. It has to
@@ -380,8 +391,6 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
   });
 
   it("keeps an ejected template's account row inside the card for a long address", async () => {
-    // A template ejected before `<zl-account>` still draws the account as a
-    // `.zl-card-account` row; layout-chrome.css keeps its styles.
     const address = `${"a".repeat(64)}@${"b".repeat(40)}.example`;
     const element = await mount({
       ...identifierStep,

@@ -208,8 +208,8 @@ describe("settings profile, generated from the schema", () => {
     const avatars = document.querySelectorAll<HTMLElement>(".zl-avatar");
     const profile = avatars[avatars.length - 1];
     const vars = avatarVars("maya@example.com") as Record<string, string>;
-    expect(profile?.style.getPropertyValue("--avatar-from")).toBe(vars["--avatar-from"]);
-    expect(profile?.style.getPropertyValue("--avatar-base")).toBe(vars["--avatar-base"]);
+    expect(profile?.style.getPropertyValue("--zl-avatar-from")).toBe(vars["--zl-avatar-from"]);
+    expect(profile?.style.getPropertyValue("--zl-avatar-base")).toBe(vars["--zl-avatar-base"]);
   });
 
   it("shows a boolean read-only, and saves a name beside a required one", async () => {

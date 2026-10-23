@@ -2,12 +2,29 @@ import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { avatarVars, registerAvatarProperties } from "../avatar.js";
+import { avatarVars } from "../avatar.js";
 import avatarSurfaceStyles from "../styles/avatar.css?inline";
 import avatarStyles from "./zl-avatar.css?inline";
 
 import type { AtomManifest } from "../manifest.js";
 import { surfaceStyles } from "../styles/index.js";
+
+/**
+ * Registers the angles `avatar.css` animates, so they interpolate. A
+ * document-level `@property` rule does the same, but one inside a shadow root
+ * is ignored, so the atom registers them from script. Registering twice
+ * throws; the first registration stands.
+ */
+function registerAvatarProperties(): void {
+  if (typeof CSS === "undefined" || typeof CSS.registerProperty !== "function") return;
+  for (const name of ["--zl-avatar-turn", "--zl-avatar-sway-a", "--zl-avatar-sway-b"]) {
+    try {
+      CSS.registerProperty({ name, syntax: "<angle>", inherits: false, initialValue: "0deg" });
+    } catch {
+      // Already registered.
+    }
+  }
+}
 
 registerAvatarProperties();
 

@@ -15,10 +15,10 @@ describe("avatarVars", () => {
 
   it("keeps a seed's colours, so the login and the console agree across releases", () => {
     expect(avatarVars("maya@example.com")).toEqual({
-      "--avatar-from": "var(--zl-gradient-red-start)",
-      "--avatar-to": "var(--zl-gradient-purple-start)",
-      "--avatar-base": "324deg",
-      "--avatar-phase": "-712s",
+      "--zl-avatar-from": "var(--zl-gradient-red-start)",
+      "--zl-avatar-to": "var(--zl-gradient-purple-start)",
+      "--zl-avatar-base": "324deg",
+      "--zl-avatar-phase": "-712s",
     });
   });
 

@@ -4246,16 +4246,6 @@
             }
           ],
           "description": "What a person's avatar is generated from: their identifier, because that is\nall the login widget can know. Its password step echoes what the visitor\ntyped whether or not the account exists, so a gradient from that string\nleaks nothing, where a user id would confirm the account and expose an\ninternal id. The cost: a changed email changes the avatar. The user id\nstands in only where no identifier is known."
-        },
-        {
-          "kind": "function",
-          "name": "registerAvatarProperties",
-          "return": {
-            "type": {
-              "text": "void"
-            }
-          },
-          "description": "Registers the angles `avatar.css` animates, so they interpolate. A\ndocument-level `@property` rule does the same, but one inside a shadow root\nis ignored, so `<zl-avatar>` registers them from script. Registering twice\nthrows; the first registration stands."
         }
       ],
       "exports": [
@@ -4272,14 +4262,6 @@
           "name": "avatarSeed",
           "declaration": {
             "name": "avatarSeed",
-            "module": "src/avatar.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "registerAvatarProperties",
-          "declaration": {
-            "name": "registerAvatarProperties",
             "module": "src/avatar.ts"
           }
         }

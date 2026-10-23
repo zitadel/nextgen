@@ -7,62 +7,63 @@
    different periods, all registered angles so they interpolate. The gradient
    drifts round, speeds up, slows and sometimes swings back, rather than
    turning steadily about its centre. Each person starts from their own angle
-   (`--avatar-base`) and point in the motion (`--avatar-phase`), so a list of
-   avatars never moves in step. */
-@property --avatar-turn {
+   (`--zl-avatar-base`) and point in the motion (`--zl-avatar-phase`), so a
+   list of avatars never moves in step. Every name carries the `zl-` prefix:
+   the widget registers the angles on the host page's document. */
+@property --zl-avatar-turn {
   syntax: "<angle>";
   inherits: false;
   initial-value: 0deg;
 }
 
-@property --avatar-sway-a {
+@property --zl-avatar-sway-a {
   syntax: "<angle>";
   inherits: false;
   initial-value: 0deg;
 }
 
-@property --avatar-sway-b {
+@property --zl-avatar-sway-b {
   syntax: "<angle>";
   inherits: false;
   initial-value: 0deg;
 }
 
-@keyframes avatar-turn {
+@keyframes zl-avatar-turn {
   to {
-    --avatar-turn: 360deg;
+    --zl-avatar-turn: 360deg;
   }
 }
 
-@keyframes avatar-sway-a {
+@keyframes zl-avatar-sway-a {
   from {
-    --avatar-sway-a: -90deg;
+    --zl-avatar-sway-a: -90deg;
   }
   to {
-    --avatar-sway-a: 90deg;
+    --zl-avatar-sway-a: 90deg;
   }
 }
 
-@keyframes avatar-sway-b {
+@keyframes zl-avatar-sway-b {
   from {
-    --avatar-sway-b: -45deg;
+    --zl-avatar-sway-b: -45deg;
   }
   to {
-    --avatar-sway-b: 45deg;
+    --zl-avatar-sway-b: 45deg;
   }
 }
 
 .zl-avatar {
   border-radius: 9999px;
   background-image: linear-gradient(
-    calc(var(--avatar-base) + var(--avatar-turn) + var(--avatar-sway-a) + var(--avatar-sway-b)),
-    var(--avatar-from) 15%,
-    var(--avatar-to) 85%
+    calc(var(--zl-avatar-base) + var(--zl-avatar-turn) + var(--zl-avatar-sway-a) + var(--zl-avatar-sway-b)),
+    var(--zl-avatar-from) 15%,
+    var(--zl-avatar-to) 85%
   );
   animation:
-    avatar-turn 60s linear infinite,
-    avatar-sway-a 18s ease-in-out infinite alternate,
-    avatar-sway-b 26s ease-in-out infinite alternate;
-  animation-delay: var(--avatar-phase);
+    zl-avatar-turn 60s linear infinite,
+    zl-avatar-sway-a 18s ease-in-out infinite alternate,
+    zl-avatar-sway-b 26s ease-in-out infinite alternate;
+  animation-delay: var(--zl-avatar-phase);
 }
 
 @media (prefers-reduced-motion: reduce) {
