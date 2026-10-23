@@ -19449,6 +19449,22 @@ func (s CreateAuthAttemptErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjMismatchCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.mismatch")
+		{
+			s := s.ProjMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateAuthAttemptErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -19522,6 +19538,9 @@ func (s *CreateAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalCreateAuthAttemptErrorResponse
 					found = true
+				case "proj.mismatch":
+					s.Type = ProjMismatchCreateAuthAttemptErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateAuthAttemptErrorResponse
 					found = true
@@ -19560,6 +19579,10 @@ func (s *CreateAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalCreateAuthAttemptErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case ProjMismatchCreateAuthAttemptErrorResponse:
+		if err := s.ProjMismatch.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidCreateAuthAttemptErrorResponse:
@@ -23086,6 +23109,38 @@ func (s CreateHandoffErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelNotFoundCreateHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedCreateHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateHandoffErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -23149,6 +23204,12 @@ func (s *CreateHandoffErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalCreateHandoffErrorResponse
 					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundCreateHandoffErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedCreateHandoffErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateHandoffErrorResponse
 					found = true
@@ -23192,6 +23253,14 @@ func (s *CreateHandoffErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalCreateHandoffErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundCreateHandoffErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedCreateHandoffErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidCreateHandoffErrorResponse:
@@ -39495,6 +39564,38 @@ func (s ExchangeHandoffErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjMismatchExchangeHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.mismatch")
+		{
+			s := s.ProjMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedExchangeHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidExchangeHandoffErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -39657,6 +39758,12 @@ func (s *ExchangeHandoffErrorResponse) Decode(d *jx.Decoder) error {
 				case "tkn.invalid_tknid":
 					s.Type = TknInvalidTknidExchangeHandoffErrorResponse
 					found = true
+				case "proj.mismatch":
+					s.Type = ProjMismatchExchangeHandoffErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedExchangeHandoffErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidExchangeHandoffErrorResponse
 					found = true
@@ -39722,6 +39829,14 @@ func (s *ExchangeHandoffErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case TknInvalidTknidExchangeHandoffErrorResponse:
 		if err := s.TknInvalidTknid.Decode(d); err != nil {
+			return err
+		}
+	case ProjMismatchExchangeHandoffErrorResponse:
+		if err := s.ProjMismatch.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedExchangeHandoffErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidExchangeHandoffErrorResponse:
@@ -50137,6 +50252,38 @@ func (s GetAuthAttemptErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelNotFoundGetAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedGetAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetAuthAttemptErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -50188,6 +50335,12 @@ func (s *GetAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetAuthAttemptErrorResponse
 					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundGetAuthAttemptErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedGetAuthAttemptErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetAuthAttemptErrorResponse
 					found = true
@@ -50215,6 +50368,14 @@ func (s *GetAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalGetAuthAttemptErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundGetAuthAttemptErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedGetAuthAttemptErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidGetAuthAttemptErrorResponse:
@@ -65139,6 +65300,38 @@ func (s IssueChallengeErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelNotFoundIssueChallengeErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedIssueChallengeErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidIssueChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -65199,6 +65392,12 @@ func (s *IssueChallengeErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalIssueChallengeErrorResponse
 					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundIssueChallengeErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedIssueChallengeErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidIssueChallengeErrorResponse
 					found = true
@@ -65238,6 +65437,14 @@ func (s *IssueChallengeErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalIssueChallengeErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundIssueChallengeErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedIssueChallengeErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidIssueChallengeErrorResponse:
@@ -79540,6 +79747,40 @@ func (s *OptProjClaimWindowExpiredDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes ProjMismatchDetails as json.
+func (o OptProjMismatchDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes ProjMismatchDetails from json.
+func (o *OptProjMismatchDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptProjMismatchDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(ProjMismatchDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptProjMismatchDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptProjMismatchDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes ProjMissingIDDetails as json.
 func (o OptProjMissingIDDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -91998,6 +92239,194 @@ func (s ProjClaimWindowExpiredDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *ProjClaimWindowExpiredDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ProjMismatch) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ProjMismatch) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("proj.mismatch")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfProjMismatch = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes ProjMismatch from json.
+func (s *ProjMismatch) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ProjMismatch to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ProjMismatch")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfProjMismatch) {
+					name = jsonFieldsNameOfProjMismatch[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ProjMismatch) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ProjMismatch) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s ProjMismatchDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s ProjMismatchDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes ProjMismatchDetails from json.
+func (s *ProjMismatchDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ProjMismatchDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ProjMismatchDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ProjMismatchDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ProjMismatchDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -131699,6 +132128,38 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelNotFoundVerifyChallengeProofErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedVerifyChallengeProofErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidVerifyChallengeProofErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -131867,6 +132328,12 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalVerifyChallengeProofErrorResponse
 					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundVerifyChallengeProofErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedVerifyChallengeProofErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidVerifyChallengeProofErrorResponse
 					found = true
@@ -131940,6 +132407,14 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalVerifyChallengeProofErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundVerifyChallengeProofErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedVerifyChallengeProofErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidVerifyChallengeProofErrorResponse:

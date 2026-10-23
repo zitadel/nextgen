@@ -12318,6 +12318,7 @@ type CreateAuthAttemptErrorResponse struct {
 	EncKeyDecryptFailed EncKeyDecryptFailed
 	EvtInvalid          EvtInvalid
 	Internal            Internal
+	ProjMismatch        ProjMismatch
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
 }
@@ -12332,6 +12333,7 @@ const (
 	EncKeyDecryptFailedCreateAuthAttemptErrorResponse CreateAuthAttemptErrorResponseType = "enc_key.decrypt_failed"
 	EvtInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "evt.invalid"
 	InternalCreateAuthAttemptErrorResponse            CreateAuthAttemptErrorResponseType = "internal"
+	ProjMismatchCreateAuthAttemptErrorResponse        CreateAuthAttemptErrorResponseType = "proj.mismatch"
 	ReqInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "enc_key.unknown_alg"
 )
@@ -12359,6 +12361,11 @@ func (s CreateAuthAttemptErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether CreateAuthAttemptErrorResponse is Internal.
 func (s CreateAuthAttemptErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateAuthAttemptErrorResponse
+}
+
+// IsProjMismatch reports whether CreateAuthAttemptErrorResponse is ProjMismatch.
+func (s CreateAuthAttemptErrorResponse) IsProjMismatch() bool {
+	return s.Type == ProjMismatchCreateAuthAttemptErrorResponse
 }
 
 // IsReqInvalid reports whether CreateAuthAttemptErrorResponse is ReqInvalid.
@@ -12473,6 +12480,27 @@ func (s CreateAuthAttemptErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalCreateAuthAttemptErrorResponse(v Internal) CreateAuthAttemptErrorResponse {
 	var s CreateAuthAttemptErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetProjMismatch sets CreateAuthAttemptErrorResponse to ProjMismatch.
+func (s *CreateAuthAttemptErrorResponse) SetProjMismatch(v ProjMismatch) {
+	s.Type = ProjMismatchCreateAuthAttemptErrorResponse
+	s.ProjMismatch = v
+}
+
+// GetProjMismatch returns ProjMismatch and true boolean if CreateAuthAttemptErrorResponse is ProjMismatch.
+func (s CreateAuthAttemptErrorResponse) GetProjMismatch() (v ProjMismatch, ok bool) {
+	if !s.IsProjMismatch() {
+		return v, false
+	}
+	return s.ProjMismatch, true
+}
+
+// NewProjMismatchCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from ProjMismatch.
+func NewProjMismatchCreateAuthAttemptErrorResponse(v ProjMismatch) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetProjMismatch(v)
 	return s
 }
 
@@ -15127,6 +15155,8 @@ type CreateHandoffErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	EvtInvalid          EvtInvalid
 	Internal            Internal
+	RelNotFound         RelNotFound
+	RelRevoked          RelRevoked
 	ReqInvalid          ReqInvalid
 }
 
@@ -15142,6 +15172,8 @@ const (
 	AuthUnauthorizedCreateHandoffErrorResponse    CreateHandoffErrorResponseType = "auth.unauthorized"
 	EvtInvalidCreateHandoffErrorResponse          CreateHandoffErrorResponseType = "evt.invalid"
 	InternalCreateHandoffErrorResponse            CreateHandoffErrorResponseType = "internal"
+	RelNotFoundCreateHandoffErrorResponse         CreateHandoffErrorResponseType = "rel.not_found"
+	RelRevokedCreateHandoffErrorResponse          CreateHandoffErrorResponseType = "rel.revoked"
 	ReqInvalidCreateHandoffErrorResponse          CreateHandoffErrorResponseType = "req.invalid"
 )
 
@@ -15178,6 +15210,16 @@ func (s CreateHandoffErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether CreateHandoffErrorResponse is Internal.
 func (s CreateHandoffErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateHandoffErrorResponse
+}
+
+// IsRelNotFound reports whether CreateHandoffErrorResponse is RelNotFound.
+func (s CreateHandoffErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundCreateHandoffErrorResponse
+}
+
+// IsRelRevoked reports whether CreateHandoffErrorResponse is RelRevoked.
+func (s CreateHandoffErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedCreateHandoffErrorResponse
 }
 
 // IsReqInvalid reports whether CreateHandoffErrorResponse is ReqInvalid.
@@ -15329,6 +15371,48 @@ func (s CreateHandoffErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalCreateHandoffErrorResponse(v Internal) CreateHandoffErrorResponse {
 	var s CreateHandoffErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetRelNotFound sets CreateHandoffErrorResponse to RelNotFound.
+func (s *CreateHandoffErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundCreateHandoffErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if CreateHandoffErrorResponse is RelNotFound.
+func (s CreateHandoffErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundCreateHandoffErrorResponse returns new CreateHandoffErrorResponse from RelNotFound.
+func NewRelNotFoundCreateHandoffErrorResponse(v RelNotFound) CreateHandoffErrorResponse {
+	var s CreateHandoffErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets CreateHandoffErrorResponse to RelRevoked.
+func (s *CreateHandoffErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedCreateHandoffErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if CreateHandoffErrorResponse is RelRevoked.
+func (s CreateHandoffErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedCreateHandoffErrorResponse returns new CreateHandoffErrorResponse from RelRevoked.
+func NewRelRevokedCreateHandoffErrorResponse(v RelRevoked) CreateHandoffErrorResponse {
+	var s CreateHandoffErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -22588,6 +22672,8 @@ type ExchangeHandoffErrorResponse struct {
 	Internal                Internal
 	TknInvalid              TknInvalid
 	TknInvalidTknid         TknInvalidTknid
+	ProjMismatch            ProjMismatch
+	RelRevoked              RelRevoked
 	ReqInvalid              ReqInvalid
 	SessExchangeConflict    SessExchangeConflict
 	SessInvalidHandoffToken SessInvalidHandoffToken
@@ -22610,6 +22696,8 @@ const (
 	InternalExchangeHandoffErrorResponse                ExchangeHandoffErrorResponseType = "internal"
 	TknInvalidExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "tkn.invalid"
 	TknInvalidTknidExchangeHandoffErrorResponse         ExchangeHandoffErrorResponseType = "tkn.invalid_tknid"
+	ProjMismatchExchangeHandoffErrorResponse            ExchangeHandoffErrorResponseType = "proj.mismatch"
+	RelRevokedExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "rel.revoked"
 	ReqInvalidExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "req.invalid"
 	SessExchangeConflictExchangeHandoffErrorResponse    ExchangeHandoffErrorResponseType = "sess.exchange_conflict"
 	SessInvalidHandoffTokenExchangeHandoffErrorResponse ExchangeHandoffErrorResponseType = "sess.invalid_handoff_token"
@@ -22657,6 +22745,16 @@ func (s ExchangeHandoffErrorResponse) IsTknInvalid() bool {
 // IsTknInvalidTknid reports whether ExchangeHandoffErrorResponse is TknInvalidTknid.
 func (s ExchangeHandoffErrorResponse) IsTknInvalidTknid() bool {
 	return s.Type == TknInvalidTknidExchangeHandoffErrorResponse
+}
+
+// IsProjMismatch reports whether ExchangeHandoffErrorResponse is ProjMismatch.
+func (s ExchangeHandoffErrorResponse) IsProjMismatch() bool {
+	return s.Type == ProjMismatchExchangeHandoffErrorResponse
+}
+
+// IsRelRevoked reports whether ExchangeHandoffErrorResponse is RelRevoked.
+func (s ExchangeHandoffErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedExchangeHandoffErrorResponse
 }
 
 // IsReqInvalid reports whether ExchangeHandoffErrorResponse is ReqInvalid.
@@ -22859,6 +22957,48 @@ func (s ExchangeHandoffErrorResponse) GetTknInvalidTknid() (v TknInvalidTknid, o
 func NewTknInvalidTknidExchangeHandoffErrorResponse(v TknInvalidTknid) ExchangeHandoffErrorResponse {
 	var s ExchangeHandoffErrorResponse
 	s.SetTknInvalidTknid(v)
+	return s
+}
+
+// SetProjMismatch sets ExchangeHandoffErrorResponse to ProjMismatch.
+func (s *ExchangeHandoffErrorResponse) SetProjMismatch(v ProjMismatch) {
+	s.Type = ProjMismatchExchangeHandoffErrorResponse
+	s.ProjMismatch = v
+}
+
+// GetProjMismatch returns ProjMismatch and true boolean if ExchangeHandoffErrorResponse is ProjMismatch.
+func (s ExchangeHandoffErrorResponse) GetProjMismatch() (v ProjMismatch, ok bool) {
+	if !s.IsProjMismatch() {
+		return v, false
+	}
+	return s.ProjMismatch, true
+}
+
+// NewProjMismatchExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from ProjMismatch.
+func NewProjMismatchExchangeHandoffErrorResponse(v ProjMismatch) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetProjMismatch(v)
+	return s
+}
+
+// SetRelRevoked sets ExchangeHandoffErrorResponse to RelRevoked.
+func (s *ExchangeHandoffErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedExchangeHandoffErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if ExchangeHandoffErrorResponse is RelRevoked.
+func (s ExchangeHandoffErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from RelRevoked.
+func NewRelRevokedExchangeHandoffErrorResponse(v RelRevoked) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -28610,6 +28750,8 @@ type GetAuthAttemptErrorResponse struct {
 	AttNotFound      AttNotFound
 	AuthUnauthorized AuthUnauthorized
 	Internal         Internal
+	RelNotFound      RelNotFound
+	RelRevoked       RelRevoked
 	ReqInvalid       ReqInvalid
 }
 
@@ -28621,6 +28763,8 @@ const (
 	AttNotFoundGetAuthAttemptErrorResponse      GetAuthAttemptErrorResponseType = "att.not_found"
 	AuthUnauthorizedGetAuthAttemptErrorResponse GetAuthAttemptErrorResponseType = "auth.unauthorized"
 	InternalGetAuthAttemptErrorResponse         GetAuthAttemptErrorResponseType = "internal"
+	RelNotFoundGetAuthAttemptErrorResponse      GetAuthAttemptErrorResponseType = "rel.not_found"
+	RelRevokedGetAuthAttemptErrorResponse       GetAuthAttemptErrorResponseType = "rel.revoked"
 	ReqInvalidGetAuthAttemptErrorResponse       GetAuthAttemptErrorResponseType = "req.invalid"
 )
 
@@ -28637,6 +28781,16 @@ func (s GetAuthAttemptErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether GetAuthAttemptErrorResponse is Internal.
 func (s GetAuthAttemptErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetAuthAttemptErrorResponse
+}
+
+// IsRelNotFound reports whether GetAuthAttemptErrorResponse is RelNotFound.
+func (s GetAuthAttemptErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundGetAuthAttemptErrorResponse
+}
+
+// IsRelRevoked reports whether GetAuthAttemptErrorResponse is RelRevoked.
+func (s GetAuthAttemptErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedGetAuthAttemptErrorResponse
 }
 
 // IsReqInvalid reports whether GetAuthAttemptErrorResponse is ReqInvalid.
@@ -28704,6 +28858,48 @@ func (s GetAuthAttemptErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetAuthAttemptErrorResponse(v Internal) GetAuthAttemptErrorResponse {
 	var s GetAuthAttemptErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetRelNotFound sets GetAuthAttemptErrorResponse to RelNotFound.
+func (s *GetAuthAttemptErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundGetAuthAttemptErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if GetAuthAttemptErrorResponse is RelNotFound.
+func (s GetAuthAttemptErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundGetAuthAttemptErrorResponse returns new GetAuthAttemptErrorResponse from RelNotFound.
+func NewRelNotFoundGetAuthAttemptErrorResponse(v RelNotFound) GetAuthAttemptErrorResponse {
+	var s GetAuthAttemptErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets GetAuthAttemptErrorResponse to RelRevoked.
+func (s *GetAuthAttemptErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedGetAuthAttemptErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if GetAuthAttemptErrorResponse is RelRevoked.
+func (s GetAuthAttemptErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedGetAuthAttemptErrorResponse returns new GetAuthAttemptErrorResponse from RelRevoked.
+func NewRelRevokedGetAuthAttemptErrorResponse(v RelRevoked) GetAuthAttemptErrorResponse {
+	var s GetAuthAttemptErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -39033,6 +39229,8 @@ type IssueChallengeErrorResponse struct {
 	AttNotFound         AttNotFound
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	RelNotFound         RelNotFound
+	RelRevoked          RelRevoked
 	ReqInvalid          ReqInvalid
 }
 
@@ -39047,6 +39245,8 @@ const (
 	AttNotFoundIssueChallengeErrorResponse         IssueChallengeErrorResponseType = "att.not_found"
 	AuthUnauthorizedIssueChallengeErrorResponse    IssueChallengeErrorResponseType = "auth.unauthorized"
 	InternalIssueChallengeErrorResponse            IssueChallengeErrorResponseType = "internal"
+	RelNotFoundIssueChallengeErrorResponse         IssueChallengeErrorResponseType = "rel.not_found"
+	RelRevokedIssueChallengeErrorResponse          IssueChallengeErrorResponseType = "rel.revoked"
 	ReqInvalidIssueChallengeErrorResponse          IssueChallengeErrorResponseType = "req.invalid"
 )
 
@@ -39078,6 +39278,16 @@ func (s IssueChallengeErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether IssueChallengeErrorResponse is Internal.
 func (s IssueChallengeErrorResponse) IsInternal() bool {
 	return s.Type == InternalIssueChallengeErrorResponse
+}
+
+// IsRelNotFound reports whether IssueChallengeErrorResponse is RelNotFound.
+func (s IssueChallengeErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundIssueChallengeErrorResponse
+}
+
+// IsRelRevoked reports whether IssueChallengeErrorResponse is RelRevoked.
+func (s IssueChallengeErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedIssueChallengeErrorResponse
 }
 
 // IsReqInvalid reports whether IssueChallengeErrorResponse is ReqInvalid.
@@ -39208,6 +39418,48 @@ func (s IssueChallengeErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalIssueChallengeErrorResponse(v Internal) IssueChallengeErrorResponse {
 	var s IssueChallengeErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetRelNotFound sets IssueChallengeErrorResponse to RelNotFound.
+func (s *IssueChallengeErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundIssueChallengeErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if IssueChallengeErrorResponse is RelNotFound.
+func (s IssueChallengeErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundIssueChallengeErrorResponse returns new IssueChallengeErrorResponse from RelNotFound.
+func NewRelNotFoundIssueChallengeErrorResponse(v RelNotFound) IssueChallengeErrorResponse {
+	var s IssueChallengeErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets IssueChallengeErrorResponse to RelRevoked.
+func (s *IssueChallengeErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedIssueChallengeErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if IssueChallengeErrorResponse is RelRevoked.
+func (s IssueChallengeErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedIssueChallengeErrorResponse returns new IssueChallengeErrorResponse from RelRevoked.
+func NewRelRevokedIssueChallengeErrorResponse(v RelRevoked) IssueChallengeErrorResponse {
+	var s IssueChallengeErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -54923,6 +55175,52 @@ func (o OptProjClaimWindowExpiredDetails) Or(d ProjClaimWindowExpiredDetails) Pr
 	return d
 }
 
+// NewOptProjMismatchDetails returns new OptProjMismatchDetails with value set to v.
+func NewOptProjMismatchDetails(v ProjMismatchDetails) OptProjMismatchDetails {
+	return OptProjMismatchDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjMismatchDetails is optional ProjMismatchDetails.
+type OptProjMismatchDetails struct {
+	Value ProjMismatchDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjMismatchDetails was set.
+func (o OptProjMismatchDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjMismatchDetails) Reset() {
+	var v ProjMismatchDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjMismatchDetails) SetTo(v ProjMismatchDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjMismatchDetails) Get() (v ProjMismatchDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjMismatchDetails) Or(d ProjMismatchDetails) ProjMismatchDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjMissingIDDetails returns new OptProjMissingIDDetails with value set to v.
 func NewOptProjMissingIDDetails(v ProjMissingIDDetails) OptProjMissingIDDetails {
 	return OptProjMissingIDDetails{
@@ -64640,6 +64938,59 @@ func (*ProjClaimWindowExpired) initClaimRes() {}
 type ProjClaimWindowExpiredDetails map[string]jx.Raw
 
 func (s *ProjClaimWindowExpiredDetails) init() ProjClaimWindowExpiredDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjMismatch struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjMismatchDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjMismatch) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjMismatch) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjMismatch) GetDetails() OptProjMismatchDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjMismatch) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjMismatch) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjMismatch) SetDetails(val OptProjMismatchDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjMismatchDetails map[string]jx.Raw
+
+func (s *ProjMismatchDetails) init() ProjMismatchDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -87362,6 +87713,8 @@ type VerifyChallengeProofErrorResponse struct {
 	AuthUnauthorized            AuthUnauthorized
 	EvtInvalid                  EvtInvalid
 	Internal                    Internal
+	RelNotFound                 RelNotFound
+	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
 	UserAlreadyExists           UserAlreadyExists
 	UserInvalid                 UserInvalid
@@ -87386,6 +87739,8 @@ const (
 	AuthUnauthorizedVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "auth.unauthorized"
 	EvtInvalidVerifyChallengeProofErrorResponse                  VerifyChallengeProofErrorResponseType = "evt.invalid"
 	InternalVerifyChallengeProofErrorResponse                    VerifyChallengeProofErrorResponseType = "internal"
+	RelNotFoundVerifyChallengeProofErrorResponse                 VerifyChallengeProofErrorResponseType = "rel.not_found"
+	RelRevokedVerifyChallengeProofErrorResponse                  VerifyChallengeProofErrorResponseType = "rel.revoked"
 	ReqInvalidVerifyChallengeProofErrorResponse                  VerifyChallengeProofErrorResponseType = "req.invalid"
 	UserAlreadyExistsVerifyChallengeProofErrorResponse           VerifyChallengeProofErrorResponseType = "user.already_exists"
 	UserInvalidVerifyChallengeProofErrorResponse                 VerifyChallengeProofErrorResponseType = "user.invalid"
@@ -87443,6 +87798,16 @@ func (s VerifyChallengeProofErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether VerifyChallengeProofErrorResponse is Internal.
 func (s VerifyChallengeProofErrorResponse) IsInternal() bool {
 	return s.Type == InternalVerifyChallengeProofErrorResponse
+}
+
+// IsRelNotFound reports whether VerifyChallengeProofErrorResponse is RelNotFound.
+func (s VerifyChallengeProofErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundVerifyChallengeProofErrorResponse
+}
+
+// IsRelRevoked reports whether VerifyChallengeProofErrorResponse is RelRevoked.
+func (s VerifyChallengeProofErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedVerifyChallengeProofErrorResponse
 }
 
 // IsReqInvalid reports whether VerifyChallengeProofErrorResponse is ReqInvalid.
@@ -87687,6 +88052,48 @@ func (s VerifyChallengeProofErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalVerifyChallengeProofErrorResponse(v Internal) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetRelNotFound sets VerifyChallengeProofErrorResponse to RelNotFound.
+func (s *VerifyChallengeProofErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundVerifyChallengeProofErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if VerifyChallengeProofErrorResponse is RelNotFound.
+func (s VerifyChallengeProofErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from RelNotFound.
+func NewRelNotFoundVerifyChallengeProofErrorResponse(v RelNotFound) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets VerifyChallengeProofErrorResponse to RelRevoked.
+func (s *VerifyChallengeProofErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedVerifyChallengeProofErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if VerifyChallengeProofErrorResponse is RelRevoked.
+func (s VerifyChallengeProofErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from RelRevoked.
+func NewRelRevokedVerifyChallengeProofErrorResponse(v RelRevoked) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 

@@ -11,8 +11,16 @@ import (
 )
 
 func (h Handler) CreateAuthAttempt(ctx context.Context, req *api.CreateAuthAttemptRequest) (api.CreateAuthAttemptRes, error) {
+	scopeCtx, ok := GetScopeContext(ctx)
+	if !ok {
+		return nil, domain.ErrAuthUnauthorized(nil)
+	}
+	if bodyProjectID := string(req.GetProjectID()); bodyProjectID != "" && bodyProjectID != scopeCtx.ProjectID {
+		return nil, domain.ErrProjectMismatch()
+	}
+
 	input := service.CreateAuthAttemptInput{
-		ProjectID: string(req.GetProjectID()),
+		ProjectID: scopeCtx.ProjectID,
 	}
 	sessionID, err := h.provenSessionID(ctx, input.ProjectID,
 		string(req.GetSessionID().Or("")), string(req.GetSessionToken().Or("")),
@@ -41,11 +49,18 @@ func (h Handler) GetAuthAttempt(ctx context.Context, params api.GetAuthAttemptPa
 		// attempt-surface resource: it stays invisible here.
 		return nil, domain.ErrAuthAttemptNotFound()
 	}
+	if _, err := h.withSealedRuntime(ctx, attempt.ProjectID, attempt.DeploymentID, attempt.ReleaseID); err != nil {
+		return nil, err
+	}
 	return authAttemptToAPI(attempt), nil
 }
 
 func (h Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeRequest, params api.IssueChallengeParams) (api.IssueChallengeRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
+
+	if err := h.refuseRevokedAttempt(ctx, scopeCtx.ProjectID, string(params.AttemptID)); err != nil {
+		return nil, err
+	}
 
 	challenge, err := challengeRequestToChallenge(req)
 	if err != nil {
@@ -71,6 +86,10 @@ func (h Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeRequ
 func (h Handler) VerifyChallengeProof(ctx context.Context, req *api.VerifyChallengeRequest, params api.VerifyChallengeProofParams) (api.VerifyChallengeProofRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
 
+	if err := h.refuseRevokedAttempt(ctx, scopeCtx.ProjectID, string(params.AttemptID)); err != nil {
+		return nil, err
+	}
+
 	proof, err := verifyRequestToProof(req)
 	if err != nil {
 		return nil, err
@@ -89,6 +108,9 @@ func (h Handler) VerifyChallengeProof(ctx context.Context, req *api.VerifyChalle
 
 func (h Handler) CreateHandoff(ctx context.Context, params api.CreateHandoffParams) (api.CreateHandoffRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
+	if err := h.refuseRevokedAttempt(ctx, scopeCtx.ProjectID, string(params.AttemptID)); err != nil {
+		return nil, err
+	}
 	input := service.HandoffInput{
 		ProjectID: scopeCtx.ProjectID,
 		AttemptID: string(params.AttemptID),
@@ -104,6 +126,17 @@ func (h Handler) CreateHandoff(ctx context.Context, params api.CreateHandoffPara
 		HandoffToken: attempt.HandoffToken.Plain(),
 		ExpiresAt:    attempt.HandoffToken.ExpiresAt(attempt.HandedOffAt),
 	}, nil
+}
+
+// refuseRevokedAttempt loads the attempt and refuses when its sealed release
+// was revoked. Missing attempts are left for the caller to surface.
+func (h *Handler) refuseRevokedAttempt(ctx context.Context, projectID, attemptID string) error {
+	attempt, err := h.authAttemptService.GetByID(ctx, projectID, attemptID)
+	if err != nil {
+		return err
+	}
+	_, err = h.withSealedRuntime(ctx, attempt.ProjectID, attempt.DeploymentID, attempt.ReleaseID)
+	return err
 }
 
 // challengeRequestToChallenge maps the API oneOf challenge to the service Challenge discriminated union.

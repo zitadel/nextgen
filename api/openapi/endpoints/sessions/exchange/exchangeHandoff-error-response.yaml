@@ -12,6 +12,8 @@ content:
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid_tknid.yaml'
+        - $ref: '../../../components/schemas/errors/proj-mismatch.yaml'
+        - $ref: '../../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/sess-exchange_conflict.yaml'
         - $ref: '../../../components/schemas/errors/sess-invalid_handoff_token.yaml'
@@ -30,6 +32,8 @@ content:
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           tkn.invalid_tknid: '../../../components/schemas/errors/tkn-invalid_tknid.yaml'
+          proj.mismatch: '../../../components/schemas/errors/proj-mismatch.yaml'
+          rel.revoked: '../../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           sess.exchange_conflict: '../../../components/schemas/errors/sess-exchange_conflict.yaml'
           sess.invalid_handoff_token: '../../../components/schemas/errors/sess-invalid_handoff_token.yaml'
@@ -78,6 +82,16 @@ content:
         value:
           code: tkn.invalid_tknid
           message: 'token identifiers do not match token type'
+      proj.mismatch:
+        summary: proj.mismatch
+        value:
+          code: proj.mismatch
+          message: 'the project named in the request is not the one the credential belongs to'
+      rel.revoked:
+        summary: rel.revoked
+        value:
+          code: rel.revoked
+          message: 'the release this attempt runs on was revoked'
       req.invalid:
         summary: req.invalid
         value:
