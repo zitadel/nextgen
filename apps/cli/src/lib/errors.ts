@@ -227,6 +227,16 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/**
+ * Whether a request reached a server that has no such endpoint: a 404 without
+ * the platform's error envelope. A Zitadel API answers a miss it knows about
+ * with the envelope, so this is a route the server does not serve, such as one
+ * added in a later release.
+ */
+export function isMissingEndpoint(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404 && !isPlatformErrorEnvelope(error.body);
+}
+
 function isPlatformErrorEnvelope(body: unknown): boolean {
   return (
     typeof body === "object" &&

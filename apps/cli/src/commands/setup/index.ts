@@ -89,6 +89,7 @@ import {
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { type Asker, input } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
+import { PASSWORD_POLICY_PATH, parsePasswordMinLength } from "../../lib/policies";
 import { publicCliCommand } from "../../lib/public-cli";
 import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
@@ -199,6 +200,10 @@ export default class Setup extends BaseCommand {
     // hidden so scripts and agents still passing it get a targeted error
     // pointing at `branding eject` instead of oclif's unknown-flag error.
     design: nonBlankString({ hidden: true }),
+    "password-min-length": nonBlankString({
+      description:
+        "Minimum password length for the project's password policy, for example 15; 0 sets none. Without it, setup writes the policy with no rules; change it in .zitadel/policies/ later.",
+    }),
     [SETUP_FLAG_KEYS.provider]: Flags.string({
       description:
         "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider. Pipe the client secret in on stdin; never pass it as a flag.",
@@ -351,7 +356,6 @@ export default class Setup extends BaseCommand {
     }
     // A new app, created below, or on a dry run only previewed.
     const scaffoldedFramework = detected === undefined;
-
     this.recordTelemetry({
       framework: app.framework,
       renderer: flags.renderer ?? "react",
@@ -361,8 +365,14 @@ export default class Setup extends BaseCommand {
       preset: flags.preset ?? DEFAULT_SETUP_PRESET,
       use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
       sso: flags.sso ?? "none",
+      // Whether the flag was passed: it is parsed below, so a bad value fails
+      // after this step is recorded, like the other flags'. The final call
+      // records what it meant (0 sets none).
+      password_policy: flags["password-min-length"] === undefined ? "empty" : "set",
       step: "framework_resolved",
     });
+    // Read once: a bad value is refused here, before anything is created.
+    const passwordMinLengthFlag = passwordMinLengthFromFlag(flags["password-min-length"]);
 
     // An explicit --dev-port overrides the detected port for the whole run, so
     // the issuer and the registered origin track the requested port (and several
@@ -380,6 +390,7 @@ export default class Setup extends BaseCommand {
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
       useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
       sso: ssoFromCommandLine === undefined ? [] : [ssoFromCommandLine],
+      passwordMinLength: passwordMinLengthFlag,
     };
 
     if (!nonInteractive && !dryRun) {
@@ -397,6 +408,7 @@ export default class Setup extends BaseCommand {
         presetFromFlag: flags.preset !== undefined,
         useCaseFromFlag: flags["use-case"] !== undefined,
         ssoFromFlag: flags.sso !== undefined,
+        passwordMinLengthFromFlag: flags["password-min-length"] !== undefined,
         developmentBuild: isDevelopmentBuild(),
       };
       for (const prompt of SETUP_PROMPTS) {
@@ -423,6 +435,8 @@ export default class Setup extends BaseCommand {
               ? selectionName(answers.sso[0].selection)
               : "none"
             : "multiple",
+      // Whether a minimum went into the password policy, never the value.
+      password_policy: answers.passwordMinLength === undefined ? "empty" : "set",
     });
 
     const issuer = issuerFromPort(answers.devPort);
@@ -573,6 +587,7 @@ export default class Setup extends BaseCommand {
               preset: answers.preset,
               useCase: answers.useCase,
               sso: answers.sso,
+              passwordMinLength: answers.passwordMinLength,
               cliVersion: this.meta.cliVersion,
             });
       } catch (error) {
@@ -596,13 +611,15 @@ export default class Setup extends BaseCommand {
           hint:
             cause.hint ??
             (newApp === undefined
-              ? "The project was created but its default schema/flow upload did not finish. " +
-                "Re-run `zitadel setup` to start over; --force overwrites the files setup " +
-                "scaffolds. It does not cover a connection under .zitadel/idps/ -- those are " +
+              ? "The project was created but its default resources (schema, login flow, " +
+                "password policy) did not all upload. Re-run `zitadel setup` to start over; " +
+                "--force overwrites the schema and flow files setup scaffolds and keeps an " +
+                "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
                 "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
                 "one, or keep it and enable the provider after setup to reuse it."
-              : "The project was created but its default schema/flow upload did not finish, " +
-                "so setup removed the new app again. Re-run setup as before to start over."),
+              : "The project was created but its default resources (schema, login flow, " +
+                "password policy) did not all upload, so setup removed the new app again. " +
+                "Re-run setup as before to start over."),
           nextCommands:
             cause.nextCommands ?? (newApp === undefined ? ["zitadel setup --force"] : []),
           details: cause.details,
@@ -1683,6 +1700,21 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
 }
 
 /**
+ * `--password-min-length`, read with the prompt's parser so the two cannot
+ * disagree. Refused before anything is created.
+ */
+function passwordMinLengthFromFlag(value: string | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = parsePasswordMinLength(value);
+  if (!parsed.ok) {
+    throw new ZitadelError("E_VALIDATION", `--password-min-length: ${parsed.problem}`);
+  }
+  return parsed.value;
+}
+
+/**
  * Map from the patcher's deterministic output paths to a short noun
  * phrase describing what the file is for. Anything not in the map falls
  * back to the bare path in the narration; add an entry here when a new
@@ -1701,6 +1733,9 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
     subject: "the editable default human user schema",
   },
   ".zitadel/schemas/README.md": { subject: "the schemas folder README" },
+  ".zitadel/policies/auth.factor.password.set.json": { subject: "the editable password policy" },
+  ".zitadel/policies/README.md": { subject: "the policies folder README" },
+  ".zitadel/meta/policy.json": { subject: "the policy dialect spec (editor $schema)" },
   ".zitadel/meta/flow-definition.json": { subject: "the flow dialect spec (editor $schema)" },
   ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
   ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
@@ -1791,13 +1826,14 @@ export function buildSummary(opts: {
   }
 
   // The login-customization entry points. These are what a user edits to
-  // change what the login collects and how it authenticates —
+  // change what the login collects, how it authenticates and what it enforces —
   // burying them in the verbose per-file narration above the box means users
   // don't find them (each folder ships a README with the workflow).
   const customizeRows: Row[] = [];
   for (const [label, suffix, dir] of [
     ["User schema", ".zitadel/schemas/default-human-user.json", ".zitadel/schemas/"],
     ["Login flow", ".zitadel/flows/default-login.json", ".zitadel/flows/"],
+    ["Password policy", PASSWORD_POLICY_PATH, ".zitadel/policies/"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });

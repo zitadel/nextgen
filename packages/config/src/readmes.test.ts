@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { flowsReadmeContent, schemasReadmeContent } from "./readmes";
+import { flowsReadmeContent, policiesReadmeContent, schemasReadmeContent } from "./readmes";
 
 // Regression guard for the scaffolded README content: a bad merge once
 // shipped `.zitadel/flows/README.md` with its "## Presets" section
@@ -9,6 +9,7 @@ import { flowsReadmeContent, schemasReadmeContent } from "./readmes";
 describe.each([
   ["flows", flowsReadmeContent],
   ["schemas", schemasReadmeContent],
+  ["policies", policiesReadmeContent],
 ])("%s README content", (_name, content) => {
   it("is non-empty markdown with a top-level heading", () => {
     expect(content()).toMatch(/^# /);

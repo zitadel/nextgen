@@ -1,4 +1,4 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import type {
@@ -17,6 +17,7 @@ import {
   flowsReadmeContent,
   getDefaultHumanUserSchema,
   getDefaultLoginFlow,
+  policiesReadmeContent,
   schemasReadmeContent,
   type SetupPreset,
   type SetupUseCase,
@@ -33,8 +34,17 @@ import {
   normalizeIdpBody,
   normalizeSchemaBody,
 } from "@zitadel/config/normalize";
+import { policyConfigSchema } from "@zitadel/config/schemas";
 
 import { FLOWS_DIR } from "./flows";
+import {
+  PASSWORD_POLICY_OPERATION,
+  PASSWORD_POLICY_PATH,
+  POLICIES_DIR,
+  type PolicyFile,
+  passwordPolicyFile,
+  toPolicyWireBody,
+} from "./policies";
 import {
   applySsoToFlow,
   applySsoToSchema,
@@ -52,7 +62,8 @@ import { normalizePublicCliProse } from "./public-cli";
 import { hashForState } from "./sync";
 import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
-import { ZitadelError } from "./errors";
+import { isMissingEndpoint, ZitadelError } from "./errors";
+import { reportWarning } from "./warnings";
 
 export type MaterializeSetupResourcesResult = {
   filesWritten: string[];
@@ -88,6 +99,12 @@ export async function materializeSetupResources(opts: {
    * created per entry, and every slug is added to the schema and the flow.
    */
   sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
+  /**
+   * The minimum password length to put into the password policy, or
+   * `undefined` for none. The policy is written and published either way;
+   * without a minimum its `config` is empty and enforces nothing.
+   */
+  passwordMinLength?: number;
   /**
    * CLI version used to render `zitadel …` command mentions in the scaffolded
    * READMEs as runnable `npx @zitadel/cli@<version> …` commands — the CLI is
@@ -215,8 +232,50 @@ export async function materializeSetupResources(opts: {
     status: flowBody.status,
   });
 
+  // The password policy, created before its file like the connections. The
+  // CLI chooses no value: without one from the developer, `config` is empty.
+  // A policy file already there (only with --force: without it the conflict
+  // check refused it) holds a project's chosen rules, so it is kept and
+  // published as it is; a minimum given now goes into it.
+  const kept = opts.force ? await readPasswordPolicyFile(opts.cwd) : undefined;
+  const policy =
+    kept === undefined
+      ? passwordPolicyFile(opts.passwordMinLength)
+      : opts.passwordMinLength === undefined
+        ? kept
+        : { ...kept, config: { ...kept.config, min_length: opts.passwordMinLength } };
+  let published: { id?: unknown } | undefined;
+  try {
+    published = await opts.client.publishPolicy(toPolicyWireBody(policy), {
+      project_id: opts.projectId,
+    });
+  } catch (error) {
+    if (!isMissingEndpoint(error)) {
+      throw error;
+    }
+    // A server from before operation policies: the project works without
+    // one, so setup goes on without the file rather than failing.
+    reportWarning(
+      "The server has no policy endpoints yet, so setup wrote no password policy. Upgrade the server, then add .zitadel/policies/ and run `zitadel apply`.",
+    );
+  }
+  if (published !== undefined) {
+    await mkdir(join(opts.cwd, POLICIES_DIR), { recursive: true });
+    if (
+      (kept === undefined || policy !== kept) &&
+      (await writeResourceFile(opts.cwd, PASSWORD_POLICY_PATH, policy, opts.force))
+    ) {
+      filesWritten.push(join(opts.cwd, PASSWORD_POLICY_PATH));
+    }
+    await updateState(opts.cwd, PASSWORD_POLICY_PATH, {
+      id: requiredString(published.id, "published policy id"),
+      hash: hashForState({ normalize: (body) => toPolicyWireBody(body as PolicyFile) }, policy),
+    });
+  }
+
   const schemasReadme = join(SCHEMAS_DIR, "README.md");
   const flowsReadme = join(FLOWS_DIR, "README.md");
+  const policiesReadme = join(POLICIES_DIR, "README.md");
   if (
     await writeReadmeFile(
       opts.cwd,
@@ -234,6 +293,16 @@ export async function materializeSetupResources(opts: {
     )
   ) {
     filesWritten.push(join(opts.cwd, flowsReadme));
+  }
+  if (
+    published !== undefined &&
+    (await writeReadmeFile(
+      opts.cwd,
+      policiesReadme,
+      normalizePublicCliProse(policiesReadmeContent(), opts.cliVersion),
+    ))
+  ) {
+    filesWritten.push(join(opts.cwd, policiesReadme));
   }
 
   return { filesWritten };
@@ -341,6 +410,46 @@ async function refuseResourceConflicts(
       throw resourceExists(path);
     }
   }
+  if (await exists(join(cwd, PASSWORD_POLICY_PATH))) {
+    throw resourceExists(PASSWORD_POLICY_PATH, {
+      hint: "Rerun setup with --force to keep this policy and publish it to the new project, or move the file aside to start from an empty one.",
+    });
+  }
+}
+
+/**
+ * The password policy file a project already has, or `undefined` when there is
+ * none. It must be a valid policy for the password operation: setup publishes
+ * it as it is, so a broken one is refused here, before it reaches the server.
+ */
+async function readPasswordPolicyFile(cwd: string): Promise<PolicyFile | undefined> {
+  let raw: string;
+  try {
+    raw = await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8");
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return undefined;
+    }
+    throw error;
+  }
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    data = undefined;
+  }
+  const result = policyConfigSchema.safeParse(data);
+  if (!result.success || result.data.operation !== PASSWORD_POLICY_OPERATION) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `${PASSWORD_POLICY_PATH} is not a valid password policy`,
+      {
+        hint: "Setup keeps an existing policy file and publishes it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
+        details: { file: PASSWORD_POLICY_PATH },
+      },
+    );
+  }
+  return data as PolicyFile;
 }
 
 /**

@@ -87,13 +87,13 @@ describe("plan", () => {
         expect(result.total).toBeGreaterThan(0);
       });
 
-      it("reports a new password policy file as one create", async () => {
+      it("reports an edit to the password policy as one update", async () => {
         const app = await aSetUpApp();
         await app.writePasswordPolicy({ min_length: 12 });
 
         const result = await app.plan();
 
-        expect(result).toEqual(expect.objectContaining({ creates: 1, total: 1 }));
+        expect(result).toEqual(expect.objectContaining({ updates: 1, total: 1 }));
       });
 
       it("has nothing to reconcile once the password policy is applied", async () => {
