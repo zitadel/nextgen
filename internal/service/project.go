@@ -591,17 +591,22 @@ type ListAuthorizedProjectsRequest struct {
 	// there (ADR 053 §3). Required.
 	HomeProjectID string
 	// UserID is the human the session is bound to. Required.
-	UserID    string
-	Limit     int
-	PageToken string
+	UserID string
+	// NameContains narrows the listing to the projects whose name contains
+	// it, ignoring case. The storage statement applies it together with the
+	// authorization, so a search reaches every project the user can act on.
+	// Empty lists them all.
+	NameContains string
+	Limit        int
+	PageToken    string
 }
 
 func (s *projectService) ListAuthorized(ctx context.Context, req ListAuthorizedProjectsRequest) (_ *ListProjectsResponse, err error) {
 	ctx, end := startSpan(ctx, "ProjectService.ListAuthorized")
 	defer end(&err)
 
-	return s.listForSessionUser(ctx, req, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
-		return s.v2Pool.Statements().ListAuthorizedProjects(ctx, req.HomeProjectID, req.UserID, page)
+	return s.listForSessionUser(ctx, req, func(opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+		return s.v2Pool.Statements().ListAuthorizedProjects(ctx, req.HomeProjectID, req.UserID, opts)
 	})
 }
 
@@ -609,15 +614,16 @@ func (s *projectService) ListEveryProject(ctx context.Context, req ListAuthorize
 	ctx, end := startSpan(ctx, "ProjectService.ListEveryProject")
 	defer end(&err)
 
-	return s.listForSessionUser(ctx, req, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
-		return s.v2Pool.Statements().ListProjects(ctx, &database.ListOptions[domain.ProjectField]{Pagination: page})
+	return s.listForSessionUser(ctx, req, func(opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+		return s.v2Pool.Statements().ListProjects(ctx, opts)
 	})
 }
 
 // listForSessionUser is what ListAuthorized and ListEveryProject share: it
 // refuses a session whose user is missing or inactive, then pages list by
-// project id. The two differ only in which projects list reads.
-func (s *projectService) listForSessionUser(ctx context.Context, req ListAuthorizedProjectsRequest, list func(database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error)) (*ListProjectsResponse, error) {
+// project id, narrowed by the name search when there is one. The two differ
+// only in which projects list reads.
+func (s *projectService) listForSessionUser(ctx context.Context, req ListAuthorizedProjectsRequest, list func(*database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)) (*ListProjectsResponse, error) {
 	// Fail closed: an empty id would bind an empty string into the grant
 	// predicate instead of narrowing it, so there is no safe default here.
 	if req.UserID == "" || req.HomeProjectID == "" {
@@ -631,14 +637,20 @@ func (s *projectService) listForSessionUser(ctx context.Context, req ListAuthori
 		return nil, err
 	}
 
-	result, err := list(database.Page[domain.ProjectField]{
-		Limit: uint32(normalizeLimit(req.Limit)),
-		OrderBy: database.OrderBy[domain.ProjectField]{
-			Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
-			Direction: database.OrderAsc,
+	opts := &database.ListOptions[domain.ProjectField]{
+		Pagination: database.Page[domain.ProjectField]{
+			Limit: uint32(normalizeLimit(req.Limit)),
+			OrderBy: database.OrderBy[domain.ProjectField]{
+				Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
+				Direction: database.OrderAsc,
+			},
+			Cursor: []byte(req.PageToken),
 		},
-		Cursor: []byte(req.PageToken),
-	})
+	}
+	if req.NameContains != "" {
+		opts.Filter = database.StringContainsFold(database.Col(domain.ProjectFieldName), req.NameContains)
+	}
+	result, err := list(opts)
 	if err != nil {
 		return nil, mapListError(err, "failed to list authorized projects")
 	}

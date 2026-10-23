@@ -1043,7 +1043,7 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 		result       *database.ListResult[*domain.Project]
 		statementErr error
 		wantErr      error
-		checkCall    func(t *testing.T, home, user string, page database.Page[domain.ProjectField])
+		checkCall    func(t *testing.T, home, user string, opts *database.ListOptions[domain.ProjectField])
 		checkResp    func(t *testing.T, resp *service.ListProjectsResponse)
 	}{
 		{
@@ -1053,15 +1053,16 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 				Items:      []*domain.Project{{ID: "proj_a"}, {ID: "proj_b"}},
 				NextCursor: []byte("next"),
 			},
-			checkCall: func(t *testing.T, home, user string, page database.Page[domain.ProjectField]) {
+			checkCall: func(t *testing.T, home, user string, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, "proj_platform", home)
 				assert.Equal(t, "user_a", user)
-				assert.Equal(t, uint32(20), page.Limit)
-				assert.Empty(t, page.Cursor)
-				assert.Equal(t, database.OrderAsc, page.OrderBy.Direction)
+				assert.Nil(t, opts.Filter, "no search: every project the user can act on")
+				assert.Equal(t, uint32(20), opts.Pagination.Limit)
+				assert.Empty(t, opts.Pagination.Cursor)
+				assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
 				assert.Equal(t, []database.Column[domain.ProjectField]{
 					database.Col(domain.ProjectFieldID),
-				}, page.OrderBy.Columns)
+				}, opts.Pagination.OrderBy.Columns)
 			},
 			checkResp: func(t *testing.T, resp *service.ListProjectsResponse) {
 				assert.Len(t, resp.Projects, 2)
@@ -1072,16 +1073,27 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 			name:   "limit clamped to max",
 			req:    service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", Limit: 500},
 			result: &database.ListResult[*domain.Project]{},
-			checkCall: func(t *testing.T, _, _ string, page database.Page[domain.ProjectField]) {
-				assert.Equal(t, uint32(100), page.Limit)
+			checkCall: func(t *testing.T, _, _ string, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, uint32(100), opts.Pagination.Limit)
 			},
 		},
 		{
 			name:   "page token is passed through as the cursor",
 			req:    service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", PageToken: "tok"},
 			result: &database.ListResult[*domain.Project]{},
-			checkCall: func(t *testing.T, _, _ string, page database.Page[domain.ProjectField]) {
-				assert.Equal(t, []byte("tok"), page.Cursor)
+			checkCall: func(t *testing.T, _, _ string, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
+			},
+		},
+		{
+			// The search is a filter on the same statement, so storage applies it
+			// together with the grants rather than to a page of them.
+			name:   "name search narrows the grant query",
+			req:    service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", NameContains: "Acme", PageToken: "tok"},
+			result: &database.ListResult[*domain.Project]{},
+			checkCall: func(t *testing.T, _, _ string, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, database.StringContainsFold(database.Col(domain.ProjectFieldName), "Acme"), opts.Filter)
+				assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
 			},
 		},
 		{
@@ -1106,10 +1118,10 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 			expectActiveSessionUser(statements)
 
 			var gotHome, gotUser string
-			var gotPage database.Page[domain.ProjectField]
+			var gotOpts *database.ListOptions[domain.ProjectField]
 			statements.EXPECT().ListAuthorizedProjects(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-				func(_ context.Context, home, user string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
-					gotHome, gotUser, gotPage = home, user, page
+				func(_ context.Context, home, user string, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+					gotHome, gotUser, gotOpts = home, user, opts
 					return tc.result, tc.statementErr
 				})
 
@@ -1120,7 +1132,7 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 			}
 			require.NoError(t, err)
 			if tc.checkCall != nil {
-				tc.checkCall(t, gotHome, gotUser, gotPage)
+				tc.checkCall(t, gotHome, gotUser, gotOpts)
 			}
 			if tc.checkResp != nil {
 				tc.checkResp(t, resp)
@@ -1161,6 +1173,32 @@ func TestProjectService_ListEveryProject(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, resp.Projects, 2)
 	assert.Equal(t, "next", resp.NextPageToken)
+}
+
+// An operator searches like anyone (ADR 075 §6): the name filter that narrows
+// the grant query narrows the listing of every project the same way.
+func TestProjectService_ListEveryProjectByName(t *testing.T) {
+	t.Parallel()
+
+	svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+	expectActiveSessionUser(statements)
+	statements.EXPECT().ListAuthorizedProjects(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+			assert.Equal(t, database.StringContainsFold(database.Col(domain.ProjectFieldName), "acme"), opts.Filter)
+			assert.Equal(t, []database.Column[domain.ProjectField]{
+				database.Col(domain.ProjectFieldID),
+			}, opts.Pagination.OrderBy.Columns)
+			return &database.ListResult[*domain.Project]{Items: []*domain.Project{{ID: "proj_a"}}}, nil
+		})
+
+	resp, err := svc.ListEveryProject(context.Background(), service.ListAuthorizedProjectsRequest{
+		HomeProjectID: "proj_platform",
+		UserID:        "user_a",
+		NameContains:  "acme",
+	})
+	require.NoError(t, err)
+	assert.Len(t, resp.Projects, 1)
 }
 
 // An empty user or home project must never reach storage: the predicate would

@@ -10,16 +10,19 @@ import { Box, Boxes, Check, ChevronsUpDown, type LucideIcon, Plus, Slash } from 
 import { useState } from "react";
 
 import { AddTeamSheet } from "@/components/add-team-sheet";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-import { api } from "@/api/zitadel";
 import { queryActiveTeams } from "@/lib/teams";
 import { useAsync } from "@/hooks/use-async";
 import {
+  type ProjectRef,
   useMyProjects,
   useProjectScope,
+  useProjectSearch,
+  useSelectedProject,
   useSelectProjectTarget,
   withoutTrailingSlash,
 } from "@/lib/project-scope";
@@ -30,8 +33,11 @@ import {
  * shadcn `Popover`.
  *
  * The project popover has no footer: the sidebar's first entry is the
- * Projects overview. The team popover's footer adds a team, opening the Add
- * team drawer and then the new team.
+ * Projects overview. It lists the person's first page of projects, and once
+ * they run past one page it gains a search field above them, matched on the
+ * server across all of them: a list that fits needs no search. The team
+ * popover's footer adds a team, opening the Add team drawer and then the new
+ * team.
  */
 
 /**
@@ -43,6 +49,15 @@ const NO_PROJECTS = "No projects";
 /** What the project pill says while projects exist but none is selected. */
 const NO_SELECTION = "Select a project";
 
+/** The project popover's search field, label and placeholder alike. */
+const FIND_PROJECT = "Find a project";
+
+/** What the project list says when a search finds nothing. */
+const NO_MATCHES = "No matching projects";
+
+/** How many projects a search lists: as many as the first page. */
+const PROJECT_RESULTS = 20;
+
 interface SwitcherOption {
   id: string;
   label: string;
@@ -51,13 +66,20 @@ interface SwitcherOption {
 }
 
 export function ContextSwitcher() {
-  const projects = useProjects();
+  // The first page says whether there are more projects than it shows, and so
+  // whether the list offers a search; the list itself is the search's answer.
+  const mine = useMyProjects();
+  const [query, setQuery] = useState("");
+  const found = useProjectSearch(query, PROJECT_RESULTS);
+  const toOption = useProjectOption();
   // The pill shows the selected project (`?project=`, `src/lib/project-scope.ts`),
   // never `getConsoleProjectId()`: that is the project the console signs into —
   // the platform project on a platform deployment — which is not what anybody
-  // means here unless it was selected.
+  // means here unless it was selected. Never named from a search's matches,
+  // which come and go as the person types; by its id until its name is read.
   const selected = useProjectScope();
-  const current = useSelectedOption(selected, projects);
+  const named = useSelectedProject();
+  const current = named && { id: named.id, label: named.name ?? named.id };
   const teamId = useParams({ strict: false, select: (params) => params.teamId });
   // The Projects list is where a project is chosen, and it marks the selected
   // one, so the pill would only repeat it: no switcher there.
@@ -71,9 +93,11 @@ export function ContextSwitcher() {
           heading="Projects"
           label={current?.label}
           currentId={current?.id}
-          options={projects}
-          emptyLabel={projects?.length === 0 ? NO_PROJECTS : NO_SELECTION}
+          options={found?.projects.map(toOption)}
+          emptyLabel={mine?.projects.length === 0 ? NO_PROJECTS : NO_SELECTION}
+          noOptions={found?.term ? NO_MATCHES : undefined}
           ariaLabel="Switch project"
+          search={mine?.more ? { label: FIND_PROJECT, query, onQueryChange: setQuery } : undefined}
         />
       )}
       {/* The team switcher joins the bar once a team is open — the team is the
@@ -140,11 +164,10 @@ function TeamSwitcher({ projectId, teamId }: { projectId: string; teamId: string
 /** One page of the team switcher's list. */
 const TEAM_PAGE = 25;
 
-/** The project pill's options: the person's projects (`useMyProjects`), each a link re-scoping to it. */
-function useProjects(): SwitcherOption[] | undefined {
-  const projects = useMyProjects();
+/** A project as the pill lists it: a link re-scoping to it. */
+function useProjectOption(): (project: ProjectRef) => SwitcherOption {
   const scopeTo = useScopeTarget();
-  return projects?.map(({ id, name }) => ({ id, label: name, link: scopeTo(id) }));
+  return ({ id, name }) => ({ id, label: name, link: scopeTo(id) });
 }
 
 /**
@@ -168,33 +191,6 @@ function useScopeTarget(): (projectId: string) => NonNullable<SwitcherOption["li
       : selectTarget(projectId);
 }
 
-/**
- * The option the pill shows. A selected project missing from the list — one
- * named by a shared link's `?project=` rather than chosen here — is named by
- * `GET /projects/{id}`, and by its id until that read answers or if it is
- * refused.
- */
-function useSelectedOption(
-  selected: string | undefined,
-  projects: SwitcherOption[] | undefined,
-): Pick<SwitcherOption, "id" | "label"> | undefined {
-  const listed = selected ? projects?.find((project) => project.id === selected) : undefined;
-  const missing = selected !== undefined && projects !== undefined && listed === undefined;
-  // Tagged with the id it answers for: a re-read keeps the last answer until
-  // the next lands, and that must not name another project.
-  const read = useAsync(
-    missing && selected
-      ? () => api.getProject(selected).then((project) => ({ id: selected, name: project.name }))
-      : null,
-    undefined,
-    [missing, selected],
-  );
-
-  if (listed) return listed;
-  if (!missing) return undefined;
-  return { id: selected, label: read?.id === selected ? read.name : selected };
-}
-
 function Switcher({
   icon: Icon,
   heading,
@@ -202,8 +198,10 @@ function Switcher({
   currentId,
   options,
   emptyLabel,
+  noOptions,
   ariaLabel,
   footer,
+  search,
   current = false,
 }: {
   icon: LucideIcon;
@@ -217,13 +215,22 @@ function Switcher({
   options: SwitcherOption[] | undefined;
   /** Shown in place of a label once the options have loaded and there are none. */
   emptyLabel: string;
+  /** What the empty list says instead of `emptyLabel`: a search that found nothing. */
+  noOptions?: string;
   ariaLabel: string;
   /** An action beneath the options, which closes the popover first. */
   footer?: { label: string; icon: LucideIcon; onSelect: () => void };
+  /** A field above the options. The caller searches with `query` and answers with `options`. */
+  search?: { label: string; query: string; onQueryChange: (query: string) => void };
   /** The innermost context in the bar, whose label the design sets semibold. */
   current?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // A search starts over each time the list opens.
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    if (!next) search?.onQueryChange("");
+  };
 
   // Loading is the options not having answered yet — not the label being
   // absent, which is also what an empty answer looks like.
@@ -232,7 +239,7 @@ function Switcher({
   const rows = options ?? [];
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={changeOpen}>
       <PopoverTrigger asChild>
         <button type="button" aria-label={ariaLabel} className={TRIGGER}>
           <Icon size={16} className="shrink-0 text-foreground" aria-hidden />
@@ -261,9 +268,22 @@ function Switcher({
         <p className="px-2 py-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {heading}
         </p>
+        {search && (
+          // The popover focuses it on opening, so typing searches at once.
+          <div className="px-1 pb-1">
+            <Input
+              type="search"
+              value={search.query}
+              onChange={(event) => search.onQueryChange(event.target.value)}
+              placeholder={search.label}
+              aria-label={search.label}
+              className={SEARCH}
+            />
+          </div>
+        )}
         <ul aria-label={ariaLabel} className="flex flex-col">
           {rows.length === 0 ? (
-            <li className="px-2 py-1.5 text-sm text-muted-foreground">{emptyLabel}</li>
+            <li className="px-2 py-1.5 text-sm text-muted-foreground">{noOptions ?? emptyLabel}</li>
           ) : (
             // Links, not buttons: selecting a project or a team is a navigation —
             // the project lives in the URL (`?project=`), the team is the page.
@@ -282,7 +302,7 @@ function Switcher({
                   // By id, not by label: two projects may share a name.
                   aria-current={selected ? "true" : undefined}
                 >
-                  <Link {...option.link} onClick={() => setOpen(false)} className={ROW}>
+                  <Link {...option.link} onClick={() => changeOpen(false)} className={ROW}>
                     {content}
                   </Link>
                 </li>
@@ -298,7 +318,7 @@ function Switcher({
             <button
               type="button"
               onClick={() => {
-                setOpen(false);
+                changeOpen(false);
                 footer.onSelect();
               }}
               // Laid out like a row: icon, then the label in line with the
@@ -324,6 +344,14 @@ function Switcher({
  */
 const TRIGGER =
   "flex h-8 max-w-64 min-w-0 items-center gap-2 rounded-md px-2 text-sm transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent";
+
+/**
+ * The search field: the design system's boxed Combobox search, which bears no
+ * focus ring because the popover focuses it on opening, where a ring would
+ * read as a state rather than an affordance (`docs/styling.md`).
+ */
+const SEARCH =
+  "h-9 bg-input/30 text-sm focus-visible:border-input focus-visible:ring-0 dark:bg-transparent";
 
 /**
  * A list row: 32px, glyph, name, and a check on the current one. The focus

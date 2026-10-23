@@ -240,4 +240,33 @@ func TestListMyProjects_PlatformOperator(t *testing.T) {
 		_, err := h.ListMyProjects(session(t, customer), api.ListMyProjectsParams{})
 		require.NoError(t, err)
 	})
+
+	// The search belongs to the one listing, not to the operator's: it reaches
+	// the service whichever way the user reaches their projects.
+	for _, tc := range []struct {
+		name     string
+		operator bool
+	}{
+		{"name_contains narrows an operator's projects", true},
+		{"name_contains narrows anyone else's projects", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			h, projects := operatorHandler(t, new(tc.operator))
+			searched := func(_ context.Context, req service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
+				assert.Equal(t, "acme", req.NameContains)
+				return &service.ListProjectsResponse{}, nil
+			}
+			if tc.operator {
+				projects.EXPECT().ListEveryProject(gomock.Any(), gomock.Any()).DoAndReturn(searched)
+			} else {
+				projects.EXPECT().ListAuthorized(gomock.Any(), gomock.Any()).DoAndReturn(searched)
+			}
+
+			_, err := h.ListMyProjects(session(t, operatorScope), api.ListMyProjectsParams{
+				NameContains: api.NewOptString("acme"),
+			})
+			require.NoError(t, err)
+		})
+	}
 }

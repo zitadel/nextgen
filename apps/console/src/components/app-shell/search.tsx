@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useAsync } from "@/hooks/use-async";
-import { useMyProjects, useProjectScope } from "@/lib/project-scope";
+import { TYPING_PAUSE_MS, useDebounced } from "@/hooks/use-debounced";
+import { useProjectScope, useProjectSearch, useSelectedProject } from "@/lib/project-scope";
 import { queryActiveTeams } from "@/lib/teams";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +27,8 @@ import { type NavItem, useNavItems } from "./use-nav-items";
  * is navigation, not a results page.
  *
  * Groups, top to bottom: pages in the selected project, teams (matched on the
- * server, so a project with many is searched in full), projects, and you (the
+ * server, so a project with many is searched in full), projects (matched on
+ * the server too, across every project the person can act on), and you (the
  * Settings sidebar's pages). Users are not offered: `POST /users/query`
  * filters by id, schema, status and team only — there is no email or name
  * filter to search with.
@@ -96,7 +98,6 @@ export function SearchDialog({
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const projectId = useProjectScope();
-  const projects = useMyProjects();
   // One request per pause in typing, not per keystroke.
   const typed = useDebounced(open ? query.trim() : "", TYPING_PAUSE_MS);
   const teams = useAsync(
@@ -106,6 +107,9 @@ export function SearchDialog({
     [],
     [typed, projectId],
   );
+  // The first page until something is typed, then the server's matches; each
+  // answer stays until the next lands, so the group never empties mid-typing.
+  const projects = useProjectSearch(open ? query : "", PROJECT_RESULTS);
   const pages = useNavItems();
   const yours = useNavItems("settings");
 
@@ -114,7 +118,7 @@ export function SearchDialog({
     if (open) setQuery("");
   }, [open]);
 
-  const projectName = projects?.find((project) => project.id === projectId)?.name;
+  const projectName = useSelectedProject()?.name;
   const q = query.trim().toLowerCase();
 
   const groups = useMemo(() => {
@@ -147,15 +151,13 @@ export function SearchDialog({
         go: close(() => void navigate({ to: "/teams/$teamId", params: { teamId: team.id } })),
       }));
 
-    const projectResults: Result[] = (projects ?? [])
-      .filter((project) => matches(project.name))
-      .map((project) => ({
-        id: `project:${project.id}`,
-        icon: Boxes,
-        label: project.name,
-        // Selecting a project is a navigation: the selection lives in the URL.
-        go: close(() => void navigate({ to: "/", search: { project: project.id } })),
-      }));
+    const projectResults: Result[] = (projects?.projects ?? []).map((project) => ({
+      id: `project:${project.id}`,
+      icon: Boxes,
+      label: project.name,
+      // Selecting a project is a navigation: the selection lives in the URL.
+      go: close(() => void navigate({ to: "/", search: { project: project.id } })),
+    }));
 
     return [
       {
@@ -175,8 +177,9 @@ export function SearchDialog({
         <DialogDescription className="sr-only">
           Search for a page, a team or a project.
         </DialogDescription>
-        {/* Filtering is ours, not cmdk's: teams arrive already filtered by the
-            server, and every group matches the same way (substring, any case). */}
+        {/* Filtering is ours, not cmdk's: teams and projects arrive already
+            filtered by the server, and every group matches the same way
+            (substring, any case). */}
         <Command shouldFilter={false} className="bg-popover">
           <div className="relative">
             <CommandInput
@@ -222,18 +225,8 @@ export function SearchDialog({
   );
 }
 
-const TYPING_PAUSE_MS = 200;
 const TEAM_RESULTS = 8;
-
-/** `value`, once it has stopped changing for `ms`. */
-function useDebounced<T>(value: T, ms: number): T {
-  const [settled, setSettled] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setSettled(value), ms);
-    return () => clearTimeout(timer);
-  }, [value, ms]);
-  return settled;
-}
+const PROJECT_RESULTS = 8;
 
 function Kbd({ children, className }: { children: ReactNode; className?: string }) {
   return (
