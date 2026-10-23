@@ -349,6 +349,10 @@ type ListPreviewsRes interface {
 	listPreviewsRes()
 }
 
+type ListProjectAdminsRes interface {
+	listProjectAdminsRes()
+}
+
 type ListReleasesRes interface {
 	listReleasesRes()
 }
