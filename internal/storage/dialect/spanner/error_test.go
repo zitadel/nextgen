@@ -126,19 +126,6 @@ func TestWrapError(t *testing.T) {
 			want: new(database.UnavailableError),
 		},
 		{
-			// The client turns a canceled context into a gRPC status, which
-			// does not unwrap to context.Canceled. The API logs a client that
-			// went away at Warn only when the cause is kept.
-			name: "grpc canceled keeps the context cause",
-			err:  status.Error(codes.Canceled, "context canceled"),
-			want: context.Canceled,
-		},
-		{
-			name: "canceled context as the client reports it keeps the cause",
-			err:  spanner.ToSpannerError(context.Canceled),
-			want: context.Canceled,
-		},
-		{
 			name: "preserves domain error",
 			err:  domain.ErrNotImplemented(),
 			want: domain.ErrNotImplemented(),

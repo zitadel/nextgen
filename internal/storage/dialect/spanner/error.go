@@ -3,7 +3,6 @@ package spanner
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"cloud.google.com/go/spanner"
@@ -47,11 +46,6 @@ func wrapError(err error) error {
 	// reporting a transient conflict as an unexplained internal failure.
 	case codes.Aborted, codes.DeadlineExceeded, codes.Unavailable:
 		return database.NewUnavailableError(err)
-	// The client reports a canceled context as a gRPC status, which does not
-	// unwrap to context.Canceled. Keep the cause, so the API can tell a client
-	// that went away from a server fault.
-	case codes.Canceled:
-		return database.NewUnknownError(fmt.Errorf("%w: %w", context.Canceled, err))
 	case codes.NotFound:
 		return database.NewNoRowFoundError(err)
 	case codes.AlreadyExists:

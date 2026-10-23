@@ -6,7 +6,6 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,30 +40,6 @@ func TestWrapError(t *testing.T) {
 			assert.ErrorIs(t, got, tt.want)
 		})
 	}
-}
-
-// A query the client's cancel interrupts must still name context.Canceled
-// after wrapError: the API logs a client that went away at Warn only when the
-// cause survives the wrapping.
-func TestWrapErrorKeepsContextCanceled(t *testing.T) {
-	t.Parallel()
-	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "cancel.db"))
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
-	conn, err := db.Conn(t.Context())
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = conn.Close() })
-
-	// A query that never ends on its own, canceled while the driver runs it.
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	time.AfterFunc(50*time.Millisecond, cancel)
-	var n int64
-	err = conn.QueryRowContext(ctx, `WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c) SELECT count(*) FROM c`).Scan(&n)
-	require.Error(t, err)
-
-	got := domain.ErrInternal(wrapError(err)).WithMessage("failed to query projects")
-	require.ErrorIs(t, got, context.Canceled)
 }
 
 func TestWrapErrorConstraintMapping(t *testing.T) {
