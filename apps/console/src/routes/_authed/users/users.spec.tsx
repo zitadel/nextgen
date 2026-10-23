@@ -1,7 +1,7 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -41,6 +41,57 @@ function recordQueries(response: (body: Record<string, unknown>) => Response) {
   );
   return bodies;
 }
+
+/** Opens the toolbar's Columns menu and returns it. */
+async function openColumns() {
+  await userEvent.click(await screen.findByRole("button", { name: "Columns" }));
+  return within(await screen.findByRole("menu"));
+}
+
+/**
+ * Pins one property from the Columns menu, then closes it. The menu stays open
+ * on select, and while it is open the rest of the page is `aria-hidden`.
+ */
+async function pin(name: string) {
+  const menu = await openColumns();
+  await userEvent.click(menu.getByRole("menuitemcheckbox", { name }));
+  await userEvent.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
+}
+
+/** A `Storage` held in a plain map, so a spec can read what was persisted. */
+function memoryStorage(): Storage {
+  const items = new Map<string, string>();
+  return {
+    get length() {
+      return items.size;
+    },
+    clear: () => items.clear(),
+    getItem: (key) => items.get(key) ?? null,
+    key: (index) => [...items.keys()][index] ?? null,
+    removeItem: (key) => void items.delete(key),
+    setItem: (key, value) => void items.set(key, String(value)),
+  };
+}
+
+const BUSINESS_SCHEMA = {
+  id: "sch_business",
+  schema: {
+    title: "Business",
+    "x-identifier": "email",
+    properties: {
+      email: { type: "string", format: "email" },
+      givenName: { type: "string" },
+      familyName: { type: "string" },
+      companyName: { type: "string", title: "Company name" },
+    },
+  },
+};
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  localStorage.clear();
+});
 
 describe("users screen", () => {
   it("lists the selected project's users, on every page", async () => {
@@ -153,15 +204,21 @@ describe("users screen", () => {
     expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
     // The User column leads with the resolved display and carries the link;
     // the designated identifier sits under it, its tooltip naming the property.
-    // Schema-driven attribute columns follow (decisions log D4).
     expect(await screen.findByRole("link", { name: "Maya Patel" })).toBeInTheDocument();
     const table = within(screen.getByRole("table"));
     expect(table.getByText("maya.patel@acme.com")).toHaveAttribute("title", "email");
-    expect(table.getByText("Maya")).toBeInTheDocument();
-    expect(table.getByText("Patel")).toBeInTheDocument();
-    // The email column would only repeat the line under the name.
-    expect(table.queryByRole("columnheader", { name: "Identifier" })).not.toBeInTheDocument();
-    expect(table.queryByRole("columnheader", { name: /email/i })).not.toBeInTheDocument();
+    // Schema properties are not columns until the viewer pins one (D21): the
+    // rest of the record reads in one Attributes cell, in the schema's field
+    // order, without the email that would only repeat the line under the name.
+    expect(table.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
+      "User",
+      "Attributes",
+      "Status",
+      "Team",
+      "ID",
+      "",
+    ]);
+    expect(table.getByText("familyName: Patel · givenName: Maya")).toBeInTheDocument();
   });
 
   it("shows the email once under the default schema", async () => {
@@ -234,10 +291,170 @@ describe("users screen", () => {
     expect(headers.at(-1)).toHaveClass("sticky", "right-0");
   });
 
-  it("keeps an attribute column some row needs, even where it repeats another row's identity", async () => {
-    // A mixed list: one schema identifies by email, another by username, so
-    // the second row's email is said nowhere else. The column stays whole
-    // rather than leaving the first row's cell blank as if it had no email.
+  it("names the first unpinned attributes and counts the rest", async () => {
+    // The Attributes cell has a fixed width whatever the schema, which is what
+    // bounds the table: three values, then a count of the others, structured
+    // ones included. An object is never stringified into the cell.
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              identifier: "maya@acme.com",
+              attributes: {
+                email: "maya@acme.com",
+                a: "1",
+                b: 2,
+                c: true,
+                d: "4",
+                address: { street: "Main St" },
+              },
+            },
+          ],
+        }),
+      ),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    // Sorted, as a record without a loaded schema has no field order; the
+    // email repeats the User cell and is left out.
+    expect(table.getByText("a: 1 · b: 2 · c: true")).toBeInTheDocument();
+    expect(table.getByText("· +2")).toBeInTheDocument();
+    expect(table.queryByText(/Main St/)).not.toBeInTheDocument();
+  });
+
+  it("opens the user's whole attributes tree from the Attributes cell", async () => {
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              identifier: "maya@acme.com",
+              attributes: {
+                email: "maya@acme.com",
+                givenName: "Maya",
+                address: { street: "Main St" },
+              },
+            },
+          ],
+        }),
+      ),
+    );
+    await renderUsers();
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /^Attributes of maya@acme\.com/ }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    const popover = within(dialog);
+    // The structured value the cell only counts is here in full, with the
+    // record's identity attribute too: the popover is the whole document.
+    const json = dialog.querySelector("code");
+    expect(json).toHaveTextContent('"street": "Main St"');
+    expect(json).toHaveTextContent('"email": "maya@acme.com"');
+    expect(popover.getByRole("tab", { name: "YAML" })).toBeInTheDocument();
+    // Data, not configuration: no CLI hint about applying it.
+    expect(popover.queryByText(/apply your changes/)).not.toBeInTheDocument();
+    expect(popover.getByRole("link", { name: "View details" })).toHaveAttribute(
+      "href",
+      scopedPath("/users/user_1"),
+    );
+  });
+
+  it("pins a property as a column, and keeps the pin across a reload", async () => {
+    const storage = memoryStorage();
+    vi.stubGlobal("localStorage", storage);
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              schema: "sch_business",
+              identifier: "maya@acme.com",
+              attributes: {
+                email: "maya@acme.com",
+                givenName: "Maya",
+                companyName: "Acme",
+              },
+            },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)),
+    );
+    await renderUsers();
+
+    const menu = await openColumns();
+    // One schema loaded, so its properties are not grouped under its title;
+    // the identifier is not offered, as it would only repeat the User cell.
+    expect(menu.queryByText("Business")).not.toBeInTheDocument();
+    expect(menu.getAllByRole("menuitemcheckbox").map((item) => item.textContent)).toEqual([
+      "Company name",
+      "Family name",
+      "Given name",
+    ]);
+    await userEvent.keyboard("{Escape}");
+    await pin("Company name");
+
+    // The value moves out of the summary into its own column.
+    const table = within(screen.getByRole("table"));
+    expect(table.getByRole("columnheader", { name: "Company name" })).toBeInTheDocument();
+    expect(table.getByText("Acme")).toBeInTheDocument();
+    expect(table.getByText("givenName: Maya")).toBeInTheDocument();
+    // Per viewer, keyed by project, schema and property.
+    expect(JSON.parse(storage.getItem("zl-console-users-columns:proj_test") ?? "")).toEqual({
+      sch_business: ["companyName"],
+    });
+
+    cleanup();
+    await renderUsers();
+    const reloaded = within(await screen.findByRole("table"));
+    expect(await reloaded.findByRole("columnheader", { name: "Company name" })).toBeInTheDocument();
+    expect(reloaded.getByText("Acme")).toBeInTheDocument();
+  });
+
+  it("shows the default columns, and still pins, when storage is unavailable", async () => {
+    // Privacy modes and blocked origins throw on any storage access. The screen
+    // must not: nothing is pinned, and a pin lasts until the page is left.
+    vi.stubGlobal("localStorage", {
+      getItem: () => {
+        throw new DOMException("blocked", "SecurityError");
+      },
+      setItem: () => {
+        throw new DOMException("blocked", "SecurityError");
+      },
+    });
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              schema: "sch_business",
+              identifier: "maya@acme.com",
+              attributes: { email: "maya@acme.com", companyName: "Acme" },
+            },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("companyName: Acme")).toBeInTheDocument();
+    await pin("Company name");
+    expect(table.getByRole("columnheader", { name: "Company name" })).toBeInTheDocument();
+  });
+
+  it("offers a property some row needs, even where it repeats another row's identity", async () => {
+    // A mixed list: one record identifies by email, another by username, so
+    // the second row's email is said nowhere else. The property stays on offer
+    // and in that row's summary.
     server.use(
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
@@ -261,14 +478,16 @@ describe("users screen", () => {
     await renderUsers();
 
     const table = within(await screen.findByRole("table"));
-    expect(table.getByRole("columnheader", { name: "email" })).toBeInTheDocument();
-    expect(table.getByText("kenji@acme.com")).toBeInTheDocument();
-    // `username` only ever repeats the identity, so it is dropped.
-    expect(table.queryByRole("columnheader", { name: "username" })).not.toBeInTheDocument();
+    expect(table.getByText("email: kenji@acme.com")).toBeInTheDocument();
+    // `username` only ever repeats the identity, so it reads once, as the link.
     expect(table.getAllByText("kenji")).toHaveLength(1);
+
+    const menu = await openColumns();
+    expect(menu.getByRole("menuitemcheckbox", { name: "email" })).toBeInTheDocument();
+    expect(menu.queryByRole("menuitemcheckbox", { name: "username" })).not.toBeInTheDocument();
   });
 
-  it("builds the columns from the schema the users reference", async () => {
+  it("offers the referenced schema's properties to pin, under their own titles", async () => {
     server.use(
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
@@ -298,16 +517,17 @@ describe("users screen", () => {
     );
     await renderUsers();
 
-    // The header comes from the schema's own `title`, not from the record keys.
-    expect(await screen.findByText("Company name")).toBeInTheDocument();
+    // The label comes from the schema's own `title`, not from the record key.
+    await pin("Company name");
     // Scoped to the table: the app shell's organisation switcher also renders an
     // "Acme" label.
     const table = within(screen.getByRole("table"));
+    expect(table.getByRole("columnheader", { name: "Company name" })).toBeInTheDocument();
     expect(table.getByText("Acme")).toBeInTheDocument();
-    expect(table.getByText("maya@acme.com")).toBeInTheDocument();
+    expect(table.getByText("email: maya@acme.com")).toBeInTheDocument();
   });
 
-  it("adds raw attribute columns for users whose schema did not load", async () => {
+  it("offers the raw attribute keys of users whose schema did not load", async () => {
     server.use(
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
@@ -328,15 +548,18 @@ describe("users screen", () => {
     await renderUsers();
 
     const table = within(await screen.findByRole("table"));
-    // The loaded schema's column, then the unreadable schema's keys that are not already columns.
-    expect(await table.findByText("handle")).toBeInTheDocument();
-    expect(table.getByText("xy")).toBeInTheDocument();
-    expect(table.getByText("x@y.com")).toBeInTheDocument();
+    expect(table.getByText("email: x@y.com · handle: xy")).toBeInTheDocument();
+    // Grouped by schema, as the list mixes two: the unreadable one under its id,
+    // offering the keys its users carry.
+    const menu = await openColumns();
+    expect(menu.getByText("Business")).toBeInTheDocument();
+    expect(menu.getByText("sch_gone")).toBeInTheDocument();
+    expect(menu.getByRole("menuitemcheckbox", { name: "handle" })).toBeInTheDocument();
   });
 
-  it("renders a placeholder where a user's schema does not define a column", async () => {
-    // Columns union across schemas (D4), so a minimal user sits in a table that
-    // also has business columns. The cell must read as empty, not as missing.
+  it("renders a placeholder where a user has no value for a pinned column", async () => {
+    // A minimal user sits in a table that also has a pinned business column.
+    // The cell must read as empty, not as missing.
     server.use(
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
@@ -364,14 +587,14 @@ describe("users screen", () => {
       ),
     );
     await renderUsers();
+    await pin("Company name");
 
-    // The link lives on the User identity column now. Neither fixture
-    // carries envelope identity, so both rows degrade to their id — the
-    // schema-driven cells render values and placeholders unchanged.
-    expect(await screen.findByRole("link", { name: "user_1" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "user_2" })).toBeInTheDocument();
+    // Neither fixture carries envelope identity, so both rows degrade to their id.
+    const minimal = (await screen.findByRole("link", { name: "user_2" })).closest("tr");
     expect(within(screen.getByRole("table")).getByText("Acme")).toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getByText("min@acme.com")).toBeInTheDocument();
+    expect(within(minimal as HTMLElement).getByText("email: min@acme.com")).toBeInTheDocument();
+    const cells = within(minimal as HTMLElement).getAllByRole("cell");
+    expect(cells[1]).toHaveTextContent("—");
   });
 
   it("renders the server-resolved identity chain, never deriving from attributes", async () => {
@@ -433,11 +656,11 @@ describe("users screen", () => {
     await renderUsers();
     expect(await screen.findByRole("link", { name: "kenji@acme.com" })).toBeInTheDocument();
     expect(screen.getByText("user_1")).toBeInTheDocument();
-    // `status` renders because this record carries it — the table shows what the
-    // data has (D4). What is still absent is a *base-model* status the console
-    // could count on for every user (#553); nothing is invented for records
-    // without one.
-    expect(screen.getByText("Blocked")).toBeInTheDocument();
+    // `status` renders because this record carries it — the Attributes cell
+    // shows what the data has. What is still absent is a *base-model* status
+    // the console could count on for every user (#553); nothing is invented
+    // for records without one.
+    expect(screen.getByText("status: Blocked")).toBeInTheDocument();
   });
 
   it("copies the whole id from the row, though the cell truncates it", async () => {
@@ -484,8 +707,9 @@ describe("users screen", () => {
     await screen.findByRole("link", { name: "user_1" });
 
     // The first user's schema leads, though its read finished last.
-    const headers = screen.getAllByRole("columnheader").map((cell) => cell.textContent);
-    expect(headers.indexOf("Email")).toBeLessThan(headers.indexOf("Handle"));
+    const menu = await openColumns();
+    const items = menu.getAllByRole("menuitemcheckbox").map((item) => item.textContent);
+    expect(items).toEqual(["Email", "Handle"]);
   });
 
   it("renders the not-authorized state on a 401 with a live session (no redirect loop)", async () => {
@@ -578,12 +802,12 @@ describe("users screen", () => {
     );
     await renderUsers();
 
-    expect(await screen.findByText("first@x.com")).toBeInTheDocument();
+    expect(await screen.findByText("email: first@x.com")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Load more" }));
 
     // The second page is appended, not swapped in.
-    expect(await screen.findByText("second@x.com")).toBeInTheDocument();
-    expect(screen.getByText("first@x.com")).toBeInTheDocument();
+    expect(await screen.findByText("email: second@x.com")).toBeInTheDocument();
+    expect(screen.getByText("email: first@x.com")).toBeInTheDocument();
     expect(asked).toBe("tok_2");
     // No token came back, so there is nothing left to offer.
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
@@ -618,7 +842,7 @@ describe("users screen", () => {
     );
 
     const router = await renderUsers();
-    expect(await screen.findByText("page1-1@x.com")).toBeInTheDocument();
+    expect(await screen.findByText("email: page1-1@x.com")).toBeInTheDocument();
 
     // Start the fetch, then invalidate before letting it answer.
     await userEvent.click(screen.getByRole("button", { name: "Load more" }));
@@ -627,7 +851,7 @@ describe("users screen", () => {
     await act(async () => {
       await router.invalidate();
     });
-    await screen.findByText("page1-2@x.com");
+    await screen.findByText("email: page1-2@x.com");
 
     releaseSecondPage();
 
@@ -638,8 +862,8 @@ describe("users screen", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Load more" })).toBeEnabled());
 
     // The in-flight page is discarded rather than appended to the new list.
-    expect(screen.queryByText("stale@x.com")).not.toBeInTheDocument();
-    expect(screen.getByText("page1-2@x.com")).toBeInTheDocument();
+    expect(screen.queryByText("email: stale@x.com")).not.toBeInTheDocument();
+    expect(screen.getByText("email: page1-2@x.com")).toBeInTheDocument();
   });
 
   it("asks for the memberships and lists every team a user is on", async () => {
@@ -744,7 +968,7 @@ describe("users screen", () => {
     await renderUsers();
 
     const table = within(await screen.findByRole("table"));
-    expect(table.getByText("maya@acme.com")).toBeInTheDocument();
+    expect(table.getByText("email: maya@acme.com")).toBeInTheDocument();
     expect(table.queryByText("Team")).not.toBeInTheDocument();
     // The retry drops the expansion rather than the request.
     expect(bodies).toHaveLength(2);
@@ -764,11 +988,11 @@ describe("users screen", () => {
           });
     });
     await renderUsers();
-    expect(await screen.findByText("maya@acme.com")).toBeInTheDocument();
+    expect(await screen.findByText("email: maya@acme.com")).toBeInTheDocument();
     expect(bodies).toHaveLength(2);
 
     await userEvent.click(screen.getByRole("button", { name: "Load more" }));
-    expect(await screen.findByText("omar@acme.com")).toBeInTheDocument();
+    expect(await screen.findByText("email: omar@acme.com")).toBeInTheDocument();
     expect(bodies).toHaveLength(3);
     expect(bodies.at(-1)).toMatchObject({ page_token: "page-2" });
     expect(bodies.at(-1)).not.toHaveProperty("expand");

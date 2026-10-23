@@ -5,6 +5,7 @@ import { CLI_APPLY, CliCommand, CliHint } from "@/components/cli-hint";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type CodeLanguage, type CodeLine, highlightCode } from "@/lib/highlight";
+import { cn } from "@/lib/utils";
 
 /**
  * `lineWidth: 0` disables YAML's line folding. Folding is legal and Shiki reads
@@ -25,8 +26,22 @@ const YAML_OPTIONS = { indent: 2, lineWidth: 0 } as const;
  * `noun` is what the footer calls the document ("schema", "definition") and
  * what the copy button announces. The two screens draw the same panel around
  * different documents, so the noun is the only thing that varies.
+ *
+ * The Users list shows a user's attributes in it too, inside a popover. Those
+ * are data rather than configuration, so it drops the CLI hint (`hint={false}`)
+ * and caps the code at the popover's height (`codeClassName`).
  */
-export function DocumentViewer({ document, noun }: { document: unknown; noun: string }) {
+export function DocumentViewer({
+  document,
+  noun,
+  hint = true,
+  codeClassName = "max-h-[32rem]",
+}: {
+  document: unknown;
+  noun: string;
+  hint?: boolean;
+  codeClassName?: string;
+}) {
   const [format, setFormat] = useState<CodeLanguage>("json");
 
   const source = useMemo(
@@ -66,7 +81,12 @@ export function DocumentViewer({ document, noun }: { document: unknown; noun: st
           pixels below the fold and leave the field table stranded beside a
           column of JSON. Capping the viewport keeps the hint at the foot and
           the two panels the same order of height the design pairs them at. */}
-      <pre className="max-h-[32rem] overflow-auto p-4 font-mono text-xs leading-5 text-(--zl-syntax-punctuation)">
+      <pre
+        className={cn(
+          "overflow-auto p-4 font-mono text-xs leading-5 text-(--zl-syntax-punctuation)",
+          codeClassName,
+        )}
+      >
         {/* Plain until the grammars compile — same face, size and leading, so
             the block does not reflow when the colour arrives. */}
         <code>
@@ -87,10 +107,12 @@ export function DocumentViewer({ document, noun }: { document: unknown; noun: st
         </code>
       </pre>
 
-      <CliHint>
-        Edit the {noun} locally, then apply your changes with <CliCommand>{CLI_APPLY}</CliCommand>.
-        Applying creates a new revision.
-      </CliHint>
+      {hint && (
+        <CliHint>
+          Edit the {noun} locally, then apply your changes with <CliCommand>{CLI_APPLY}</CliCommand>
+          . Applying creates a new revision.
+        </CliHint>
+      )}
     </div>
   );
 }

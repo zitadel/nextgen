@@ -32,8 +32,8 @@ import { PAGE_TITLE, PAGE_TITLE_ROW } from "./typography";
  * | Row icon      | 16px, stroke 1.5, `muted-foreground`, 10px to label |
  *
  * Column widths stay with each screen: Teams is a fixed 248px grid, Projects
- * thirds, and the Users table is schema-driven (its ID column takes the slack),
- * so it has no fixed grid to share.
+ * thirds, and the Users table takes the properties a viewer pins (its ID
+ * column takes the slack), so it has no fixed grid to share.
  */
 
 /**

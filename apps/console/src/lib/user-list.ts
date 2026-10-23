@@ -3,7 +3,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import { api } from "@/api/zitadel";
 
 import { displayValue, field, isPresent } from "./record";
-import { type SchemaField, type UserSchema, schemaColumns } from "./schema";
+import { type SchemaField, type UserSchema, schemaFields } from "./schema";
 import {
   type UserTeam,
   userAttributes,
@@ -83,10 +83,23 @@ export function fetchTeamMembers(
 }
 
 /**
- * Columns for a set of users, from the schemas those users reference.
+ * The properties one schema gives the users that reference it: what the
+ * Columns menu offers to pin, grouped under the schema it belongs to.
+ */
+export interface ColumnGroup {
+  /** The users' `schema`; empty for users that carry none. */
+  schemaId: string;
+  /** The schema's `title`, else its id. */
+  title: string;
+  fields: SchemaField[];
+}
+
+/**
+ * The column groups for a set of users, from the schemas those users reference,
+ * in the users' first-seen order.
  *
  * Only the loaded users' schemas are fetched, not every schema in the project:
- * one nobody uses would add a column that is blank in every row. Each user
+ * one nobody uses would offer properties that are blank in every row. Each user
  * carries `schema`, so the set is known without a second list call.
  *
  * Schema ids are unique per project only — the seeded default carries the same
@@ -96,21 +109,22 @@ export function fetchTeamMembers(
 export async function columnsForUsers(
   projectId: string,
   users: Record<string, unknown>[],
-): Promise<SchemaField[]> {
+): Promise<ColumnGroup[]> {
   const schemaIds = [...new Set(users.map((user) => field(user, "schema")).filter(isPresent))];
   const fetched = await Promise.all(
     schemaIds.map(async (id) => {
       try {
         return (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema;
       } catch {
-        // One unreadable schema costs its columns, not the screen. Its users
-        // still render from the fallback below.
+        // One unreadable schema costs its titles and labels, not the screen.
+        // Its users still render from the fallback below.
         return undefined;
       }
     }),
   );
   // Keyed in the users' first-seen order, not in the order the reads finish:
-  // columns follow the map, and a race would reshuffle them on every load.
+  // the Columns menu and the pinned columns follow the map, and a race would
+  // reshuffle them on every load.
   const loaded = new Map<string, UserSchema>();
   schemaIds.forEach((id, index) => {
     const schema = fetched[index];
@@ -120,34 +134,48 @@ export async function columnsForUsers(
 }
 
 /**
- * Columns from the users' schemas, plus a column for every attribute key of a
- * user whose schema did not load. A user with no schema at all counts as such.
+ * A group per schema the users reference. A schema that did not load, and the
+ * users with no schema at all, offer the attribute keys their users carry.
  */
 function columnsFor(
   users: Record<string, unknown>[],
   schemas: Map<string, UserSchema>,
-): SchemaField[] {
-  const columns = schemaColumns([...schemas.values()]);
-  const known = new Set(columns.map((column) => column.key));
-  const keys = new Set<string>();
+): ColumnGroup[] {
+  const groups = new Map<string, ColumnGroup>();
+  const fallback = new Map<string, Set<string>>();
   for (const user of users) {
-    const schemaId = field(user, "schema");
-    if (schemaId && schemas.has(schemaId)) continue;
-    for (const key of Object.keys(userAttributes(user))) {
-      if (!known.has(key)) keys.add(key);
+    const schemaId = field(user, "schema") ?? "";
+    const schema = schemas.get(schemaId);
+    if (schema) {
+      if (!groups.has(schemaId)) {
+        const title = field(schema, "title") ?? schemaId;
+        groups.set(schemaId, { schemaId, title, fields: schemaFields(schema) });
+      }
+      continue;
     }
+    if (!groups.has(schemaId)) {
+      groups.set(schemaId, { schemaId, title: schemaId || "No schema", fields: [] });
+      fallback.set(schemaId, new Set());
+    }
+    for (const key of Object.keys(userAttributes(user))) fallback.get(schemaId)?.add(key);
   }
-  const fallback = [...keys].sort().map((key) => ({
-    key,
-    label: key,
-    required: false,
-    inputType: "text" as const,
-  }));
-  return [...columns, ...fallback];
+  for (const [schemaId, keys] of fallback) {
+    const group = groups.get(schemaId);
+    if (!group) continue;
+    group.fields = [...keys].sort().map((key) => ({
+      key,
+      label: key,
+      required: false,
+      inputType: "text" as const,
+    }));
+  }
+  return [...groups.values()];
 }
 
 export interface UserRow {
   id: string;
+  /** The user's `schema`; empty when it carries none. */
+  schemaId: string;
   /**
    * The rendered identity (display → identifier → id, ADR 058) — the User
    * column, the row menu's accessible name, and the delete dialog's heading.
@@ -162,7 +190,14 @@ export interface UserRow {
   secondary?: string;
   /** The schema property the identifier came from (e.g. "email"), as the line's tooltip. */
   identifierProperty?: string;
-  /** Rendered cell values, keyed by schema property. */
+  /** The user's whole `attributes` tree, as the Attributes popover shows it. */
+  attributes: Record<string, unknown>;
+  /**
+   * Every attribute key, the schema's properties first in its field order and
+   * any the schema does not declare after them, sorted.
+   */
+  attributeKeys: string[];
+  /** Rendered scalar values, keyed by attribute. */
   values: Record<string, string>;
   /** `metadata.status`, absent on a record the server has not stamped. */
   status?: string;
@@ -175,20 +210,28 @@ export interface UserRow {
 export function toUserRow(
   user: Record<string, unknown>,
   index: number,
-  columns: SchemaField[],
+  groups: ColumnGroup[],
 ): UserRow {
   const id = field(user, "id") ?? `unknown-user-${index}`;
+  const schemaId = field(user, "schema") ?? "";
   const attributes = userAttributes(user);
+  const declared = groups.find((group) => group.schemaId === schemaId)?.fields ?? [];
+  const keys = new Set(declared.map((entry) => entry.key).filter((key) => key in attributes));
+  for (const key of Object.keys(attributes).sort()) keys.add(key);
   const values: Record<string, string> = {};
-  for (const column of columns) {
+  for (const key of keys) {
     // Only scalars are read. A property whose value is an object or array has no
     // one-line rendering, and `JSON.stringify` in a table cell is noise — the
-    // detail screen is where a structured attribute belongs.
-    const value = displayValue(attributes, column.key);
-    if (value !== undefined) values[column.key] = value;
+    // Attributes popover and the detail screen are where a structured attribute
+    // belongs.
+    const value = displayValue(attributes, key);
+    if (value !== undefined) values[key] = value;
   }
   return {
     id,
+    schemaId,
+    attributes,
+    attributeKeys: [...keys],
     values,
     name: userIdentity(user) ?? id,
     identifier: userIdentifier(user),
@@ -200,25 +243,129 @@ export function toUserRow(
   };
 }
 
+/** Whether a row's value only repeats what its User cell already shows. */
+function repeatsIdentity(row: UserRow, key: string): boolean {
+  const value = row.values[key];
+  return value !== undefined && (value === row.name || value === row.identifier);
+}
+
 /**
- * The schema columns that tell the reader something the User cell does not.
+ * The properties of a schema that tell the reader something the User cell
+ * does not, which are the ones the Columns menu offers to pin.
  *
  * The User cell already shows each row's display name and identifier, and the
  * identifier is usually a schema property too: under the default schema the
- * email would otherwise read three times in one row. A column is dropped when
- * every value it holds repeats its own row's name or identifier; one with any
- * other value stays whole, so a mixed-schema list keeps the column for the
- * rows that need it. A column with no values at all is kept, as before.
+ * email would otherwise read twice in one row (D20). A property is dropped
+ * when every value its rows hold repeats that row's name or identifier; one
+ * with any other value stays. One no row has a value for is kept.
  */
 export function columnsBeyondIdentity(columns: SchemaField[], rows: UserRow[]): SchemaField[] {
   return columns.filter((column) => {
     let repeats = false;
     for (const row of rows) {
-      const value = row.values[column.key];
-      if (value === undefined) continue;
-      if (value !== row.name && value !== row.identifier) return true;
+      if (row.values[column.key] === undefined) continue;
+      if (!repeatsIdentity(row, column.key)) return true;
       repeats = true;
     }
     return !repeats;
   });
+}
+
+/** The pinned properties of each schema, by schema id. */
+export type ColumnPins = Record<string, string[]>;
+
+/** A pinned property, rendered as its own column. */
+export interface PinnedColumn {
+  key: string;
+  label: string;
+}
+
+/**
+ * The pinned columns, in the groups' order and each group's field order.
+ *
+ * A pin names one schema's property, but the column is the property: a key
+ * two schemas share is one column, and every row with a value for it shows
+ * that value there, whichever schema's pin made the column. An em dash under
+ * a pinned "Family name" would otherwise read as "has none".
+ */
+export function pinnedColumns(groups: ColumnGroup[], pins: ColumnPins): PinnedColumn[] {
+  const columns = new Map<string, PinnedColumn>();
+  for (const group of groups) {
+    const pinned = new Set(pins[group.schemaId] ?? []);
+    for (const entry of group.fields) {
+      if (pinned.has(entry.key) && !columns.has(entry.key)) {
+        columns.set(entry.key, { key: entry.key, label: entry.label });
+      }
+    }
+  }
+  return [...columns.values()];
+}
+
+/** How many attributes the Attributes cell names before it counts the rest. */
+const SUMMARY_LENGTH = 3;
+
+/** The one-line Attributes cell: the first unpinned scalars and a count of the rest. */
+export interface AttributeSummary {
+  entries: { key: string; value: string }[];
+  /** The unpinned attributes not named, structured ones included. */
+  more: number;
+}
+
+/**
+ * The attributes a row's Attributes cell summarises: every one no pinned
+ * column shows and that does not repeat the User cell, in the row's attribute
+ * order. Objects and arrays are counted, never rendered.
+ */
+export function attributeSummary(row: UserRow, columns: PinnedColumn[]): AttributeSummary {
+  const shown = new Set(columns.map((column) => column.key));
+  const rest = row.attributeKeys.filter(
+    (key) => !(shown.has(key) && row.values[key] !== undefined) && !repeatsIdentity(row, key),
+  );
+  const entries: AttributeSummary["entries"] = [];
+  for (const key of rest) {
+    const value = row.values[key];
+    if (value === undefined) continue;
+    entries.push({ key, value });
+    if (entries.length === SUMMARY_LENGTH) break;
+  }
+  return { entries, more: rest.length - entries.length };
+}
+
+/**
+ * Pinned columns live in the viewer's browser, per project: a pin is a viewing
+ * preference, not project configuration, and schema ids are unique per project
+ * only.
+ */
+const PINS_STORAGE_KEY = "zl-console-users-columns";
+
+function pinsStorageKey(projectId: string): string {
+  return `${PINS_STORAGE_KEY}:${projectId}`;
+}
+
+/**
+ * The viewer's pinned columns for a project. Nothing is pinned when storage is
+ * unavailable (privacy mode, a blocked origin) or holds something unreadable.
+ */
+export function readColumnPins(projectId: string): ColumnPins {
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(pinsStorageKey(projectId)) ?? "{}");
+    if (!stored || typeof stored !== "object" || Array.isArray(stored)) return {};
+    const pins: ColumnPins = {};
+    for (const [schemaId, keys] of Object.entries(stored)) {
+      if (!Array.isArray(keys)) continue;
+      pins[schemaId] = keys.filter((key): key is string => typeof key === "string");
+    }
+    return pins;
+  } catch {
+    return {};
+  }
+}
+
+/** Persists the viewer's pinned columns. A failed write keeps them for this visit only. */
+export function writeColumnPins(projectId: string, pins: ColumnPins): void {
+  try {
+    localStorage.setItem(pinsStorageKey(projectId), JSON.stringify(pins));
+  } catch {
+    /* storage unavailable: the pins last until the page is left */
+  }
 }

@@ -16,6 +16,10 @@
 
 ## Decisions
 
+### D21 · The Users table pins properties; the rest reads in one Attributes column — 2026-10-23
+Supersedes D4. Showing every schema property as a column made wide schemas scroll the table and pushed the row menu out of reach. By default the table shows User, Attributes, Status, Team, ID and the row menu (the identifier stays in the User cell, D20). A Columns menu pins properties as columns, grouped by schema when the list mixes them; pins are per viewer, kept in the browser per project, schema and property. Every unpinned attribute reads in one fixed-width Attributes cell (`givenName: Maya · company: Acme · +3`) that opens the user's full attributes as JSON/YAML. The User column and the row menu are sticky, so the menu is reachable at any width.
+→ Design review of the Columns menu, the Attributes cell and its popover.
+
 ### D20 · The Users table shows each value once — 2026-10-20 · [standing]
 The User cell carries the display name with the identifier under it, so there is no Identifier column, and a schema column that only repeats a row's name or identifier is dropped (under the default schema, the email). The ID column gives way first and truncates. Refines D4. The console's landing (`/`) is Users, where people who just signed up appear.
 

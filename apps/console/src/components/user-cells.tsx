@@ -1,13 +1,23 @@
 import { Link } from "@tanstack/react-router";
 
+import { DocumentViewer } from "@/components/document-viewer";
 import {
   RESOURCE_CELL,
   RESOURCE_STICKY_BODY,
   RESOURCE_STICKY_START,
 } from "@/components/resource-list";
 import { TableCell } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
-import type { UserRow } from "@/lib/user-list";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import type { AttributeSummary, UserRow } from "@/lib/user-list";
 import { cn } from "@/lib/utils";
 
 /** The User and schema-driven cells clamp at 280px and truncate. */
@@ -75,6 +85,80 @@ export function UserIdCell({ user }: { user: UserRow }) {
         </span>
         <CopyButton value={user.id} label={`Copy the ID of ${user.name}`} className={ROW_COPY} />
       </span>
+    </TableCell>
+  );
+}
+
+/**
+ * The Attributes cell of the Users list: one muted line naming the first
+ * attributes no column shows, and a count of the rest. It is a fixed 280px
+ * wherever a schema has more properties than that, which is what keeps the
+ * table's width bounded (D21).
+ *
+ * The line opens the user's whole `attributes` tree in a popover, objects and
+ * arrays included, which a cell never stringifies (`toUserRow`). A row with
+ * nothing left to summarise reads as an em dash, like any empty cell.
+ */
+export function UserAttributesCell({
+  user,
+  summary,
+}: {
+  user: UserRow;
+  summary: AttributeSummary;
+}) {
+  const empty = summary.entries.length === 0 && summary.more === 0;
+  return (
+    <TableCell className={cn(RESOURCE_CELL, "w-70 max-w-70 text-muted-foreground text-sm")}>
+      {empty ? (
+        "—"
+      ) : (
+        <Popover>
+          <PopoverTrigger asChild>
+            {/* Ghost, pulled out by its own inset so the text aligns with the
+                column's other cells and only the hover fill reaches past them. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="-mx-2 w-[calc(100%+1rem)] justify-start gap-1.5 px-2! font-normal text-muted-foreground hover:text-foreground"
+            >
+              <span className="sr-only">Attributes of {user.name}: </span>
+              <span className="min-w-0 truncate">
+                {summary.entries.map((entry) => `${entry.key}: ${entry.value}`).join(" · ")}
+              </span>
+              {/* Outside the truncating span, as the Team cell's `+more` is: a
+                  long first value must not clip the count of the rest. */}
+              {summary.more > 0 && (
+                <span className="shrink-0">
+                  {summary.entries.length > 0
+                    ? `· +${summary.more}`
+                    : `${summary.more} ${summary.more === 1 ? "attribute" : "attributes"}`}
+                </span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-[min(28rem,calc(100vw-2rem))] p-3">
+            <div className="mb-3 flex items-start justify-between gap-3 px-1">
+              <PopoverHeader className="min-w-0">
+                <PopoverTitle>Attributes</PopoverTitle>
+                <PopoverDescription className="truncate text-xs">{user.name}</PopoverDescription>
+              </PopoverHeader>
+              <Link
+                to="/users/$userId"
+                params={{ userId: user.id }}
+                className="shrink-0 text-sm underline-offset-2 hover:underline"
+              >
+                View details
+              </Link>
+            </div>
+            <DocumentViewer
+              document={user.attributes}
+              noun="attributes"
+              hint={false}
+              codeClassName="max-h-80"
+            />
+          </PopoverContent>
+        </Popover>
+      )}
     </TableCell>
   );
 }
