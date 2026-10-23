@@ -200,8 +200,18 @@ func TestPasswordPolicyEnforced(t *testing.T) {
 		require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 		flowHeaders := createResp.(*api.FlowResponseHeaders)
 
-		// Ten characters pass the flow field's own minimum of 8 and are
-		// refused by the project's policy.
+		// The step that sets the password shows the policy's bounds, with the
+		// cap as the maximum the policy leaves unset.
+		var shown api.FieldValidation
+		for _, f := range flowHeaders.Response.Step.Fields {
+			if f.Name == "x-auth-methods#password" {
+				shown = f.Validation.Or(api.FieldValidation{})
+			}
+		}
+		assert.Equal(t, api.NewOptInt(12), shown.MinLength)
+		assert.Equal(t, api.NewOptInt(domain.MaxPasswordLength), shown.MaxLength)
+
+		// Ten characters are refused on the step that collects them.
 		submitResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 			Action: "submit",
 			Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
