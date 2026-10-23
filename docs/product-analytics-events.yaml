@@ -11,8 +11,11 @@
 # against this file.
 
 # What every event carries, whichever component sends it. `<surface>` stands
-# for the component, as in `cli_version`. Vercel's automatic page views carry
-# no properties, so the header applies to the events a component sends.
+# for the component, as in `cli_version`: the release version of a build that
+# came from a release, or the git commit of one we deployed ourselves, as the
+# cloud's server and Console, the website and the docs are. Vercel's automatic
+# page views carry no properties, so the header applies to the events a
+# component sends.
 header:
   properties: [surface, <surface>_version, server_kind]
   # Website and docs belong to no Zitadel deployment.
@@ -31,18 +34,20 @@ properties:
     description: The CLI's release version, such as `1.0.0-alpha.26`.
   server_version:
     type: string
-    description: The server's release version.
+    description: >-
+      The server's release version; in the cloud, the git commit it was
+      deployed from.
   console_version:
     type: string
     description: >-
-      The git commit the Console was built from, in the cloud and in a
-      self-hosted server alike.
+      The release version of the server that embeds the Console; in the cloud,
+      the git commit it was deployed from.
   website_version:
     type: string
-    description: The git commit the website was built from.
+    description: The git commit the website was deployed from.
   docs_version:
     type: string
-    description: The git commit the docs site was built from.
+    description: The git commit the docs site was deployed from.
   server_kind:
     type: string
     values: [cloud, local, self_hosted, unknown]
