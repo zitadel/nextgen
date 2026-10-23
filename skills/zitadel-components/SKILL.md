@@ -122,6 +122,9 @@ authoritative and discover the current shape first:
   — the stable `--zl-*` tokens and the `::part()` names the login forwards.
 - Per-atom manifests (`@zitadel/components/manifests`) — the allowed
   attributes/parts/events for each atom.
+- `node_modules/@zitadel/components/custom-elements.json` — every element's
+  `::part()` names (`cssParts`) and, on the `zitadel-*` elements, the stable
+  tokens (`cssProperties`).
 
 Read the pattern, then confirm the specific attribute/part/token/event against
 these before writing it — don't reproduce a catalogue from memory.
