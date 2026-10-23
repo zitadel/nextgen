@@ -824,6 +824,10 @@ type AuthzCatalogStatements interface {
 //     homeProjectID) or a local membership edge in project. Empty homeProjectID
 //     falls back to projectID.
 //   - CheckAuthz: allowed + foothold in one round-trip (assignments, closure, membership, TTU).
+//     With a ResourceID the foothold covers that target only (an assignment scoped
+//     project-wide, to ResourceTeamID or to ResourceID, a membership in the target
+//     team or the target's team, or the user's own record; #2112); without one it
+//     is HasAuthzProjectFoothold.
 //   - ListAuthzObjectIDs: L4/oracle helper materializing authorized RSI ids for one kind.
 //     List *endpoints* compose an injectable SQL predicate (ADR 033); that lands with HTTP wiring.
 type AuthzResolverStatements interface {
