@@ -378,4 +378,150 @@ describe("add user sheet", () => {
     await waitFor(() => expect(body).toBeDefined());
     expect(body?.attributes).toMatchObject({ seats: sent });
   });
+
+  describe("a value the server refuses", () => {
+    const EMPLOYEES = {
+      ...MINIMAL,
+      title: "Employees",
+      properties: {
+        email: { type: "string", format: "email" },
+        givenName: { type: "string", maxLength: 50 },
+        deskNumber: { type: "integer", title: "Desk number" },
+        newsletter: { type: "boolean", title: "Newsletter" },
+      },
+    };
+
+    /** The `400 req.invalid` `POST /users` answers, naming `fields`. */
+    function refuse(fields: string[], status = 400) {
+      server.use(
+        http.post(USERS_URL, () =>
+          HttpResponse.json(
+            {
+              code: status === 409 ? "user.already_exists" : "req.invalid",
+              message:
+                status === 409
+                  ? "a user already exists with the given unique attributes"
+                  : "The request is invalid and fails base validation.",
+              details: { details: { fields } },
+            },
+            { status },
+          ),
+        ),
+      );
+    }
+
+    it("marks the field it names, with what its schema expects", async () => {
+      stubSchemas({ sch_employees: EMPLOYEES });
+      refuse(["attributes.deskNumber"]);
+      await openSheet();
+
+      await userEvent.type(await screen.findByLabelText("Email"), "a@acme.com");
+      await userEvent.type(screen.getByLabelText("Desk number"), "12a");
+      await userEvent.click(screen.getByRole("button", { name: "Add user" }));
+
+      const desk = screen.getByLabelText("Desk number");
+      await waitFor(() => expect(desk).toHaveAttribute("aria-invalid", "true"));
+      expect(desk).toHaveAccessibleDescription("Expected a whole number.");
+      expect(screen.getByLabelText("Email")).not.toHaveAttribute("aria-invalid");
+      // The API's message stays the form's error; the field it named is on the
+      // field, not repeated after the message.
+      // The field's own line is an alert too; the form's is the one with the message.
+      const alert = screen
+        .getAllByRole("alert")
+        .find((element) => element.textContent?.includes("base validation"));
+      expect(alert).toBeDefined();
+      expect(alert).not.toHaveTextContent("deskNumber");
+
+      // Editing the field takes its mark away.
+      await userEvent.type(desk, "{Backspace}");
+      expect(desk).not.toHaveAttribute("aria-invalid");
+    });
+
+    it("says a unique value is taken when the server answers 409", async () => {
+      stubSchemas({ sch_employees: EMPLOYEES });
+      refuse(["attributes.email"], 409);
+      await openSheet();
+
+      await userEvent.type(await screen.findByLabelText("Email"), "taken@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: "Add user" }));
+
+      await waitFor(() =>
+        expect(screen.getByLabelText("Email")).toHaveAccessibleDescription(
+          "Another user already has this value.",
+        ),
+      );
+    });
+
+    it("keeps a field the form has no control for in the message", async () => {
+      stubSchemas({ sch_employees: EMPLOYEES });
+      refuse(["attributes.address"]);
+      await openSheet();
+
+      await userEvent.type(await screen.findByLabelText("Email"), "a@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: "Add user" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("(address)");
+    });
+  });
+
+  it("edits a boolean with a switch, and sends it only once moved", async () => {
+    stubSchemas({
+      sch_employees: {
+        ...MINIMAL,
+        properties: {
+          email: { type: "string", format: "email" },
+          newsletter: { type: "boolean", title: "Newsletter" },
+        },
+      },
+    });
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      http.post(USERS_URL, async ({ request }) => {
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ code: "req.invalid", message: "Stop here." }, { status: 400 });
+      }),
+    );
+    await openSheet();
+
+    // A text box would take `yes`, which a boolean property refuses.
+    const newsletter = await screen.findByRole("switch", { name: "Newsletter" });
+    await userEvent.type(screen.getByLabelText("Email"), "a@acme.com");
+    await userEvent.click(screen.getByRole("button", { name: "Add user" }));
+    await screen.findByRole("alert");
+    await userEvent.click(newsletter);
+    await userEvent.click(screen.getByRole("button", { name: "Add user" }));
+
+    // Untouched and optional, it is not written; switched on, it is `true`.
+    await waitFor(() => expect(bodies).toHaveLength(2));
+    expect(bodies[0]?.attributes).toEqual({ email: "a@acme.com" });
+    expect(bodies[1]?.attributes).toEqual({ email: "a@acme.com", newsletter: true });
+  });
+
+  it("writes a required boolean left off as false", async () => {
+    stubSchemas({
+      sch_terms: {
+        ...MINIMAL,
+        required: ["email", "acceptedTerms"],
+        properties: {
+          email: { type: "string", format: "email" },
+          acceptedTerms: { type: "boolean", title: "Accepted terms" },
+        },
+      },
+    });
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      http.post(USERS_URL, async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: "user_1" }, { status: 201 });
+      }),
+    );
+    await openSheet();
+
+    // Off is a value, so the switch does not hold Add user back.
+    await userEvent.type(await screen.findByLabelText("Email"), "a@acme.com");
+    await userEvent.click(screen.getByRole("button", { name: "Add user" }));
+
+    await waitFor(() => expect(body).toBeDefined());
+    expect(body?.attributes).toEqual({ email: "a@acme.com", acceptedTerms: false });
+  });
 });

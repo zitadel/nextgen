@@ -50,6 +50,13 @@ export interface SchemaField {
    */
   inputType: "text" | "email" | "number" | "url" | "tel" | "date" | "boolean";
   placeholder?: string;
+  /**
+   * What a value must be, from the property's own constraints (`Expected a
+   * whole number.`), for a field the server refused. The server names the
+   * field but not the reason, so the form shows what the schema asks for.
+   * Absent when the property states no constraint a form can describe.
+   */
+  expects?: string;
 }
 
 /**
@@ -141,7 +148,57 @@ export function schemaFields(schema: UserSchema): SchemaField[] {
       required: required.has(key),
       inputType: propertyInputType(property),
       placeholder: propertyPlaceholder(property),
+      expects: propertyExpectation(property),
     }));
+}
+
+/**
+ * The constraints of a property, in words: its type, `format`, `enum`, string
+ * length and numeric range. `pattern` is named but not shown, since a regular
+ * expression says nothing to most readers.
+ */
+function propertyExpectation(property: Record<string, unknown>): string | undefined {
+  const parts: string[] = [];
+  const type = field(property, "type");
+  const format = field(property, "format");
+  const choices = Array.isArray(property.enum) ? property.enum : undefined;
+  if (choices) {
+    parts.push(`one of ${choices.map(String).join(", ")}`);
+  } else if (type === "integer") {
+    parts.push("a whole number");
+  } else if (type === "number") {
+    parts.push("a number");
+  } else if (format && FORMAT_NOUNS[format]) {
+    parts.push(FORMAT_NOUNS[format]);
+  }
+  const range = bounds(property.minLength, property.maxLength, "characters");
+  if (range) parts.push(range);
+  const numeric = bounds(property.minimum, property.maximum);
+  if (numeric) parts.push(numeric);
+  if (typeof property.pattern === "string") parts.push("in the format the schema requires");
+  if (parts.length === 0) return undefined;
+  return `Expected ${parts.join(", ")}.`;
+}
+
+const FORMAT_NOUNS: Record<string, string> = {
+  email: "an email address",
+  uri: "a URL",
+  url: "a URL",
+  date: "a date",
+  "date-time": "a date and time",
+  phone: "a phone number",
+  tel: "a phone number",
+};
+
+/** `between 2 and 50 characters`, `at most 50`, … — or nothing without a bound. */
+function bounds(min: unknown, max: unknown, unit?: string): string | undefined {
+  const suffix = unit ? ` ${unit}` : "";
+  const low = typeof min === "number" ? min : undefined;
+  const high = typeof max === "number" ? max : undefined;
+  if (low !== undefined && high !== undefined) return `between ${low} and ${high}${suffix}`;
+  if (high !== undefined) return `at most ${high}${suffix}`;
+  if (low !== undefined) return `at least ${low}${suffix}`;
+  return undefined;
 }
 
 /**

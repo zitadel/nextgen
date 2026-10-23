@@ -20,13 +20,18 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
  * are listed as the server named them, minus the `attributes.` prefix of the
  * request body, and never guessed from the schema's `x-unique` markers.
  */
-export function describeError(cause: unknown, fallback: string): string {
+export function describeError(
+  cause: unknown,
+  fallback: string,
+  /** False when the form shows the named fields on the fields themselves. */
+  withFields = true,
+): string {
   if (cause instanceof ApiError) {
     const body = cause.body;
     if (body && typeof body === "object") {
       const message = (body as Record<string, unknown>).message;
       if (typeof message === "string" && message.trim() !== "") {
-        const fields = namedFields(body as Record<string, unknown>);
+        const fields = withFields ? invalidFields(cause) : [];
         return fields.length > 0 ? `${message} (${fields.join(", ")})` : message;
       }
     }
@@ -35,9 +40,16 @@ export function describeError(cause: unknown, fallback: string): string {
   return cause instanceof Error ? cause.message : fallback;
 }
 
-/** The fields an error payload names, from its producer's `details`. */
-function namedFields(body: Record<string, unknown>): string[] {
-  const details = body.details;
+/**
+ * The fields a failed request names, from its producer's `details`, as
+ * attribute keys: the `attributes.` prefix of the request body is dropped, so
+ * a form can match them to its own controls. Empty for any other failure.
+ */
+export function invalidFields(cause: unknown): string[] {
+  if (!(cause instanceof ApiError)) return [];
+  const body = cause.body;
+  if (!body || typeof body !== "object") return [];
+  const details = (body as Record<string, unknown>).details;
   if (!details || typeof details !== "object") return [];
   const producer = (details as Record<string, unknown>).details;
   if (!producer || typeof producer !== "object") return [];
