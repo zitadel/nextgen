@@ -23,6 +23,13 @@ type FlowState struct {
 	// reshape in-flight data.
 	UserSchemaURL string
 
+	// DeploymentID and ReleaseID are what the request resolved to when the
+	// flow started: every later step reads release-pinned configuration and
+	// the deployment's frozen values from them, so a deploy landing
+	// mid-attempt leaves the attempt on what it started with.
+	DeploymentID string
+	ReleaseID    string
+
 	// FlowProgress is the user's current progress: which definition is
 	// running, which step is being shown, and what's been collected so
 	// far. Promoted to the top level so callers read e.g.
@@ -211,6 +218,11 @@ type CollectedFlowData struct {
 	UserData    map[string]any
 	UserID      string
 	AuthMethods CollectedAuthMethodData
+	// SSOConflictConnectionID is the connection whose sign-in collided with
+	// the bound user (user_already_exists from an external identity). The
+	// steps shown to that user leave this provider out: choosing it again
+	// collides again. Cleared with the bound user.
+	SSOConflictConnectionID string `json:",omitempty"`
 }
 
 type CollectedAuthMethodData struct {

@@ -8,7 +8,7 @@ import type {
 } from "@zitadel/components";
 
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { render } from "@testing-library/svelte";
+import { render, waitFor } from "@testing-library/svelte";
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
@@ -145,6 +145,23 @@ describe("ZitadelLogout", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it("passes an async callback's promise to the event's waitUntil", async () => {
+    const ran = vi.fn();
+    const registered: Array<Promise<unknown>> = [];
+    const { container } = render(ZitadelLogout, {
+      props: { project, onSignout: () => Promise.resolve().then(() => ran()) },
+    });
+    const el = widgetIn(container, widgetTags.logout);
+    el.dispatchEvent(
+      new CustomEvent("zitadel-signout", {
+        detail: { waitUntil: (work: Promise<unknown>) => registered.push(work) },
+      }),
+    );
+    expect(registered).toHaveLength(1);
+    await registered[0];
+    expect(ran).toHaveBeenCalledOnce();
+  });
 
   it("exposes the underlying element via getElement()", () => {
     const { component, container } = render(ZitadelLogout, {
@@ -470,6 +487,39 @@ describe("hydrating a server-rendered login", () => {
     await unmount(app);
     host.remove();
   });
+
+  it("loads the supplied flow on its first request instead of creating one", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = await serverMarkup({ project: globalProject, resumeFlowId: "flow_123" });
+    const rendered = host.querySelector(widgetTags.login);
+    expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
+    const firstStep = new Promise((resolve) =>
+      rendered?.addEventListener("zitadel-flow-step", resolve, { once: true }),
+    );
+
+    const app = hydrate(ZitadelLogin, {
+      target: host,
+      props: { project: globalProject, resumeFlowId: "flow_123" },
+    });
+
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
+    expect(first.method).toBe("GET");
+    expect(first.url).toContain("flow_123");
+    expect(host.querySelector(widgetTags.login)).toBe(rendered);
+    await firstStep;
+    await rendered?.updateComplete;
+    await Promise.all(fetched.mock.results.map((result) => result.value));
+    expect(fetched).toHaveBeenCalledTimes(1);
+    await unmount(app);
+    host.remove();
+  });
 });
 
 const SDK = "svelte";
@@ -586,7 +636,7 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { projectId: "p1", resumeFlowId: "" },
     present: {},
     absent: ["resume-flow-id"],
-    gaps: ["vue", "angular", "svelte"],
+    gaps: ["vue", "angular", "svelte", "solid", "qwik"],
   },
   {
     title: "puts the post-sign-in URL into the login markup",
@@ -685,7 +735,7 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     },
     present: {},
     absent: ["project-id", "proxy-path", "url"],
-    gaps: ["vue", "angular", "svelte"],
+    gaps: ["vue", "angular", "svelte", "solid", "qwik"],
   },
   {
     title: "leaves a keyed project handle out of the logout markup",
@@ -696,7 +746,7 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     },
     present: {},
     absent: ["project-id", "proxy-path", "url"],
-    gaps: ["vue", "angular", "svelte"],
+    gaps: ["vue", "angular", "svelte", "solid", "qwik"],
   },
   {
     title: "puts the discrete project props into the logout markup",
@@ -738,6 +788,53 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { projectId: "p1", postSignOutUrl: "/bye" },
     present: { "post-sign-out-url": "/bye" },
     absent: [],
+  },
+  {
+    title: "normalizes an empty proxy path to the site root in the login markup",
+    widget: "login",
+    props: { projectId: "p1", proxyPath: "" },
+    present: { "proxy-path": "/" },
+    absent: [],
+    gaps: ["react", "vue", "angular"],
+  },
+  {
+    title: "normalizes an empty proxy path to the site root in the session markup",
+    widget: "session",
+    props: { projectId: "p1", proxyPath: "" },
+    present: { "proxy-path": "/" },
+    absent: [],
+    gaps: ["react", "vue", "angular"],
+  },
+  {
+    title: "normalizes an empty proxy path to the site root in the logout markup",
+    widget: "logout",
+    props: { projectId: "p1", proxyPath: "" },
+    present: { "proxy-path": "/" },
+    absent: [],
+    gaps: ["react", "vue", "angular"],
+  },
+  {
+    title: "puts the heading into the session markup",
+    widget: "session",
+    props: { projectId: "p1", heading: "Welcome" },
+    present: { heading: "Welcome" },
+    absent: [],
+    gaps: ["react", "svelte"],
+  },
+  {
+    title: "puts the logout label into the session markup",
+    widget: "session",
+    props: { projectId: "p1", logoutLabel: "Leave" },
+    present: { "logout-label": "Leave" },
+    absent: [],
+    gaps: ["react", "svelte"],
+  },
+  {
+    title: "leaves an unset heading and logout label out of the session markup",
+    widget: "session",
+    props: { projectId: "p1" },
+    present: {},
+    absent: ["heading", "logout-label"],
   },
 ];
 

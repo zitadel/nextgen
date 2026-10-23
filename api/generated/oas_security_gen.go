@@ -22,8 +22,8 @@ type SecurityHandler interface {
 	// request is refused with `403` and code `auth.csrf_invalid`. Every such
 	// request must also send the session's token from `GET /sessions/me/csrf` in the
 	// `X-Zitadel-CSRF` header, or it answers the same `403`. The only exceptions are
-	// sign-out (`revokeMySession`) and the `POST …/query` reads, which need no
-	// token. Safe methods (`GET`) are not checked. A request a project secret
+	// the `POST …/query` reads, which need no token. Safe methods (`GET`) are not checked. A request a
+	// project secret
 	// authenticates is not affected.
 	HandleNextgenSession(ctx context.Context, operationName OperationName, t NextgenSession) (context.Context, error)
 	// HandleOAuth2 handles oauth2 security.
@@ -57,21 +57,30 @@ var operationRolesNextgenSession = map[string][]string{
 	GetFlowDefinitionOperation:     []string{},
 	GetGrantOperation:              []string{},
 	GetIdpByIdOperation:            []string{},
+	GetIdpRevisionByIdOperation:    []string{},
+	GetMyPasswordStateOperation:    []string{},
 	GetMySessionOperation:          []string{},
 	GetMySessionCsrfTokenOperation: []string{},
 	GetMyUserOperation:             []string{},
+	GetMyUserSchemaOperation:       []string{},
 	GetProjectOperation:            []string{},
 	GetSchemaByIdOperation:         []string{},
 	GetTeamOperation:               []string{},
 	GetUserByIDOperation:           []string{},
+	GetUserPasswordStateOperation:  []string{},
 	ListBrandingOperation:          []string{},
 	ListFlowDefinitionsOperation:   []string{},
+	ListMyIdentityLinksOperation:   []string{},
+	ListMyPasskeysOperation:        []string{},
 	ListMyProjectsOperation:        []string{},
+	ListMyTeamsOperation:           []string{},
 	ListSchemasOperation:           []string{},
 	ListUserIdentityLinksOperation: []string{},
 	ListUserPasskeysOperation:      []string{},
+	ListUserTeamsOperation:         []string{},
 	PatchMyUserOperation:           []string{},
 	PatchProjectOperation:          []string{},
+	PatchUserByIDOperation:         []string{},
 	QueryGrantsOperation:           []string{},
 	QueryIdpsOperation:             []string{},
 	QueryTeamsOperation:            []string{},
@@ -197,6 +206,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetIdpRevisionByIdOperation: []string{
 		"idp.read",
 	},
+	GetPolicyRevisionOperation: []string{
+		"policy.read",
+	},
 	GetProjectOperation: []string{
 		"project.write",
 	},
@@ -213,6 +225,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"team.read",
 	},
 	GetUserByIDOperation: []string{
+		"user.read",
+	},
+	GetUserPasswordStateOperation: []string{
 		"user.read",
 	},
 	GetVariableOperation: []string{
@@ -266,6 +281,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	PatchUserByIDOperation: []string{
 		"user.write",
+	},
+	PublishPolicyOperation: []string{
+		"policy.write",
 	},
 	QueryGrantsOperation: []string{
 		"project.read",
@@ -387,8 +405,8 @@ type SecuritySource interface {
 	// request is refused with `403` and code `auth.csrf_invalid`. Every such
 	// request must also send the session's token from `GET /sessions/me/csrf` in the
 	// `X-Zitadel-CSRF` header, or it answers the same `403`. The only exceptions are
-	// sign-out (`revokeMySession`) and the `POST …/query` reads, which need no
-	// token. Safe methods (`GET`) are not checked. A request a project secret
+	// the `POST …/query` reads, which need no token. Safe methods (`GET`) are not checked. A request a
+	// project secret
 	// authenticates is not affected.
 	NextgenSession(ctx context.Context, operationName OperationName) (NextgenSession, error)
 	// OAuth2 provides oauth2 security value.

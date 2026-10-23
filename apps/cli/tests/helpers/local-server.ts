@@ -9,12 +9,26 @@ import { afterEach } from "vitest";
  * itself. `orphaned` is a launcher that starts the server as its own child and
  * exits at once (the child is detached from it, or the launcher would wait for
  * it), which leaves the server running with nothing to answer for the pid the CLI
- * recorded, as when a launcher is killed.
+ * recorded, as when a launcher is killed. `logging` is the server, writing
+ * {@link LOGGED_LINES} to its log as it starts.
  */
-export type ServerShape = "plain" | "orphaned";
+export type ServerShape = "plain" | "orphaned" | "logging";
 
-const PLAIN_SERVER = `#!/usr/bin/env node
-const http = require("node:http");
+/** What the `logging` server logs, in the real one's format: a sign-in provider it could not reach, and a failed request. */
+export const LOGGED_LINES = {
+  info: 'time=2026-10-22T07:58:44.765-07:00 level=INFO msg="server listening for requests" address=:8080',
+  warning:
+    'time=2026-10-22T07:58:52.102-07:00 level=WARN msg="sso provider unavailable" stream=service project_id=proj_1 slug=acme error="idp.discovery_failed"',
+  error:
+    'time=2026-10-22T07:58:52.104-07:00 level=ERROR msg="request failed" stream=request request.status_code=500',
+} as const;
+
+/** The `logging` server's first statement: it writes {@link LOGGED_LINES} to its log. */
+const WRITE_LOGGED_LINES = `process.stderr.write(${JSON.stringify(`${Object.values(LOGGED_LINES).join("\n")}\n`)});
+`;
+
+/** The stand-in server, after its `#!` line. */
+const PLAIN_SERVER = `const http = require("node:http");
 const port = Number((process.env.NEXTGEN_SERVER_ADDRESS || ":8080").split(":").at(-1));
 const server = http.createServer((req, res) => {
   res.writeHead(req.url === "/healthz" ? 200 : 404).end("ok");
@@ -31,9 +45,12 @@ const startedDirs: string[] = [];
 export async function aFakeServerBinary(shape: ServerShape): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "zitadel-fake-server-"));
   const server = join(dir, "nextgen");
-  await writeFile(server, PLAIN_SERVER);
+  await writeFile(
+    server,
+    `#!/usr/bin/env node\n${shape === "logging" ? WRITE_LOGGED_LINES : ""}${PLAIN_SERVER}`,
+  );
   await chmod(server, 0o755);
-  if (shape === "plain") {
+  if (shape !== "orphaned") {
     return server;
   }
   const launcher = join(dir, "launcher");

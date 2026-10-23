@@ -1,5 +1,11 @@
 # @zitadel/server-darwin-arm64
 
+## 0.1.0
+
+No changes in this release.
+
+## 1.0.0-alpha.28
+
 ## 1.0.0-alpha.27
 
 ## 1.0.0-alpha.26

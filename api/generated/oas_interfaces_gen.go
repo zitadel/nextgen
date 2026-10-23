@@ -229,6 +229,10 @@ type GetLiveRes interface {
 	getLiveRes()
 }
 
+type GetMyPasswordStateRes interface {
+	getMyPasswordStateRes()
+}
+
 type GetMySessionCsrfTokenRes interface {
 	getMySessionCsrfTokenRes()
 }
@@ -239,6 +243,14 @@ type GetMySessionRes interface {
 
 type GetMyUserRes interface {
 	getMyUserRes()
+}
+
+type GetMyUserSchemaRes interface {
+	getMyUserSchemaRes()
+}
+
+type GetPolicyRevisionRes interface {
+	getPolicyRevisionRes()
 }
 
 type GetProjectRes interface {
@@ -267,6 +279,10 @@ type GetTeamRes interface {
 
 type GetUserByIDRes interface {
 	getUserByIDRes()
+}
+
+type GetUserPasswordStateRes interface {
+	getUserPasswordStateRes()
 }
 
 type GetVariableRes interface {
@@ -317,8 +333,20 @@ type ListIdpRevisionsRes interface {
 	listIdpRevisionsRes()
 }
 
+type ListMyIdentityLinksRes interface {
+	listMyIdentityLinksRes()
+}
+
+type ListMyPasskeysRes interface {
+	listMyPasskeysRes()
+}
+
 type ListMyProjectsRes interface {
 	listMyProjectsRes()
+}
+
+type ListMyTeamsRes interface {
+	listMyTeamsRes()
 }
 
 type ListPreviewsRes interface {
@@ -365,6 +393,14 @@ type PatchUserByIDRes interface {
 	patchUserByIDRes()
 }
 
+type PolicyCreatedRes interface {
+	policyCreatedRes()
+}
+
+type PolicyUpdatedRes interface {
+	policyUpdatedRes()
+}
+
 type ProjectCreatedRes interface {
 	projectCreatedRes()
 }
@@ -375,6 +411,10 @@ type ProjectDeletedRes interface {
 
 type ProjectUpdatedRes interface {
 	projectUpdatedRes()
+}
+
+type PublishPolicyRes interface {
+	publishPolicyRes()
 }
 
 type QueryGrantsRes interface {

@@ -24,6 +24,7 @@
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@types/node": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/sdk-nuxt": "workspace:*",
     "@zitadel/testing": "workspace:*",

@@ -3,8 +3,9 @@
   import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelSession as ZitadelSessionElement } from '@zitadel/components';
 
-  import type { ZitadelSessionSvelteProps, ZitadelSignoutDetail } from './types';
+  import type { ZitadelSessionSvelteProps } from './types';
   import { assignGiven } from './given';
+  import { withDetail } from './events';
   import { onClient, proxyPathAttr } from './attributes';
 
   let {
@@ -48,8 +49,9 @@
     if (!node) {
       return;
     }
-    const onSignoutEvent = (event: Event): void =>
-      onSignout?.((event as CustomEvent<ZitadelSignoutDetail>).detail);
+    const onSignoutEvent = (event: Event): void => {
+      withDetail(event, onSignout);
+    };
     node.addEventListener('zitadel-signout', onSignoutEvent);
     return () => {
       node.removeEventListener('zitadel-signout', onSignoutEvent);

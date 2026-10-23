@@ -64,6 +64,53 @@ const firstDifference = (titles: readonly string[], canonical: readonly string[]
   return "";
 };
 
+// Matches `it("title"`, `it.each(…)("title"`, `describe("title"` and `describe.each(…)("title"`.
+const BLOCK_TITLE = /\b(?:it|describe)(?:\.each\([^)]*\))?\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+
+/** Where the `// name:edge` marker comment, alone on its line, starts; -1 when there is none. */
+const markerAt = (source: string, name: string, edge: "begin" | "end"): number => {
+  const marker = new RegExp(`^[ \\t]*// ${name}:${edge}[ \\t]*$`, "m").exec(source);
+  return marker ? marker.index + marker[0].indexOf("//") : -1;
+};
+
+const blockIn = (source: string, name: string): string | undefined => {
+  const begin = markerAt(source, name, "begin");
+  const end = markerAt(source, name, "end");
+  return begin >= 0 && end > begin ? source.slice(begin, end) : undefined;
+};
+
+const titlesIn = (block: string): string[] =>
+  Array.from(block.matchAll(BLOCK_TITLE), (match) => match[2] ?? "");
+
+/**
+ * What is wrong with the `name` blocks of the given sources: a block that is
+ * missing, one whose titles are not the canonical ones, in order and without an
+ * extra, and one whose body is not the first source's, byte for byte.
+ */
+const problems = (
+  sources: Readonly<Record<string, string>>,
+  name: string,
+  canonical: readonly string[],
+): string[] => {
+  const blocks = Object.entries(sources).map(
+    ([sdk, source]) => [sdk, source, blockIn(source, name)] as const,
+  );
+  const reference = blocks[0]?.[2];
+  return blocks.flatMap(([sdk, source, block]) => {
+    if (block === undefined) return [`${sdk} has no ${name} block`];
+    const found = [];
+    const difference = firstDifference(titlesIn(block), canonical);
+    if (difference) found.push(`${sdk}: ${difference}`);
+    if (block !== reference) found.push(`${sdk}: the body differs from the first SDK's`);
+    const outside = titlesIn(source.replace(block, "")).filter((title) =>
+      canonical.includes(title),
+    );
+    if (outside.length > 0)
+      found.push(`${sdk}: ${JSON.stringify(outside[0])} is also tested outside the block`);
+    return found;
+  });
+};
+
 /**
  * The element↔contract drift guard.
  *
@@ -253,6 +300,8 @@ describe("server-render cases ↔ SDK specs", () => {
     SDK_SPECS["sdk-vue"].client,
     ANGULAR_SPEC,
     SDK_SPECS["sdk-svelte"].client,
+    SDK_SPECS["sdk-solid"].server,
+    SDK_SPECS["sdk-qwik"].server,
   ];
 
   const casesIn = (spec: string): string => {
@@ -327,47 +376,6 @@ describe("standard-attribute tests ↔ SDK specs", () => {
     "puts the standard attributes into the server markup",
     "leaves props outside the standard set out of the server markup",
   ];
-
-  // Matches `it("title"`, `it.each(…)("title"`, `describe("title"` and `describe.each(…)("title"`.
-  const TITLE = /\b(?:it|describe)(?:\.each\([^)]*\))?\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
-
-  const blockIn = (source: string, name: string): string | undefined => {
-    const begin = source.indexOf(`// ${name}:begin`);
-    const end = source.indexOf(`// ${name}:end`);
-    return begin >= 0 && end > begin ? source.slice(begin, end) : undefined;
-  };
-
-  const titlesIn = (block: string): string[] =>
-    Array.from(block.matchAll(TITLE), (match) => match[2] ?? "");
-
-  /**
-   * What is wrong with the `name` blocks of the given sources: a block that is
-   * missing, one whose titles are not the canonical ones, in order and without an
-   * extra, and one whose body is not the first source's, byte for byte.
-   */
-  const problems = (
-    sources: Readonly<Record<string, string>>,
-    name: string,
-    canonical: readonly string[],
-  ): string[] => {
-    const blocks = Object.entries(sources).map(
-      ([sdk, source]) => [sdk, source, blockIn(source, name)] as const,
-    );
-    const reference = blocks[0]?.[2];
-    return blocks.flatMap(([sdk, source, block]) => {
-      if (block === undefined) return [`${sdk} has no ${name} block`];
-      const found = [];
-      const difference = firstDifference(titlesIn(block), canonical);
-      if (difference) found.push(`${sdk}: ${difference}`);
-      if (block !== reference) found.push(`${sdk}: the body differs from the first SDK's`);
-      const outside = titlesIn(source.replace(block, "")).filter((title) =>
-        canonical.includes(title),
-      );
-      if (outside.length > 0)
-        found.push(`${sdk}: ${JSON.stringify(outside[0])} is also tested outside the block`);
-      return found;
-    });
-  };
 
   const read = (spec: string): string =>
     readFileSync(fileURLToPath(new URL(spec, import.meta.url)), "utf8");
@@ -476,6 +484,7 @@ describe("widget loading ↔ SDK packages", () => {
     "sdk-react",
     "sdk-solid",
     "sdk-svelte",
+    "sdk-tanstack-start",
     "sdk-vue",
   ];
 
@@ -658,6 +667,298 @@ describe("SDK READMEs ↔ opening structure", () => {
 });
 
 /**
+ * What every client SDK entry holds in common about `@zitadel/components`: the
+ * side-effect import that registers the elements in the browser, and the
+ * `businessLocales` re-export, each with the same comment, once. Nothing else
+ * of the package is re-exported: an element class (as a value or as a type)
+ * would pull the elements entry into a bundle that has to load on the edge, and
+ * would make one SDK export what the others do not.
+ */
+const IMPORT_BLOCK = [
+  "// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.",
+  "// The edge build of the components package has no elements, so this does nothing there.",
+  'import "@zitadel/components";',
+].join("\n");
+
+const EXPORT_BLOCK = [
+  "// Re-exported so scaffolded apps can wire the business copy overlay without a",
+  "// direct @zitadel/components dependency (strict package managers reject those).",
+  'export { businessLocales } from "@zitadel/components";',
+].join("\n");
+
+const BUSINESS_LOCALES_EXPORT = 'export { businessLocales } from "@zitadel/components"';
+
+/** Every `export … from "@zitadel/components"` statement of a source. */
+const EXPORTS_FROM_COMPONENTS = /\bexport\s[^;]*?from\s*["']@zitadel\/components["']/g;
+
+/** A line that imports `@zitadel/components` for its side effect, however it is written. */
+const REGISTERING_IMPORT_LINE = /^\s*import\s*["']@zitadel\/components["']/;
+
+/** A line that re-exports `businessLocales`, however it is written. */
+const BUSINESS_LOCALES_LINE = /^\s*export\s*\{[^}]*\bbusinessLocales\b/;
+
+/** How often the lines of `block` follow each other in `lines`, each matching whole and exactly. */
+const blocksIn = (lines: readonly string[], block: string): number => {
+  const wanted = block.split("\n");
+  return lines.filter((_, at) => wanted.every((line, offset) => lines[at + offset] === line))
+    .length;
+};
+
+/** What is wrong with the way a client SDK entry uses `@zitadel/components`. */
+const entryProblems = (source: string): string[] => {
+  const found: string[] = [];
+  const lines = source.split("\n");
+  if (
+    blocksIn(lines, IMPORT_BLOCK) !== 1 ||
+    lines.filter((line) => REGISTERING_IMPORT_LINE.test(line)).length !== 1
+  ) {
+    found.push("does not hold the registering import, with its comment, exactly once");
+  }
+  if (
+    blocksIn(lines, EXPORT_BLOCK) !== 1 ||
+    lines.filter((line) => BUSINESS_LOCALES_LINE.test(line)).length !== 1
+  ) {
+    found.push("does not hold the businessLocales re-export, with its comment, exactly once");
+  }
+  for (const statement of source.match(EXPORTS_FROM_COMPONENTS) ?? []) {
+    if (statement !== BUSINESS_LOCALES_EXPORT) {
+      found.push(`re-exports more than businessLocales: ${statement.replace(/\s+/g, " ")}`);
+    }
+  }
+  return found;
+};
+
+describe("client SDK entries ↔ @zitadel/components", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const ENTRIES: [string, string][] = [
+    ["sdk-react", "sdk-react/src/index.tsx"],
+    ["sdk-vue", "sdk-vue/src/index.ts"],
+    ["sdk-angular", "sdk-angular/src/public-api.ts"],
+    ["sdk-svelte", "sdk-svelte/src/lib/index.ts"],
+    ["sdk-solid", "sdk-solid/src/index.tsx"],
+    ["sdk-qwik", "sdk-qwik/src/index.tsx"],
+    ["sdk-next", "sdk-next/src/client.ts"],
+    ["sdk-nuxt", "sdk-nuxt/src/index.ts"],
+    ["sdk-tanstack-start", "sdk-tanstack-start/src/react.tsx"],
+  ];
+
+  it.each(ENTRIES)("%s registers the elements and re-exports no element class", (_sdk, path) => {
+    expect(entryProblems(readFileSync(`${packagesDir}${path}`, "utf8"))).toEqual([]);
+  });
+
+  describe("the guard", () => {
+    const good = `${IMPORT_BLOCK}\n\n${EXPORT_BLOCK}\nexport const x = 1;\n`;
+
+    it("accepts the canonical lines", () => {
+      expect(entryProblems(good)).toEqual([]);
+    });
+
+    it("sees a missing import and a missing re-export", () => {
+      expect(entryProblems(good.replace(IMPORT_BLOCK, ""))).toHaveLength(1);
+      expect(entryProblems(good.replace(EXPORT_BLOCK, ""))).toHaveLength(1);
+    });
+
+    it("sees a repeated import", () => {
+      expect(entryProblems(`${IMPORT_BLOCK}\n${good}`)).toHaveLength(1);
+    });
+
+    it("sees a reworded comment", () => {
+      expect(entryProblems(good.replace("Registers", "Loads"))).toHaveLength(1);
+    });
+
+    it.each([
+      ["a trailing comment", 'import "@zitadel/components";', 'import "@zitadel/components"; // x'],
+      ["extra whitespace", 'import "@zitadel/components";', 'import  "@zitadel/components";'],
+      ["trailing whitespace", 'import "@zitadel/components";', 'import "@zitadel/components"; '],
+      ["an indent", 'import "@zitadel/components";', '  import "@zitadel/components";'],
+      [
+        "a trailing comment on the re-export",
+        'export { businessLocales } from "@zitadel/components";',
+        'export { businessLocales } from "@zitadel/components"; // x',
+      ],
+      [
+        "extra whitespace in the re-export",
+        'export { businessLocales } from "@zitadel/components";',
+        'export {  businessLocales } from "@zitadel/components";',
+      ],
+    ])("sees %s", (_, line, changed) => {
+      expect(entryProblems(good.replace(line, changed))).not.toEqual([]);
+    });
+
+    it("sees a second import or re-export beside the canonical lines", () => {
+      expect(entryProblems(`${good}import "@zitadel/components"; // x\n`)).toHaveLength(1);
+      expect(entryProblems(`${good}import '@zitadel/components';\n`)).toHaveLength(1);
+      expect(
+        entryProblems(`${good}export { businessLocales } from "@zitadel/components"; // x\n`),
+      ).toHaveLength(1);
+    });
+
+    it.each([
+      'export { ZitadelLogin } from "@zitadel/components";',
+      'export type { ZitadelLogout, ZitadelSession } from "@zitadel/components";',
+      'export { businessLocales, ZitadelSession } from "@zitadel/components";',
+      'export * from "@zitadel/components";',
+      'export {\n  ZitadelLogin,\n} from "@zitadel/components";',
+    ])("sees %j", (statement) => {
+      expect(entryProblems(`${good}${statement}\n`)).not.toEqual([]);
+    });
+
+    it("lets an entry import an element class as a type for its own use", () => {
+      expect(
+        entryProblems(`import type { ZitadelLogin } from "@zitadel/components";\n${good}`),
+      ).toEqual([]);
+    });
+  });
+});
+
+/**
+ * The client SDK edge specs. Each loads its built package inside the edge VM and
+ * carries the same `edge-entry` block and, but for `@zitadel/sdk-next/client`,
+ * which renders no widget, the same `edge-render` block: the same titles and the
+ * same body, byte for byte. Only the render call and the imports are the
+ * framework's.
+ */
+const EDGE_COMMENT =
+  "      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.";
+
+/** What is wrong with the way a Vitest config declares its edge project. */
+const edgeConfigProblems = (source: string): string[] => {
+  const lines = source.split("\n");
+  const at = lines.indexOf(EDGE_COMMENT);
+  const found: string[] = [];
+  if (
+    !lines.some((line) =>
+      /^import \{[^}]*\bedgeProject\b[^}]*\} from "\.\.\/\.\.\/vitest\.shared\.mjs";$/.test(line),
+    )
+  ) {
+    found.push("does not import edgeProject from the shared module");
+  }
+  if (at === -1 || lines.indexOf(EDGE_COMMENT, at + 1) !== -1) {
+    found.push("does not have the shared comment exactly once");
+  } else if (!(lines[at + 1] ?? "").startsWith("      edgeProject(")) {
+    found.push("does not declare the edge project right under the shared comment");
+  }
+  return found;
+};
+
+describe("client SDK edge specs", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const read = (path: string): string => readFileSync(`${packagesDir}${path}`, "utf8");
+
+  const ENTRY_TITLES = [
+    "the SDK entry in the edge runtime",
+    "runs without a DOM",
+    "keeps the locale data it re-exports",
+  ];
+  const EDGE_TITLES = [
+    "the SDK in the edge runtime",
+    "renders the login widget as its custom element with its attributes",
+    "renders the session widget as its custom element with its attributes",
+    "renders the logout widget as its custom element with its attributes",
+    "writes the purpose and the resumed flow into the login markup",
+    "omits the language when none is set",
+  ];
+
+  const WRAPPERS = {
+    "sdk-react": "sdk-react/src/index.edge.spec.tsx",
+    "sdk-vue": "sdk-vue/src/index.edge.spec.ts",
+    "sdk-angular": "sdk-angular/src/public-api.edge.spec.ts",
+    "sdk-svelte": "sdk-svelte/src/index.edge.spec.ts",
+    "sdk-solid": "sdk-solid/src/index.edge.spec.tsx",
+    "sdk-qwik": "sdk-qwik/src/index.edge.spec.tsx",
+  };
+  const NEXT = { "sdk-next": "sdk-next/src/__tests__/client.edge.test.ts" };
+
+  const sourcesOf = (specs: Record<string, string>): Record<string, string> =>
+    Object.fromEntries(Object.entries(specs).map(([sdk, path]) => [sdk, read(path)]));
+
+  it("has the entry block in every client SDK, sdk-next included", () => {
+    expect(problems(sourcesOf({ ...WRAPPERS, ...NEXT }), "edge-entry", ENTRY_TITLES)).toEqual([]);
+  });
+
+  it("has the render block in every SDK that renders widgets", () => {
+    expect(problems(sourcesOf(WRAPPERS), "edge-render", EDGE_TITLES)).toEqual([]);
+  });
+
+  it("declares the edge project the same way in every config", () => {
+    const configs = [
+      "components",
+      "sdk-angular",
+      "sdk-next",
+      "sdk-nuxt",
+      "sdk-qwik",
+      "sdk-qwik-router",
+      "sdk-react",
+      "sdk-solid",
+      "sdk-solid-start",
+      "sdk-svelte",
+      "sdk-sveltekit",
+      "sdk-tanstack-start",
+      "sdk-vue",
+    ].map((dir) => `${dir}/vitest.config.ts`);
+    expect(
+      [...configs, "sdk-core/vite.config.ts"].flatMap((path) =>
+        edgeConfigProblems(read(path)).map((problem) => `${path}: ${problem}`),
+      ),
+    ).toEqual([]);
+  });
+
+  describe("the config guard", () => {
+    const good = `import { baseTest, edgeProject } from "../../vitest.shared.mjs";\n${EDGE_COMMENT}\n      edgeProject({}),\n`;
+
+    it("accepts the shared import and comment", () => {
+      expect(edgeConfigProblems(good)).toEqual([]);
+    });
+
+    it("sees a missing import, a missing, repeated or reworded comment and a detached call", () => {
+      expect(edgeConfigProblems(good.replace("edgeProject }", "baseTest }"))).toHaveLength(1);
+      expect(edgeConfigProblems(good.replace(EDGE_COMMENT, ""))).not.toEqual([]);
+      expect(edgeConfigProblems(`${good}${EDGE_COMMENT}\n`)).not.toEqual([]);
+      expect(edgeConfigProblems(good.replace("Runs", "Run"))).not.toEqual([]);
+      expect(edgeConfigProblems(good.replace("      edgeProject", "      other"))).toHaveLength(1);
+    });
+  });
+});
+
+/**
+ * The server SDK edge specs. Each sends requests through its built package inside
+ * the edge VM and carries the same `edge-server` block: the same titles and the
+ * same body, byte for byte. Only the glue that hands a request to the framework's
+ * handler, above the block, is the framework's.
+ */
+describe("server SDK edge specs", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+
+  const SERVER_TITLES = [
+    "the server SDK in the edge runtime",
+    "answers a protected route with a redirect to the login path",
+    "forwards the proxy path to the backend",
+    "forwards a GET on the proxy path as a GET",
+    "refuses a request that carries the auth header before forwarding it",
+    "passes an unprotected route through",
+  ];
+
+  const SERVERS = {
+    "sdk-sveltekit": "sdk-sveltekit/src/__tests__/handle.edge.test.ts",
+    "sdk-solid-start": "sdk-solid-start/src/__tests__/middleware.edge.test.ts",
+    "sdk-tanstack-start": "sdk-tanstack-start/src/__tests__/middleware.edge.test.ts",
+    "sdk-qwik-router": "sdk-qwik-router/src/__tests__/request-handler.edge.test.ts",
+    "sdk-next": "sdk-next/src/__tests__/middleware.edge.test.ts",
+    "sdk-nuxt": "sdk-nuxt/src/__tests__/server/middleware.edge.test.ts",
+  };
+
+  it("has the server block in every server SDK", () => {
+    const sources = Object.fromEntries(
+      Object.entries(SERVERS).map(([sdk, path]) => [
+        sdk,
+        readFileSync(`${packagesDir}${path}`, "utf8"),
+      ]),
+    );
+    expect(problems(sources, "edge-server", SERVER_TITLES)).toEqual([]);
+  });
+});
+
+/**
  * The server SDKs' test titles.
  *
  * The six meta-framework SDKs test the same server behaviours, so their test
@@ -763,15 +1064,19 @@ describe("server SDK test titles", () => {
     "lets a request without the auth header through",
     "sends the exchange bearer from %s",
     "proxies to the backend from %s",
+    "proxies to a backend url given with a trailing slash",
+    "verifies a JWT against a backend url given with a trailing slash",
+    "asks the session probe at a backend url given with a trailing slash",
   ];
 
   // Matches `it("title"`, `it.fails("title"` and the `it.each([...])("title"` form.
   const TITLE = /(?:\bit(?:\.fails)?\(|\]\)\()\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
 
+  const sourceOf = (sdk: keyof typeof TEST_FILES): string =>
+    readFileSync(`${packagesPath}${TEST_FILES[sdk]}`, "utf8");
+
   const titlesOf = (sdk: keyof typeof TEST_FILES): string[] =>
-    [...readFileSync(`${packagesPath}${TEST_FILES[sdk]}`, "utf8").matchAll(TITLE)].map(
-      (match) => match[2]!,
-    );
+    [...sourceOf(sdk).matchAll(TITLE)].map((match) => match[2]!);
 
   it.each(Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[])(
     "%s carries exactly the canonical tests, in the canonical order",
@@ -783,4 +1088,87 @@ describe("server SDK test titles", () => {
       ).toBe("");
     },
   );
+
+  /**
+   * The backend-url tests are the one group of cases the server SDKs also
+   * carry byte for byte: the same rows and bodies between the same markers, so
+   * every SDK resolves the url the same way. Only the glue outside the block
+   * (`serve`, `captureFetch`, `signer`) differs.
+   */
+  describe("the backend-url block", () => {
+    const URL_TITLES = [
+      "proxies to a backend url given with a trailing slash",
+      "verifies a JWT against a backend url given with a trailing slash",
+      "asks the session probe at a backend url given with a trailing slash",
+    ];
+
+    it("is canonical in every SDK", () => {
+      const sources = Object.fromEntries(
+        (Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[]).map((sdk) => [sdk, sourceOf(sdk)]),
+      );
+      expect(problems(sources, "backend-url", URL_TITLES)).toEqual([]);
+    });
+
+    // The guard's own logic, on a fixture block it is made to reject.
+    describe("the guard", () => {
+      const fixture = [
+        "describe('x', () => {",
+        "  // backend-url:begin",
+        '  it("proxies to a backend url given with a trailing slash", () => {',
+        '    expect(proxied("http://a.test/")).toBe("http://a.test/v1");',
+        "  });",
+        '  it("verifies a JWT against a backend url given with a trailing slash", () => {});',
+        '  it("asks the session probe at a backend url given with a trailing slash", () => {});',
+        "  // backend-url:end",
+        "});",
+      ].join("\n");
+      const check = (other: string): string[] =>
+        problems({ one: fixture, two: other }, "backend-url", URL_TITLES);
+      const CHANGED = ["two: the body differs from the first SDK's"];
+
+      it("accepts blocks that match", () => {
+        expect(check(fixture)).toEqual([]);
+      });
+
+      it("sees a changed body and names the SDK", () => {
+        expect(check(fixture.replace('"http://a.test/"', '"http://a.test"'))).toEqual(CHANGED);
+      });
+
+      it("sees an extra test", () => {
+        expect(
+          check(
+            fixture.replace(
+              "  // backend-url:end",
+              '  it("extra", () => {});\n  // backend-url:end',
+            ),
+          ),
+        ).toHaveLength(2);
+      });
+
+      it("sees a changed assertion", () => {
+        expect(check(fixture.replace(").toBe(", ").not.toBe("))).toEqual(CHANGED);
+      });
+
+      it("sees a missing marker", () => {
+        expect(check(fixture.replace("  // backend-url:end\n", ""))).toEqual([
+          "two has no backend-url block",
+        ]);
+      });
+
+      it("does not take a longer marker for its own", () => {
+        expect(check(fixture.replace("// backend-url:end", "// backend-url:end2"))).toEqual([
+          "two has no backend-url block",
+        ]);
+        expect(check(fixture.replace("// backend-url:begin", "// backend-url:begin2"))).toEqual([
+          "two has no backend-url block",
+        ]);
+      });
+
+      it("does not take a marker inside other text for its own", () => {
+        expect(check(fixture.replace("  // backend-url:end", "  x // backend-url:end"))).toEqual([
+          "two has no backend-url block",
+        ]);
+      });
+    });
+  });
 });

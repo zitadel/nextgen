@@ -564,6 +564,13 @@ export class ScaffoldedApp {
     await writeFile(join(this.path, ".zitadel/local/runtime.json"), "{not json");
   }
 
+  /** The log lines a `logs --json` run returned. */
+  loggedLinesOf(result: CliResult): string[] {
+    expect(result, "logs should have succeeded").toSucceed();
+    const { logs } = this.envelopeOf<{ logs: string }>(result).data;
+    return logs.split("\n").filter((line) => line !== "");
+  }
+
   /** The lifecycle `status` reports for the local server. */
   async localServerLifecycle(): Promise<string> {
     const status = await this.cli(["status", "--json"]);
@@ -643,6 +650,31 @@ export class ScaffoldedApp {
         ...(secret ? ["--secret"] : []),
       ]),
     );
+  }
+
+  /** `zitadel api` with an operation and its arguments, as a script runs it. */
+  api(...args: string[]): Promise<CliResult> {
+    return this.cli(["api", ...args, "--non-interactive", "--json"]);
+  }
+
+  /** `zitadel api` with `body` piped in on stdin. */
+  apiPiping(body: string, ...args: string[]): Promise<CliResult> {
+    return this.pipingStdin(body, () => this.api(...args));
+  }
+
+  /** `zitadel api` without `--json`, for a spec asserting what the developer reads. */
+  apiRendered(...args: string[]): Promise<CliResult> {
+    return this.cli(["api", ...args, "--non-interactive"]);
+  }
+
+  /** `zitadel api ls` with its arguments. */
+  apiOperations(...args: string[]): Promise<CliResult> {
+    return this.cli(["api", "ls", ...args, "--non-interactive", "--json"]);
+  }
+
+  /** `zitadel api ls` without `--json`. */
+  apiOperationsRendered(...args: string[]): Promise<CliResult> {
+    return this.cli(["api", "ls", ...args, "--non-interactive"]);
   }
 
   getVariable(name: string): Promise<CliResult> {

@@ -1,0 +1,12 @@
+title: DeploymentStatus
+type: string
+description: |
+  Whether the deployment serves its release now.
+
+  - `live` — at least one of its targets serves it now.
+  - `inactive` — none does: a later deployment replaced it, or its previews
+    expired or were removed.
+enum:
+  - live
+  - inactive
+example: live

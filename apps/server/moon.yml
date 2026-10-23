@@ -257,18 +257,17 @@ tasks:
     # replaying results recorded by an emulator execution. A benchmark number
     # was nearly read off a run that never happened.
     #
-    # -parallel is deliberately NOT pinned to 1. The emulator serves one
-    # transaction at a time, so tests running concurrently within a package force
-    # the aborts that prove the abort-retry path still works. Pinning it hid the
-    # missing retry rather than fixing it (#788); do not put it back.
+    # -parallel is deliberately NOT pinned to 1. Tests running concurrently
+    # within a package put transactions in real contention, on top of the
+    # aborts a spanner_integration build injects on purpose (#788); pinning it
+    # hid a missing retry rather than fixing it. Do not put it back.
     #
-    # -p 1 stays, but not for isolation: testdb.SpannerDSN starts a fresh
-    # emulator testcontainer per package, so each package already has its own
-    # database in its own process. What the flag buys is not running three
-    # emulators at once. Dropping it would overlap stmttest and the spanner
-    # dialect package with integration_test and save roughly 40 seconds, which
-    # is a poor trade against three concurrent emulator containers on a
-    # developer laptop.
+    # -p is left at its default, so the three packages run at once. Each still
+    # gets its own database: with ZITADEL_TEST_SPANNER_INSTANCE set (spanner.yml
+    # points it at Spanner Omni) every package provisions one on that instance,
+    # because one shared database failed on tests reading each other's
+    # leftovers (#1011). Without it, each package starts its own emulator
+    # container, so a local run starts three at once.
     command: "go"
     args:
       - "test"
@@ -276,19 +275,18 @@ tasks:
       - "-count=1"
       - "-tags"
       - "spanner_integration"
-      # Same budget as test-postgres. The emulator's planner is still slow on the
-      # authz list predicate, which real Cloud Spanner answers in ~40ms, but the
-      # lane no longer lets rows pile up in front of it: tests delete their own
-      # project when they finish, and the one test that reads lists against the
-      # whole database runs serially, so it meets an almost empty one. The
-      # integration_test package takes about 111s in CI, so this leaves roughly
-      # five times headroom and a genuine hang surfaces again instead of sitting
-      # inside a 20 minute window. See #1011.
+      # Per package. Against Spanner Omni each package first spends about six
+      # minutes creating and migrating its database (#1011), and spanner.yml
+      # runs all three on one engine on a 4-vCPU runner. A hang still surfaces
+      # well inside that job's 60 minutes.
       - "-timeout"
-      - "10m"
-      - "-p"
-      - "1"
-      - "./..."
+      - "30m"
+      # Only the packages that open a Spanner database. Under this tag every
+      # other package has no Spanner test; internal/bootstrap/users builds on it
+      # but runs against Postgres, which test-postgres covers.
+      - "./internal/api/integration_test/"
+      - "./internal/storage/dialect/spanner/"
+      - "./internal/storage/stmttest/"
     deps:
       # check-generate rewrites api/generated; see test-postgres.
       - "check-generate"

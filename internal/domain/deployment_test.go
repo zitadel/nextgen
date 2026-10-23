@@ -43,10 +43,10 @@ func TestNewDeploymentValidates(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("rollback requires rollback_to", func(t *testing.T) {
+	t.Run("rollback_to is optional and never blank", func(t *testing.T) {
 		origins := []string{"https://app.acme.com"}
 		_, err := NewDeployment("proj_1", "rel_1", DeploymentOriginKindPrimary, origins, DeploymentMetadata{Reason: DeploymentReasonRollback})
-		assertDeploymentInvalid(t, err)
+		require.NoError(t, err)
 
 		_, err = NewDeployment("proj_1", "rel_1", DeploymentOriginKindPrimary, origins, DeploymentMetadata{Reason: DeploymentReasonRollback, RollbackTo: new(" ")})
 		assertDeploymentInvalid(t, err)
@@ -90,29 +90,25 @@ func TestNewestOriginDeploymentBreaksTiesOnID(t *testing.T) {
 	assert.Equal(t, "dep_b", newest.DeploymentID)
 }
 
-func TestDeploymentUnchanged(t *testing.T) {
+func TestDeploymentsEqual(t *testing.T) {
 	origins := []string{"https://app.acme.com", "https://www.acme.com"}
-	serving := []OriginDeployment{
-		{Origin: "https://app.acme.com", ReleaseID: "rel_a", Kind: DeploymentOriginKindPrimary},
-		{Origin: "https://www.acme.com", ReleaseID: "rel_a", Kind: DeploymentOriginKindPrimary},
-	}
 	primary, err := NewDeployment("proj_1", "rel_a", DeploymentOriginKindPrimary, origins, DeploymentMetadata{})
 	require.NoError(t, err)
-	assert.True(t, primary.Unchanged(serving))
-	assert.False(t, primary.Unchanged(serving[:1]), "an origin serving nothing is a change")
+	current := *primary
+	assert.True(t, DeploymentsEqual(primary, &current))
+	assert.False(t, DeploymentsEqual(primary, nil), "nothing deployed yet is a change")
 
-	// An origin last served as a preview becomes a primary origin: that is a
-	// change, or its row would still expire with the preview.
-	fromPreview := []OriginDeployment{serving[0], {Origin: "https://www.acme.com", ReleaseID: "rel_a", Kind: DeploymentOriginKindPreview}}
-	assert.False(t, primary.Unchanged(fromPreview))
+	added, err := NewDeployment("proj_1", "rel_a", DeploymentOriginKindPrimary, append(origins, "https://acme.com"), DeploymentMetadata{})
+	require.NoError(t, err)
+	assert.False(t, DeploymentsEqual(added, &current), "a primary origin added since is a change")
 
 	other, err := NewDeployment("proj_1", "rel_b", DeploymentOriginKindPrimary, origins, DeploymentMetadata{})
 	require.NoError(t, err)
-	assert.False(t, other.Unchanged(serving))
+	assert.False(t, DeploymentsEqual(other, &current))
 
 	preview, err := NewDeployment("proj_1", "rel_a", DeploymentOriginKindPreview, origins, DeploymentMetadata{})
 	require.NoError(t, err)
-	assert.False(t, preview.Unchanged(serving), "a preview deploy renews, so it is always written")
+	assert.False(t, DeploymentsEqual(preview, &current), "a preview deploy renews, so it is always written")
 }
 
 func TestCheckExpectedDeployment(t *testing.T) {
@@ -135,5 +131,45 @@ func assertDeploymentInvalid(t *testing.T, err error) {
 	require.Error(t, err)
 	de, ok := err.(Error)
 	require.True(t, ok, "expected a domain error, got %T", err)
-	assert.Equal(t, ErrDeploymentInvalid(nil, nil).Code, de.Code)
+	assert.Equal(t, ErrDeploymentInvalid().Code, de.Code)
+}
+
+var projectOrigins = []Origin{
+	{Pattern: "https://www.acme.com", Kind: OriginKindPrimary},
+	{Pattern: "https://app.acme.com", Kind: OriginKindPrimary},
+	{Pattern: "https://*-acmeinc.vercel.app", Kind: OriginKindPreview},
+}
+
+func TestResolveDeploymentTargets(t *testing.T) {
+	t.Run("primary covers every primary origin", func(t *testing.T) {
+		kind, origins, err := ResolveDeploymentTargets(projectOrigins, []string{DeploymentTargetPrimary})
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentOriginKindPrimary, kind)
+		assert.Equal(t, []string{"https://www.acme.com", "https://app.acme.com"}, origins)
+	})
+
+	t.Run("an exact primary origin", func(t *testing.T) {
+		_, _, err := ResolveDeploymentTargets(projectOrigins, []string{"https://app.acme.com"})
+		assert.ErrorIs(t, err, ErrDeploymentInvalid())
+	})
+
+	t.Run("primary with no primary origin", func(t *testing.T) {
+		_, _, err := ResolveDeploymentTargets(projectOrigins[2:], []string{DeploymentTargetPrimary})
+		assert.ErrorIs(t, err, ErrDeploymentInvalid())
+	})
+
+	t.Run("primary and a preview URL mixed", func(t *testing.T) {
+		for _, targets := range [][]string{
+			{DeploymentTargetPrimary, "https://acme-git-sso-acmeinc.vercel.app"},
+			{"https://acme-git-sso-acmeinc.vercel.app", DeploymentTargetPrimary},
+		} {
+			_, _, err := ResolveDeploymentTargets(projectOrigins, targets)
+			assert.ErrorIs(t, err, ErrDeploymentInvalid(), targets)
+		}
+	})
+
+	t.Run("any other origin is not served yet", func(t *testing.T) {
+		_, _, err := ResolveDeploymentTargets(projectOrigins, []string{"https://acme-git-sso-acmeinc.vercel.app"})
+		assert.ErrorIs(t, err, ErrNotImplemented())
+	})
 }

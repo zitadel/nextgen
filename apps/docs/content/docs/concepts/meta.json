@@ -1,13 +1,10 @@
 {
   "title": "Concepts",
   "pages": [
-    "index",
     "project-team-user",
-    "local-runtime",
-    "databases",
     "repo-config",
     "flows-and-schemas",
-    "sdk-proxy",
-    "sessions-auth-attempts"
+    "sessions-auth-attempts",
+    "databases"
   ]
 }

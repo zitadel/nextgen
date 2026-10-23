@@ -3877,86 +3877,19 @@ func (s *CreateAuthAttemptRequest) Validate() error {
 	return nil
 }
 
-func (s *CreateDeploymentBadRequest) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if value, ok := s.Details.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "details",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s *CreateDeploymentBadRequestDetails) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.Kind.Validate(); err != nil {
+func (s CreateDeploymentBadRequest) Validate() error {
+	switch s.Type {
+	case DepInvalidCreateDeploymentBadRequest:
+		return nil // no validation needed
+	case DeploymentVariablesMissingCreateDeploymentBadRequest:
+		if err := s.DeploymentVariablesMissing.Validate(); err != nil {
 			return err
 		}
 		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "kind",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if s.Names == nil {
-			return errors.New("nil is invalid value")
-		}
-		if err := (validate.Array{
-			MinLength:    1,
-			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
-		}).ValidateLength(len(s.Names)); err != nil {
-			return errors.Wrap(err, "array")
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "names",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s CreateDeploymentBadRequestDetailsKind) Validate() error {
-	switch s {
-	case "primary":
-		return nil
-	case "preview":
-		return nil
+	case ReqInvalidCreateDeploymentBadRequest:
+		return nil // no validation needed
 	default:
-		return errors.Errorf("invalid value: %v", s)
+		return errors.Errorf("invalid type %q", s.Type)
 	}
 }
 
@@ -4771,6 +4704,17 @@ func (s *Deployment) Validate() error {
 		})
 	}
 	if err := func() error {
+		if err := s.Kind.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "kind",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if s.Targets == nil {
 			return errors.New("nil is invalid value")
 		}
@@ -4803,6 +4747,17 @@ func (s *Deployment) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "targets",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Status.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "status",
 			Error: err,
 		})
 	}
@@ -5056,6 +5011,17 @@ func (s DeploymentID) Validate() error {
 	return nil
 }
 
+func (s DeploymentKind) Validate() error {
+	switch s {
+	case "primary":
+		return nil
+	case "preview":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *DeploymentMetadata) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -5171,6 +5137,17 @@ func (s DeploymentReason) Validate() error {
 	}
 }
 
+func (s DeploymentStatus) Validate() error {
+	switch s {
+	case "live":
+		return nil
+	case "inactive":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *DeploymentTarget) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -5235,6 +5212,71 @@ func (s DeploymentTargetsRequest) Validate() error {
 				Error: err,
 			})
 		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DeploymentVariablesMissing) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Details.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "details",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *DeploymentVariablesMissingDetails) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Kind.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "kind",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if s.Names == nil {
+			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    1,
+			MinLengthSet: true,
+			MaxLength:    0,
+			MaxLengthSet: false,
+		}).ValidateLength(len(s.Names)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "names",
+			Error: err,
+		})
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
@@ -5361,6 +5403,16 @@ func (s Event) Validate() error {
 		return nil
 	case OriginRemovedEventEvent:
 		if err := s.OriginRemovedEvent.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolicyCreatedEventEvent:
+		if err := s.PolicyCreatedEvent.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PolicyUpdatedEventEvent:
+		if err := s.PolicyUpdatedEvent.Validate(); err != nil {
 			return err
 		}
 		return nil
@@ -8789,6 +8841,29 @@ func (s *ListUserIdentityLinksResponse) Validate() error {
 	return nil
 }
 
+func (s *ListUserIdentityLinksResponseHeaders) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *ListUserPasskeysResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -8803,6 +8878,29 @@ func (s *ListUserPasskeysResponse) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "passkeys",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ListUserPasskeysResponseHeaders) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
 			Error: err,
 		})
 	}
@@ -8843,6 +8941,29 @@ func (s *ListUserTeamsResponse) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "teams",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ListUserTeamsResponseHeaders) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
 			Error: err,
 		})
 	}
@@ -9611,6 +9732,329 @@ func (s PatchUserRequestAttributes) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s *Policy) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.ID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.RevisionID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "revision_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.ProjectID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *PolicyCreatedEvent) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.ProjectID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Category.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "category",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.ActorType.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "actor_type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.DelegationType.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "delegation_type",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s PolicyCreatedEventActorType) Validate() error {
+	switch s {
+	case "human":
+		return nil
+	case "service":
+		return nil
+	case "system":
+		return nil
+	case "agent":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s PolicyCreatedEventCategory) Validate() error {
+	switch s {
+	case "request":
+		return nil
+	case "auth":
+		return nil
+	case "session":
+		return nil
+	case "admin":
+		return nil
+	case "entity":
+		return nil
+	case "signal":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s PolicyCreatedEventDelegationType) Validate() error {
+	switch s {
+	case "direct":
+		return nil
+	case "delegated":
+		return nil
+	case "pat_shared":
+		return nil
+	case "exchanged":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s PolicyID) Validate() error {
+	alias := (string)(s)
+	if err := (validate.String{
+		MinLength:     0,
+		MinLengthSet:  false,
+		MaxLength:     0,
+		MaxLengthSet:  false,
+		Email:         false,
+		Hostname:      false,
+		Regex:         regexMap["^pol_[a-zA-Z0-9_-]+$"],
+		MinNumeric:    0,
+		MinNumericSet: false,
+		MaxNumeric:    0,
+		MaxNumericSet: false,
+	}).Validate(string(alias)); err != nil {
+		return errors.Wrap(err, "string")
+	}
+	return nil
+}
+
+func (s PolicyRevisionID) Validate() error {
+	alias := (string)(s)
+	if err := (validate.String{
+		MinLength:     0,
+		MinLengthSet:  false,
+		MaxLength:     0,
+		MaxLengthSet:  false,
+		Email:         false,
+		Hostname:      false,
+		Regex:         regexMap["^polrev_[a-zA-Z0-9_-]+$"],
+		MinNumeric:    0,
+		MinNumericSet: false,
+		MaxNumeric:    0,
+		MaxNumericSet: false,
+	}).Validate(string(alias)); err != nil {
+		return errors.Wrap(err, "string")
+	}
+	return nil
+}
+
+func (s *PolicyUpdatedEvent) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.ProjectID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Category.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "category",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.ActorType.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "actor_type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.DelegationType.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "delegation_type",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s PolicyUpdatedEventActorType) Validate() error {
+	switch s {
+	case "human":
+		return nil
+	case "service":
+		return nil
+	case "system":
+		return nil
+	case "agent":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s PolicyUpdatedEventCategory) Validate() error {
+	switch s {
+	case "request":
+		return nil
+	case "auth":
+		return nil
+	case "session":
+		return nil
+	case "admin":
+		return nil
+	case "entity":
+		return nil
+	case "signal":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s PolicyUpdatedEventDelegationType) Validate() error {
+	switch s {
+	case "direct":
+		return nil
+	case "delegated":
+		return nil
+	case "pat_shared":
+		return nil
+	case "exchanged":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
 }
 
 func (s *Preview) Validate() error {
@@ -12422,6 +12866,17 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if err := s.Origin.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "origin",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.DeploymentID.Validate(); err != nil {
 			return err
 		}
@@ -12729,6 +13184,29 @@ func (s SchemaDocument) Validate() error {
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
 	}
+}
+
+func (s *SchemaHeaders) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
 }
 
 func (s *SecretVariableInput) Validate() error {

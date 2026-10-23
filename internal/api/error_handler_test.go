@@ -251,6 +251,7 @@ var dualSchemeRequests = []struct {
 	{"user create", http.MethodPost, "/users?project_id=proj_1", `{}`},
 	{"user get", http.MethodGet, "/users/user_1", ""},
 	{"user passkeys", http.MethodGet, "/users/user_1/passkeys", ""},
+	{"user patch", http.MethodPatch, "/users/user_1", `{"attributes":{"nickname":"x"}}`},
 	{"user delete", http.MethodDelete, "/users/user_1", ""},
 	{"team create", http.MethodPost, "/teams?project_id=proj_1", `{"name":"x"}`},
 	{"team update", http.MethodPatch, "/teams/team_1", `{"name":"x"}`},
@@ -278,6 +279,7 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		api.GetTeamOperation,
 		api.CreateUserOperation,
 		api.GetUserByIDOperation,
+		api.PatchUserByIDOperation,
 		api.DeleteUserByIDOperation,
 		api.CreateTeamOperation,
 		api.UpdateTeamOperation,
@@ -515,6 +517,67 @@ func TestOgenErrorHandlerSecurityInternalErrorIs500(t *testing.T) {
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 	require.JSONEq(t, `{"code":"internal","message":"An unexpected error occurred."}`, rec.Body.String())
+}
+
+// Attributes failing the user schema keep their own code inside the server,
+// but answer as request validation does: req.invalid with the stable message
+// and the failing field paths, never the validator text.
+func TestErrorResponseUserAttributesInvalidIsRequestInvalid(t *testing.T) {
+	t.Parallel()
+
+	_, validationErr := domain.NewCreateUser(domain.CreateUserParams{
+		ProjectID:  "proj_1",
+		SchemaURL:  "https://example.test/schema.json",
+		Schema:     []byte(`{"type": "object", "required": ["country"], "properties": {"age": {"type": "integer"}, "country": {"type": "string"}}}`),
+		Attributes: map[string]any{"age": "secret-value"},
+	})
+	require.ErrorIs(t, validationErr, domain.ErrUserAttributesInvalid(nil))
+
+	got := errorResponse(userAttributesRequestInvalid(validationErr))
+
+	require.Equal(t, http.StatusBadRequest, got.StatusCode)
+	require.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), got.Response.Code)
+	require.Equal(t, domain.ErrRequestInvalid().Message, got.Response.Message)
+	body, err := got.Response.MarshalJSON()
+	require.NoError(t, err)
+	require.JSONEq(t, `{"code":"req.invalid","message":`+fmt.Sprintf("%q", domain.ErrRequestInvalid().Message)+
+		`,"details":{"details":{"fields":["attributes.age","attributes.country"]}}}`, string(body))
+	require.NotContains(t, string(body), "secret-value")
+
+	// Outside the /users endpoints no request body carries attributes, so a
+	// flow answers the failure as before.
+	flow := errorResponse(validationErr)
+	require.Equal(t, http.StatusBadRequest, flow.StatusCode)
+	require.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), flow.Response.Code)
+	require.Equal(t, "user is not valid according to schema", flow.Response.Message)
+	require.False(t, flow.Response.Details.Set)
+}
+
+// The domain names attributes by key; the API names them by their path from
+// the request body, and a failure on the document itself names attributes.
+func TestErrorResponseUserAttributesAreNamedByBodyPath(t *testing.T) {
+	t.Parallel()
+
+	conflict := errorResponse(domain.ErrUserAlreadyExists().WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"email"}}))
+	require.Equal(t, http.StatusConflict, conflict.StatusCode)
+	require.Equal(t, api.ErrorCode(domain.ErrUserAlreadyExists().Code), conflict.Response.Code)
+	require.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Response.Details.Value["details"]))
+
+	invalid := errorResponse(userAttributesRequestInvalid(domain.ErrUserAttributesInvalid(nil).
+		WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"", "address.zip"}})))
+	require.Equal(t, http.StatusBadRequest, invalid.StatusCode)
+	require.JSONEq(t, `{"fields":["attributes","attributes.address.zip"]}`, string(invalid.Response.Details.Value["details"]))
+}
+
+// A schema failure that names no attributes has no fields to report, so it is
+// answered as a schema failure, never as req.invalid with an empty list.
+func TestErrorResponseUserAttributesInvalidWithoutKeysStaysUserInvalid(t *testing.T) {
+	t.Parallel()
+
+	got := errorResponse(userAttributesRequestInvalid(domain.ErrUserAttributesInvalid(nil)))
+	require.Equal(t, http.StatusBadRequest, got.StatusCode)
+	require.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), got.Response.Code)
+	require.False(t, got.Response.Details.Set)
 }
 
 // A credential IntrospectToken refuses is a 401; an introspection that could

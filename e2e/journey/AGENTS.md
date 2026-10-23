@@ -7,7 +7,7 @@ the repo root.
 
 ## The journey
 
-- CI runs `npx @zitadel/cli@alpha doctor --runtime binary`,
+- CI runs `npx @zitadel/cli@latest doctor --runtime binary`,
   `start --runtime binary` and `setup --framework <id> --server local`, each
   with `--non-interactive --json`, for every id in `ciFrameworkIds`
   (`e2e/journey/scripts/frameworks.mjs`). The ids in `ciExcludedFrameworkIds`
@@ -35,6 +35,8 @@ the repo root.
   consumer suite in `e2e/journey/fixtures/testkit/`. It never sets
   `ZITADEL_SERVER_BINARY` or `NEXTGEN_*`: proving the published binary works
   unconfigured is the point.
+- Skip a spec that needs the mock OIDC provider when `JOURNEY_OIDC_MOCK_URL`
+  is unset: lanes on `--runtime docker` or without a built mock start none.
 
 ## Packages and the registry
 

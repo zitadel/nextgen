@@ -80,3 +80,9 @@ func TestAutocompleteForField(t *testing.T) {
 		})
 	}
 }
+
+func TestPasswordPolicyStepError(t *testing.T) {
+	t.Parallel()
+	got := domain.PasswordPolicyStepError(map[string]any{"min_length": int64(12), "history_depth": int64(4)})
+	assert.Equal(t, "error.x-auth-methods#password_history_depth; error.x-auth-methods#password_min_length", got)
+}

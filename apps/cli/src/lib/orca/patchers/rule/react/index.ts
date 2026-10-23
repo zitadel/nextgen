@@ -36,8 +36,8 @@ export class ReactPatcher extends AbstractRulePatcher implements ViteSupport {
     return framework === "react";
   }
 
-  viteProxyOp(devPort: number, server: string): FileOp {
-    return buildViteProxyOp(devPort, server);
+  viteProxyOp(devPort: number, server: string, previousPort?: number): FileOp {
+    return buildViteProxyOp(devPort, server, previousPort);
   }
 
   viteSessionCookieOp(): FileOp {
@@ -46,6 +46,10 @@ export class ReactPatcher extends AbstractRulePatcher implements ViteSupport {
 
   protected override async preflight(_ctx: PatchContext, cwd: string): Promise<void> {
     await assertMountsRootComponent(cwd, await viteEntry(cwd), ROOT);
+  }
+
+  protected devPortOps(ctx: PatchContext, previousPort: number | undefined): FileOp[] {
+    return [this.viteProxyOp(ctx.framework.devPort, ctx.server, previousPort)];
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {

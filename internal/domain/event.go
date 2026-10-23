@@ -88,6 +88,9 @@ const (
 
 	EventTypeBrandingCreated EventType = "branding.created"
 
+	EventTypePolicyCreated EventType = "policy.created"
+	EventTypePolicyUpdated EventType = "policy.updated"
+
 	EventTypeReleaseCreated EventType = "release.created"
 	EventTypeReleaseRevoked EventType = "release.revoked"
 

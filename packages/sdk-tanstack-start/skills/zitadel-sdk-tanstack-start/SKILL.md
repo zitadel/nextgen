@@ -29,10 +29,10 @@ Start app by hand, or adjusting a scaffolded wiring.
 ## Install
 
 ```bash
-pnpm add @zitadel/sdk-tanstack-start@alpha
+pnpm add @zitadel/sdk-tanstack-start@latest
 ```
 
-Peer deps: `@tanstack/react-start >=1`, `react >=18`, `react-dom >=18`.
+Peer deps: `@tanstack/react-start >=1.168.10`, `react >=18`, `react-dom >=18`.
 
 ## Integrate
 

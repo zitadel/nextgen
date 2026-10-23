@@ -14,12 +14,12 @@ import {
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
-  ResourcePage,
   ResourceRow,
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
+import { USER_CLAMP, UserIdCell, UserIdentityCell } from "@/components/user-cells";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
@@ -31,7 +31,8 @@ import {
 } from "@/lib/project-scope";
 import type { SchemaField } from "@/lib/schema";
 import type { UserTeam } from "@/lib/user";
-import { columnsForUsers, fetchUsers, toUserRow } from "@/lib/user-list";
+import { columnsBeyondIdentity, columnsForUsers, fetchUsers, toUserRow } from "@/lib/user-list";
+import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the single-person glyph. The plural two-person one
@@ -59,9 +60,6 @@ interface UsersPage {
   columns: SchemaField[];
   teamsExpanded: boolean;
 }
-
-/** The User and schema-driven cells clamp at 280px and truncate. */
-const CLAMP = "max-w-70";
 
 function UsersScreen() {
   const projectId = useRequiredProjectScope();
@@ -104,9 +102,12 @@ function UsersScreen() {
     () => users.map((user, index) => toUserRow(user, index, columns)),
     [users, columns],
   );
+  // Each value once per row: a column that only repeats what the User cell
+  // already shows is dropped (under the default schema, the email).
+  const shown = useMemo(() => columnsBeyondIdentity(columns, rows), [columns, rows]);
 
   return (
-    <ResourcePage>
+    <Page>
       {/* No search beside the title: it is out of the page headers until there
           is a console-wide solution (D19). */}
       <ResourceTitle
@@ -124,15 +125,15 @@ function UsersScreen() {
         Users
       </ResourceTitle>
 
-      {/* The column set is schema-driven and so has no fixed width; the design
-          scrolls the table horizontally rather than compressing cells. */}
+      {/* The column set is schema-driven and so has no fixed width. The ID
+          gives way first; a schema with more columns than fit scrolls the
+          table horizontally rather than compressing cells. */}
       <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
         <Table className="text-xs">
           <TableHeader>
             <ResourceHeaderRow>
               <ResourceHeadCell>User</ResourceHeadCell>
-              <ResourceHeadCell>Identifier</ResourceHeadCell>
-              {columns.map((column) => (
+              {shown.map((column) => (
                 <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
               ))}
               <ResourceHeadCell>Status</ResourceHeadCell>
@@ -144,37 +145,15 @@ function UsersScreen() {
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <ResourceEmptyRow colSpan={columns.length + (teamsExpanded ? 6 : 5)}>
+              <ResourceEmptyRow colSpan={shown.length + (teamsExpanded ? 5 : 4)}>
                 No users yet.
               </ResourceEmptyRow>
             ) : (
               rows.map((user) => (
-                <ResourceRow key={user.id}>
-                  {/* The User column renders the server-resolved identity
-                      (display → identifier → id, ADR 058 §3a) and carries the
-                      link to the detail screen — schema-driven columns cannot
-                      promise a meaningful leading value, this cell always can. */}
-                  <TableCell className={`${RESOURCE_CELL} ${CLAMP} text-sm`}>
-                    <Link
-                      to="/users/$userId"
-                      params={{ userId: user.id }}
-                      className="text-foreground block truncate font-medium underline-offset-2 hover:underline"
-                    >
-                      {user.name}
-                    </Link>
-                  </TableCell>
-                  {/* The designated identifier (x-identifier) — role-named, so a
-                      mixed-schema list reads down one column whether a row's
-                      identifier is an email or a loginname; the tooltip names
-                      the property it came from. */}
-                  <TableCell
-                    className={`${RESOURCE_CELL_MUTED} ${CLAMP}`}
-                    title={user.identifierProperty}
-                  >
-                    {user.identifier ?? "—"}
-                  </TableCell>
-                  {columns.map((column) => (
-                    <TableCell key={column.key} className={`${RESOURCE_CELL_MUTED} ${CLAMP}`}>
+                <ResourceRow key={user.id} className="group">
+                  <UserIdentityCell user={user} />
+                  {shown.map((column) => (
+                    <TableCell key={column.key} className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
                       {user.values[column.key] ?? "—"}
                     </TableCell>
                   ))}
@@ -182,13 +161,11 @@ function UsersScreen() {
                     <StatusBadge status={user.status} />
                   </TableCell>
                   {teamsExpanded && (
-                    <TableCell className={`${RESOURCE_CELL_MUTED} ${CLAMP}`}>
+                    <TableCell className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
                       <TeamCell teams={user.teams} truncated={user.teamsTruncated} />
                     </TableCell>
                   )}
-                  <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
-                    {user.id}
-                  </TableCell>
+                  <UserIdCell user={user} />
                   <TableCell className={RESOURCE_CELL}>
                     <RowActions
                       userId={user.id}
@@ -204,7 +181,7 @@ function UsersScreen() {
       </div>
       {/* Full width and `secondary`, 24px under the table, not a centred pill. */}
       <LoadMore paging={paging} />
-    </ResourcePage>
+    </Page>
   );
 }
 

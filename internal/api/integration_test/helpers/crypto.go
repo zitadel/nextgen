@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -47,6 +48,42 @@ func (h *Harness) ensureHasher(t testing.TB) *crypto.PasswapHasher {
 func (h *Harness) EnsureProjectHashers(t testing.TB) service.ProjectHasherResolver {
 	t.Helper()
 	return service.NewProjectHasherResolver(h.EnsureServiceDB(t), h.EnsureHasherFactory(t))
+}
+
+// EnsurePolicyService is the operation policy service the server wires: the
+// embedded policy catalog over the harness database.
+func (h *Harness) EnsurePolicyService(t testing.TB) *service.PolicyService {
+	t.Helper()
+	db := h.EnsureServiceDB(t)
+	h.policyService.mutex.Lock()
+	defer h.policyService.mutex.Unlock()
+
+	if h.policyService.value == nil {
+		engine, err := policy.New()
+		require.NoError(t, err)
+		h.policyService.value = service.NewPolicyService(db, engine)
+	}
+	return h.policyService.value
+}
+
+// EnsurePasswordPolicy is the password gate the server wires: the embedded
+// policy catalog, the project's published instance resolved through the
+// policy service, and the deployment's default verifier for history checks.
+func (h *Harness) EnsurePasswordPolicy(t testing.TB) *service.PasswordPolicy {
+	t.Helper()
+	hasherFactory := h.EnsureHasherFactory(t)
+	db := h.EnsureServiceDB(t)
+	policies := h.EnsurePolicyService(t)
+	h.passwordPolicy.mutex.Lock()
+	defer h.passwordPolicy.mutex.Unlock()
+
+	if h.passwordPolicy.value == nil {
+		engine, err := policy.New()
+		require.NoError(t, err)
+		h.passwordPolicy.value, err = service.NewPasswordPolicy(engine, policies, hasherFactory.Default(), db)
+		require.NoError(t, err)
+	}
+	return h.passwordPolicy.value
 }
 
 func (h *Harness) EnsureHasherFactory(t testing.TB) *crypto.HasherFactory {

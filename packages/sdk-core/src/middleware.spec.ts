@@ -308,6 +308,17 @@ describe("opaque session tokens", () => {
       );
     });
 
+    it("asks the backend at an address given with a trailing slash", async () => {
+      const fetchMock = backend(Response.json({ project_id: PROJECT, user_id: "u1" }));
+
+      await checkOpaqueSessionToken("tok", "http://auth.test/", 1000, PROJECT);
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://auth.test/sessions/me?project_id=proj_app",
+        expect.anything(),
+      );
+    });
+
     // CreateSession sets the cookie before any factor is verified.
     it.each([[{ project_id: PROJECT }], [{ project_id: PROJECT, user_id: "" }]])(
       "reports a live session without a user (%j) as anonymous",
@@ -789,6 +800,22 @@ describe("proxySessionCookies", () => {
           headers: { cookie: "__nextgen_session=earlier" },
         }),
       );
+    });
+
+    it("asks for and ends the second session at an address given with a trailing slash", async () => {
+      const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
+      const cookies = proxySessionCookies(
+        proxied({ ...SIGN_OUT, cookie: `${OWN}=current; __nextgen_session=earlier` }),
+        PROJECT,
+        { ...UPSTREAM, url: "http://auth.test/" },
+      );
+
+      await cookies.toBrowser(answer(204, null, [CLEARED_SHARED]));
+
+      expect(fetchMock.mock.calls.map(([url, init]) => [String(url), init?.method])).toEqual([
+        [`http://auth.test/sessions/me?project_id=${PROJECT}`, "GET"],
+        ["http://auth.test/sessions/me", "DELETE"],
+      ]);
     });
 
     it("clears a session of this project on sign-in without ending it", async () => {

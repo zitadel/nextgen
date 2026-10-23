@@ -5,7 +5,7 @@ Nuxt module, Nitro middleware, and helpers for Nextgen Auth.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-nuxt@alpha
+pnpm add @zitadel/sdk-nuxt@latest
 ```
 
 There are two ways to wire the SDK. **The module is what `zitadel setup`
@@ -15,6 +15,8 @@ for hand-rolled setups.
 ## Requirements
 
 Peer dependencies: `nuxt >=4` and `h3 >=1`.
+
+The Nitro middleware reads the request and writes the response only through h3's accessors (`getRequestHeaders`, `getRequestIP`, `setResponseHeader` and the like), never `event.node`, and reads a proxied request body through the web `Request`. It is tested on Node and inside the `edge-runtime` VM over a web-style h3 event. It has not been deployed to a Cloudflare, Vercel Edge or other edge Nitro preset, and h3 1.x still builds its event on a Node-shaped shim there. On a preset that reports no connection address, `X-Forwarded-For` is left as the proxy chain it received, with the address added only when the runtime provides it (`event.context.clientAddress` or the socket).
 
 TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
 
@@ -181,7 +183,7 @@ Both surfaces take these options: the module under `nextgen` in
 
 | Option              | Type                 | Default                  | Description                                                                                                                |
 | ------------------- | -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `url`                 | `string`             | `ZITADEL_URL` env, read when the server starts (`nuxt dev` also reads `.env.local`), else `http://localhost:8080` | Full URL of the Zitadel auth backend                                                                                       |
+| `url`                 | `string`             | `ZITADEL_URL` env, read when the server starts (`nuxt dev` also reads `.env.local`), else `http://localhost:8080` | Full URL of the Zitadel auth backend. A trailing slash is ignored.                                                         |
 | `projectId`         | `string`             | the public project id (`runtimeConfig.public.zitadelProjectId`), else `ZITADEL_PROJECT_ID` at runtime; `createNextgenMiddleware` alone: `ZITADEL_PROJECT_ID`, else `NUXT_PUBLIC_ZITADEL_PROJECT_ID` | The project this app signs its users in to. A session of any other project on the server reads as signed out and keeps its cookie; with no project, no session counts. A built server takes it from `NUXT_NEXTGEN_PROJECT_ID` |
 | `proxyPath`         | `string`             | `"/__nextgen"`           | Path prefix proxied to the auth backend. Sign-in with an external provider currently requires the default: the provider returns to `/__nextgen/idp/{slug}/callback` |
 | `protectedRoutes`   | `string[]`           | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |

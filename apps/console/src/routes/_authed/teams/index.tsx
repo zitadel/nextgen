@@ -16,7 +16,6 @@ import {
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
-  ResourcePage,
   ResourceRow,
   RowMenu,
 } from "@/components/resource-list";
@@ -28,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatDate } from "@/lib/date";
 import { requireProjectScope, useRequiredProjectScope } from "@/lib/project-scope";
+import { Page } from "@/components/layout";
 
 /**
  * The two states `team-status` defines. The tabs filter on exactly these, so the
@@ -106,7 +106,7 @@ function TeamsScreen() {
   const teams = [...loaded.teams, ...paging.extra];
 
   return (
-    <ResourcePage>
+    <Page>
       {/* The tabs filter one list rather than switch between panels, so the
           table is the tab's panel: it renders under whichever tab is selected,
           which is also what keeps each trigger's `aria-controls` pointing at a
@@ -211,7 +211,7 @@ function TeamsScreen() {
           </TabsContent>
         ))}
       </Tabs>
-    </ResourcePage>
+    </Page>
   );
 }
 

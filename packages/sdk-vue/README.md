@@ -5,7 +5,7 @@ Vue 3 components for the Zitadel auth UI, for client-side SPAs (Vite, etc.).
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-vue@alpha
+pnpm add @zitadel/sdk-vue@latest
 ```
 
 ## Requirements
@@ -75,6 +75,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 ```vue
 <ZitadelLogin :project="project" theme="light" @flowComplete="track" />
 ```
+
+The `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` details carry a `waitUntil(promise)`; call it from your handler to make the widget wait for your async work before it navigates.
 
 ## Standard HTML attributes
 

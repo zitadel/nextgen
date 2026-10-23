@@ -3,6 +3,7 @@ import { format } from "node:util";
 
 import { run } from "@oclif/core";
 
+import type { LocalServers, ManagedRuntimeProcess } from "../../src/lib/local-server/processes";
 import { publicCliCommand } from "../../src/lib/public-cli";
 import { cliPackageRoot } from "./oclif-build";
 
@@ -17,11 +18,16 @@ const cliVersion = JSON.parse(
  * `run*` functions to stdout exactly as in production. Requires the CLI to have
  * been built (vitest global setup builds `dist/index.mjs`). `root` is the
  * package oclif loads; pass a staged copy to exercise a published layout.
+ *
+ * `doctor` and `stop` run from the source with `machine` as the servers the
+ * machine runs, none unless a test gives some, so no run reads the host's
+ * processes and a Zitadel running on the developer's machine changes no result.
  */
 export async function runCliForTest(
   argv: string[],
   env: NodeJS.ProcessEnv = {},
   root: string = cliPackageRoot,
+  machine: LocalServers = aMachineRunning(),
 ) {
   let stdout = "";
   let stderr = "";
@@ -52,7 +58,8 @@ export async function runCliForTest(
 
   let exitCode = 0;
   try {
-    await run(argv, root);
+    const command = await commandSeeing(argv[0], machine);
+    await (command ? command.run(argv.slice(1), root) : run(argv, root));
   } catch (error) {
     exitCode = exitCodeOf(error);
   } finally {
@@ -71,6 +78,45 @@ export async function runCliForTest(
   }
 
   return { exitCode, stdout, stderr };
+}
+
+/** A machine that runs exactly the given servers, whatever it really runs. */
+export function aMachineRunning(
+  ...processes: ReadonlyArray<Omit<ManagedRuntimeProcess, "kind">>
+): LocalServers {
+  return {
+    current: () =>
+      Promise.resolve({
+        supported: true,
+        processes: processes.map((entry) => ({ ...entry, kind: "server-wrapper" as const })),
+      }),
+  };
+}
+
+/** The source command that asks `machine` which servers run, for the commands that ask. */
+async function commandSeeing(
+  name: string | undefined,
+  machine: LocalServers,
+): Promise<{ run(argv: string[], root: string): Promise<unknown> } | undefined> {
+  // Loaded here, not at the top: this module is loaded by the test setup, ahead
+  // of any test's mocks, and the commands must not be.
+  if (name === "doctor") {
+    const { default: Doctor } = await import("../../src/commands/doctor");
+    return class extends Doctor {
+      protected override localServers(): LocalServers {
+        return machine;
+      }
+    };
+  }
+  if (name === "stop") {
+    const { default: Stop } = await import("../../src/commands/stop");
+    return class extends Stop {
+      protected override localServers(): LocalServers {
+        return machine;
+      }
+    };
+  }
+  return undefined;
 }
 
 function exitCodeOf(error: unknown): number {

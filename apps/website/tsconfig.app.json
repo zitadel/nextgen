@@ -11,5 +11,5 @@
     ]
   },
   "include": ["next-env.d.ts", "app/**/*.ts", "app/**/*.tsx"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "app/**/*.spec.ts", "app/**/*.spec.tsx"]
 }

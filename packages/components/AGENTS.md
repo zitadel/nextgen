@@ -48,6 +48,9 @@ The Lit atoms (`<zl-*>`) and the orchestrators under `src/orchestrator/`
   `unsafeHTML` inside `render()`.
 - Coordinate before adding a `template` accessor to `<zitadel-login>`: it
   changes the public surface.
+- `src/server.ts` is what the package root resolves to on edge runtimes
+  (`workerd`, `worker` or `edge-light` together with `browser`): it must never
+  import Lit, directly or through another module. `server.spec.ts` proves it against the built `dist/`.
 - Comments explain why, not what.
 
 ### Input atoms expose a real native control
@@ -67,11 +70,18 @@ and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM.
   `aria-hidden`, out of the tab order, its state in `data-*` hooks.
   `<zl-select>` is the reference.
 
+## Secrets and events
+
+The widget never broadcasts a password or one-time-code value through its own events: `zitadel-flow-input` is not dispatched for a field whose type is `password` or whose autocomplete is `current-password`, `new-password` or `one-time-code`, and the internal `zl-input`, `zl-change` and `zl-passkey-result` events are emitted `{ composed: false }` so they stay inside the widget. It does not, and cannot, hide the input from other scripts on the same page.
+
 ## Tests
 
-- `pnpm test` runs both projects of `vitest.config.ts`: `unit` (jsdom) and
-  `browser` (Chromium, `*.browser.spec.ts`). `pnpm test:unit` is the fast lane;
+- `pnpm test` runs the projects of `vitest.config.ts`: `unit` (jsdom),
+  `edge` and `browser` (Chromium, `*.browser.spec.ts`). `pnpm test:unit` is the fast lane;
   `pnpm test:browser` runs the browser project alone.
+- The `edge` project runs `*.edge.spec.ts` inside the `edge-runtime` VM
+  (`edgeProject()` in `vitest.shared.mjs`). Only `src/server.ts`, which exists
+  for the edge, has one; it imports the built `dist/server.mjs`.
 - Put a test in the lowest project that proves it (the ladder in
   [`packages/testing/AGENTS.md`](../testing/AGENTS.md#which-layer-a-test-belongs-in)):
   form association and focus in `browser`, markup and ARIA in `unit`.

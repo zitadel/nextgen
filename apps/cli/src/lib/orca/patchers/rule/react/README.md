@@ -2,6 +2,8 @@
 
 Integrates Zitadel auth into a Vite + React single-page app.
 
+The detector requires `react` 18 or newer; older versions are refused.
+
 ## What it patches
 
 - `src/App.tsx` — auth entry that renders the Zitadel login/logout widgets

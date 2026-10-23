@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import { _setRuntimeForTesting } from "@/runtime/runtime";
 import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
@@ -60,6 +61,31 @@ describe("projects screen", () => {
     const table = within(await screen.findByRole("table"));
     expect(table.getByRole("link", { name: "River" })).toBeInTheDocument();
     expect(table.getByText(expectedDate("2026-07-08T09:00:00Z"))).toBeInTheDocument();
+  });
+
+  it("suggests setup against this console's own server", async () => {
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [
+            {
+              id: "proj_1",
+              name: "River",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
+          ],
+        }),
+      ),
+    );
+    await renderProjects();
+    await screen.findByRole("heading", { name: "Projects" });
+
+    // The specs' API base is http://localhost/api, so that is the server the
+    // command names, not the CLI's hosted default.
+    expect(
+      await screen.findByText("npx @zitadel/cli@latest setup --server http://localhost"),
+    ).toBeInTheDocument();
   });
 
   it("lists a project somebody else granted access to", async () => {
@@ -268,5 +294,41 @@ describe("projects screen", () => {
     // Absent rather than disabled: its absence is how the screen says the list
     // is complete (design decisions log D5 — no total count to show instead).
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  // On localhost the cookie may hold an app's session. Every read of the list
+  // names the console's project, so the server refuses that session instead of
+  // listing the app user's projects.
+  it("names the console's project in every read of the list", async () => {
+    _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
+    const reads: URLSearchParams[] = [];
+    server.use(
+      http.get(PROJECTS_URL, ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        reads.push(params);
+        const id = params.get("page_token") === null ? "proj_1" : "proj_2";
+        return HttpResponse.json({
+          projects: [
+            {
+              id,
+              name: id === "proj_1" ? "River" : "Delta",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
+          ],
+          next_page_token: id === "proj_1" ? "page-2" : undefined,
+        });
+      }),
+    );
+    await renderProjects();
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    expect(await screen.findByRole("link", { name: "Delta" })).toBeInTheDocument();
+
+    // The guard's and the switcher's shared read, the screen's and Load more.
+    expect(reads.some((params) => !params.has("limit"))).toBe(true);
+    expect(reads.some((params) => params.get("page_token") === "page-2")).toBe(true);
+    expect(reads.map((params) => params.get("project_id"))).toEqual(
+      reads.map(() => "proj_platform"),
+    );
   });
 });

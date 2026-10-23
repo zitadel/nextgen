@@ -1,0 +1,22 @@
+title: PublishPolicyRequest
+type: object
+description: |
+  One publish of the project's policy for an operation. `config` sets the
+  operation template's settings; a setting left out is off, and `{}` switches
+  every rule off. The settings each operation accepts are listed in the policy
+  catalog.
+required:
+  - operation
+  - config
+properties:
+  operation:
+    type: string
+    description: The operation the policy guards.
+    example: auth.factor.password.set
+  config:
+    type: object
+    additionalProperties: true
+    description: The settings, checked against the operation's template.
+    example:
+      min_length: 12
+      history_depth: 4

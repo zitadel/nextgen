@@ -50,7 +50,7 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // back into the console, where the guard's `GET /sessions/me` now answers
   // 200. Four more calls that only resolve if the base is right.
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  // `/` has no screen of its own and lands on Teams, which acts on a selected
+  // `/` has no screen of its own and lands on Users, which acts on a selected
   // project. The seeded user holds no grant, so `GET /users/me/projects` lists
   // nothing and there is no project to select for them
   // (`resolveDefaultProjectScope`): the guard sends them to Projects instead,
@@ -65,8 +65,8 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // reached.
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
   await expect(page.getByText("No projects yet.")).toBeVisible();
-  // `toContainText`: the pill carries its label twice, once per breakpoint.
-  await expect(page.getByRole("button", { name: "Switch project" })).toContainText("No projects");
+  // Projects is where a project is chosen, so the bar carries no switcher there.
+  await expect(page.getByRole("button", { name: "Switch project" })).toHaveCount(0);
 });
 
 test("manages the project with the session cookie alone", async ({ page, seed, zitadel }) => {

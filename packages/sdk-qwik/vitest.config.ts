@@ -3,7 +3,8 @@ import { playwright } from "@vitest/browser-playwright";
 import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
+import { renderServerLogin } from "./src/__tests__/server-markup.ts";
 
 /**
  * Two projects in one config:
@@ -40,12 +41,14 @@ export default defineConfig({
           globals: true,
           setupFiles: ["src/test-setup.ts"],
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/*.ssr.spec.tsx"],
+          exclude: ["src/**/*.ssr.spec.tsx", edgeSpecs],
           browser: {
             enabled: true,
             provider: playwright(),
             headless: true,
             instances: [{ browser: "chromium" }],
+            // Node-side helpers a browser spec calls through `commands`.
+            commands: { renderServerLogin },
           },
         },
       },
@@ -59,6 +62,13 @@ export default defineConfig({
           include: ["src/**/*.ssr.spec.tsx"],
         },
       },
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
+      edgeProject({
+        // Qwik keeps its request context in an AsyncLocalStorage, which Workers
+        // (`nodejs_compat`) and Vercel Edge both provide.
+        polyfilledPackages: ["@qwik.dev/core"],
+        plugins: [qwikVite()],
+      }),
     ],
   },
 });

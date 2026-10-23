@@ -57,9 +57,9 @@ func TestExchangeHandoff_RefusedToken(t *testing.T) {
 	}
 
 	t.Run("replay of an exchanged token", func(t *testing.T) {
-		// A completed attempt with no required checks, handed off: the
-		// exchange makes a session without a user.
-		attempt := &domain.AuthAttempt{ProjectID: project.ID}
+		// A completed attempt (a verified password and no user), handed off:
+		// the exchange makes a session without a user.
+		attempt := &domain.AuthAttempt{ProjectID: project.ID, Checks: []domain.AuthCheck{&domain.AuthFactorPassword{}}}
 		stmts := harness.EnsureServiceDB(t).Statements()
 		require.NoError(t, stmts.CreateAuthAttempt(t.Context(), attempt))
 		plainToken := "handoff_" + helpers.RandString(12)

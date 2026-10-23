@@ -35,7 +35,6 @@ type ReleaseArtifactsModule = {
     ) => Promise<void>;
   }) => Promise<{ archives: string[]; checksumPath: string }>;
   SERVER_PLATFORMS: Array<{ goos: string; goarch: string }>;
-  TAG_PRERELEASE_AS_LATEST: boolean;
   readServerRelease: (repoRoot: string) => Promise<{
     name: string;
     version: string;
@@ -44,8 +43,10 @@ type ReleaseArtifactsModule = {
   }>;
   packPublicPackages: (options: {
     repoRoot: string;
-    outDir: string;
-    version: string;
+    dirs?: string[];
+    outDir?: string;
+    tarballsDir?: string;
+    version?: string;
     run?: (
       command: string,
       args: string[],
@@ -157,17 +158,11 @@ describe("release artifact helpers", () => {
     ]);
   });
 
-  // Temporary, paired with TAG_PRERELEASE_AS_LATEST in release-artifacts.mjs:
-  // pre-GA there is no stable release to own `:latest`, so the alpha train
-  // carries it. Delete this and restore the prerelease case above when the flag
-  // goes back to false on `changeset pre exit`.
-  it("also adds latest for prereleases while the alpha train owns it", async () => {
-    const { containerTags, TAG_PRERELEASE_AS_LATEST } = await loadModule();
+  it("keeps latest off prereleases", async () => {
+    const { containerTags } = await loadModule();
 
-    expect(TAG_PRERELEASE_AS_LATEST).toBe(true);
     expect(containerTags({ version: "1.2.3-alpha.1", prerelease: true })).toEqual([
       "ghcr.io/zitadel/nextgen:1.2.3-alpha.1",
-      "ghcr.io/zitadel/nextgen:latest",
     ]);
   });
 
@@ -345,5 +340,32 @@ describe("release artifact helpers", () => {
     // every other public package — no special telemetry-channel env.
     const cliPack = calls.find((call) => call.args.includes("apps/cli"));
     expect(cliPack).toBeDefined();
+  });
+
+  it("packs only the given directories into the given tarball directory", async () => {
+    const { packPublicPackages } = await loadModule();
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-packages-"));
+    tempDirs.push(repoRoot);
+    const tarballsDir = join(repoRoot, "registry/npm-packages");
+    await mkdir(join(repoRoot, "packages/sdk-core/dist"), { recursive: true });
+    await writeFile(
+      join(repoRoot, "packages/sdk-core/package.json"),
+      `${JSON.stringify({ name: "@zitadel/sdk-core", version: "0.1.0-alpha.6" })}\n`,
+    );
+
+    const packed: string[][] = [];
+    const result = await packPublicPackages({
+      repoRoot,
+      dirs: ["packages/sdk-core"],
+      tarballsDir,
+      run: async (_command, args) => {
+        packed.push(args);
+      },
+    });
+
+    expect(result).toBe(tarballsDir);
+    expect(packed).toEqual([
+      ["pnpm", "--dir", "packages/sdk-core", "pack", "--pack-destination", tarballsDir],
+    ]);
   });
 });

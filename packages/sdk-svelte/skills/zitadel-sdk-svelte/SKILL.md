@@ -24,13 +24,13 @@ If the user is starting fresh, prefer the `zitadel` CLI instead — it scaffolds
 working Svelte app and wires the dev proxy for you:
 
 ```sh
-npx @zitadel/cli@alpha setup --framework svelte --non-interactive --json
+npx @zitadel/cli@latest setup --framework svelte --non-interactive --json
 ```
 
 ## Install
 
 ```sh
-npm install @zitadel/sdk-svelte@alpha
+npm install @zitadel/sdk-svelte@latest
 ```
 
 Peer dependencies: `svelte ^5.0.0`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).
@@ -103,6 +103,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 ```svelte
 <ZitadelLogin {project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
+
+When your callback for `zitadel-flow-complete`, `zitadel-flow-redirect` or `zitadel-signout` returns a promise, the widget waits for it to settle (up to two seconds) before it navigates.
 
 ## Read these, don't guess
 

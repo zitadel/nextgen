@@ -32,6 +32,7 @@ export async function claimProjectAsAdmin(input: {
   const cookie = await adminSessionCookie(serverUrl, admin);
   const session = createZitadelClient({ baseUrl: serverUrl });
   const { csrf_token } = await session.getMySessionCsrfToken(
+    undefined,
     localAdminRequest(serverUrl, { cookie }),
   );
   const { team_id, claimed_at } = await session.completeClaim(

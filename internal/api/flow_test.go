@@ -168,7 +168,7 @@ func newTestServerKeys(t *testing.T, openErr, sealErr error, middleware ...func(
 	// The project service is read only when a submit carries an Origin, so
 	// a test that sends one sets its expectation.
 	projects := mocks.NewMockProjectService(mock)
-	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, projects, nil, nil, nil, nil, nil, releaseService, nil, nil, tokenService, keyService, nil, nil, nil, nil, "")
+	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, projects, nil, nil, nil, nil, nil, releaseService, nil, nil, nil, tokenService, keyService, nil, nil, nil, nil, "")
 	oas, err := gen.NewServer(
 		handler,
 		api.NewSecurityHandler(tokenService),

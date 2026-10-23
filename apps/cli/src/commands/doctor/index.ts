@@ -3,14 +3,12 @@ import consola from "consola";
 
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
 import { ZitadelError } from "../../lib/errors";
+import { serverLogAction } from "../../lib/journey-guidance";
 import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
 } from "../../lib/local-server/docker-guidance";
-import {
-  discoverManagedRuntimeProcesses,
-  type ManagedRuntimeProcess,
-} from "../../lib/local-server/processes";
+import type { LocalServers, ManagedRuntimeProcess } from "../../lib/local-server/processes";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   assertLocalStateWritable,
@@ -97,6 +95,7 @@ export default class Doctor extends BaseCommand {
       runtimeBackend,
       image,
       port,
+      this.localServers(),
     );
     const hasConfig = await hasZitadelConfig(cwd);
     const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
@@ -124,6 +123,15 @@ export default class Doctor extends BaseCommand {
     const failed = checks.filter((check) => check.status === "fail");
     const warnings = checks.filter((check) => check.status === "warn");
     const warningAdvice = advisoryForWarnings(warnings, this.meta.cliVersion);
+    // A server that is running is one a sign-in or a request can fail
+    // against, and its log is where the reason is.
+    const serving =
+      existingRuntime !== undefined &&
+      runtimeChecks.find((check) => check.name === "runtime")?.status === "pass";
+    const nextActions = [
+      ...(warningAdvice?.nextActions ?? []),
+      ...(serving ? [serverLogAction(this.meta.cliVersion)] : []),
+    ];
     this.recordTelemetry({
       runtime: runtimeBackend,
       checks_total: checks.length,
@@ -146,12 +154,8 @@ export default class Doctor extends BaseCommand {
         lifecycle: hasConfig ? "configured" : "not-configured",
       },
       checks,
-      ...(warningAdvice
-        ? {
-            next_actions: warningAdvice.nextActions,
-            next_commands: warningAdvice.nextCommands,
-          }
-        : {}),
+      ...(nextActions.length > 0 ? { next_actions: nextActions } : {}),
+      ...(warningAdvice ? { next_commands: warningAdvice.nextCommands } : {}),
     };
 
     if (failed.length > 0) {
@@ -352,8 +356,9 @@ async function runLocalRuntimeChecks(
   runtimeBackend: RuntimeBackend,
   image: string,
   port: number,
+  servers: LocalServers,
 ): Promise<CheckOutcome[]> {
-  const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime);
+  const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime, servers);
   if (runtimeBackend === "binary") {
     return [
       await check("server-binary", "Server npm package is available", async () => {
@@ -475,8 +480,9 @@ class PortInUseCheckError extends Error {
 
 async function checkManagedRuntimeProcesses(
   runtime: RuntimeMetadata | undefined,
+  servers: LocalServers,
 ): Promise<CheckOutcome> {
-  const discovery = await discoverManagedRuntimeProcesses();
+  const discovery = await servers.current();
   if (!discovery.supported) {
     return {
       name: "managed-runtime-processes",

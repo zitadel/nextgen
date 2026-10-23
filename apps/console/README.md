@@ -38,17 +38,22 @@ each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
 
 - **Projects** (`/projects`): the one entry outside a project, and the only one
   until a project is selected.
-- **Teams** (`/teams`, `/teams/$teamId`).
-- **Users** (`/users`, `/users/$userId`), with **User schemas** (`/schemas`,
-  `/schemas/$schemaId`) nested under it.
-- **Login flows** (`/flow-definitions`, `/flow-definitions/$definitionId`), with
-  **Branding** (`/branding`) nested under it.
+- **Teams** (`/teams`, `/teams/$teamId`, with Overview and Members tabs).
+- **Users** (`/users`, `/users/$userId`).
+- **User schemas** (`/schemas`, `/schemas/$schemaId`).
+- **Login flows** (`/flow-definitions`, `/flow-definitions/$definitionId`).
+- **Branding** (`/branding`).
+- **Authentication** (`/authentication`).
 - **Project settings** (`/project`).
-- **Profile** (`/settings/profile`), in the Settings view.
+- **Settings** (`/settings/profile`), your profile, in the Settings view the
+  account menu opens.
+
+The sidebar is one level, in the order and with the icons of the design's
+"01 / Nav Level 1".
 
 **Not in the sidebar:**
 
-- `/` redirects to Teams, `/settings` to Profile, and `/projects/$projectId` to
+- `/` redirects to Users, `/settings` to the profile, and `/projects/$projectId` to
   `/project` with that project selected.
 - `/system` shows server health.
 - `/login` and `/claim` render outside the app shell.
@@ -63,7 +68,8 @@ empty). Attaching `staticData.nav` to a new route lists it.
 - Desktop expanded = 256px sidebar
 - Desktop collapsed / mobile = icon rail (48px), with a Sheet
   overlay available for the expanded label view
-- Context bar: project `Popover` switcher + theme toggle
+- Context bar: the project switcher (not on Projects), the team switcher on a
+  team's page, and search (⌘K / Ctrl K). The theme lives in the account menu.
 
 ## API access and auth
 

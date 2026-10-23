@@ -18,7 +18,7 @@ JSX you drop into your routes.
 
 ## When to use
 
-- **Fresh project:** prefer the CLI. `npx @zitadel/cli@alpha setup --framework solid`
+- **Fresh project:** prefer the CLI. `npx @zitadel/cli@latest setup --framework solid`
   scaffolds a wired Solid app (and the dev proxy) for you — see the
   `zitadel-cli` skill. Don't hand-assemble what the CLI generates.
 - **This skill:** an app that already exists, or a custom integration the
@@ -31,7 +31,7 @@ JSX you drop into your routes.
 TypeScript >= 5.0.
 
 ```sh
-npm install @zitadel/sdk-solid@alpha
+npm install @zitadel/sdk-solid@latest
 ```
 
 ## Integrate
@@ -110,6 +110,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 ```tsx
 <ZitadelLogin project={project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
+
+When your callback for `zitadel-flow-complete`, `zitadel-flow-redirect` or `zitadel-signout` returns a promise, the widget waits for it to settle (up to two seconds) before it navigates.
 
 ## Read these, don't guess
 

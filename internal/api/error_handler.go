@@ -120,6 +120,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return schemaErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixBranding.ErrorCodePrefix("")):
 		return brandingErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixPolicy.ErrorCodePrefix("")):
+		return policyErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixEnvironment.ErrorCodePrefix("")):
 		return environmentErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixRelease.ErrorCodePrefix("")):
@@ -222,7 +224,7 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 		// ogen's validation rejected do go into details.
 		invalid := domain.ErrRequestInvalid()
 		if fields := validationFieldPaths(err); len(fields) > 0 {
-			invalid = invalid.WithDetails(map[string][]string{"fields": fields})
+			invalid = invalid.WithDetails(domain.InvalidFieldPathsDetails{Fields: fields})
 		}
 		details = domainErrorDetails(invalid)
 

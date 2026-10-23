@@ -51,6 +51,10 @@ type SchemaValidator struct {
 	// latestURIByKind maps a schema kind stem (e.g. "flow-definition") to the
 	// canonical URI of its latest known version.
 	latestSchemaURIByKind map[KnownSchemaKind]string
+	// builtinBases names the meta-schemas under the canonical base and under
+	// every other known base, so a document declaring its metaSchema under
+	// another one still validates.
+	builtinBases BuiltinSchemaBases
 }
 
 // NewSchemaValidator compiles the meta-schemas for the tenant schema kinds into memory and returns a SchemaValidator instance.
@@ -100,6 +104,7 @@ func NewSchemaValidator(builtinPublicBase string) (*SchemaValidator, error) {
 	return &SchemaValidator{
 		compiledSchemas:       compiledSchemas,
 		latestSchemaURIByKind: latestURIByKind,
+		builtinBases:          BuiltinSchemaBasesFor(builtinPublicBase),
 	}, nil
 }
 
@@ -151,7 +156,10 @@ func (v *SchemaValidator) ValidateAgainstMetaSchema(schemaBs []byte) error {
 //
 // todo: support fetching compiled schema by version as well when multiple versions of the meta-schemas are available.
 func (v *SchemaValidator) GetBuiltinSchema(uri string) (*jsonschema.Schema, error) {
-	compiledSchema, ok := v.compiledSchemas[uri]
+	// The map is keyed by the canonical base, and Canonicalize maps every
+	// spelling the resolver treats as a built-in (another base, another host
+	// spelling) onto it, so the validator accepts the same URIs.
+	compiledSchema, ok := v.compiledSchemas[v.builtinBases.Canonicalize(uri)]
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownSchemaURI, uri)
 	}
@@ -199,6 +207,30 @@ func ValidationLocation(ve *types.ValidationError) string {
 		return "/"
 	}
 	return "/" + strings.Join(*ve.Loc, "/")
+}
+
+func ValidationErrAttributeKey(ve *types.ValidationError, doc map[string]any) (key AttributeKey, complete bool) {
+	if ve.Loc == nil {
+		return "", true
+	}
+	var instance any = doc
+	for _, segment := range *ve.Loc {
+		keyword, name, _ := strings.Cut(segment, "/")
+		switch keyword {
+		case "properties", "patternProperties", "additionalProperties", "unevaluatedProperties", "required":
+			object, ok := instance.(map[string]any)
+			if !ok {
+				return key, false
+			}
+			key = key.AppendNode(name)
+			instance = object[name]
+		case "allOf", "dependentSchemas", "dependencies":
+			// Applied to the same instance.
+		default:
+			return key, false
+		}
+	}
+	return key, true
 }
 
 // compileMetaSchema compiles a meta-schema from a rendered JSON document.

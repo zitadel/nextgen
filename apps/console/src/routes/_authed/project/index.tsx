@@ -1,13 +1,14 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Box, SlidersHorizontal } from "lucide-react";
+import { Boxes, Settings } from "lucide-react";
 
 import { api } from "@/api/zitadel";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DetailHeader, DetailPage } from "@/components/detail-page";
+import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
 import { ProjectAdmins } from "@/components/project-admins";
 import { RenameCard } from "@/components/rename-card";
 import { formatDate } from "@/lib/date";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { Page } from "@/components/layout";
 
 /**
  * Project settings — the selected project's own page.
@@ -35,7 +36,7 @@ export const Route = createFileRoute("/_authed/project/")({
   // Last: the list above it is the project's contents, this is the project.
   staticData: {
     scope: "project",
-    nav: { label: "Project settings", order: 6, icon: SlidersHorizontal },
+    nav: { label: "Project settings", order: 8, icon: Settings },
   },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
@@ -57,9 +58,9 @@ function ProjectDetail() {
   const router = useRouter();
 
   return (
-    <DetailPage>
+    <Page>
       <DetailHeader
-        icon={Box}
+        icon={Boxes}
         title={project.name}
         meta={
           <>
@@ -88,6 +89,6 @@ function ProjectDetail() {
         viewerUserId={session.user_id ?? undefined}
         onChanged={() => void router.invalidate()}
       />
-    </DetailPage>
+    </Page>
   );
 }
