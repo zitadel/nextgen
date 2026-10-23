@@ -30,7 +30,7 @@ export const VERCEL_EVENT_KEYS = [
   "os",
   "server_kind",
   "host_agent",
-  "is_ci",
+  "non_interactive",
 ] as const;
 
 export const FIRST_RUN_NOTICE =

@@ -45,7 +45,7 @@ Run a command with `--debug` to see each event on stderr before it is sent.
 
 ### The copy for Vercel Web Analytics
 
-Each event also goes, as a copy, to Vercel Web Analytics on the Zitadel cloud (`preview.zitadel.com`). The copy keeps at most eight properties: `command`, `status`, `reason`, `cli_version`, `os`, `server_kind`, `host_agent` and `is_ci`. Vercel records a location (country, region and city) worked out from the IP address the copy comes from. Runs in CI send no copy.
+Each event also goes, as a copy, to Vercel Web Analytics on the Zitadel cloud (`preview.zitadel.com`). The copy keeps at most eight properties: `command`, `status`, `reason`, `cli_version`, `os`, `server_kind`, `host_agent` and `non_interactive`. Vercel records a location (country, region and city) worked out from the IP address the copy comes from. Runs in CI send no copy.
 
 ## What it never sends
 
