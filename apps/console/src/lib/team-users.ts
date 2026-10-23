@@ -9,8 +9,8 @@ type UsersPage = Awaited<ReturnType<typeof api.queryUsers>>;
 type UserFilter = NonNullable<Parameters<typeof api.queryUsers>[0]["filter"]>;
 
 /**
- * The two ways a user relates to a team (ADR 024), one tab each on the team's
- * page:
+ * The two ways a user relates to a team (ADR 024), the two values of the
+ * filter on the team's Users tab:
  *
  *   - `members`: users holding an active membership — who collaborates in it.
  *   - `owned`: users whose identity lifecycle the team owns — who it may
@@ -52,13 +52,13 @@ export interface TeamUsersPage {
 /**
  * One page of a team's users in one relation.
  *
- * The members tab embeds each user's lifecycle owner, so a member owned by
+ * The members view embeds each user's lifecycle owner, so a member owned by
  * another team says so. `expand: ["lifecycle_owner_team"]` needs `team.read`
  * on top of `user.read`, and a credential without it is refused the whole
  * request (ADR 059); the refusal falls back to the unexpanded read, which still
  * carries `metadata.lifecycle_owner_team_id`, so the column shows the owner's
- * id instead of its name. The owned tab asks for nothing: every row's owner is
- * this team.
+ * id instead of its name. The owned view asks for nothing: every row's owner is
+ * this team, which the id alone tells.
  *
  * `expand` is false once a page was served without the expansion, so Load more
  * does not ask to be refused again — the same contract as `fetchUsers`. A 403

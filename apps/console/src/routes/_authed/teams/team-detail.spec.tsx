@@ -48,6 +48,13 @@ function user(id: string, email: string, metadata: Record<string, unknown> = {})
   };
 }
 
+/** Opens the Users tab, and the filter's `relation` within it. */
+async function openUsers(relation: "Members" | "Owned" = "Members") {
+  await userEvent.click(await screen.findByRole("tab", { name: "Users" }));
+  if (relation === "Owned")
+    await userEvent.click(await screen.findByRole("tab", { name: "Owned" }));
+}
+
 /** The cell under `column` in the row of the user whose link reads `name`. */
 function cellOf(name: string, column: string): HTMLElement {
   const row = screen.getByRole("link", { name }).closest("tr") as HTMLElement;
@@ -176,7 +183,7 @@ describe("team detail", () => {
     await waitFor(() => expect(switcher).toHaveTextContent("Acme Group"));
   });
 
-  it("lists the team's members on the Members tab", async () => {
+  it("lists the team's members on the Users tab", async () => {
     server.use(http.get(TEAM_URL, () => HttpResponse.json(team())));
     const bodies = recordQueries((body) =>
       HttpResponse.json({
@@ -195,7 +202,7 @@ describe("team detail", () => {
     );
     await renderDetail();
 
-    await userEvent.click(await screen.findByRole("tab", { name: "Members" }));
+    await openUsers();
     expect(await screen.findByRole("link", { name: "Ada Lovelace" })).toHaveAttribute(
       "href",
       scopedPath("/users/user_1"),
@@ -220,7 +227,7 @@ describe("team detail", () => {
     );
     await renderDetail();
 
-    await userEvent.click(await screen.findByRole("tab", { name: "Members" }));
+    await openUsers();
     expect(
       await screen.findByText("Your access does not include this team's members."),
     ).toBeInTheDocument();
@@ -245,7 +252,7 @@ describe("team detail", () => {
     );
     await renderDetail();
 
-    await userEvent.click(await screen.findByRole("tab", { name: "Members" }));
+    await openUsers();
     await screen.findByRole("link", { name: "self@acme.com" });
     expect(cellOf("self@acme.com", "Lifecycle owner")).toHaveTextContent("Self-owned");
     expect(cellOf("owned@acme.com", "Lifecycle owner")).toHaveTextContent("This team");
@@ -272,7 +279,7 @@ describe("team detail", () => {
     });
     await renderDetail();
 
-    await userEvent.click(await screen.findByRole("tab", { name: "Members" }));
+    await openUsers();
     // `lifecycle_owner_team_id` is on every user, so the refused expansion
     // costs the owner's name, not the column.
     expect(await screen.findByRole("link", { name: "team_2" })).toBeInTheDocument();
@@ -286,7 +293,7 @@ describe("team detail", () => {
     );
   });
 
-  it("lists the users the team owns on the Owned tab, as its own query", async () => {
+  it("filters the Users tab to the users the team owns, as its own query", async () => {
     server.use(http.get(TEAM_URL, () => HttpResponse.json(team())));
     const bodies = recordQueries((body) =>
       HttpResponse.json({
@@ -298,31 +305,29 @@ describe("team detail", () => {
     );
     await renderDetail();
 
-    await userEvent.click(await screen.findByRole("tab", { name: "Owned" }));
+    await openUsers("Owned");
     expect(await screen.findByRole("link", { name: "owned@acme.com" })).toBeInTheDocument();
-    // Ownership is a filter of its own, not the members list narrowed, and every
-    // row's owner is this team, so there is nothing to expand or show.
+    // Ownership is a query of its own, not the members list narrowed, and every
+    // row's owner is this team, so there is nothing to expand.
     expect(bodies.filter((body) => relationOf(body) === "owned")).toEqual([
       {
         limit: 25,
         filter: [{ field: "lifecycle_owner_team_id", operation: "equals", value: TEAM_ID }],
       },
     ]);
-    const panel = within(screen.getByRole("tabpanel"));
-    expect(panel.queryByRole("columnheader", { name: "Lifecycle owner" })).not.toBeInTheDocument();
-    // Adding makes a member, so it is not offered where the user would not appear.
-    expect(panel.queryByRole("button", { name: "Add user" })).not.toBeInTheDocument();
+    // The columns stay put when the filter changes.
+    expect(cellOf("owned@acme.com", "Lifecycle owner")).toHaveTextContent("This team");
   });
 
   it("says so when the team owns no users", async () => {
     server.use(http.get(TEAM_URL, () => HttpResponse.json(team())));
     await renderDetail();
 
-    await userEvent.click(await screen.findByRole("tab", { name: "Owned" }));
+    await openUsers("Owned");
     expect(await screen.findByText("This team owns no users.")).toBeInTheDocument();
   });
 
-  it("adds a new user to the team from the Members tab", async () => {
+  it("adds a new user to the team, and shows the members they joined", async () => {
     const created: { teamId: string | null; body: unknown }[] = [];
     server.use(
       http.get(TEAM_URL, () => HttpResponse.json(team())),
@@ -352,7 +357,8 @@ describe("team detail", () => {
     );
     await renderDetail();
 
-    await userEvent.click(await screen.findByRole("tab", { name: "Members" }));
+    // Added from the owned view, the user lands where they appear: members.
+    await openUsers("Owned");
     await userEvent.click(await screen.findByRole("button", { name: "Add user" }));
     // The team is the drawer's context, preselected and not editable.
     expect(await screen.findByLabelText("Team")).toHaveValue("Acme Web");
@@ -370,6 +376,9 @@ describe("team detail", () => {
           body: { schema: "sch_minimal", attributes: { email: "maya@acme.com" } },
         },
       ]),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Members" })).toHaveAttribute("aria-selected", "true"),
     );
   });
 });

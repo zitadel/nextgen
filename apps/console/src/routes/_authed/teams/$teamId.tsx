@@ -26,8 +26,11 @@ import { fetchTeamUsers } from "@/lib/team-users";
  * and more than one domain per team — rather than a string on `team-response`.
  * That model is not defined yet, so the cell is left out rather than shown empty.
  *
- * Members and Owned are the two relations ADR 024 keeps apart — who
- * collaborates in the team, and whose lifecycle it owns — each its own query.
+ * The Users tab lists the team's users in either of the two relations ADR 024
+ * keeps apart — who collaborates in the team, and whose lifecycle it owns —
+ * each its own query, loaded with the team. It is one tab, filtered, rather
+ * than a tab per relation: the team's other sections (branding, login flows)
+ * become tabs of their own.
  */
 export const Route = createFileRoute("/_authed/teams/$teamId")({
   staticData: { scope: "project" },
@@ -37,8 +40,8 @@ export const Route = createFileRoute("/_authed/teams/$teamId")({
     const [team, members, owned] = await Promise.all([
       api.getTeam(params.teamId),
       // Listing members needs `team_membership.read`, which a grant on only
-      // part of the project does not carry: a refusal costs the Members tab
-      // its list, not the team its page.
+      // part of the project does not carry: a refusal costs the Users tab its
+      // members, not the team its page. Owned users need only `user.read`.
       nullOnForbidden(fetchTeamUsers(projectId, params.teamId, "members")),
       nullOnForbidden(fetchTeamUsers(projectId, params.teamId, "owned")),
     ]);
@@ -69,8 +72,7 @@ function TeamDetail() {
       <Tabs defaultValue="overview" className={`${DETAIL_BODY} gap-6`}>
         <TabsList aria-label="Team detail sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
-          <TabsTrigger value="owned">Owned</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -89,34 +91,13 @@ function TeamDetail() {
           />
         </TabsContent>
 
-        <TabsContent value="members">
-          {members ? (
-            <TeamUsers
-              team={team}
-              relation="members"
-              loaded={members}
-              onChanged={() => router.invalidate()}
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Your access does not include this team&apos;s members.
-            </p>
-          )}
-        </TabsContent>
-
-        <TabsContent value="owned">
-          {owned ? (
-            <TeamUsers
-              team={team}
-              relation="owned"
-              loaded={owned}
-              onChanged={() => router.invalidate()}
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Your access does not include the users this team owns.
-            </p>
-          )}
+        <TabsContent value="users">
+          <TeamUsers
+            team={team}
+            members={members}
+            owned={owned}
+            onChanged={() => router.invalidate()}
+          />
         </TabsContent>
       </Tabs>
     </Page>

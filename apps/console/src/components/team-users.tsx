@@ -16,6 +16,7 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { USER_CLAMP, UserIdCell, UserIdentityCell } from "@/components/user-cells";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useRequiredProjectScope } from "@/lib/project-scope";
@@ -27,20 +28,35 @@ import {
   toTeamUserRow,
 } from "@/lib/team-users";
 
+const RELATIONS: { value: TeamUserRelation; label: string; denied: string; empty: string }[] = [
+  {
+    value: "members",
+    label: "Members",
+    denied: "Your access does not include this team's members.",
+    empty: "No members yet.",
+  },
+  {
+    value: "owned",
+    label: "Owned",
+    denied: "Your access does not include the users this team owns.",
+    empty: "This team owns no users.",
+  },
+];
+
 /**
- * A team's users in one of the two relations ADR 024 keeps apart: the
- * **members** who collaborate in the team, or the users whose lifecycle the
- * team **owns**. Each is its own tab and its own query.
+ * A team's users, filtered by one of the two relations ADR 024 keeps apart:
+ * the **members** who collaborate in the team, or the users whose lifecycle
+ * the team **owns**. The filter picks the query; it does not narrow one list,
+ * and each relation pages on its own.
  *
- * The members list carries a Lifecycle owner column, so a member owned by
- * another team — or by nobody but themselves — reads as such here rather than
- * only on that other team's Owned tab. The owned list drops the column: every
- * row's owner is this team.
+ * Both views carry the Lifecycle owner column, so a member owned by another
+ * team — or by nobody but themselves — reads as such, and the columns stay put
+ * when the filter changes. On the owned view every row reads `This team`.
  *
- * **Add user is the members tab's action only.** `POST /users?team_id=` makes
- * the new user a member, and no endpoint sets a lifecycle owner, so offering it
- * on the owned tab would create a user that does not appear there. For the same
- * reason the owned list is nearly always empty today.
+ * **Add user always makes a member.** `POST /users?team_id=` creates a
+ * membership and no endpoint sets a lifecycle owner, so a user added while the
+ * owned view is showing switches the filter to members, where they appear. For
+ * the same reason the owned view is nearly always empty today.
  *
  * Members are `active` memberships only: the `team_id` filter does not match a
  * pending invite, and a full roster waits on a members endpoint. No endpoint
@@ -48,16 +64,84 @@ import {
  */
 export function TeamUsers({
   team,
+  members,
+  owned,
+  onChanged,
+}: {
+  team: { id: string; name: string };
+  /** The loader's first page of each relation, `null` when it was refused. */
+  members: TeamUsersPage | null;
+  owned: TeamUsersPage | null;
+  /** Called after a user was added, to reload the page's data. */
+  onChanged: () => void | Promise<void>;
+}) {
+  const [relation, setRelation] = useState<TeamUserRelation>("members");
+  const pages = { members, owned };
+
+  return (
+    // The filter switches the table under it, so the table is the filter's
+    // panel, as on the Teams list's status tabs. `gap-4` is the 16px from the
+    // toolbar to the table.
+    <Tabs
+      value={relation}
+      onValueChange={(value) => setRelation(value as TeamUserRelation)}
+      className="gap-4"
+    >
+      {/* The toolbar: the filter, and the table's own controls beside it, on
+          the left; the action on the right. */}
+      <div className="flex items-center justify-between gap-3">
+        <TabsList aria-label="Filter the team's users">
+          {RELATIONS.map(({ value, label }) => (
+            // `muted`: a filter inside the page's own tabs, drawn apart from them.
+            <TabsTrigger key={value} value={value} variant="muted">
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <AddUserSheet
+          team={team}
+          onCreated={async () => {
+            setRelation("members");
+            await onChanged();
+          }}
+        >
+          {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
+              `px-2.5`. */}
+          <Button className="shrink-0 gap-1.5 px-2.5!">
+            <Plus aria-hidden />
+            Add user
+          </Button>
+        </AddUserSheet>
+      </div>
+
+      {RELATIONS.map(({ value, denied, empty }) => {
+        const page = pages[value];
+        return (
+          <TabsContent key={value} value={value}>
+            {page ? (
+              <UsersTable team={team} relation={value} loaded={page} empty={empty} />
+            ) : (
+              <p className="text-sm text-muted-foreground">{denied}</p>
+            )}
+          </TabsContent>
+        );
+      })}
+    </Tabs>
+  );
+}
+
+/** One relation's users, paged with Load more. */
+function UsersTable({
+  team,
   relation,
   loaded,
-  onChanged,
+  empty,
 }: {
   team: { id: string; name: string };
   relation: TeamUserRelation;
   /** The loader's first page; a new one resets Load more. */
   loaded: TeamUsersPage;
-  /** Called after a user was added, to reload the page's data. */
-  onChanged: () => void | Promise<void>;
+  empty: string;
 }) {
   const projectId = useRequiredProjectScope();
   const [ownersExpanded, setOwnersExpanded] = useState(loaded.ownersExpanded);
@@ -78,37 +162,22 @@ export function TeamUsers({
       [...loaded.items, ...paging.extra].map((user, index) => toTeamUserRow(user, index, team.id)),
     [loaded.items, paging.extra, team.id],
   );
-  const members = relation === "members";
 
   return (
     <>
-      {members && (
-        <div className="mb-4 flex justify-end">
-          <AddUserSheet team={team} onCreated={onChanged}>
-            {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
-                `px-2.5`. */}
-            <Button className="shrink-0 gap-1.5 px-2.5!">
-              <Plus aria-hidden />
-              Add user
-            </Button>
-          </AddUserSheet>
-        </div>
-      )}
       <div className={RESOURCE_TABLE_WRAP}>
         <Table className="text-xs">
           <TableHeader>
             <ResourceHeaderRow>
               <ResourceHeadCell>User</ResourceHeadCell>
               <ResourceHeadCell>Status</ResourceHeadCell>
-              {members && <ResourceHeadCell>Lifecycle owner</ResourceHeadCell>}
+              <ResourceHeadCell>Lifecycle owner</ResourceHeadCell>
               <ResourceHeadCell>ID</ResourceHeadCell>
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <ResourceEmptyRow colSpan={members ? 4 : 3}>
-                {members ? "No members yet." : "This team owns no users."}
-              </ResourceEmptyRow>
+              <ResourceEmptyRow colSpan={4}>{empty}</ResourceEmptyRow>
             ) : (
               rows.map((user) => (
                 <ResourceRow key={user.id} className="group">
@@ -116,11 +185,9 @@ export function TeamUsers({
                   <TableCell className={RESOURCE_CELL}>
                     <StatusBadge status={user.status} />
                   </TableCell>
-                  {members && (
-                    <TableCell className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
-                      <OwnerCell owner={user.owner} />
-                    </TableCell>
-                  )}
+                  <TableCell className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
+                    <OwnerCell owner={user.owner} />
+                  </TableCell>
                   <UserIdCell user={user} />
                 </ResourceRow>
               ))
