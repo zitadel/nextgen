@@ -10,7 +10,7 @@ These guidelines apply across all Zitadel interfaces, including the marketing we
 
 Vercel Web Analytics and Speed Insights continue to provide traffic and performance reporting for the hosted frontends. Mixpanel provides product journey, funnel and outcome reporting. Counts may differ because collection methods and consent conditions differ.
 
-This document defines shared patterns. Tracking tickets define the specific events and properties needed for each interface or journey.
+This document defines shared patterns. [`product-analytics-events.yaml`](product-analytics-events.yaml) lists every event and property, per interface: what each one sends today and what its tracking ticket plans.
 
 ## Event names
 
@@ -122,5 +122,7 @@ Each tracking ticket specifies:
 - Properties, types and allowed values.
 - Identity and attribution requirements.
 - How sensitive data is excluded.
+
+Add a ticket's events to the catalog as `planned`, and mark them `emitted` in the change that sends them.
 
 Verify that tracked actions appear in Mixpanel once, with the expected names and properties.
