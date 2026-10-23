@@ -129,6 +129,22 @@ describe("projects screen", () => {
     expect(table.getAllByRole("button", { name: "Copy the ID of maxtest1" })).toHaveLength(2);
   });
 
+  it("marks the selected project, which the bar does not name here", async () => {
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({ projects: [listed("proj_1", "River"), listed("proj_2", "Delta")] }),
+      ),
+    );
+    await renderProjects("/projects?project=proj_2");
+
+    const table = within(await screen.findByRole("table"));
+    const current = (await table.findByText("Current")).closest("tr") as HTMLElement;
+    expect(within(current).getByRole("link", { name: "Delta" })).toBeInTheDocument();
+    expect(table.getAllByText("Current")).toHaveLength(1);
+    // The list is the switcher here (D21).
+    expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
+  });
+
   it("lists the projects by name while they fit on one page", async () => {
     // By id, the server's order, `proj_platform` sorts after every generated id.
     server.use(

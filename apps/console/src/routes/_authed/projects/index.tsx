@@ -23,6 +23,7 @@ import {
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -55,6 +56,10 @@ import { Page } from "@/components/layout";
  * rows shown rather than reshuffling them. The search is matched on the server
  * across every project the person can act on (`name_contains`), never against
  * the rows already loaded.
+ *
+ * The top bar shows no project switcher here: this list, with its search, is
+ * the switcher's job done at full size, so the selected project is marked in it
+ * (`Current`) rather than named above it.
  */
 export const Route = createFileRoute("/_authed/projects/")({
   // Order 1: above Teams (2), the first of the selected project's screens.
@@ -209,12 +214,17 @@ function ProjectsScreen() {
                       <span className="flex min-w-0 items-center gap-2.5">
                         <ProjectMark projectId={project.id} className="size-6" />
                         <span className="min-w-0">
-                          <Link
-                            {...selectTarget(project.id)}
-                            className="text-foreground block truncate font-medium underline-offset-2 hover:underline"
-                          >
-                            {project.name}
-                          </Link>
+                          {/* The bar has no project pill here, so the list
+                              says which project the other screens open (D21). */}
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <Link
+                              {...selectTarget(project.id)}
+                              className="text-foreground min-w-0 truncate font-medium underline-offset-2 hover:underline"
+                            >
+                              {project.name}
+                            </Link>
+                            {project.id === selected && <Badge variant="secondary">Current</Badge>}
+                          </span>
                           {host && (
                             <span className="text-muted-foreground block truncate text-xs">
                               {host}

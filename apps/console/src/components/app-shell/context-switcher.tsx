@@ -101,12 +101,15 @@ export function ContextSwitcher({ userId }: { userId?: string }) {
   useRememberRecentProject(userId, current);
   const selected = useProjectScope();
   const teamId = useParams({ strict: false, select: (params) => params.teamId });
+  // Projects is the switcher's list with room to read it, and has its own
+  // search, so a pill there would only offer a second way to find a project,
+  // naming one above the list of all of them (D21). That list marks the
+  // selected project instead.
+  const onProjects = useMatch({ from: "/_authed/projects/", shouldThrow: false });
 
   return (
     <nav aria-label="Context" className="flex min-w-0 items-center gap-2">
-      {/* On every screen, Projects included: the bar keeps its shape and
-          names the selected project wherever the person is (D21). */}
-      <ProjectSwitcher userId={userId} current={current} />
+      {!onProjects && <ProjectSwitcher userId={userId} current={current} />}
       {/* The team switcher joins the bar once a team is open — the team is the
           context then, and following another team from the list switches it.
           Teams are not a standing selection the way projects are: no screen
