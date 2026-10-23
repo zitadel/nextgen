@@ -76,6 +76,12 @@ type ProjectService interface {
 	// Returns domain.ErrSessionTokenInvalid when either id is missing.
 	ListAuthorized(ctx context.Context, req ListAuthorizedProjectsRequest) (*ListProjectsResponse, error)
 
+	// ListEveryProject lists every project of the deployment for a session
+	// user the caller has established is a platform operator (ADR 075 §6),
+	// who can act on all of them. The session-user refusal, order and paging
+	// are ListAuthorized's, so a page token from one continues the other.
+	ListEveryProject(ctx context.Context, req ListAuthorizedProjectsRequest) (*ListProjectsResponse, error)
+
 	// Delete hard-deletes a project, cascading to its child resources through the
 	// storage delete. Deleting a project that does not exist is a no-op.
 	Delete(ctx context.Context, id string) error
@@ -594,6 +600,24 @@ func (s *projectService) ListAuthorized(ctx context.Context, req ListAuthorizedP
 	ctx, end := startSpan(ctx, "ProjectService.ListAuthorized")
 	defer end(&err)
 
+	return s.listForSessionUser(ctx, req, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+		return s.v2Pool.Statements().ListAuthorizedProjects(ctx, req.HomeProjectID, req.UserID, page)
+	})
+}
+
+func (s *projectService) ListEveryProject(ctx context.Context, req ListAuthorizedProjectsRequest) (_ *ListProjectsResponse, err error) {
+	ctx, end := startSpan(ctx, "ProjectService.ListEveryProject")
+	defer end(&err)
+
+	return s.listForSessionUser(ctx, req, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+		return s.v2Pool.Statements().ListProjects(ctx, &database.ListOptions[domain.ProjectField]{Pagination: page})
+	})
+}
+
+// listForSessionUser is what ListAuthorized and ListEveryProject share: it
+// refuses a session whose user is missing or inactive, then pages list by
+// project id. The two differ only in which projects list reads.
+func (s *projectService) listForSessionUser(ctx context.Context, req ListAuthorizedProjectsRequest, list func(database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error)) (*ListProjectsResponse, error) {
 	// Fail closed: an empty id would bind an empty string into the grant
 	// predicate instead of narrowing it, so there is no safe default here.
 	if req.UserID == "" || req.HomeProjectID == "" {
@@ -607,7 +631,7 @@ func (s *projectService) ListAuthorized(ctx context.Context, req ListAuthorizedP
 		return nil, err
 	}
 
-	result, err := s.v2Pool.Statements().ListAuthorizedProjects(ctx, req.HomeProjectID, req.UserID, database.Page[domain.ProjectField]{
+	result, err := list(database.Page[domain.ProjectField]{
 		Limit: uint32(normalizeLimit(req.Limit)),
 		OrderBy: database.OrderBy[domain.ProjectField]{
 			Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},

@@ -13,6 +13,21 @@ const (
 // PrefixAuthzAssignment is the dialect-minted ID prefix for authz_assignments (asgn_<opaque>).
 const PrefixAuthzAssignment ResourcePrefix = "asgn"
 
+// The platform object (ADR 075): one per deployment, above every project.
+// Its only relation, operator, closes to project.admin on every project
+// through the implied project.platform tupleset, which holds no rows.
+const (
+	AuthzObjectTypePlatform = "platform"
+	AuthzRelationOperator   = "operator"
+	// AuthzTuplesetPlatform names the relation that hangs an object off the
+	// deployment's platform object. The resolver reads it as implied.
+	AuthzTuplesetPlatform = "platform"
+)
+
+// AuthzGrantorTypeConfig marks an assignment the server's configuration
+// grants and revokes (platform.operators, ADR 075 §4).
+const AuthzGrantorTypeConfig = "config"
+
 // ResourceKind is the resource_scope_index.resource_kind discriminator.
 type ResourceKind string
 
@@ -349,6 +364,25 @@ func NewPersonalTeamOwnerAssignment(projectID, teamID, userID string) *AuthzAssi
 	return a
 }
 
+// NewPlatformOperatorAssignment is the row the platform.operators configuration
+// reconciles (ADR 075 §4): the user on platform.operator in the deployment's
+// platform project. GrantorType config marks it as configuration's to revoke;
+// grantor_id stays unset, as the schema CHECK ties it to delegation_id.
+func NewPlatformOperatorAssignment(platformProjectID, userID string) *AuthzAssignment {
+	grantor := AuthzGrantorTypeConfig
+	a := &AuthzAssignment{
+		ProjectID:     platformProjectID,
+		CatalogID:     SystemCatalogID,
+		PrincipalType: AuthzPrincipalTypeUser,
+		PrincipalID:   userID,
+		ObjectType:    AuthzObjectTypePlatform,
+		Relation:      AuthzRelationOperator,
+		GrantorType:   &grantor,
+	}
+	a.ApplyScope(NewProjectAssignmentScope())
+	return a
+}
+
 // AuthzMembershipEdge is the authz projection of set membership (not lifecycle).
 // The resolver expands team grants through these edges; team_memberships remains
 // the roster table and is not read at check time.
@@ -423,6 +457,42 @@ type AuthzCheckParams struct {
 	ResourceID             string
 	// ResourceTeamID is RSI.team_id for by-id Check (team-scoped grant arm).
 	ResourceTeamID string
+	// PlatformProjectID is the deployment's platform project (ADR 075). Set,
+	// it adds the platform operator path to lists for a user homed there;
+	// CheckAuthz ignores it, the resolver asks CheckPlatformOperator instead.
+	PlatformProjectID string
+}
+
+// PlatformOperatorEligible reports whether the platform operator path
+// (ADR 075 §3) applies at all: a platform project is configured and the
+// principal is a user homed in it. Project secrets, teams and users of any
+// other project never reach it.
+func (p AuthzCheckParams) PlatformOperatorEligible() bool {
+	return p.PlatformProjectID != "" &&
+		p.PrincipalType == AuthzPrincipalTypeUser &&
+		p.PrincipalHomeProjectID == p.PlatformProjectID
+}
+
+// PlatformCheckParams is the platform operator question p asks.
+func (p AuthzCheckParams) PlatformCheckParams() AuthzPlatformCheckParams {
+	return AuthzPlatformCheckParams{
+		CatalogID:         p.CatalogID,
+		PlatformProjectID: p.PlatformProjectID,
+		UserID:            p.PrincipalID,
+		ObjectType:        p.ObjectType,
+		Relation:          p.Relation,
+	}
+}
+
+// AuthzPlatformCheckParams is the storage input for the platform operator path
+// (ADR 075 §3): does UserID, homed and active in PlatformProjectID, hold a
+// platform relation the catalog maps onto ObjectType.Relation of every object?
+type AuthzPlatformCheckParams struct {
+	CatalogID         string
+	PlatformProjectID string
+	UserID            string
+	ObjectType        string
+	Relation          string
 }
 
 // AuthzHomeProjectID returns home when set, otherwise projectID.

@@ -188,6 +188,20 @@ func TestLoadConfigAcceptsStreamsFromEnv(t *testing.T) {
 	assert.Equal(t, []zlog.Stream{zlog.StreamRequest, zlog.StreamService}, cfg.Instrumentation.Log.Streams)
 }
 
+func TestLoadConfigReadsPlatformOperatorsFromEnv(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	t.Setenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT", "true")
+	t.Setenv("NEXTGEN_PLATFORM_OPERATORS", "user_platformadmin,user_01H0000000000000000000000")
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"user_platformadmin", "user_01H0000000000000000000000"}, cfg.Platform.Operators)
+}
+
 // TestRunLogsTheErrorItReturns pins #1409. run's deferred "run error" record
 // did not fire for the early returns that declare err in an if's scope, among
 // them the bootstrap return this test drives, so such a failed start was only

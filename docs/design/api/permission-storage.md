@@ -610,7 +610,10 @@ session/credential is allowed to *act* on Acme remains [#333](https://github.com
 
 **Left open for #333:** relation/bundle names and tiers, break-glass, listing
 “projects I can support” at scale, staff-specific audit fields beyond
-grantor/expiry/revoke.
+grantor/expiry/revoke. Deployment-wide operators are decided by
+[ADR 075](../../adrs/075-platform-operators.md): one `platform.operator`
+relation, stored in the platform project and reached by every project through
+an implied tupleset, not a grant per protected project.
 
 ## Seed sketch (fixture-level)
 
