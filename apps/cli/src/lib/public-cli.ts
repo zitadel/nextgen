@@ -75,21 +75,64 @@ export function publicCliCommand(args: string, cliVersion: string): string {
   return args.length > 0 ? `${prefix} ${args}` : prefix;
 }
 
-export function normalizePublicCliCommand(command: string, cliVersion: string): string {
-  if (command === "zitadel") {
-    return publicCliCommand("", cliVersion);
-  }
-  if (command.startsWith("zitadel ")) {
-    return publicCliCommand(command.slice("zitadel ".length), cliVersion);
-  }
-  return command;
+/** How a suggested follow-up is written out. */
+export type FollowUpOptions = {
+  /**
+   * The suggesting command ran with `--json`: a follow-up that runs this CLI
+   * asks for JSON too, so it can be run as given. `--non-interactive` is not
+   * added, because `--json` turns prompts off on its own.
+   */
+  readonly json?: boolean;
+};
+
+/**
+ * A suggested follow-up in the form a user runs it: a bare `zitadel …` gets
+ * the public `npx` prefix, and another tool's command (`npm install`,
+ * `docker version`) stays as it is.
+ */
+export function normalizePublicCliCommand(
+  command: string,
+  cliVersion: string,
+  { json = false }: FollowUpOptions = {},
+): string {
+  const normalized =
+    command === "zitadel"
+      ? publicCliCommand("", cliVersion)
+      : command.startsWith("zitadel ")
+        ? publicCliCommand(command.slice("zitadel ".length), cliVersion)
+        : command;
+  return json ? withJsonFlag(normalized) : normalized;
 }
 
 export function normalizePublicCliCommands(
   commands: ReadonlyArray<string> | undefined,
   cliVersion: string,
+  options: FollowUpOptions = {},
 ): string[] | undefined {
-  return commands?.map((command) => normalizePublicCliCommand(command, cliVersion));
+  return commands?.map((command) => normalizePublicCliCommand(command, cliVersion, options));
+}
+
+const JSON_FLAG = "--json";
+
+/**
+ * A follow-up given as this CLI's arguments rather than a command string,
+ * asking for JSON: `--json` is appended unless the arguments carry it.
+ */
+export function jsonFollowUpArgs(args: ReadonlyArray<string>): string[] {
+  return args.includes(JSON_FLAG) ? [...args] : [...args, JSON_FLAG];
+}
+
+/**
+ * `command` with `--json` appended when it runs one of this CLI's commands
+ * and does not carry it yet. The bare `npx @zitadel/cli@<selector>`, which
+ * prints help, and other tools' commands are returned as they are.
+ */
+function withJsonFlag(command: string): string {
+  const prefix = `npx ${CLI_PACKAGE_NAME}@`;
+  if (!command.startsWith(prefix) || !command.includes(" ", prefix.length)) {
+    return command;
+  }
+  return command.split(" ").includes(JSON_FLAG) ? command : `${command} ${JSON_FLAG}`;
 }
 
 /**

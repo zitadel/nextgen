@@ -174,7 +174,12 @@ Each invocation prints one JSON object:
   `E_CONFLICT`) and `message`, usually with a `hint`, and `details` when there
   is structured context.
 - `next_commands`: the suggested follow-ups, inside `data` on success and at
-  the top level on a no-op or failure. Prefer these over free-text hints.
+  the top level on a no-op or failure. Prefer these over free-text hints. On a
+  `--json` run, every follow-up that runs the CLI carries `--json`, so run it
+  as given; so does each argument list in `data.next_args` and
+  `details.suggested_args`. They don't add `--non-interactive`: `--json` turns
+  prompts off on its own. Another tool's command (`npm run dev`,
+  `docker version`) stays as it is.
 - `warnings`: things that went wrong without stopping the command, such as a
   value that was not published. Always present on success (often empty), and
   present on a no-op or failure when there are any. Read them before you report
