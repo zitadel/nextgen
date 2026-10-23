@@ -10,7 +10,7 @@ These guidelines apply across all Zitadel interfaces, including the marketing we
 
 Vercel Web Analytics and Speed Insights continue to provide traffic and performance reporting for the hosted frontends. Mixpanel provides product journey, funnel and outcome reporting. Counts may differ because collection methods and consent conditions differ.
 
-This document defines shared patterns. [`product-analytics-events.yaml`](product-analytics-events.yaml) lists every event and property, per interface: what each one sends today and what its tracking ticket plans.
+This document defines shared patterns. [`product-analytics-events.yaml`](product-analytics-events.yaml) defines the header every event carries, and lists every event and property per interface: what each one sends today and what its tracking ticket plans.
 
 ## Event names
 
@@ -47,6 +47,8 @@ Define each event’s trigger precisely and emit success events only after succe
 
 Use properties to describe the context of an event.
 
+Every event starts with the same header, whichever component sends it: `surface`, the component's version as `<surface>_version`, and `server_kind`. The rest is the event's body: the component's own context and the event's properties. The [catalog](product-analytics-events.yaml) defines both.
+
 | Property type | Purpose | Examples |
 |---|---|---|
 | Interface | Where the event happened | `surface`: `website`, `docs`, `console`, `cli` |
@@ -58,7 +60,7 @@ Use properties to describe the context of an event.
 | Version | Which product version | `cli_version`: `1.0.0-alpha.26` |
 | Measurements | Duration or counts | `duration_ms`: `12500`, `result_count`: `5` |
 
-These are examples, not required properties for every event.
+Apart from the header, these are examples, not required properties for every event.
 
 Use `reason` for a predefined error code, never a raw error message. Include `exit_code` where a process exit code applies.
 

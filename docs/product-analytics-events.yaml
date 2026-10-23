@@ -1,18 +1,57 @@
 # Product analytics events, per component: what each one sends today
 # (status: emitted) and what its tracking ticket plans (status: planned).
 #
-# Conventions: product-analytics.md. Every property an event, a CLI dimension
-# or the CLI install profile uses is defined once under `properties`; an event
-# takes a group's properties with `include`. The CLI's unit tests
+# An event is a header and a body. Every component sends the header the same
+# way, so events compare across components. The body is the component's own:
+# its context, which all its events carry, and the event's properties.
+#
+# Conventions: product-analytics.md. Every property is defined once under
+# `properties`. The CLI's unit tests
 # (apps/cli/tests/unit/lib/telemetry/catalog.test.ts) check what it sends
 # against this file.
 
+# What every event carries, whichever component sends it. `<surface>` stands
+# for the component, as in `cli_version`. Vercel's automatic page views carry
+# no properties, so the header applies to the events a component sends.
+header:
+  properties: [surface, <surface>_version, server_kind]
+  # Website and docs belong to no Zitadel deployment.
+  except:
+    website: [server_kind]
+    docs: [server_kind]
+
 properties:
-  # Interface and location
+  # Header
   surface:
     type: string
-    values: [website, docs, console, cli]
-    description: The interface the event happened in.
+    values: [cli, server, console, website, docs]
+    description: The component that sent the event.
+  cli_version:
+    type: string
+    description: The CLI's release version, such as `1.0.0-alpha.26`.
+  server_version:
+    type: string
+    description: The server's release version.
+  console_version:
+    type: string
+    description: >-
+      The git commit the Console was built from, in the cloud and in a
+      self-hosted server alike.
+  website_version:
+    type: string
+    description: The git commit the website was built from.
+  docs_version:
+    type: string
+    description: The git commit the docs site was built from.
+  server_kind:
+    type: string
+    values: [cloud, local, self_hosted, unknown]
+    description: >-
+      The kind of Zitadel deployment the event concerns, never its URL: the
+      server a CLI command talked to, the one serving the Console, or the
+      server itself.
+
+  # Interface and location
   page:
     type: string
     description: A stable page category, never a URL.
@@ -146,9 +185,6 @@ properties:
   command:
     type: string
     description: The CLI command id, such as `variables:set`.
-  cli_version:
-    type: string
-    description: The CLI's version.
   node_version:
     type: string
     description: The Node.js version running the CLI.
@@ -200,10 +236,6 @@ properties:
     type: string
     values: [npm, pnpm, yarn, bun, unknown]
     description: The package manager that started the CLI.
-  server_kind:
-    type: string
-    values: [cloud, local, self_hosted, unknown]
-    description: The kind of server the command talked to, never its URL.
   invocation_id:
     type: string
     description: A random id that ties one run's events together.
@@ -307,14 +339,13 @@ properties:
     type: boolean
     description: Whether `claim` opened a browser.
 
-groups:
-  cli_lifecycle:
-    description: >-
-      What every CLI lifecycle event carries; the completed and failed events
-      also carry the dimensions their command recorded before they fired.
-    properties:
+components:
+  cli:
+    source: apps/cli
+    # Every CLI event carries this after the header. #2125 may still change
+    # its identity and execution-context properties, for every event.
+    context:
       - command
-      - cli_version
       - node_version
       - os
       - $os
@@ -329,72 +360,53 @@ groups:
       - ci_provider
       - host_agent
       - invocation_channel
-      - server_kind
       - invocation_id
       - distinct_id
       - $insert_id
-  cli_journey:
-    description: >-
-      What every planned CLI journey event carries (#2200). The shared
-      developer identity and execution context follow #2125 and are not
-      settled yet.
-    properties: [surface, cli_version]
-
-components:
-  cli:
-    source: apps/cli
     events:
       cli_command_started:
         status: emitted
         trigger: A command has read its flags.
         destinations: [mixpanel]
-        include: [cli_lifecycle]
       cli_command_completed:
         status: emitted
         trigger: A command finished.
         destinations: [mixpanel]
-        include: [cli_lifecycle]
         properties: [status, duration_ms]
       cli_command_failed:
         status: emitted
         trigger: A command failed.
         destinations: [mixpanel]
-        include: [cli_lifecycle]
         properties: [status, reason, exit_code, duration_ms]
       flow_started:
         status: planned
         plan: "#2200"
         trigger: Onboarding begins, before its initial checks; or identity provider setup begins.
         destinations: [mixpanel]
-        include: [cli_journey]
         properties: [flow, entry_point, provider_type]
       viewed_step:
         status: planned
         plan: "#2200"
         trigger: A setup prompt is shown.
         destinations: [mixpanel]
-        include: [cli_journey]
         properties: [flow, step]
       step_completed:
         status: planned
         plan: "#2200"
         trigger: A setup choice is confirmed, or resolved from the options given.
         destinations: [mixpanel]
-        include: [cli_journey]
         properties: [flow, step, framework, server_type, use_case, preset, provider_types]
       flow_completed:
         status: planned
         plan: "#2200"
         trigger: A new application's setup succeeds; or an identity provider and its credentials are saved.
         destinations: [mixpanel]
-        include: [cli_journey]
         properties: [flow, duration_ms, framework, use_case, preset, entry_point, provider_type]
       flow_failed:
         status: planned
         plan: "#2200"
         trigger: Setup fails; or identity provider setup fails.
         destinations: [mixpanel]
-        include: [cli_journey]
         properties: [flow, step, duration_ms, reason, framework, use_case, preset, entry_point, provider_type]
       action_completed:
         status: planned
@@ -403,7 +415,6 @@ components:
           A user, team or grant change, a sign-in method change, an identity
           provider test, a deployment or a rollback succeeds.
         destinations: [mixpanel]
-        include: [cli_journey]
         properties:
           - action
           - resource_type
@@ -419,11 +430,10 @@ components:
         plan: "#2200"
         trigger: One of the operations `action_completed` covers fails.
         destinations: [mixpanel]
-        include: [cli_journey]
         properties: [action, resource_type, access_level, method, entry_point, test_mode, duration_ms, stage, reason]
     # Added to the completed and failed events fired after the command records
-    # them. Keyed by command id; a command may also re-record a lifecycle
-    # property.
+    # them. Keyed by command id; a command may also re-record a header or
+    # context property.
     dimensions:
       setup:
         - framework
@@ -462,67 +472,67 @@ components:
         plan: "#2233"
         trigger: A page is shown, including on a tab switch.
         destinations: [mixpanel]
-        properties: [surface, page, resource_type, view, tab]
+        properties: [page, resource_type, view, tab]
       clicked_project_selector:
         status: planned
         plan: "#2233"
         trigger: The top project selector opens.
         destinations: [mixpanel]
-        properties: [surface, page]
+        properties: [page]
       selected_project:
         status: planned
         plan: "#2233"
         trigger: A project is picked in the selector.
         destinations: [mixpanel]
-        properties: [surface, page]
+        properties: [page]
       clicked_create_button:
         status: planned
         plan: "#2233"
         trigger: Add user, Add team or the create-deployment modal opens.
         destinations: [mixpanel]
-        properties: [surface, resource_type, view]
+        properties: [resource_type, view]
       clicked_confirm_button:
         status: planned
         plan: "#2233"
         trigger: Adding a user or team, deleting a user, or a redeploy or rollback is confirmed.
         destinations: [mixpanel]
-        properties: [surface, resource_type, view, action]
+        properties: [resource_type, view, action]
       clicked_save_button:
         status: planned
         plan: "#2233"
         trigger: User attributes or a team's name are saved from its details.
         destinations: [mixpanel]
-        properties: [surface, resource_type, view]
+        properties: [resource_type, view]
       clicked_delete_button:
         status: planned
         plan: "#2233"
         trigger: The user deletion confirmation opens.
         destinations: [mixpanel]
-        properties: [surface, resource_type, view]
+        properties: [resource_type, view]
       changed_preview_option:
         status: planned
         plan: "#2233"
         trigger: A branding preview control changes.
         destinations: [mixpanel]
-        properties: [surface, resource_type, preview_option, selected_value]
+        properties: [resource_type, preview_option, selected_value]
       clicked_deploy_button:
         status: planned
         plan: "#2233"
         trigger: Deploy is clicked after picking a release.
         destinations: [mixpanel]
-        properties: [surface, resource_type, view]
+        properties: [resource_type, view]
       clicked_redeploy_button:
         status: planned
         plan: "#2233"
         trigger: The redeploy modal opens.
         destinations: [mixpanel]
-        properties: [surface, resource_type, view]
+        properties: [resource_type, view]
       clicked_rollback_button:
         status: planned
         plan: "#2233"
         trigger: The rollback modal opens.
         destinations: [mixpanel]
-        properties: [surface, resource_type, view]
+        properties: [resource_type, view]
 
   website:
     source: apps/website

@@ -40,33 +40,41 @@ type EventDef = {
   plan?: string;
   trigger: string;
   destinations: string[];
-  include?: string[];
   properties?: string[];
 };
 
+type Component = {
+  source: string;
+  automatic?: string[];
+  context?: string[];
+  events: Record<string, EventDef>;
+  dimensions?: Record<string, string[]>;
+  profile?: { trigger: string; destinations: string[]; properties: string[] };
+};
+
 type Catalog = {
+  header: { properties: string[]; except?: Record<string, string[]> };
   properties: Record<string, PropertyDef>;
-  groups: Record<string, { description: string; properties: string[] }>;
-  components: Record<
-    string,
-    {
-      source: string;
-      automatic?: string[];
-      events: Record<string, EventDef>;
-      dimensions?: Record<string, string[]>;
-      profile?: { trigger: string; destinations: string[]; properties: string[] };
-    }
-  >;
+  components: Record<string, Component>;
 };
 
 async function loadCatalog(): Promise<Catalog> {
   return parse(await readFile(catalogPath, "utf8")) as Catalog;
 }
 
-/** An event's properties, its groups' included. */
-function eventProperties(catalog: Catalog, event: EventDef): string[] {
+/** The header `component` sends: `<surface>` stands for the component. */
+function headerOf(catalog: Catalog, component: string): string[] {
+  const except = catalog.header.except?.[component] ?? [];
+  return catalog.header.properties
+    .map((property) => property.replace("<surface>", component))
+    .filter((property) => !except.includes(property));
+}
+
+/** What an event of `component` carries: the header, the component's context and its own properties. */
+function eventProperties(catalog: Catalog, component: string, event: EventDef): string[] {
   return [
-    ...(event.include ?? []).flatMap((group) => catalog.groups[group]?.properties ?? []),
+    ...headerOf(catalog, component),
+    ...(catalog.components[component]?.context ?? []),
     ...(event.properties ?? []),
   ];
 }
@@ -195,14 +203,35 @@ function meta(): GlobalOptions {
 const STAMPED = ["distinct_id", "$insert_id"];
 
 describe("product analytics catalog", () => {
-  it("defines every property and group its events, dimensions and profiles use", async () => {
+  it("names every component as a surface", async () => {
     const catalog = await loadCatalog();
-    for (const [component, { events, dimensions, profile }] of Object.entries(catalog.components)) {
+    expect(new Set(catalog.properties.surface?.values)).toEqual(
+      new Set(Object.keys(catalog.components)),
+    );
+  });
+
+  it("excepts only header properties, and only for its components", async () => {
+    const catalog = await loadCatalog();
+    for (const [component, properties] of Object.entries(catalog.header.except ?? {})) {
+      expect(catalog.components[component], `the header excepts ${component}`).toBeDefined();
+      for (const property of properties) {
+        expect(catalog.header.properties, `${component} is excepted from ${property}`).toContain(
+          property,
+        );
+      }
+    }
+  });
+
+  it("defines every property its headers, contexts, events, dimensions and profiles use", async () => {
+    const catalog = await loadCatalog();
+    for (const [component, { context, events, dimensions, profile }] of Object.entries(
+      catalog.components,
+    )) {
+      for (const property of [...headerOf(catalog, component), ...(context ?? [])]) {
+        expect(catalog.properties[property], `${component} sends ${property}`).toBeDefined();
+      }
       for (const [name, event] of Object.entries(events)) {
-        for (const group of event.include ?? []) {
-          expect(catalog.groups[group], `${component}.${name} includes ${group}`).toBeDefined();
-        }
-        for (const property of eventProperties(catalog, event)) {
+        for (const property of event.properties ?? []) {
           expect(
             catalog.properties[property],
             `${component}.${name} uses ${property}`,
@@ -216,6 +245,22 @@ describe("product analytics catalog", () => {
       }
       for (const key of profile?.properties ?? []) {
         expect(catalog.properties[key], `${component}'s profile sends ${key}`).toBeDefined();
+      }
+    }
+  });
+
+  it("lists header and context properties once, never again in an event's body", async () => {
+    const catalog = await loadCatalog();
+    for (const [component, { context, events }] of Object.entries(catalog.components)) {
+      const header = headerOf(catalog, component);
+      for (const property of context ?? []) {
+        expect(header, `${component}'s context repeats ${property}`).not.toContain(property);
+      }
+      const shared = [...header, ...(context ?? [])];
+      for (const [name, event] of Object.entries(events)) {
+        for (const property of event.properties ?? []) {
+          expect(shared, `${component}.${name} repeats ${property}`).not.toContain(property);
+        }
       }
     }
   });
@@ -262,6 +307,13 @@ describe("CLI telemetry against the catalog", () => {
     }
   });
 
+  it("sends the header on every lifecycle event, with cli as its surface", async () => {
+    const header = headerOf(await loadCatalog(), "cli");
+    const sent = commandEventProperties(meta(), "invocation-1");
+    expect(Object.keys(sent)).toEqual(expect.arrayContaining(header));
+    expect(sent.surface).toBe("cli");
+  });
+
   it("sends exactly the properties the catalog lists on each lifecycle event", async () => {
     const catalog = await loadCatalog();
     const { events } = cliOf(catalog);
@@ -272,19 +324,19 @@ describe("CLI telemetry against the catalog", () => {
         throw new Error(`${event} is not in the catalog`);
       }
       const sent = new Set([...base, ...(await lifecycleExtras(constant))]);
-      expect(new Set(eventProperties(catalog, definition)), event).toEqual(sent);
+      expect(new Set(eventProperties(catalog, "cli", definition)), event).toEqual(sent);
     }
   });
 
   it("records only the dimensions the catalog lists for each command", async () => {
     const catalog = await loadCatalog();
     const cli = cliOf(catalog);
-    const lifecycle = catalog.groups.cli_lifecycle?.properties ?? [];
+    const shared = [...headerOf(catalog, "cli"), ...(cli.context ?? [])];
     for (const [command, keys] of await recordedDimensions()) {
       const listed = cli.dimensions?.[command] ?? [];
       for (const key of keys) {
         expect(
-          [...listed, ...lifecycle],
+          [...listed, ...shared],
           `${command} records ${key}, which the catalog does not list`,
         ).toContain(key);
       }
