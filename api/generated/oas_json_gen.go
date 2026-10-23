@@ -72,6 +72,22 @@ func (s AddOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedAddOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case OriginInvalidAddOriginErrorResponse:
 		e.FieldStart("code")
 		e.Str("origin.invalid")
@@ -200,6 +216,22 @@ func (s AddOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableAddOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -235,6 +267,9 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalAddOriginErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedAddOriginErrorResponse
+					found = true
 				case "origin.invalid":
 					s.Type = OriginInvalidAddOriginErrorResponse
 					found = true
@@ -258,6 +293,9 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidAddOriginErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableAddOriginErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -283,6 +321,10 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalAddOriginErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedAddOriginErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
 	case OriginInvalidAddOriginErrorResponse:
@@ -315,6 +357,10 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidAddOriginErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableAddOriginErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -11462,11 +11508,43 @@ func (s BeginUserPasskeyRegistrationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedBeginUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidBeginUserPasskeyRegistrationErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableBeginUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -11573,8 +11651,14 @@ func (s *BeginUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error 
 				case "internal":
 					s.Type = InternalBeginUserPasskeyRegistrationErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedBeginUserPasskeyRegistrationErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidBeginUserPasskeyRegistrationErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableBeginUserPasskeyRegistrationErrorResponse
 					found = true
 				case "user.invalid":
 					s.Type = UserInvalidBeginUserPasskeyRegistrationErrorResponse
@@ -11627,8 +11711,16 @@ func (s *BeginUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error 
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedBeginUserPasskeyRegistrationErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidBeginUserPasskeyRegistrationErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableBeginUserPasskeyRegistrationErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserInvalidBeginUserPasskeyRegistrationErrorResponse:
@@ -15301,6 +15393,22 @@ func (s BuildReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelInvalidBuildReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.invalid")
@@ -15429,6 +15537,22 @@ func (s BuildReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -15491,6 +15615,9 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 				case "sch.not_found":
 					s.Type = SchNotFoundBuildReleaseErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedBuildReleaseErrorResponse
+					found = true
 				case "rel.invalid":
 					s.Type = RelInvalidBuildReleaseErrorResponse
 					found = true
@@ -15514,6 +15641,9 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "flowdef.schema_fetch_failed":
 					s.Type = FlowdefSchemaFetchFailedBuildReleaseErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableBuildReleaseErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -15577,6 +15707,10 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.SchNotFound.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedBuildReleaseErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case RelInvalidBuildReleaseErrorResponse:
 		if err := s.RelInvalid.Decode(d); err != nil {
 			return err
@@ -15607,6 +15741,10 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case FlowdefSchemaFetchFailedBuildReleaseErrorResponse:
 		if err := s.FlowdefSchemaFetchFailed.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableBuildReleaseErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -19449,6 +19587,22 @@ func (s CreateAuthAttemptErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateAuthAttemptErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -19470,6 +19624,22 @@ func (s CreateAuthAttemptErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("enc_key.unknown_alg")
 		{
 			s := s.EncKeyUnknownAlg
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -19522,11 +19692,17 @@ func (s *CreateAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalCreateAuthAttemptErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateAuthAttemptErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateAuthAttemptErrorResponse
 					found = true
 				case "enc_key.unknown_alg":
 					s.Type = EncKeyUnknownAlgCreateAuthAttemptErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateAuthAttemptErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -19562,12 +19738,20 @@ func (s *CreateAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedCreateAuthAttemptErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidCreateAuthAttemptErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
 	case EncKeyUnknownAlgCreateAuthAttemptErrorResponse:
 		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateAuthAttemptErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -19893,11 +20077,43 @@ func (s CreateBrandingErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedCreateBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateBrandingErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCreateBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -19956,8 +20172,14 @@ func (s *CreateBrandingErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalCreateBrandingErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateBrandingErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateBrandingErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateBrandingErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -20001,8 +20223,16 @@ func (s *CreateBrandingErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedCreateBrandingErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidCreateBrandingErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateBrandingErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -20414,6 +20644,22 @@ func (s CreateDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableCreateDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -20479,6 +20725,9 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidCreateDeploymentErrorResponse
 					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateDeploymentErrorResponse
+					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -20543,6 +20792,10 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidCreateDeploymentErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateDeploymentErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -21087,6 +21340,22 @@ func (s CreateFlowDefinitionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedCreateFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateFlowDefinitionErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -21108,6 +21377,22 @@ func (s CreateFlowDefinitionErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("flowdef.schema_fetch_failed")
 		{
 			s := s.FlowdefSchemaFetchFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCreateFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -21169,11 +21454,17 @@ func (s *CreateFlowDefinitionErrorResponse) Decode(d *jx.Decoder) error {
 				case "sch.not_found":
 					s.Type = SchNotFoundCreateFlowDefinitionErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateFlowDefinitionErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateFlowDefinitionErrorResponse
 					found = true
 				case "flowdef.schema_fetch_failed":
 					s.Type = FlowdefSchemaFetchFailedCreateFlowDefinitionErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateFlowDefinitionErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -21221,12 +21512,20 @@ func (s *CreateFlowDefinitionErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.SchNotFound.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedCreateFlowDefinitionErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidCreateFlowDefinitionErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
 	case FlowdefSchemaFetchFailedCreateFlowDefinitionErrorResponse:
 		if err := s.FlowdefSchemaFetchFailed.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateFlowDefinitionErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -21575,6 +21874,22 @@ func (s CreateFlowErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ProjNotFoundCreateFlowErrorResponse:
 		e.FieldStart("code")
 		e.Str("proj.not_found")
@@ -21703,6 +22018,22 @@ func (s CreateFlowErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -21765,6 +22096,9 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 				case "tkn.invalid_tknid":
 					s.Type = TknInvalidTknidCreateFlowErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateFlowErrorResponse
+					found = true
 				case "proj.not_found":
 					s.Type = ProjNotFoundCreateFlowErrorResponse
 					found = true
@@ -21788,6 +22122,9 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "enc_key.unknown_alg":
 					s.Type = EncKeyUnknownAlgCreateFlowErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateFlowErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -21851,6 +22188,10 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.TknInvalidTknid.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedCreateFlowErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ProjNotFoundCreateFlowErrorResponse:
 		if err := s.ProjNotFound.Decode(d); err != nil {
 			return err
@@ -21881,6 +22222,10 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case EncKeyUnknownAlgCreateFlowErrorResponse:
 		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateFlowErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -22481,11 +22826,43 @@ func (s CreateGrantErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedCreateGrantErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateGrantErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCreateGrantErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -22550,8 +22927,14 @@ func (s *CreateGrantErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalCreateGrantErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateGrantErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateGrantErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateGrantErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -22603,8 +22986,16 @@ func (s *CreateGrantErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedCreateGrantErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidCreateGrantErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateGrantErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -23086,11 +23477,43 @@ func (s CreateHandoffErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedCreateHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateHandoffErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCreateHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -23149,8 +23572,14 @@ func (s *CreateHandoffErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalCreateHandoffErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateHandoffErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateHandoffErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateHandoffErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -23194,8 +23623,16 @@ func (s *CreateHandoffErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedCreateHandoffErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidCreateHandoffErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateHandoffErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -23430,11 +23867,43 @@ func (s CreateIdpErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedCreateIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateIdpErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCreateIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -23496,8 +23965,14 @@ func (s *CreateIdpErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalCreateIdpErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateIdpErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateIdpErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateIdpErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -23545,8 +24020,16 @@ func (s *CreateIdpErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedCreateIdpErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidCreateIdpErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateIdpErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -24655,6 +25138,22 @@ func (s CreateReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedCreateReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelInvalidCreateReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.invalid")
@@ -24783,6 +25282,22 @@ func (s CreateReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableCreateReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -24818,6 +25333,9 @@ func (s *CreateReleaseErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalCreateReleaseErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateReleaseErrorResponse
+					found = true
 				case "rel.invalid":
 					s.Type = RelInvalidCreateReleaseErrorResponse
 					found = true
@@ -24841,6 +25359,9 @@ func (s *CreateReleaseErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateReleaseErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateReleaseErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -24866,6 +25387,10 @@ func (s *CreateReleaseErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalCreateReleaseErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedCreateReleaseErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
 	case RelInvalidCreateReleaseErrorResponse:
@@ -24898,6 +25423,10 @@ func (s *CreateReleaseErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidCreateReleaseErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateReleaseErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -25443,11 +25972,43 @@ func (s CreateSchemaErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedCreateSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateSchemaErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCreateSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -25524,8 +26085,14 @@ func (s *CreateSchemaErrorResponse) Decode(d *jx.Decoder) error {
 				case "sch.revision_conflict":
 					s.Type = SchRevisionConflictCreateSchemaErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateSchemaErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateSchemaErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateSchemaErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -25593,8 +26160,16 @@ func (s *CreateSchemaErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.SchRevisionConflict.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedCreateSchemaErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidCreateSchemaErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateSchemaErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -25976,6 +26551,22 @@ func (s CreateSessionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedCreateSessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateSessionErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -26013,6 +26604,22 @@ func (s CreateSessionErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("enc_key.unknown_alg")
 		{
 			s := s.EncKeyUnknownAlg
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCreateSessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -26071,6 +26678,9 @@ func (s *CreateSessionErrorResponse) Decode(d *jx.Decoder) error {
 				case "tkn.invalid_tknid":
 					s.Type = TknInvalidTknidCreateSessionErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateSessionErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateSessionErrorResponse
 					found = true
@@ -26079,6 +26689,9 @@ func (s *CreateSessionErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "enc_key.unknown_alg":
 					s.Type = EncKeyUnknownAlgCreateSessionErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateSessionErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -26122,6 +26735,10 @@ func (s *CreateSessionErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.TknInvalidTknid.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedCreateSessionErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidCreateSessionErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
@@ -26132,6 +26749,10 @@ func (s *CreateSessionErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case EncKeyUnknownAlgCreateSessionErrorResponse:
 		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateSessionErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -26570,6 +27191,22 @@ func (s CreateTeamErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedCreateTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateTeamErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -26666,6 +27303,22 @@ func (s CreateTeamErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableCreateTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -26704,6 +27357,9 @@ func (s *CreateTeamErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalCreateTeamErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateTeamErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateTeamErrorResponse
 					found = true
@@ -26721,6 +27377,9 @@ func (s *CreateTeamErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "team.project_not_found":
 					s.Type = TeamProjectNotFoundCreateTeamErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateTeamErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -26752,6 +27411,10 @@ func (s *CreateTeamErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedCreateTeamErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidCreateTeamErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
@@ -26774,6 +27437,10 @@ func (s *CreateTeamErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case TeamProjectNotFoundCreateTeamErrorResponse:
 		if err := s.TeamProjectNotFound.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateTeamErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -27192,11 +27859,43 @@ func (s CreateUserErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedCreateUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableCreateUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -27310,8 +28009,14 @@ func (s *CreateUserErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalCreateUserErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedCreateUserErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateUserErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableCreateUserErrorResponse
 					found = true
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsCreateUserErrorResponse
@@ -27355,8 +28060,16 @@ func (s *CreateUserErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedCreateUserErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidCreateUserErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableCreateUserErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserAlreadyExistsCreateUserErrorResponse:
@@ -27878,11 +28591,43 @@ func (s DeleteGrantErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedDeleteGrantErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidDeleteGrantErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableDeleteGrantErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -27938,8 +28683,14 @@ func (s *DeleteGrantErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalDeleteGrantErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedDeleteGrantErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidDeleteGrantErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableDeleteGrantErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -27979,8 +28730,16 @@ func (s *DeleteGrantErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedDeleteGrantErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidDeleteGrantErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableDeleteGrantErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -28249,6 +29008,22 @@ func (s DeleteTeamErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedDeleteTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidDeleteTeamErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -28313,6 +29088,22 @@ func (s DeleteTeamErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableDeleteTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -28348,6 +29139,9 @@ func (s *DeleteTeamErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalDeleteTeamErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedDeleteTeamErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidDeleteTeamErrorResponse
 					found = true
@@ -28359,6 +29153,9 @@ func (s *DeleteTeamErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "team.permission_denied":
 					s.Type = TeamPermissionDeniedDeleteTeamErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableDeleteTeamErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -28386,6 +29183,10 @@ func (s *DeleteTeamErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedDeleteTeamErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidDeleteTeamErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
@@ -28400,6 +29201,10 @@ func (s *DeleteTeamErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case TeamPermissionDeniedDeleteTeamErrorResponse:
 		if err := s.TeamPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableDeleteTeamErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -28570,11 +29375,43 @@ func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedDeleteUserByIDErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidDeleteUserByIDErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableDeleteUserByIDErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -28656,8 +29493,14 @@ func (s *DeleteUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalDeleteUserByIDErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedDeleteUserByIDErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidDeleteUserByIDErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableDeleteUserByIDErrorResponse
 					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundDeleteUserByIDErrorResponse
@@ -28695,8 +29538,16 @@ func (s *DeleteUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedDeleteUserByIDErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidDeleteUserByIDErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableDeleteUserByIDErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundDeleteUserByIDErrorResponse:
@@ -28859,11 +29710,43 @@ func (s DeleteVariableErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedDeleteVariableErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidDeleteVariableErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableDeleteVariableErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -28942,8 +29825,14 @@ func (s *DeleteVariableErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalDeleteVariableErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedDeleteVariableErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidDeleteVariableErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableDeleteVariableErrorResponse
 					found = true
 				case "var.not_found":
 					s.Type = VarNotFoundDeleteVariableErrorResponse
@@ -28977,8 +29866,16 @@ func (s *DeleteVariableErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedDeleteVariableErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidDeleteVariableErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableDeleteVariableErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case VarNotFoundDeleteVariableErrorResponse:
@@ -39495,6 +40392,22 @@ func (s ExchangeHandoffErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedExchangeHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidExchangeHandoffErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -39607,6 +40520,22 @@ func (s ExchangeHandoffErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableExchangeHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -39657,6 +40586,9 @@ func (s *ExchangeHandoffErrorResponse) Decode(d *jx.Decoder) error {
 				case "tkn.invalid_tknid":
 					s.Type = TknInvalidTknidExchangeHandoffErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedExchangeHandoffErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidExchangeHandoffErrorResponse
 					found = true
@@ -39677,6 +40609,9 @@ func (s *ExchangeHandoffErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "enc_key.unknown_alg":
 					s.Type = EncKeyUnknownAlgExchangeHandoffErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableExchangeHandoffErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -39724,6 +40659,10 @@ func (s *ExchangeHandoffErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.TknInvalidTknid.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedExchangeHandoffErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidExchangeHandoffErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
@@ -39750,6 +40689,10 @@ func (s *ExchangeHandoffErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case EncKeyUnknownAlgExchangeHandoffErrorResponse:
 		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableExchangeHandoffErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -40810,11 +41753,43 @@ func (s FinishUserPasskeyRegistrationErrorResponse) encodeFields(e *jx.Encoder) 
 				}
 			}
 		}
+	case NotImplementedFinishUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidFinishUserPasskeyRegistrationErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableFinishUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -40978,8 +41953,14 @@ func (s *FinishUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error
 				case "internal":
 					s.Type = InternalFinishUserPasskeyRegistrationErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedFinishUserPasskeyRegistrationErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidFinishUserPasskeyRegistrationErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableFinishUserPasskeyRegistrationErrorResponse
 					found = true
 				case "user.invalid":
 					s.Type = UserInvalidFinishUserPasskeyRegistrationErrorResponse
@@ -41053,8 +42034,16 @@ func (s *FinishUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedFinishUserPasskeyRegistrationErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidFinishUserPasskeyRegistrationErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableFinishUserPasskeyRegistrationErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserInvalidFinishUserPasskeyRegistrationErrorResponse:
@@ -50137,11 +51126,43 @@ func (s GetAuthAttemptErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetAuthAttemptErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -50188,8 +51209,14 @@ func (s *GetAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetAuthAttemptErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetAuthAttemptErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetAuthAttemptErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetAuthAttemptErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -50217,8 +51244,16 @@ func (s *GetAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetAuthAttemptErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetAuthAttemptErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetAuthAttemptErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -50313,11 +51348,43 @@ func (s GetBrandingByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetBrandingByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetBrandingByIdErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetBrandingByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -50367,8 +51434,14 @@ func (s *GetBrandingByIdErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetBrandingByIdErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetBrandingByIdErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetBrandingByIdErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetBrandingByIdErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -50400,8 +51473,16 @@ func (s *GetBrandingByIdErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetBrandingByIdErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetBrandingByIdErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetBrandingByIdErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -50469,6 +51550,22 @@ func (s GetClaimStatusErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("internal")
 		{
 			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedGetClaimStatusErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -50560,6 +51657,22 @@ func (s GetClaimStatusErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableGetClaimStatusErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -50595,6 +51708,9 @@ func (s *GetClaimStatusErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetClaimStatusErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetClaimStatusErrorResponse
+					found = true
 				case "proj.claim_expired":
 					s.Type = ProjClaimExpiredGetClaimStatusErrorResponse
 					found = true
@@ -50609,6 +51725,9 @@ func (s *GetClaimStatusErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetClaimStatusErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetClaimStatusErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -50636,6 +51755,10 @@ func (s *GetClaimStatusErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetClaimStatusErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ProjClaimExpiredGetClaimStatusErrorResponse:
 		if err := s.ProjClaimExpired.Decode(d); err != nil {
 			return err
@@ -50654,6 +51777,10 @@ func (s *GetClaimStatusErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidGetClaimStatusErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetClaimStatusErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -51189,11 +52316,43 @@ func (s GetDeploymentByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetDeploymentByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetDeploymentByIdErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetDeploymentByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -51243,8 +52402,14 @@ func (s *GetDeploymentByIdErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetDeploymentByIdErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetDeploymentByIdErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetDeploymentByIdErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetDeploymentByIdErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -51276,8 +52441,16 @@ func (s *GetDeploymentByIdErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetDeploymentByIdErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetDeploymentByIdErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetDeploymentByIdErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -51404,6 +52577,22 @@ func (s GetDeploymentVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableGetDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case VarNotFoundGetDeploymentVariablesErrorResponse:
 		e.FieldStart("code")
 		e.Str("var.not_found")
@@ -51480,6 +52669,9 @@ func (s *GetDeploymentVariablesErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidGetDeploymentVariablesErrorResponse
 					found = true
+				case "unavailable":
+					s.Type = UnavailableGetDeploymentVariablesErrorResponse
+					found = true
 				case "var.not_found":
 					s.Type = VarNotFoundGetDeploymentVariablesErrorResponse
 					found = true
@@ -51522,6 +52714,10 @@ func (s *GetDeploymentVariablesErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidGetDeploymentVariablesErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetDeploymentVariablesErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case VarNotFoundGetDeploymentVariablesErrorResponse:
@@ -51640,11 +52836,43 @@ func (s GetEventErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetEventErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetEventErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetEventErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -51697,8 +52925,14 @@ func (s *GetEventErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetEventErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetEventErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetEventErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetEventErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -51734,8 +52968,16 @@ func (s *GetEventErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetEventErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetEventErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetEventErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -51976,11 +53218,43 @@ func (s GetFlowDefinitionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetFlowDefinitionErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetFlowDefinitionErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -52036,8 +53310,14 @@ func (s *GetFlowDefinitionErrorResponse) Decode(d *jx.Decoder) error {
 				case "flowdef.missing_project_id":
 					s.Type = FlowdefMissingProjectIDGetFlowDefinitionErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetFlowDefinitionErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetFlowDefinitionErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetFlowDefinitionErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -52077,8 +53357,16 @@ func (s *GetFlowDefinitionErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.FlowdefMissingProjectID.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetFlowDefinitionErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetFlowDefinitionErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetFlowDefinitionErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -52531,6 +53819,22 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -52552,6 +53856,22 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("enc_key.unknown_alg")
 		{
 			s := s.EncKeyUnknownAlg
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -52773,11 +54093,17 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "tkn.invalid":
 					s.Type = TknInvalidGetFlowStepErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetFlowStepErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetFlowStepErrorResponse
 					found = true
 				case "enc_key.unknown_alg":
 					s.Type = EncKeyUnknownAlgGetFlowStepErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetFlowStepErrorResponse
 					found = true
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsGetFlowStepErrorResponse
@@ -52910,12 +54236,20 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.TknInvalid.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetFlowStepErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetFlowStepErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
 	case EncKeyUnknownAlgGetFlowStepErrorResponse:
 		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetFlowStepErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserAlreadyExistsGetFlowStepErrorResponse:
@@ -53114,6 +54448,22 @@ func (s GetGrantErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetGrantErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetGrantErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -53135,6 +54485,22 @@ func (s GetGrantErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("team.permission_denied")
 		{
 			s := s.TeamPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetGrantErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -53200,11 +54566,17 @@ func (s *GetGrantErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetGrantErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetGrantErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetGrantErrorResponse
 					found = true
 				case "team.permission_denied":
 					s.Type = TeamPermissionDeniedGetGrantErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetGrantErrorResponse
 					found = true
 				case "user.permission_denied":
 					s.Type = UserPermissionDeniedGetGrantErrorResponse
@@ -53239,12 +54611,20 @@ func (s *GetGrantErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetGrantErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetGrantErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
 	case TeamPermissionDeniedGetGrantErrorResponse:
 		if err := s.TeamPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetGrantErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserPermissionDeniedGetGrantErrorResponse:
@@ -53571,11 +54951,43 @@ func (s GetIdpByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetIdpByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetIdpByIdErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetIdpByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -53625,8 +55037,14 @@ func (s *GetIdpByIdErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetIdpByIdErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetIdpByIdErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetIdpByIdErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetIdpByIdErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -53658,8 +55076,16 @@ func (s *GetIdpByIdErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetIdpByIdErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetIdpByIdErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetIdpByIdErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -53868,11 +55294,43 @@ func (s GetIdpRevisionByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetIdpRevisionByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetIdpRevisionByIdErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetIdpRevisionByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -53922,8 +55380,14 @@ func (s *GetIdpRevisionByIdErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetIdpRevisionByIdErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetIdpRevisionByIdErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetIdpRevisionByIdErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetIdpRevisionByIdErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -53955,8 +55419,16 @@ func (s *GetIdpRevisionByIdErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetIdpRevisionByIdErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetIdpRevisionByIdErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetIdpRevisionByIdErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -54247,6 +55719,22 @@ func (s GetMyPasswordStateErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetMyPasswordStateErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetMyPasswordStateErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -54268,6 +55756,22 @@ func (s GetMyPasswordStateErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("sess.project_mismatch")
 		{
 			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetMyPasswordStateErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -54327,11 +55831,17 @@ func (s *GetMyPasswordStateErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetMyPasswordStateErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetMyPasswordStateErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetMyPasswordStateErrorResponse
 					found = true
 				case "sess.project_mismatch":
 					s.Type = SessProjectMismatchGetMyPasswordStateErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetMyPasswordStateErrorResponse
 					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundGetMyPasswordStateErrorResponse
@@ -54358,12 +55868,20 @@ func (s *GetMyPasswordStateErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetMyPasswordStateErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetMyPasswordStateErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
 	case SessProjectMismatchGetMyPasswordStateErrorResponse:
 		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetMyPasswordStateErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundGetMyPasswordStateErrorResponse:
@@ -54430,6 +55948,22 @@ func (s GetMySessionCsrfTokenErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetMySessionCsrfTokenErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetMySessionCsrfTokenErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -54478,6 +56012,22 @@ func (s GetMySessionCsrfTokenErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableGetMySessionCsrfTokenErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -54510,6 +56060,9 @@ func (s *GetMySessionCsrfTokenErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetMySessionCsrfTokenErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetMySessionCsrfTokenErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetMySessionCsrfTokenErrorResponse
 					found = true
@@ -54518,6 +56071,9 @@ func (s *GetMySessionCsrfTokenErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "sess.project_mismatch":
 					s.Type = SessProjectMismatchGetMySessionCsrfTokenErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetMySessionCsrfTokenErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -54541,6 +56097,10 @@ func (s *GetMySessionCsrfTokenErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetMySessionCsrfTokenErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetMySessionCsrfTokenErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
@@ -54551,6 +56111,10 @@ func (s *GetMySessionCsrfTokenErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case SessProjectMismatchGetMySessionCsrfTokenErrorResponse:
 		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetMySessionCsrfTokenErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -54613,6 +56177,22 @@ func (s GetMySessionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetMySessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetMySessionErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -54661,6 +56241,22 @@ func (s GetMySessionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableGetMySessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -54693,6 +56289,9 @@ func (s *GetMySessionErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetMySessionErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetMySessionErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetMySessionErrorResponse
 					found = true
@@ -54701,6 +56300,9 @@ func (s *GetMySessionErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "sess.project_mismatch":
 					s.Type = SessProjectMismatchGetMySessionErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetMySessionErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -54724,6 +56326,10 @@ func (s *GetMySessionErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetMySessionErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetMySessionErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
@@ -54734,6 +56340,10 @@ func (s *GetMySessionErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case SessProjectMismatchGetMySessionErrorResponse:
 		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetMySessionErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -54796,6 +56406,22 @@ func (s GetMyUserErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetMyUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -54817,6 +56443,22 @@ func (s GetMyUserErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("sess.project_mismatch")
 		{
 			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -54876,11 +56518,17 @@ func (s *GetMyUserErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetMyUserErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetMyUserErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetMyUserErrorResponse
 					found = true
 				case "sess.project_mismatch":
 					s.Type = SessProjectMismatchGetMyUserErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetMyUserErrorResponse
 					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundGetMyUserErrorResponse
@@ -54907,12 +56555,20 @@ func (s *GetMyUserErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetMyUserErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetMyUserErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
 	case SessProjectMismatchGetMyUserErrorResponse:
 		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetMyUserErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundGetMyUserErrorResponse:
@@ -54979,6 +56635,22 @@ func (s GetMyUserSchemaErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetMyUserSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetMyUserSchemaErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -55000,6 +56672,22 @@ func (s GetMyUserSchemaErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("sess.project_mismatch")
 		{
 			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetMyUserSchemaErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -55059,11 +56747,17 @@ func (s *GetMyUserSchemaErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetMyUserSchemaErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetMyUserSchemaErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetMyUserSchemaErrorResponse
 					found = true
 				case "sess.project_mismatch":
 					s.Type = SessProjectMismatchGetMyUserSchemaErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetMyUserSchemaErrorResponse
 					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundGetMyUserSchemaErrorResponse
@@ -55090,12 +56784,20 @@ func (s *GetMyUserSchemaErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetMyUserSchemaErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetMyUserSchemaErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
 	case SessProjectMismatchGetMyUserSchemaErrorResponse:
 		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetMyUserSchemaErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundGetMyUserSchemaErrorResponse:
@@ -55162,6 +56864,22 @@ func (s GetPolicyRevisionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetPolicyRevisionErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case PolNotFoundGetPolicyRevisionErrorResponse:
 		e.FieldStart("code")
 		e.Str("pol.not_found")
@@ -55210,6 +56928,22 @@ func (s GetPolicyRevisionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableGetPolicyRevisionErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -55242,6 +56976,9 @@ func (s *GetPolicyRevisionErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetPolicyRevisionErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetPolicyRevisionErrorResponse
+					found = true
 				case "pol.not_found":
 					s.Type = PolNotFoundGetPolicyRevisionErrorResponse
 					found = true
@@ -55250,6 +56987,9 @@ func (s *GetPolicyRevisionErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetPolicyRevisionErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetPolicyRevisionErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -55273,6 +57013,10 @@ func (s *GetPolicyRevisionErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetPolicyRevisionErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case PolNotFoundGetPolicyRevisionErrorResponse:
 		if err := s.PolNotFound.Decode(d); err != nil {
 			return err
@@ -55283,6 +57027,10 @@ func (s *GetPolicyRevisionErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidGetPolicyRevisionErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetPolicyRevisionErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -55764,6 +57512,22 @@ func (s GetReleaseByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetReleaseByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelNotFoundGetReleaseByIdErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.not_found")
@@ -55812,6 +57576,22 @@ func (s GetReleaseByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableGetReleaseByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -55844,6 +57624,9 @@ func (s *GetReleaseByIdErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetReleaseByIdErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetReleaseByIdErrorResponse
+					found = true
 				case "rel.not_found":
 					s.Type = RelNotFoundGetReleaseByIdErrorResponse
 					found = true
@@ -55852,6 +57635,9 @@ func (s *GetReleaseByIdErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetReleaseByIdErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetReleaseByIdErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -55875,6 +57661,10 @@ func (s *GetReleaseByIdErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetReleaseByIdErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case RelNotFoundGetReleaseByIdErrorResponse:
 		if err := s.RelNotFound.Decode(d); err != nil {
 			return err
@@ -55885,6 +57675,10 @@ func (s *GetReleaseByIdErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidGetReleaseByIdErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetReleaseByIdErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -55979,11 +57773,43 @@ func (s GetSchemaByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetSchemaByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetSchemaByIdErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetSchemaByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -56033,8 +57859,14 @@ func (s *GetSchemaByIdErrorResponse) Decode(d *jx.Decoder) error {
 				case "sch.permission_denied":
 					s.Type = SchPermissionDeniedGetSchemaByIdErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetSchemaByIdErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetSchemaByIdErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetSchemaByIdErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -56066,8 +57898,16 @@ func (s *GetSchemaByIdErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.SchPermissionDenied.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetSchemaByIdErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetSchemaByIdErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetSchemaByIdErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -56130,6 +57970,22 @@ func (s GetSessionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetSessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetSessionErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -56178,6 +58034,22 @@ func (s GetSessionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableGetSessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -56210,6 +58082,9 @@ func (s *GetSessionErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetSessionErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetSessionErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetSessionErrorResponse
 					found = true
@@ -56218,6 +58093,9 @@ func (s *GetSessionErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "sess.permission_denied":
 					s.Type = SessPermissionDeniedGetSessionErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetSessionErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -56241,6 +58119,10 @@ func (s *GetSessionErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetSessionErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetSessionErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
@@ -56251,6 +58133,10 @@ func (s *GetSessionErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case SessPermissionDeniedGetSessionErrorResponse:
 		if err := s.SessPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetSessionErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -56427,6 +58313,22 @@ func (s GetTeamErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetTeamErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -56475,6 +58377,22 @@ func (s GetTeamErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableGetTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -56507,6 +58425,9 @@ func (s *GetTeamErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetTeamErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetTeamErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetTeamErrorResponse
 					found = true
@@ -56515,6 +58436,9 @@ func (s *GetTeamErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "team.permission_denied":
 					s.Type = TeamPermissionDeniedGetTeamErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetTeamErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -56538,6 +58462,10 @@ func (s *GetTeamErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetTeamErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetTeamErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
@@ -56548,6 +58476,10 @@ func (s *GetTeamErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case TeamPermissionDeniedGetTeamErrorResponse:
 		if err := s.TeamPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetTeamErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -56686,11 +58618,43 @@ func (s GetUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetUserByIDErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetUserByIDErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetUserByIDErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -56766,8 +58730,14 @@ func (s *GetUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetUserByIDErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetUserByIDErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetUserByIDErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetUserByIDErrorResponse
 					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundGetUserByIDErrorResponse
@@ -56797,8 +58767,16 @@ func (s *GetUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetUserByIDErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetUserByIDErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetUserByIDErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundGetUserByIDErrorResponse:
@@ -56945,11 +58923,43 @@ func (s GetUserPasswordStateErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetUserPasswordStateErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetUserPasswordStateErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetUserPasswordStateErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -57025,8 +59035,14 @@ func (s *GetUserPasswordStateErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetUserPasswordStateErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetUserPasswordStateErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetUserPasswordStateErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetUserPasswordStateErrorResponse
 					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundGetUserPasswordStateErrorResponse
@@ -57056,8 +59072,16 @@ func (s *GetUserPasswordStateErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetUserPasswordStateErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetUserPasswordStateErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetUserPasswordStateErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundGetUserPasswordStateErrorResponse:
@@ -57280,11 +59304,43 @@ func (s GetVariableErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetVariableErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetVariableErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetVariableErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -57360,8 +59416,14 @@ func (s *GetVariableErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetVariableErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetVariableErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetVariableErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetVariableErrorResponse
 					found = true
 				case "var.not_found":
 					s.Type = VarNotFoundGetVariableErrorResponse
@@ -57391,8 +59453,16 @@ func (s *GetVariableErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetVariableErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetVariableErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetVariableErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case VarNotFoundGetVariableErrorResponse:
@@ -57463,11 +59533,43 @@ func (s GetVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedGetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetVariablesErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -57543,8 +59645,14 @@ func (s *GetVariablesErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetVariablesErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetVariablesErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetVariablesErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetVariablesErrorResponse
 					found = true
 				case "var.not_found":
 					s.Type = VarNotFoundGetVariablesErrorResponse
@@ -57574,8 +59682,16 @@ func (s *GetVariablesErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedGetVariablesErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidGetVariablesErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetVariablesErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case VarNotFoundGetVariablesErrorResponse:
@@ -64477,6 +66593,22 @@ func (s InitClaimErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedInitClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ProjAlreadyClaimedInitClaimErrorResponse:
 		e.FieldStart("code")
 		e.Str("proj.already_claimed")
@@ -64557,6 +66689,22 @@ func (s InitClaimErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableInitClaimErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -64592,6 +66740,9 @@ func (s *InitClaimErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalInitClaimErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedInitClaimErrorResponse
+					found = true
 				case "proj.already_claimed":
 					s.Type = ProjAlreadyClaimedInitClaimErrorResponse
 					found = true
@@ -64606,6 +66757,9 @@ func (s *InitClaimErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidInitClaimErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableInitClaimErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -64633,6 +66787,10 @@ func (s *InitClaimErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedInitClaimErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ProjAlreadyClaimedInitClaimErrorResponse:
 		if err := s.ProjAlreadyClaimed.Decode(d); err != nil {
 			return err
@@ -64651,6 +66809,10 @@ func (s *InitClaimErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidInitClaimErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableInitClaimErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -65093,11 +67255,43 @@ func (s IssueChallengeErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedIssueChallengeErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidIssueChallengeErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableIssueChallengeErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -65153,8 +67347,14 @@ func (s *IssueChallengeErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalIssueChallengeErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedIssueChallengeErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidIssueChallengeErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableIssueChallengeErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -65194,8 +67394,16 @@ func (s *IssueChallengeErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedIssueChallengeErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidIssueChallengeErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableIssueChallengeErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -65593,11 +67801,43 @@ func (s ListBrandingErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListBrandingErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListBrandingErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -65647,8 +67887,14 @@ func (s *ListBrandingErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListBrandingErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListBrandingErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListBrandingErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListBrandingErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -65680,8 +67926,16 @@ func (s *ListBrandingErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListBrandingErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidListBrandingErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListBrandingErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -65939,11 +68193,43 @@ func (s ListDeploymentsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListDeploymentsErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListDeploymentsErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListDeploymentsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -65993,8 +68279,14 @@ func (s *ListDeploymentsErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListDeploymentsErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListDeploymentsErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListDeploymentsErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListDeploymentsErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -66026,8 +68318,16 @@ func (s *ListDeploymentsErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListDeploymentsErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidListDeploymentsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListDeploymentsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -66299,11 +68599,43 @@ func (s ListEventsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListEventsErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListEventsErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListEventsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -66356,8 +68688,14 @@ func (s *ListEventsErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListEventsErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListEventsErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListEventsErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListEventsErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -66393,8 +68731,16 @@ func (s *ListEventsErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListEventsErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidListEventsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListEventsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -66752,11 +69098,43 @@ func (s ListFlowDefinitionsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListFlowDefinitionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListFlowDefinitionsErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListFlowDefinitionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -66818,8 +69196,14 @@ func (s *ListFlowDefinitionsErrorResponse) Decode(d *jx.Decoder) error {
 				case "flowdef.missing_project_id":
 					s.Type = FlowdefMissingProjectIDListFlowDefinitionsErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListFlowDefinitionsErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListFlowDefinitionsErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListFlowDefinitionsErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -66867,8 +69251,16 @@ func (s *ListFlowDefinitionsErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.FlowdefMissingProjectID.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListFlowDefinitionsErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidListFlowDefinitionsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListFlowDefinitionsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -66963,11 +69355,43 @@ func (s ListIdpRevisionsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListIdpRevisionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListIdpRevisionsErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListIdpRevisionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -67017,8 +69441,14 @@ func (s *ListIdpRevisionsErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListIdpRevisionsErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListIdpRevisionsErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListIdpRevisionsErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListIdpRevisionsErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -67050,8 +69480,16 @@ func (s *ListIdpRevisionsErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListIdpRevisionsErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidListIdpRevisionsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListIdpRevisionsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -67351,6 +69789,22 @@ func (s ListMyIdentityLinksErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListMyIdentityLinksErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListMyIdentityLinksErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -67372,6 +69826,22 @@ func (s ListMyIdentityLinksErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("sess.project_mismatch")
 		{
 			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListMyIdentityLinksErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -67431,11 +69901,17 @@ func (s *ListMyIdentityLinksErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListMyIdentityLinksErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListMyIdentityLinksErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListMyIdentityLinksErrorResponse
 					found = true
 				case "sess.project_mismatch":
 					s.Type = SessProjectMismatchListMyIdentityLinksErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListMyIdentityLinksErrorResponse
 					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundListMyIdentityLinksErrorResponse
@@ -67462,12 +69938,20 @@ func (s *ListMyIdentityLinksErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListMyIdentityLinksErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidListMyIdentityLinksErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
 	case SessProjectMismatchListMyIdentityLinksErrorResponse:
 		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListMyIdentityLinksErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundListMyIdentityLinksErrorResponse:
@@ -67534,6 +70018,22 @@ func (s ListMyPasskeysErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListMyPasskeysErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListMyPasskeysErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -67555,6 +70055,22 @@ func (s ListMyPasskeysErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("sess.project_mismatch")
 		{
 			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListMyPasskeysErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -67614,11 +70130,17 @@ func (s *ListMyPasskeysErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListMyPasskeysErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListMyPasskeysErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListMyPasskeysErrorResponse
 					found = true
 				case "sess.project_mismatch":
 					s.Type = SessProjectMismatchListMyPasskeysErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListMyPasskeysErrorResponse
 					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundListMyPasskeysErrorResponse
@@ -67645,12 +70167,20 @@ func (s *ListMyPasskeysErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListMyPasskeysErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidListMyPasskeysErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
 	case SessProjectMismatchListMyPasskeysErrorResponse:
 		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListMyPasskeysErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundListMyPasskeysErrorResponse:
@@ -67755,6 +70285,22 @@ func (s ListMyProjectsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListMyProjectsErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListMyProjectsErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -67776,6 +70322,22 @@ func (s ListMyProjectsErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("sess.project_mismatch")
 		{
 			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListMyProjectsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -67819,11 +70381,17 @@ func (s *ListMyProjectsErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListMyProjectsErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListMyProjectsErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListMyProjectsErrorResponse
 					found = true
 				case "sess.project_mismatch":
 					s.Type = SessProjectMismatchListMyProjectsErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListMyProjectsErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -67847,12 +70415,20 @@ func (s *ListMyProjectsErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListMyProjectsErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidListMyProjectsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
 	case SessProjectMismatchListMyProjectsErrorResponse:
 		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListMyProjectsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -68076,6 +70652,22 @@ func (s ListMyTeamsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListMyTeamsErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListMyTeamsErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -68097,6 +70689,22 @@ func (s ListMyTeamsErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("sess.project_mismatch")
 		{
 			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListMyTeamsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -68156,11 +70764,17 @@ func (s *ListMyTeamsErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListMyTeamsErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListMyTeamsErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListMyTeamsErrorResponse
 					found = true
 				case "sess.project_mismatch":
 					s.Type = SessProjectMismatchListMyTeamsErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListMyTeamsErrorResponse
 					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundListMyTeamsErrorResponse
@@ -68187,12 +70801,20 @@ func (s *ListMyTeamsErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListMyTeamsErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidListMyTeamsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
 	case SessProjectMismatchListMyTeamsErrorResponse:
 		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListMyTeamsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundListMyTeamsErrorResponse:
@@ -68323,6 +70945,22 @@ func (s ListPreviewsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableListPreviewsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -68367,6 +71005,9 @@ func (s *ListPreviewsErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidListPreviewsErrorResponse
 					found = true
+				case "unavailable":
+					s.Type = UnavailableListPreviewsErrorResponse
+					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -68403,6 +71044,10 @@ func (s *ListPreviewsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidListPreviewsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListPreviewsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -68588,6 +71233,22 @@ func (s ListReleasesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListReleasesErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelNotFoundListReleasesErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.not_found")
@@ -68636,6 +71297,22 @@ func (s ListReleasesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableListReleasesErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -68668,6 +71345,9 @@ func (s *ListReleasesErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListReleasesErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListReleasesErrorResponse
+					found = true
 				case "rel.not_found":
 					s.Type = RelNotFoundListReleasesErrorResponse
 					found = true
@@ -68676,6 +71356,9 @@ func (s *ListReleasesErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListReleasesErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListReleasesErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -68699,6 +71382,10 @@ func (s *ListReleasesErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListReleasesErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case RelNotFoundListReleasesErrorResponse:
 		if err := s.RelNotFound.Decode(d); err != nil {
 			return err
@@ -68709,6 +71396,10 @@ func (s *ListReleasesErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidListReleasesErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListReleasesErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -68926,11 +71617,43 @@ func (s ListSchemasErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListSchemasErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListSchemasErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListSchemasErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -68980,8 +71703,14 @@ func (s *ListSchemasErrorResponse) Decode(d *jx.Decoder) error {
 				case "sch.permission_denied":
 					s.Type = SchPermissionDeniedListSchemasErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListSchemasErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListSchemasErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListSchemasErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -69013,8 +71742,16 @@ func (s *ListSchemasErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.SchPermissionDenied.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListSchemasErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidListSchemasErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListSchemasErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -69238,11 +71975,43 @@ func (s ListUserIdentityLinksErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListUserIdentityLinksErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListUserIdentityLinksErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListUserIdentityLinksErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -69318,8 +72087,14 @@ func (s *ListUserIdentityLinksErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListUserIdentityLinksErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListUserIdentityLinksErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListUserIdentityLinksErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListUserIdentityLinksErrorResponse
 					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundListUserIdentityLinksErrorResponse
@@ -69349,8 +72124,16 @@ func (s *ListUserIdentityLinksErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListUserIdentityLinksErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidListUserIdentityLinksErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListUserIdentityLinksErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundListUserIdentityLinksErrorResponse:
@@ -69734,11 +72517,43 @@ func (s ListUserPasskeysErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListUserPasskeysErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListUserPasskeysErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListUserPasskeysErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -69814,8 +72629,14 @@ func (s *ListUserPasskeysErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListUserPasskeysErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListUserPasskeysErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListUserPasskeysErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListUserPasskeysErrorResponse
 					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundListUserPasskeysErrorResponse
@@ -69845,8 +72666,16 @@ func (s *ListUserPasskeysErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListUserPasskeysErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidListUserPasskeysErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListUserPasskeysErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundListUserPasskeysErrorResponse:
@@ -70360,11 +73189,43 @@ func (s ListUserTeamsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedListUserTeamsErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidListUserTeamsErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListUserTeamsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -70440,8 +73301,14 @@ func (s *ListUserTeamsErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListUserTeamsErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListUserTeamsErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListUserTeamsErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListUserTeamsErrorResponse
 					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundListUserTeamsErrorResponse
@@ -70471,8 +73338,16 @@ func (s *ListUserTeamsErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedListUserTeamsErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidListUserTeamsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListUserTeamsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundListUserTeamsErrorResponse:
@@ -87184,6 +90059,22 @@ func (s PatchMyUserErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedPatchMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidPatchMyUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -87205,6 +90096,22 @@ func (s PatchMyUserErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("sess.project_mismatch")
 		{
 			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailablePatchMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -87318,11 +90225,17 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalPatchMyUserErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedPatchMyUserErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidPatchMyUserErrorResponse
 					found = true
 				case "sess.project_mismatch":
 					s.Type = SessProjectMismatchPatchMyUserErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailablePatchMyUserErrorResponse
 					found = true
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsPatchMyUserErrorResponse
@@ -87366,12 +90279,20 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedPatchMyUserErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidPatchMyUserErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
 	case SessProjectMismatchPatchMyUserErrorResponse:
 		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
+	case UnavailablePatchMyUserErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserAlreadyExistsPatchMyUserErrorResponse:
@@ -87759,6 +90680,22 @@ func (s PatchProjectErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedPatchProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ProjMissingIDPatchProjectErrorResponse:
 		e.FieldStart("code")
 		e.Str("proj.missing_id")
@@ -87855,6 +90792,22 @@ func (s PatchProjectErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailablePatchProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -87893,6 +90846,9 @@ func (s *PatchProjectErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalPatchProjectErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedPatchProjectErrorResponse
+					found = true
 				case "proj.missing_id":
 					s.Type = ProjMissingIDPatchProjectErrorResponse
 					found = true
@@ -87910,6 +90866,9 @@ func (s *PatchProjectErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidPatchProjectErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailablePatchProjectErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -87941,6 +90900,10 @@ func (s *PatchProjectErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedPatchProjectErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ProjMissingIDPatchProjectErrorResponse:
 		if err := s.ProjMissingID.Decode(d); err != nil {
 			return err
@@ -87963,6 +90926,10 @@ func (s *PatchProjectErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidPatchProjectErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailablePatchProjectErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -88289,11 +91256,43 @@ func (s PatchUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedPatchUserByIDErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidPatchUserByIDErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailablePatchUserByIDErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -88423,8 +91422,14 @@ func (s *PatchUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalPatchUserByIDErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedPatchUserByIDErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidPatchUserByIDErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailablePatchUserByIDErrorResponse
 					found = true
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsPatchUserByIDErrorResponse
@@ -88471,8 +91476,16 @@ func (s *PatchUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedPatchUserByIDErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidPatchUserByIDErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailablePatchUserByIDErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserAlreadyExistsPatchUserByIDErrorResponse:
@@ -95574,6 +98587,22 @@ func (s PublishPolicyErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedPublishPolicyErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case PolInvalidPublishPolicyErrorResponse:
 		e.FieldStart("code")
 		e.Str("pol.invalid")
@@ -95654,6 +98683,22 @@ func (s PublishPolicyErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailablePublishPolicyErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -95689,6 +98734,9 @@ func (s *PublishPolicyErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalPublishPolicyErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedPublishPolicyErrorResponse
+					found = true
 				case "pol.invalid":
 					s.Type = PolInvalidPublishPolicyErrorResponse
 					found = true
@@ -95703,6 +98751,9 @@ func (s *PublishPolicyErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidPublishPolicyErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailablePublishPolicyErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -95730,6 +98781,10 @@ func (s *PublishPolicyErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedPublishPolicyErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case PolInvalidPublishPolicyErrorResponse:
 		if err := s.PolInvalid.Decode(d); err != nil {
 			return err
@@ -95748,6 +98803,10 @@ func (s *PublishPolicyErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidPublishPolicyErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailablePublishPolicyErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -96129,6 +99188,22 @@ func (s QueryGrantsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableQueryGrantsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPermissionDeniedQueryGrantsErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.permission_denied")
@@ -96198,6 +99273,9 @@ func (s *QueryGrantsErrorResponse) Decode(d *jx.Decoder) error {
 				case "team.permission_denied":
 					s.Type = TeamPermissionDeniedQueryGrantsErrorResponse
 					found = true
+				case "unavailable":
+					s.Type = UnavailableQueryGrantsErrorResponse
+					found = true
 				case "user.permission_denied":
 					s.Type = UserPermissionDeniedQueryGrantsErrorResponse
 					found = true
@@ -96249,6 +99327,10 @@ func (s *QueryGrantsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case TeamPermissionDeniedQueryGrantsErrorResponse:
 		if err := s.TeamPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableQueryGrantsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserPermissionDeniedQueryGrantsErrorResponse:
@@ -97021,6 +100103,22 @@ func (s QueryIdpsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableQueryIdpsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -97068,6 +100166,9 @@ func (s *QueryIdpsErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidQueryIdpsErrorResponse
 					found = true
+				case "unavailable":
+					s.Type = UnavailableQueryIdpsErrorResponse
+					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -97108,6 +100209,10 @@ func (s *QueryIdpsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidQueryIdpsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableQueryIdpsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -97886,6 +100991,22 @@ func (s QueryProjectsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableQueryProjectsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -97933,6 +101054,9 @@ func (s *QueryProjectsErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidQueryProjectsErrorResponse
 					found = true
+				case "unavailable":
+					s.Type = UnavailableQueryProjectsErrorResponse
+					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -97973,6 +101097,10 @@ func (s *QueryProjectsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidQueryProjectsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableQueryProjectsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -98751,6 +101879,22 @@ func (s QuerySessionsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableQuerySessionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -98798,6 +101942,9 @@ func (s *QuerySessionsErrorResponse) Decode(d *jx.Decoder) error {
 				case "sess.permission_denied":
 					s.Type = SessPermissionDeniedQuerySessionsErrorResponse
 					found = true
+				case "unavailable":
+					s.Type = UnavailableQuerySessionsErrorResponse
+					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -98838,6 +101985,10 @@ func (s *QuerySessionsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case SessPermissionDeniedQuerySessionsErrorResponse:
 		if err := s.SessPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableQuerySessionsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -99594,6 +102745,22 @@ func (s QueryTeamsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableQueryTeamsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -99644,6 +102811,9 @@ func (s *QueryTeamsErrorResponse) Decode(d *jx.Decoder) error {
 				case "team.project_not_found":
 					s.Type = TeamProjectNotFoundQueryTeamsErrorResponse
 					found = true
+				case "unavailable":
+					s.Type = UnavailableQueryTeamsErrorResponse
+					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -99688,6 +102858,10 @@ func (s *QueryTeamsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case TeamProjectNotFoundQueryTeamsErrorResponse:
 		if err := s.TeamProjectNotFound.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableQueryTeamsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -100472,6 +103646,22 @@ func (s QueryUsersErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableQueryUsersErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserNotFoundQueryUsersErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.not_found")
@@ -100545,6 +103735,9 @@ func (s *QueryUsersErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidQueryUsersErrorResponse
 					found = true
+				case "unavailable":
+					s.Type = UnavailableQueryUsersErrorResponse
+					found = true
 				case "user.not_found":
 					s.Type = UserNotFoundQueryUsersErrorResponse
 					found = true
@@ -100583,6 +103776,10 @@ func (s *QueryUsersErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidQueryUsersErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableQueryUsersErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserNotFoundQueryUsersErrorResponse:
@@ -105566,6 +108763,22 @@ func (s RemoveOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedRemoveOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case OriginInvalidRemoveOriginErrorResponse:
 		e.FieldStart("code")
 		e.Str("origin.invalid")
@@ -105646,6 +108859,22 @@ func (s RemoveOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableRemoveOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -105681,6 +108910,9 @@ func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalRemoveOriginErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedRemoveOriginErrorResponse
+					found = true
 				case "origin.invalid":
 					s.Type = OriginInvalidRemoveOriginErrorResponse
 					found = true
@@ -105695,6 +108927,9 @@ func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidRemoveOriginErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableRemoveOriginErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -105722,6 +108957,10 @@ func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedRemoveOriginErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case OriginInvalidRemoveOriginErrorResponse:
 		if err := s.OriginInvalid.Decode(d); err != nil {
 			return err
@@ -105740,6 +108979,10 @@ func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidRemoveOriginErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableRemoveOriginErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -105978,6 +109221,22 @@ func (s RemovePreviewErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableRemovePreviewErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -106025,6 +109284,9 @@ func (s *RemovePreviewErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidRemovePreviewErrorResponse
 					found = true
+				case "unavailable":
+					s.Type = UnavailableRemovePreviewErrorResponse
+					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -106065,6 +109327,10 @@ func (s *RemovePreviewErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidRemovePreviewErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableRemovePreviewErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -107238,6 +110504,22 @@ func (s RevokeMySessionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedRevokeMySessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidRevokeMySessionErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -107275,6 +110557,22 @@ func (s RevokeMySessionErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("sess.project_mismatch")
 		{
 			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableRevokeMySessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -107324,6 +110622,9 @@ func (s *RevokeMySessionErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalRevokeMySessionErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedRevokeMySessionErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidRevokeMySessionErrorResponse
 					found = true
@@ -107332,6 +110633,9 @@ func (s *RevokeMySessionErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "sess.project_mismatch":
 					s.Type = SessProjectMismatchRevokeMySessionErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableRevokeMySessionErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -107363,6 +110667,10 @@ func (s *RevokeMySessionErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedRevokeMySessionErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidRevokeMySessionErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
@@ -107373,6 +110681,10 @@ func (s *RevokeMySessionErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case SessProjectMismatchRevokeMySessionErrorResponse:
 		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableRevokeMySessionErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -107792,6 +111104,22 @@ func (s RevokeReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedRevokeReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelInUseRevokeReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.in_use")
@@ -107872,6 +111200,22 @@ func (s RevokeReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableRevokeReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -107907,6 +111251,9 @@ func (s *RevokeReleaseErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalRevokeReleaseErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedRevokeReleaseErrorResponse
+					found = true
 				case "rel.in_use":
 					s.Type = RelInUseRevokeReleaseErrorResponse
 					found = true
@@ -107921,6 +111268,9 @@ func (s *RevokeReleaseErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidRevokeReleaseErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableRevokeReleaseErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -107948,6 +111298,10 @@ func (s *RevokeReleaseErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedRevokeReleaseErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case RelInUseRevokeReleaseErrorResponse:
 		if err := s.RelInUse.Decode(d); err != nil {
 			return err
@@ -107966,6 +111320,10 @@ func (s *RevokeReleaseErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidRevokeReleaseErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableRevokeReleaseErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -108044,6 +111402,22 @@ func (s RevokeSessionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedRevokeSessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidRevokeSessionErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -108092,6 +111466,22 @@ func (s RevokeSessionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableRevokeSessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -108127,6 +111517,9 @@ func (s *RevokeSessionErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalRevokeSessionErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedRevokeSessionErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidRevokeSessionErrorResponse
 					found = true
@@ -108135,6 +111528,9 @@ func (s *RevokeSessionErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "sess.permission_denied":
 					s.Type = SessPermissionDeniedRevokeSessionErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableRevokeSessionErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -108162,6 +111558,10 @@ func (s *RevokeSessionErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedRevokeSessionErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidRevokeSessionErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
@@ -108172,6 +111572,10 @@ func (s *RevokeSessionErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case SessPermissionDeniedRevokeSessionErrorResponse:
 		if err := s.SessPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableRevokeSessionErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -108524,6 +111928,22 @@ func (s RollbackDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableRollbackDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -108589,6 +112009,9 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidRollbackDeploymentErrorResponse
 					found = true
+				case "unavailable":
+					s.Type = UnavailableRollbackDeploymentErrorResponse
+					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -108653,6 +112076,10 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidRollbackDeploymentErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableRollbackDeploymentErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -115824,11 +119251,43 @@ func (s SetUserPasswordErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidSetUserPasswordErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -115987,8 +119446,14 @@ func (s *SetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalSetUserPasswordErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedSetUserPasswordErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidSetUserPasswordErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableSetUserPasswordErrorResponse
 					found = true
 				case "user.conflict":
 					s.Type = UserConflictSetUserPasswordErrorResponse
@@ -116037,8 +119502,16 @@ func (s *SetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedSetUserPasswordErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidSetUserPasswordErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableSetUserPasswordErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserConflictSetUserPasswordErrorResponse:
@@ -121466,6 +124939,22 @@ func (s UpdateTeamErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedUpdateTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidUpdateTeamErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -121562,6 +125051,22 @@ func (s UpdateTeamErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UnavailableUpdateTeamErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -121600,6 +125105,9 @@ func (s *UpdateTeamErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalUpdateTeamErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedUpdateTeamErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidUpdateTeamErrorResponse
 					found = true
@@ -121617,6 +125125,9 @@ func (s *UpdateTeamErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "team.project_not_found":
 					s.Type = TeamProjectNotFoundUpdateTeamErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableUpdateTeamErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -121648,6 +125159,10 @@ func (s *UpdateTeamErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedUpdateTeamErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidUpdateTeamErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
@@ -121670,6 +125185,10 @@ func (s *UpdateTeamErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case TeamProjectNotFoundUpdateTeamErrorResponse:
 		if err := s.TeamProjectNotFound.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableUpdateTeamErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -122021,6 +125540,22 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedUpdateVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ProjNotFoundUpdateVariablesErrorResponse:
 		e.FieldStart("code")
 		e.Str("proj.not_found")
@@ -122058,6 +125593,22 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("enc_key.unknown_alg")
 		{
 			s := s.EncKeyUnknownAlg
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableUpdateVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -122170,6 +125721,9 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 				case "var.no_project_id":
 					s.Type = VarNoProjectIDUpdateVariablesErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedUpdateVariablesErrorResponse
+					found = true
 				case "proj.not_found":
 					s.Type = ProjNotFoundUpdateVariablesErrorResponse
 					found = true
@@ -122178,6 +125732,9 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "enc_key.unknown_alg":
 					s.Type = EncKeyUnknownAlgUpdateVariablesErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableUpdateVariablesErrorResponse
 					found = true
 				case "var.limit_exceeded":
 					s.Type = VarLimitExceededUpdateVariablesErrorResponse
@@ -122238,6 +125795,10 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.VarNoProjectID.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedUpdateVariablesErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ProjNotFoundUpdateVariablesErrorResponse:
 		if err := s.ProjNotFound.Decode(d); err != nil {
 			return err
@@ -122248,6 +125809,10 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case EncKeyUnknownAlgUpdateVariablesErrorResponse:
 		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableUpdateVariablesErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case VarLimitExceededUpdateVariablesErrorResponse:
@@ -131561,11 +135126,43 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case NotImplementedVerifyChallengeProofErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidVerifyChallengeProofErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableVerifyChallengeProofErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -131729,8 +135326,14 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalVerifyChallengeProofErrorResponse
 					found = true
+				case "not_implemented":
+					s.Type = NotImplementedVerifyChallengeProofErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidVerifyChallengeProofErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableVerifyChallengeProofErrorResponse
 					found = true
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsVerifyChallengeProofErrorResponse
@@ -131804,8 +135407,16 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
+	case NotImplementedVerifyChallengeProofErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidVerifyChallengeProofErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableVerifyChallengeProofErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	case UserAlreadyExistsVerifyChallengeProofErrorResponse:

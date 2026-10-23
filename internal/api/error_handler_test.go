@@ -580,18 +580,26 @@ func TestErrorResponseUserAttributesInvalidWithoutKeysStaysUserInvalid(t *testin
 	require.False(t, got.Response.Details.Set)
 }
 
-// A credential IntrospectToken refuses is a 401; an introspection that could
-// not reach the token store is a 500. Answering the outage with 401 would tell
-// every SDK its session is dead, and they clear the session cookie on a 401.
+// A credential IntrospectToken refuses is a 401; an introspection the server
+// could not finish keeps the status of its fault: 503 for a token store that is
+// unavailable, 501 for one that does not implement the read, and 500 for the
+// rest, an unclassified error included. Answering any of them with 401 would
+// tell every SDK its session is dead, and they clear the session cookie on a
+// 401.
 func TestOgenErrorHandlerIntrospectionFailure(t *testing.T) {
 	t.Parallel()
 
 	const (
 		internal          = `{"code":"internal","message":"An unexpected error occurred."}`
+		unavailable       = `{"code":"unavailable","message":"The service could not complete the request right now. Try again."}`
+		notImplemented    = `{"code":"not_implemented","message":"This feature is not implemented yet."}`
 		sessionRefused    = `{"code":"auth.unauthorized","message":"Missing or invalid session token."}`
 		credentialRefused = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
 	)
 	storeDown := domain.ErrInternal(errors.New("connection refused")).WithMessage("failed to read token record")
+	storeUnavailable := domain.ErrUnavailable().WithParent(errors.New("retry budget spent"))
+	keyUnwrapFailed := domain.ErrDecryptionFailed(errors.New("bad master key"))
+	unclassified := errors.New("connection refused")
 
 	for _, tc := range []struct {
 		name       string
@@ -603,12 +611,20 @@ func TestOgenErrorHandlerIntrospectionFailure(t *testing.T) {
 		wantBody   string
 	}{
 		{"session me, token store down", http.MethodGet, "/sessions/me", false, storeDown, http.StatusInternalServerError, internal},
+		{"session me, token store unavailable", http.MethodGet, "/sessions/me", false, storeUnavailable, http.StatusServiceUnavailable, unavailable},
+		{"session me, token store not implemented", http.MethodGet, "/sessions/me", false, domain.ErrNotImplemented(), http.StatusNotImplemented, notImplemented},
+		{"session me, key unwrap failed", http.MethodGet, "/sessions/me", false, keyUnwrapFailed, http.StatusInternalServerError, internal},
+		{"session me, unclassified error", http.MethodGet, "/sessions/me", false, unclassified, http.StatusInternalServerError, internal},
 		{"session me, revoked token", http.MethodGet, "/sessions/me", false, domain.ErrTokenRevoked(), http.StatusUnauthorized, sessionRefused},
 		{"session me, invalid token", http.MethodGet, "/sessions/me", false, domain.ErrInvalidToken(), http.StatusUnauthorized, sessionRefused},
 		{"user me, token store down", http.MethodGet, "/users/me", false, storeDown, http.StatusInternalServerError, internal},
 		{"dual-scheme cookie, token store down", http.MethodGet, "/teams/team_1", false, storeDown, http.StatusInternalServerError, internal},
+		{"dual-scheme cookie, token store unavailable", http.MethodGet, "/teams/team_1", false, storeUnavailable, http.StatusServiceUnavailable, unavailable},
 		{"dual-scheme cookie, revoked token", http.MethodGet, "/teams/team_1", false, domain.ErrTokenRevoked(), http.StatusUnauthorized, credentialRefused},
 		{"bearer, token store down", http.MethodGet, "/teams/team_1", true, storeDown, http.StatusInternalServerError, internal},
+		{"bearer, token store unavailable", http.MethodGet, "/teams/team_1", true, storeUnavailable, http.StatusServiceUnavailable, unavailable},
+		{"bearer, token store not implemented", http.MethodGet, "/teams/team_1", true, domain.ErrNotImplemented(), http.StatusNotImplemented, notImplemented},
+		{"bearer, unclassified error", http.MethodGet, "/teams/team_1", true, unclassified, http.StatusInternalServerError, internal},
 		{"bearer, revoked token", http.MethodGet, "/teams/team_1", true, domain.ErrTokenRevoked(), http.StatusUnauthorized, credentialRefused},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
