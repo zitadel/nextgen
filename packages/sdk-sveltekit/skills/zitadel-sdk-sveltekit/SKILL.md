@@ -28,9 +28,9 @@ adjusting a scaffolded wiring.
 ## Install
 
 ```bash
-pnpm add @zitadel/sdk-sveltekit@alpha
+pnpm add @zitadel/sdk-sveltekit@latest
 # the login/logout/session widgets are a separate package:
-pnpm add @zitadel/sdk-svelte@alpha
+pnpm add @zitadel/sdk-svelte@latest
 ```
 
 Peer deps: `@sveltejs/kit ^2.0.0 || ^3.0.0`, `svelte ^5.0.0`.

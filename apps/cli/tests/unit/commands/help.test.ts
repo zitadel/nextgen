@@ -58,6 +58,8 @@ Configuration commands
 
 Resource commands
   resources:                    List the resources this CLI manages and what can be done to each
+  api:                          Call any operation of the Zitadel API, with this project's server and project secret
+  api ls:                       List the operations of the Zitadel API that \`zitadel api\` calls
   events get:                   Get one event by id
   events list:                  List events
   grants create:                Create a grant

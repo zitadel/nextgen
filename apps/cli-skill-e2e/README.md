@@ -82,7 +82,7 @@ its goal (the baseline is captured for comparison, not asserted), then in
 | `BASELINE_MAX_TURNS` | `5` | tighter loop cap for the baseline (no-skill) config |
 | `MAX_QA` | `6` | max question/answer rounds per interactive stage (with-skill only) |
 | `CALL_TIMEOUT_MS` | `420000` | wall-clock timeout per `claude -p` call (anti-hang) |
-| `CLI_SPEC` | `@zitadel/cli@alpha` | the CLI package/tag used to read live state for assertions |
+| `CLI_SPEC` | `@zitadel/cli@latest` | the CLI package/tag used to read live state for assertions |
 
 **Two safeguards keep a run from dragging or hanging.** `MAX_TURNS` caps the
 *reasoning loop* (how many model↔tool steps a call may take); `CALL_TIMEOUT_MS`

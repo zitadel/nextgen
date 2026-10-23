@@ -4,13 +4,22 @@ import { join } from "node:path";
 import { ZitadelError } from "./errors";
 import { LocalServer } from "./local-server/server";
 import { parseJsonObject } from "./json";
+import type { FlagVariable } from "./oclif/types";
 
 /**
  * Server URL used when nothing else resolves. Also surfaced in hints and
  * the interactive setup prompt as the suggested value, so it is exported
  * rather than kept private.
  */
-export const DEFAULT_SERVER = "https://api.zitadel.cloud";
+export const DEFAULT_SERVER = "https://preview.zitadel.com";
+
+/** The variable {@link resolveServer} reads when `--server` is not given. */
+export const SERVER_VARIABLE: FlagVariable = {
+  name: "ZITADEL_API_BASE",
+  flag: "server",
+  description: "The server URL, or `local`, as `--server` takes it.",
+  precedence: "`--server` wins over it, and it wins over `server` in `zitadel.json`.",
+};
 
 /**
  * The resolved target server plus the source it came from. `origin` is
@@ -44,7 +53,7 @@ export async function resolveServer(input: ResolveServerInput): Promise<Resolved
   if (input.serverFlag) {
     return validate(input.cwd, { value: input.serverFlag, origin: "flag" });
   }
-  const envValue = input.env.ZITADEL_API_BASE;
+  const envValue = input.env[SERVER_VARIABLE.name];
   if (envValue) {
     return validate(input.cwd, { value: envValue, origin: "env" });
   }

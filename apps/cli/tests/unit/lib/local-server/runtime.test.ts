@@ -13,6 +13,7 @@ import {
   ensureLocalState,
   localContainerName,
   localRuntimePaths,
+  loopbackReach,
   readNearestRuntimeMetadata,
   readRuntimeMetadata,
   removeLocalData,
@@ -36,7 +37,8 @@ describe("local server runtime metadata", () => {
     ["0.1.0-alpha.5", "ghcr.io/zitadel/nextgen:0.1.0-alpha.5"],
     ["v0.1.0-alpha.5", "ghcr.io/zitadel/nextgen:0.1.0-alpha.5"],
     ["0.0.0-test", "ghcr.io/zitadel/nextgen:latest"],
-    ["0.1.0", "ghcr.io/zitadel/nextgen:latest"],
+    ["0.1.0", "ghcr.io/zitadel/nextgen:0.1.0"],
+    ["1.0.0-beta.2", "ghcr.io/zitadel/nextgen:latest"],
   ])("derives the default image for CLI version %s", (cliVersion, image) => {
     expect(defaultLocalServerImageForCliVersion(cliVersion)).toBe(image);
   });
@@ -194,6 +196,49 @@ describe("readNearestRuntimeMetadata", () => {
     await expect(readNearestRuntimeMetadata(cwd)).rejects.toMatchObject({
       nextCommands: ["zitadel reset --force", "zitadel start"],
     });
+  });
+});
+
+describe("loopbackReach", () => {
+  const ALLOW_LIST = { injected: ["NEXTGEN_HTTPCLIENT_ALLOW_LIST"] };
+
+  function binaryRuntime(env = ALLOW_LIST): RuntimeMetadata {
+    return {
+      ...runtimeFor(cwd),
+      backend: "binary",
+      pid: 4242,
+      command: "zitadel-server",
+      log_path: join(cwd, ".zitadel/local/server.log"),
+      server_package: "@zitadel/server",
+      server_version: "0.0.0-test",
+      env,
+    };
+  }
+
+  it("allows loopback on a process server that got the allow list, from a subdirectory too", async () => {
+    await writeRuntimeMetadata(cwd, binaryRuntime());
+    const app = join(cwd, "my-app");
+    await mkdir(app);
+
+    await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("allowed");
+    await expect(loopbackReach(app, "http://127.0.0.1:8081/")).resolves.toBe("allowed");
+  });
+
+  it("names a container server, whose localhost is the container", async () => {
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd));
+    await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("container");
+  });
+
+  it("knows nothing of a process server started with the allow list off", async () => {
+    await writeRuntimeMetadata(cwd, binaryRuntime({ injected: [] }));
+    await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("unknown");
+  });
+
+  it("knows nothing of a server the record does not name, or of no record", async () => {
+    await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("unknown");
+    await writeRuntimeMetadata(cwd, binaryRuntime());
+    await expect(loopbackReach(cwd, "http://localhost:9999")).resolves.toBe("unknown");
+    await expect(loopbackReach(cwd, "https://example.zitadel.cloud")).resolves.toBe("unknown");
   });
 });
 

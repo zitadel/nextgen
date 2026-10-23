@@ -3,6 +3,7 @@ import { Flags } from "@oclif/core";
 import consola from "consola";
 
 import { ZitadelError, toZitadelError } from "../lib/errors";
+import { serverLogAction } from "../lib/journey-guidance";
 import { ensureLocalAdmin, type LocalAdmin } from "../lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "../lib/local-server/env-vars";
 import {
@@ -93,7 +94,7 @@ export default class Start extends BaseCommand {
     // NEXTGEN_* variables from .env.local and .env are read before any runtime
     // is stopped and reach the new runtime through its environment only; see
     // env-vars.ts.
-    const env = await loadProjectEnv(this.meta.cwd);
+    const env = await loadProjectEnv(this.meta.cwd, this.meta.env);
     // The developer exists on their own server from the first start: the
     // server imports the local admin, and the console signs them in by link.
     // The admin is a user of the platform project, so the two travel together:
@@ -218,6 +219,7 @@ function readyData(
         : []),
       "Run setup in this directory or one inside it, so it finds this server's local admin; the CLI will detect the framework or ask when needed.",
       "Setup installs dependencies when needed; then start your app dev server.",
+      serverLogAction(cliVersion),
     ],
     next_commands: [
       publicCliCommand("setup --server local", cliVersion),

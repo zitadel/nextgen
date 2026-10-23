@@ -20,6 +20,8 @@ import type { IconName } from "./zl-icon.js";
  * Templates render one per step when the flow returns errors; the
  * orchestrator surfaces flow-level errors through `errors` in the Liquid
  * context.
+ *
+ * @fires {CustomEvent<null>} zl-dismiss - The dismiss control was activated; the host should remove the alert.
  */
 @customElement("zl-alert")
 export class ZlAlert extends LitElement {

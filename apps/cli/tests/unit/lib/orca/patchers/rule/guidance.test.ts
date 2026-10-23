@@ -109,6 +109,7 @@ describe("guidance content", () => {
 
   it("points agents at the dialect meta-schemas and the plan/apply loop", () => {
     const agents = agentsGuidanceSection(ctx);
+    expect(agents).toContain('"$schema": "./.zitadel/meta/project.json"');
     expect(agents).toContain('"$schema": "../meta/flow-definition.json"');
     expect(agents).toContain(".zitadel/meta/user-schema.json");
     expect(agents).toContain("npx @zitadel/cli@0.1.0-alpha.15 plan");
@@ -209,5 +210,16 @@ describe("guidance content", () => {
     const nuxtAgents = agentsGuidanceSection(nuxtCtx);
     expect(nuxtAgents).toContain('variant="widget"');
     expect(nuxtAgents).not.toContain("@zitadel/sdk-next/jsx");
+  });
+});
+
+describe("moving the dev port", () => {
+  it.each([
+    ["README", readmeGuidanceSection],
+    ["AGENTS.md", agentsGuidanceSection],
+  ])("the %s section names the command for a taken port", (_name, section) => {
+    const out = section(ctx);
+    expect(out).toContain("EADDRINUSE");
+    expect(out).toContain("npx @zitadel/cli@0.1.0-alpha.15 setup --dev-port <port>");
   });
 });

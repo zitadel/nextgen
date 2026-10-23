@@ -19,19 +19,28 @@ import {
  *
  * `children` renders the form and is remounted per opening, so a cancelled
  * draft never reappears.
+ *
+ * Opened by its `trigger`, or, without one, by the caller through `open` and
+ * `onOpenChange`: for a trigger inside a popover, which unmounts with it.
  */
 export function FormSheet({
   trigger,
+  open: openProp,
+  onOpenChange,
   children,
 }: {
-  trigger: ReactNode;
+  trigger?: ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   children: (close: () => void) => ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = onOpenChange ?? setOpenState;
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>{trigger}</SheetTrigger>
+      {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
       <SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-130">
         {open && children(() => setOpen(false))}
       </SheetContent>

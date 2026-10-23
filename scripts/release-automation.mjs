@@ -1,13 +1,8 @@
 #!/usr/bin/env node
-import { appendFile, readFile, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { appendFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-import {
-  analyzeChangedEntries,
-  parseChangesetPackages,
-  parseNameStatus,
-} from "./check-changesets-status.mjs";
+import { analyzeChangedEntries, parseNameStatus } from "./check-changesets-status.mjs";
 import { forwardedArgs, isDirectRun, runCapture } from "./dev-process.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -54,19 +49,6 @@ export function parseArgs(args) {
 export async function detectReleaseAutomation(options) {
   const mode = options.mode;
   const root = options.repoRoot ?? repoRoot;
-  const pendingChangesets = options.pendingChangesets ?? (await readPendingChangesets(root));
-  const releasePendingChangesets =
-    options.releasePendingChangesets ??
-    (options.pendingChangesets
-      ? pendingChangesets
-      : await readReleaseChangesets(root, pendingChangesets));
-  const prereleaseChangesetIds = normalizeChangesetIdSet(
-    options.prereleaseChangesetIds ?? (await readPrereleaseChangesetIds(root)),
-  );
-  const unrecordedPendingChangesets = findUnrecordedPendingChangesets(
-    releasePendingChangesets,
-    prereleaseChangesetIds,
-  );
 
   if (mode !== "publish") {
     throw new Error(`unknown release automation mode: ${mode || "(empty)"}`);
@@ -79,27 +61,18 @@ export async function detectReleaseAutomation(options) {
   const versionCommit = isVersionPackageCommit(message);
   const errors = [];
 
-  if (versionCommit && unrecordedPendingChangesets.length > 0) {
-    errors.push(
-      `version package commit still has pending changesets not recorded in .changeset/pre.json: ${unrecordedPendingChangesets.join(", ")}`,
-    );
-  }
   if (versionCommit && !analysis.versionOutputOnly) {
     errors.push("version package commit changed files outside Changesets version output");
   }
 
-  const shouldRun =
-    versionCommit && unrecordedPendingChangesets.length === 0 && analysis.versionOnly;
+  const shouldRun = versionCommit && analysis.versionOnly;
   return {
     ok: errors.length === 0,
     mode,
     shouldRun,
-    reason: publishReason({ versionCommit, unrecordedPendingChangesets, analysis, errors }),
+    reason: publishReason({ versionCommit, analysis, errors }),
     base,
     message,
-    pendingChangesets,
-    releasePendingChangesets,
-    unrecordedPendingChangesets,
     changedFiles: analysis.changedFiles,
     errors,
   };
@@ -121,26 +94,6 @@ export function renderStepSummary(result) {
     `Reason: ${result.reason}`,
     "",
   ];
-
-  if (result.pendingChangesets.length > 0) {
-    lines.push("## Pending changesets", "");
-    for (const file of result.pendingChangesets) {
-      lines.push(`- \`${file}\``);
-    }
-    lines.push("");
-  }
-
-  if (result.unrecordedPendingChangesets?.length > 0) {
-    lines.push("## Pending release changesets not recorded in prerelease state", "");
-    for (const file of result.unrecordedPendingChangesets) {
-      lines.push(`- \`${file}\``);
-    }
-    lines.push("");
-  } else if (result.releasePendingChangesets?.length > 0) {
-    lines.push("All pending release changesets are recorded in `.changeset/pre.json`.", "");
-  } else if (result.pendingChangesets.length > 0) {
-    lines.push("No pending release changesets require prerelease recording.", "");
-  }
 
   if (result.changedFiles.length > 0) {
     lines.push("## Changed files", "");
@@ -177,7 +130,6 @@ export async function main(args = forwardedArgs(), options = {}) {
     base: parsed.base,
     message: parsed.message || undefined,
     entries: options.entries,
-    pendingChangesets: options.pendingChangesets,
   });
 
   await writeOutputs(result, options.outputPath ?? process.env.GITHUB_OUTPUT);
@@ -198,47 +150,6 @@ export async function main(args = forwardedArgs(), options = {}) {
     `release ${result.mode} automation: ${result.shouldRun ? "run" : "skip"} - ${result.reason}`,
   );
   return 0;
-}
-
-export async function readPendingChangesets(root) {
-  const entries = await readdir(join(root, ".changeset"), { withFileTypes: true });
-  return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".md") && entry.name !== "README.md")
-    .map((entry) => `.changeset/${entry.name}`)
-    .sort((left, right) => left.localeCompare(right));
-}
-
-export async function readReleaseChangesets(root, pendingChangesets = undefined) {
-  const files = pendingChangesets ?? (await readPendingChangesets(root));
-  const releaseChangesets = [];
-  for (const file of files) {
-    const source = await readFile(join(root, file), "utf8");
-    if (parseChangesetPackages(source).length > 0) {
-      releaseChangesets.push(file);
-    }
-  }
-  return releaseChangesets;
-}
-
-export async function readPrereleaseChangesetIds(root) {
-  try {
-    const source = await readFile(join(root, ".changeset/pre.json"), "utf8");
-    const parsed = JSON.parse(source);
-    if (parsed?.mode !== "pre" || !Array.isArray(parsed.changesets)) {
-      return new Set();
-    }
-    return new Set(parsed.changesets.map((id) => String(id)));
-  } catch (error) {
-    if (error?.code === "ENOENT") {
-      return new Set();
-    }
-    throw error;
-  }
-}
-
-export function findUnrecordedPendingChangesets(pendingChangesets, prereleaseChangesetIds) {
-  const ids = normalizeChangesetIdSet(prereleaseChangesetIds);
-  return pendingChangesets.filter((file) => !ids.has(changesetIdFromFile(file)));
 }
 
 async function gitChangedEntries(root, base) {
@@ -274,31 +185,17 @@ async function writeSummary(summary, summaryPath) {
   console.log(summary);
 }
 
-function publishReason({ versionCommit, unrecordedPendingChangesets, analysis, errors }) {
+function publishReason({ versionCommit, analysis, errors }) {
   if (errors.length > 0) {
     return "release commit preflight failed";
   }
   if (!versionCommit) {
     return "latest commit is not a Changesets version package commit";
   }
-  if (unrecordedPendingChangesets.length > 0) {
-    return "pending changesets are not recorded in .changeset/pre.json";
-  }
   if (!analysis.versionOnly) {
     return "version package commit has no publishable package version output";
   }
   return "Changesets version package commit detected";
-}
-
-function normalizeChangesetIdSet(ids) {
-  if (ids instanceof Set) {
-    return ids;
-  }
-  return new Set((ids ?? []).map((id) => String(id)));
-}
-
-function changesetIdFromFile(file) {
-  return file.split("/").at(-1)?.replace(/\.md$/, "") ?? file;
 }
 
 function normalizeBase(base) {

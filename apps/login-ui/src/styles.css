@@ -1,5 +1,14 @@
 @import "@zitadel/design-tokens/css/tokens.css";
 
+/* Self-hosted Arimo — the face `--zl-font-family-sans` names first. The widget
+   loads no face of its own (ADR 025, amended), so this shell serves it from
+   its own origin rather than a font CDN. Mirrors `apps/console/src/styles.css`;
+   a face is fetched only when a tenant's branding leaves it in use. */
+@import "@fontsource/arimo/400.css";
+@import "@fontsource/arimo/500.css";
+@import "@fontsource/arimo/600.css";
+@import "@fontsource/arimo/700.css";
+
 /* APK Futural — the brand display typeface the design uses for card titles and
    field labels. Licensed, so it is declared per app rather than shipped by
    `@zitadel/design-tokens`, which publishes to npm. Regular (400) is the only

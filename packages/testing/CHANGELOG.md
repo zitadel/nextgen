@@ -1,5 +1,96 @@
 # @zitadel/testing
 
+## 0.1.0
+
+### Patch Changes
+
+- Updated dependencies [[`114c32c`](https://github.com/zitadel/nextgen/commit/114c32c4a86f7b05794528b889faad159d59bf3f), [`43b20ea`](https://github.com/zitadel/nextgen/commit/43b20ea687081da0b074b8dfa95deb82ce921d98), [`17523dc`](https://github.com/zitadel/nextgen/commit/17523dcf8e55d9d8a07f27a05c6597749f81ef9b), [`8ef9c49`](https://github.com/zitadel/nextgen/commit/8ef9c495c97188893fd8b879c524ce8e097fa52b), [`dedd93b`](https://github.com/zitadel/nextgen/commit/dedd93ba07e58108771019e70466e858b504c374), [`1653960`](https://github.com/zitadel/nextgen/commit/16539605bbdeadbcf4d8ac2bbfa7e3e16b1af557), [`9194819`](https://github.com/zitadel/nextgen/commit/919481901283c4dddc6ce32276439b47b53961e8), [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1), [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1), [`ab19e1e`](https://github.com/zitadel/nextgen/commit/ab19e1eb2b2cfcfe15000d8d97861d465a2d0c4b), [`831cb81`](https://github.com/zitadel/nextgen/commit/831cb81978e65f1b5d41b41330c31e9c43fd2030)]:
+  - @zitadel/cli@0.1.0
+  - @zitadel/api@0.1.0
+  - @zitadel/config@0.1.0
+
+## 1.0.0-alpha.28
+
+### Minor Changes
+
+- [#2071](https://github.com/zitadel/nextgen/pull/2071) [`fa301b9`](https://github.com/zitadel/nextgen/commit/fa301b96daf57512cef6ffb4eb60fdd49cff33e4) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now keep each app's session in a cookie named after its
+  project, `__nextgen_session_<project id>`, instead of the `__nextgen_session`
+  cookie every project on a host shared. On `localhost`, signing in to an app no
+  longer signs you out of the Console of `zitadel start` or of another app, and
+  signing in to the Console no longer signs you out of your apps.
+
+  The `/__nextgen` proxy renames the cookie Zitadel sets on its way to the
+  browser, sends the app's cookie to Zitadel under Zitadel's name, and passes no
+  other project's session cookie on. Users who signed in before the upgrade stay
+  signed in: the first time the middleware, or the widgets' session check, finds
+  that the old cookie holds a session of the app's project, the session is copied
+  to the new cookie. The old cookie stays until the user next signs in or out
+  through the app, since the Console may share the app's project; then the proxy
+  clears it, and on sign-out ends its session too, so it cannot sign the user
+  back in. A response that sets a session cookie is never stored by a shared
+  cache (`Cache-Control: private, no-store`). With no project configured, the
+  proxy passes cookies through unchanged.
+
+  If your server-SDK app reads the session cookie itself, or its tests set it,
+  use `sessionCookieName(projectId)` (from `@zitadel/sdk-core`, or from
+  `@zitadel/testing` in tests) instead of `__nextgen_session` or
+  `SESSION_COOKIE_NAME`: the app's session is no longer kept there.
+
+  `@zitadel/testing` adds `sessionCookieName(projectId)`, the cookie a server-SDK
+  app keeps its session in, and `authenticatedPage` now signs its browser context
+  in under both names, so it works for SPAs and server-SDK apps alike.
+  `SESSION_COOKIE_NAME` stays Zitadel's own name. `@zitadel/sdk-core` adds
+  `sessionCookieName`, `proxySessionCookies`, `serializeSessionCookie` and
+  `SESSION_COOKIE_CACHE_CONTROL`.
+
+### Patch Changes
+
+- [#2076](https://github.com/zitadel/nextgen/pull/2076) [`12b3226`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now count a session as signed in only when it belongs to the
+  app's own project. A session of another project on the same server, such as a
+  second app on the same host or the console of a local `zitadel start`, reads
+  as signed out in `protectedRoutes`, `auth()` and `getAuth()`, and its cookie is
+  left in place for the app it belongs to.
+
+  The project comes from the new `projectId` middleware option, else
+  `ZITADEL_PROJECT_ID`, else the framework's public project id variable
+  (`NEXT_PUBLIC_`, `VITE_` or `PUBLIC_ZITADEL_PROJECT_ID`). `zitadel setup`
+  already writes these to `.env.local`. A deployment that sets none of them must
+  set `ZITADEL_PROJECT_ID`, or nobody is signed in. With `@zitadel/sdk-nuxt`, the
+  public project id (`NUXT_PUBLIC_ZITADEL_PROJECT_ID`) decides unless
+  `nextgen.projectId` names one, so a built server follows it at runtime. A JWT
+  session token must name the project in its `aud` claim. `auth()` in
+  `@zitadel/sdk-next` also takes the project of `configureZitadel()`; with
+  `createProxy(config)`, pass the same project to `auth()` when it lives only in
+  that handle.
+
+  `GET /sessions/me` takes an optional `project_id` and answers a session of
+  another project with `403 sess.project_mismatch`. The SDKs send it, and so do
+  `getSession()` in `@zitadel/sdk-next`, `<zitadel-session>`, `<zitadel-logout>`
+  and the console. `getSession()` takes the project from its `projectId` option,
+  `configureZitadel()` or `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, and without one reads
+  as signed out. Signing out with `<zitadel-logout>` or `<zitadel-session>` no
+  longer ends another project's session. The `AGENTS.md` guidance that
+  `zitadel setup` writes now tells agents to read the session this way.
+
+  A Bearer token that is not this app's no longer decides what happens to the
+  session cookie that came with it: the cookie is judged, and cleared only when
+  the backend refuses it, on its own.
+
+  In `@zitadel/api`, `getMySession()` now takes its query parameters first: call
+  `getMySession(undefined, init)` where you called `getMySession(init)`. In
+  `@zitadel/sdk-core`, `checkOpaqueSessionToken()` and
+  `validateOpaqueSessionToken()` take the project id as a fourth argument, and
+  `resolveSession()` is the one implementation of these rules behind every server
+  SDK's middleware.
+
+  The `@zitadel/sdk-next` middleware also no longer lets a session that has not
+  finished signing in through `protectedRoutes`.
+
+- Updated dependencies [[`0f4b901`](https://github.com/zitadel/nextgen/commit/0f4b901f60f2ed20bff71e321564d3b1fc187eab), [`d04f94b`](https://github.com/zitadel/nextgen/commit/d04f94b50061418b1dba90f3f8b8ddfa0dee9adf), [`d04f94b`](https://github.com/zitadel/nextgen/commit/d04f94b50061418b1dba90f3f8b8ddfa0dee9adf), [`122864a`](https://github.com/zitadel/nextgen/commit/122864a9a65bd637a42258da9aaadc65cf462548), [`21ac783`](https://github.com/zitadel/nextgen/commit/21ac783d40f0480d93aaea550eb938e8f98a96dd), [`4d63c44`](https://github.com/zitadel/nextgen/commit/4d63c44b4f60dd02382d28fbc2fcf5fd1046f065), [`3d80fcb`](https://github.com/zitadel/nextgen/commit/3d80fcba9cf55a6c19c31912451e67e6cfc5d980), [`b53ef49`](https://github.com/zitadel/nextgen/commit/b53ef494bce234fc3f1e54c6cb4bd0cf288423c5), [`7c3d3dc`](https://github.com/zitadel/nextgen/commit/7c3d3dc557c3be1626c732e61221e33a180e4718), [`628e101`](https://github.com/zitadel/nextgen/commit/628e101e5c254ab8bdaca830fc6e4acbd084b41e), [`12b3226`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f), [`adf6453`](https://github.com/zitadel/nextgen/commit/adf64530b8a647465ae80888fb52232d05107809), [`fa301b9`](https://github.com/zitadel/nextgen/commit/fa301b96daf57512cef6ffb4eb60fdd49cff33e4), [`f65cebe`](https://github.com/zitadel/nextgen/commit/f65cebe8142daaab33882a8ae22822a75bd94e6f), [`e90dade`](https://github.com/zitadel/nextgen/commit/e90dade940d52ce4827ed63d0171d0de68cf2959)]:
+  - @zitadel/api@1.0.0-alpha.28
+  - @zitadel/config@1.0.0-alpha.28
+  - @zitadel/cli@1.0.0-alpha.28
+
 ## 1.0.0-alpha.27
 
 ### Patch Changes

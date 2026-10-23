@@ -1,22 +1,21 @@
 title: Deployment
 description: |
-  An immutable record of a release being made live on a set of targets.
+  An immutable record of a release made live on a set of targets. Deploying
+  and rolling back each append one, so the history is the audit trail.
 
-  Deploying and rolling back both create a deployment. The record is what
-  ran where and when — the release, the targets and the timestamp — plus
-  metadata saying why and who. It is append-only: written once, in one
-  transaction for all of its targets, and never changed afterwards, so the
-  deployment log is the audit trail of what ran where.
+  All primary origins serve the project's newest primary deployment; one
+  added after it serves nothing until the next deployment to `primary`. A
+  preview URL serves the newest deployment to it while its preview is live.
 
-  A target serves the release of the newest deployment that targeted it.
-  An older deployment stays in the history after a newer one replaces it on
-  some or all of its targets.
+  Every field is fixed at creation except `status`, which is read as of now.
 type: object
 required:
   - id
   - project_id
   - release_id
+  - kind
   - targets
+  - status
   - deployed_at
   - metadata
 properties:
@@ -34,16 +33,21 @@ properties:
       The release this deployment made live. Always the release id, also
       when the request named the release by `content_hash`.
     $ref: ../../components/schemas/release-id.yaml
+  kind:
+    readOnly: true
+    $ref: deployment-kind.yaml
   targets:
     readOnly: true
     type: array
     minItems: 1
     description: |
-      The origins this deployment made the release live on, as resolved when
-      it was created: `primary` appears here as the origins it expanded to.
-      Sorted by origin.
+      The resolved origins, sorted. For `primary`, the project's primary
+      origins at creation. The live view lists only the targets still served.
     items:
       $ref: deployment-target.yaml
+  status:
+    readOnly: true
+    $ref: deployment-status.yaml
   deployed_at:
     readOnly: true
     type: string

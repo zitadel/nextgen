@@ -17,7 +17,7 @@ import {
 import { HttpHealth, TcpPorts } from "./internal/probes";
 import { withStartLock } from "./internal/start-lock";
 import { RuntimeFileStore } from "./internal/store";
-import { discoverManagedRuntimeProcesses, type ManagedRuntimeProcess } from "./processes";
+import type { LocalServers, ManagedRuntimeProcess } from "./processes";
 import {
   type RuntimeBackend,
   type RuntimeMetadata,
@@ -31,6 +31,15 @@ import {
   removeLocalData,
   removeRuntimeMetadata,
 } from "./runtime";
+import {
+  type LogLevel,
+  type LogLine,
+  LogLineReader,
+  type LogSink,
+  atLeast,
+  lastLines,
+  logLines,
+} from "./server-log";
 
 /** What every backend needs to start: what the directory does not already say. */
 type CommonRunConfig = Readonly<{
@@ -211,8 +220,8 @@ export class LocalServer {
    * cannot find the server: the processes are found by their command lines, not
    * by any directory's record.
    */
-  static async stopAll(): Promise<SweepResult> {
-    const discovery = await discoverManagedRuntimeProcesses();
+  static async stopAll(servers: LocalServers): Promise<SweepResult> {
+    const discovery = await servers.current();
     if (!discovery.supported) {
       return { supported: false, error: discovery.error };
     }
@@ -412,15 +421,59 @@ export class LocalServer {
   }
 
   /**
-   * The end of the server's log, or, with `follow`, the log streamed until
-   * interrupted (then `logs` is empty: it was written to the terminal as it
-   * came). The log is read by the record, so it works for a server that has
-   * stopped, which is when the log is most wanted.
+   * The end of the server's log: its last `tail` lines, or with `level` the
+   * last `tail` lines at that level or above. The log is read by the record,
+   * so it works for a server that has stopped, which is when the log is most
+   * wanted.
    */
   async logs(options: {
     tail: number;
-    follow?: boolean;
-  }): Promise<{ runtime: RuntimeMetadata; logs: string }> {
+    level?: LogLevel;
+  }): Promise<{ runtime: RuntimeMetadata; lines: LogLine[] }> {
+    const runtime = await this.recordedRuntime();
+    // Docker picks the last lines itself, but by count only, so lines at a
+    // level are picked here from the whole log.
+    const text =
+      runtime.backend === "binary"
+        ? await BinaryLauncher.readLog(runtime.log_path)
+        : await DockerLauncher.readLogs(
+            runtime.container_name,
+            options.level ? "all" : options.tail,
+          );
+    return { runtime, lines: lastLines(logLines(text), options.tail, options.level) };
+  }
+
+  /**
+   * Prints the end of the server's log, the lines {@link logs} picks, and then
+   * each line the server writes, until interrupted. With `level`, the lines
+   * below it are left out of both.
+   */
+  async followLogs(options: {
+    tail: number;
+    level?: LogLevel;
+    print: (lines: readonly LogLine[]) => void;
+  }): Promise<RuntimeMetadata> {
+    const runtime = await this.recordedRuntime();
+    const reader = new LogLineReader();
+    const sink: LogSink = {
+      existing: (text) => options.print(lastLines(reader.read(text), options.tail, options.level)),
+      appended: (text) => options.print(atLeast(reader.read(text), options.level)),
+    };
+    if (runtime.backend === "binary") {
+      await BinaryLauncher.followLogs(runtime.log_path, sink);
+    } else {
+      await DockerLauncher.followLogs(
+        runtime.container_name,
+        options.level ? "all" : options.tail,
+        sink,
+      );
+    }
+    options.print(atLeast(reader.end(), options.level));
+    return runtime;
+  }
+
+  /** The directory's record, which reading the log needs: the log is found by it. */
+  private async recordedRuntime(): Promise<RuntimeMetadata> {
     const runtime = await readRuntimeMetadata(this.cwd);
     if (!runtime) {
       throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
@@ -428,19 +481,7 @@ export class LocalServer {
         nextCommands: [publicCliCommand("start", this.cliVersion)],
       });
     }
-    if (options.follow) {
-      if (runtime.backend === "binary") {
-        await BinaryLauncher.followLogs(runtime.log_path, options.tail);
-      } else {
-        await DockerLauncher.followLogs(runtime.container_name, options.tail);
-      }
-      return { runtime, logs: "" };
-    }
-    const logs =
-      runtime.backend === "binary"
-        ? await BinaryLauncher.readLogs(runtime.log_path, options.tail)
-        : await DockerLauncher.readLogs(runtime.container_name, options.tail);
-    return { runtime, logs };
+    return runtime;
   }
 
   /**

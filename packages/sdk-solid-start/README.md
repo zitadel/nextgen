@@ -5,7 +5,7 @@ SolidStart middleware and helpers for Zitadel.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-solid-start@alpha
+pnpm add @zitadel/sdk-solid-start@latest
 ```
 
 ## Requirements
@@ -129,7 +129,7 @@ Install the Solid component library and render its `ZitadelLogin` component.
 `@zitadel/sdk-solid-start` is server-only; the widget comes from `@zitadel/sdk-solid`:
 
 ```bash
-pnpm add @zitadel/sdk-solid@alpha
+pnpm add @zitadel/sdk-solid@latest
 ```
 
 Load it with SolidStart's `clientOnly`, so the widget is created in the browser
@@ -201,7 +201,7 @@ const ZitadelLogin = clientOnly(() =>
 
 | Option              | Type                 | Default                      | Description                                                          |
 | ------------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------- |
-| `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend                                 |
+| `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend. A trailing slash is ignored.   |
 | `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project secret, sent as the bearer on the handoff exchange only           |
 | `projectId`         | `string`             | `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID` env | The project this app signs its users in to. A session of any other project on the server reads as signed out and keeps its cookie; with no project, no session counts |
 | `proxyPath`         | `string`             | `"/__nextgen"`               | Path prefix proxied to the auth backend                              |

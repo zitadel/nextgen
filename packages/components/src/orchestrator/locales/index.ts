@@ -45,3 +45,32 @@ export function mergeLocale(builtin: Locale, custom: Partial<Locale>): Locale {
   }
   return merged;
 }
+
+/**
+ * The dictionary for a BCP 47 language tag. Its layers, strongest first: the
+ * integrator's `locales` entries for the tag's primary subtag, the built-in
+ * dictionary for it, their `en` entries, and the built-in English.
+ *
+ * The integrator's English is thus the fallback for every language: a key a
+ * language has no text for, such as one for a step they added, shows their
+ * English rather than the raw key, while a built-in translation still beats it.
+ */
+export function localeFor(
+  tag: string,
+  locales?: Readonly<Record<string, Partial<Locale>>>,
+): Locale {
+  const language = (tag.split("-")[0] ?? "").toLowerCase();
+  const custom = locales?.[language];
+  const fallback = locales?.en;
+  if (language === "en" || !fallback) {
+    const builtin = builtinLocales[language] ?? en;
+    return custom ? mergeLocale(builtin, custom) : builtin;
+  }
+
+  // The built-in dictionaries share their keys, so merging one over the
+  // integrator's English keeps only the keys they added themselves.
+  const english = mergeLocale(en, fallback);
+  const builtin = builtinLocales[language];
+  const base = builtin ? mergeLocale(english, builtin) : english;
+  return custom ? mergeLocale(base, custom) : base;
+}

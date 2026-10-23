@@ -38,6 +38,20 @@ func (h *Harness) CreateSession(t testing.TB, projectID string, ttl time.Duratio
 	return session
 }
 
+// SessionToken returns the session_token a client holds for session, as
+// POST /sessions and the handoff exchange return it. A request that runs a
+// sign-in against an existing session must present it (step-up proof). Only a
+// session with a token record (CreateActiveSession's) gets a token that
+// introspection checks against that record.
+func (h *Harness) SessionToken(t testing.TB, session *domain.Session) string {
+	t.Helper()
+	crypter, err := h.EnsureKeyService(t).GetProjectCrypter(t.Context(), session.ProjectID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	token, err := session.Token(crypter)
+	require.NoError(t, err)
+	return token
+}
+
 // CreateActiveSession exchanges a handed-off attempt with a verified user
 // factor, binding the user to the new session. The user must exist:
 // sessions.user_id references users.
@@ -54,8 +68,11 @@ func (h *Harness) CreateActiveSession(t testing.TB, projectID, userID string) *d
 	for range 3 {
 		attempt := &domain.AuthAttempt{
 			ProjectID:      projectID,
-			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
-			Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser, domain.AuthCheckTypePassword},
+			// A completed attempt carries a verified credential-class factor
+			// alongside the identifier; the bare user factor never completes
+			// one (see domain.AuthAttempt.IsCompleted).
+			Checks: []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}, &domain.AuthFactorPassword{}},
 		}
 		require.NoError(t, stmts.CreateAuthAttempt(t.Context(), attempt))
 

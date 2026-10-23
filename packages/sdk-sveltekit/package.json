@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-sveltekit",
-  "version": "1.0.0-alpha.27",
+  "version": "0.1.0",
   "description": "SvelteKit handle hook and helpers for Zitadel",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-sveltekit#readme",
   "bugs": {
@@ -45,7 +45,8 @@
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
-    "@zitadel/sdk-core": "workspace:*"
+    "@zitadel/sdk-core": "workspace:*",
+    "ufo": "catalog:"
   },
   "peerDependencies": {
     "@sveltejs/kit": "^2.0.0 || ^3.0.0",

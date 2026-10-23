@@ -26,7 +26,7 @@ For a **fresh** scaffold, prefer the CLI instead — it wires the proxy, env, an
 components for you:
 
 ```sh
-npx @zitadel/cli@alpha setup --framework vue --non-interactive --json
+npx @zitadel/cli@latest setup --framework vue --non-interactive --json
 ```
 
 Use this skill when `setup` is not appropriate (an app with its own structure,
@@ -35,7 +35,7 @@ a partial integration, or customizing what the CLI produced).
 ## Install
 
 ```sh
-npm install @zitadel/sdk-vue@alpha
+npm install @zitadel/sdk-vue@latest
 ```
 
 Peer dependencies: `vue >=3.2`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).
@@ -114,6 +114,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 ```vue
 <ZitadelLogin :project="project" theme="light" @flowComplete="track" />
 ```
+
+The `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` details carry a `waitUntil(promise)`; call it from your handler to make the widget wait for your async work before it navigates.
 
 ## Read these, don't guess
 

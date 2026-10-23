@@ -88,6 +88,7 @@ see [§ Drift notes](#drift-notes).
 | `signing_key` | action-verbs | `create`, `read`, `delete` — **no `signing_key.rotate`.** Rotation is create-a-successor ([ADR 039](../../adrs/039-signing-key-rotation-and-incident-response.md)), not in-place secret replacement. Emergency replacement creates the successor before deleting the compromised key. |
 | `billing` | read-write-only | Tier/subscription/payment — no `billing.create`. |
 | `branding` | manage | Immutable revisions: `write` publishes a revision; no update or delete. Already matches OpenAPI. |
+| `policy` | manage | Operation policies (ADR 066), immutable revisions: `write` publishes a revision; no update or delete. |
 | `domain`, `origin`, `webhook` | manage | Project-scoped collections; `write` = create + update; `delete` separate. Class covers the full set; grant `write` and/or `delete`, never a `manage` permission. |
 | `feature` | read-write-only | Project feature configuration has no independent create/delete lifecycle. |
 | `import` | job-lifecycle | Start job (`create`); poll status (`read`). |
@@ -126,6 +127,8 @@ the target catalog for the planned paths in
 |---|---|---|
 | `branding.read` | `GET /branding`, `GET /branding/{id}` | Read/list immutable branding revisions. |
 | `branding.write` | `POST /branding` | Publish a new immutable revision; no separate create/delete permission. |
+| `policy.read` | `GET /policies/revisions/{revision_id}` | Read operation policy revisions. |
+| `policy.write` | `POST /policies` | Publish a new immutable policy revision. |
 | `domain.read` | Read/list `/projects/{id}/domains` | Domain context known to Zitadel; does not imply DNS/TLS infrastructure management. |
 | `domain.write` | Add/update a domain | Create + manage. |
 | `domain.delete` | Remove a domain | |
@@ -153,7 +156,7 @@ the corresponding resource permission.
 |---|---|---|
 | `team.create` | `POST /teams` | |
 | `team.read` | `POST /teams/query`, `GET /teams/{id}`, `POST /users/query` with `expand: ["lifecycle_owner_team"]` | Team resource only. Does **not** imply `team_membership.*` or `user.*`. Required on top of `user.read` to resolve `metadata.lifecycle_owner_team_id` into the team itself — the id alone is served unconditionally. **Drift ([ADR 036](../../adrs/036-api-credential-planes.md)):** granular scopes are not minted yet, so an operator project secret satisfies this interim — preview secrets do not. Tighten when #420 lands. **Sessions ([#1300](https://github.com/zitadel/nextgen/issues/1300)):** a Console session carries no scopes, so on `POST /users/query` alone the resolver answers instead: the session needs `viewer` on the target project, the finest read role the system catalog has ([ADR 054](../../adrs/054-customer-collaboration-grants.md) §5). A partial foothold still lists, but gets 403 on the expansion. The other endpoints in this row keep requiring the scope. |
-| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. |
+| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. **Personal team:** the platform user a personal team is created for holds `editor` scoped to that team, so they can read and rename it and nothing else; it stands in for [ADR 054](../../adrs/054-customer-collaboration-grants.md) §2's `team.owner` until that relation is seeded. The grant is a foothold in the shared platform project, so until [#2112](https://github.com/zitadel/nextgen/issues/2112) lands an owner gets 403 rather than 404 for other users and teams there, and lists answer with a partial view. |
 | `team.delete` | `DELETE /teams/{id}` | Deactivates and tombstones the team, cascading to memberships and lifecycle-owned users (ADR 024). |
 
 ### Users
@@ -167,13 +170,15 @@ the corresponding resource permission.
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `user.create` | `POST /users` | |
-| `user.read` | `POST /users/query`, `GET /users/{id}`, `GET /users/{id}/identity_links` | Get + list; full representation for now. Listing is `POST /users/query` — there is no `GET /users`. `project_id` is optional and defaults to the credential's project; a session may name another project it holds a grant on (#1300), a project secret only its own. |
-| `user.write` | `PATCH /users/{id}`, non-credential action verbs (e.g. `verify_email`) | Profile / attribute edits. Does **not** include setting another user's password — see `user.set_password`. `PATCH /users/{id}` is **not yet exposed**. |
+| `user.read` | `POST /users/query`, `GET /users/{id}`, `GET /users/{id}/identity_links`, `GET /users/{id}/passkeys`, `GET /users/{id}/password` | Get + list; full representation for now. Listing is `POST /users/query` — there is no `GET /users`. `project_id` is optional and defaults to the credential's project; a session may name another project it holds a grant on (#1300), a project secret only its own. |
+| `user.write` | `PATCH /users/{id}`, non-credential action verbs (e.g. `verify_email`) | Profile / attribute edits. Does **not** include setting another user's password — see `user.set_password`. `PATCH /users/{id}` takes the full project secret (`project.write`; the `user.write` scope is not checked) or a Console session, and needs editor access on the user's project. An editor can change any user's attributes there, identifiers and its own included, and move a user to another schema of the project. That is safe only while no sign-in method trusts the email alone: `magic_link` or `otp` must revisit this level (`internal/domain/schema_designation.go:68`). |
 | `user.set_password` | `PUT /users/{id}/password` | **Credential-tier, account-takeover-grade.** Admin sets/resets *another* user's password. Held separately so a profile-editor / help-desk role can hold `user.write` without it. OpenAPI tags this endpoint `user.write` today (see [Drift notes](#drift-notes)). Reserve `user.reset_mfa` / similar for future admin factor-reset endpoints. |
-| `user.delete` | `DELETE /users/{id}` | **Not yet exposed**. |
+| `user.delete` | `DELETE /users/{id}` | Takes the full project secret (`project.write`; the `user.delete` scope is not checked) or a Console session, and needs admin access on the user's project. |
 
 `/me` and `/me/memberships` are self-access and do not require system
-permissions — they are gated by the session/credential itself. A user changing
+permissions — they are gated by the session/credential itself. That includes
+`GET /users/me/schema` (the schema the caller's own record is validated
+against) and `GET /users/me/teams` (the caller's own roster). A user changing
 their **own** password/factors is self-service (`/me`-gated), **not**
 `user.set_password`.
 
@@ -190,7 +195,7 @@ their **own** password/factors is self-service (`/me`-gated), **not**
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `team_membership.create` | `POST /teams/{id}/memberships`, `POST /team_memberships` | Prefer nested create; flat create with `team_id` in body is legacy. |
-| `team_membership.read` | `GET /teams/{id}/memberships`, `GET /team_memberships/{id}`, `GET /users/{id}/teams`, `GET /users/{id}` with `team_id`, `POST /users/query` with `expand: ["teams"]` or a `team_id` filter | Required on top of `user.read` for the user-side membership reads: reading users is not reading memberships. The `team_id` filter is gated with the expansion — it answers "who is in this team" a page at a time, which is the same read. **Drift ([ADR 036](../../adrs/036-api-credential-planes.md)):** granular scopes are not minted yet and memberships have no RSI kind, so an operator project secret satisfies this interim — preview secrets do not. Tighten when #420 lands. **Sessions ([#1300](https://github.com/zitadel/nextgen/issues/1300)):** a Console session carries no scopes, so on `POST /users/query` and `GET /users/{id}` with `team_id` the resolver answers instead: the session needs `viewer` on the target project, the finest read role the system catalog has ([ADR 054](../../adrs/054-customer-collaboration-grants.md) §5). A partial foothold still lists, but gets 403 on the expansion. The other endpoints in this row keep requiring the scope. |
+| `team_membership.read` | `GET /teams/{id}/memberships`, `GET /team_memberships/{id}`, `GET /users/{id}/teams`, `GET /users/{id}` with `team_id`, `POST /users/query` with `expand: ["teams"]` or a `team_id` filter | Required on top of `user.read` for the user-side membership reads: reading users is not reading memberships. The `team_id` filter is gated with the expansion — it answers "who is in this team" a page at a time, which is the same read. **Drift ([ADR 036](../../adrs/036-api-credential-planes.md)):** granular scopes are not minted yet and memberships have no RSI kind, so an operator project secret satisfies this interim — preview secrets do not. Tighten when #420 lands. **Sessions ([#1300](https://github.com/zitadel/nextgen/issues/1300)):** a Console session carries no scopes, so on `POST /users/query`, `GET /users/{id}` with `team_id` and `GET /users/{id}/teams` the resolver answers instead: the session needs `viewer` on the target project, the finest read role the system catalog has ([ADR 054](../../adrs/054-customer-collaboration-grants.md) §5). A partial foothold still lists, but gets 403 on the expansion. The other endpoints in this row keep requiring the scope. |
 | `team_membership.write` | `PATCH /team_memberships/{id}` | Role changes within a membership (replaces old `team.roles.assign`). |
 | `team_membership.delete` | `DELETE /team_memberships/{id}` | |
 
@@ -387,6 +392,7 @@ Full control over a project and its project-scoped resources.
 ```
 project.create, project.read, project.write, project.delete,
 branding.read, branding.write,
+policy.read, policy.write,
 domain.read, domain.write, domain.delete,
 feature.read, feature.write,
 origin.read, origin.write, origin.delete,
@@ -420,6 +426,7 @@ Read-only access to all project resources.
 ```
 project.read,
 branding.read,
+policy.read,
 domain.read,
 feature.read,
 origin.read,

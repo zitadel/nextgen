@@ -1,60 +1,72 @@
 import type { ReactNode } from "react";
-import { GradientBorder, TITLE_BAR, WindowDots } from "../gradient-border";
-
-// Each half of the switch is at least 24px high, the smallest target WCAG 2.2
-// asks for.
-const SWITCH = "cursor-pointer rounded px-2.5 py-1 transition-colors";
-const SWITCH_ON = "bg-surface-black-secondary text-text-primary";
-const SWITCH_OFF = "text-text-secondary hover:text-text-primary";
+import { SEGMENTS, segment, Window } from "../window";
 
 /**
- * A browser window around what a row produced (zitadel/new-website's
- * BrowserFrame): the address over `children`, the page, and with `onToggle` a
- * Before / After switch that sets `showResult`, which the page follows.
+ * A browser window around what a step produced (zitadel/new-website's
+ * BrowserFrame): the address over `children`, the page; with `onToggle` a
+ * Before / After switch that sets `showResult`, which the page follows;
+ * `control` adds one more beside it.
  */
 export function BrowserFrame({
   url,
   showResult,
   onToggle,
+  control,
   children,
 }: {
   url: string;
   showResult: boolean;
   onToggle?: (showResult: boolean) => void;
+  control?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <GradientBorder className="overflow-hidden">
-      {/* On a phone the address and the switch need the dots' room: the
-          address fits from 360px wide, and narrower ends in an ellipsis. */}
-      <div className={`${TITLE_BAR} gap-3 pr-2.5 pl-2.5 sm:pl-4`}>
-        <WindowDots className="max-sm:hidden" />
-        <span className="flex h-7 min-w-0 flex-1 items-center justify-center rounded-md bg-surface-black-secondary px-2 font-mono text-[0.6875rem] text-text-secondary leading-4 sm:px-3 sm:text-xs">
+    <Window
+      className="h-full"
+      title={
+        <span className="flex h-7 w-full max-w-[17rem] min-w-0 items-center justify-center gap-1.5 rounded-md bg-tint/[0.05] px-2 text-[0.6875rem] text-text-secondary sm:px-3 sm:text-xs">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            fill="none"
+            className="size-3 shrink-0 max-sm:hidden"
+          >
+            <rect x="3" y="7" width="10" height="7" rx="1.5" fill="currentColor" opacity="0.7" />
+            <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
           <span className="truncate">{url}</span>
         </span>
-        {onToggle && (
-          <fieldset className="flex shrink-0 rounded-md border border-border-secondary p-px font-semibold text-xs leading-4">
-            <legend className="sr-only">Before or after the change</legend>
-            <button
-              type="button"
-              aria-pressed={!showResult}
-              onClick={() => onToggle(false)}
-              className={`${SWITCH} ${showResult ? SWITCH_OFF : SWITCH_ON}`}
-            >
-              Before
-            </button>
-            <button
-              type="button"
-              aria-pressed={showResult}
-              onClick={() => onToggle(true)}
-              className={`${SWITCH} ${showResult ? SWITCH_ON : SWITCH_OFF}`}
-            >
-              After
-            </button>
-          </fieldset>
-        )}
-      </div>
+      }
+      end={
+        (onToggle || control) && (
+          <>
+            {control}
+            {onToggle && (
+              <fieldset className={SEGMENTS}>
+                <legend className="sr-only">Before or after the change</legend>
+                <button
+                  type="button"
+                  aria-pressed={!showResult}
+                  onClick={() => onToggle(false)}
+                  className={segment(!showResult)}
+                >
+                  Before
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={showResult}
+                  onClick={() => onToggle(true)}
+                  className={segment(showResult)}
+                >
+                  After
+                </button>
+              </fieldset>
+            )}
+          </>
+        )
+      }
+    >
       {children}
-    </GradientBorder>
+    </Window>
   );
 }

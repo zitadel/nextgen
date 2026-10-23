@@ -5,6 +5,7 @@ go 1.26.0
 toolchain go1.26.9
 
 require (
+	cel.dev/cel-go v0.32.0
 	cloud.google.com/go/spanner v1.91.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.53.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.33.0
@@ -20,6 +21,7 @@ require (
 	github.com/ianlancetaylor/jsonschema v0.0.0-20251021232724-46ecbf32a0a5
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/moby/moby/api v1.54.2
 	github.com/muhlemmer/gu v0.3.1
 	github.com/ogen-go/ogen v1.20.3
 	github.com/oklog/ulid/v2 v2.1.1
@@ -29,7 +31,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	github.com/testcontainers/testcontainers-go v0.42.0
+	github.com/testcontainers/testcontainers-go v0.43.0
 	github.com/veqryn/slog-context v0.9.0
 	github.com/veqryn/slog-context/otel v0.9.0
 	github.com/zitadel/oidc/v3 v3.47.5
@@ -146,7 +148,6 @@ require (
 	github.com/mfridman/interpolate v0.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.3.0 // indirect
-	github.com/moby/moby/api v1.54.2 // indirect
 	github.com/moby/moby/client v0.4.1 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/sys/sequential v0.7.0 // indirect
@@ -172,7 +173,7 @@ require (
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
-	github.com/shirou/gopsutil/v4 v4.26.3 // indirect
+	github.com/shirou/gopsutil/v4 v4.26.5 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/spf13/cast v1.10.0 // indirect

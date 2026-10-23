@@ -14,6 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/deployment"
 )
 
 const appOrigin = "https://app.acme.com"
@@ -47,22 +48,30 @@ func deploymentInput() service.CreateDeploymentInput {
 	}
 }
 
-// expectServing sets up the reads of one attempt: the release, and what
-// appOrigin serves (nothing when serving is nil). It returns what was read.
+// expectServing sets up the reads of one primary attempt: the release, what
+// appOrigin last received (nothing when serving is nil), and the project's
+// newest primary deployment. It returns what was read for the lock.
 func expectServing(statements *servicemocks.MockAllStatements, serving *domain.Deployment) []domain.OriginDeployment {
 	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
-	if serving == nil {
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return(nil, nil)
-		return nil
+	var read []domain.OriginDeployment
+	if serving != nil {
+		read = []domain.OriginDeployment{{
+			Origin: appOrigin, DeploymentID: serving.ID, ReleaseID: serving.ReleaseID, Kind: serving.OriginKind,
+			DeployedAt: serving.DeployedAt, Seq: 7,
+		}}
 	}
-	read := []domain.OriginDeployment{{
-		Origin: appOrigin, DeploymentID: serving.ID, ReleaseID: serving.ReleaseID, Kind: serving.OriginKind,
-		DeployedAt: serving.DeployedAt, Seq: 7,
-	}}
 	statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return(read, nil)
-	statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", serving.ID).Return(serving, nil)
+	newest := &database.ListResult[*domain.Deployment]{}
+	if serving != nil && serving.OriginKind == domain.DeploymentOriginKindPrimary {
+		newest.Items = []*domain.Deployment{serving}
+	}
+	statements.EXPECT().ListDeployments(unrestricted, gomock.Any()).Return(newest, nil)
 	return read
 }
+
+// unrestricted matches the context of a lookup that is not the caller's
+// list, so it must not carry the caller's authz list filter.
+var unrestricted = gomock.Cond(func(ctx context.Context) bool { return service.AuthzListUnrestricted(ctx) })
 
 func expectInsert(statements *servicemocks.MockAllStatements, read []domain.OriginDeployment) {
 	statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read).
@@ -144,7 +153,8 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.OriginDeployment{{
 			Origin: appOrigin, DeploymentID: winner.ID, DeployedAt: winner.DeployedAt, Seq: 8,
 		}}, nil)
-		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", winner.ID).Return(winner, nil)
+		statements.EXPECT().ListDeployments(unrestricted, gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{winner}}, nil)
 
 		input := deploymentInput()
 		input.ExpectedDeploymentID = new("dep_before")
@@ -163,7 +173,8 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.OriginDeployment{{
 			Origin: appOrigin, DeploymentID: winner.ID, DeployedAt: winner.DeployedAt, Seq: 9,
 		}}, nil)
-		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", winner.ID).Return(winner, nil)
+		statements.EXPECT().ListDeployments(unrestricted, gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{winner}}, nil)
 
 		_, err := svc.Create(t.Context(), deploymentInput())
 		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
@@ -171,8 +182,8 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 	})
 }
 
-// Deploying to primary origins that all serve the release writes nothing and
-// answers with what they serve.
+// Deploying the release the newest primary deployment has, to the same
+// origins, writes nothing and answers with that deployment.
 func TestDeploymentServiceCreateUnchangedPrimaryWritesNothing(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
 	serving := servingDeployment("rel_1")
@@ -202,7 +213,13 @@ func TestDeploymentServiceCreatePreviewAlwaysRenews(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
 	serving := servingDeployment("rel_1")
 	serving.OriginKind = domain.DeploymentOriginKindPreview
-	read := expectServing(statements, serving)
+	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
+	read := []domain.OriginDeployment{{
+		Origin: appOrigin, DeploymentID: serving.ID, ReleaseID: serving.ReleaseID, Kind: serving.OriginKind,
+		DeployedAt: serving.DeployedAt, Seq: 7,
+	}}
+	statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return(read, nil)
+	statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", serving.ID).Return(serving, nil)
 	expectInsert(statements, read)
 	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", []string{appOrigin}, deployedAt.Add(168*time.Hour), deployedAt).Return(nil)
 
@@ -261,6 +278,134 @@ func TestDeploymentServiceCreateGuard(t *testing.T) {
 	})
 }
 
+func expectProjectOrigins(statements *servicemocks.MockAllStatements, origins ...domain.Origin) {
+	statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1", Origins: origins}, nil)
+}
+
+var appPrimary = domain.Origin{Pattern: appOrigin, Kind: domain.OriginKindPrimary}
+
+func TestDeploymentServiceDeployExpandsPrimary(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	expectProjectOrigins(statements, appPrimary)
+	expectInsert(statements, expectServing(statements, nil))
+
+	result, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}})
+	require.NoError(t, err)
+	assert.True(t, result.Created)
+	assert.Equal(t, []string{appOrigin}, result.Deployment.Origins())
+}
+
+func TestDeploymentServiceDeployRejects(t *testing.T) {
+	t.Run("a ttl for primary origins", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectProjectOrigins(statements, appPrimary)
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, HasTTL: true})
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+	})
+
+	t.Run("an exact primary origin", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectProjectOrigins(statements, appPrimary)
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{appOrigin}})
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+	})
+
+	t.Run("a missing project", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}})
+		assertServiceDomainCode(t, err, domain.ErrProjectNotFound().Code)
+	})
+}
+
+func TestDeploymentServiceRollback(t *testing.T) {
+	rollback := func(expected *string) service.RollbackDeploymentInput {
+		return service.RollbackDeploymentInput{ProjectID: "proj_1", DeploymentID: "dep_previous", ExpectedDeploymentID: expected}
+	}
+	previousDeployment := func() *domain.Deployment {
+		previous := servingDeployment("rel_1")
+		previous.ID = "dep_previous"
+		return previous
+	}
+
+	t.Run("re-deploys the release to every primary origin", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
+		expectProjectOrigins(statements, appPrimary)
+		serving := servingDeployment("rel_0")
+		expectInsert(statements, expectServing(statements, serving))
+
+		result, err := svc.Rollback(t.Context(), rollback(new(serving.ID)))
+		require.NoError(t, err)
+		assert.True(t, result.Created)
+		assert.Equal(t, "rel_1", result.Deployment.ReleaseID)
+		assert.Equal(t, []string{appOrigin}, result.Deployment.Origins())
+		assert.Equal(t, domain.DeploymentReasonRollback, result.Deployment.Metadata.Reason)
+		assert.Equal(t, new("dep_previous"), result.Deployment.Metadata.RollbackTo)
+	})
+
+	t.Run("unchanged answers the newest primary deployment", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
+		expectProjectOrigins(statements, appPrimary)
+		serving := servingDeployment("rel_1")
+		expectServing(statements, serving)
+
+		result, err := svc.Rollback(t.Context(), rollback(nil))
+		require.NoError(t, err)
+		assert.False(t, result.Created)
+		assert.Same(t, serving, result.Deployment)
+	})
+
+	t.Run("a deployment to preview URLs", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		previous := previousDeployment()
+		previous.OriginKind = domain.DeploymentOriginKindPreview
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previous, nil)
+
+		_, err := svc.Rollback(t.Context(), rollback(nil))
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+	})
+
+	t.Run("a project without a primary origin", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
+		expectProjectOrigins(statements)
+
+		_, err := svc.Rollback(t.Context(), rollback(nil))
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+	})
+
+	t.Run("a guard mismatch carries the newest primary deployment", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
+		expectProjectOrigins(statements, appPrimary)
+		serving := servingDeployment("rel_0")
+		expectServing(statements, serving)
+
+		_, err := svc.Rollback(t.Context(), rollback(new("dep_stale")))
+		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
+		assert.Equal(t, domain.DeploymentConflictDetails{Deployment: serving}, de.Details)
+	})
+
+	t.Run("an unknown deployment", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(nil, database.NewNoRowFoundError(nil))
+
+		_, err := svc.Rollback(t.Context(), rollback(nil))
+		assertServiceDomainCode(t, err, domain.ErrDeploymentNotFound().Code)
+	})
+}
+
+func TestDeploymentServiceCreateRefusesARevokedRelease(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	revokedAt := deployedAt.Add(-time.Hour)
+	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1", RevokedAt: &revokedAt}, nil)
+
+	_, err := svc.Create(t.Context(), deploymentInput())
+	assertServiceDomainCode(t, err, domain.ErrReleaseRevoked().Code)
+}
+
 func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 	t.Run("release missing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
@@ -284,9 +429,9 @@ func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 	t.Run("invalid input never reaches storage", func(t *testing.T) {
 		svc, _ := newMockedDeploymentService(t)
 		input := deploymentInput()
-		input.Reason = domain.DeploymentReasonRollback
+		input.RollbackTo = new("dep_1")
 		_, err := svc.Create(t.Context(), input)
-		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid(nil, nil).Code)
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
 	})
 
 	t.Run("preview without ttl never reaches storage", func(t *testing.T) {
@@ -294,7 +439,7 @@ func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 		input := deploymentInput()
 		input.OriginKind = domain.DeploymentOriginKindPreview
 		_, err := svc.Create(t.Context(), input)
-		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid(nil, nil).Code)
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
 	})
 }
 
@@ -319,6 +464,7 @@ func TestDeploymentServiceListExpandsReleases(t *testing.T) {
 	statements.EXPECT().
 		ListDeployments(gomock.Any(), gomock.Any()).
 		Return(&database.ListResult[*domain.Deployment]{Items: items}, nil)
+	expectStatusLookup(statements, items[0])
 	statements.EXPECT().
 		GetReleasesByIDs(gomock.Any(), "proj_1", []string{"rel_a", "rel_b"}).
 		Return([]*domain.Release{
@@ -338,13 +484,69 @@ func TestDeploymentServiceListExpandsReleases(t *testing.T) {
 // Not asking reads nothing and leaves the map nil.
 func TestDeploymentServiceListWithoutExpand(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
+	only := &domain.Deployment{ProjectID: "proj_1", ID: "dep_1", ReleaseID: "rel_a"}
 	statements.EXPECT().
 		ListDeployments(gomock.Any(), gomock.Any()).
-		Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{
-			{ProjectID: "proj_1", ID: "dep_1", ReleaseID: "rel_a"},
-		}}, nil)
+		Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{only}}, nil)
+	expectStatusLookup(statements, only)
 
 	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1"})
 	require.NoError(t, err)
 	assert.Nil(t, result.ReleasesByID)
+}
+
+// expectStatusLookup answers the unfiltered read of which listed deployments
+// are live, with live.
+func expectStatusLookup(statements *servicemocks.MockAllStatements, live ...*domain.Deployment) {
+	statements.EXPECT().ListLiveDeployments(unrestricted, gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.Deployment]{Items: live}, nil)
+}
+
+// status is what the storage live predicate answers for the listed ids.
+func TestDeploymentServiceListStatus(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	newer := &domain.Deployment{ProjectID: "proj_1", ID: "dep_newer"}
+	preview := &domain.Deployment{ProjectID: "proj_1", ID: "dep_preview", OriginKind: domain.DeploymentOriginKindPreview}
+	older := &domain.Deployment{ProjectID: "proj_1", ID: "dep_older"}
+	statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{newer, preview, older}}, nil)
+	expectStatusLookup(statements, newer, preview)
+
+	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1"})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]bool{"dep_newer": true, "dep_preview": true}, result.Live)
+}
+
+// The live view is one page of the storage live list, with its cursor.
+func TestDeploymentServiceListLive(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	served := &domain.Deployment{ProjectID: "proj_1", ID: "dep_served"}
+	statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ time.Time, opts *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
+			assert.Equal(t, []byte("cursor"), opts.Pagination.Cursor)
+			return &database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{served}, NextCursor: []byte("next")}, nil
+		})
+
+	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, PageToken: "cursor"})
+	require.NoError(t, err)
+	assert.Equal(t, []*domain.Deployment{served}, result.Items)
+	assert.Equal(t, "next", result.NextPageToken)
+	assert.True(t, result.Live["dep_served"])
+}
+
+// With an origin, the live view asks storage for the deployment serving it at
+// the same time it reads the live set.
+func TestDeploymentServiceListLiveOrigin(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	serving := &domain.Deployment{ID: "dep_serving"}
+	statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, now time.Time, opts *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
+			filters := opts.Filter.(database.AndFilter[domain.DeploymentField]).Filters
+			assert.Contains(t, filters, deployment.ServesOrigin(appOrigin, now))
+			return &database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{serving}}, nil
+		})
+
+	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, Origin: new(appOrigin)})
+	require.NoError(t, err)
+	assert.Equal(t, []*domain.Deployment{serving}, result.Items)
 }

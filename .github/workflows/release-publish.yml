@@ -113,6 +113,7 @@ jobs:
           cache-dependency-path: |
             go.sum
             tools/bench/go.sum
+            tools/oidc-mock/go.sum
 
       - uses: pnpm/action-setup@v5
         with:

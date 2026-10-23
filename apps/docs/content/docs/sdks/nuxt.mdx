@@ -19,17 +19,17 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/sdk-nuxt@alpha
+    pnpm add @zitadel/sdk-nuxt@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/sdk-nuxt@alpha
+    npm install @zitadel/sdk-nuxt@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/sdk-nuxt@alpha
+    yarn add @zitadel/sdk-nuxt@latest
     ```
   </Tab>
 </Tabs>
@@ -113,6 +113,6 @@ The widgets are plain custom elements, so each event is a DOM `CustomEvent` that
 
 ## See also
 
-- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
 - [`apps/demo-nuxt`](https://github.com/zitadel/nextgen/tree/main/apps/demo-nuxt) — a runnable Nuxt example in this repo.
 - [`@zitadel/sdk-nuxt` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt) and the [CLI Nuxt patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/nuxt).

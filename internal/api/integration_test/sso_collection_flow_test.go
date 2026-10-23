@@ -109,7 +109,7 @@ func collectionClaims() (map[string]any, map[string]bool) {
 // rotated cookie and the rendered step.
 func (f *ssoCollectionFixture) collect(t *testing.T, subject string) (ssoFlow, api.FlowStep) {
 	t.Helper()
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 	claims, verified := collectionClaims()
 	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, subject, claims, verified)
 	resp := f.getStep(t, flow)

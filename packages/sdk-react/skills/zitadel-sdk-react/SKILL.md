@@ -19,14 +19,14 @@ app — your own routes, your own bundler (Vite, TanStack Start, etc.) — by
 rendering the SDK's components on your login/profile pages.
 
 If the user instead wants a **fresh** app scaffolded, the CLI does that:
-`npx @zitadel/cli@alpha setup --framework react` generates a wired React project. Reach for
+`npx @zitadel/cli@latest setup --framework react` generates a wired React project. Reach for
 this skill when there is already an app to integrate into and the CLI's
 scaffolding would overwrite or not fit it.
 
 ## Install
 
 ```sh
-npm install @zitadel/sdk-react@alpha
+npm install @zitadel/sdk-react@latest
 ```
 
 Peer dependencies: `react >=18` and `react-dom >=18`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).
@@ -109,6 +109,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 ```tsx
 <ZitadelLogin project={project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
+
+When your callback for `zitadel-flow-complete`, `zitadel-flow-redirect` or `zitadel-signout` returns a promise, the widget waits for it to settle (up to two seconds) before it navigates.
 
 ## Read these, don't guess
 

@@ -139,10 +139,14 @@ const PROXY_IMPORTS = [{ from: "vite", imported: "loadEnv", local: "loadEnv" }] 
  * the host-keeping entry. Throws `E_VALIDATION` when the file is absent or the
  * config object cannot be reached (function-built/exotic configs), with a hint
  * to add the block manually.
+ *
+ * `previousPort` moves the app: a `server.port` still on that port is
+ * rewritten to `devPort`, while any other pinned port stays the user's.
  */
 export function viteProxyEdit(
   devPort: number,
   server: string,
+  previousPort?: number,
 ): (source: string | undefined) => string {
   return (source) => {
     const label = "the Vite config (vite.config.*)";
@@ -165,7 +169,10 @@ export function viteProxyEdit(
     const config = resolveDefaultExportObject(mod, label);
     let changed = workingSource !== source;
     const serverConfig = ensureEditableObject(config, "server");
-    if (serverConfig.port === undefined) {
+    if (
+      serverConfig.port === undefined ||
+      (previousPort !== undefined && serverConfig.port === previousPort && devPort !== previousPort)
+    ) {
       serverConfig.port = devPort;
       changed = true;
     }
@@ -344,17 +351,17 @@ export const VITE_CONFIG_PATHS = configCandidates("vite.config");
  */
 export interface ViteSupport {
   /** The `edit` file-op that merges the `/__nextgen` proxy into the Vite config. */
-  viteProxyOp(devPort: number, server: string): FileOp;
+  viteProxyOp(devPort: number, server: string, previousPort?: number): FileOp;
   /** The `edit` file-op that gives a proxy setup wrote before its session-cookie hooks. */
   viteSessionCookieOp(): FileOp;
 }
 
 /** Builds the shared Vite-config proxy {@link FileOp} for a {@link ViteSupport} patcher. */
-export function buildViteProxyOp(devPort: number, server: string): FileOp {
+export function buildViteProxyOp(devPort: number, server: string, previousPort?: number): FileOp {
   return {
     kind: "edit",
     path: [...VITE_CONFIG_PATHS],
-    edit: viteProxyEdit(devPort, server),
+    edit: viteProxyEdit(devPort, server, previousPort),
     // The dev proxy is the auth request path — the doctor managed-files
     // check fails when this merge is no longer applied.
     wiring: "infrastructure",

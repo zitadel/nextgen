@@ -4,16 +4,16 @@ import { curl } from "fumadocs-openapi/requests/generators/curl";
 import { createOpenAPIPage } from "fumadocs-openapi/ui";
 
 import { cliCommand, cliSample } from "@/lib/cli-sample";
-import { codeThemes } from "@/lib/code-theme";
+import { codeOptions } from "@/lib/code-theme";
 import { sdkSample } from "@/lib/sdk-sample";
 
 // The request and response samples in the console's colours, like the pages'
 // code blocks. An operation's samples are its call through @zitadel/api, the
 // client the SDK pages document (lib/sdk-sample.ts), its `zitadel` command
-// where the spec names one (lib/cli-sample.ts), then cURL: an empty registry
+// where the CLI can run it (lib/cli-sample.ts), then cURL: an empty registry
 // leaves out Fumadocs' plain HTTP in the languages Zitadel ships no SDK for.
 export const OpenAPIPage = createOpenAPIPage({
-  shikiOptions: { themes: codeThemes },
+  shikiOptions: codeOptions,
   codeUsages: createCodeUsageGeneratorRegistry(),
   generateCodeSamples: ({ operation, path, pathItem }) => [
     {
@@ -22,14 +22,14 @@ export const OpenAPIPage = createOpenAPIPage({
       label: "TypeScript",
       source: (request) => sdkSample(operation, path, pathItem, request),
     },
-    ...(cliCommand(operation)
+    ...(cliCommand(operation, pathItem)
       ? [
           {
             id: "cli",
             lang: "bash",
             label: "CLI",
-            source: (request: Parameters<typeof cliSample>[2]) =>
-              cliSample(operation, path, request) ?? "",
+            source: (request: Parameters<typeof cliSample>[3]) =>
+              cliSample(operation, path, pathItem, request) ?? "",
           },
         ]
       : []),

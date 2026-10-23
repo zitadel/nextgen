@@ -3,12 +3,18 @@ post:
   summary: Create a new authentication attempt
   description: |
     Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
-    
+
     An attempt is an ephemeral (15-minute TTL) state machine that drives a single authentication round.
     It accepts factor challenges, verifies proofs, and completes into a session or handoff token.
-    
+
     Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
-    also include session_id to add factors to an existing session.
+    also include session_id and that session's session_token to add factors to an existing session.
+
+    The project comes from the project secret. A body `project_id` that disagrees
+    answers `403` with `proj.mismatch`. The attempt resolves a deployment the
+    same way as other runtime operations and seals it; with no browser `Origin`
+    and nothing deployed to the resolved target the response is `409` with
+    `rel.not_deployed`. A revoked release answers `409` with `rel.revoked`.
   tags:
     - Authentication Attempts
   security:
@@ -27,5 +33,38 @@ post:
         application/json:
           schema:
             $ref: auth-attempt-response.yaml
+    '403':
+      description: |
+        The body `project_id` does not match the project the credential
+        belongs to (`proj.mismatch`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+          examples:
+            mismatch:
+              summary: Body project_id disagrees with the credential
+              value:
+                code: proj.mismatch
+                message: 'the project named in the request is not the one the credential belongs to'
+    '409':
+      description: |
+        Nothing is deployed to the resolved target (`rel.not_deployed`), or the
+        release of that deployment is revoked (`rel.revoked`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+          examples:
+            not_deployed:
+              summary: No deployment for the resolved target
+              value:
+                code: rel.not_deployed
+                message: 'nothing is deployed to this origin'
+            revoked:
+              summary: The release is revoked
+              value:
+                code: rel.revoked
+                message: 'the release this attempt runs on was revoked'
     default:
       $ref: createAuthAttempt-error-response.yaml

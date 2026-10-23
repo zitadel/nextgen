@@ -16,7 +16,7 @@ shared SPA config/handler types.
 
 ## When to use
 
-- **Fresh Qwik app → use the CLI instead.** `npx @zitadel/cli@alpha setup --framework qwik`
+- **Fresh Qwik app → use the CLI instead.** `npx @zitadel/cli@latest setup --framework qwik`
   scaffolds auth into a new or detected Qwik project end to end (it wires this
   SDK, the dev proxy, and config). Reach for the `zitadel-cli` skill for that.
   Note the CLI scaffolds against **Qwik 2**, which this package also targets.
@@ -26,7 +26,7 @@ shared SPA config/handler types.
 ## Install
 
 ```sh
-pnpm add @zitadel/sdk-qwik@alpha
+pnpm add @zitadel/sdk-qwik@latest
 ```
 
 The package declares a peer dependency on `@qwik.dev/core` (`^2.0.0-beta.45`),
@@ -97,6 +97,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 ```tsx
 <ZitadelLogin project={project} theme="light" onFlowComplete$={(detail) => track(detail)} />
 ```
+
+When your callback for `zitadel-flow-complete`, `zitadel-flow-redirect` or `zitadel-signout` returns a promise, the widget waits for it to settle (up to two seconds) before it navigates.
 
 ## Read these, don't guess
 

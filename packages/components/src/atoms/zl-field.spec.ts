@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import "./zl-field.js";
 import type { ZlField } from "./zl-field.js";
@@ -296,5 +296,34 @@ describe("<zl-field> password toggle", () => {
     field.passwordToggle = true;
     await field.updateComplete;
     expect(input(field).type).toBe("password");
+  });
+});
+
+describe("<zl-field> events", () => {
+  const input = (field: ZlField) => field.shadowRoot?.querySelector("input") as HTMLInputElement;
+
+  it("keeps zl-input inside the widget", async () => {
+    // Arrange
+    const heardOnPage = vi.fn();
+    const heardInWidget = vi.fn();
+    const host = document.body.appendChild(document.createElement("div"));
+    const root = host.attachShadow({ mode: "open" });
+    const element = document.createElement("zl-field");
+    window.addEventListener("zl-input", heardOnPage, true);
+    element.addEventListener("zl-input", heardInWidget);
+    onTestFinished(() => {
+      window.removeEventListener("zl-input", heardOnPage, true);
+      host.remove();
+    });
+    root.append(element);
+    await element.updateComplete;
+
+    // Act
+    input(element).value = "hunter2";
+    input(element).dispatchEvent(new Event("input", { bubbles: true }));
+
+    // Assert
+    expect(heardInWidget).toHaveBeenCalledOnce();
+    expect(heardOnPage).not.toHaveBeenCalled();
   });
 });
