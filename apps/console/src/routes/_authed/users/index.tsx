@@ -332,7 +332,10 @@ function ColumnsMenu({
           Columns
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-96 w-56">
+      <DropdownMenuContent
+        align="end"
+        className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-56"
+      >
         {groups.map((group, index) => (
           <Fragment key={group.schemaId}>
             {index > 0 && <DropdownMenuSeparator />}

@@ -391,6 +391,31 @@ describe("users screen", () => {
     expect(table.queryByText(/Main St/)).not.toBeInTheDocument();
   });
 
+  it("reads an attribute named like an Object member as data", async () => {
+    // Attributes are customer-authored: `constructor` is a property like any
+    // other, structured here, so it is counted rather than rendered as
+    // `Object`'s own constructor.
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              identifier: "maya@acme.com",
+              attributes: { email: "maya@acme.com", a: "1", constructor: { kind: "x" } },
+            },
+          ],
+        }),
+      ),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("a: 1")).toBeInTheDocument();
+    expect(table.getByText("· +1")).toBeInTheDocument();
+    expect(table.queryByText(/native code/)).not.toBeInTheDocument();
+  });
+
   it("opens the user's whole attributes tree from the Attributes cell", async () => {
     server.use(
       http.post(USERS_QUERY_URL, () =>
@@ -414,7 +439,7 @@ describe("users screen", () => {
     await userEvent.click(
       await screen.findByRole("button", { name: /^Attributes of maya@acme\.com/ }),
     );
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("dialog", { name: "Attributes of maya@acme.com" });
     const popover = within(dialog);
     // The structured value the cell only counts is here in full, with the
     // record's identity attribute too: the popover is the whole document.

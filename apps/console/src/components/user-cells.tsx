@@ -263,12 +263,13 @@ export function UserAttributesCell({
               walks on to View details, the tabs and Copy. */}
           <PopoverContent
             align="start"
+            aria-label={`Attributes of ${user.name}`}
             tabIndex={-1}
             onOpenAutoFocus={(event) => {
               event.preventDefault();
               (event.currentTarget as HTMLElement).focus();
             }}
-            className="w-[min(28rem,calc(100vw-2rem))] overflow-hidden p-0"
+            className="max-h-(--radix-popover-content-available-height) w-[min(28rem,calc(100vw-2rem))] overflow-y-auto p-0"
           >
             {/* 16px inset, the same as the viewer's tab labels and code. */}
             <div className="flex items-start justify-between gap-3 px-4 py-3">

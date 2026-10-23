@@ -221,9 +221,14 @@ export function toUserRow(
   const attributes = userAttributes(user);
   const metadata = userMetadata(user);
   const declared = groups.find((group) => group.schemaId === schemaId)?.fields ?? [];
-  const keys = new Set(declared.map((entry) => entry.key).filter((key) => key in attributes));
+  // Own keys only, and a lookup with no prototype: attributes are
+  // customer-authored, and a property named `constructor` or `__proto__` is
+  // data, not something inherited from `Object.prototype`.
+  const keys = new Set(
+    declared.map((entry) => entry.key).filter((key) => Object.hasOwn(attributes, key)),
+  );
   for (const key of Object.keys(attributes).sort()) keys.add(key);
-  const values: Record<string, string> = {};
+  const values: Record<string, string> = Object.create(null);
   for (const key of keys) {
     // Only scalars are read. A property whose value is an object or array has no
     // one-line rendering, and `JSON.stringify` in a table cell is noise — the
