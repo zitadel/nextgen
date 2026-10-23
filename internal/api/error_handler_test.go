@@ -20,13 +20,11 @@ import (
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/ogen-go/ogen/validate"
 	"github.com/stretchr/testify/require"
-	slogctx "github.com/veqryn/slog-context"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog/extractors"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/sloggcp"
@@ -763,8 +761,9 @@ func (h errorStubHandler) GetHealth(context.Context) (api.GetHealthRes, error) {
 
 // serveAndRecordLogs serves req the way the production chain does (WithRecover
 // around the generated server, ogen's operation id middleware, a request
-// logger that adds the request id) and returns the response and every record
-// logged while serving it (see recordLogs). Not parallel: it changes globals.
+// logger that carries the request id, as WithLogging sets it) and returns the
+// response and every record logged while serving it (see recordLogs). Not
+// parallel: it changes globals.
 func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenService, req *http.Request) (*httptest.ResponseRecorder, []map[string]any) {
 	t.Helper()
 	records := recordLogs(t)
@@ -776,6 +775,7 @@ func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenS
 	require.NoError(t, err)
 
 	ctx := middleware.WithRequestIDContext(req.Context(), "req_1")
+	ctx = zlog.WithLoggingContext(ctx, slog.Default().With("request_id", "req_1"))
 	ctx = middleware.WithOperationIDContext(ctx, "")
 	rec := httptest.NewRecorder()
 	WithRecover(srv).ServeHTTP(rec, req.WithContext(ctx))
@@ -783,18 +783,15 @@ func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenS
 }
 
 // recordLogs points slog.Default, which every logger lookup without a request
-// logger falls back to, at a JSON recorder that adds the request id, and
-// returns a function reading back every record logged so far. Not parallel:
-// it changes globals.
+// logger falls back to, at a JSON recorder, and returns a function reading
+// back every record logged so far. Not parallel: it changes globals.
 func recordLogs(t *testing.T) func() []map[string]any {
 	t.Helper()
 	defaultLogger := slog.Default()
 	t.Cleanup(func() { slog.SetDefault(defaultLogger) })
 
 	var logs bytes.Buffer
-	slog.SetDefault(slog.New(slogctx.NewHandler(slog.NewJSONHandler(&logs, nil), &slogctx.HandlerOptions{
-		Prependers: []slogctx.AttrExtractor{extractors.ExtractRequestID},
-	})))
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
 
 	return func() []map[string]any {
 		var records []map[string]any
