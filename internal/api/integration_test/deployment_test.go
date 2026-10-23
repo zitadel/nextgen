@@ -14,7 +14,6 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const (
@@ -774,15 +773,17 @@ func TestCreatePreviewDeployment(t *testing.T) {
 	})
 
 	t.Run("a ttl above the maximum writes nothing", func(t *testing.T) {
-		const untouched = "https://acme-ttl-acmeinc.vercel.app"
+		before, err := harness.EnsureServiceDB(t).Statements().GetPreview(t.Context(), fixture.project, previewOrigin)
+		require.NoError(t, err)
 		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
 			ReleaseID: api.NewOptReleaseID(releaseID),
-			Targets:   api.DeploymentTargetsRequest{untouched},
+			Targets:   api.DeploymentTargetsRequest{previewOrigin},
 			TTL:       api.NewOptPreviewTTL("366d"),
 		})
 		refused(t, resp, &api.CreateDeploymentBadRequest{}, domain.ErrDeploymentInvalid().Code)
-		_, err := harness.EnsureServiceDB(t).Statements().GetPreview(t.Context(), fixture.project, untouched)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		after, err := harness.EnsureServiceDB(t).Statements().GetPreview(t.Context(), fixture.project, previewOrigin)
+		require.NoError(t, err)
+		assert.Equal(t, before.ExpiresAt, after.ExpiresAt)
 	})
 
 	t.Run("a loopback URL is never a preview", func(t *testing.T) {

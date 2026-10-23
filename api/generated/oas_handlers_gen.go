@@ -1298,7 +1298,7 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 // - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
 // a primary origin named exactly; `primary` mixed with preview URLs;
 // `primary` on a project with no primary origin; `ttl` with `primary`;
-// `ttl` above the project's maximum.
+// `ttl` above 365 days (`365d`).
 // - `400 dep.variables_missing`: a referenced variable has no value for
 // the kind; `details` names the kind and every missing variable.
 // - `403 proj.origin_not_allowed`: a preview URL matches no preview

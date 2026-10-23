@@ -13733,8 +13733,8 @@ type CreateDeploymentRequest struct {
 	// `sha256:` prefix.
 	ContentHash OptReleaseContentHash    `json:"content_hash"`
 	Targets     DeploymentTargetsRequest `json:"targets"`
-	// Preview URLs only. Each preview stays live this long from this
-	// deployment; omitted, 7 days (`7d`). At most 365 days (`365d`).
+	// Preview URLs only. How long each preview stays live from this
+	// deployment; omitted, 7 days (`7d`).
 	TTL OptPreviewTTL `json:"ttl"`
 	// Why this deployment happens. Omitted, the server records `deploy`.
 	Reason OptDeploymentReason `json:"reason"`

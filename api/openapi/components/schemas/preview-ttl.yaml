@@ -3,6 +3,6 @@ type: string
 description: |
   How long a preview stays live after the deployment that writes it: a
   positive whole number followed by `m` for minutes, `h` for hours or `d`
-  for days.
+  for days. At most 365 days (`365d`, `8760h` or `525600m`).
 pattern: '^[1-9][0-9]{0,5}[mhd]$'
 example: 168h

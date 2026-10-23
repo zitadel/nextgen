@@ -24,19 +24,33 @@ const MaxPreviewTTL = 365 * 24 * time.Hour
 
 // ParsePreviewTTL parses a ttl such as 30m, 168h or 7d, at most MaxPreviewTTL.
 func ParsePreviewTTL(ttl string) (time.Duration, error) {
-	invalid := ErrDeploymentInvalid().WithMessage("ttl must be a positive whole number followed by m, h or d, at most 365d")
 	if len(ttl) < 2 {
-		return 0, invalid
+		return 0, invalidPreviewTTL()
 	}
 	count, err := strconv.ParseUint(ttl[:len(ttl)-1], 10, 32)
 	if err != nil || count == 0 {
-		return 0, invalid
+		return 0, invalidPreviewTTL()
 	}
-	unit := map[byte]time.Duration{'m': time.Minute, 'h': time.Hour, 'd': 24 * time.Hour}[ttl[len(ttl)-1]]
-	if unit == 0 || count > uint64(MaxPreviewTTL/unit) {
-		return 0, invalid
+	var unit time.Duration
+	switch ttl[len(ttl)-1] {
+	case 'm':
+		unit = time.Minute
+	case 'h':
+		unit = time.Hour
+	case 'd':
+		unit = 24 * time.Hour
+	default:
+		return 0, invalidPreviewTTL()
+	}
+	if count > uint64(MaxPreviewTTL/unit) {
+		return 0, invalidPreviewTTL()
 	}
 	return time.Duration(count) * unit, nil
+}
+
+func invalidPreviewTTL() Error {
+	return ErrDeploymentInvalid().WithMessage(fmt.Sprintf(
+		"ttl must be a positive whole number followed by m, h or d, at most %dd", MaxPreviewTTL/(24*time.Hour)))
 }
 
 // DeploymentReason records why a deployment was created.

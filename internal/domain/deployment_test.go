@@ -209,8 +209,10 @@ func TestParsePreviewTTL(t *testing.T) {
 		require.NoError(t, err, ttl)
 		assert.Equal(t, want, got, ttl)
 	}
-	for _, ttl := range []string{"", "h", "0h", "7w", "-1h", "366d", "8761h", "999999d"} {
+	for _, ttl := range []string{"", "h", "0h", "7w", "-1h", "+1h", "366d", "8761h", "999999d"} {
 		_, err := ParsePreviewTTL(ttl)
 		assert.ErrorIs(t, err, ErrDeploymentInvalid(), ttl)
 	}
+	_, err := ParsePreviewTTL("366d")
+	assert.ErrorContains(t, err, "at most 365d")
 }
