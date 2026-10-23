@@ -9,6 +9,7 @@ import { DETAIL_BODY, DETAIL_CARD, DetailHeader, DetailSection } from "@/compone
 import { FormError } from "@/components/form-error";
 import { Page } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
+import { FIELD_LABEL_TYPOGRAPHY } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -100,9 +101,9 @@ export const Route = createFileRoute("/_authed/users/$userId")({
 // Long utility strings live as named constants so Tailwind's scanner sees the
 // full literal (it never sees a concatenated fragment).
 // The design's label column on a wide row, for the fields and for the card's
-// title, so the revision box starts where the inputs do: 203px plus the row's
-// 12px gap is the design's 215px. The `!` beats the responsive Field's own
-// `flex-auto` on its label.
+// title, so the schema name and its revision box start where the inputs do:
+// 203px plus the row's 12px gap is the design's 215px. The `!` beats the
+// responsive Field's own `flex-auto` on its label.
 const LABEL_COLUMN = "@md/field-group:flex-[0_0_203px]!";
 // The design's inputs are 360px wide rather than stretched across the row.
 const INPUT_WIDTH = "max-w-90";
@@ -378,6 +379,7 @@ function ProfileCard({
   const missing = fields.filter(
     (entry) => entry.required && !readOnlyKeys.has(entry.key) && !values[entry.key]?.trim(),
   );
+  const name = schema && schemaId ? schemaDisplayName(schema, schemaId) : undefined;
 
   return (
     <Card className={DETAIL_CARD}>
@@ -390,24 +392,33 @@ function ProfileCard({
           User schema
         </h2>
         {schema && schemaId && (
-          <Button
-            asChild
-            variant="secondary"
-            size="xs"
-            className="h-auto min-h-6 max-w-full flex-wrap justify-start py-0.5 whitespace-normal has-[>svg]:px-2"
-          >
-            <Link to="/schemas/$schemaId" params={{ schemaId }}>
-              {/* The space separates name and id in the link's accessible name. */}
-              {schemaDisplayName(schema, schemaId)}{" "}
-              <GitCommitHorizontal className="size-4" strokeWidth={1.5} aria-hidden />
-              <Badge
-                variant="ghost"
-                className="h-auto min-h-5 min-w-0 shrink overflow-visible py-0 font-mono font-normal break-all whitespace-normal"
+          <div className="flex max-w-full min-w-0 flex-wrap items-center gap-x-3">
+            {name !== schemaId && (
+              <span className={`text-foreground min-w-0 break-words ${FIELD_LABEL_TYPOGRAPHY}`}>
+                {name}
+              </span>
+            )}
+            <Button
+              asChild
+              variant="secondary"
+              size="xs"
+              className="h-auto min-h-6 max-w-full flex-wrap justify-start py-0.5 whitespace-normal has-[>svg]:px-2"
+            >
+              <Link
+                to="/schemas/$schemaId"
+                params={{ schemaId }}
+                aria-label={name !== schemaId ? `${name} ${schemaId}` : undefined}
               >
-                {schemaId}
-              </Badge>
-            </Link>
-          </Button>
+                <GitCommitHorizontal className="size-4" strokeWidth={1.5} aria-hidden />
+                <Badge
+                  variant="ghost"
+                  className="h-auto min-h-5 min-w-0 shrink overflow-visible py-0 font-mono font-normal break-all whitespace-normal"
+                >
+                  {schemaId}
+                </Badge>
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
       <Separator className={PANEL_RULE} />
