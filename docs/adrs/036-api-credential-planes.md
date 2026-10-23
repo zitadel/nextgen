@@ -297,3 +297,13 @@ no environments ([ADR 068](068-project-is-the-data-boundary.md)), so:
   decide is withdrawn.
 
 Design: [origins](https://github.com/zitadel/nextgen/pull/1427) in the spike behind #1389.
+
+## Amendment (2026-10-23): the server's own origin may open a flow
+
+The console previews a project's login with the project's own flow, opened
+by `createFlow` from the server's own origin, which a project's origins do
+not list. `createFlow` therefore admits the origin of `server.public_base`
+without a pattern, as it admits a loopback origin. Nothing past the first
+step follows from that: `submitFlowStep` still holds a browser `Origin` to
+the project's primary patterns and loopback, so a page on the server's own
+origin can show a project's first step but cannot sign anyone in to it.
