@@ -62,6 +62,7 @@ import {
   writeColumnPins,
 } from "@/lib/user-list";
 import { Page } from "@/components/layout";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the single-person glyph. The plural two-person one
@@ -215,7 +216,10 @@ function UsersScreen() {
                   cell's hover card (D21). */}
               {teamsExpanded && <ResourceHeadCell>Member of</ResourceHeadCell>}
               <ResourceHeadCell>ID</ResourceHeadCell>
-              <ResourceMenuHead className={`w-15 ${RESOURCE_STICKY_END}`} />
+              {/* 52px: the 36px menu button and 8px either side. The cell
+                  inset the other columns take would make this pinned column
+                  84px wide for one icon. */}
+              <ResourceMenuHead className={`w-13 px-2 ${RESOURCE_STICKY_END}`} />
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
@@ -254,7 +258,7 @@ function UsersScreen() {
                   )}
                   <UserIdCell user={user} />
                   <TableCell
-                    className={`${RESOURCE_CELL} ${RESOURCE_STICKY_END} ${RESOURCE_STICKY_BODY}`}
+                    className={cn(RESOURCE_CELL, "px-2", RESOURCE_STICKY_END, RESOURCE_STICKY_BODY)}
                   >
                     <RowActions
                       userId={user.id}
