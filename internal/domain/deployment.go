@@ -63,6 +63,26 @@ func ErrDeploymentConflict(details DeploymentConflictDetails) Error {
 	return newError(PrefixDeployment.ErrorCodePrefix("conflict"), "deployment: the deployment it replaces does not match expected_deployment_id", details, nil)
 }
 
+// DeploymentVariablesMissingDetails names the kind whose values the deployment
+// would freeze and every referenced name that kind does not hold.
+type DeploymentVariablesMissingDetails struct {
+	Kind  string   `json:"kind"`
+	Names []string `json:"names"`
+}
+
+// ErrDeploymentVariablesMissing refuses a deploy whose release references
+// names the frozen set lacks. names is sorted so the wire order is stable.
+func ErrDeploymentVariablesMissing(kind DeploymentOriginKind, names []string) Error {
+	sorted := slices.Clone(names)
+	slices.Sort(sorted)
+	return newError(
+		PrefixDeployment.ErrorCodePrefix("variables_missing"),
+		fmt.Sprintf("deployment: variables have no %s value: %s", kind, strings.Join(sorted, ", ")),
+		DeploymentVariablesMissingDetails{Kind: kind.String(), Names: sorted},
+		nil,
+	)
+}
+
 // DeploymentMetadata records why the release went live and who did it. A
 // caller without a user identity leaves DeployedBy and DeployedByType nil.
 type DeploymentMetadata struct {
@@ -127,14 +147,14 @@ func NewestOriginDeployment(deployments []OriginDeployment) *OriginDeployment {
 }
 
 // DeploymentsEqual reports whether candidate repeats current, the project's
-// newest primary deployment: the same release to the same origins, so writing
-// it would change nothing. A deployment to preview URLs never equals one,
-// since writing it renews its previews.
-// TODO(#1781): compare the variable set create resolves too.
-func DeploymentsEqual(candidate, current *Deployment) bool {
+// newest primary deployment: the same release, the same origins, and the same
+// frozen variable set, so writing it would change nothing. A deployment to
+// preview URLs never equals one, since writing it renews its previews.
+func DeploymentsEqual(candidate, current *Deployment, candidateSetHash, currentSetHash string) bool {
 	return candidate.OriginKind == DeploymentOriginKindPrimary && current != nil &&
 		current.OriginKind == DeploymentOriginKindPrimary &&
-		current.ReleaseID == candidate.ReleaseID && slices.Equal(current.Origins(), candidate.Origins())
+		current.ReleaseID == candidate.ReleaseID && slices.Equal(current.Origins(), candidate.Origins()) &&
+		candidateSetHash == currentSetHash
 }
 
 // CheckExpectedDeployment fails with ErrDeploymentConflict unless expected is

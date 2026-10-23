@@ -93,6 +93,12 @@ func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, pr
 	return set, nil
 }
 
+// LinkDeploymentVariableSet implements [service.VariableSetStatements].
+func (s variableSetStatements) LinkDeploymentVariableSet(ctx context.Context, projectID, deploymentID, setHash string) error {
+	_, err := s.db.Update(ctx, buildStatement(linkDeploymentVariableSetStmt, projectID, deploymentID, setHash).statement())
+	return err
+}
+
 // readDeploymentOriginKind returns the kind of target deploymentID went to,
 // which is the kind of variables it freezes. The column holds the kind's
 // name under a CHECK, so a name the enum does not know is a broken row.

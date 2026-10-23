@@ -4457,6 +4457,44 @@ func (c *MockAllStatementsIssueSSOStateCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
+// LinkDeploymentVariableSet mocks base method.
+func (m *MockAllStatements) LinkDeploymentVariableSet(ctx context.Context, projectID, deploymentID, setHash string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LinkDeploymentVariableSet", ctx, projectID, deploymentID, setHash)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LinkDeploymentVariableSet indicates an expected call of LinkDeploymentVariableSet.
+func (mr *MockAllStatementsMockRecorder) LinkDeploymentVariableSet(ctx, projectID, deploymentID, setHash any) *MockAllStatementsLinkDeploymentVariableSetCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LinkDeploymentVariableSet", reflect.TypeOf((*MockAllStatements)(nil).LinkDeploymentVariableSet), ctx, projectID, deploymentID, setHash)
+	return &MockAllStatementsLinkDeploymentVariableSetCall{Call: call}
+}
+
+// MockAllStatementsLinkDeploymentVariableSetCall wrap *gomock.Call
+type MockAllStatementsLinkDeploymentVariableSetCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsLinkDeploymentVariableSetCall) Return(arg0 error) *MockAllStatementsLinkDeploymentVariableSetCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsLinkDeploymentVariableSetCall) Do(f func(context.Context, string, string, string) error) *MockAllStatementsLinkDeploymentVariableSetCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsLinkDeploymentVariableSetCall) DoAndReturn(f func(context.Context, string, string, string) error) *MockAllStatementsLinkDeploymentVariableSetCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListAuthorizedProjects mocks base method.
 func (m *MockAllStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 	m.ctrl.T.Helper()

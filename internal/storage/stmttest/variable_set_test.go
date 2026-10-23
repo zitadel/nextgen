@@ -4,6 +4,7 @@ package stmttest
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -337,5 +339,67 @@ func TestVariableSetStatements_ProjectDeleteCascades(t *testing.T) {
 		variables, err := d.stmts.GetVariables(t.Context(), f.owner(), domain.DeploymentOriginKindPrimary)
 		require.NoError(t, err)
 		assert.Empty(t, variables)
+	})
+}
+
+// Freeze reads the deployment row it links. That read has to see the insert
+// when both run in one transaction: Spanner SQL cannot see a buffered mutation,
+// so the insert has to be DML.
+func TestVariableSetStatements_FreezeSeesTheDeploymentItFollows(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		f := newVariableSetFixture(t, d)
+		f.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://api.example.test", false)
+
+		var deploymentID string
+		err := d.pool.Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+			stmts := tx.Statements()
+			entity, err := domain.NewDeployment(f.projectID, f.releaseID, domain.DeploymentOriginKindPrimary, []string{f.primaryOrigin}, domain.DeploymentMetadata{Reason: domain.DeploymentReasonDeploy})
+			if err != nil {
+				return err
+			}
+			serving, err := stmts.GetNewestPerOrigin(ctx, f.projectID, entity.Origins())
+			if err != nil {
+				return err
+			}
+			if err := stmts.CreateDeployment(ctx, entity, serving); err != nil {
+				return err
+			}
+			if _, err := stmts.FreezeDeploymentVariables(ctx, f.projectID, entity.ID); err != nil {
+				return err
+			}
+			deploymentID = entity.ID
+			return nil
+		})
+		require.NoError(t, err)
+
+		assert.Equal(t, map[string]any{"api_url": "https://api.example.test"}, entryValues(f.get(t, deploymentID)))
+	})
+}
+
+// A rollback links the restored deployment's set. The new deployment keeps
+// those values after the live rows move on, and it does not write a set of its own.
+func TestVariableSetStatements_LinkReusesAnExistingSet(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		f := newVariableSetFixture(t, d)
+		f.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://v1.example.test", false)
+
+		first := f.deploy(t, domain.DeploymentOriginKindPrimary)
+		frozen := f.freeze(t, first)
+
+		f.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://v2.example.test", false)
+		second := f.deploy(t, domain.DeploymentOriginKindPrimary)
+		require.NoError(t, d.stmts.LinkDeploymentVariableSet(t.Context(), f.projectID, second, frozen.Hash))
+
+		got := f.get(t, second)
+		assert.Equal(t, frozen.Hash, got.Hash)
+		assert.Equal(t, map[string]any{"api_url": "https://v1.example.test"}, entryValues(got))
+		assert.Equal(t, map[string]any{"api_url": "https://v2.example.test"}, entryValues(f.freeze(t, f.deploy(t, domain.DeploymentOriginKindPrimary))), "a later freeze still copies the live rows")
+
+		err := d.stmts.LinkDeploymentVariableSet(t.Context(), f.projectID, second, frozen.Hash)
+		assert.ErrorIs(t, err, new(database.UniqueError), "a deployment links one set")
+
+		third := f.deploy(t, domain.DeploymentOriginKindPrimary)
+		err = d.stmts.LinkDeploymentVariableSet(t.Context(), f.projectID, third, strings.Repeat("ab", 32))
+		assert.ErrorIs(t, err, new(database.ForeignKeyError), "the set has to exist already")
 	})
 }

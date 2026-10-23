@@ -249,14 +249,29 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 		if release.Revoked() {
 			return domain.ErrReleaseRevoked()
 		}
+		set, err := resolveDeploymentVariableSet(ctx, stmts, entity)
+		if err != nil {
+			return err
+		}
+		missing, err := missingVariableNames(ctx, stmts, entity.ProjectID, release, set)
+		if err != nil {
+			return err
+		}
+		if len(missing) > 0 {
+			return domain.ErrDeploymentVariablesMissing(entity.OriginKind, missing)
+		}
 		read, current, err := servedBy(ctx, stmts, entity)
+		if err != nil {
+			return err
+		}
+		currentHash, err := deploymentSetHash(ctx, stmts, current)
 		if err != nil {
 			return err
 		}
 		if err := domain.CheckExpectedDeployment(current, input.ExpectedDeploymentID); err != nil {
 			return err
 		}
-		if domain.DeploymentsEqual(entity, current) {
+		if domain.DeploymentsEqual(entity, current, set.Hash, currentHash) {
 			output = &CreateDeploymentOutput{Deployment: current}
 			return nil
 		}
@@ -271,8 +286,9 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
-		// TODO(#1781): resolve the variable set before DeploymentsEqual, from
-		// RollbackTo's frozen set or else the current values, and link it here.
+		if err := attachVariableSet(ctx, stmts, &written, set); err != nil {
+			return err
+		}
 		if written.OriginKind == domain.DeploymentOriginKindPreview {
 			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
 				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {
