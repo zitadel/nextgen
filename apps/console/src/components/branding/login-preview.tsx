@@ -32,7 +32,10 @@ type Props = {
  * A stubbed step would drift from the flow definition the project actually
  * serves, which is the thing a customer is checking their branding against.
  * The flow response carries the revision in use, so the element paints it the
- * way it does for a visitor; nothing here is passed in beside the flow. The
+ * way it does for a visitor; nothing here is passed in beside the flow. That
+ * revision is the project's newest, not a deployed release: the server admits
+ * the console's origin without a deployment (ADR 036), so the preview shows
+ * what is being edited. The
  * element's preview mode then shows that step in the chosen state and never
  * submits, so the screen writes nothing to the project.
  *

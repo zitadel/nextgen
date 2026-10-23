@@ -229,6 +229,17 @@ func TestValidateOriginAgainstProject(t *testing.T) {
 			},
 		},
 		{
+			// The server's own origin passes the release gate, never this check:
+			// a passkey ceremony there would use the console host as relying party.
+			name:    "server's own origin is not a relying party",
+			origin:  "https://preview.zitadel.com",
+			allowed: []domain.Origin{{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary}},
+			wantErr: true,
+			wantInError: []string{
+				`"https://preview.zitadel.com"`,
+			},
+		},
+		{
 			name:   "non-loopback without primary match is rejected",
 			origin: "https://other.example.com",
 			allowed: []domain.Origin{

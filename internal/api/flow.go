@@ -306,7 +306,8 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 
 // resolveRuntime decides which release serves the attempt from the browser
 // Origin header and puts the answer on the context. A request with no Origin,
-// or an open admission (empty allowlist / loopback) with nothing deployed yet,
+// or an open admission (empty allowlist / loopback / the server's own origin)
+// with nothing deployed yet,
 // keeps the pre-resolution newest-revision path until the project default
 // target lands; a present Origin that resolves to a deployment is sealed.
 func (h *Handler) resolveRuntime(ctx context.Context, projectID string, params api.CreateFlowParams) (context.Context, error) {

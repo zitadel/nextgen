@@ -423,7 +423,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	defer shipper.Close()
 
-	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService)
+	runtimeResolver, err := service.NewRuntimeResolver(serviceDBPool, releaseService).
+		WithFirstPartyOrigin(publicOrigin(cfg.Server.PublicBase))
+	if err != nil {
+		return fmt.Errorf("server public base %q has no valid origin: %w", cfg.Server.PublicBase, err)
+	}
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			flowService,
@@ -532,6 +536,22 @@ func consoleBaseURL(publicBase, consolePath string) (string, error) {
 	}
 	base.Path = strings.TrimRight(base.Path, "/") + strings.TrimRight(consolePath, "/")
 	return base.String(), nil
+}
+
+// publicOrigin is the scheme and host of the public base, the origin the
+// console is served from, as a browser sends it: without the scheme's default
+// port. consoleBaseURL has already refused a base that is not an absolute
+// http(s) URL.
+func publicOrigin(publicBase string) string {
+	base, err := url.Parse(publicBase)
+	if err != nil {
+		return publicBase
+	}
+	host := base.Host
+	if (base.Scheme == "https" && base.Port() == "443") || (base.Scheme == "http" && base.Port() == "80") {
+		host = strings.TrimSuffix(host, ":"+base.Port())
+	}
+	return base.Scheme + "://" + host
 }
 
 // ----------------------------- CONFIG --------------------------------------
