@@ -3,6 +3,7 @@ import { useRouter, useSearch } from "@tanstack/react-router";
 import { api } from "@/api/zitadel";
 import { consoleSessionProject } from "@/auth/session";
 import { useAsync } from "@/hooks/use-async";
+import { TYPING_PAUSE_MS, useDebounced } from "@/hooks/use-debounced";
 
 import { sessionCached } from "./session-cache";
 
@@ -47,22 +48,106 @@ export const listMyProjectsCached = sessionCached(
   15_000,
 );
 
+/** A project as the chrome names it. */
+export interface ProjectRef {
+  id: string;
+  name: string;
+}
+
 /**
  * The person's projects for chrome (the switcher, search), from
  * `GET /users/me/projects` (ADR 053 §6): their own and the ones granted to
  * them. `POST /projects/query` cannot serve this — it is pinned to the
  * credential's home project. One page, shared with the `_authed` guard's
- * default-selection read; the Projects screen pages the full set.
- * `undefined` while loading, `[]` when there are none or the read failed:
- * the chrome degrades rather than blocking a screen behind a boundary.
+ * default-selection read; the Projects screen pages the full set. `more` says
+ * the page is not all of them, so the rest are found by searching
+ * (`searchMyProjects`), never by filtering this page.
+ * `undefined` while loading, no projects when there are none or the read
+ * failed: the chrome degrades rather than blocking a screen behind a boundary.
  */
-export function useMyProjects(): { id: string; name: string }[] | undefined {
+export function useMyProjects(): { projects: ProjectRef[]; more: boolean } | undefined {
+  return useAsync(readMyProjects, { projects: [], more: false }, []);
+}
+
+function readMyProjects(): Promise<{ projects: ProjectRef[]; more: boolean }> {
+  return listMyProjectsCached().then((page) => ({
+    projects: page.projects.map(toProjectRef),
+    more: Boolean(page.next_page_token),
+  }));
+}
+
+/**
+ * Up to `limit` of the person's projects whose name contains `nameContains`,
+ * ignoring case. The server matches them together with the grants
+ * (`name_contains`), so a search reaches every project the person can act on,
+ * however many there are, rather than the one page the chrome holds.
+ */
+export async function searchMyProjects(nameContains: string, limit: number): Promise<ProjectRef[]> {
+  const page = await api.listMyProjects({
+    name_contains: nameContains,
+    limit,
+    ...consoleSessionProject(),
+  });
+  return page.projects.map(toProjectRef);
+}
+
+function toProjectRef({ id, name }: ProjectRef): ProjectRef {
+  return { id, name };
+}
+
+/** Projects a search field lists, and the term they answer: empty for the first page. */
+export interface ProjectMatches {
+  term: string;
+  projects: ProjectRef[];
+}
+
+/**
+ * The project search behind the chrome's fields (the switcher, ⌘K). Once
+ * typing pauses, up to `limit` of the server's matches for `query`
+ * (`searchMyProjects`); with nothing typed, the first page, at once, since it
+ * needs no request. An answer stays until the next one lands, so a list never
+ * empties between keystrokes, and `term` says which search it answers. A
+ * failed search finds nothing. `undefined` until the first answer.
+ */
+export function useProjectSearch(query: string, limit: number): ProjectMatches | undefined {
+  const trimmed = query.trim();
+  const term = useDebounced(trimmed, trimmed ? TYPING_PAUSE_MS : 0);
   return useAsync(
     () =>
-      listMyProjectsCached().then((page) => page.projects.map(({ id, name }) => ({ id, name }))),
-    [],
-    [],
+      term
+        ? searchMyProjects(term, limit).then((projects) => ({ term, projects }))
+        : readMyProjects().then(({ projects }) => ({ term, projects })),
+    { term, projects: [] },
+    [term, limit],
   );
+}
+
+/**
+ * The selected project, named for the chrome (the project pill, search's
+ * headings): from the person's first page of projects when it is there, and
+ * otherwise by `GET /projects/{id}`, since a project found by searching, or
+ * named by a shared link's `?project=`, is often past that page. `name` is
+ * `undefined` until that read answers, and stays so if it is refused.
+ * `undefined` while nothing is selected or the first page is loading.
+ */
+export function useSelectedProject(): { id: string; name: string | undefined } | undefined {
+  const selected = useProjectScope();
+  const mine = useMyProjects();
+  const listed = selected ? mine?.projects.find((project) => project.id === selected) : undefined;
+  const missing = selected !== undefined && mine !== undefined && listed === undefined;
+  // Tagged with the id it answers for: a re-read keeps the last answer until
+  // the next lands, and that must not name another project.
+  const read = useAsync(
+    missing && selected
+      ? () => api.getProject(selected).then((project) => ({ id: selected, name: project.name }))
+      : null,
+    undefined,
+    [missing, selected],
+  );
+
+  if (listed) return listed;
+  if (!missing || !selected) return undefined;
+  return { id: selected, name: read?.id === selected ? read.name : undefined };
 }
 
 /** `validateSearch` for the `_authed` layout: an id, or nothing. */

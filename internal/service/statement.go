@@ -738,6 +738,11 @@ type AuthzAssignmentStatements interface {
 	CreateAuthzAssignment(ctx context.Context, assignment *domain.AuthzAssignment) error
 	GetAuthzAssignment(ctx context.Context, projectID, id string) (*domain.AuthzAssignment, error)
 	ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error)
+	// ListActiveAuthzAssignmentsByRelation lists the unrevoked assignments on
+	// objectType.relation in the project, whoever holds them, ordered by
+	// creation. Expiry is not consulted. The platform.operators reconcile
+	// reads the operators it granted with it (ADR 075 §4).
+	ListActiveAuthzAssignmentsByRelation(ctx context.Context, projectID, objectType, relation string) ([]*domain.AuthzAssignment, error)
 	// ListManagedGrants lists unrevoked collaboration grants (user/team
 	// viewer|editor|admin) with cursor pagination. Setup and owning-team
 	// rows are excluded in SQL. projectID is required and always ANDed
@@ -771,9 +776,11 @@ type AuthzAssignmentStatements interface {
 	//     the tupleset team, so nothing names the user on the project at all.
 	//
 	// Every route is evaluated on the active system catalog, mirroring
-	// CheckAuthz. page.OrderBy carries the sort columns; a cursor issued for a
-	// different OrderBy is rejected.
-	ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
+	// CheckAuthz. opts.Filter narrows the set (a name search) and is ANDed
+	// with that predicate in the same statement, so paging walks only the
+	// matches (ADR 053 §6). opts.Pagination.OrderBy carries the sort columns;
+	// a cursor issued for a different OrderBy is rejected.
+	ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 }
 
 // AuthzMembershipEdgeStatements persists the authz projection of set membership.
@@ -834,13 +841,18 @@ type AuthzCatalogStatements interface {
 //     homeProjectID) or a local membership edge in project. Empty homeProjectID
 //     falls back to projectID.
 //   - CheckAuthz: allowed + foothold in one round-trip (assignments, closure, membership, TTU).
+//     It answers from the protected project's grants only; params.PlatformProjectID is ignored.
+//   - CheckPlatformOperator: the deployment-wide operator path (ADR 075 §3), which the
+//     resolver asks when CheckAuthz did not allow.
 //   - ListAuthzObjectIDs: L4/oracle helper materializing authorized RSI ids for one kind.
 //     List *endpoints* compose an injectable SQL predicate (ADR 033); that lands with HTTP wiring.
+//     Both include the operator path when params.PlatformOperatorEligible().
 type AuthzResolverStatements interface {
 	Statements
 	ActiveSystemCatalogID(ctx context.Context) (string, error)
 	HasAuthzProjectFoothold(ctx context.Context, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
 	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (allowed bool, foothold bool, err error)
+	CheckPlatformOperator(ctx context.Context, params domain.AuthzPlatformCheckParams) (bool, error)
 	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
 }
 

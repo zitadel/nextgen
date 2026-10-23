@@ -139,7 +139,7 @@ func (h *Harness) EnsureSecurityHandler(t testing.TB) *api.SecurityHandler {
 	if h.securityHandler.value == nil {
 		h.securityHandler.value = api.NewSecurityHandler(
 			h.EnsureTokenService(t),
-		)
+		).WithPlatformProject(h.EnsurePlatformProject(t).ID)
 	}
 	return h.securityHandler.value
 }

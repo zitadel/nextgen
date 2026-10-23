@@ -809,12 +809,17 @@ type Invoker interface {
 	ListMyPasskeys(ctx context.Context, params ListMyPasskeysParams) (ListMyPasskeysRes, error)
 	// ListMyProjects invokes listMyProjects operation.
 	//
-	// The projects the signed-in user holds an active grant on, either directly or
-	// through a team they are a member of. Ordered by project id and paged with an
-	// opaque cursor.
+	// The projects the signed-in user can act on: those they hold an active grant
+	// on, either directly or through a team they are a member of. For a platform
+	// operator (ADR 075) that is every project of the deployment. Ordered by
+	// project id and paged with an opaque cursor.
 	// This is not the same question as `queryProjects`, which answers with the one
 	// project the calling credential is bound to. Here the session is the caller
 	// and the grants are the answer, so the list spans projects.
+	// With `name_contains`, only the projects whose name contains that text are
+	// listed. The search runs on the server together with the grants, so it
+	// reaches every project the user can act on, however many there are, and
+	// pages like the full list.
 	// With `project_id`, the projects are listed only when the session belongs to
 	// that project. It names the project the session was signed in to, not one to
 	// list.
@@ -11100,12 +11105,17 @@ func (c *Client) sendListMyPasskeys(ctx context.Context, params ListMyPasskeysPa
 
 // ListMyProjects invokes listMyProjects operation.
 //
-// The projects the signed-in user holds an active grant on, either directly or
-// through a team they are a member of. Ordered by project id and paged with an
-// opaque cursor.
+// The projects the signed-in user can act on: those they hold an active grant
+// on, either directly or through a team they are a member of. For a platform
+// operator (ADR 075) that is every project of the deployment. Ordered by
+// project id and paged with an opaque cursor.
 // This is not the same question as `queryProjects`, which answers with the one
 // project the calling credential is bound to. Here the session is the caller
 // and the grants are the answer, so the list spans projects.
+// With `name_contains`, only the projects whose name contains that text are
+// listed. The search runs on the server together with the grants, so it
+// reaches every project the user can act on, however many there are, and
+// pages like the full list.
 // With `project_id`, the projects are listed only when the session belongs to
 // that project. It names the project the session was signed in to, not one to
 // list.
@@ -11193,6 +11203,23 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}
 				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "name_contains" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "name_contains",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.NameContains.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
 			}
 			return nil
 		}); err != nil {

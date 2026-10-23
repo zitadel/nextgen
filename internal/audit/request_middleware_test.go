@@ -171,3 +171,35 @@ func TestRequestEventMiddleware_EmptyClientStaysEmptyObject(t *testing.T) {
 	require.Len(t, ins.events, 1)
 	assert.JSONEq(t, `{}`, string(ins.events[0].Metadata))
 }
+
+// TestRequestEventMiddleware_CarriesTheAuthorizationMark: a handler marks the
+// request (ADR 075 §5) after the actor was stamped, and the request.api event
+// carries the mark beside the client context.
+func TestRequestEventMiddleware_CarriesTheAuthorizationMark(t *testing.T) {
+	ins, buf := startPathA(t)
+	marking := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if ac, ok := ActorSlotFromContext(r.Context()); ok {
+			ac.ProjectID = "proj_platform"
+		}
+		MarkAuthorization(r.Context(), domain.EventAuthorizationMetadata{
+			Path:               domain.EventAuthorizationPathPlatformOperator,
+			ActorHomeProjectID: "proj_platform",
+		})
+		w.WriteHeader(http.StatusOK)
+	})
+	h := middleware.WithUserAgentMiddleware(WithRequestEventMiddleware(buf, marking))
+	req := httptest.NewRequest(http.MethodGet, "/projects/proj_customer", nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (test)")
+	h.ServeHTTP(httptest.NewRecorder(), req)
+
+	require.Eventually(t, func() bool { return buf.Flushed() >= 1 }, 2*time.Second, 10*time.Millisecond)
+	ins.mu.Lock()
+	defer ins.mu.Unlock()
+	require.Len(t, ins.events, 1)
+	var meta domain.EventMetadata
+	require.NoError(t, json.Unmarshal(ins.events[0].Metadata, &meta))
+	require.NotNil(t, meta.Client)
+	require.NotNil(t, meta.Authorization)
+	assert.Equal(t, domain.EventAuthorizationPathPlatformOperator, meta.Authorization.Path)
+	assert.Equal(t, "proj_platform", meta.Authorization.ActorHomeProjectID)
+}
