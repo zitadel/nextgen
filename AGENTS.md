@@ -31,6 +31,7 @@ conflict.
 | `packages/api-mock/` | mock API for demos and tests | [api-mock](packages/api-mock/AGENTS.md) |
 | `packages/testing/` | `@zitadel/testing`, the published test kit | [testing](packages/testing/AGENTS.md) |
 | `.moon/`, `scripts/` | task graph; scripts behind `workspace:*` | [moon](.moon/AGENTS.md) |
+| `.agents/skills/` | contributor-only agent skills (`metadata.internal: true`); consumer skills live in `skills/` and `<pkg>/skills/` | [setup](CONTRIBUTING.md#personal-agent-setup) |
 | `docs/` | ADRs, design notes, runbooks | [ADR index](docs/adrs/README.md) |
 
 ## Workflow Front Doors

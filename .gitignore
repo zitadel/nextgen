@@ -44,8 +44,14 @@ __debug_bin*
 .codex/
 .opencode/
 opencode.json
-.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/docs-review/
 .cursor/
+
+# Runtime data of the docs-review skill (.agents/skills/docs-review)
+.docs-review/
 
 # OSX
 .DS_Store

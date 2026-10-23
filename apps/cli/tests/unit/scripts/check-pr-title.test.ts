@@ -105,6 +105,8 @@ describe("isNonShippingFile", () => {
   });
 
   it.each([
+    // Contributor-only agent skills, hidden from `npx skills add` by `metadata.internal`.
+    ".agents/skills/docs-review/SKILL.md",
     ".github/workflows/ci.yml",
     ".changeset/some-slug.md",
     "docs/adrs/030-errreport.md",
