@@ -213,8 +213,8 @@ describe("setup command pre-flight", () => {
     );
     expect(json.hint).toContain("Run start to restart it");
     expect(json.next_commands).toEqual([
-      expectedPublicCliCommand("start"),
-      expectedPublicCliCommand("setup --framework next --non-interactive --server local"),
+      expectedPublicCliCommand("start --json"),
+      expectedPublicCliCommand("setup --framework next --non-interactive --server local --json"),
     ]);
     expect(json.details).toMatchObject({ server_url: serverUrl, server_version: "0.0.1" });
     // Nothing scaffolded and no project files: only the runtime `start` left.
@@ -269,8 +269,8 @@ describe("setup command pre-flight", () => {
     expect(json.code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
     expect(json.hint).toContain("Start local Zitadel first");
     expect(json.next_commands).toEqual([
-      expectedPublicCliCommand("start"),
-      expectedPublicCliCommand("setup --framework next --non-interactive --server local"),
+      expectedPublicCliCommand("start --json"),
+      expectedPublicCliCommand("setup --framework next --non-interactive --server local --json"),
     ]);
   });
 
@@ -278,7 +278,9 @@ describe("setup command pre-flight", () => {
     // The retry goes into next_commands, which an agent runs verbatim. With
     // --sso and --non-interactive the CLI reads the secret from stdin, and a
     // command handed over as text has none -- so advertising that combination
-    // is advertising a command that fails on sight.
+    // is advertising a command that fails on sight. (A --json run's retry
+    // carries --json, which turns prompts off as well: it fails fast in JSON,
+    // naming the --sso-client-id the hint says to add.)
     const cwd = await makeTempDir();
     await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
@@ -476,9 +478,9 @@ describe("setup command pre-flight", () => {
       "--framework next --dev-port 3000 --non-interactive --server local",
     );
     expect(json.next_commands).toEqual([
-      expectedPublicCliCommand("start"),
+      expectedPublicCliCommand("start --json"),
       expectedPublicCliCommand(
-        "setup --framework next --dev-port 3000 --non-interactive --server local",
+        "setup --framework next --dev-port 3000 --non-interactive --server local --json",
       ),
     ]);
   });
@@ -517,9 +519,9 @@ describe("setup command pre-flight", () => {
     // sign-in preset, not silently fall back to the default.
     expect(json.hint).toContain("--preset passkey-first");
     expect(json.next_commands).toEqual([
-      expectedPublicCliCommand("start"),
+      expectedPublicCliCommand("start --json"),
       expectedPublicCliCommand(
-        "setup --framework next --preset passkey-first --dev-port 3000 --non-interactive --server local",
+        "setup --framework next --preset passkey-first --dev-port 3000 --non-interactive --server local --json",
       ),
     ]);
   });

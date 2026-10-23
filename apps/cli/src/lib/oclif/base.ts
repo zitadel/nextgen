@@ -11,7 +11,12 @@ import { type Asker, input as askInput } from "../input";
 import { isObject } from "../json";
 import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
-import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
+import {
+  type FollowUpOptions,
+  jsonFollowUpArgs,
+  normalizePublicCliCommand,
+  normalizePublicCliCommands,
+} from "../public-cli";
 import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "../server";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
@@ -329,7 +334,7 @@ export abstract class BaseCommand extends Command {
    * envelope so oclif's `--json` path serialises it.
    */
   protected emit(result: CommandResult): JsonEnvelope {
-    const normalized = normalizeCommandResult(result, this.meta);
+    const normalized = normalizeCommandResult(result, this.meta, { json: this.jsonEnabled() });
     if (this.telemetry?.enabled) {
       this.telemetry.track(
         CLI_COMMAND_COMPLETED,
@@ -432,30 +437,82 @@ export abstract class BaseCommand extends Command {
   }
 }
 
-function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): CommandResult {
+/**
+ * A result with its suggested follow-ups written out as a user runs them. A
+ * `--json` run's follow-ups ask for JSON too, so an agent that runs one as
+ * given gets an envelope back rather than human output.
+ */
+function normalizeCommandResult(
+  result: CommandResult,
+  meta: GlobalOptions,
+  options: FollowUpOptions,
+): CommandResult {
   if (result.status === "ok") {
     return {
       ...result,
-      data: normalizeDataNextCommands(result.data, meta),
+      data: normalizeDataFollowUps(result.data, meta, options),
     };
   }
   return {
     ...result,
-    data: normalizeDataNextCommands(result.data, meta),
-    nextCommands: normalizePublicCliCommands(result.nextCommands, meta.cliVersion),
+    data: normalizeDataFollowUps(result.data, meta, options),
+    nextCommands: normalizePublicCliCommands(result.nextCommands, meta.cliVersion, options),
   };
 }
 
-function normalizeDataNextCommands(data: unknown, meta: GlobalOptions): unknown {
-  if (!isObject(data) || !Array.isArray(data.next_commands)) {
+/** `data.next_commands`, and on a `--json` run `data.next_args`, as a user runs them. */
+function normalizeDataFollowUps(
+  data: unknown,
+  meta: GlobalOptions,
+  options: FollowUpOptions,
+): unknown {
+  if (!isObject(data)) {
+    return data;
+  }
+  const nextCommands = Array.isArray(data.next_commands)
+    ? data.next_commands.map((command) =>
+        typeof command === "string"
+          ? normalizePublicCliCommand(command, meta.cliVersion, options)
+          : command,
+      )
+    : undefined;
+  const nextArgs = options.json ? jsonArgLists(data.next_args) : undefined;
+  if (nextCommands === undefined && nextArgs === undefined) {
     return data;
   }
   return {
     ...data,
-    next_commands: data.next_commands.map((command) =>
-      typeof command === "string" ? normalizePublicCliCommand(command, meta.cliVersion) : command,
-    ),
+    ...(nextCommands === undefined ? {} : { next_commands: nextCommands }),
+    ...(nextArgs === undefined ? {} : { next_args: nextArgs }),
   };
+}
+
+/**
+ * Follow-ups handed over as argument lists (`next_args`,
+ * `details.suggested_args`), each asking for JSON; `undefined` when `lists`
+ * holds none.
+ */
+function jsonArgLists(lists: unknown): unknown[] | undefined {
+  if (!Array.isArray(lists)) {
+    return undefined;
+  }
+  return lists.map((args) =>
+    Array.isArray(args) && args.every((arg) => typeof arg === "string")
+      ? jsonFollowUpArgs(args)
+      : args,
+  );
+}
+
+/**
+ * The failure envelope's `details`, with its `suggested_args` asking for JSON:
+ * only a `--json` run prints the envelope.
+ */
+function errorDetails(details: unknown): unknown {
+  if (!isObject(details)) {
+    return details;
+  }
+  const suggestedArgs = jsonArgLists(details.suggested_args);
+  return suggestedArgs === undefined ? details : { ...details, suggested_args: suggestedArgs };
 }
 
 /** Add the warnings reported while the command ran to an ok result. */
@@ -501,7 +558,10 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
   };
 }
 
-/** Builds the failure envelope from a {@link ZitadelError} and the invocation metadata. */
+/**
+ * Builds the failure envelope from a {@link ZitadelError} and the invocation
+ * metadata. Only a `--json` run prints it, so its follow-ups ask for JSON.
+ */
 function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelope {
   return {
     status: "error",
@@ -511,8 +571,8 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
     code: error.code,
     message: error.message,
     hint: error.hint,
-    next_commands: normalizePublicCliCommands(error.nextCommands, meta.cliVersion),
-    details: error.details,
+    next_commands: normalizePublicCliCommands(error.nextCommands, meta.cliVersion, { json: true }),
+    details: errorDetails(error.details),
   };
 }
 

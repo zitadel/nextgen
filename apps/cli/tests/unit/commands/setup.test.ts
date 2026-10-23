@@ -230,7 +230,7 @@ describe("setup command", () => {
       command: "npm install",
     });
     expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
-    expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
+    expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan --json$/);
   });
 
   // `data.sso` is a list, one entry per provider, because setup can enable
@@ -443,7 +443,7 @@ describe("setup command", () => {
       data: { next_actions: string[]; next_commands: string[] };
     };
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim --json$/);
   });
 
   // A bootstrapped local server hosts its own platform project and claim
@@ -469,7 +469,7 @@ describe("setup command", () => {
       data: { next_actions: string[]; next_commands: string[] };
     };
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim --json$/);
   });
 
   // The probe behind the real-run local nudge: only a runtime document
@@ -544,7 +544,7 @@ describe("setup command", () => {
       expect(json.data.install).toMatchObject({ status: "skipped", reason: "dry-run" });
       expect(json.data.files_written).toContain(expectedFile);
       expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
-      expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
+      expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan --json$/);
     },
   );
 
@@ -661,7 +661,7 @@ describe("setup command", () => {
       team_id?: string;
     };
     expect(secret.team_id).toBeUndefined();
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim --json$/);
   });
 
   it("says the project went unattached when a local platform server has no local admin here", async () => {
@@ -706,7 +706,7 @@ describe("setup command", () => {
     expect(json.warnings[0]).toContain("If `zitadel start` started this server");
     expect(json.data.next_actions.join("\n")).not.toContain("No local admin");
     // No project to manage there, so the console is not suggested.
-    expect(json.data.next_commands.join("\n")).not.toMatch(/ console$/m);
+    expect(json.data.next_commands.join("\n")).not.toMatch(/ console --json$/m);
   });
 
   it("passes over a local admin that belongs to another server", async () => {
@@ -838,7 +838,7 @@ describe("setup command", () => {
     const json = parseJson(res.stdout) as {
       data: { next_actions: string[]; next_commands: string[] };
     };
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ console$/);
+    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ console --json$/);
     expect(json.data.next_actions.join("\n")).toContain(
       "Manage the project in the local console as admin@zitadel.localhost",
     );
