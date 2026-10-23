@@ -236,7 +236,8 @@
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
         // Read by the cloud launcher's tests, as in moon.yml.
         "$TURBO_ROOT$/vercel.json",
-        "$TURBO_ROOT$/apps/cloud/build.sh"
+        "$TURBO_ROOT$/apps/cloud/build.sh",
+        "$TURBO_ROOT$/apps/cloud/go-import/**"
       ]
     },
     // The database lanes talk to a database whose state no hash sees, so

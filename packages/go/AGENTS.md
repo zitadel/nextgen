@@ -11,3 +11,7 @@ The public Go client module, `go.zitadel.com/zitadel/v5`.
 - A type the spec names with `x-ogen-type` lives in `ogenx/`, because a
   public module cannot import the server's `internal/`.
 - MIT, not AGPL ([LICENSING.md](../../LICENSING.md)).
+- The `module` line, the `go-import` page the cloud serves for
+  `go.zitadel.com` (`apps/cloud/go-import/public/index.html`) and the
+  launcher test that holds them together (`apps/api/cmd/cloud-launcher`)
+  change together.
