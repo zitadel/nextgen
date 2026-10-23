@@ -179,6 +179,37 @@ func AutocompleteForField(f FlowField, purpose FlowDefinitionPurpose) string {
 	return ""
 }
 
+// PasswordMinLength is the shortest password a flow lets a user choose.
+// TODO: should come from the `user.password.save` policy (ADR 066).
+const PasswordMinLength = 8
+
+// passwordChosen lists the purposes whose password field asks the user to
+// choose a password rather than enter the one they have. Only those carry a
+// length rule: checked against an existing password, it would turn away a
+// user whose password predates the rule before the credential is ever
+// verified, and tell anyone probing the sign-in form how short a password
+// cannot be. Mapped one purpose at a time like [passwordAutocomplete], so an
+// unlisted purpose (reauth, link_account) asks for no rule.
+var passwordChosen = map[FlowDefinitionPurpose]bool{
+	FlowDefinitionPurposeRegister: true,
+	FlowDefinitionPurposeRecovery: true,
+}
+
+// PasswordValidationForField returns the validation rules a resolved field
+// carries under the given purpose. Fields other than the password keep the
+// rules the resolver derived from the schema; the password gets
+// [PasswordMinLength] when the purpose has the user choose it, and no rule
+// when it is checked.
+func PasswordValidationForField(f FlowField, purpose FlowDefinitionPurpose) *FlowFieldValidation {
+	if f.Challenge != FlowFieldChallengePassword {
+		return f.Validation
+	}
+	if !passwordChosen[purpose] {
+		return nil
+	}
+	return &FlowFieldValidation{MinLength: PasswordMinLength}
+}
+
 // FlowFieldValidation carries the validation rules the resolver
 // surfaces to the client and enforces on submit. Each field maps to a
 // user meta-schema keyword on [user-property.yaml]:

@@ -81,6 +81,73 @@ func TestAutocompleteForField(t *testing.T) {
 	}
 }
 
+func TestPasswordValidationForField(t *testing.T) {
+	t.Parallel()
+
+	password := domain.FlowField{Challenge: domain.FlowFieldChallengePassword, Type: domain.FlowFieldTypePassword}
+	chosen := &domain.FlowFieldValidation{MinLength: domain.PasswordMinLength}
+	schemaRules := &domain.FlowFieldValidation{MinLength: 3, MaxLength: 20}
+
+	tests := []struct {
+		name    string
+		field   domain.FlowField
+		purpose domain.FlowDefinitionPurpose
+		want    *domain.FlowFieldValidation
+	}{
+		{
+			// A sign-in password is checked, not chosen: a length rule would
+			// turn away a short legacy password before it is verified.
+			name:    "a password the engine verifies carries no length rule",
+			field:   password,
+			purpose: domain.FlowDefinitionPurposeLogin,
+			want:    nil,
+		},
+		{
+			name:    "a password the user chooses at registration carries the minimum",
+			field:   password,
+			purpose: domain.FlowDefinitionPurposeRegister,
+			want:    chosen,
+		},
+		{
+			name:    "a password the user chooses in recovery carries the minimum",
+			field:   password,
+			purpose: domain.FlowDefinitionPurposeRecovery,
+			want:    chosen,
+		},
+		{
+			name:    "a password under reauth carries no length rule",
+			field:   password,
+			purpose: domain.FlowDefinitionPurposeReauth,
+			want:    nil,
+		},
+		{
+			name:    "a password under link_account carries no length rule",
+			field:   password,
+			purpose: domain.FlowDefinitionPurposeLinkAccount,
+			want:    nil,
+		},
+		{
+			name:    "a plain property keeps its schema rules under login",
+			field:   domain.FlowField{Name: "username", Type: domain.FlowFieldTypeText, Validation: schemaRules},
+			purpose: domain.FlowDefinitionPurposeLogin,
+			want:    schemaRules,
+		},
+		{
+			name:    "a plain property keeps its schema rules under register",
+			field:   domain.FlowField{Name: "username", Type: domain.FlowFieldTypeText, Validation: schemaRules},
+			purpose: domain.FlowDefinitionPurposeRegister,
+			want:    schemaRules,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, domain.PasswordValidationForField(tc.field, tc.purpose))
+		})
+	}
+}
+
 func TestPasswordPolicyStepError(t *testing.T) {
 	t.Parallel()
 	got := domain.PasswordPolicyStepError(map[string]any{"min_length": int64(12), "history_depth": int64(4)})

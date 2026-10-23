@@ -25,9 +25,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   identifierStep,
+  PASSWORD_FIELD,
   passwordStep,
   registerPasswordStep,
   registerStep,
+  ssoConflictStep,
   type StepFixtureInput,
 } from "./login.js";
 
@@ -96,5 +98,29 @@ describe("fixture action surface vs default-login.json", () => {
         ).not.toContain(extra);
       }
     }
+  });
+});
+
+/**
+ * The engine puts a length rule on the password only where the user chooses
+ * one (register, recovery). Where an existing password is checked it sends
+ * none, so a short legacy password reaches verification instead of being
+ * turned away as "too short" (internal/domain PasswordValidationForField).
+ */
+describe("password field validation vs the engine's purpose rule", () => {
+  const passwordField = (step: ReturnType<typeof passwordStep>["step"]) =>
+    step.fields.find((f) => f.name === PASSWORD_FIELD);
+
+  it.each([
+    ["password", passwordStep],
+    ["sso-conflict", ssoConflictStep],
+  ])("%s: a checked password carries no length rule", (_, builder) => {
+    const field = passwordField(builder(input).step);
+    expect(field).toBeDefined();
+    expect(field?.validation).toBeUndefined();
+  });
+
+  it("register-password: a chosen password carries the minimum", () => {
+    expect(passwordField(registerPasswordStep(input).step)?.validation).toEqual({ min_length: 8 });
   });
 });
