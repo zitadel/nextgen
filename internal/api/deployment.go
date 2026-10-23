@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"time"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -30,8 +31,8 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 		Targets:   req.Targets,
 	}
 	if ttl, ok := req.TTL.Get(); ok {
-		parsed, err := domain.ParsePreviewTTL(string(ttl))
-		if err != nil {
+		parsed := time.Duration(ttl)
+		if err := domain.ValidatePreviewTTL(parsed); err != nil {
 			return nil, err
 		}
 		input.TTL = &parsed

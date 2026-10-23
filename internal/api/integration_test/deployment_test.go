@@ -200,7 +200,7 @@ func TestCreateDeployment(t *testing.T) {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
 				Targets:   api.DeploymentTargetsRequest{"primary"},
-				TTL:       api.NewOptPreviewTTL("1h"),
+				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
@@ -208,7 +208,7 @@ func TestCreateDeployment(t *testing.T) {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
 				Targets:   api.DeploymentTargetsRequest{appOrigin},
-				TTL:       api.NewOptPreviewTTL("1h"),
+				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
@@ -216,7 +216,7 @@ func TestCreateDeployment(t *testing.T) {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
 				Targets:   api.DeploymentTargetsRequest{"primary", previewOrigin},
-				TTL:       api.NewOptPreviewTTL("1h"),
+				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
@@ -765,7 +765,7 @@ func TestCreatePreviewDeployment(t *testing.T) {
 	t.Run("a ttl sets the expiry", func(t *testing.T) {
 		deployed := preview(t, &api.CreateDeploymentRequest{
 			Targets: api.DeploymentTargetsRequest{previewOrigin},
-			TTL:     api.NewOptPreviewTTL("90m"),
+			TTL:     api.NewOptPreviewTTL(api.PreviewTTL(90 * time.Minute)),
 		})
 		got, err := harness.EnsureServiceDB(t).Statements().GetPreview(t.Context(), fixture.project, previewOrigin)
 		require.NoError(t, err)
@@ -778,7 +778,7 @@ func TestCreatePreviewDeployment(t *testing.T) {
 		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
 			ReleaseID: api.NewOptReleaseID(releaseID),
 			Targets:   api.DeploymentTargetsRequest{previewOrigin},
-			TTL:       api.NewOptPreviewTTL("366d"),
+			TTL:       api.NewOptPreviewTTL(api.PreviewTTL(366 * 24 * time.Hour)),
 		})
 		refused(t, resp, &api.CreateDeploymentBadRequest{}, domain.ErrDeploymentInvalid().Code)
 		after, err := harness.EnsureServiceDB(t).Statements().GetPreview(t.Context(), fixture.project, previewOrigin)

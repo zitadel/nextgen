@@ -20,6 +20,9 @@ func TestParseISODuration(t *testing.T) {
 		{name: "composite", raw: "P1DT2H3M4S", want: 24*time.Hour + 2*time.Hour + 3*time.Minute + 4*time.Second},
 		{name: "invalid", raw: "3h", wantErr: true},
 		{name: "empty payload", raw: "P", wantErr: true},
+		{name: "days past the largest duration", raw: "P200000D", wantErr: true},
+		{name: "sum past the largest duration", raw: "P106751DT24H", wantErr: true},
+		{name: "seconds past the largest duration", raw: "PT9999999999S", wantErr: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := ParseISODuration(tt.raw)

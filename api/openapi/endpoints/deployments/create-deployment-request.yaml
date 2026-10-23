@@ -20,7 +20,7 @@ properties:
   ttl:
     description: |
       Preview URLs only. How long each preview stays live from this
-      deployment; omitted, 7 days (`7d`).
+      deployment; omitted, 7 days (`P7D`).
     $ref: ../../components/schemas/preview-ttl.yaml
   reason:
     description: |

@@ -3,7 +3,6 @@ package domain
 import (
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -22,35 +21,14 @@ const DefaultPreviewTTL = 7 * 24 * time.Hour
 // MaxPreviewTTL caps the ttl a deployment may give.
 const MaxPreviewTTL = 365 * 24 * time.Hour
 
-// ParsePreviewTTL parses a ttl such as 30m, 168h or 7d, at most MaxPreviewTTL.
-func ParsePreviewTTL(ttl string) (time.Duration, error) {
-	if len(ttl) < 2 {
-		return 0, invalidPreviewTTL()
+// ValidatePreviewTTL refuses a ttl that is not positive or exceeds
+// MaxPreviewTTL.
+func ValidatePreviewTTL(ttl time.Duration) error {
+	if ttl <= 0 || ttl > MaxPreviewTTL {
+		return ErrDeploymentInvalid().WithMessage(fmt.Sprintf(
+			"ttl must be positive and at most %d days", MaxPreviewTTL/(24*time.Hour)))
 	}
-	count, err := strconv.ParseUint(ttl[:len(ttl)-1], 10, 32)
-	if err != nil || count == 0 {
-		return 0, invalidPreviewTTL()
-	}
-	var unit time.Duration
-	switch ttl[len(ttl)-1] {
-	case 'm':
-		unit = time.Minute
-	case 'h':
-		unit = time.Hour
-	case 'd':
-		unit = 24 * time.Hour
-	default:
-		return 0, invalidPreviewTTL()
-	}
-	if count > uint64(MaxPreviewTTL/unit) {
-		return 0, invalidPreviewTTL()
-	}
-	return time.Duration(count) * unit, nil
-}
-
-func invalidPreviewTTL() Error {
-	return ErrDeploymentInvalid().WithMessage(fmt.Sprintf(
-		"ttl must be a positive whole number followed by m, h or d, at most %dd", MaxPreviewTTL/(24*time.Hour)))
+	return nil
 }
 
 // DeploymentReason records why a deployment was created.

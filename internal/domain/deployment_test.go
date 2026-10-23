@@ -198,21 +198,12 @@ func TestResolveDeploymentTargets(t *testing.T) {
 	})
 }
 
-func TestParsePreviewTTL(t *testing.T) {
-	for ttl, want := range map[string]time.Duration{
-		"30m":  30 * time.Minute,
-		"168h": 168 * time.Hour,
-		"7d":   7 * 24 * time.Hour,
-		"365d": 365 * 24 * time.Hour,
-	} {
-		got, err := ParsePreviewTTL(ttl)
-		require.NoError(t, err, ttl)
-		assert.Equal(t, want, got, ttl)
+func TestValidatePreviewTTL(t *testing.T) {
+	for _, ttl := range []time.Duration{time.Second, 7 * 24 * time.Hour, MaxPreviewTTL} {
+		assert.NoError(t, ValidatePreviewTTL(ttl), ttl)
 	}
-	for _, ttl := range []string{"", "h", "0h", "7w", "-1h", "+1h", "366d", "8761h", "999999d"} {
-		_, err := ParsePreviewTTL(ttl)
-		assert.ErrorIs(t, err, ErrDeploymentInvalid(), ttl)
+	for _, ttl := range []time.Duration{0, -time.Hour, MaxPreviewTTL + time.Second} {
+		assert.ErrorIs(t, ValidatePreviewTTL(ttl), ErrDeploymentInvalid(), ttl)
 	}
-	_, err := ParsePreviewTTL("366d")
-	assert.ErrorContains(t, err, "at most 365d")
+	assert.ErrorContains(t, ValidatePreviewTTL(MaxPreviewTTL+time.Second), "at most 365 days")
 }

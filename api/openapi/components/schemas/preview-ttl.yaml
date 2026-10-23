@@ -1,8 +1,8 @@
 title: PreviewTTL
 type: string
+format: duration
+x-ogen-type: github.com/zitadel/nextgen/internal/api/ogenx.ISODuration
 description: |
-  How long a preview stays live after the deployment that writes it: a
-  positive whole number followed by `m` for minutes, `h` for hours or `d`
-  for days. At most 365 days (`365d`, `8760h` or `525600m`).
-pattern: '^[1-9][0-9]{0,5}[mhd]$'
-example: 168h
+  How long a preview stays live after the deployment that writes it, as an
+  ISO-8601 duration. At most 365 days (`P365D`).
+example: P7D
