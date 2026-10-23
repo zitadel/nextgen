@@ -76,7 +76,7 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin string)
 		if errors.As(err, &de) {
 			attrs = append(attrs, slog.String("code", de.Code))
 		}
-		logger.Warn("runtime resolution refused", attrs...)
+		logger.Info("runtime resolution refused", attrs...)
 		return nil, err
 	}
 	if resolution == nil {
