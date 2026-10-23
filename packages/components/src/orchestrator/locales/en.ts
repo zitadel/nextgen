@@ -239,6 +239,8 @@ export const en: Record<string, string> = {
   "error.field_format": "Please enter a valid {0}.",
   "error.field_min_length": "{0} is too short.",
   "error.field_max_length": "{0} is too long.",
+  "error.field_min_length_value": "{0} must be at least {1} characters.",
+  "error.field_max_length_value": "{0} must be at most {1} characters.",
   "error.field_invalid": "Please check {0}.",
 
   // --- Sign-in form-level alert ---

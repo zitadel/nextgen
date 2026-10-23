@@ -136,7 +136,7 @@ type Invoker interface {
 	// - `400 dep.variables_missing`: a referenced variable has no value for
 	// the kind; `details` names the kind and every missing variable.
 	// - `403 proj.origin_not_allowed`: a preview URL matches no preview
-	// pattern.
+	// pattern, or is a loopback URL.
 	// - `404 rel.not_found`: the release id or digest names no release here.
 	// - `409 dep.conflict`: `expected_deployment_id` is not the deployment
 	// this write replaces; `details.deployment` is that deployment.
@@ -602,6 +602,15 @@ type Invoker interface {
 	//
 	// GET /users/me/schema
 	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
+	// GetPolicy invokes getPolicy operation.
+	//
+	// Reads a policy as its newest revision, the one that applies the next time
+	// its operation runs.
+	// The lookup is scoped to the project in `project_id`: a policy of another
+	// project answers not found exactly as an unknown id does.
+	//
+	// GET /policies/{policy_id}
+	GetPolicy(ctx context.Context, params GetPolicyParams) (GetPolicyRes, error)
 	// GetPolicyRevision invokes getPolicyRevision operation.
 	//
 	// Reads one revision of a policy, newest or not.
@@ -820,6 +829,25 @@ type Invoker interface {
 	//
 	// GET /users/me/teams
 	ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error)
+	// ListPolicies invokes listPolicies operation.
+	//
+	// Lists the project's policies, one per operation, each as its newest
+	// revision, ordered by `created_at` (first publish) and then `id`. Filter
+	// by `operation` to read the policy of one operation; a project that never
+	// published one gets an empty list.
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /policies
+	ListPolicies(ctx context.Context, params ListPoliciesParams) (ListPoliciesRes, error)
+	// ListPolicyRevisions invokes listPolicyRevisions operation.
+	//
+	// Returns every revision of one policy, newest first, paginated with a
+	// cursor. The order is fixed, so there is no `sorting`.
+	// The lookup is scoped to the project in `project_id`: a policy of another
+	// project answers not found exactly as an unknown id does.
+	//
+	// GET /policies/{policy_id}/revisions
+	ListPolicyRevisions(ctx context.Context, params ListPolicyRevisionsParams) (ListPolicyRevisionsRes, error)
 	// ListPreviews invokes listPreviews operation.
 	//
 	// Lists the project's live previews, newest first by `created_at`. An
@@ -908,14 +936,20 @@ type Invoker interface {
 	// applies to the next time the operation runs; nothing already stored is
 	// re-evaluated, so a stricter password policy applies the next time a
 	// password is set.
-	// `config` is checked against the operation's template: an unknown
-	// operation or setting, a value of the wrong type or outside its bounds, or
-	// settings that contradict each other (a `min_length` above `max_length`)
-	// answer `pol.invalid`. A setting left out is off, and `{}` switches every
+	// The request is typed by `operation`: an unknown operation or setting, or
+	// a value of the wrong type or outside its bounds, answers `req.invalid`
+	// like any malformed request. The operation's template then checks the
+	// config again, together with the rules that relate settings to each other
+	// (a `min_length` above `max_length`), and answers `pol.invalid`. Its
+	// `details.details.violations` lists everything that failed, settings
+	// first, then rules: `{"setting": "min_length"}` for one setting, or
+	// `{"config_rule": "min_length_not_above_max_length", "settings":
+	// ["min_length", "max_length"]}` for a rule across settings, with the
+	// settings it reads. A setting left out is off, and `{}` switches every
 	// rule off; there are no defaults.
 	//
 	// POST /policies
-	PublishPolicy(ctx context.Context, request *PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error)
+	PublishPolicy(ctx context.Context, request PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error)
 	// QueryGrants invokes queryGrants operation.
 	//
 	// Returns the collaboration grants of a project, paginated with a cursor.
@@ -2096,7 +2130,7 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 // - `400 dep.variables_missing`: a referenced variable has no value for
 // the kind; `details` names the kind and every missing variable.
 // - `403 proj.origin_not_allowed`: a preview URL matches no preview
-// pattern.
+// pattern, or is a loopback URL.
 // - `404 rel.not_found`: the release id or digest names no release here.
 // - `409 dep.conflict`: `expected_deployment_id` is not the deployment
 // this write replaces; `details.deployment` is that deployment.
@@ -7384,6 +7418,170 @@ func (c *Client) sendGetMyUserSchema(ctx context.Context, params GetMyUserSchema
 	return result, nil
 }
 
+// GetPolicy invokes getPolicy operation.
+//
+// Reads a policy as its newest revision, the one that applies the next time
+// its operation runs.
+// The lookup is scoped to the project in `project_id`: a policy of another
+// project answers not found exactly as an unknown id does.
+//
+// GET /policies/{policy_id}
+func (c *Client) GetPolicy(ctx context.Context, params GetPolicyParams) (GetPolicyRes, error) {
+	res, err := c.sendGetPolicy(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetPolicy(ctx context.Context, params GetPolicyParams) (res GetPolicyRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getPolicy"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/policies/{policy_id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetPolicyOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/policies/"
+	{
+		// Encode "policy_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "policy_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.PolicyID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetPolicyOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetPolicyOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetPolicyResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // GetPolicyRevision invokes getPolicyRevision operation.
 //
 // Reads one revision of a policy, newest or not.
@@ -7499,11 +7697,23 @@ func (c *Client) sendGetPolicyRevision(ctx context.Context, params GetPolicyRevi
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetPolicyRevisionOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -11240,6 +11450,412 @@ func (c *Client) sendListMyTeams(ctx context.Context, params ListMyTeamsParams) 
 	return result, nil
 }
 
+// ListPolicies invokes listPolicies operation.
+//
+// Lists the project's policies, one per operation, each as its newest
+// revision, ordered by `created_at` (first publish) and then `id`. Filter
+// by `operation` to read the policy of one operation; a project that never
+// published one gets an empty list.
+// The lookup is scoped to the project in `project_id`.
+//
+// GET /policies
+func (c *Client) ListPolicies(ctx context.Context, params ListPoliciesParams) (ListPoliciesRes, error) {
+	res, err := c.sendListPolicies(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListPolicies(ctx context.Context, params ListPoliciesParams) (res ListPoliciesRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listPolicies"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/policies"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListPoliciesOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/policies"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "operation" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "operation",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Operation.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListPoliciesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, ListPoliciesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeListPoliciesResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListPolicyRevisions invokes listPolicyRevisions operation.
+//
+// Returns every revision of one policy, newest first, paginated with a
+// cursor. The order is fixed, so there is no `sorting`.
+// The lookup is scoped to the project in `project_id`: a policy of another
+// project answers not found exactly as an unknown id does.
+//
+// GET /policies/{policy_id}/revisions
+func (c *Client) ListPolicyRevisions(ctx context.Context, params ListPolicyRevisionsParams) (ListPolicyRevisionsRes, error) {
+	res, err := c.sendListPolicyRevisions(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListPolicyRevisions(ctx context.Context, params ListPolicyRevisionsParams) (res ListPolicyRevisionsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listPolicyRevisions"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/policies/{policy_id}/revisions"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListPolicyRevisionsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/policies/"
+	{
+		// Encode "policy_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "policy_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.PolicyID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/revisions"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListPolicyRevisionsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, ListPolicyRevisionsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeListPolicyRevisionsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // ListPreviews invokes listPreviews operation.
 //
 // Lists the project's live previews, newest first by `created_at`. An
@@ -12868,19 +13484,34 @@ func (c *Client) sendPatchUserByID(ctx context.Context, request *PatchUserReques
 // applies to the next time the operation runs; nothing already stored is
 // re-evaluated, so a stricter password policy applies the next time a
 // password is set.
-// `config` is checked against the operation's template: an unknown
-// operation or setting, a value of the wrong type or outside its bounds, or
-// settings that contradict each other (a `min_length` above `max_length`)
-// answer `pol.invalid`. A setting left out is off, and `{}` switches every
+// The request is typed by `operation`: an unknown operation or setting, or
+// a value of the wrong type or outside its bounds, answers `req.invalid`
+// like any malformed request. The operation's template then checks the
+// config again, together with the rules that relate settings to each other
+// (a `min_length` above `max_length`), and answers `pol.invalid`. Its
+// `details.details.violations` lists everything that failed, settings
+// first, then rules: `{"setting": "min_length"}` for one setting, or
+// `{"config_rule": "min_length_not_above_max_length", "settings":
+// ["min_length", "max_length"]}` for a rule across settings, with the
+// settings it reads. A setting left out is off, and `{}` switches every
 // rule off; there are no defaults.
 //
 // POST /policies
-func (c *Client) PublishPolicy(ctx context.Context, request *PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error) {
+func (c *Client) PublishPolicy(ctx context.Context, request PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error) {
 	res, err := c.sendPublishPolicy(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendPublishPolicy(ctx context.Context, request *PublishPolicyRequest, params PublishPolicyParams) (res PublishPolicyRes, err error) {
+func (c *Client) sendPublishPolicy(ctx context.Context, request PublishPolicyRequest, params PublishPolicyParams) (res PublishPolicyRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("publishPolicy"),
 		semconv.HTTPRequestMethodKey.String("POST"),

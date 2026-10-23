@@ -13,6 +13,7 @@ content:
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/team-permission_denied.yaml'
+        - $ref: '../../../components/schemas/errors/unavailable.yaml'
         - $ref: '../../../components/schemas/errors/user-permission_denied.yaml'
       discriminator:
         propertyName: code
@@ -26,6 +27,7 @@ content:
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           team.permission_denied: '../../../components/schemas/errors/team-permission_denied.yaml'
+          unavailable: '../../../components/schemas/errors/unavailable.yaml'
           user.permission_denied: '../../../components/schemas/errors/user-permission_denied.yaml'
     examples:
       auth.csrf_invalid:
@@ -73,6 +75,11 @@ content:
         value:
           code: team.permission_denied
           message: 'the team management API requires the project secret'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'
       user.permission_denied:
         summary: user.permission_denied
         value:

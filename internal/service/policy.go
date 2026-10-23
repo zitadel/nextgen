@@ -11,6 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/policystore"
 )
 
 // PublishPolicyInput is one publish of a project's policy for an operation:
@@ -52,7 +53,7 @@ func (s *PolicyService) Publish(ctx context.Context, in PublishPolicyInput) (_ *
 	bound, err := s.engine.Bind(ctx, in.Operation, inst)
 	if err != nil {
 		if errors.Is(err, policy.ErrInvalidInstance) || errors.Is(err, policy.ErrUnknownOperation) {
-			return nil, domain.ErrPolicyInvalid(nil, err).WithMessage("policy: invalid: " + strings.TrimPrefix(err.Error(), "policy: "))
+			return nil, domain.ErrPolicyInvalid(policyInvalidDetails(err), err).WithMessage("policy: invalid: " + strings.TrimPrefix(err.Error(), "policy: "))
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to validate policy")
 	}
@@ -75,7 +76,7 @@ func (s *PolicyService) Publish(ctx context.Context, in PublishPolicyInput) (_ *
 		entity = &domain.Policy{ProjectID: in.ProjectID, Operation: in.Operation, Config: raw}
 		eventType := domain.EventTypePolicyCreated
 		stmts := tx.Statements()
-		current, err := stmts.GetPolicy(ctx, in.ProjectID, in.Operation)
+		current, err := stmts.GetPolicy(ctx, policystore.ByOperation(in.ProjectID, in.Operation))
 		switch {
 		case err == nil:
 			// The lock serializes publishes of one operation, so this
@@ -130,6 +131,98 @@ func (s *PolicyService) Publish(ctx context.Context, in PublishPolicyInput) (_ *
 	return entity, nil
 }
 
+// policyInvalidDetails lists the violations the template found, or returns
+// nil when the error names none (an unknown operation).
+func policyInvalidDetails(err error) any {
+	violations := policy.Violations(err)
+	if len(violations) == 0 {
+		return nil
+	}
+	details := domain.PolicyInvalidDetails{Violations: make([]domain.PolicyViolation, 0, len(violations))}
+	for _, v := range violations {
+		details.Violations = append(details.Violations, domain.PolicyViolation{
+			Setting:    v.Setting,
+			ConfigRule: v.ConfigRule,
+			Settings:   v.Settings,
+		})
+	}
+	return details
+}
+
+// ListPoliciesInput pages a project's policies, optionally narrowed to one
+// operation.
+type ListPoliciesInput struct {
+	ProjectID string
+	Operation string
+	Limit     int
+	PageToken string
+}
+
+// ListPolicyRevisionsInput pages the revisions of one policy.
+type ListPolicyRevisionsInput struct {
+	ProjectID string
+	ID        string
+	Limit     int
+	PageToken string
+}
+
+// ListPoliciesOutput is one page of policies or revisions.
+type ListPoliciesOutput struct {
+	Items         []*domain.Policy
+	NextPageToken string
+}
+
+// Get returns a policy of the project at its newest revision.
+func (s *PolicyService) Get(ctx context.Context, projectID, id string) (_ *domain.Policy, err error) {
+	ctx, end := startSpan(ctx, "PolicyService.Get")
+	defer end(&err)
+
+	entity, err := s.v2Pool.Statements().GetPolicy(ctx, policystore.ByID(projectID, id))
+	if err != nil {
+		if isNoRowFound(err) {
+			return nil, domain.ErrPolicyNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get policy")
+	}
+	return entity, nil
+}
+
+// List returns the project's policies, one per operation at its newest
+// revision, first published first.
+func (s *PolicyService) List(ctx context.Context, input ListPoliciesInput) (_ *ListPoliciesOutput, err error) {
+	ctx, end := startSpan(ctx, "PolicyService.List")
+	defer end(&err)
+
+	opts := policystore.ListOptions(input.ProjectID, input.Operation, uint32(normalizeLimit(input.Limit)))
+	opts.Pagination.Cursor = []byte(input.PageToken)
+	result, err := s.v2Pool.Statements().ListPolicies(ctx, opts)
+	if err != nil {
+		return nil, mapListError(err, "failed to list policies")
+	}
+	return &ListPoliciesOutput{Items: result.Items, NextPageToken: string(result.NextCursor)}, nil
+}
+
+// ListRevisions pages one policy's revisions, newest first.
+func (s *PolicyService) ListRevisions(ctx context.Context, input ListPolicyRevisionsInput) (_ *ListPoliciesOutput, err error) {
+	ctx, end := startSpan(ctx, "PolicyService.ListRevisions")
+	defer end(&err)
+
+	// The revisions statement answers an unknown policy with an empty page,
+	// so the lookup is what tells a miss from a policy's history.
+	if _, err := s.Get(ctx, input.ProjectID, input.ID); err != nil {
+		return nil, err
+	}
+	result, err := s.v2Pool.Statements().ListPolicyRevisions(ctx, input.ProjectID, input.ID, database.Page[domain.PolicyField]{
+		Limit:   uint32(normalizeLimit(input.Limit)),
+		OrderBy: policystore.NewestRevisionFirst(),
+		Cursor:  []byte(input.PageToken),
+	})
+	if err != nil {
+		return nil, mapListError(err, "failed to list policy revisions")
+	}
+	return &ListPoliciesOutput{Items: result.Items, NextPageToken: string(result.NextCursor)}, nil
+}
+
 // GetRevision returns one revision of a policy in the project, newest or not.
 func (s *PolicyService) GetRevision(ctx context.Context, projectID, revisionID string) (_ *domain.Policy, err error) {
 	ctx, end := startSpan(ctx, "PolicyService.GetRevision")
@@ -155,7 +248,7 @@ func (s *PolicyService) ResolvePolicy(ctx context.Context, projectID, operation 
 	ctx, end := startSpan(ctx, "PolicyService.ResolvePolicy")
 	defer end(&err)
 
-	entity, err := s.v2Pool.Statements().GetPolicy(ctx, projectID, operation)
+	entity, err := s.v2Pool.Statements().GetPolicy(ctx, policystore.ByOperation(projectID, operation))
 	if err != nil {
 		if isNoRowFound(err) {
 			return nil, nil

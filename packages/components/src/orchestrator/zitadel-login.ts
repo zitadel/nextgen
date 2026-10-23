@@ -1110,6 +1110,11 @@ export class ZitadelLogin extends ZitadelSurface {
           // step doesn't render their field — the inline outlet is the
           // only place the template shows them.
           fields: (step.fields ?? []).map((field) => field.name),
+          // A length error names the bound the field carries, e.g. the
+          // password policy's minimum.
+          validations: Object.fromEntries(
+            (step.fields ?? []).map((field) => [field.name, field.validation]),
+          ),
         }) ?? [{ message: step.error }])
       : [];
     // A dismissed step error must not flicker back on the `loading`

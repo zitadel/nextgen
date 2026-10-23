@@ -343,7 +343,7 @@ func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState,
 	decrypter, err := h.keyService.GetCrypter(ctx, header.KeyID, header.EncryptionAlgorithm)
 	if err != nil {
 		var domainError domain.Error
-		if errors.As(err, &domainError) && domainError.Code != domain.ErrInternal(nil).Code {
+		if errors.As(err, &domainError) && !domain.IsServerFault(domainError) {
 			return nil, domain.ErrFlowCookieInvalid()
 		}
 		return nil, err

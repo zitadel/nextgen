@@ -372,6 +372,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		service.NewFlowSSOProviderResolver(idpConnectionService),
 		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers, passwordPolicy),
 		service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
+		passwordPolicy,
 		time.Now,
 	)
 	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)

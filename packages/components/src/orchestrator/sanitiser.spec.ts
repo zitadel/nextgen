@@ -60,6 +60,20 @@ describe("DOMPurify sanitiser", () => {
     expect(out).not.toContain("<zl-button");
   });
 
+  it("keeps the account chip and what the template tells it", () => {
+    const out = sanitise(
+      `<zl-account identifier="maya@example.com" action="back" label="Use another account" avatar=""></zl-account>`,
+    );
+    expect(out).toContain(
+      '<zl-account identifier="maya@example.com" action="back" label="Use another account" avatar="">',
+    );
+  });
+
+  it("keeps the account's avatar and its seed", () => {
+    const out = sanitise(`<zl-avatar seed="maya@example.com"></zl-avatar>`);
+    expect(out).toContain('<zl-avatar seed="maya@example.com">');
+  });
+
   it("preserves data-* and aria-* attributes", () => {
     const out = sanitise(`<div data-theme="dark" data-testid="login" aria-label="Login">x</div>`);
     expect(out).toContain('data-theme="dark"');

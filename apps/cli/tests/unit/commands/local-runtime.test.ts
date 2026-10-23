@@ -514,6 +514,7 @@ describe("local runtime commands", () => {
         runtime: { backend: string; pid: number; log_path: string; server_package: string };
         urls: { api: string };
         console: { signed_in_as: string; sign_in_url?: string; error?: string; hint?: string };
+        next_actions: string[];
         next_commands: string[];
       };
     };
@@ -536,6 +537,9 @@ describe("local runtime commands", () => {
     });
     expect(envelope.data.console.sign_in_url).toBeUndefined();
     expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
+    expect(envelope.data.next_actions).toContainEqual(
+      expect.stringContaining(expectedPublicCliCommand("logs --follow")),
+    );
 
     const runtime = await readRuntimeMetadata(cwd);
     expect(runtime).toMatchObject({

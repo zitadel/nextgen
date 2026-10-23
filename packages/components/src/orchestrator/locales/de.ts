@@ -225,6 +225,8 @@ export const de: Locale = {
   "error.field_format": "Bitte gib einen gültigen Wert für {0} ein.",
   "error.field_min_length": "{0} ist zu kurz.",
   "error.field_max_length": "{0} ist zu lang.",
+  "error.field_min_length_value": "{0} muss mindestens {1} Zeichen lang sein.",
+  "error.field_max_length_value": "{0} darf höchstens {1} Zeichen lang sein.",
   "error.field_invalid": "Bitte überprüfe {0}.",
 
   // --- Formular-Alerts ---

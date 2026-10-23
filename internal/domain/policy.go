@@ -16,7 +16,8 @@ func ErrPolicyNotFound() Error {
 
 // ErrPolicyInvalid rejects an instance that does not fit its operation's
 // template: an unknown operation or setting, a value of the wrong type or out
-// of bounds, or a failed config rule. details names what failed.
+// of bounds, or a failed config rule. details names what failed, as
+// [PolicyInvalidDetails] when the template found it.
 func ErrPolicyInvalid(details any, parent error) Error {
 	return newError(PrefixPolicy.ErrorCodePrefix("invalid"), "policy: invalid", details, parent)
 }
@@ -30,6 +31,21 @@ func ErrPolicyPermissionDenied() Error {
 // the operation won. Retrying publishes on top of it.
 func ErrPolicyRevisionConflict() Error {
 	return newError(PrefixPolicy.ErrorCodePrefix("revision_conflict"), "policy: another revision of the same policy was published at the same instant; retry", nil, nil)
+}
+
+// PolicyInvalidDetails lists every way a published instance does not fit
+// its template, the settings first, then the config rules. It names settings
+// and rules only, never a value.
+type PolicyInvalidDetails struct {
+	Violations []PolicyViolation `json:"violations"`
+}
+
+// PolicyViolation is one setting that is unknown, of the wrong type or out of
+// bounds, or one config rule that does not hold, with the settings it reads.
+type PolicyViolation struct {
+	Setting    string   `json:"setting,omitempty"`
+	ConfigRule string   `json:"config_rule,omitempty"`
+	Settings   []string `json:"settings,omitempty"`
 }
 
 // Policy is one revision of a project's policy instance for one operation
