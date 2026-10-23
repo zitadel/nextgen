@@ -139,7 +139,10 @@ function ProfileScreen() {
               </FieldContent>
               <FieldContent className="items-start @md/field-group:items-end">
                 <UserAvatar
-                  seed={avatarSeed({ userId: field(record, "id") })}
+                  seed={avatarSeed({
+                    identifier: field(record, "identifier"),
+                    userId: field(record, "id"),
+                  })}
                   className="size-10"
                 />
               </FieldContent>
