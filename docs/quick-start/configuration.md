@@ -111,11 +111,13 @@ session:
 
 ## Logging
 
-| YAML key                      | Environment                           | Default                                       | Description                   |
-| ----------------------------- | ------------------------------------- | --------------------------------------------- | ----------------------------- |
-| `instrumentation.log.level`   | `NEXTGEN_INSTRUMENTATION_LOG_LEVEL`   | `info`                                        | Minimum log level             |
-| `instrumentation.log.format`  | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT`  | `text`                                        | Log output encoding           |
-| `instrumentation.log.streams` | `NEXTGEN_INSTRUMENTATION_LOG_STREAMS` | `[runtime, ready, request, service, storage]` | Which log streams are enabled |
+| YAML key                                     | Environment                                          | Default                                       | Description                                    |
+| -------------------------------------------- | ---------------------------------------------------- | --------------------------------------------- | ---------------------------------------------- |
+| `instrumentation.log.level`                  | `NEXTGEN_INSTRUMENTATION_LOG_LEVEL`                  | `info`                                        | Minimum log level                              |
+| `instrumentation.log.format`                 | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT`                 | `text`                                        | Log output encoding                            |
+| `instrumentation.log.streams`                | `NEXTGEN_INSTRUMENTATION_LOG_STREAMS`                | `[runtime, ready, request, service, storage]` | Which log streams are enabled                  |
+| `instrumentation.log.errors.report_location` | `NEXTGEN_INSTRUMENTATION_LOG_ERRORS_REPORT_LOCATION` | `true`                                        | Record where each error was created            |
+| `instrumentation.log.errors.stack_trace`     | `NEXTGEN_INSTRUMENTATION_LOG_ERRORS_STACK_TRACE`     | `true`                                        | Capture a stack trace when an error is created |
 
 `level`, `format`, and each entry of `streams` accept either their documented
 string name (below) or the underlying numeric value; string values are
@@ -128,12 +130,24 @@ resolved case-insensitively via each type's `encoding.TextUnmarshaler`.
 - `format`: `disabled`, `text`, `json`, `gcp`, `gcp_error_reporting`.
 - `streams`: `runtime`, `ready`, `request`, `service`, `storage`.
 
+`errors.report_location` and `errors.stack_trace` feed the error line that the
+server logs once per failed API call. Location is one `runtime.Caller` and is
+cheap. A stack is one `debug.Stack()` per error and is expensive on busy
+servers. The error line includes it only at `error` level, so 4xx answers
+never carry one there; other log lines that carry a `domain.Error` include it
+whenever it was captured. ADR 030 intends stack capture to be off in production, but the
+server currently defaults it to on. The decision is tracked in
+[#1485](https://github.com/zitadel/nextgen/issues/1485).
+
 ```yaml
 instrumentation:
   log:
     level: debug
     format: json
     streams: [request, service]
+    errors:
+      report_location: true
+      stack_trace: false
 ```
 
 ## Tracing
