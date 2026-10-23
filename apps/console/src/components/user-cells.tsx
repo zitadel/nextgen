@@ -140,9 +140,7 @@ function UserIdentityCard({ user, context }: { user: UserRow; context: IdentityC
           {user.identifier ? (
             <>
               {user.identifierProperty && (
-                <InlineCode className={IDENTIFIER_CHIP}>
-                  {user.identifierProperty}
-                </InlineCode>
+                <InlineCode className={IDENTIFIER_CHIP}>{user.identifierProperty}</InlineCode>
               )}
               <span className="truncate">{user.identifier}</span>
             </>
