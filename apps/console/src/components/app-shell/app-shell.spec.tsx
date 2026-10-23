@@ -112,9 +112,10 @@ describe("app shell navigation", () => {
     // Projects itself, not on the way to Users: nothing asked for a screen.
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("next");
     expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
-    // The bar keeps its pill on Projects too (D21), asking for a selection.
-    const pill = await screen.findByRole("button", { name: "Switch project" });
-    await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
+    // Projects is the list the switcher would offer, with its own search, so
+    // the bar carries no pill there (D21).
+    await screen.findByRole("navigation", { name: "Context" });
+    expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
 
     // The project's screens are listed before one is chosen (D22).
     const nav = within(screen.getByRole("navigation", { name: "Primary" }));
