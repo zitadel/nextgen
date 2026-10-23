@@ -107,9 +107,9 @@ export default class Deploy extends EnvironmentCommand {
       suggest: (args) => this.suggest(args),
     };
 
-    // Before-release steps: validate, sync IdPs (validated and previewed but
-    // not written on a dry run), diff.
-    await runSteps([validateStep, diffStep], ctx);
+    // Before-release steps: validate, then diff, which `--json` reports as
+    // `diff` on a dry run and a deploy alike.
+    const reported = await runSteps([validateStep, diffStep], ctx);
 
     if (dryRun) {
       return this.emit({
@@ -118,6 +118,7 @@ export default class Deploy extends EnvironmentCommand {
           dry_run: true,
           resources: resourceCount,
           targets: ["primary"],
+          ...reported,
         },
         pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
       });
@@ -205,6 +206,7 @@ export default class Deploy extends EnvironmentCommand {
         deployment_id: deployment.id,
         resources: resourceCount,
         origins: servedOrigins,
+        ...reported,
         ...nextCommandsData([this.suggest("deployment list")]),
       },
       pretty: [
