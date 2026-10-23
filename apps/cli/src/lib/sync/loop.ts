@@ -306,7 +306,7 @@ export type SyncLoopResult = {
    * deleted). Feeds the `apply` `--json` `changes` array.
    */
   applied: PlanResourceChange[];
-  /** Removed files whose resource was kept, because it cannot be deleted yet. */
+  /** Removed files whose resource was kept, because it cannot be deleted. */
   unsupported: string[];
 };
 

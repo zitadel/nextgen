@@ -196,6 +196,8 @@ export type ResourceDescriptor<Ctx> = Readonly<{
    * What the positional accepts, for `--help`. Defaults to
    * `<singular> <idArg>`, which reads well when the argument is an `id` or a
    * `name` but not when a resource takes more than one kind of reference.
+   * `get` also reads it into its summary, "Get one <singular> by …", so word
+   * it as a noun phrase that follows "by".
    */
   idDescription?: string;
   /** Dot-paths projected into the human-readable table; `--json` carries the full resource. */

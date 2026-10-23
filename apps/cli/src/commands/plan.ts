@@ -64,7 +64,7 @@ export default class Plan extends BaseCommand {
         `${summary.deletes} delete${summary.deletes === 1 ? "" : "s"}, ` +
         `${plan.filter((action) => action.kind === "skip" && !isUnsupportedDeletion(action)).length} unchanged` +
         (summary.unsupported_deletions > 0
-          ? `, ${summary.unsupported_deletions} removed but kept (cannot be deleted yet)`
+          ? `, ${summary.unsupported_deletions} removed but kept (cannot be deleted)`
           : ""),
     );
     return this.emit({

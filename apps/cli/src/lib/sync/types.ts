@@ -156,6 +156,12 @@ export interface ResourceSyncer {
    */
   readonly deletion?: "unsupported";
   /**
+   * What `plan` and `apply` say about a removed file when `deletion` is
+   * unsupported, for a resource with a better answer than "not supported
+   * yet". Omit it for the default note.
+   */
+  deletionNote?(path: string): string;
+  /**
    * Checks that need the platform, run for every create and update before any
    * mutation, given the file `path`. It answers with the id of the resource a create would revise, when one already holds its identity, so the planner can tell a moved file from a new one. `old` is the stored body of an update (null for a create, or
    * when it could not be read). Throws to stop the plan.
@@ -191,7 +197,7 @@ export type SyncPlanSummary = {
   deletes: number;
   /** Files that moved: the same resource, under a new file name. */
   moves: number;
-  /** Removed files whose resource cannot be deleted yet; not part of `total`. */
+  /** Removed files whose resource cannot be deleted; not part of `total`. */
   unsupported_deletions: number;
   total: number;
 };

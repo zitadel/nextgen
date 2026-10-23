@@ -87,6 +87,25 @@ describe("plan", () => {
         expect(result.total).toBeGreaterThan(0);
       });
 
+      it("reports a new password policy file as one create", async () => {
+        const app = await aSetUpApp();
+        await app.writePasswordPolicy({ min_length: 12 });
+
+        const result = await app.plan();
+
+        expect(result).toEqual(expect.objectContaining({ creates: 1, total: 1 }));
+      });
+
+      it("has nothing to reconcile once the password policy is applied", async () => {
+        const app = await aSetUpApp();
+        await app.writePasswordPolicy({ min_length: 12 });
+        await app.apply();
+
+        const result = await app.plan();
+
+        expect(result).toReportNothingToDo();
+      });
+
       it("previews without consuming the change it previewed", async () => {
         const app = await aSetUpApp();
         await addCompanyField(app);
