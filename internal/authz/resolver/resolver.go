@@ -135,21 +135,18 @@ func (r *Resolver) CheckPath(ctx context.Context, stmts service.AuthzResolverSta
 		return DecisionUnspecified, PathNone, err
 	}
 	o := outcome{decision: DecisionNotFound}
-	switch {
-	case allowed:
+	if allowed {
 		o = outcome{decision: DecisionAllow, path: PathGrant}
-	case params.PlatformOperatorEligible():
+	} else if params.PlatformOperatorEligible() {
 		operator, err := stmts.CheckPlatformOperator(ctx, params.PlatformCheckParams())
 		if err != nil {
 			return DecisionUnspecified, PathNone, err
 		}
-		switch {
-		case operator:
+		if operator {
 			o = outcome{decision: DecisionAllow, path: PathPlatformOperator}
-		case foothold:
-			o = outcome{decision: DecisionForbidden}
 		}
-	case foothold:
+	}
+	if o.decision == DecisionNotFound && foothold {
 		o = outcome{decision: DecisionForbidden}
 	}
 	r.memo[key] = o
