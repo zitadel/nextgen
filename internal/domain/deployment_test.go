@@ -197,3 +197,20 @@ func TestResolveDeploymentTargets(t *testing.T) {
 		}
 	})
 }
+
+func TestParsePreviewTTL(t *testing.T) {
+	for ttl, want := range map[string]time.Duration{
+		"30m":  30 * time.Minute,
+		"168h": 168 * time.Hour,
+		"7d":   7 * 24 * time.Hour,
+		"365d": 365 * 24 * time.Hour,
+	} {
+		got, err := ParsePreviewTTL(ttl)
+		require.NoError(t, err, ttl)
+		assert.Equal(t, want, got, ttl)
+	}
+	for _, ttl := range []string{"", "h", "0h", "7w", "-1h", "366d", "8761h", "999999d"} {
+		_, err := ParsePreviewTTL(ttl)
+		assert.ErrorIs(t, err, ErrDeploymentInvalid(), ttl)
+	}
+}

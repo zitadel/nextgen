@@ -37,8 +37,9 @@ type CreateDeploymentOutput struct {
 
 // DeployInput carries the targets as the request gives them.
 type DeployInput struct {
-	// HasTTL reports a ttl in the request, which only a preview deploy takes.
-	HasTTL               bool
+	// TTL is the request's ttl, which only a preview deploy takes; nil uses
+	// domain.DefaultPreviewTTL.
+	TTL                  *time.Duration
 	ProjectID            string
 	ReleaseID            string
 	Targets              []string
@@ -145,13 +146,15 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 	if err != nil {
 		return nil, err
 	}
-	if input.HasTTL && kind == domain.DeploymentOriginKindPrimary {
+	if input.TTL != nil && kind == domain.DeploymentOriginKindPrimary {
 		return nil, domain.ErrDeploymentInvalid().WithMessage("ttl is only valid for preview URLs")
 	}
 	var ttl time.Duration
-	// TODO(#2210): take the request's ttl instead of the default.
 	if kind == domain.DeploymentOriginKindPreview {
 		ttl = domain.DefaultPreviewTTL
+		if input.TTL != nil {
+			ttl = *input.TTL
+		}
 	}
 	return s.Create(ctx, CreateDeploymentInput{
 		ProjectID:            input.ProjectID,

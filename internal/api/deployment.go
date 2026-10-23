@@ -28,7 +28,13 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 		ProjectID: string(params.ProjectID),
 		ReleaseID: string(req.ReleaseID.Value),
 		Targets:   req.Targets,
-		HasTTL:    req.TTL.Set,
+	}
+	if ttl, ok := req.TTL.Get(); ok {
+		parsed, err := domain.ParsePreviewTTL(string(ttl))
+		if err != nil {
+			return nil, err
+		}
+		input.TTL = &parsed
 	}
 	if reason, ok := req.Reason.Get(); ok {
 		parsed, err := domain.DeploymentReasonString(string(reason))

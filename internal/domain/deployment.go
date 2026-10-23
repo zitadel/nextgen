@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -15,8 +16,28 @@ const (
 const MaxDeploymentTargets = 50
 
 // DefaultPreviewTTL is how long a preview stays live after the deployment
-// that writes it.
+// that writes it, when the deployment gives no ttl.
 const DefaultPreviewTTL = 7 * 24 * time.Hour
+
+// MaxPreviewTTL caps the ttl a deployment may give.
+const MaxPreviewTTL = 365 * 24 * time.Hour
+
+// ParsePreviewTTL parses a ttl such as 30m, 168h or 7d, at most MaxPreviewTTL.
+func ParsePreviewTTL(ttl string) (time.Duration, error) {
+	invalid := ErrDeploymentInvalid().WithMessage("ttl must be a positive whole number followed by m, h or d, at most 365d")
+	if len(ttl) < 2 {
+		return 0, invalid
+	}
+	count, err := strconv.ParseUint(ttl[:len(ttl)-1], 10, 32)
+	if err != nil || count == 0 {
+		return 0, invalid
+	}
+	unit := map[byte]time.Duration{'m': time.Minute, 'h': time.Hour, 'd': 24 * time.Hour}[ttl[len(ttl)-1]]
+	if unit == 0 || count > uint64(MaxPreviewTTL/unit) {
+		return 0, invalid
+	}
+	return time.Duration(count) * unit, nil
+}
 
 // DeploymentReason records why a deployment was created.
 //
