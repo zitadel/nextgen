@@ -17,13 +17,15 @@
     // The @zitadel/server wrapper its server-wrapper test loads is an input,
     // not a dependency on the server build: the built oclif commands only
     // read the launcher script. So are the spec files whose `x-zitadel-cli`
-    // names the api-coverage test checks against the commands.
+    // names the api-coverage test checks against the commands, and the
+    // product analytics catalog the catalog test checks telemetry against.
     "test": {
       "dependsOn": ["build", "@zitadel/api-mock#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/apps/server/bin/**",
-        "$TURBO_ROOT$/api/openapi/endpoints/**/methods.yaml"
+        "$TURBO_ROOT$/api/openapi/endpoints/**/methods.yaml",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml"
       ]
     },
     // It asks the npm advisory database, whose answer changes when an
