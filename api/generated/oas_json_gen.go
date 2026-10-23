@@ -20596,6 +20596,22 @@ func (s CreateDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjOriginNotAllowedCreateDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.origin_not_allowed")
+		{
+			s := s.ProjOriginNotAllowed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelNotFoundCreateDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.not_found")
@@ -20716,6 +20732,9 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "proj.not_found":
 					s.Type = ProjNotFoundCreateDeploymentErrorResponse
 					found = true
+				case "proj.origin_not_allowed":
+					s.Type = ProjOriginNotAllowedCreateDeploymentErrorResponse
+					found = true
 				case "rel.not_found":
 					s.Type = RelNotFoundCreateDeploymentErrorResponse
 					found = true
@@ -20780,6 +20799,10 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ProjNotFoundCreateDeploymentErrorResponse:
 		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ProjOriginNotAllowedCreateDeploymentErrorResponse:
+		if err := s.ProjOriginNotAllowed.Decode(d); err != nil {
 			return err
 		}
 	case RelNotFoundCreateDeploymentErrorResponse:
@@ -111880,6 +111903,22 @@ func (s RollbackDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjOriginNotAllowedRollbackDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.origin_not_allowed")
+		{
+			s := s.ProjOriginNotAllowed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelNotFoundRollbackDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.not_found")
@@ -112000,6 +112039,9 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "proj.not_found":
 					s.Type = ProjNotFoundRollbackDeploymentErrorResponse
 					found = true
+				case "proj.origin_not_allowed":
+					s.Type = ProjOriginNotAllowedRollbackDeploymentErrorResponse
+					found = true
 				case "rel.not_found":
 					s.Type = RelNotFoundRollbackDeploymentErrorResponse
 					found = true
@@ -112064,6 +112106,10 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ProjNotFoundRollbackDeploymentErrorResponse:
 		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ProjOriginNotAllowedRollbackDeploymentErrorResponse:
+		if err := s.ProjOriginNotAllowed.Decode(d); err != nil {
 			return err
 		}
 	case RelNotFoundRollbackDeploymentErrorResponse:
