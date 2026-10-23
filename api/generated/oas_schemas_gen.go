@@ -35126,6 +35126,184 @@ func (s *GetMyUserSchemaErrorResponseStatusCode) SetResponse(val GetMyUserSchema
 
 func (*GetMyUserSchemaErrorResponseStatusCode) getMyUserSchemaRes() {}
 
+// GetPolicyErrorResponse represents sum type.
+type GetPolicyErrorResponse struct {
+	Type             GetPolicyErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+	Unavailable      Unavailable
+}
+
+// GetPolicyErrorResponseType is oneOf type of GetPolicyErrorResponse.
+type GetPolicyErrorResponseType string
+
+// Possible values for GetPolicyErrorResponseType.
+const (
+	AuthUnauthorizedGetPolicyErrorResponse GetPolicyErrorResponseType = "auth.unauthorized"
+	InternalGetPolicyErrorResponse         GetPolicyErrorResponseType = "internal"
+	NotImplementedGetPolicyErrorResponse   GetPolicyErrorResponseType = "not_implemented"
+	ReqInvalidGetPolicyErrorResponse       GetPolicyErrorResponseType = "req.invalid"
+	UnavailableGetPolicyErrorResponse      GetPolicyErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether GetPolicyErrorResponse is AuthUnauthorized.
+func (s GetPolicyErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetPolicyErrorResponse
+}
+
+// IsInternal reports whether GetPolicyErrorResponse is Internal.
+func (s GetPolicyErrorResponse) IsInternal() bool { return s.Type == InternalGetPolicyErrorResponse }
+
+// IsNotImplemented reports whether GetPolicyErrorResponse is NotImplemented.
+func (s GetPolicyErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetPolicyErrorResponse
+}
+
+// IsReqInvalid reports whether GetPolicyErrorResponse is ReqInvalid.
+func (s GetPolicyErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetPolicyErrorResponse
+}
+
+// IsUnavailable reports whether GetPolicyErrorResponse is Unavailable.
+func (s GetPolicyErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetPolicyErrorResponse
+}
+
+// SetAuthUnauthorized sets GetPolicyErrorResponse to AuthUnauthorized.
+func (s *GetPolicyErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetPolicyErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetPolicyErrorResponse is AuthUnauthorized.
+func (s GetPolicyErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetPolicyErrorResponse returns new GetPolicyErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetPolicyErrorResponse(v AuthUnauthorized) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetPolicyErrorResponse to Internal.
+func (s *GetPolicyErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetPolicyErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetPolicyErrorResponse is Internal.
+func (s GetPolicyErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetPolicyErrorResponse returns new GetPolicyErrorResponse from Internal.
+func NewInternalGetPolicyErrorResponse(v Internal) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetPolicyErrorResponse to NotImplemented.
+func (s *GetPolicyErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetPolicyErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetPolicyErrorResponse is NotImplemented.
+func (s GetPolicyErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetPolicyErrorResponse returns new GetPolicyErrorResponse from NotImplemented.
+func NewNotImplementedGetPolicyErrorResponse(v NotImplemented) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets GetPolicyErrorResponse to ReqInvalid.
+func (s *GetPolicyErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetPolicyErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetPolicyErrorResponse is ReqInvalid.
+func (s GetPolicyErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetPolicyErrorResponse returns new GetPolicyErrorResponse from ReqInvalid.
+func NewReqInvalidGetPolicyErrorResponse(v ReqInvalid) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetPolicyErrorResponse to Unavailable.
+func (s *GetPolicyErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetPolicyErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetPolicyErrorResponse is Unavailable.
+func (s GetPolicyErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetPolicyErrorResponse returns new GetPolicyErrorResponse from Unavailable.
+func NewUnavailableGetPolicyErrorResponse(v Unavailable) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// GetPolicyErrorResponseStatusCode wraps GetPolicyErrorResponse with StatusCode.
+type GetPolicyErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetPolicyErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetPolicyErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetPolicyErrorResponseStatusCode) GetResponse() GetPolicyErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetPolicyErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetPolicyErrorResponseStatusCode) SetResponse(val GetPolicyErrorResponse) {
+	s.Response = val
+}
+
+func (*GetPolicyErrorResponseStatusCode) getPolicyRes() {}
+
 // GetPolicyRevisionErrorResponse represents sum type.
 type GetPolicyRevisionErrorResponse struct {
 	Type                GetPolicyRevisionErrorResponseType // switch on this field
@@ -44710,6 +44888,429 @@ func (s *ListMyTeamsErrorResponseStatusCode) SetResponse(val ListMyTeamsErrorRes
 }
 
 func (*ListMyTeamsErrorResponseStatusCode) listMyTeamsRes() {}
+
+// ListPoliciesErrorResponse represents sum type.
+type ListPoliciesErrorResponse struct {
+	Type             ListPoliciesErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+	Unavailable      Unavailable
+}
+
+// ListPoliciesErrorResponseType is oneOf type of ListPoliciesErrorResponse.
+type ListPoliciesErrorResponseType string
+
+// Possible values for ListPoliciesErrorResponseType.
+const (
+	AuthUnauthorizedListPoliciesErrorResponse ListPoliciesErrorResponseType = "auth.unauthorized"
+	InternalListPoliciesErrorResponse         ListPoliciesErrorResponseType = "internal"
+	NotImplementedListPoliciesErrorResponse   ListPoliciesErrorResponseType = "not_implemented"
+	ReqInvalidListPoliciesErrorResponse       ListPoliciesErrorResponseType = "req.invalid"
+	UnavailableListPoliciesErrorResponse      ListPoliciesErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether ListPoliciesErrorResponse is AuthUnauthorized.
+func (s ListPoliciesErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListPoliciesErrorResponse
+}
+
+// IsInternal reports whether ListPoliciesErrorResponse is Internal.
+func (s ListPoliciesErrorResponse) IsInternal() bool {
+	return s.Type == InternalListPoliciesErrorResponse
+}
+
+// IsNotImplemented reports whether ListPoliciesErrorResponse is NotImplemented.
+func (s ListPoliciesErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListPoliciesErrorResponse
+}
+
+// IsReqInvalid reports whether ListPoliciesErrorResponse is ReqInvalid.
+func (s ListPoliciesErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListPoliciesErrorResponse
+}
+
+// IsUnavailable reports whether ListPoliciesErrorResponse is Unavailable.
+func (s ListPoliciesErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListPoliciesErrorResponse
+}
+
+// SetAuthUnauthorized sets ListPoliciesErrorResponse to AuthUnauthorized.
+func (s *ListPoliciesErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListPoliciesErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListPoliciesErrorResponse is AuthUnauthorized.
+func (s ListPoliciesErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListPoliciesErrorResponse returns new ListPoliciesErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListPoliciesErrorResponse(v AuthUnauthorized) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListPoliciesErrorResponse to Internal.
+func (s *ListPoliciesErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListPoliciesErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListPoliciesErrorResponse is Internal.
+func (s ListPoliciesErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListPoliciesErrorResponse returns new ListPoliciesErrorResponse from Internal.
+func NewInternalListPoliciesErrorResponse(v Internal) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets ListPoliciesErrorResponse to NotImplemented.
+func (s *ListPoliciesErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListPoliciesErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListPoliciesErrorResponse is NotImplemented.
+func (s ListPoliciesErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListPoliciesErrorResponse returns new ListPoliciesErrorResponse from NotImplemented.
+func NewNotImplementedListPoliciesErrorResponse(v NotImplemented) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets ListPoliciesErrorResponse to ReqInvalid.
+func (s *ListPoliciesErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListPoliciesErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListPoliciesErrorResponse is ReqInvalid.
+func (s ListPoliciesErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListPoliciesErrorResponse returns new ListPoliciesErrorResponse from ReqInvalid.
+func NewReqInvalidListPoliciesErrorResponse(v ReqInvalid) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListPoliciesErrorResponse to Unavailable.
+func (s *ListPoliciesErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListPoliciesErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListPoliciesErrorResponse is Unavailable.
+func (s ListPoliciesErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListPoliciesErrorResponse returns new ListPoliciesErrorResponse from Unavailable.
+func NewUnavailableListPoliciesErrorResponse(v Unavailable) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// ListPoliciesErrorResponseStatusCode wraps ListPoliciesErrorResponse with StatusCode.
+type ListPoliciesErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListPoliciesErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListPoliciesErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListPoliciesErrorResponseStatusCode) GetResponse() ListPoliciesErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListPoliciesErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListPoliciesErrorResponseStatusCode) SetResponse(val ListPoliciesErrorResponse) {
+	s.Response = val
+}
+
+func (*ListPoliciesErrorResponseStatusCode) listPoliciesRes() {}
+
+// Paginated list of the project's policies, one per operation, each as its
+// newest revision.
+// Ref: #
+type ListPoliciesResponse struct {
+	Policies []Policy `json:"policies"`
+	// Token to pass as `page_token` in the next request to fetch the following
+	// page. Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetPolicies returns the value of Policies.
+func (s *ListPoliciesResponse) GetPolicies() []Policy {
+	return s.Policies
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListPoliciesResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetPolicies sets the value of Policies.
+func (s *ListPoliciesResponse) SetPolicies(val []Policy) {
+	s.Policies = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListPoliciesResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListPoliciesResponse) listPoliciesRes() {}
+
+// ListPolicyRevisionsErrorResponse represents sum type.
+type ListPolicyRevisionsErrorResponse struct {
+	Type             ListPolicyRevisionsErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+	Unavailable      Unavailable
+}
+
+// ListPolicyRevisionsErrorResponseType is oneOf type of ListPolicyRevisionsErrorResponse.
+type ListPolicyRevisionsErrorResponseType string
+
+// Possible values for ListPolicyRevisionsErrorResponseType.
+const (
+	AuthUnauthorizedListPolicyRevisionsErrorResponse ListPolicyRevisionsErrorResponseType = "auth.unauthorized"
+	InternalListPolicyRevisionsErrorResponse         ListPolicyRevisionsErrorResponseType = "internal"
+	NotImplementedListPolicyRevisionsErrorResponse   ListPolicyRevisionsErrorResponseType = "not_implemented"
+	ReqInvalidListPolicyRevisionsErrorResponse       ListPolicyRevisionsErrorResponseType = "req.invalid"
+	UnavailableListPolicyRevisionsErrorResponse      ListPolicyRevisionsErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether ListPolicyRevisionsErrorResponse is AuthUnauthorized.
+func (s ListPolicyRevisionsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListPolicyRevisionsErrorResponse
+}
+
+// IsInternal reports whether ListPolicyRevisionsErrorResponse is Internal.
+func (s ListPolicyRevisionsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListPolicyRevisionsErrorResponse
+}
+
+// IsNotImplemented reports whether ListPolicyRevisionsErrorResponse is NotImplemented.
+func (s ListPolicyRevisionsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListPolicyRevisionsErrorResponse
+}
+
+// IsReqInvalid reports whether ListPolicyRevisionsErrorResponse is ReqInvalid.
+func (s ListPolicyRevisionsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListPolicyRevisionsErrorResponse
+}
+
+// IsUnavailable reports whether ListPolicyRevisionsErrorResponse is Unavailable.
+func (s ListPolicyRevisionsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListPolicyRevisionsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListPolicyRevisionsErrorResponse to AuthUnauthorized.
+func (s *ListPolicyRevisionsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListPolicyRevisionsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListPolicyRevisionsErrorResponse is AuthUnauthorized.
+func (s ListPolicyRevisionsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListPolicyRevisionsErrorResponse(v AuthUnauthorized) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListPolicyRevisionsErrorResponse to Internal.
+func (s *ListPolicyRevisionsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListPolicyRevisionsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListPolicyRevisionsErrorResponse is Internal.
+func (s ListPolicyRevisionsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from Internal.
+func NewInternalListPolicyRevisionsErrorResponse(v Internal) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets ListPolicyRevisionsErrorResponse to NotImplemented.
+func (s *ListPolicyRevisionsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListPolicyRevisionsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListPolicyRevisionsErrorResponse is NotImplemented.
+func (s ListPolicyRevisionsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from NotImplemented.
+func NewNotImplementedListPolicyRevisionsErrorResponse(v NotImplemented) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets ListPolicyRevisionsErrorResponse to ReqInvalid.
+func (s *ListPolicyRevisionsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListPolicyRevisionsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListPolicyRevisionsErrorResponse is ReqInvalid.
+func (s ListPolicyRevisionsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from ReqInvalid.
+func NewReqInvalidListPolicyRevisionsErrorResponse(v ReqInvalid) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListPolicyRevisionsErrorResponse to Unavailable.
+func (s *ListPolicyRevisionsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListPolicyRevisionsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListPolicyRevisionsErrorResponse is Unavailable.
+func (s ListPolicyRevisionsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from Unavailable.
+func NewUnavailableListPolicyRevisionsErrorResponse(v Unavailable) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// ListPolicyRevisionsErrorResponseStatusCode wraps ListPolicyRevisionsErrorResponse with StatusCode.
+type ListPolicyRevisionsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListPolicyRevisionsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListPolicyRevisionsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListPolicyRevisionsErrorResponseStatusCode) GetResponse() ListPolicyRevisionsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListPolicyRevisionsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListPolicyRevisionsErrorResponseStatusCode) SetResponse(val ListPolicyRevisionsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListPolicyRevisionsErrorResponseStatusCode) listPolicyRevisionsRes() {}
+
+// Paginated list of the revisions of one policy, newest first.
+// Ref: #
+type ListPolicyRevisionsResponse struct {
+	Revisions []Policy `json:"revisions"`
+	// Token to pass as `page_token` in the next request to fetch the following
+	// page. Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetRevisions returns the value of Revisions.
+func (s *ListPolicyRevisionsResponse) GetRevisions() []Policy {
+	return s.Revisions
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListPolicyRevisionsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetRevisions sets the value of Revisions.
+func (s *ListPolicyRevisionsResponse) SetRevisions(val []Policy) {
+	s.Revisions = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListPolicyRevisionsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListPolicyRevisionsResponse) listPolicyRevisionsRes() {}
 
 // ListPreviewsErrorResponse represents sum type.
 type ListPreviewsErrorResponse struct {
@@ -58163,6 +58764,52 @@ func (o OptPolicyCreatedEventDelegationType) Or(d PolicyCreatedEventDelegationTy
 	return d
 }
 
+// NewOptPolicyOperation returns new OptPolicyOperation with value set to v.
+func NewOptPolicyOperation(v PolicyOperation) OptPolicyOperation {
+	return OptPolicyOperation{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPolicyOperation is optional PolicyOperation.
+type OptPolicyOperation struct {
+	Value PolicyOperation
+	Set   bool
+}
+
+// IsSet returns true if OptPolicyOperation was set.
+func (o OptPolicyOperation) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPolicyOperation) Reset() {
+	var v PolicyOperation
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPolicyOperation) SetTo(v PolicyOperation) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPolicyOperation) Get() (v PolicyOperation, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPolicyOperation) Or(d PolicyOperation) PolicyOperation {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptPolicyUpdatedEventDelegationType returns new OptPolicyUpdatedEventDelegationType with value set to v.
 func NewOptPolicyUpdatedEventDelegationType(v PolicyUpdatedEventDelegationType) OptPolicyUpdatedEventDelegationType {
 	return OptPolicyUpdatedEventDelegationType{
@@ -65436,6 +66083,239 @@ func (s *PasswordProof) SetPassword(val string) {
 	s.Password = val
 }
 
+// The settings of an `auth.factor.password.set` policy. Every setting is
+// optional; a setting left out switches its rule off, and `{}` switches every
+// rule off. There are no defaults. The bounds are technical limits, not
+// recommendations; the server's template checks the same bounds.
+// Ref: #
+type PasswordSetConfig struct {
+	// The fewest Unicode code points a new password may have, counted after
+	// NFC normalization. At most `max_length` when both are set.
+	MinLength OptInt `json:"min_length"`
+	// The most Unicode code points a new password may have. A password above
+	// 64 code points is refused whether or not this is set.
+	MaxLength OptInt `json:"max_length"`
+	// How many of the user's passwords a new one may not repeat, the current
+	// one included. Checked only when users set their own password.
+	HistoryDepth OptInt `json:"history_depth"`
+}
+
+// GetMinLength returns the value of MinLength.
+func (s *PasswordSetConfig) GetMinLength() OptInt {
+	return s.MinLength
+}
+
+// GetMaxLength returns the value of MaxLength.
+func (s *PasswordSetConfig) GetMaxLength() OptInt {
+	return s.MaxLength
+}
+
+// GetHistoryDepth returns the value of HistoryDepth.
+func (s *PasswordSetConfig) GetHistoryDepth() OptInt {
+	return s.HistoryDepth
+}
+
+// SetMinLength sets the value of MinLength.
+func (s *PasswordSetConfig) SetMinLength(val OptInt) {
+	s.MinLength = val
+}
+
+// SetMaxLength sets the value of MaxLength.
+func (s *PasswordSetConfig) SetMaxLength(val OptInt) {
+	s.MaxLength = val
+}
+
+// SetHistoryDepth sets the value of HistoryDepth.
+func (s *PasswordSetConfig) SetHistoryDepth(val OptInt) {
+	s.HistoryDepth = val
+}
+
+// One revision of a project's `auth.factor.password.set` policy (ADR 066).
+// `id` is shared by every revision of the operation's policy; `revision_id`
+// names this revision.
+// Ref: #
+type PasswordSetPolicy struct {
+	ID         PolicyID         `json:"id"`
+	RevisionID PolicyRevisionID `json:"revision_id"`
+	// The project the policy belongs to.
+	ProjectID ProjectID `json:"project_id"`
+	// The operation the policy guards.
+	Operation PasswordSetPolicyOperation `json:"operation"`
+	Config    PasswordSetConfig          `json:"config"`
+	// When the operation's policy was first published.
+	CreatedAt time.Time `json:"created_at"`
+	// When this revision was published.
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// GetID returns the value of ID.
+func (s *PasswordSetPolicy) GetID() PolicyID {
+	return s.ID
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *PasswordSetPolicy) GetRevisionID() PolicyRevisionID {
+	return s.RevisionID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *PasswordSetPolicy) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetOperation returns the value of Operation.
+func (s *PasswordSetPolicy) GetOperation() PasswordSetPolicyOperation {
+	return s.Operation
+}
+
+// GetConfig returns the value of Config.
+func (s *PasswordSetPolicy) GetConfig() PasswordSetConfig {
+	return s.Config
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *PasswordSetPolicy) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *PasswordSetPolicy) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *PasswordSetPolicy) SetID(val PolicyID) {
+	s.ID = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *PasswordSetPolicy) SetRevisionID(val PolicyRevisionID) {
+	s.RevisionID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *PasswordSetPolicy) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *PasswordSetPolicy) SetOperation(val PasswordSetPolicyOperation) {
+	s.Operation = val
+}
+
+// SetConfig sets the value of Config.
+func (s *PasswordSetPolicy) SetConfig(val PasswordSetConfig) {
+	s.Config = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *PasswordSetPolicy) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *PasswordSetPolicy) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// A publish of the password policy, checked before a password is set.
+// Ref: #
+type PasswordSetPolicyInput struct {
+	// The operation the policy guards.
+	Operation PasswordSetPolicyInputOperation `json:"operation"`
+	Config    PasswordSetConfig               `json:"config"`
+}
+
+// GetOperation returns the value of Operation.
+func (s *PasswordSetPolicyInput) GetOperation() PasswordSetPolicyInputOperation {
+	return s.Operation
+}
+
+// GetConfig returns the value of Config.
+func (s *PasswordSetPolicyInput) GetConfig() PasswordSetConfig {
+	return s.Config
+}
+
+// SetOperation sets the value of Operation.
+func (s *PasswordSetPolicyInput) SetOperation(val PasswordSetPolicyInputOperation) {
+	s.Operation = val
+}
+
+// SetConfig sets the value of Config.
+func (s *PasswordSetPolicyInput) SetConfig(val PasswordSetConfig) {
+	s.Config = val
+}
+
+// The operation the policy guards.
+type PasswordSetPolicyInputOperation string
+
+const (
+	PasswordSetPolicyInputOperationAuthFactorPasswordSet PasswordSetPolicyInputOperation = "auth.factor.password.set"
+)
+
+// AllValues returns all PasswordSetPolicyInputOperation values.
+func (PasswordSetPolicyInputOperation) AllValues() []PasswordSetPolicyInputOperation {
+	return []PasswordSetPolicyInputOperation{
+		PasswordSetPolicyInputOperationAuthFactorPasswordSet,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PasswordSetPolicyInputOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case PasswordSetPolicyInputOperationAuthFactorPasswordSet:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PasswordSetPolicyInputOperation) UnmarshalText(data []byte) error {
+	switch PasswordSetPolicyInputOperation(data) {
+	case PasswordSetPolicyInputOperationAuthFactorPasswordSet:
+		*s = PasswordSetPolicyInputOperationAuthFactorPasswordSet
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The operation the policy guards.
+type PasswordSetPolicyOperation string
+
+const (
+	PasswordSetPolicyOperationAuthFactorPasswordSet PasswordSetPolicyOperation = "auth.factor.password.set"
+)
+
+// AllValues returns all PasswordSetPolicyOperation values.
+func (PasswordSetPolicyOperation) AllValues() []PasswordSetPolicyOperation {
+	return []PasswordSetPolicyOperation{
+		PasswordSetPolicyOperationAuthFactorPasswordSet,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PasswordSetPolicyOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case PasswordSetPolicyOperationAuthFactorPasswordSet:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PasswordSetPolicyOperation) UnmarshalText(data []byte) error {
+	switch PasswordSetPolicyOperation(data) {
+	case PasswordSetPolicyOperationAuthFactorPasswordSet:
+		*s = PasswordSetPolicyOperationAuthFactorPasswordSet
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type PatchMyUserBadRequest ErrorDetails
 
 func (*PatchMyUserBadRequest) patchMyUserRes() {}
@@ -66952,109 +67832,51 @@ func (s *PolRevisionConflictDetails) init() PolRevisionConflictDetails {
 	return m
 }
 
-// One revision of a project's policy for an operation (ADR 066). `id` is
-// shared by every revision of the operation's policy; `revision_id` names this
-// revision.
+// One revision of a project's policy for an operation (ADR 066), typed by
+// `operation`. `id` is shared by every revision of the operation's policy;
+// `revision_id` names this revision.
 // Ref: #
+// Policy represents sum type.
 type Policy struct {
-	ID         PolicyID         `json:"id"`
-	RevisionID PolicyRevisionID `json:"revision_id"`
-	// The project the policy belongs to.
-	ProjectID ProjectID `json:"project_id"`
-	// The operation the policy guards.
-	Operation string `json:"operation"`
-	// The settings this revision publishes.
-	Config PolicyConfig `json:"config"`
-	// When the operation's policy was first published.
-	CreatedAt time.Time `json:"created_at"`
-	// When this revision was published.
-	UpdatedAt time.Time `json:"updated_at"`
+	Type              PolicyType // switch on this field
+	PasswordSetPolicy PasswordSetPolicy
 }
 
-// GetID returns the value of ID.
-func (s *Policy) GetID() PolicyID {
-	return s.ID
+// PolicyType is oneOf type of Policy.
+type PolicyType string
+
+// Possible values for PolicyType.
+const (
+	PasswordSetPolicyPolicy PolicyType = "auth.factor.password.set"
+)
+
+// IsPasswordSetPolicy reports whether Policy is PasswordSetPolicy.
+func (s Policy) IsPasswordSetPolicy() bool { return s.Type == PasswordSetPolicyPolicy }
+
+// SetPasswordSetPolicy sets Policy to PasswordSetPolicy.
+func (s *Policy) SetPasswordSetPolicy(v PasswordSetPolicy) {
+	s.Type = PasswordSetPolicyPolicy
+	s.PasswordSetPolicy = v
 }
 
-// GetRevisionID returns the value of RevisionID.
-func (s *Policy) GetRevisionID() PolicyRevisionID {
-	return s.RevisionID
+// GetPasswordSetPolicy returns PasswordSetPolicy and true boolean if Policy is PasswordSetPolicy.
+func (s Policy) GetPasswordSetPolicy() (v PasswordSetPolicy, ok bool) {
+	if !s.IsPasswordSetPolicy() {
+		return v, false
+	}
+	return s.PasswordSetPolicy, true
 }
 
-// GetProjectID returns the value of ProjectID.
-func (s *Policy) GetProjectID() ProjectID {
-	return s.ProjectID
+// NewPasswordSetPolicyPolicy returns new Policy from PasswordSetPolicy.
+func NewPasswordSetPolicyPolicy(v PasswordSetPolicy) Policy {
+	var s Policy
+	s.SetPasswordSetPolicy(v)
+	return s
 }
 
-// GetOperation returns the value of Operation.
-func (s *Policy) GetOperation() string {
-	return s.Operation
-}
-
-// GetConfig returns the value of Config.
-func (s *Policy) GetConfig() PolicyConfig {
-	return s.Config
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *Policy) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetUpdatedAt returns the value of UpdatedAt.
-func (s *Policy) GetUpdatedAt() time.Time {
-	return s.UpdatedAt
-}
-
-// SetID sets the value of ID.
-func (s *Policy) SetID(val PolicyID) {
-	s.ID = val
-}
-
-// SetRevisionID sets the value of RevisionID.
-func (s *Policy) SetRevisionID(val PolicyRevisionID) {
-	s.RevisionID = val
-}
-
-// SetProjectID sets the value of ProjectID.
-func (s *Policy) SetProjectID(val ProjectID) {
-	s.ProjectID = val
-}
-
-// SetOperation sets the value of Operation.
-func (s *Policy) SetOperation(val string) {
-	s.Operation = val
-}
-
-// SetConfig sets the value of Config.
-func (s *Policy) SetConfig(val PolicyConfig) {
-	s.Config = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *Policy) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetUpdatedAt sets the value of UpdatedAt.
-func (s *Policy) SetUpdatedAt(val time.Time) {
-	s.UpdatedAt = val
-}
-
+func (*Policy) getPolicyRes()         {}
 func (*Policy) getPolicyRevisionRes() {}
 func (*Policy) publishPolicyRes()     {}
-
-// The settings this revision publishes.
-type PolicyConfig map[string]jx.Raw
-
-func (s *PolicyConfig) init() PolicyConfig {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
 
 // PolicyCreated2XX is 2XX pattern response for PolicyCreated operation.
 type PolicyCreated2XX struct {
@@ -67536,6 +68358,42 @@ func (s *PolicyCreatedEventDelegationType) UnmarshalText(data []byte) error {
 }
 
 type PolicyID string
+
+// An operation a policy can guard; the policy catalog lists them.
+// Ref: #
+type PolicyOperation string
+
+const (
+	PolicyOperationAuthFactorPasswordSet PolicyOperation = "auth.factor.password.set"
+)
+
+// AllValues returns all PolicyOperation values.
+func (PolicyOperation) AllValues() []PolicyOperation {
+	return []PolicyOperation{
+		PolicyOperationAuthFactorPasswordSet,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyOperationAuthFactorPasswordSet:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyOperation) UnmarshalText(data []byte) error {
+	switch PolicyOperation(data) {
+	case PolicyOperationAuthFactorPasswordSet:
+		*s = PolicyOperationAuthFactorPasswordSet
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Allowlisted fields for `policy.created` (the first publish of an
 // operation's policy) and `policy.updated` (every later publish). The policy id
@@ -70620,48 +71478,49 @@ func (s *PublishPolicyErrorResponseStatusCode) SetResponse(val PublishPolicyErro
 
 func (*PublishPolicyErrorResponseStatusCode) publishPolicyRes() {}
 
-// One publish of the project's policy for an operation. `config` sets the
-// operation template's settings; a setting left out is off, and `{}` switches
-// every rule off. The settings each operation accepts are listed in the policy
-// catalog.
+// One publish of the project's policy for an operation. `operation` selects
+// the operation's template, and `config` sets that template's settings; a
+// setting left out is off, and `{}` switches every rule off. The settings each
+// operation accepts are listed in the policy catalog.
 // Ref: #
+// PublishPolicyRequest represents sum type.
 type PublishPolicyRequest struct {
-	// The operation the policy guards.
-	Operation string `json:"operation"`
-	// The settings, checked against the operation's template.
-	Config PublishPolicyRequestConfig `json:"config"`
+	Type                   PublishPolicyRequestType // switch on this field
+	PasswordSetPolicyInput PasswordSetPolicyInput
 }
 
-// GetOperation returns the value of Operation.
-func (s *PublishPolicyRequest) GetOperation() string {
-	return s.Operation
+// PublishPolicyRequestType is oneOf type of PublishPolicyRequest.
+type PublishPolicyRequestType string
+
+// Possible values for PublishPolicyRequestType.
+const (
+	PasswordSetPolicyInputPublishPolicyRequest PublishPolicyRequestType = "auth.factor.password.set"
+)
+
+// IsPasswordSetPolicyInput reports whether PublishPolicyRequest is PasswordSetPolicyInput.
+func (s PublishPolicyRequest) IsPasswordSetPolicyInput() bool {
+	return s.Type == PasswordSetPolicyInputPublishPolicyRequest
 }
 
-// GetConfig returns the value of Config.
-func (s *PublishPolicyRequest) GetConfig() PublishPolicyRequestConfig {
-	return s.Config
+// SetPasswordSetPolicyInput sets PublishPolicyRequest to PasswordSetPolicyInput.
+func (s *PublishPolicyRequest) SetPasswordSetPolicyInput(v PasswordSetPolicyInput) {
+	s.Type = PasswordSetPolicyInputPublishPolicyRequest
+	s.PasswordSetPolicyInput = v
 }
 
-// SetOperation sets the value of Operation.
-func (s *PublishPolicyRequest) SetOperation(val string) {
-	s.Operation = val
-}
-
-// SetConfig sets the value of Config.
-func (s *PublishPolicyRequest) SetConfig(val PublishPolicyRequestConfig) {
-	s.Config = val
-}
-
-// The settings, checked against the operation's template.
-type PublishPolicyRequestConfig map[string]jx.Raw
-
-func (s *PublishPolicyRequestConfig) init() PublishPolicyRequestConfig {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
+// GetPasswordSetPolicyInput returns PasswordSetPolicyInput and true boolean if PublishPolicyRequest is PasswordSetPolicyInput.
+func (s PublishPolicyRequest) GetPasswordSetPolicyInput() (v PasswordSetPolicyInput, ok bool) {
+	if !s.IsPasswordSetPolicyInput() {
+		return v, false
 	}
-	return m
+	return s.PasswordSetPolicyInput, true
+}
+
+// NewPasswordSetPolicyInputPublishPolicyRequest returns new PublishPolicyRequest from PasswordSetPolicyInput.
+func NewPasswordSetPolicyInputPublishPolicyRequest(v PasswordSetPolicyInput) PublishPolicyRequest {
+	var s PublishPolicyRequest
+	s.SetPasswordSetPolicyInput(v)
+	return s
 }
 
 type QueryGrantsBadRequest ErrorDetails

@@ -1,0 +1,18 @@
+type: object
+description: |
+  Paginated list of the project's policies, one per operation, each as its
+  newest revision.
+required:
+  - policies
+properties:
+  policies:
+    type: array
+    items:
+      $ref: policy.yaml
+  next_page_token:
+    description: |
+      Token to pass as `page_token` in the next request to fetch the following
+      page. Absent when there are no more results.
+    oneOf:
+      - $ref: ../../components/schemas/page-token.yaml
+      - type: 'null'
