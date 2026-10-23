@@ -80,14 +80,16 @@ export const RESOURCE_TABLE_WRAP =
  */
 export const RESOURCE_TABLE_SCROLL = "group/scroll";
 
-("bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-aria-expanded:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]");
-
 /**
- * The leading column, pinned to the card's left edge. Its 1px divider shows
- * only while a column is scrolled under it.
+ * The leading column, pinned to the card's left edge from 640px. Its 1px
+ * divider shows only while a column is scrolled under it.
+ *
+ * Below 640px it scrolls with the rest: a phone's card is about 300px wide,
+ * and a pinned identity column (up to 280px) beside the pinned menu would
+ * leave no room for any column between them.
  */
 export const RESOURCE_STICKY_START =
-  "sticky left-0 z-10 bg-card group-data-[scroll-start]/scroll:shadow-[inset_-1px_0_0_var(--color-border)]";
+  "sm:sticky sm:left-0 sm:z-10 bg-card sm:group-data-[scroll-start]/scroll:shadow-[inset_-1px_0_0_var(--color-border)]";
 
 /**
  * The trailing column (the row menu), pinned to the card's right edge so the

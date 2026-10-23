@@ -176,8 +176,9 @@ Two things are deliberately **not** shared, because the designs genuinely differ
   to share. It shows each value once (D20) and bounds its width (D21): the
   unpinned attributes share one 280px Attributes column, and the ID column
   absorbs the slack and truncates, so the default columns fit 1024px. Pinning
-  enough columns scrolls the table under its sticky User and row-menu columns
-  (`RESOURCE_STICKY_START` / `RESOURCE_STICKY_END` with `useScrollEdges`).
+  enough columns scrolls the table under its sticky row-menu column, and from
+  640px its sticky User column (`RESOURCE_STICKY_END` / `RESOURCE_STICKY_START`
+  with `useScrollEdges`).
 - **The header block above the table.** Each frame places its own toolbar, so
   the table's top margin stays with the screen.
 

@@ -179,16 +179,16 @@ function UsersScreen() {
         Users
       </ResourceTitle>
 
-      {/* The pinned columns give the table no fixed width. The ID gives way
-          first; more pinned columns than fit scroll the table horizontally
-          rather than compressing cells. The User column and
-          the row menu stay pinned to the card's edges while the rest scrolls
-          under them, so the menu is reachable at any width. */}
       {pickable.length > 0 && (
         <div className={`${RESOURCE_TABLE_TOP} flex justify-end`}>
           <ColumnsMenu groups={pickable} pins={pins} onToggle={togglePin} />
         </div>
       )}
+      {/* The pinned columns give the table no fixed width. The ID gives way
+          first; more pinned columns than fit scroll the table horizontally
+          rather than compressing cells. The row menu (and from 640px the User
+          column) stays pinned to the card's edge while the rest scrolls under
+          it, so the menu is reachable at any width. */}
       <div
         ref={scroll.ref}
         data-scroll-start={scroll.edges.start || undefined}
