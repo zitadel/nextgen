@@ -26,6 +26,10 @@ import { cn } from "@/lib/utils";
 /** The User and schema-driven cells clamp at 280px and truncate. */
 export const USER_CLAMP = "max-w-70";
 
+// The identifier's property beside it: a label, so smaller and quieter than
+// the value it names (`InlineCode` alone is the 12/16 prose size).
+const IDENTIFIER_CHIP = "text-muted-foreground shrink-0 px-1 py-0 text-[10px] leading-3.5";
+
 // The row's copy button rests hidden and shows on the row's hover or its own
 // focus, so a keyboard reaches it; where there is no hover it always shows.
 // The row needs the `group` class for the hover.
@@ -57,7 +61,7 @@ export function UserIdentityCell({
   card?: IdentityCardContext;
 }) {
   const chip = user.identifierProperty && (
-    <InlineCode className="text-muted-foreground shrink-0">{user.identifierProperty}</InlineCode>
+    <InlineCode className={IDENTIFIER_CHIP}>{user.identifierProperty}</InlineCode>
   );
   // No display name: the identifier is the link text itself.
   const chipOnName =
@@ -136,7 +140,7 @@ function UserIdentityCard({ user, context }: { user: UserRow; context: IdentityC
           {user.identifier ? (
             <>
               {user.identifierProperty && (
-                <InlineCode className="text-muted-foreground shrink-0">
+                <InlineCode className={IDENTIFIER_CHIP}>
                   {user.identifierProperty}
                 </InlineCode>
               )}
