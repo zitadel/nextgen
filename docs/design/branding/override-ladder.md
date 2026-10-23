@@ -34,7 +34,7 @@ Custom properties inherit across shadow boundaries, so these reach the atoms' in
 
 Use `::part()` to restyle internals of a named atom without forking it. Two scopes:
 
-**Through the orchestrator** — the page embedding `<zitadel-login>` addresses atom internals as `<atom>-<part>`: the atom's tag minus `zl-`, a hyphen, the part name. The orchestrator stamps the forwarding (`exportparts`, derived from the manifest registry in `packages/components/src/orchestrator/exportparts.ts`) on every atom it renders — template-rendered and gate-patched alike — so the mapping holds for tenant templates too. Templates cannot author their own forwarding; the sanitiser strips `exportparts`.
+**Through the orchestrator** — the page embedding `<zitadel-login>` or `<zitadel-session>` addresses atom internals as `<atom>-<part>`: the atom's tag minus `zl-`, a hyphen, the part name. Every orchestrator stamps the forwarding (`exportparts`, derived from the manifest registry in `packages/components/src/orchestrator/exportparts.ts`) on every atom it renders — template-rendered and gate-patched alike — so the mapping holds for tenant templates too. `<zitadel-logout>` renders no atom with parts, so it has none. Templates cannot author their own forwarding; the sanitiser strips `exportparts`.
 
 ```css
 zitadel-login::part(field-input) {
@@ -50,7 +50,7 @@ The orchestrator additionally exposes its own chrome parts directly: `form`, `pa
 
 **Directly composed atoms** — a page using atoms without the orchestrator addresses bare part names: `zl-field::part(input)`.
 
-Each atom's manifest is the canonical part catalogue ([`validator.md`](validator.md)). Part names and the `<atom>-<part>` forwarding rule are public contract and follow the same stability rules as token names.
+Each atom's manifest is the canonical part catalogue ([`validator.md`](validator.md)); `custom-elements.json` publishes it as each element's `cssParts`, bare on atoms and forwarded on orchestrators. Part names and the `<atom>-<part>` forwarding rule are public contract and follow the same stability rules as token names.
 
 ## Tier 3: Named slots
 
