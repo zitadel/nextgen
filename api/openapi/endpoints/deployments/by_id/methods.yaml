@@ -13,6 +13,7 @@ get:
   security:
     - oauth2:
         - deployment.read
+    - nextgenSession: []
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/deployment-id.yaml

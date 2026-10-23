@@ -26,6 +26,7 @@ post:
   security:
     - oauth2:
         - release.write
+    - nextgenSession: []
   parameters:
     - $ref: ../../../../components/parameters/project-id.yaml
     - $ref: ../../../../components/parameters/release-id.yaml

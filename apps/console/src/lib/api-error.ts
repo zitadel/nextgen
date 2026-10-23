@@ -61,3 +61,16 @@ export async function nullOnForbidden<T>(read: Promise<T>): Promise<T | null> {
     throw cause;
   }
 }
+
+/**
+ * The API's error code of a failed request (ADR 030 `code`), or nothing when
+ * the failure carried no payload. For the one case a screen answers
+ * differently by code, such as a refusal with its own dialog.
+ */
+export function errorCode(cause: unknown): string | undefined {
+  if (!(cause instanceof ApiError)) return undefined;
+  const body = cause.body;
+  if (!body || typeof body !== "object") return undefined;
+  const code = (body as Record<string, unknown>).code;
+  return typeof code === "string" ? code : undefined;
+}

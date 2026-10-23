@@ -52,7 +52,7 @@ export interface AuthenticationSearch {
 
 export const Route = createFileRoute("/_authed/authentication/")({
   // Order 7: after Branding, as the design's single-level sidebar places it.
-  staticData: { scope: "project", nav: { label: "Authentication", order: 7, icon: Shield } },
+  staticData: { scope: "project", nav: { label: "Authentication", order: 8, icon: Shield } },
   validateSearch: (search: Record<string, unknown>): AuthenticationSearch =>
     search.tab === "identity-providers" ? { tab: "identity-providers" } : {},
   loaderDeps: projectScopeDeps,

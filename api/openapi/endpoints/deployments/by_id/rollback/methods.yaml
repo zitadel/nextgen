@@ -24,6 +24,7 @@ post:
   security:
     - oauth2:
         - deployment.write
+    - nextgenSession: []
   requestBody:
     required: false
     content:
