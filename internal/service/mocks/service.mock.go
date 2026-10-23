@@ -3250,18 +3250,18 @@ func (c *MockAllStatementsGetPersonalTeamForUserCall) DoAndReturn(f func(context
 }
 
 // GetPolicy mocks base method.
-func (m *MockAllStatements) GetPolicy(ctx context.Context, projectID, operation string) (*domain.Policy, error) {
+func (m *MockAllStatements) GetPolicy(ctx context.Context, filter database.Filter[domain.PolicyField]) (*domain.Policy, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPolicy", ctx, projectID, operation)
+	ret := m.ctrl.Call(m, "GetPolicy", ctx, filter)
 	ret0, _ := ret[0].(*domain.Policy)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetPolicy indicates an expected call of GetPolicy.
-func (mr *MockAllStatementsMockRecorder) GetPolicy(ctx, projectID, operation any) *MockAllStatementsGetPolicyCall {
+func (mr *MockAllStatementsMockRecorder) GetPolicy(ctx, filter any) *MockAllStatementsGetPolicyCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPolicy", reflect.TypeOf((*MockAllStatements)(nil).GetPolicy), ctx, projectID, operation)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPolicy", reflect.TypeOf((*MockAllStatements)(nil).GetPolicy), ctx, filter)
 	return &MockAllStatementsGetPolicyCall{Call: call}
 }
 
@@ -3277,13 +3277,13 @@ func (c *MockAllStatementsGetPolicyCall) Return(arg0 *domain.Policy, arg1 error)
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetPolicyCall) Do(f func(context.Context, string, string) (*domain.Policy, error)) *MockAllStatementsGetPolicyCall {
+func (c *MockAllStatementsGetPolicyCall) Do(f func(context.Context, database.Filter[domain.PolicyField]) (*domain.Policy, error)) *MockAllStatementsGetPolicyCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetPolicyCall) DoAndReturn(f func(context.Context, string, string) (*domain.Policy, error)) *MockAllStatementsGetPolicyCall {
+func (c *MockAllStatementsGetPolicyCall) DoAndReturn(f func(context.Context, database.Filter[domain.PolicyField]) (*domain.Policy, error)) *MockAllStatementsGetPolicyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -5233,6 +5233,84 @@ func (c *MockAllStatementsListOriginsCall) Do(f func(context.Context, *database.
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsListOriginsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.OriginField]) (*database.ListResult[*domain.Origin], error)) *MockAllStatementsListOriginsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListPolicies mocks base method.
+func (m *MockAllStatements) ListPolicies(ctx context.Context, opts *database.ListOptions[domain.PolicyField]) (*database.ListResult[*domain.Policy], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPolicies", ctx, opts)
+	ret0, _ := ret[0].(*database.ListResult[*domain.Policy])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPolicies indicates an expected call of ListPolicies.
+func (mr *MockAllStatementsMockRecorder) ListPolicies(ctx, opts any) *MockAllStatementsListPoliciesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPolicies", reflect.TypeOf((*MockAllStatements)(nil).ListPolicies), ctx, opts)
+	return &MockAllStatementsListPoliciesCall{Call: call}
+}
+
+// MockAllStatementsListPoliciesCall wrap *gomock.Call
+type MockAllStatementsListPoliciesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListPoliciesCall) Return(arg0 *database.ListResult[*domain.Policy], arg1 error) *MockAllStatementsListPoliciesCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListPoliciesCall) Do(f func(context.Context, *database.ListOptions[domain.PolicyField]) (*database.ListResult[*domain.Policy], error)) *MockAllStatementsListPoliciesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListPoliciesCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.PolicyField]) (*database.ListResult[*domain.Policy], error)) *MockAllStatementsListPoliciesCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListPolicyRevisions mocks base method.
+func (m *MockAllStatements) ListPolicyRevisions(ctx context.Context, projectID, policyID string, page database.Page[domain.PolicyField]) (*database.ListResult[*domain.Policy], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPolicyRevisions", ctx, projectID, policyID, page)
+	ret0, _ := ret[0].(*database.ListResult[*domain.Policy])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPolicyRevisions indicates an expected call of ListPolicyRevisions.
+func (mr *MockAllStatementsMockRecorder) ListPolicyRevisions(ctx, projectID, policyID, page any) *MockAllStatementsListPolicyRevisionsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPolicyRevisions", reflect.TypeOf((*MockAllStatements)(nil).ListPolicyRevisions), ctx, projectID, policyID, page)
+	return &MockAllStatementsListPolicyRevisionsCall{Call: call}
+}
+
+// MockAllStatementsListPolicyRevisionsCall wrap *gomock.Call
+type MockAllStatementsListPolicyRevisionsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListPolicyRevisionsCall) Return(arg0 *database.ListResult[*domain.Policy], arg1 error) *MockAllStatementsListPolicyRevisionsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListPolicyRevisionsCall) Do(f func(context.Context, string, string, database.Page[domain.PolicyField]) (*database.ListResult[*domain.Policy], error)) *MockAllStatementsListPolicyRevisionsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListPolicyRevisionsCall) DoAndReturn(f func(context.Context, string, string, database.Page[domain.PolicyField]) (*database.ListResult[*domain.Policy], error)) *MockAllStatementsListPolicyRevisionsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

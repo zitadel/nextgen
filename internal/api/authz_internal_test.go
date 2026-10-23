@@ -857,6 +857,33 @@ func TestRequireResourceAccessAmong(t *testing.T) {
 	assertDomainCode(t, err, domain.ErrJSONSchemaNotFound().Code)
 }
 
+// A route scoped to the project the caller names answers its not-found when
+// the id lives in another project, also for a project secret, whose lookup
+// stays in its own project whatever the hint says.
+func TestRequireResourceAccessHonoursTheNamedProject(t *testing.T) {
+	stmts := stubAuthzStmts{
+		scopes: map[string]string{"pol_a": "proj_a"},
+		kinds:  map[string]domain.ResourceKind{"pol_a": domain.ResourceKindPolicy},
+	}
+	operator := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+
+	projectID, err := requireResourceAccess(operator, stmts, "proj_a", "pol_a", policyAccess, opRead)
+	if err != nil {
+		t.Fatalf("own project: %v", err)
+	}
+	if projectID != "proj_a" {
+		t.Fatalf("projectID = %q, want proj_a", projectID)
+	}
+
+	for _, named := range []string{"proj_b", "proj_unknown"} {
+		_, err = requireResourceAccess(operator, stmts, named, "pol_a", policyAccess, opRead)
+		assertDomainCode(t, err, domain.ErrPolicyNotFound().Code)
+	}
+}
+
 func TestRequireResourceAccessWrongKind(t *testing.T) {
 	stmts := stubAuthzStmts{
 		scopes: map[string]string{"id_shared": "proj_a"},

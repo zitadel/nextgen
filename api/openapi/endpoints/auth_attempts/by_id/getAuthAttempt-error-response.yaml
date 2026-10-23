@@ -7,14 +7,18 @@ content:
         - $ref: '../../../components/schemas/errors/att-not_found.yaml'
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
+        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
           att.not_found: '../../../components/schemas/errors/att-not_found.yaml'
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
+          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
+          unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
       att.not_found:
         summary: att.not_found
@@ -31,8 +35,18 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
       req.invalid:
         summary: req.invalid
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'
