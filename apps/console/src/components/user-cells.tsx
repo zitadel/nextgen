@@ -1,9 +1,14 @@
 import { Link } from "@tanstack/react-router";
 
-import { RESOURCE_CELL } from "@/components/resource-list";
+import {
+  RESOURCE_CELL,
+  RESOURCE_STICKY_BODY,
+  RESOURCE_STICKY_START,
+} from "@/components/resource-list";
 import { TableCell } from "@/components/ui/table";
 import { CopyButton } from "@/components/ui/copy-button";
 import type { UserRow } from "@/lib/user-list";
+import { cn } from "@/lib/utils";
 
 /** The User and schema-driven cells clamp at 280px and truncate. */
 export const USER_CLAMP = "max-w-70";
@@ -21,10 +26,21 @@ const ROW_COPY =
  * property it came from. Schema-driven columns cannot promise a meaningful
  * leading value; this cell always can, so a mixed-schema list still reads the
  * identifier down one column.
+ *
+ * `sticky` pins it to the card's left edge while the other columns scroll
+ * under it (the Users list); the header cell over it takes
+ * `RESOURCE_STICKY_START` too.
  */
-export function UserIdentityCell({ user }: { user: UserRow }) {
+export function UserIdentityCell({ user, sticky = false }: { user: UserRow; sticky?: boolean }) {
   return (
-    <TableCell className={`${RESOURCE_CELL} ${USER_CLAMP} text-sm`}>
+    <TableCell
+      className={cn(
+        RESOURCE_CELL,
+        USER_CLAMP,
+        "text-sm",
+        sticky && [RESOURCE_STICKY_START, RESOURCE_STICKY_BODY],
+      )}
+    >
       <Link
         to="/users/$userId"
         params={{ userId: user.id }}

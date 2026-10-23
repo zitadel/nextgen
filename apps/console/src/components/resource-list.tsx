@@ -73,6 +73,39 @@ export function ResourceTitle({ children, action }: { children: ReactNode; actio
 export const RESOURCE_TABLE_WRAP =
   "border-sidebar-border bg-card overflow-x-auto rounded-md border";
 
+/**
+ * The card of a table whose leading and trailing columns stay put while the
+ * rest scrolls under them. It is the `scroll` group the sticky cells read
+ * `data-scroll-start` / `data-scroll-end` from (`useScrollEdges`).
+ */
+export const RESOURCE_TABLE_SCROLL = "group/scroll";
+
+("bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-aria-expanded:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]");
+
+/**
+ * The leading column, pinned to the card's left edge. Its 1px divider shows
+ * only while a column is scrolled under it.
+ */
+export const RESOURCE_STICKY_START =
+  "sticky left-0 z-10 bg-card group-data-[scroll-start]/scroll:shadow-[inset_-1px_0_0_var(--color-border)]";
+
+/**
+ * The trailing column (the row menu), pinned to the card's right edge so the
+ * menu is reachable at any width. Its divider shows while columns run on
+ * under it.
+ */
+export const RESOURCE_STICKY_END =
+  "sticky right-0 z-10 bg-card group-data-[scroll-end]/scroll:shadow-[inset_1px_0_0_var(--color-border)]";
+
+/**
+ * A body cell of a sticky column. It must be opaque, or the scrolled cells
+ * show through it, so the row's translucent hover and open-menu fills
+ * (`ResourceRow`, `TableRow`) are mixed onto the card colour here rather than
+ * layered over it. The row needs the `group` class.
+ */
+export const RESOURCE_STICKY_BODY =
+  "bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-aria-expanded:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]";
+
 /** One body cell: 56px tall, inset 24px. */
 export const RESOURCE_CELL = "h-14 px-6 py-2";
 

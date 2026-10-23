@@ -8,6 +8,10 @@ import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_STICKY_BODY,
+  RESOURCE_STICKY_END,
+  RESOURCE_STICKY_START,
+  RESOURCE_TABLE_SCROLL,
   RESOURCE_TABLE_TOP,
   RESOURCE_TABLE_WRAP,
   ResourceEmptyRow,
@@ -24,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
+import { useScrollEdges } from "@/hooks/use-scroll-edges";
 import {
   projectScopeDeps,
   requireProjectScope,
@@ -105,6 +110,7 @@ function UsersScreen() {
   // Each value once per row: a column that only repeats what the User cell
   // already shows is dropped (under the default schema, the email).
   const shown = useMemo(() => columnsBeyondIdentity(columns, rows), [columns, rows]);
+  const scroll = useScrollEdges();
 
   return (
     <Page>
@@ -127,12 +133,19 @@ function UsersScreen() {
 
       {/* The column set is schema-driven and so has no fixed width. The ID
           gives way first; a schema with more columns than fit scrolls the
-          table horizontally rather than compressing cells. */}
-      <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
+          table horizontally rather than compressing cells. The User column and
+          the row menu stay pinned to the card's edges while the rest scrolls
+          under them, so the menu is reachable at any width. */}
+      <div
+        ref={scroll.ref}
+        data-scroll-start={scroll.edges.start || undefined}
+        data-scroll-end={scroll.edges.end || undefined}
+        className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL}`}
+      >
         <Table className="text-xs">
           <TableHeader>
             <ResourceHeaderRow>
-              <ResourceHeadCell>User</ResourceHeadCell>
+              <ResourceHeadCell className={RESOURCE_STICKY_START}>User</ResourceHeadCell>
               {shown.map((column) => (
                 <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
               ))}
@@ -140,7 +153,7 @@ function UsersScreen() {
               {/* After `Status`, where the design's column order puts it. */}
               {teamsExpanded && <ResourceHeadCell>Team</ResourceHeadCell>}
               <ResourceHeadCell>ID</ResourceHeadCell>
-              <ResourceMenuHead className="w-15" />
+              <ResourceMenuHead className={`w-15 ${RESOURCE_STICKY_END}`} />
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
@@ -151,7 +164,7 @@ function UsersScreen() {
             ) : (
               rows.map((user) => (
                 <ResourceRow key={user.id} className="group">
-                  <UserIdentityCell user={user} />
+                  <UserIdentityCell user={user} sticky />
                   {shown.map((column) => (
                     <TableCell key={column.key} className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
                       {user.values[column.key] ?? "—"}
@@ -166,7 +179,9 @@ function UsersScreen() {
                     </TableCell>
                   )}
                   <UserIdCell user={user} />
-                  <TableCell className={RESOURCE_CELL}>
+                  <TableCell
+                    className={`${RESOURCE_CELL} ${RESOURCE_STICKY_END} ${RESOURCE_STICKY_BODY}`}
+                  >
                     <RowActions
                       userId={user.id}
                       name={user.name}

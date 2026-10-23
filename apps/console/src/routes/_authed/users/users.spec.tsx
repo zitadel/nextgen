@@ -210,6 +210,30 @@ describe("users screen", () => {
     expect(table.getByText("user_1")).toHaveAttribute("title", "user_1");
   });
 
+  it("pins the User column and the row menu to the card's edges", async () => {
+    // A wide table scrolls under them, so the menu is reachable at any width
+    // without scrolling to it. jsdom lays nothing out, so this asserts the
+    // classes that pin them rather than a position.
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [{ id: "user_1", identifier: "maya@acme.com", attributes: {} }],
+        }),
+      ),
+    );
+    await renderUsers();
+
+    const menu = await screen.findByRole("button", { name: "Actions for maya@acme.com" });
+    expect(menu.closest("td")).toHaveClass("sticky", "right-0");
+    expect(screen.getByRole("link", { name: "maya@acme.com" }).closest("td")).toHaveClass(
+      "sticky",
+      "left-0",
+    );
+    const headers = screen.getAllByRole("columnheader");
+    expect(headers[0]).toHaveClass("sticky", "left-0");
+    expect(headers.at(-1)).toHaveClass("sticky", "right-0");
+  });
+
   it("keeps an attribute column some row needs, even where it repeats another row's identity", async () => {
     // A mixed list: one schema identifies by email, another by username, so
     // the second row's email is said nowhere else. The column stays whole
