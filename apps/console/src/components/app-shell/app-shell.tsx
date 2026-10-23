@@ -63,7 +63,7 @@ export function AppShell({
         {/* No context bar in the Settings view: the settings design draws none,
             and the switcher it carries is a *project* control that says nothing
             about an account screen. */}
-        {!inSettings && <ContextBar onSearch={() => setSearchOpen(true)} />}
+        {!inSettings && <ContextBar onSearch={() => setSearchOpen(true)} userId={user?.userId} />}
         {children}
       </SidebarInset>
     </SidebarProvider>
@@ -234,10 +234,11 @@ function NavList({ view, label }: { view: NavView; label: string }) {
  * sidebar's brand header. The collapse toggle lives in the sidebar and the
  * theme in the account menu, so the bar carries neither.
  */
-function ContextBar({ onSearch }: { onSearch: () => void }) {
+function ContextBar({ onSearch, userId }: { onSearch: () => void; userId?: string }) {
   return (
     <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-background px-2 md:px-4">
-      <ContextSwitcher />
+      {/* The signed-in person, whose recent projects the switcher keeps. */}
+      <ContextSwitcher userId={userId} />
       {/* Hidden on phones, as in the proposal: ⌘K still opens it, and the bar
           needs the width for the switchers. */}
       <div className="hidden w-75 justify-end sm:flex">
