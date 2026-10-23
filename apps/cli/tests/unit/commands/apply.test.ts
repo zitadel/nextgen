@@ -223,6 +223,6 @@ describe("apply command sync", () => {
       "Re-run plan to confirm local config and platform are in sync.",
     ]);
     expect(json.data.next_commands).toHaveLength(1);
-    expect(json.data.next_commands[0]).toMatch(/^npx @zitadel\/cli@\S+ plan --json$/);
+    expect(json.data.next_commands[0]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
   });
 });

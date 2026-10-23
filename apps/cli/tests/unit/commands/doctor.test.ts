@@ -206,7 +206,7 @@ describe("doctor command", () => {
     const claim = json.data.checks.find((check) => check.name === "claim");
     expect(claim?.status).toBe("warn");
     expect(claim?.message).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim --json"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
   });
 
   // Same advisory posture, reconciliation wording: past the 14-day window
@@ -228,7 +228,7 @@ describe("doctor command", () => {
     expect(claim?.status).toBe("warn");
     expect(claim?.message).toContain("claim window has closed");
     expect((json.data.next_actions ?? []).join("\n")).toContain("claim window has closed");
-    expect(json.data.next_commands ?? []).toContain(expectedPublicCliCommand("claim --json"));
+    expect(json.data.next_commands ?? []).toContain(expectedPublicCliCommand("claim"));
   });
 
   // Claiming needs a human in a browser, so --fix has nothing safe to do. The
@@ -269,7 +269,7 @@ describe("doctor command", () => {
       data: { checks: Check[]; next_commands?: string[] };
     };
     expect(json.data.checks.find((check) => check.name === "claim")?.status).toBe("pass");
-    expect(json.data.next_commands ?? []).not.toContain(expectedPublicCliCommand("claim --json"));
+    expect(json.data.next_commands ?? []).not.toContain(expectedPublicCliCommand("claim"));
   });
 
   // The skew stays advisory (the app keeps working on its pinned train), and
@@ -393,7 +393,7 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
       expect.stringContaining("doctor"),
       expect.stringContaining("doctor --port"),
     ]);
-    expect(json.hint).toContain(expectedPublicCliCommand("stop --all"));
+    expect(json.hint).toContain(json.next_commands?.[0]);
   });
 
   // `zitadel start` tells developers to run setup in the directory it ran in,

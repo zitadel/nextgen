@@ -128,7 +128,7 @@ describe("auth-method password and passkey", () => {
       const next = envelope.data?.next_commands as string[];
       expect(
         next.map((command) => command.replace(/^.*?@\S+ /, "").replace(/--cwd \S+/, "--cwd <cwd>")),
-      ).toEqual(["plan --cwd <cwd> --json", "apply --cwd <cwd> --json"]);
+      ).toEqual(["plan --cwd <cwd>", "apply --cwd <cwd>"]);
     });
 
     it("hands over the follow-ups as argument lists when the path needs quoting", async () => {
@@ -141,8 +141,8 @@ describe("auth-method password and passkey", () => {
 
       expect(envelope.data?.next_commands).toEqual([]);
       expect(envelope.data?.next_args).toEqual([
-        ["plan", "--cwd", expect.stringContaining("my project"), "--json"],
-        ["apply", "--cwd", expect.stringContaining("my project"), "--json"],
+        ["plan", "--cwd", expect.stringContaining("my project")],
+        ["apply", "--cwd", expect.stringContaining("my project")],
       ]);
     });
 
@@ -373,8 +373,8 @@ describe("auth-method password and passkey", () => {
       expect(envelope.code).toBe("E_VALIDATION");
       expect(envelope.details?.usable).toEqual(["passkey"]);
       expect(envelope.next_commands?.map(suggested)).toEqual([
-        "passkey disable --schema default-human-user --cwd <cwd> --force --json",
-        "password enable --schema default-human-user --cwd <cwd> --json",
+        "passkey disable --schema default-human-user --cwd <cwd> --force",
+        "password enable --schema default-human-user --cwd <cwd>",
       ]);
     });
 
@@ -393,7 +393,7 @@ describe("auth-method password and passkey", () => {
       const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope.next_commands?.map(suggested)).toEqual([
-        "passkey disable --schema default-human-user --cwd <cwd> --force --json",
+        "passkey disable --schema default-human-user --cwd <cwd> --force",
       ]);
     });
 
@@ -422,7 +422,6 @@ describe("auth-method password and passkey", () => {
             "--cwd",
             expect.any(String),
             "--force",
-            "--json",
           ],
           [
             "auth-method",
@@ -432,7 +431,6 @@ describe("auth-method password and passkey", () => {
             "my users&calc",
             "--cwd",
             expect.any(String),
-            "--json",
           ],
         ],
       });

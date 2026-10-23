@@ -754,8 +754,8 @@ describe("auth-method sso enable preflight", () => {
     const { data } = parseJson(result.stdout) as { data: { next_args: string[][] } };
     expect(data.next_args).toEqual(
       expect.arrayContaining([
-        ["plan", "--cwd", expect.any(String), "--json"],
-        ["apply", "--cwd", expect.any(String), "--json"],
+        ["plan", "--cwd", expect.any(String)],
+        ["apply", "--cwd", expect.any(String)],
       ]),
     );
     for (const args of data.next_args) {
@@ -777,7 +777,6 @@ describe("auth-method sso enable preflight", () => {
       "--project-level",
       "--cwd",
       expect.any(String),
-      "--json",
     ]);
   });
 

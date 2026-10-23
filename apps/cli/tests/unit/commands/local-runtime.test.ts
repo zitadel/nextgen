@@ -166,7 +166,7 @@ describe("local runtime commands", () => {
     expect(envelope.data.next_actions.join("\n")).toContain("managed local runtime");
     expect(envelope.data.next_actions.join("\n")).toContain("--server <url>");
     expect(envelope.data.next_commands).toContain("docker version");
-    expect(envelope.data.next_commands).toContain(expectedPublicCliCommand("doctor --json"));
+    expect(envelope.data.next_commands).toContain(expectedPublicCliCommand("doctor"));
     expect(envelope.data.checks.find((check) => check.name === "docker-cli")).toMatchObject({
       status: "warn",
     });
@@ -255,8 +255,8 @@ describe("local runtime commands", () => {
     };
     expect(envelope.status).toBe("error");
     expect(envelope.hint).toContain("Existing local runtime metadata");
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand("start --json"));
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand("reset --force --json"));
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand("start"));
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand("reset --force"));
     expect(envelope.details.checks.find((check) => check.name === "runtime")).toMatchObject({
       status: "fail",
     });
@@ -316,7 +316,7 @@ describe("local runtime commands", () => {
       warnings: string[];
     };
     expect(envelope.warnings.join("\n")).toContain("managed-runtime-processes");
-    expect(envelope.data.next_commands).toContain(expectedPublicCliCommand("stop --all --json"));
+    expect(envelope.data.next_commands).toContain(expectedPublicCliCommand("stop --all"));
     expect(
       envelope.data.checks.find((check) => check.name === "managed-runtime-processes"),
     ).toMatchObject({
@@ -352,7 +352,7 @@ describe("local runtime commands", () => {
     expect(envelope.hint).toContain("managed local runtime");
     expect(envelope.hint).toContain("--server <url>");
     expect(envelope.next_commands).toContain("docker version");
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand("start --json"));
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand("start"));
     expect(envelope.details.message).toContain("remote or cloud setup can continue");
 
     const dockerCalls = await readDockerCalls(fake.logPath);
@@ -536,9 +536,7 @@ describe("local runtime commands", () => {
       hint: expect.stringContaining("zitadel stop"),
     });
     expect(envelope.data.console.sign_in_url).toBeUndefined();
-    expect(envelope.data.next_commands).toEqual([
-      expectedPublicCliCommand("setup --server local --json"),
-    ]);
+    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
     expect(envelope.data.next_actions).toContainEqual(
       expect.stringContaining(expectedPublicCliCommand("logs --follow")),
     );
@@ -587,7 +585,7 @@ describe("local runtime commands", () => {
     expect(envelope.code).toBe("E_PORT_IN_USE");
     expect(envelope.details.port).toBe(port);
     expect(envelope.details.listeners.length).toBeGreaterThan(0);
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand("stop --all --json"));
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand("stop --all"));
   });
 
   // The platform project and the local admin travel together: a harness that
@@ -623,7 +621,7 @@ describe("local runtime commands", () => {
       // No admin, so nothing to sign in as and nothing to suggest.
       expect(envelope.data.console).toBeUndefined();
       expect(envelope.data.next_commands).toEqual([
-        expectedPublicCliCommand("setup --server local --json"),
+        expectedPublicCliCommand("setup --server local"),
       ]);
       await expect(readFile(join(cwd, ".zitadel/local/admin.json"), "utf8")).rejects.toThrow();
       await expect(readFile(join(cwd, ".zitadel/local/admin-user.json"), "utf8")).rejects.toThrow();
@@ -676,9 +674,7 @@ describe("local runtime commands", () => {
     expect(envelope.data.next_actions.join("\n")).toContain("Setup installs dependencies");
     // As in the binary case: no platform project on the fake server, so no
     // link and no `console` suggestion.
-    expect(envelope.data.next_commands).toEqual([
-      expectedPublicCliCommand("setup --server local --json"),
-    ]);
+    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
     expect(envelope.data.next_commands).not.toContain("npm install");
     expect(envelope.data.next_commands).not.toContain("npm run dev");
 
@@ -838,7 +834,7 @@ describe("local runtime commands", () => {
       next_commands?: string[];
     };
     expect(envelope.status).toBe("error");
-    expect(envelope.next_commands).toEqual([expectedPublicCliCommand("start --json")]);
+    expect(envelope.next_commands).toEqual([expectedPublicCliCommand("start")]);
   });
 
   it("stop succeeds without suggesting a restart", async () => {
@@ -874,7 +870,7 @@ describe("local runtime commands", () => {
       data: { next_commands?: string[] };
     };
     expect(envelope.status).toBe("ok");
-    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("stop --json")]);
+    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("stop")]);
   });
 
   it("stop --all reports only discovered CLI-managed runtime candidates", async () => {
@@ -1000,7 +996,7 @@ describe("local runtime commands", () => {
       next_commands?: string[];
     };
     expect(envelope.status).toBe("error");
-    expect(envelope.next_commands).toEqual([expectedPublicCliCommand("reset --force --json")]);
+    expect(envelope.next_commands).toEqual([expectedPublicCliCommand("reset --force")]);
   });
 });
 

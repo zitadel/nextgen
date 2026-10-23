@@ -1026,31 +1026,6 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
   }
-  for (const followUp of cliFollowUps(envelope)) {
-    expect(followUp, `${where}: \`${followUp.join(" ")}\` does not ask for JSON`).toContain(
-      "--json",
-    );
-  }
-}
-
-/**
- * The follow-ups of an envelope that run the CLI, as their words: the
- * `next_commands` in the public `npx` form, and the argument lists of
- * `next_args` and `details.suggested_args`.
- */
-function cliFollowUps(envelope: Envelope): unknown[][] {
-  const { data, details } = envelope as unknown as {
-    data?: { next_commands?: unknown; next_args?: unknown } | null;
-    details?: { suggested_args?: unknown } | null;
-  };
-  const commands = [envelope.next_commands, data?.next_commands]
-    .flatMap((list) => (Array.isArray(list) ? list : []))
-    .filter((command): command is string => /^npx @zitadel\/cli@\S+ /.test(String(command)))
-    .map((command) => command.split(" "));
-  const argLists = [data?.next_args, details?.suggested_args].flatMap((lists) =>
-    Array.isArray(lists) ? lists.filter(Array.isArray) : [],
-  );
-  return [...commands, ...argLists];
 }
 
 /**

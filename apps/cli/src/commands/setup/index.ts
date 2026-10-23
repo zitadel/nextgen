@@ -1343,9 +1343,7 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
   // as text has no stdin to read. Offering it would advertise a retry that
   // fails the moment it is run. Interactively the rerun asks for the secret,
   // which is the one way a plain command can obtain it -- putting it in the
-  // command text is never an option. A `--json` run's follow-ups end in
-  // `--json` (`BaseCommand`), which turns prompts off too; the hint names the
-  // flags a scripted rerun needs.
+  // command text is never an option.
   if (opts.nonInteractive && firstSso === undefined && opts.ssoTyped === undefined) {
     parts.push("--non-interactive");
   }

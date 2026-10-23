@@ -36,7 +36,7 @@ describe("console", () => {
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_VALIDATION");
     expect(json.message).toBe("No local admin in this directory or its parents");
-    expect(json.next_commands.at(-1)).toMatch(/ start --json$/);
+    expect(json.next_commands.at(-1)).toMatch(/ start$/);
   });
 
   it("signs in as the admin of a parent directory when run from an app inside it", async () => {

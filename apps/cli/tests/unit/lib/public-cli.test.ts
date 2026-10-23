@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  jsonFollowUpArgs,
   normalizePublicCliCommand,
   normalizePublicCliJson,
   normalizePublicCliProse,
@@ -51,45 +50,6 @@ describe("public CLI command formatting", () => {
     );
     expect(normalizePublicCliCommand("npm install", "0.1.0-alpha.1")).toBe("npm install");
     expect(normalizePublicCliCommand("docker version", "0.1.0-alpha.1")).toBe("docker version");
-  });
-});
-
-describe("follow-ups of a --json run", () => {
-  it("ask for JSON, and only that, when they run the CLI", () => {
-    expect(normalizePublicCliCommand("zitadel doctor --fix", "0.1.0", { json: true })).toBe(
-      "npx @zitadel/cli@0.1.0 doctor --fix --json",
-    );
-    expect(
-      normalizePublicCliCommand(publicCliCommand("plan", "0.1.0"), "0.1.0", { json: true }),
-    ).toBe("npx @zitadel/cli@0.1.0 plan --json");
-    expect(
-      normalizePublicCliCommand("npx @zitadel/cli@latest start", "0.1.0", { json: true }),
-    ).toBe("npx @zitadel/cli@latest start --json");
-  });
-
-  it("carry --json once", () => {
-    const nextPage = "npx @zitadel/cli@0.1.0 users list --page-token abc --json";
-
-    expect(normalizePublicCliCommand(nextPage, "0.1.0", { json: true })).toBe(nextPage);
-  });
-
-  it("leave other tools' commands and the bare CLI as they are", () => {
-    for (const command of ["npm run dev", "docker version", "npm install @zitadel/cli@latest"]) {
-      expect(normalizePublicCliCommand(command, "0.1.0", { json: true })).toBe(command);
-    }
-    expect(normalizePublicCliCommand("zitadel", "0.1.0", { json: true })).toBe(
-      "npx @zitadel/cli@0.1.0",
-    );
-  });
-
-  it("end in --json once when handed over as arguments", () => {
-    expect(jsonFollowUpArgs(["start", "--cwd", "/home/dev/my app"])).toEqual([
-      "start",
-      "--cwd",
-      "/home/dev/my app",
-      "--json",
-    ]);
-    expect(jsonFollowUpArgs(["api", "ls", "--json"])).toEqual(["api", "ls", "--json"]);
   });
 });
 

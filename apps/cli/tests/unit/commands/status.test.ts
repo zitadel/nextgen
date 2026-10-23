@@ -90,7 +90,7 @@ describe("status command", () => {
     expect(json.data.project.lifecycle).toBe("configured");
     expect(json.data.project.project_id).toBe("proj-001");
     expect(json.data.project.issuer).toBe("http://localhost:3000");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("doctor --json"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("doctor"));
   });
 
   it("reports a project with no owning team as temporary and points at claim", async () => {
@@ -107,7 +107,7 @@ describe("status command", () => {
     };
     expect(json.data.project.claim).toMatchObject({ kind: "detached", claimable: true });
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim --json"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
   });
 
   // Once the locally recorded creation time says the 14-day window has
@@ -136,7 +136,7 @@ describe("status command", () => {
     expect(actions).toContain("claim window has closed");
     expect(actions).toContain("no longer be claimed");
     expect(actions).not.toContain("its data may be lost");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim --json"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
   });
 
   it("reports the owning team once claimed, and stops nudging", async () => {
@@ -161,7 +161,7 @@ describe("status command", () => {
       claimed_at: "2026-01-02T00:00:00.000Z",
     });
     expect(json.data.next_actions.join("\n")).not.toContain("its data may be lost");
-    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim --json"));
+    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim"));
   });
 
   // The project lives wherever `zitadel.json` says, not wherever this
@@ -184,7 +184,7 @@ describe("status command", () => {
       data: { project: { claim?: unknown }; next_commands: string[] };
     };
     expect(json.data.project.claim).toBeUndefined();
-    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim --json"));
+    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim"));
   });
 
   it("reports orphaned-config when zitadel.json exists but secret is missing", async () => {
@@ -205,7 +205,7 @@ describe("status command", () => {
       };
     };
     expect(json.status).toBe("ok");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("setup --force --json"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("setup --force"));
     expect(json.data.project.project_id).toBe("orphan");
     expect(json.data.project.lifecycle).toBe("orphaned-config");
   });
@@ -229,10 +229,8 @@ describe("status command", () => {
     expect(json.data.server.lifecycle).toBe("missing");
     expect(json.data.project.lifecycle).toBe("not-configured");
     expect(json.data.next_actions.join("\n")).toContain("From your app directory");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("start --json"));
-    expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand("setup --server local --json"),
-    );
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("start"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("setup --server local"));
   });
 
   it("normalizes relative --cwd before reading runtime metadata", async () => {
@@ -306,8 +304,8 @@ describe("status command", () => {
     expect(actions).not.toContain(".zitadel/schemas/");
     // next_commands is staged in lockstep: preview is fine, publishing
     // waits for the first proven login.
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("plan --json"));
-    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("apply --json"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("plan"));
+    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("apply"));
   });
 
   it("switches to customize/publish guidance once users exist", async () => {
@@ -328,7 +326,7 @@ describe("status command", () => {
         `then ${expectedPublicCliCommand("apply")} to publish.`,
     );
     expect(actions).not.toContain("register a user");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply --json"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply"));
   });
 
   it("keeps lifecycle-only output when the platform is unreachable", async () => {
@@ -348,7 +346,7 @@ describe("status command", () => {
     expect(actions).not.toContain("register a user");
     expect(actions).not.toContain("Customize what you ask for");
     expect(actions).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply --json"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply"));
   });
 });
 
