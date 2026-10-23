@@ -279,7 +279,10 @@ func TestCreateUser(t *testing.T) {
 
 			resp, err = client.CreateUser(t.Context(), user, params)
 			assert.NoError(t, err)
-			assert.IsType(t, &api.CreateUserConflict{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateUserConflict{}, resp, helpers.MustMarshal(t, resp))
+			conflict := resp.(*api.CreateUserConflict)
+			assert.Equal(t, api.ErrorCode(domain.ErrUserAlreadyExists().Code), conflict.Code)
+			assert.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Details.Value["details"]))
 		})
 	})
 }
@@ -389,6 +392,49 @@ func TestDeleteUser(t *testing.T) {
 
 			assert.IsType(t, &api.GetUserByIDNotFound{}, getResp, helpers.MustMarshal(t, getResp))
 		})
+	})
+}
+
+func TestGetUserPasswordState(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID:  project.ID,
+		SchemaURL:  test_data.UserSchemaURL,
+		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuserpassword@example.com"),
+	})
+	require.NoError(t, err)
+	params := api.GetUserPasswordStateParams{UserID: api.UserID(user.ID)}
+	setAt := func(t *testing.T) api.OptDateTime {
+		t.Helper()
+		resp, err := client.GetUserPasswordState(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.UserPasswordState{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.UserPasswordState).SetAt
+	}
+	assert.False(t, setAt(t).IsSet(), "a user without a password has no set_at")
+
+	resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "fake-password"},
+		api.SetUserPasswordParams{UserID: params.UserID})
+	require.NoError(t, err)
+	require.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
+
+	got := setAt(t)
+	require.True(t, got.IsSet())
+	// The database stamps it, on its own clock.
+	assert.WithinDuration(t, time.Now(), got.Value, time.Minute)
+
+	t.Run("unknown user", func(t *testing.T) {
+		resp, err := client.GetUserPasswordState(t.Context(), api.GetUserPasswordStateParams{UserID: "user_unknown"})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetUserPasswordStateNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.GetUserPasswordStateNotFound).Code)
 	})
 }
 
@@ -537,7 +583,15 @@ func TestSetUserPassword(t *testing.T) {
 
 		t.Run("longer than 64 characters", func(t *testing.T) {
 			t.Parallel()
-			badRequest(t, strings.Repeat("a", domain.MaxPasswordLength+1), domain.ErrUserPasswordTooLong().Code)
+			// The server's cap is reported in the password policy's shape,
+			// as a max_length violation, whether or not a policy exists.
+			params, _ := createUser(t, "testsetuserpassword.toolong@example.com")
+			resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: strings.Repeat("a", domain.MaxPasswordLength+1)}, params)
+			assert.NoError(t, err)
+			require.IsType(t, &api.SetUserPasswordBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			body := resp.(*api.SetUserPasswordBadRequest)
+			assert.Equal(t, domain.ErrUserPasswordPolicyViolation(nil).Code, string(body.Code))
+			assert.JSONEq(t, `{"violations":{"max_length":64}}`, string(body.Details.Value["details"]))
 		})
 
 		t.Run("empty", func(t *testing.T) {
@@ -681,7 +735,12 @@ func TestPatchUser(t *testing.T) {
 			"attributes": map[string]any{"email": 5},
 		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 		require.NoError(t, err)
-		assert.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		// Answered like request validation: the field is named, its value is not.
+		invalid := resp.(*api.PatchUserByIDBadRequest)
+		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), invalid.Code)
+		assert.Equal(t, domain.ErrRequestInvalid().Message, invalid.Message)
+		assert.JSONEq(t, `{"fields":["attributes.email"]}`, string(invalid.Details.Value["details"]))
 	})
 
 	t.Run("an unknown schema pointer is refused", func(t *testing.T) {
@@ -695,6 +754,105 @@ func TestPatchUser(t *testing.T) {
 		assert.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
 	})
 
+	// Two revisions of one logical schema: v2 drops nickname and requires
+	// country. Both are closed, so a value the target does not declare must be
+	// removed by the patch.
+	revisionSchema := func(revision string, properties, required string) string {
+		return `{
+			"title": "PatchRevisionsSchema",
+			"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
+			"$id": "https://patch-revisions.example.com/schemas/` + revision + `.json",
+			"kind": "user-schema",
+			"objectType": "patch-revisions-user",
+			"type": "object",
+			"additionalProperties": false,
+			"x-identifier": "email",
+			"x-auth-methods": {"password": {"enabled": true}},
+			"required": ` + required + `,
+			"properties": {
+				"email": {"type": "string", "format": "email", "x-unique": "project"},
+				` + properties + `
+			}
+		}`
+	}
+	revisionV1 := harness.CreateUserSchema(t, project, revisionSchema("v1",
+		`"nickname": {"type": "string"}`, `["email"]`))
+	revisionV2 := harness.CreateUserSchema(t, project, revisionSchema("v2",
+		`"country": {"type": "string"}`, `["email", "country"]`))
+
+	createRevisionUser := func(t *testing.T, email string) *domain.User {
+		t.Helper()
+		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  project.ID,
+			SchemaURL:  revisionV1,
+			Attributes: map[string]any{"email": email, "nickname": "Nick"},
+		})
+		require.NoError(t, err)
+		return user
+	}
+	getUser := func(t *testing.T, userID string) *api.User {
+		t.Helper()
+		resp, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.User)
+	}
+	requireAttributesInvalid := func(t *testing.T, resp api.PatchUserByIDRes, wantFields string) {
+		t.Helper()
+		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		invalid := resp.(*api.PatchUserByIDBadRequest)
+		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), invalid.Code)
+		assert.JSONEq(t, wantFields, string(invalid.Details.Value["details"]))
+	}
+
+	t.Run("an older revision is validated like a newer one", func(t *testing.T) {
+		t.Parallel()
+		user := createRevisionUser(t, "testpatchuser.olderrevision@example.com")
+		params := api.PatchUserByIDParams{UserID: api.UserID(user.ID)}
+
+		// Forward: v2 requires country and does not declare nickname.
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"schema": revisionV2,
+		}), params)
+		require.NoError(t, err)
+		requireAttributesInvalid(t, resp, `{"fields":["attributes.country","attributes.nickname"]}`)
+		unchanged := getUser(t, user.ID)
+		assert.Equal(t, revisionV1, unchanged.Schema)
+		assert.Equal(t, "Nick", userProp(t, *unchanged, "nickname"))
+
+		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"schema":     revisionV2,
+			"attributes": map[string]any{"country": "CH", "nickname": nil},
+		}), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, revisionV2, resp.(*api.User).Schema)
+
+		// Backward: v1 does not declare country, so the same validation
+		// refuses keeping it, and the user is left unchanged.
+		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"schema": revisionV1,
+		}), params)
+		require.NoError(t, err)
+		requireAttributesInvalid(t, resp, `{"fields":["attributes.country"]}`)
+		unchanged = getUser(t, user.ID)
+		assert.Equal(t, revisionV2, unchanged.Schema)
+		assert.Equal(t, "CH", userProp(t, *unchanged, "country"))
+
+		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"schema":     revisionV1,
+			"attributes": map[string]any{"country": nil},
+		}), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		moved := resp.(*api.User)
+		assert.Equal(t, revisionV1, moved.Schema)
+		_, hasCountry := moved.Attributes["country"]
+		assert.False(t, hasCountry)
+		_, hasNickname := moved.Attributes["nickname"]
+		assert.False(t, hasNickname, "v1 declares nickname, but the value removed by the forward move stays removed")
+	})
+
 	t.Run("duplicate mail address", func(t *testing.T) {
 		t.Parallel()
 		createUser(t, "testpatchuser.taken@example.com")
@@ -704,7 +862,11 @@ func TestPatchUser(t *testing.T) {
 			"attributes": map[string]any{"email": "testpatchuser.taken@example.com"},
 		}), api.PatchUserByIDParams{UserID: api.UserID(userB.ID)})
 		require.NoError(t, err)
-		assert.IsType(t, &api.PatchUserByIDConflict{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.PatchUserByIDConflict{}, resp, helpers.MustMarshal(t, resp))
+		// The taken attribute is named, the user holding it is not.
+		conflict := resp.(*api.PatchUserByIDConflict)
+		assert.Equal(t, api.ErrorCode(domain.ErrUserAlreadyExists().Code), conflict.Code)
+		assert.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Details.Value["details"]))
 	})
 
 	t.Run("unknown user", func(t *testing.T) {
@@ -836,18 +998,22 @@ func TestPatchUserFailedMigration(t *testing.T) {
 		collide    bool
 		wantStatus any
 		wantCode   string
+		// wantFields, when set, is the details.fields a schema failure names.
+		wantFields string
 	}{
 		{
 			name:         "a required attribute of the target revision is missing",
 			targetSchema: requiresGivenName,
 			wantStatus:   &api.PatchUserByIDBadRequest{},
-			wantCode:     domain.ErrUserInvalid().Code,
+			wantCode:     domain.ErrRequestInvalid().Code,
+			wantFields:   `{"fields":["attributes.givenName"]}`,
 		},
 		{
 			name:         "a value violates a tightened rule",
 			targetSchema: restrictsColor,
 			wantStatus:   &api.PatchUserByIDBadRequest{},
-			wantCode:     domain.ErrUserInvalid().Code,
+			wantCode:     domain.ErrRequestInvalid().Code,
+			wantFields:   `{"fields":["attributes.color"]}`,
 		},
 		{
 			name:         "a value collides with another user's unique attribute",
@@ -888,6 +1054,9 @@ func TestPatchUserFailedMigration(t *testing.T) {
 			require.NoError(t, err)
 			require.IsType(t, tc.wantStatus, resp, helpers.MustMarshal(t, resp))
 			assertAuthzError(t, resp, tc.wantCode)
+			if tc.wantFields != "" {
+				assert.JSONEq(t, tc.wantFields, string(resp.(*api.PatchUserByIDBadRequest).Details.Value["details"]))
+			}
 
 			after := readStored(t, user.ID)
 			assert.Equal(t, before.schemaURL, after.schemaURL, "schema reference")
@@ -947,7 +1116,7 @@ func TestPatchMyUser(t *testing.T) {
 			"attributes": map[string]any{"nickname": "Myself"},
 		}))))
 
-		resp, err := client.PatchMyUser(t.Context(), patch)
+		resp, err := client.PatchMyUser(t.Context(), patch, api.PatchMyUserParams{})
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 		assert.Equal(t, "Myself", userProp(t, *resp.(*api.User), "nickname"))
@@ -1134,7 +1303,7 @@ func TestGetMyUser(t *testing.T) {
 		// GET USER USING TOKEN
 
 		client.SetSessionToken(sessionToken)
-		resp, err := client.GetMyUser(t.Context())
+		resp, err := client.GetMyUser(t.Context(), api.GetMyUserParams{})
 		assert.NoError(t, err)
 
 		assert.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
@@ -1168,6 +1337,140 @@ func TestGetMyUser(t *testing.T) {
 		assert.Equal(t, "auth.unauthorized", answer.Code)
 		assert.Equal(t, "Missing or invalid session token.", answer.Message)
 	})
+}
+
+// TestMyUser_HoldsTheSessionToTheNamedProject pins project-bound calls on the
+// session's user: with project_id, a live session of another project on the
+// same server is refused with 403 sess.project_mismatch by the user read, its
+// patch, its schema and the lists of its projects and teams alike, and the
+// refused patch changes nothing. Its own project is served as before.
+func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
+	t.Parallel()
+
+	projects := harness.EnsureProjectService(t)
+	project, err := projects.Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	// Nothing is read from it: it only has to be a project the session does not
+	// belong to.
+	otherProject, err := projects.Create(t.Context(), helpers.ProjectName(), nil, false)
+	require.NoError(t, err)
+
+	userService := harness.EnsureUserService(t)
+	user, err := userService.CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID:  project.ID,
+		SchemaURL:  test_data.UserSchemaURL,
+		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testmyuserproject@example.com"),
+	})
+	require.NoError(t, err)
+	const password = "fake-password"
+	require.NoError(t, userService.SetPassword(t.Context(), service.SetPasswordInput{
+		ProjectID: project.ID,
+		UserID:    user.ID,
+		Password:  password,
+	}))
+	session, err := helpers.CreateSessionUsingPassword(t,
+		harness.EnsureAuthAttemptService(t),
+		harness.EnsureSessionService(t),
+		project.ID,
+		user.StringAttribute("email"),
+		password,
+	)
+	require.NoError(t, err)
+	tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	sessionToken, err := session.Token(tokenCrypter)
+	require.NoError(t, err)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetSessionToken(sessionToken)
+
+	own := api.NewOptProjectID(api.ProjectID(project.ID))
+	other := api.NewOptProjectID(api.ProjectID(otherProject.ID))
+	nickname := func(value string) *api.PatchMyUserRequest {
+		patch := &api.PatchMyUserRequest{}
+		require.NoError(t, patch.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{
+			"attributes": map[string]any{"nickname": value},
+		}))))
+		return patch
+	}
+
+	read, err := client.GetMyUser(t.Context(), api.GetMyUserParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, read, helpers.MustMarshal(t, read))
+	assert.Equal(t, "sess.project_mismatch", read.(*api.SessProjectMismatch).Code)
+
+	patched, err := client.PatchMyUser(t.Context(), nickname("Intruder"), api.PatchMyUserParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.PatchMyUserForbidden{}, patched, helpers.MustMarshal(t, patched))
+	assert.Equal(t, api.ErrorCode("sess.project_mismatch"), patched.(*api.PatchMyUserForbidden).Code)
+
+	listed, err := client.ListMyProjects(t.Context(), api.ListMyProjectsParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, listed, helpers.MustMarshal(t, listed))
+	assert.Equal(t, "sess.project_mismatch", listed.(*api.SessProjectMismatch).Code)
+
+	schema, err := client.GetMyUserSchema(t.Context(), api.GetMyUserSchemaParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, schema, helpers.MustMarshal(t, schema))
+	assert.Equal(t, "sess.project_mismatch", schema.(*api.SessProjectMismatch).Code)
+
+	teams, err := client.ListMyTeams(t.Context(), api.ListMyTeamsParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, teams, helpers.MustMarshal(t, teams))
+	assert.Equal(t, "sess.project_mismatch", teams.(*api.SessProjectMismatch).Code)
+
+	passkeys, err := client.ListMyPasskeys(t.Context(), api.ListMyPasskeysParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, passkeys, helpers.MustMarshal(t, passkeys))
+	assert.Equal(t, "sess.project_mismatch", passkeys.(*api.SessProjectMismatch).Code)
+
+	links, err := client.ListMyIdentityLinks(t.Context(), api.ListMyIdentityLinksParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, links, helpers.MustMarshal(t, links))
+	assert.Equal(t, "sess.project_mismatch", links.(*api.SessProjectMismatch).Code)
+
+	passwordState, err := client.GetMyPasswordState(t.Context(), api.GetMyPasswordStateParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, passwordState, helpers.MustMarshal(t, passwordState))
+	assert.Equal(t, "sess.project_mismatch", passwordState.(*api.SessProjectMismatch).Code)
+
+	read, err = client.GetMyUser(t.Context(), api.GetMyUserParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.User{}, read, helpers.MustMarshal(t, read))
+	assert.Equal(t, api.UserID(user.ID), read.(*api.User).ID)
+	assert.NotContains(t, read.(*api.User).Attributes, "nickname", "the refused patch changed nothing")
+
+	patched, err = client.PatchMyUser(t.Context(), nickname("Myself"), api.PatchMyUserParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.User{}, patched, helpers.MustMarshal(t, patched))
+	assert.Equal(t, "Myself", userProp(t, *patched.(*api.User), "nickname"))
+
+	listed, err = client.ListMyProjects(t.Context(), api.ListMyProjectsParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListMyProjectsResponseHeaders{}, listed, helpers.MustMarshal(t, listed))
+
+	schema, err = client.GetMyUserSchema(t.Context(), api.GetMyUserSchemaParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.SchemaHeaders{}, schema, helpers.MustMarshal(t, schema))
+	assert.Equal(t, read.(*api.User).Schema, schema.(*api.SchemaHeaders).Response.ID)
+
+	teams, err = client.ListMyTeams(t.Context(), api.ListMyTeamsParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListUserTeamsResponseHeaders{}, teams, helpers.MustMarshal(t, teams))
+
+	passkeys, err = client.ListMyPasskeys(t.Context(), api.ListMyPasskeysParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListUserPasskeysResponseHeaders{}, passkeys, helpers.MustMarshal(t, passkeys))
+
+	links, err = client.ListMyIdentityLinks(t.Context(), api.ListMyIdentityLinksParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListUserIdentityLinksResponseHeaders{}, links, helpers.MustMarshal(t, links))
+
+	// The session was made with a password, so its state carries when it was set.
+	passwordState, err = client.GetMyPasswordState(t.Context(), api.GetMyPasswordStateParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.UserPasswordStateHeaders{}, passwordState, helpers.MustMarshal(t, passwordState))
+	assert.True(t, passwordState.(*api.UserPasswordStateHeaders).Response.SetAt.IsSet())
 }
 
 func TestListPasskeys(t *testing.T) {
@@ -1272,9 +1575,9 @@ func TestListPasskeys(t *testing.T) {
 	})
 }
 
-// TestSelfAccessReads: a person reads their own schema and roster with only
-// their session, and anything short of a user-bound session gets the 401 the
-// contract declares.
+// TestSelfAccessReads: a person reads their own schema, roster, sign-in methods
+// and password state with only their session, and anything short of a
+// user-bound session gets the 401 the contract declares.
 func TestSelfAccessReads(t *testing.T) {
 	t.Parallel()
 
@@ -1303,13 +1606,38 @@ func TestSelfAccessReads(t *testing.T) {
 		assert.Equal(t, teamID, string(teams[0].ID))
 	})
 
+	t.Run("own passkeys, without a grant", func(t *testing.T) {
+		t.Parallel()
+		harness.RegisterPasskey(t, project.ID, userID, "laptop")
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/passkeys", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		passkeys := helpers.MustUnmarshal[api.ListUserPasskeysResponse](t, []byte(body)).Passkeys
+		require.Len(t, passkeys, 1)
+		assert.Equal(t, "laptop", passkeys[0].Name)
+	})
+
+	t.Run("own password state, without a grant", func(t *testing.T) {
+		t.Parallel()
+		// The user signs in with a cookie, not a password, so they have none.
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/password", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.False(t, helpers.MustUnmarshal[api.UserPasswordState](t, []byte(body)).SetAt.IsSet())
+	})
+
+	t.Run("own identity links, without a grant", func(t *testing.T) {
+		t.Parallel()
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/identity_links", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Empty(t, helpers.MustUnmarshal[api.ListUserIdentityLinksResponse](t, []byte(body)).IdentityLinks)
+	})
+
 	session := harness.CreateSession(t, project.ID, time.Hour)
 	crypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
 	require.NoError(t, err)
 	anonymous, err := session.Token(crypter)
 	require.NoError(t, err)
 
-	for _, path := range []string{"/users/me", "/users/me/schema", "/users/me/teams"} {
+	for _, path := range []string{"/users/me", "/users/me/schema", "/users/me/teams", "/users/me/passkeys", "/users/me/identity_links", "/users/me/password"} {
 		for name, cookie := range map[string]*http.Cookie{
 			"anonymous session": {Name: "__nextgen_session", Value: anonymous},
 			"no cookie":         nil,

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // Test-only OIDC provider for the journey runner; nested Go module, no root import.
+  "tasks": {
+    // Tracked Go files only, as the server project checks them.
+    "format": {},
+    "vet": {
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
+    },
+    "build": {
+      "dependsOn": ["vet"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
+      "outputs": ["dist/oidc-mock"]
+    },
+    "test": {
+      "dependsOn": ["format", "vet"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
+    }
+  }
+}

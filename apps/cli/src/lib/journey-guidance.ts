@@ -1,7 +1,8 @@
 import { publicCliCommand } from "./public-cli";
 
 /**
- * Journey-staged guidance copy shared by `setup` and `status`.
+ * Guidance copy that commands share, so the story doesn't fork; most of it is
+ * the journey-staged copy of `setup` and `status`.
  *
  * The staging exists because of alpha tester feedback (Elina, alpha.15):
  * printing customize/publish steps before the user has logged in once reads
@@ -22,6 +23,18 @@ export function verifyLoginAction(openUrl?: string): string {
   return (
     `Verify auth in the browser: ${open}register a user, log out, ` +
     "log in again with the same user, and confirm /profile shows Signed in."
+  );
+}
+
+/**
+ * Where to look when something fails against the local server, shared by
+ * `start` and `doctor`. A sign-in step only says that a provider or a check
+ * failed, because the login is public; the server logs why.
+ */
+export function serverLogAction(cliVersion: string): string {
+  return (
+    "When a sign-in or a request fails, the server's log says why: run " +
+    `${publicCliCommand("logs --follow", cliVersion)} in another terminal to watch it.`
   );
 }
 

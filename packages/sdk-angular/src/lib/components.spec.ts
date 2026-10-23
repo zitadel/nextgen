@@ -300,6 +300,22 @@ describe("server-rendered widget config", () => {
     });
   });
 
+  it("writes the login language into the server markup only when one is set", async () => {
+    const unset = await serverRender(`<zitadel-auth-login />`, [ZitadelLoginComponent]);
+    expect(attributesOf(unset, widgetTags.login)).not.toHaveProperty("lang");
+    const set = await serverRender(`<zitadel-auth-login lang="de" />`, [ZitadelLoginComponent]);
+    expect(attributesOf(set, widgetTags.login)).toMatchObject({ lang: "de" });
+  });
+
+  it("leaves the properties and the callbacks out of the server markup", async () => {
+    const html = await serverRender(
+      `<zitadel-auth-login [project]="{ projectId: 'p1', proxyPath: '/px' }" [locales]="{ en: {} }" />`,
+      [ZitadelLoginComponent],
+    );
+    expect(attributesOf(html, widgetTags.login)).not.toHaveProperty("locales");
+    expect(html).not.toMatch(/locales|flowStep|object Object/i);
+  });
+
   it("puts the session config into the server markup", async () => {
     const html = await serverRender(`<zitadel-auth-session postSignOutUrl="/bye" heading="Hi" />`, [
       ZitadelSessionComponent,
@@ -668,7 +684,7 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { projectId: "p1", resumeFlowId: "" },
     present: {},
     absent: ["resume-flow-id"],
-    gaps: ["vue", "angular", "svelte"],
+    gaps: ["vue", "angular", "svelte", "solid", "qwik"],
   },
   {
     title: "puts the post-sign-in URL into the login markup",
@@ -767,7 +783,7 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     },
     present: {},
     absent: ["project-id", "proxy-path", "url"],
-    gaps: ["vue", "angular", "svelte"],
+    gaps: ["vue", "angular", "svelte", "solid", "qwik"],
   },
   {
     title: "leaves a keyed project handle out of the logout markup",
@@ -778,7 +794,7 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     },
     present: {},
     absent: ["project-id", "proxy-path", "url"],
-    gaps: ["vue", "angular", "svelte"],
+    gaps: ["vue", "angular", "svelte", "solid", "qwik"],
   },
   {
     title: "puts the discrete project props into the logout markup",
@@ -820,6 +836,53 @@ const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
     props: { projectId: "p1", postSignOutUrl: "/bye" },
     present: { "post-sign-out-url": "/bye" },
     absent: [],
+  },
+  {
+    title: "normalizes an empty proxy path to the site root in the login markup",
+    widget: "login",
+    props: { projectId: "p1", proxyPath: "" },
+    present: { "proxy-path": "/" },
+    absent: [],
+    gaps: ["react", "vue", "angular"],
+  },
+  {
+    title: "normalizes an empty proxy path to the site root in the session markup",
+    widget: "session",
+    props: { projectId: "p1", proxyPath: "" },
+    present: { "proxy-path": "/" },
+    absent: [],
+    gaps: ["react", "vue", "angular"],
+  },
+  {
+    title: "normalizes an empty proxy path to the site root in the logout markup",
+    widget: "logout",
+    props: { projectId: "p1", proxyPath: "" },
+    present: { "proxy-path": "/" },
+    absent: [],
+    gaps: ["react", "vue", "angular"],
+  },
+  {
+    title: "puts the heading into the session markup",
+    widget: "session",
+    props: { projectId: "p1", heading: "Welcome" },
+    present: { heading: "Welcome" },
+    absent: [],
+    gaps: ["react", "svelte"],
+  },
+  {
+    title: "puts the logout label into the session markup",
+    widget: "session",
+    props: { projectId: "p1", logoutLabel: "Leave" },
+    present: { "logout-label": "Leave" },
+    absent: [],
+    gaps: ["react", "svelte"],
+  },
+  {
+    title: "leaves an unset heading and logout label out of the session markup",
+    widget: "session",
+    props: { projectId: "p1" },
+    present: {},
+    absent: ["heading", "logout-label"],
   },
 ];
 

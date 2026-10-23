@@ -222,6 +222,28 @@ img[data-zl-asset-broken] {
 .zl-card-nav__link:hover {
   color: var(--zl-foreground);
 }
+/* The account a step signs in to (`step.identifier`), above its fields: whose
+   password is asked for, with the way back to change it. The address wraps
+   anywhere so a long one never widens the card. */
+.zl-card-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--zl-spacing-1) var(--zl-spacing-3);
+  margin: 0;
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  color: var(--zl-muted-foreground);
+}
+.zl-card-account__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--zl-foreground);
+  font-weight: var(--zl-font-weight-medium);
+}
 /* Standalone forgot-password row: emitted only by templates ejected before
    `<zl-field>` carried the link on its label row. */
 .zl-card-forgot {

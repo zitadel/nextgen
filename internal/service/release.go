@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/deployment"
 	"github.com/zitadel/nextgen/internal/storage/release"
 )
 
@@ -52,6 +56,7 @@ type ReleaseService interface {
 	Build(ctx context.Context, input BuildReleaseInput) (*CreateReleaseOutput, error)
 	Get(ctx context.Context, projectID, id string) (*domain.Release, error)
 	List(ctx context.Context, input ListReleasesInput) (*ListReleasesOutput, error)
+	Revoke(ctx context.Context, projectID, id string) (*domain.Release, error)
 }
 
 type releaseService struct {
@@ -60,6 +65,9 @@ type releaseService struct {
 	flows    *flowDefinitionService
 	branding *BrandingService
 	idps     *idpConnectionService
+	// builtinBases resolves a schema given as a built-in schema's `$id` under
+	// whichever base the project stores it; the release pins the row found.
+	builtinBases domain.BuiltinSchemaBases
 }
 
 // NewReleaseService wires Build's kind writers. flows and idps are the
@@ -70,13 +78,15 @@ func NewReleaseService(
 	flows *flowDefinitionService,
 	branding *BrandingService,
 	idps *idpConnectionService,
+	builtinBases domain.BuiltinSchemaBases,
 ) ReleaseService {
 	return &releaseService{
-		v2Pool:   v2Pool,
-		schemas:  schemas,
-		flows:    flows,
-		branding: branding,
-		idps:     idps,
+		v2Pool:       v2Pool,
+		schemas:      schemas,
+		flows:        flows,
+		branding:     branding,
+		idps:         idps,
+		builtinBases: builtinBases,
 	}
 }
 
@@ -217,7 +227,11 @@ func (s *releaseService) Get(ctx context.Context, projectID, id string) (_ *doma
 	ctx, end := startSpan(ctx, "ReleaseService.Get")
 	defer end(&err)
 
-	entity, err := s.v2Pool.Statements().GetReleaseByID(ctx, projectID, id)
+	return getRelease(ctx, s.v2Pool.Statements(), projectID, id)
+}
+
+func getRelease(ctx context.Context, stmts ReleaseStatements, projectID, id string) (*domain.Release, error) {
+	entity, err := stmts.GetReleaseByID(ctx, projectID, id)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrReleaseNotFound()
@@ -225,6 +239,71 @@ func (s *releaseService) Get(ctx context.Context, projectID, id string) (_ *doma
 		return nil, domain.ErrInternal(err).WithMessage("failed to get release from database")
 	}
 	return entity, nil
+}
+
+// Revoke marks the release revoked, once: a release already revoked comes
+// back unchanged. A release an origin still serves is refused with the
+// origins and the deployments that pin it.
+func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *domain.Release, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.Revoke")
+	defer end(&err)
+
+	var revoked *domain.Release
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		stmts := tx.Statements()
+		entity, err := getRelease(ctx, stmts, projectID, id)
+		if err != nil {
+			return err
+		}
+		if entity.Revoked() {
+			revoked = entity
+			return nil
+		}
+		// TODO(#2206): a concurrent deploy of this release can land after this check.
+		served, err := servedOrigins(ctx, stmts, projectID, id, time.Now())
+		if err != nil {
+			return err
+		}
+		if len(served) > 0 {
+			return domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: served})
+		}
+		revoked, err = stmts.RevokeRelease(ctx, projectID, id)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to revoke release")
+		}
+		return audit.Emit(ctx, stmts, audit.EmitSpec{
+			Type:       domain.EventTypeReleaseRevoked,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  projectID,
+			EntityType: "release",
+			EntityID:   id,
+			Payload:    domain.ReleaseRevokedPayload{ContentHash: revoked.ContentHash},
+		})
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to revoke release")
+	}
+	return revoked, nil
+}
+
+// servedOrigins returns the origins still serving the release, each with the
+// deployment that serves it.
+func servedOrigins(ctx context.Context, stmts DeploymentStatements, projectID, releaseID string, now time.Time) ([]domain.ReleaseInUseOrigin, error) {
+	result, err := stmts.ListLiveDeployments(WithAuthzListUnrestricted(ctx), now, deployment.LiveListOptions(projectID, &releaseID, 0))
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list the live deployments")
+	}
+	var served []domain.ReleaseInUseOrigin
+	for _, live := range result.Items {
+		for _, origin := range live.Origins() {
+			served = append(served, domain.ReleaseInUseOrigin{Origin: origin, DeploymentID: live.ID})
+		}
+	}
+	slices.SortFunc(served, func(a, b domain.ReleaseInUseOrigin) int { return strings.Compare(a.Origin, b.Origin) })
+	return served, nil
 }
 
 func (s *releaseService) List(ctx context.Context, input ListReleasesInput) (_ *ListReleasesOutput, err error) {
@@ -267,7 +346,7 @@ func (s *releaseService) loadContent(ctx context.Context, projectID string, requ
 	for _, pointer := range requested {
 		switch pointer.Kind {
 		case domain.ReleasePointerKindSchema:
-			schema, err := stmts.GetJSONSchemaByID(ctx, projectID, pointer.RevisionID)
+			schema, err := s.builtinBases.GetJSONSchema(ctx, stmts, projectID, pointer.RevisionID)
 			if err != nil {
 				return content, mapRevisionLookupError(err, pointer)
 			}

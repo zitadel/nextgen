@@ -1,5 +1,30 @@
 # @zitadel/sdk-svelte
 
+## 0.1.0
+
+### Patch Changes
+
+- [#2178](https://github.com/zitadel/nextgen/pull/2178) [`3b206b2`](https://github.com/zitadel/nextgen/commit/3b206b2453cabf4da6840396f2be0e96b4ede8fa) Thanks [@mridang](https://github.com/mridang)! - The widgets now wait for their listeners before they navigate. The detail of `zitadel-flow-redirect`, `zitadel-flow-complete` and `zitadel-signout` carries a `waitUntil(promise)` function; the widget navigates once every promise a listener passed has settled, or after two seconds, and at once when none was passed. The React, Solid, Svelte and Qwik wrappers forward each callback's returned promise to `waitUntil`, so an async or lazily loaded handler runs before the page unloads; the Vue and Angular wrappers expose `waitUntil` on the event detail for a handler to call itself.
+- Updated dependencies [[`114c32c`](https://github.com/zitadel/nextgen/commit/114c32c4a86f7b05794528b889faad159d59bf3f), [`5680eb7`](https://github.com/zitadel/nextgen/commit/5680eb76a273b722456d567f94554e828bcf55e9), [`17523dc`](https://github.com/zitadel/nextgen/commit/17523dcf8e55d9d8a07f27a05c6597749f81ef9b), [`8ef9c49`](https://github.com/zitadel/nextgen/commit/8ef9c495c97188893fd8b879c524ce8e097fa52b), [`dedd93b`](https://github.com/zitadel/nextgen/commit/dedd93ba07e58108771019e70466e858b504c374), [`1653960`](https://github.com/zitadel/nextgen/commit/16539605bbdeadbcf4d8ac2bbfa7e3e16b1af557), [`e3cd8f8`](https://github.com/zitadel/nextgen/commit/e3cd8f81111f3298b5635e31ab3c63a2ce293707), [`be96308`](https://github.com/zitadel/nextgen/commit/be96308eec43f3ffe04a62fd414a18ea2b1ccb21), [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1), [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1), [`831cb81`](https://github.com/zitadel/nextgen/commit/831cb81978e65f1b5d41b41330c31e9c43fd2030), [`3b206b2`](https://github.com/zitadel/nextgen/commit/3b206b2453cabf4da6840396f2be0e96b4ede8fa)]:
+  - @zitadel/api@0.1.0
+  - @zitadel/components@0.1.0
+  - @zitadel/sdk-core@0.1.0
+
+## 1.0.0-alpha.28
+
+### Minor Changes
+
+- [#2075](https://github.com/zitadel/nextgen/pull/2075) [`f64c9c4`](https://github.com/zitadel/nextgen/commit/f64c9c46b0475e143abd68c2c16e67f134773f08) Thanks [@mridang](https://github.com/mridang)! - The ZitadelLogin, ZitadelLogout and ZitadelSession wrappers of the React, Vue, Svelte, Solid and Qwik SDKs now pass the standard HTML attributes (class, style, id, title, slot, hidden, role, tabindex, data-* and aria-*) to the widget element, so an app can position, style and label a widget without an extra wrapper element, and their props types accept exactly those attributes besides the widget's own props. All five use one definition, standardAttributes in @zitadel/sdk-core/types, which also exports the widgetTags constant that names the three widget elements. This changes behaviour for React and Vue callers: those wrappers used to pass every extra prop or attribute on to the element, and now pass only the standard attributes, so a prop such as an event handler, srcdoc or part no longer reaches the element. In Svelte, removing the title prop leaves title="null" on the element. In Angular the component tag already carries the standard attributes, so that SDK is unchanged. The TanStack Start entry re-exports the new React types.
+
+### Patch Changes
+
+- [#2099](https://github.com/zitadel/nextgen/pull/2099) [`20e5433`](https://github.com/zitadel/nextgen/commit/20e5433792cb70a515ad3e22730d8b1ae6dbee74) Thanks [@mridang](https://github.com/mridang)! - The published Svelte package now server-renders: it ships its components' source under the `svelte` export condition, so your Svelte build compiles them for the server as well as the browser, instead of the client-only build that threw `effect_orphan` when rendered with `svelte/server`.
+
+- Updated dependencies [[`0f4b901`](https://github.com/zitadel/nextgen/commit/0f4b901f60f2ed20bff71e321564d3b1fc187eab), [`4efca9c`](https://github.com/zitadel/nextgen/commit/4efca9c361ecf7d7806d6147ca3e2e6a31241e23), [`20e5433`](https://github.com/zitadel/nextgen/commit/20e5433792cb70a515ad3e22730d8b1ae6dbee74), [`437c7f1`](https://github.com/zitadel/nextgen/commit/437c7f127395ac45c8b014948c627516c1f9b4af), [`fce5b01`](https://github.com/zitadel/nextgen/commit/fce5b01506a1941f743c25a51a4011955c7b9bd8), [`fa301b9`](https://github.com/zitadel/nextgen/commit/fa301b96daf57512cef6ffb4eb60fdd49cff33e4), [`628e101`](https://github.com/zitadel/nextgen/commit/628e101e5c254ab8bdaca830fc6e4acbd084b41e), [`12b3226`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f), [`5bf2573`](https://github.com/zitadel/nextgen/commit/5bf257321b290dc54befe3a32b4c39027bd25a2b), [`f65cebe`](https://github.com/zitadel/nextgen/commit/f65cebe8142daaab33882a8ae22822a75bd94e6f), [`e90dade`](https://github.com/zitadel/nextgen/commit/e90dade940d52ce4827ed63d0171d0de68cf2959), [`f64c9c4`](https://github.com/zitadel/nextgen/commit/f64c9c46b0475e143abd68c2c16e67f134773f08)]:
+  - @zitadel/api@1.0.0-alpha.28
+  - @zitadel/components@1.0.0-alpha.28
+  - @zitadel/sdk-core@1.0.0-alpha.28
+
 ## 1.0.0-alpha.27
 
 ### Minor Changes

@@ -75,6 +75,9 @@ jobs:
       # stay apart from the Vercel builds' (the plan: "Who may write to the
       # cache"). Forks get no token.
       TURBO_CACHE: local:rw,remote:rw
+      # As in ci.yml: no Ryuk reaper, the postgres lane's only Docker Hub
+      # image. test-postgres passes TESTCONTAINERS_* through turbo's strict env.
+      TESTCONTAINERS_RYUK_DISABLED: "true"
     steps:
       # As in ci.yml: write dirty pages back early, so that Docker's container
       # creates do not wait for a backlog of several GB on Depot's EC2 runners.
@@ -102,8 +105,9 @@ jobs:
       # GOCACHEPROG, so the builds here use Go's own files. Whichever job
       # saved a shared entry first chose the format for both. The key names
       # the installed Go, whose patch differs between Depot's runner images
-      # (a build result serves only the compiler that made it), and both
-      # modules' go.sum (tools/bench is a module of its own).
+      # (a build result serves only the compiler that made it), and every
+      # module's go.sum (tools/bench and tools/oidc-mock are modules of their
+      # own).
       - uses: actions/setup-go@v6
         id: setup-go
         with:
@@ -116,7 +120,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum', 'tools/bench/go.sum') }}
+          key: go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}
           restore-keys: |
             go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-
 
@@ -163,12 +167,11 @@ jobs:
         if: ${{ steps.remote-cache.outcome != 'success' }}
         run: echo "TURBO_CACHE=local:rw" >> "$GITHUB_ENV"
 
-      - name: Check PR title
+      - name: Check pending changesets
         if: ${{ github.event_name == 'pull_request' }}
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: node scripts/check-pr-title.mjs --title "$PR_TITLE" --base "$BASE_SHA" --summary
+        run: |
+          git branch --force main origin/main
+          node scripts/check-changesets-status.mjs --pending --summary
 
       # Same outputs and gates as ci.yml; the affected set comes from turbo's
       # task graph (NEXTGEN_TASK_RUNNER above) instead of `moon query`. On a

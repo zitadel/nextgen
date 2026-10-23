@@ -127,8 +127,8 @@ const IDP_CALLBACK_ERROR_PAGE = `<!doctype html>
  * `httputil.ParseRedirectTarget`, ported as `parseRedirectTarget`, then binds it
  * to the request origin: the `Origin` header, else the request's own host. The
  * callback redirects to this value, so a target the server would refuse would
- * make it an open redirect, and this mock is publicly deployed
- * (`apps/mock-zitadel`). The accepted target is the one stored, as on the
+ * make it an open redirect, and a client that sends one must fail here as it
+ * would against the server. The accepted target is the one stored, as on the
  * engine.
  */
 function returnTargetRefusal(
@@ -534,9 +534,15 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       return getExchangeHandoffResponseMock();
     }),
     // The session endpoints `<zitadel-session>` and `<zitadel-logout>` read on
-    // mount. In-process there is no session cookie to present, so both answer
-    // the contract's 401 for a signed-out browser.
+    // mount and on sign-out. In-process there is no session cookie to present,
+    // so all of them answer the contract's 401 for a signed-out browser.
     http.get("*/sessions/me", () =>
+      HttpResponse.json(
+        { code: "auth.unauthorized", message: "no session cookie" },
+        { status: 401, headers: { "Cache-Control": "private, no-store" } },
+      ),
+    ),
+    http.get("*/sessions/me/csrf", () =>
       HttpResponse.json(
         { code: "auth.unauthorized", message: "no session cookie" },
         { status: 401, headers: { "Cache-Control": "private, no-store" } },

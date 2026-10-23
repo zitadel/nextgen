@@ -30,6 +30,9 @@ var (
 	// ErrPasswordTooLong is returned when the hashing algorithm cannot take
 	// the whole password: bcrypt stops at 72 bytes.
 	ErrPasswordTooLong = errors.New("the password is too long for the hashing algorithm")
+	// ErrHashMismatch is returned by VerifyHash when the hash was read and the
+	// password does not match it, as opposed to a hash that cannot be read.
+	ErrHashMismatch = errors.New("the password does not match the hash")
 )
 
 type PasswapHasher struct {
@@ -48,6 +51,9 @@ func (h *PasswapHasher) Hash(password string) (string, error) {
 
 func (h *PasswapHasher) VerifyHash(encoded string, target string) error {
 	_, err := h.Swapper.Verify(encoded, target)
+	if errors.Is(err, passwap.ErrPasswordMismatch) {
+		return fmt.Errorf("%w: %w", ErrHashMismatch, err)
+	}
 	return err
 }
 

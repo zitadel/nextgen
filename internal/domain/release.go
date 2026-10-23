@@ -66,10 +66,41 @@ func ErrReleaseRevisionUnpinnable(details any) Error {
 	return newError(PrefixRelease.ErrorCodePrefix("revision_unpinnable"), "release: pinned revision declares no handle", details, nil)
 }
 
+// ReleaseInUseOrigin is one origin whose newest deployment pins the release.
+type ReleaseInUseOrigin struct {
+	Origin       string `json:"origin"`
+	DeploymentID string `json:"deployment_id"`
+}
+
+// ReleaseInUseDetails names every origin that still serves the release.
+type ReleaseInUseDetails struct {
+	Origins []ReleaseInUseOrigin `json:"origins"`
+}
+
+// ErrReleaseInUse refuses to revoke a release an origin still serves; the
+// details name each such origin and the deployment that pins it.
+func ErrReleaseInUse(details ReleaseInUseDetails) Error {
+	return newError(PrefixRelease.ErrorCodePrefix("in_use"), "release: still served by an origin", details, nil)
+}
+
 // ErrReleaseUnresolvedReference reports a handle a revision names that the
 // release does not include.
 func ErrReleaseUnresolvedReference() Error {
 	return newError(PrefixRelease.ErrorCodePrefix("unresolved_reference"), "release: handle is not in the release", nil, nil)
+}
+
+// ErrReleaseRevoked reports a release that was revoked and can no longer be
+// served or deployed. The message is what the login surface shows when an
+// in-flight attempt discovers the revocation.
+func ErrReleaseRevoked() Error {
+	return newError(PrefixRelease.ErrorCodePrefix("revoked"), "the release this attempt runs on was revoked", nil, nil)
+}
+
+// ErrReleaseNotDeployed reports that nothing is deployed to the target the
+// request resolved to. Callers that name the origin in the message use
+// WithMessage so the login surface can show it.
+func ErrReleaseNotDeployed(details any) Error {
+	return newError(PrefixRelease.ErrorCodePrefix("not_deployed"), "nothing is deployed to this origin", details, nil)
 }
 
 // ReleasePointer pins one revision of one resource. Handle names the resource
@@ -107,6 +138,11 @@ type Release struct {
 	Metadata    ReleaseMetadata
 	CreatedAt   time.Time
 	RevokedAt   *time.Time
+}
+
+// Revoked reports whether the release can no longer be served or deployed.
+func (r *Release) Revoked() bool {
+	return r != nil && r.RevokedAt != nil
 }
 
 // ReleaseField enumerates the fields of Release which can be used for

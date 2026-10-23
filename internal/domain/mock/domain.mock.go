@@ -1037,6 +1037,45 @@ func (c *MockFlowSSOIdentityServiceLoadParkedCall) DoAndReturn(f func(context.Co
 	return c
 }
 
+// UserHasPasskey mocks base method.
+func (m *MockFlowSSOIdentityService) UserHasPasskey(ctx context.Context, projectID, userID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UserHasPasskey", ctx, projectID, userID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UserHasPasskey indicates an expected call of UserHasPasskey.
+func (mr *MockFlowSSOIdentityServiceMockRecorder) UserHasPasskey(ctx, projectID, userID any) *MockFlowSSOIdentityServiceUserHasPasskeyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserHasPasskey", reflect.TypeOf((*MockFlowSSOIdentityService)(nil).UserHasPasskey), ctx, projectID, userID)
+	return &MockFlowSSOIdentityServiceUserHasPasskeyCall{Call: call}
+}
+
+// MockFlowSSOIdentityServiceUserHasPasskeyCall wrap *gomock.Call
+type MockFlowSSOIdentityServiceUserHasPasskeyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockFlowSSOIdentityServiceUserHasPasskeyCall) Return(arg0 bool, arg1 error) *MockFlowSSOIdentityServiceUserHasPasskeyCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockFlowSSOIdentityServiceUserHasPasskeyCall) Do(f func(context.Context, string, string) (bool, error)) *MockFlowSSOIdentityServiceUserHasPasskeyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockFlowSSOIdentityServiceUserHasPasskeyCall) DoAndReturn(f func(context.Context, string, string) (bool, error)) *MockFlowSSOIdentityServiceUserHasPasskeyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MockFlowSSORedirectIssuer is a mock of FlowSSORedirectIssuer interface.
 type MockFlowSSORedirectIssuer struct {
 	ctrl     *gomock.Controller

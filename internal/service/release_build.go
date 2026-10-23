@@ -324,7 +324,7 @@ func (s *releaseService) prepareBundleFlows(
 		}
 		req := flow.Request
 		req.ProjectID = input.ProjectID
-		userSchema, err := resolveBundleOrProjectSchema(ctx, stmts, input.ProjectID, req.UserSchema, bundleSchemas)
+		userSchema, err := resolveBundleOrProjectSchema(ctx, stmts, s.builtinBases, input.ProjectID, req.UserSchema, bundleSchemas)
 		if err != nil {
 			if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
 				failures.add(domain.ReleasePointerKindFlowDefinition, flow.Index, req.Name,
@@ -375,13 +375,14 @@ func activeBundleFlowNames(flows []BuildFlowDefinition) map[string]bool {
 func resolveBundleOrProjectSchema(
 	ctx context.Context,
 	stmts AllStatements,
+	bases domain.BuiltinSchemaBases,
 	projectID, handle string,
 	bundleSchemas map[string]*domain.JSONSchema,
 ) (*domain.JSONSchema, error) {
 	if schema, ok := bundleSchemas[handle]; ok {
 		return schema, nil
 	}
-	return resolveUserSchema(ctx, stmts, projectID, handle)
+	return resolveUserSchema(ctx, stmts, bases, projectID, handle)
 }
 
 func (s *releaseService) prepareBundleIDPs(input BuildReleaseInput, failures *BundleValidationError) []preparedIDP {

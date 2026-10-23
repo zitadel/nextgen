@@ -9,6 +9,7 @@ import {
   userAttributes,
   userIdentifier,
   userIdentity,
+  userIdentitySecondary,
   userMetadata,
   userTeams,
 } from "./user";
@@ -61,6 +62,27 @@ export async function fetchUsers(
 }
 
 /**
+ * One page of a team's members: the project's users holding an active
+ * membership in it (`team_id`, ADR 024). The filter reads memberships, so it
+ * needs `team_membership.read` like `expand: ["teams"]` does, and is refused
+ * the same way to a grant on only part of the project.
+ */
+export function fetchTeamMembers(
+  projectId: string,
+  teamId: string,
+  pageToken?: string,
+): Promise<UsersPage> {
+  return api.queryUsers(
+    {
+      limit: PAGE_SIZE,
+      page_token: pageToken,
+      filter: [{ field: "team_id", operation: "equals", value: teamId }],
+    },
+    { project_id: projectId },
+  );
+}
+
+/**
  * Columns for a set of users, from the schemas those users reference.
  *
  * Only the loaded users' schemas are fetched, not every schema in the project:
@@ -76,20 +98,24 @@ export async function columnsForUsers(
   users: Record<string, unknown>[],
 ): Promise<SchemaField[]> {
   const schemaIds = [...new Set(users.map((user) => field(user, "schema")).filter(isPresent))];
-  const loaded = new Map<string, UserSchema>();
-  await Promise.all(
+  const fetched = await Promise.all(
     schemaIds.map(async (id) => {
       try {
-        loaded.set(
-          id,
-          (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema,
-        );
+        return (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema;
       } catch {
         // One unreadable schema costs its columns, not the screen. Its users
         // still render from the fallback below.
+        return undefined;
       }
     }),
   );
+  // Keyed in the users' first-seen order, not in the order the reads finish:
+  // columns follow the map, and a race would reshuffle them on every load.
+  const loaded = new Map<string, UserSchema>();
+  schemaIds.forEach((id, index) => {
+    const schema = fetched[index];
+    if (schema) loaded.set(id, schema);
+  });
   return columnsFor(users, loaded);
 }
 
@@ -127,10 +153,14 @@ export interface UserRow {
    * column, the row menu's accessible name, and the delete dialog's heading.
    */
   name: string;
-  /** The designated identifier — its own column: platform-derived like Status
-   * and ID, so it sits outside the schema-driven set (D4). */
+  /** The designated identifier, whether or not it is the row's `name`. */
   identifier?: string;
-  /** The schema property the identifier came from (e.g. "email"), as the cell's tooltip. */
+  /**
+   * The identifier as a muted line under `name`: set only when a display name
+   * leads, since the identifier is `name` itself otherwise.
+   */
+  secondary?: string;
+  /** The schema property the identifier came from (e.g. "email"), as the line's tooltip. */
   identifierProperty?: string;
   /** Rendered cell values, keyed by schema property. */
   values: Record<string, string>;
@@ -162,9 +192,33 @@ export function toUserRow(
     values,
     name: userIdentity(user) ?? id,
     identifier: userIdentifier(user),
+    secondary: userIdentitySecondary(user),
     identifierProperty: field(user, "identifier_property"),
     status: userMetadata(user).status,
     teams: userTeams(user),
     teamsTruncated: user.teams_truncated === true,
   };
+}
+
+/**
+ * The schema columns that tell the reader something the User cell does not.
+ *
+ * The User cell already shows each row's display name and identifier, and the
+ * identifier is usually a schema property too: under the default schema the
+ * email would otherwise read three times in one row. A column is dropped when
+ * every value it holds repeats its own row's name or identifier; one with any
+ * other value stays whole, so a mixed-schema list keeps the column for the
+ * rows that need it. A column with no values at all is kept, as before.
+ */
+export function columnsBeyondIdentity(columns: SchemaField[], rows: UserRow[]): SchemaField[] {
+  return columns.filter((column) => {
+    let repeats = false;
+    for (const row of rows) {
+      const value = row.values[column.key];
+      if (value === undefined) continue;
+      if (value !== row.name && value !== row.identifier) return true;
+      repeats = true;
+    }
+    return !repeats;
+  });
 }

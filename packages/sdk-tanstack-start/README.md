@@ -5,12 +5,12 @@ TanStack Start request middleware and helpers for Zitadel.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-tanstack-start@alpha
+pnpm add @zitadel/sdk-tanstack-start@latest
 ```
 
 ## Requirements
 
-Peer dependencies: `@tanstack/react-start >=1`, `react >=18` and `react-dom >=18`.
+Peer dependencies: `@tanstack/react-start >=1.168.10`, `react >=18` and `react-dom >=18`.
 
 TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
 

@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
+import { PAGE_TITLE, PAGE_TITLE_ROW } from "./typography";
+
 /**
  * Page hero: title + optional sub-headline on the left, optional trailing
  * action on the right. For filter tabs use shadcn `Tabs` (see Users).
@@ -20,13 +22,11 @@ export function PageHeader({
 }) {
   return (
     <div className="mb-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-2xl tracking-tight text-foreground">{title}</h1>
-          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
-        </div>
+      <div className={PAGE_TITLE_ROW}>
+        <h1 className={PAGE_TITLE}>{title}</h1>
         {action && <div className="shrink-0">{action}</div>}
       </div>
+      {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
     </div>
   );
 }

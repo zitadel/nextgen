@@ -42,6 +42,8 @@ export type ZlSelectChangeDetail = { name: string; value: string };
  * tree. A mouse user sees the styled popup; everyone else (keyboard, AT, agents)
  * uses the native `<select>` and its native popup. Both paths converge on
  * `value`, emit `zl-change`, and mirror `internals.setFormValue()`.
+ *
+ * @fires {CustomEvent<ZlSelectChangeDetail>} zl-change - The selected option changed; carries the new value.
  */
 @customElement("zl-select")
 export class ZlSelect extends FormAtom {
@@ -315,7 +317,12 @@ export class ZlSelect extends FormAtom {
     }
     this.value = next;
     this.syncFormState();
-    emit<ZlSelectChangeDetail>(this, "zl-change", { name: this.name, value: this.value });
+    emit<ZlSelectChangeDetail>(
+      this,
+      "zl-change",
+      { name: this.name, value: this.value },
+      { composed: false },
+    );
     this.dispatchNativeChange();
   }
 

@@ -20,6 +20,7 @@ import {
   SOURCE_DIR,
   writeBuiltinSchemas,
 } from "./render-builtin-schemas.mjs";
+import { DEFAULT_BUILTIN_SCHEMA_BASE } from "../packages/config/src/defaults.ts";
 
 const BASE = "https://schemas.example.test/v1";
 
@@ -134,4 +135,10 @@ test("the files land under the base's path, and stale ones go", () => {
     readFileSync(join(first, "a.json"), "utf8"),
     `${JSON.stringify({ $id: `${BASE}/a.json`, $ref: `${BASE}/b.json` }, null, 2)}\n`,
   );
+});
+
+test("publishes under the namespace the server mints ids in", () => {
+  // The two bases move together: a document whose $id the server does not
+  // know as a built-in would be fetched as anyone's schema.
+  assert.equal(HOSTED_BASE, DEFAULT_BUILTIN_SCHEMA_BASE);
 });

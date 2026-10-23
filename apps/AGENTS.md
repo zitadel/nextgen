@@ -17,9 +17,6 @@ Conventions shared by the deployable apps.
   - The cloud's `schemas` service (`root: apps/cloud` in the repo-root
     [`vercel.json`](../vercel.json)) renders the built-in schemas into the
     repo-root `dist/cloud-schemas`.
-  - `mock-zitadel` is a Vercel Function with its own
-    [`vercel.json`](mock-zitadel/vercel.json): tsdown bundles the app into
-    `dist/app.mjs`, and the hand-written `api/index.mjs` re-exports it.
 
 ## What `next dev` writes
 

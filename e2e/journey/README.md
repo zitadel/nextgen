@@ -28,9 +28,9 @@ The default mode runs the full framework matrix in parallel. It uses the
 5. Publish tarballs to Verdaccio with `alpha` and `latest` tags.
 6. Install `@zitadel/cli` and `@zitadel/server` from the temporary registry.
 7. Create one empty app directory per selected framework in a temporary directory.
-8. Run `npx <cli-package>@alpha doctor --runtime binary --non-interactive --json`.
-9. Run `npx <cli-package>@alpha start --runtime binary --non-interactive --json`.
-10. Run `npx <cli-package>@alpha setup --framework <id> --server local --non-interactive --json`.
+8. Run `npx <cli-package>@latest doctor --runtime binary --non-interactive --json`.
+9. Run `npx <cli-package>@latest start --runtime binary --non-interactive --json`.
+10. Run `npx <cli-package>@latest setup --framework <id> --server local --non-interactive --json`.
 11. Start each generated app on `localhost`.
 12. Run the Playwright tests with one worker per framework journey.
 
@@ -72,6 +72,10 @@ moon run e2e:journey -- --tarballs-dir dist/release/<version>/npm
   building one and implies `--runtime docker`.
 - `--tarballs-dir <path>` uses prebuilt release npm tarballs instead of running
   `moon run release:pack`.
+- Each framework lane starts the mock OIDC provider from
+  `tools/oidc-mock/dist/oidc-mock` (`moon run oidc-mock:build`). Without it the
+  specs that sign in through it skip, and `--ci` refuses to start. A docker
+  runtime starts no mock.
 - `--keep` keeps the temporary work directory after success.
 - `--work-dir <path>` uses an explicit work directory.
 
@@ -85,6 +89,7 @@ Useful environment overrides:
 - `JOURNEY_TARBALLS_REQUIRED=1` to refuse to pack without them. The
   `e2e:journey-local` lane sets it: the e2e lanes beside it read the dist
   folders a pack wipes and rebuilds.
+- `JOURNEY_OIDC_MOCK_PORT` for single-framework runs only
 - `JOURNEY_CI=1`, `JOURNEY_CONCURRENCY`, `JOURNEY_MATRIX`, `JOURNEY_RUNTIME`
   and `JOURNEY_WORK_DIR` for `--ci`, `--concurrency`, `--matrix`, `--runtime`
   and `--work-dir`. Arguments on the command line win. CI's turbo job sets
@@ -101,12 +106,13 @@ Every runner line starts with the time since the runner started
 (`[journey-local 1:12]`), so the log reads as a timeline even where a task
 runner prints a task's output only when it ends. Once the lanes have finished,
 passed or failed, the runner prints a table: a row per lane with when it began,
-the seconds each phase took (doctor, start, setup, the drift probe, the
-testkit's stop and install, app start, Playwright, teardown) and the phase a
-failed lane failed in, and a line with the shared steps before the lanes
-(Playwright browsers, the registry). In GitHub Actions the table also goes to
-the job summary. `scripts/timings.mjs` defines the phases; prepare-app records
-its CLI steps in `timings.json` in the lane's work dir, which the runner reads.
+the seconds each phase took (the mock OIDC provider's start, doctor, start,
+setup, the drift probe, the testkit's stop and install, app start, Playwright,
+teardown) and the phase a failed lane failed in, and a line with the shared
+steps before the lanes (Playwright browsers, the registry). In GitHub Actions
+the table also goes to the job summary. `scripts/timings.mjs` defines the
+phases; prepare-app records its CLI steps in `timings.json` in the lane's work
+dir, which the runner reads.
 
 ## CI gate
 

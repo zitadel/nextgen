@@ -42,7 +42,7 @@ export class ServerPrompt implements SetupPrompt {
       options: [
         {
           value: DEFAULT_SERVER,
-          label: "Zitadel Cloud (api.zitadel.cloud)",
+          label: `Zitadel Cloud (${new URL(DEFAULT_SERVER).host})`,
           hint: "recommended for real projects",
         },
         ...(detected

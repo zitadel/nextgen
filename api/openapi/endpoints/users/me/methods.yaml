@@ -6,8 +6,13 @@ get:
 
     The project and the user both come from the session cookie, so a caller only
     ever reads their own user.
+
+    With `project_id`, the user is returned only when the session belongs to
+    that project.
   tags:
     - Users
+  parameters:
+    - $ref: ../../../components/parameters/session-project-id.yaml
   security:
     - nextgenSession: []
   responses:
@@ -23,6 +28,12 @@ get:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
+    '403':
+      description: The session belongs to a different project than `project_id`.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/schemas/errors/sess-project_mismatch.yaml
     '404':
       description: User referenced by the current session was not found
       content:
@@ -39,8 +50,13 @@ patch:
     Partially updates the caller's own schema-defined attributes. The merged
     result is validated against the user's schema before commit. Concurrent
     writes are last-write-wins.
+
+    With `project_id`, the user is updated only when the session belongs to
+    that project.
   tags:
     - Users
+  parameters:
+    - $ref: ../../../components/parameters/session-project-id.yaml
   security:
     - nextgenSession: []
   requestBody:
@@ -58,13 +74,32 @@ patch:
           schema:
             $ref: ../user.yaml
     '400':
-      description: Invalid request body, empty patch, or merged attributes failing schema validation.
+      description: |
+        Invalid request body, empty patch, or merged attributes failing schema
+        validation.
+
+        Merged attributes that fail the schema answer `req.invalid`, as on
+        `PATCH /users/{user_id}`: `details.details.fields` lists the dotted
+        path of every failing field from the request body, such as
+        `attributes.address.zip`, never the rejected values.
       content:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
     '401':
       description: Client was not authorized or the session is anonymous.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: |
+        `sess.project_mismatch`: the session belongs to a different project than
+        `project_id`. The user is not changed.
+
+        `auth.csrf_invalid`: the request came from another site, or did not carry
+        the session's `X-Zitadel-CSRF` token (see the `nextgenSession` scheme).
+        It is refused before the session is looked at.
       content:
         application/json:
           schema:
@@ -79,6 +114,10 @@ patch:
       description: |
         A patched value is unique and already taken by another user, or
         concurrent writes kept the user changing under the patch; retry.
+
+        A taken value answers `user.already_exists`, with
+        `details.details.fields` naming the attributes whose value is taken,
+        such as `attributes.email`. The user holding the value is not named.
       content:
         application/json:
           schema:

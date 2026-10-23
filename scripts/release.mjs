@@ -8,15 +8,9 @@ import {
   findPublishBlockers,
   publishBlockersMessage,
   readLocalPackages,
-  readPrereleaseTag,
-} from "./release-dist-tags.mjs";
+} from "./release-npm-preflight.mjs";
 import { PUBLIC_PACKAGE_DIRS } from "./release-manifest.mjs";
-import {
-  detectReleaseAutomation,
-  findUnrecordedPendingChangesets,
-  readPrereleaseChangesetIds,
-  readReleaseChangesets,
-} from "./release-automation.mjs";
+import { detectReleaseAutomation } from "./release-automation.mjs";
 import {
   CONTAINER_PLATFORMS,
   buildContainerImage,
@@ -147,7 +141,6 @@ async function commandPublish(options) {
     }
   }
 
-  await assertNoUnrecordedPendingChangesets();
   await assertMainBranch(options, { allowDryRunBypass: !options.recoverVersion });
   await assertPackagesPublishable();
 
@@ -185,15 +178,13 @@ async function commandPublish(options) {
 }
 
 // Fails before anything is published when `changeset publish` would publish a
-// package npm has never seen, which trusted publishing cannot create, or would
-// put a package on `latest` instead of the prerelease tag (see
-// release-dist-tags.mjs).
+// package npm has never seen, which trusted publishing cannot create (see
+// release-npm-preflight.mjs).
 async function assertPackagesPublishable() {
-  const tag = await readPrereleaseTag(repoRoot);
   const packages = await readLocalPackages(repoRoot, PUBLIC_PACKAGE_DIRS);
-  const blockers = await findPublishBlockers(packages, tag);
-  if (blockers.unpublished.length > 0 || blockers.prereleaseOnly.length > 0) {
-    throw new Error(publishBlockersMessage(blockers, tag));
+  const blockers = await findPublishBlockers(packages);
+  if (blockers.unpublished.length > 0) {
+    throw new Error(publishBlockersMessage(blockers));
   }
 }
 
@@ -257,17 +248,6 @@ function parseOptions(args, env = process.env) {
     }
   }
   return parsed;
-}
-
-export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
-  const pending = await readReleaseChangesets(root);
-  const prereleaseChangesetIds = await readPrereleaseChangesetIds(root);
-  const unrecorded = findUnrecordedPendingChangesets(pending, prereleaseChangesetIds);
-  if (unrecorded.length > 0) {
-    throw new Error(
-      `release publish requires all pending changesets to be recorded in .changeset/pre.json: ${unrecorded.join(", ")}`,
-    );
-  }
 }
 
 export function releasePublishEnv(overrides = {}) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,8 +32,12 @@ func newMockedReleaseService(t *testing.T) (service.ReleaseService, *servicemock
 		AnyTimes()
 	statementer.EXPECT().Statements().Return(statements).AnyTimes()
 	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	return service.NewReleaseService(service.NewPool(pool), nil, nil, nil, nil), statements
+	return service.NewReleaseService(service.NewPool(pool), nil, nil, nil, nil, testBuiltinBases), statements
 }
+
+// testBuiltinBases is the built-in schema namespace the release tests run
+// under: example.com rows are outside it, so pointers resolve as written.
+var testBuiltinBases = domain.NewBuiltinSchemaBases("https://schemas.test/builtin/v1", "https://schemas.test/builtin/v0")
 
 // loginFlow collects email, which human-user-v2.json dropped.
 func loginFlow() *domain.FlowDefinition {
@@ -406,4 +411,102 @@ func TestReleaseServiceGetUnknownIsNotFound(t *testing.T) {
 	domErr, ok := errors.AsType[domain.Error](err)
 	require.True(t, ok)
 	assert.Equal(t, domain.ErrReleaseNotFound().Code, domErr.Code)
+}
+
+// A schema pointer may name a built-in schema's `$id` under a base the
+// project was not seeded under: the release pins the row that was found,
+// under the base it is stored at.
+func TestReleaseServiceCreateResolvesBuiltinSchemaUnderAnotherBase(t *testing.T) {
+	const asked = "https://schemas.test/builtin/v0/default-human-user.json"
+	const stored = "https://schemas.test/builtin/v1/default-human-user.json"
+
+	svc, statements := newMockedReleaseService(t)
+	statements.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", asked).
+		Return(nil, new(database.NoRowFoundError))
+	statements.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", stored).
+		Return(&domain.JSONSchema{
+			ProjectID:  "proj_1",
+			URL:        stored,
+			ObjectType: new("human-user"),
+			Schema: []byte(`{"type": "object", "x-identifier": "email",
+				"x-auth-methods": {"password": {"enabled": true}},
+				"properties": {"email": {"type": "string", "format": "email", "x-unique": "team"}}}`),
+		}, nil)
+	statements.EXPECT().
+		GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).
+		Return(nil, new(database.NoRowFoundError))
+	statements.EXPECT().
+		CreateRelease(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, rel *domain.Release) error {
+			rel.ID = "rel_test02"
+			return nil
+		})
+
+	result, err := svc.Create(t.Context(), service.CreateReleaseInput{
+		ProjectID: "proj_1",
+		Pointers:  []service.CreateReleasePointer{{Kind: domain.ReleasePointerKindSchema, RevisionID: asked}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []domain.ReleasePointer{
+		{Kind: domain.ReleasePointerKindSchema, Handle: "human-user", RevisionID: stored},
+	}, result.Release.Pointers)
+}
+
+func TestReleaseServiceRevoke(t *testing.T) {
+	revokedAt := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+	unrevoked := &domain.Release{ProjectID: "proj_1", ID: "rel_1", ContentHash: "abc"}
+	revoked := *unrevoked
+	revoked.RevokedAt = &revokedAt
+	nothingLive := &database.ListResult[*domain.Deployment]{}
+
+	t.Run("revokes a release nothing serves", func(t *testing.T) {
+		svc, statements := newMockedReleaseService(t)
+		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(unrevoked, nil)
+		statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).Return(nothingLive, nil)
+		statements.EXPECT().RevokeRelease(gomock.Any(), "proj_1", "rel_1").Return(&revoked, nil)
+
+		got, err := svc.Revoke(t.Context(), "proj_1", "rel_1")
+		require.NoError(t, err)
+		assert.Equal(t, &revokedAt, got.RevokedAt)
+	})
+
+	t.Run("a revoked release comes back unchanged", func(t *testing.T) {
+		svc, statements := newMockedReleaseService(t)
+		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&revoked, nil)
+
+		got, err := svc.Revoke(t.Context(), "proj_1", "rel_1")
+		require.NoError(t, err)
+		assert.Same(t, &revoked, got)
+	})
+
+	t.Run("an origin still serving it", func(t *testing.T) {
+		svc, statements := newMockedReleaseService(t)
+		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(unrevoked, nil)
+		// The live view narrows each deployment to the origins it still serves.
+		statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{
+				{ProjectID: "proj_1", ID: "dep_3", ReleaseID: "rel_1", Targets: []domain.DeploymentTarget{{Origin: "https://www.acme.com"}}},
+				{ProjectID: "proj_1", ID: "dep_2", ReleaseID: "rel_1", Targets: []domain.DeploymentTarget{{Origin: "https://pr-1-acmeinc.vercel.app"}}},
+			}}, nil)
+
+		_, err := svc.Revoke(t.Context(), "proj_1", "rel_1")
+		require.Error(t, err)
+		de, ok := err.(domain.Error)
+		require.True(t, ok)
+		assert.Equal(t, domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code, de.Code)
+		assert.Equal(t, domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
+			{Origin: "https://pr-1-acmeinc.vercel.app", DeploymentID: "dep_2"},
+			{Origin: "https://www.acme.com", DeploymentID: "dep_3"},
+		}}, de.Details)
+	})
+
+	t.Run("an unknown release", func(t *testing.T) {
+		svc, statements := newMockedReleaseService(t)
+		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_x").Return(nil, database.NewNoRowFoundError(nil))
+
+		_, err := svc.Revoke(t.Context(), "proj_1", "rel_x")
+		assert.ErrorIs(t, err, domain.ErrReleaseNotFound())
+	})
 }

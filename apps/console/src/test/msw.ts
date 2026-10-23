@@ -21,10 +21,12 @@ import { TEST_PROJECT_ID } from "./project-scope.fixture";
  */
 
 /**
- * The one read every `_authed` screen makes for its chrome rather than for the
+ * The reads every `_authed` screen makes for its chrome rather than for the
  * screen under test: the context switcher and the `_authed` guard both list the
  * person's projects, and the default lists the fixture's project so the
- * selection most specs open under is a listed one. A spec about the switcher or
+ * selection most specs open under is a listed one. The profile's own reads
+ * (schema, passkeys, identity links) are defaulted too, since specs reach it
+ * through the account menu and the Settings view. A spec about the switcher or
  * the guard overrides it with `server.use(...)`.
  *
  * `GET /projects/{id}` is deliberately not defaulted: the switcher reads it only
@@ -37,6 +39,23 @@ const shellHandlers = [
   http.get("*/api/users/me/projects", () =>
     HttpResponse.json({ projects: [{ id: TEST_PROJECT_ID, name: "Test project" }] }),
   ),
+  // The signed-in person's own schema (account settings' profile): the shipped
+  // default, email only, nothing designated for display.
+  http.get("*/api/users/me/schema", () =>
+    HttpResponse.json({
+      id: "https://example.test/default-human-user.json",
+      schema: {
+        "x-identifier": "email",
+        required: ["email"],
+        properties: { email: { type: "string", format: "email" } },
+      },
+    }),
+  ),
+  // The person's own sign-in methods, on account settings' profile: none, and
+  // no password.
+  http.get("*/api/users/me/password", () => HttpResponse.json({})),
+  http.get("*/api/users/me/passkeys", () => HttpResponse.json({ passkeys: [] })),
+  http.get("*/api/users/me/identity_links", () => HttpResponse.json({ identity_links: [] })),
 ];
 
 export const server = setupServer(...shellHandlers);

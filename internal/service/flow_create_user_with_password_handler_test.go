@@ -40,8 +40,12 @@ type passwordHandlerFixture struct {
 	hasher      *cryptomock.MockHasher
 }
 
-func newPasswordHandlerFixture(t *testing.T) *passwordHandlerFixture {
+func newPasswordHandlerFixture(t *testing.T, gate ...service.PasswordGate) *passwordHandlerFixture {
 	t.Helper()
+	var passwords service.PasswordGate = noPolicyGate(t)
+	if len(gate) > 0 {
+		passwords = gate[0]
+	}
 	ctrl := gomock.NewController(t)
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
 	v2Pool := servicemocks.NewMockPool(ctrl)
@@ -52,8 +56,8 @@ func newPasswordHandlerFixture(t *testing.T) *passwordHandlerFixture {
 	svcPool := service.NewPool(v2Pool)
 	stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&database.ListResult[*domain.JSONSchema]{}, nil).AnyTimes()
-	userService := service.NewUserService(svcPool, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}, service.StatementsUserRefResolver{Pool: svcPool})
-	handler := service.NewFlowCreateUserHandler(service.FixedProjectHasherResolver{Hasher: hasher}, userService, schemaStore, v2Pool)
+	userService := service.NewUserService(svcPool, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}, passwords, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{})
+	handler := service.NewFlowCreateUserHandler(service.FixedProjectHasherResolver{Hasher: hasher}, passwords, userService, schemaStore, v2Pool)
 
 	return &passwordHandlerFixture{
 		handler:     handler,
@@ -179,6 +183,42 @@ func TestFlowCreateUserWithPassword_TakenValueShowsStepError(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, out.StepError)
 	assert.Equal(t, domain.FlowStepErrorUserAlreadyExists, *out.StepError)
+	assert.Empty(t, out.UserID)
+}
+
+func TestFlowCreateUserWithPassword_PolicyViolationShowsStepError(t *testing.T) {
+	gate := newGate(t, fixedPolicy{config: map[string]any{"min_length": 12}}, nil, nil)
+	f := newPasswordHandlerFixture(t, gate)
+
+	f.stmts.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_premint01", nil)
+	f.schemaStore.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
+		Return(&domain.JSONSchema{
+			ProjectID: "proj_1",
+			URL:       "https://example.test/schema.json",
+			Schema:    []byte(passwordHandlerTestSchema),
+		}, nil).AnyTimes()
+	// No hash, no transaction: the policy rejects the password first.
+
+	out, err := f.handler.Handle(t.Context(), domain.FlowOnSuccessInput{
+		ProjectID:     "proj_1",
+		UserSchemaURL: "https://example.test/schema.json",
+		State: &domain.FlowState{
+			ProjectID:     "proj_1",
+			AuthAttemptID: "att-1",
+			FlowProgress: domain.FlowProgress{
+				CollectedData: domain.CollectedFlowData{
+					UserData: map[string]any{"email": "alice@example.com"},
+					AuthMethods: domain.CollectedAuthMethodData{
+						Password: "s3cret",
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, out.StepError)
+	assert.Equal(t, "error.x-auth-methods#password_min_length", *out.StepError)
 	assert.Empty(t, out.UserID)
 }
 

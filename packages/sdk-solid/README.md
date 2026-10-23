@@ -5,7 +5,7 @@ Solid components for the Zitadel auth UI, for client-side SPAs (Vite, etc.).
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-solid@alpha
+pnpm add @zitadel/sdk-solid@latest
 ```
 
 ## Requirements
@@ -73,6 +73,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 ```tsx
 <ZitadelLogin project={project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
+
+When your callback for `zitadel-flow-complete`, `zitadel-flow-redirect` or `zitadel-signout` returns a promise, the widget waits for it to settle (up to two seconds) before it navigates.
 
 ## Standard HTML attributes
 

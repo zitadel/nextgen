@@ -1,7 +1,7 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { configDefaults, defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
 
 /**
  * Two projects in one config:
@@ -32,7 +32,7 @@ export default defineConfig({
           setupFiles: ["src/test-setup.ts"],
           include: ["src/**/*.{test,spec}.ts"],
           // Never run the svelte-package build output (a staged copy of the spec).
-          exclude: [...configDefaults.exclude, ".svelte-kit/**", "src/**/*.ssr.spec.ts"],
+          exclude: [...configDefaults.exclude, ".svelte-kit/**", "src/**/*.ssr.spec.ts", edgeSpecs],
         },
       },
       {
@@ -46,6 +46,13 @@ export default defineConfig({
           exclude: [...configDefaults.exclude, ".svelte-kit/**"],
         },
       },
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
+      edgeProject({
+        // Svelte loads `node:async_hooks` for its async server rendering, which
+        // Workers (`nodejs_compat`) and Vercel Edge both provide.
+        polyfilledPackages: ["svelte"],
+        plugins: [svelte()],
+      }),
     ],
   },
 });

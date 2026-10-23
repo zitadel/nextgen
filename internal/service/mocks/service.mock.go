@@ -820,6 +820,44 @@ func (c *MockAllStatementsCreateJSONSchemaCall) DoAndReturn(f func(context.Conte
 	return c
 }
 
+// CreatePolicy mocks base method.
+func (m *MockAllStatements) CreatePolicy(ctx context.Context, entity *domain.Policy) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreatePolicy", ctx, entity)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreatePolicy indicates an expected call of CreatePolicy.
+func (mr *MockAllStatementsMockRecorder) CreatePolicy(ctx, entity any) *MockAllStatementsCreatePolicyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreatePolicy", reflect.TypeOf((*MockAllStatements)(nil).CreatePolicy), ctx, entity)
+	return &MockAllStatementsCreatePolicyCall{Call: call}
+}
+
+// MockAllStatementsCreatePolicyCall wrap *gomock.Call
+type MockAllStatementsCreatePolicyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsCreatePolicyCall) Return(arg0 error) *MockAllStatementsCreatePolicyCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsCreatePolicyCall) Do(f func(context.Context, *domain.Policy) error) *MockAllStatementsCreatePolicyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsCreatePolicyCall) DoAndReturn(f func(context.Context, *domain.Policy) error) *MockAllStatementsCreatePolicyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // CreateProject mocks base method.
 func (m *MockAllStatements) CreateProject(ctx context.Context, entity *domain.Project) error {
 	m.ctrl.T.Helper()
@@ -3172,6 +3210,84 @@ func (c *MockAllStatementsGetPersonalTeamForUserCall) DoAndReturn(f func(context
 	return c
 }
 
+// GetPolicy mocks base method.
+func (m *MockAllStatements) GetPolicy(ctx context.Context, projectID, operation string) (*domain.Policy, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPolicy", ctx, projectID, operation)
+	ret0, _ := ret[0].(*domain.Policy)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPolicy indicates an expected call of GetPolicy.
+func (mr *MockAllStatementsMockRecorder) GetPolicy(ctx, projectID, operation any) *MockAllStatementsGetPolicyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPolicy", reflect.TypeOf((*MockAllStatements)(nil).GetPolicy), ctx, projectID, operation)
+	return &MockAllStatementsGetPolicyCall{Call: call}
+}
+
+// MockAllStatementsGetPolicyCall wrap *gomock.Call
+type MockAllStatementsGetPolicyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetPolicyCall) Return(arg0 *domain.Policy, arg1 error) *MockAllStatementsGetPolicyCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetPolicyCall) Do(f func(context.Context, string, string) (*domain.Policy, error)) *MockAllStatementsGetPolicyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetPolicyCall) DoAndReturn(f func(context.Context, string, string) (*domain.Policy, error)) *MockAllStatementsGetPolicyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetPolicyRevision mocks base method.
+func (m *MockAllStatements) GetPolicyRevision(ctx context.Context, projectID, revisionID string) (*domain.Policy, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPolicyRevision", ctx, projectID, revisionID)
+	ret0, _ := ret[0].(*domain.Policy)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPolicyRevision indicates an expected call of GetPolicyRevision.
+func (mr *MockAllStatementsMockRecorder) GetPolicyRevision(ctx, projectID, revisionID any) *MockAllStatementsGetPolicyRevisionCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPolicyRevision", reflect.TypeOf((*MockAllStatements)(nil).GetPolicyRevision), ctx, projectID, revisionID)
+	return &MockAllStatementsGetPolicyRevisionCall{Call: call}
+}
+
+// MockAllStatementsGetPolicyRevisionCall wrap *gomock.Call
+type MockAllStatementsGetPolicyRevisionCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetPolicyRevisionCall) Return(arg0 *domain.Policy, arg1 error) *MockAllStatementsGetPolicyRevisionCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetPolicyRevisionCall) Do(f func(context.Context, string, string) (*domain.Policy, error)) *MockAllStatementsGetPolicyRevisionCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetPolicyRevisionCall) DoAndReturn(f func(context.Context, string, string) (*domain.Policy, error)) *MockAllStatementsGetPolicyRevisionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetPreview mocks base method.
 func (m *MockAllStatements) GetPreview(ctx context.Context, projectID, origin string) (*domain.Preview, error) {
 	m.ctrl.T.Helper()
@@ -3558,6 +3674,45 @@ func (c *MockAllStatementsGetSigningKeyCall) Do(f func(context.Context, database
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsGetSigningKeyCall) DoAndReturn(f func(context.Context, database.Filter[domain.SigningKeyField]) (*domain.SigningKey, error)) *MockAllStatementsGetSigningKeyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetTakenUniqueAttributeKeys mocks base method.
+func (m *MockAllStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projectID, userID string, claims []service.UniqueAttributeClaim) ([]domain.AttributeKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTakenUniqueAttributeKeys", ctx, projectID, userID, claims)
+	ret0, _ := ret[0].([]domain.AttributeKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetTakenUniqueAttributeKeys indicates an expected call of GetTakenUniqueAttributeKeys.
+func (mr *MockAllStatementsMockRecorder) GetTakenUniqueAttributeKeys(ctx, projectID, userID, claims any) *MockAllStatementsGetTakenUniqueAttributeKeysCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTakenUniqueAttributeKeys", reflect.TypeOf((*MockAllStatements)(nil).GetTakenUniqueAttributeKeys), ctx, projectID, userID, claims)
+	return &MockAllStatementsGetTakenUniqueAttributeKeysCall{Call: call}
+}
+
+// MockAllStatementsGetTakenUniqueAttributeKeysCall wrap *gomock.Call
+type MockAllStatementsGetTakenUniqueAttributeKeysCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetTakenUniqueAttributeKeysCall) Return(arg0 []domain.AttributeKey, arg1 error) *MockAllStatementsGetTakenUniqueAttributeKeysCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetTakenUniqueAttributeKeysCall) Do(f func(context.Context, string, string, []service.UniqueAttributeClaim) ([]domain.AttributeKey, error)) *MockAllStatementsGetTakenUniqueAttributeKeysCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetTakenUniqueAttributeKeysCall) DoAndReturn(f func(context.Context, string, string, []service.UniqueAttributeClaim) ([]domain.AttributeKey, error)) *MockAllStatementsGetTakenUniqueAttributeKeysCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -5588,6 +5743,44 @@ func (c *MockAllStatementsLockIDPConnectionCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
+// LockPolicy mocks base method.
+func (m *MockAllStatements) LockPolicy(ctx context.Context, projectID, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LockPolicy", ctx, projectID, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LockPolicy indicates an expected call of LockPolicy.
+func (mr *MockAllStatementsMockRecorder) LockPolicy(ctx, projectID, id any) *MockAllStatementsLockPolicyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockPolicy", reflect.TypeOf((*MockAllStatements)(nil).LockPolicy), ctx, projectID, id)
+	return &MockAllStatementsLockPolicyCall{Call: call}
+}
+
+// MockAllStatementsLockPolicyCall wrap *gomock.Call
+type MockAllStatementsLockPolicyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsLockPolicyCall) Return(arg0 error) *MockAllStatementsLockPolicyCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsLockPolicyCall) Do(f func(context.Context, string, string) error) *MockAllStatementsLockPolicyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsLockPolicyCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsLockPolicyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MarkChallengeCompleted mocks base method.
 func (m *MockAllStatements) MarkChallengeCompleted(ctx context.Context, projectID, id string) error {
 	m.ctrl.T.Helper()
@@ -5813,6 +6006,44 @@ func (c *MockAllStatementsReviseIDPConnectionCall) Do(f func(context.Context, *d
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsReviseIDPConnectionCall) DoAndReturn(f func(context.Context, *domain.IDPConnection) error) *MockAllStatementsReviseIDPConnectionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// RevisePolicy mocks base method.
+func (m *MockAllStatements) RevisePolicy(ctx context.Context, entity *domain.Policy) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RevisePolicy", ctx, entity)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RevisePolicy indicates an expected call of RevisePolicy.
+func (mr *MockAllStatementsMockRecorder) RevisePolicy(ctx, entity any) *MockAllStatementsRevisePolicyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevisePolicy", reflect.TypeOf((*MockAllStatements)(nil).RevisePolicy), ctx, entity)
+	return &MockAllStatementsRevisePolicyCall{Call: call}
+}
+
+// MockAllStatementsRevisePolicyCall wrap *gomock.Call
+type MockAllStatementsRevisePolicyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsRevisePolicyCall) Return(arg0 error) *MockAllStatementsRevisePolicyCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsRevisePolicyCall) Do(f func(context.Context, *domain.Policy) error) *MockAllStatementsRevisePolicyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsRevisePolicyCall) DoAndReturn(f func(context.Context, *domain.Policy) error) *MockAllStatementsRevisePolicyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -9641,6 +9872,45 @@ func (c *MockUserStatementsDeleteUserByIDCall) Do(f func(context.Context, string
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUserStatementsDeleteUserByIDCall) DoAndReturn(f func(context.Context, string, string) error) *MockUserStatementsDeleteUserByIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetTakenUniqueAttributeKeys mocks base method.
+func (m *MockUserStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projectID, userID string, claims []service.UniqueAttributeClaim) ([]domain.AttributeKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTakenUniqueAttributeKeys", ctx, projectID, userID, claims)
+	ret0, _ := ret[0].([]domain.AttributeKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetTakenUniqueAttributeKeys indicates an expected call of GetTakenUniqueAttributeKeys.
+func (mr *MockUserStatementsMockRecorder) GetTakenUniqueAttributeKeys(ctx, projectID, userID, claims any) *MockUserStatementsGetTakenUniqueAttributeKeysCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTakenUniqueAttributeKeys", reflect.TypeOf((*MockUserStatements)(nil).GetTakenUniqueAttributeKeys), ctx, projectID, userID, claims)
+	return &MockUserStatementsGetTakenUniqueAttributeKeysCall{Call: call}
+}
+
+// MockUserStatementsGetTakenUniqueAttributeKeysCall wrap *gomock.Call
+type MockUserStatementsGetTakenUniqueAttributeKeysCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserStatementsGetTakenUniqueAttributeKeysCall) Return(arg0 []domain.AttributeKey, arg1 error) *MockUserStatementsGetTakenUniqueAttributeKeysCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserStatementsGetTakenUniqueAttributeKeysCall) Do(f func(context.Context, string, string, []service.UniqueAttributeClaim) ([]domain.AttributeKey, error)) *MockUserStatementsGetTakenUniqueAttributeKeysCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserStatementsGetTakenUniqueAttributeKeysCall) DoAndReturn(f func(context.Context, string, string, []service.UniqueAttributeClaim) ([]domain.AttributeKey, error)) *MockUserStatementsGetTakenUniqueAttributeKeysCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -15211,6 +15481,45 @@ func (c *MockReleaseServiceListCall) Do(f func(context.Context, service.ListRele
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockReleaseServiceListCall) DoAndReturn(f func(context.Context, service.ListReleasesInput) (*service.ListReleasesOutput, error)) *MockReleaseServiceListCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Revoke mocks base method.
+func (m *MockReleaseService) Revoke(ctx context.Context, projectID, id string) (*domain.Release, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Revoke", ctx, projectID, id)
+	ret0, _ := ret[0].(*domain.Release)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Revoke indicates an expected call of Revoke.
+func (mr *MockReleaseServiceMockRecorder) Revoke(ctx, projectID, id any) *MockReleaseServiceRevokeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Revoke", reflect.TypeOf((*MockReleaseService)(nil).Revoke), ctx, projectID, id)
+	return &MockReleaseServiceRevokeCall{Call: call}
+}
+
+// MockReleaseServiceRevokeCall wrap *gomock.Call
+type MockReleaseServiceRevokeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockReleaseServiceRevokeCall) Return(arg0 *domain.Release, arg1 error) *MockReleaseServiceRevokeCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockReleaseServiceRevokeCall) Do(f func(context.Context, string, string) (*domain.Release, error)) *MockReleaseServiceRevokeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockReleaseServiceRevokeCall) DoAndReturn(f func(context.Context, string, string) (*domain.Release, error)) *MockReleaseServiceRevokeCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

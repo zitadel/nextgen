@@ -1,5 +1,191 @@
 # @zitadel/server
 
+## 0.1.0
+
+### Minor Changes
+
+- [#2142](https://github.com/zitadel/nextgen/pull/2142) [`f4115f8`](https://github.com/zitadel/nextgen/commit/f4115f84a8c749d40c1d27c5698ef5c2ea88d723) Thanks [@IAM-marco](https://github.com/IAM-marco)! - The console's user detail screen now edits a boolean attribute with a switch and saves it as `true` or `false`. Optional fields are marked "Optional" beside their label. A cleared required field now says "This field is required." next to it, and a partly cleared date keeps Save off instead of deleting the stored date. An unsaved edit now survives a switch to the Authentication tab and back. The fields are locked while a save runs, so nothing typed meanwhile is lost.
+
+- [#2135](https://github.com/zitadel/nextgen/pull/2135) [`7066bf8`](https://github.com/zitadel/nextgen/commit/7066bf86ad807ab8278e6c588f40e13f5e3be683) Thanks [@IAM-marco](https://github.com/IAM-marco)! - The console's user detail screen now shows which schema revision a user is on, and links to that schema.
+
+- [#1884](https://github.com/zitadel/nextgen/pull/1884) [`8ef9c49`](https://github.com/zitadel/nextgen/commit/8ef9c495c97188893fd8b879c524ce8e097fa52b) Thanks [@vitorbari](https://github.com/vitorbari)! - `GET /deployments/{deployment_id}` reads one deployment and `GET /deployments` lists them newest first, each with its `kind` and `status`. `origin` narrows the list to one origin, `live=true` lists what is served now, and `expand=release` embeds the release each deployment made live.
+
+- [#1736](https://github.com/zitadel/nextgen/pull/1736) [`77a4f86`](https://github.com/zitadel/nextgen/commit/77a4f8630ddec71c66cb442d64b982ba6e14bb38) Thanks [@vitorbari](https://github.com/vitorbari)! - Every deployment carries a `kind`, `primary` or `preview`, and a `status`, `live` or `inactive`. Primary origins are deployed as a whole with `targets: ["primary"]`, so they all serve the same deployment, and a rollback re-deploys to every primary origin the project has.
+  
+  **Breaking:** a deploy that names a primary origin answers `400` with `dep.invalid`; deploy to `primary` instead.
+
+- [#1883](https://github.com/zitadel/nextgen/pull/1883) [`dedd93b`](https://github.com/zitadel/nextgen/commit/dedd93ba07e58108771019e70466e858b504c374) Thanks [@vitorbari](https://github.com/vitorbari)! - Releases can now be deployed to a project's primary origins with `POST /deployments` and `targets: ["primary"]`, which covers every primary origin. Deploying the release that is already live answers `200` and writes nothing, and `expected_deployment_id` guards against racing another deploy with `409` `dep.conflict`.
+
+- [#1886](https://github.com/zitadel/nextgen/pull/1886) [`1653960`](https://github.com/zitadel/nextgen/commit/16539605bbdeadbcf4d8ac2bbfa7e3e16b1af557) Thanks [@peintnermax](https://github.com/peintnermax)! - `GET /users/{user_id}/password` reports when the user's current password was set (`set_at`), and leaves it out when the user has none. It never returns the password or its hash. It takes `user.read`, or a Console session with access to the user's project, and the generated client gains `getUserPasswordState`.
+
+- [#2107](https://github.com/zitadel/nextgen/pull/2107) [`f80ea64`](https://github.com/zitadel/nextgen/commit/f80ea64893ce78a1a5511f1baef214d9b9869217) Thanks [@livio-a](https://github.com/livio-a)! - A password longer than 64 characters is now rejected with the error code `user.password_policy_violation` instead of `user.password_too_long` when it is set through the API (`PUT /users/{user_id}/password`); the response's `details.details` holds `{"violations": {"max_length": 64}}`. During sign-up, with a password or through a social provider, the same rejection now appears as an error on the sign-up step instead of the request failing; in the default sign-up flow that is the step with the password field, so the user can choose another password. Clients that match on `user.password_too_long` for over-long passwords should also handle `user.password_policy_violation`; `user.password_too_long` remains for passwords the project's hashing method cannot take.
+
+- [#2043](https://github.com/zitadel/nextgen/pull/2043) [`0e1ee74`](https://github.com/zitadel/nextgen/commit/0e1ee74cd4aa9239d90c91831fa0f4028003e7c6) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Runtime operations document how a request finds its release from the browser `Origin` header. `POST /flow` takes `Origin` as the input that selects the deployment; an origin that matches no project pattern answers `403` with `proj.origin_not_allowed`, a preview URL with no live preview answers `403` with `proj.preview_not_live`, nothing deployed answers `409` with `rel.not_deployed`, and a revoked release answers `409` with `rel.revoked`. Later flow steps and app-plane auth-attempt operations re-use the sealed deployment and only refuse with `rel.revoked` (plus `proj.mismatch` / `rel.not_deployed` on create and handoff exchange). The server still serves today's behavior until the resolution path lands.
+
+- [`5dea188`](https://github.com/zitadel/nextgen/commit/5dea1885224ee60b41c268ed501e179e0c648c6a) Thanks [@adlerhurst](https://github.com/adlerhurst)! - `POST /flow` resolves the release from the browser `Origin` header: the gate admits the origin against the project's patterns and live previews, the newest deployment to that exact origin is the target, and that deployment's release is sealed into `_zflow` as `deployment_id` and `release_id`. An origin that matches no pattern answers `403` with `proj.origin_not_allowed`, a preview URL with no live preview answers `403` with `proj.preview_not_live`, nothing deployed to a pattern-matched origin answers `409` with `rel.not_deployed`, and a revoked release answers `409` with `rel.revoked`. A request with no `Origin`, or an open admission (empty allowlist / loopback) with nothing deployed yet, keeps the previous newest-revision path until the project default target lands.
+
+- [#2160](https://github.com/zitadel/nextgen/pull/2160) [`4d661a6`](https://github.com/zitadel/nextgen/commit/4d661a6fd1f392a496424803c320741f8755b628) Thanks [@fforootd](https://github.com/fforootd)! - The "You already have an account" step after a sign-in with an identity provider now carries the account's email when the provider verified it (as `step.identifier`, so a password manager offers the matching password), no longer offers the provider that just led there, and offers "Use a passkey" only to an account that has one.
+
+- [#1894](https://github.com/zitadel/nextgen/pull/1894) [`aae6e07`](https://github.com/zitadel/nextgen/commit/aae6e07dddd858ee21b09a5ce4bf68d269b2bca6) Thanks [@wim07101993](https://github.com/wim07101993)! - User attribute errors now name the fields to fix. When `POST /users`, `PATCH /users/{user_id}` or `PATCH /users/me` refuses attributes that fail the user schema, the answer is `400 req.invalid`, the same as for a malformed body, and `details.details.fields` lists every failing field by its path from the request body, such as `attributes.country` or `attributes.address.zip`. A unique value another user holds still answers `409 user.already_exists`, and `details.details.fields` now names the attributes whose value is taken in the same form, without naming the user who holds it. Clients that matched `user.invalid` for schema failures should match `req.invalid`.
+
+- [#2202](https://github.com/zitadel/nextgen/pull/2202) [`831cb81`](https://github.com/zitadel/nextgen/commit/831cb81978e65f1b5d41b41330c31e9c43fd2030) Thanks [@peintnermax](https://github.com/peintnermax)! - Add `GET /users/me/passkeys`, `GET /users/me/identity_links` and `GET /users/me/password`: the signed-in user's own passkeys, linked identity provider accounts and password state, readable with the session alone. Like the other `/users/me` reads they take an optional `project_id`, and refuse a session of another project with `403 sess.project_mismatch`. The `@zitadel/api` client gains `listMyPasskeys()`, `listMyIdentityLinks()` and `getMyPasswordState()`.
+
+### Patch Changes
+
+- [#2211](https://github.com/zitadel/nextgen/pull/2211) [`d66f2ee`](https://github.com/zitadel/nextgen/commit/d66f2eecf3ed3814a277c86ae5837fd04c3fef1b) Thanks [@fforootd](https://github.com/fforootd)! - Fix an authentication bypass: a sign-in through `POST /auth_attempts` could
+  issue a session after verifying only the user's identifier, with no password,
+  passkey, or SSO. An attempt created without required checks counted as complete
+  as soon as the identifier resolved, and the project's publishable key, which is
+  public by design, can call these endpoints, so anyone holding it could sign in
+  as any user whose identifier they knew.
+  
+  An attempt now completes only once it carries a verified password, passkey, or
+  SSO factor, and `POST /auth_attempts/{id}/handoff` refuses one without it with
+  `att.not_completed`. A client that drives the auth-attempt API directly must
+  verify one of those factors before it asks for a handoff. Sessions issued
+  through this gap before you upgrade stay valid until they expire: list your
+  active sessions and revoke any whose only factor is `identifier`.
+
+- [#1885](https://github.com/zitadel/nextgen/pull/1885) [`b69348e`](https://github.com/zitadel/nextgen/commit/b69348e0741c91073a876daefeb39408d0e2faf6) Thanks [@peintnermax](https://github.com/peintnermax)! - The console's user detail screen follows the updated design. Overview heads the
+  profile with the user's schema and saves edited attributes with a Save button;
+  only the changed attributes are sent, and a cleared optional field is removed.
+  The Authentication tab lists the passkey state as a label and its value, with
+  when the passkey was verified, and the identity providers in the same style.
+
+- [#2192](https://github.com/zitadel/nextgen/pull/2192) [`54000c1`](https://github.com/zitadel/nextgen/commit/54000c1c17aceb0553c462b2195ed32f39b30a30) Thanks [@peintnermax](https://github.com/peintnermax)! - The console's users list keeps its attribute columns in the same order on every load; before, a list mixing user schemas could reshuffle them depending on which schema loaded first. Each row's ID gains a copy button, shown on hover or focus, which copies the whole ID even where the column truncates it.
+
+- [#2188](https://github.com/zitadel/nextgen/pull/2188) [`17523dc`](https://github.com/zitadel/nextgen/commit/17523dcf8e55d9d8a07f27a05c6597749f81ef9b) Thanks [@fforootd](https://github.com/fforootd)! - Declare the error codes that the branding, event, team, project-claim and health operations return. Their error response described only the generic `{ code, message }` shape, so the OpenAPI document and the API reference did not list which codes these 17 operations can send. Each now names its codes, like every other operation, and the `@zitadel/api` client gains a code-discriminated `<Operation>Default` type for each (for example `GetTeamDefault`) to branch on.
+
+- [#2166](https://github.com/zitadel/nextgen/pull/2166) [`fe8b825`](https://github.com/zitadel/nextgen/commit/fe8b82561af2d28a31ddea18b0ae972c8e7a92a1) Thanks [@fforootd](https://github.com/fforootd)! - Step-up sign-in now requires proof that the caller holds the session. `POST /auth_attempts` and `POST /flow` take a new `session_token` field. A request that names an existing `session_id` must also send that session's `session_token`, as `POST /sessions` or `POST /sessions/exchange` returned it. A request that sends only `session_token` runs against the token's session. Before this, a `session_id` alone was accepted. The new attempt then inherited that session's verified factors, so a caller who knew a session id but did not hold the session could complete a step-up on it and receive a fresh session token. A `session_id` without a matching `session_token` of the same project is now refused with `400` (`att.invalid_request` on attempts, `req.invalid` on flows).
+
+## 1.0.0-alpha.28
+
+### Minor Changes
+
+- [#1802](https://github.com/zitadel/nextgen/pull/1802) [`0f4b901`](https://github.com/zitadel/nextgen/commit/0f4b901f60f2ed20bff71e321564d3b1fc187eab) Thanks [@peintnermax](https://github.com/peintnermax)! - Add `GET /users/me/schema` and `GET /users/me/teams`: the signed-in user's own schema and team roster, readable with the session alone. Every `/users/me` endpoint now answers a refused session with `401 auth.unauthorized`. The `@zitadel/api` client gains `getMyUserSchema()` and `listMyTeams()`.
+
+- [#1858](https://github.com/zitadel/nextgen/pull/1858) [`83ffa22`](https://github.com/zitadel/nextgen/commit/83ffa22d6d8945e8234ced513083b3f17d85a5f0) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Build a release from a `.zitadel/` configuration bundle in one request (`POST /releases/build`): every resource failure is reported at once under `400 rel.invalid`, matching content reuses any prior revision (so rebuilding older content returns the existing release without allocating), and a missing handle answers `rel.unresolved_reference`.
+
+- [#1890](https://github.com/zitadel/nextgen/pull/1890) [`aa3454d`](https://github.com/zitadel/nextgen/commit/aa3454dba80ba69124053a975e3d53c7b6a99a2e) Thanks [@peintnermax](https://github.com/peintnermax)! - A platform user can rename the personal team created for them at sign-up: it is created with an `editor` grant scoped to that team.
+
+- [#1801](https://github.com/zitadel/nextgen/pull/1801) [`7c7bd5d`](https://github.com/zitadel/nextgen/commit/7c7bd5d731c90e3624b2b8fbfe62f6f719492adc) Thanks [@peintnermax](https://github.com/peintnermax)! - Seed the platform project with a user schema that adds an optional `name`, designated as `x-display`, so the people operating Zitadel — the cloud's admin and the local `zitadel start` admin — can name themselves. Customer projects keep the default schema unchanged, and registration still asks for an email only. A platform project that already exists keeps its schema until it is reseeded.
+
+- [#2080](https://github.com/zitadel/nextgen/pull/2080) [`628e101`](https://github.com/zitadel/nextgen/commit/628e101e5c254ab8bdaca830fc6e4acbd084b41e) Thanks [@fforootd](https://github.com/fforootd)! - `DELETE /sessions/me` and `GET /sessions/me/csrf` take the same optional
+  `project_id` as `GET /sessions/me`, and answer a session of another project
+  with `403 sess.project_mismatch`. A refused sign-out leaves that session signed
+  in and keeps its cookie. `<zitadel-session>`, `<zitadel-logout>` and the console
+  send their project when they sign out, and the console also when it reads its
+  CSRF token. Signing out with `<zitadel-session>` or `<zitadel-logout>` after the
+  session already ended, in another tab or by expiring, now completes instead of
+  showing an error.
+
+  In `@zitadel/api`, `revokeMySession()` and `getMySessionCsrfToken()` now take
+  their query parameters first: call `revokeMySession(undefined, init)` and
+  `getMySessionCsrfToken(undefined, init)` where you passed `init` alone.
+
+- [#2140](https://github.com/zitadel/nextgen/pull/2140) [`767f391`](https://github.com/zitadel/nextgen/commit/767f391de04c1209c7b3d114c8b3ff87bda13667) Thanks [@IAM-marco](https://github.com/IAM-marco)! - `PATCH /users/{user_id}` now accepts the Console session cookie as the signed-in user, like reading and deleting a user.
+
+- [#1888](https://github.com/zitadel/nextgen/pull/1888) [`43b52f6`](https://github.com/zitadel/nextgen/commit/43b52f627ce1fb09765f5726102342fb031c5a5e) Thanks [@peintnermax](https://github.com/peintnermax)! - `GET /users/{id}/teams` accepts the Console session cookie, gated like the membership expansion on `POST /users/query`.
+
+- [#2076](https://github.com/zitadel/nextgen/pull/2076) [`12b3226`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now count a session as signed in only when it belongs to the
+  app's own project. A session of another project on the same server, such as a
+  second app on the same host or the console of a local `zitadel start`, reads
+  as signed out in `protectedRoutes`, `auth()` and `getAuth()`, and its cookie is
+  left in place for the app it belongs to.
+
+  The project comes from the new `projectId` middleware option, else
+  `ZITADEL_PROJECT_ID`, else the framework's public project id variable
+  (`NEXT_PUBLIC_`, `VITE_` or `PUBLIC_ZITADEL_PROJECT_ID`). `zitadel setup`
+  already writes these to `.env.local`. A deployment that sets none of them must
+  set `ZITADEL_PROJECT_ID`, or nobody is signed in. With `@zitadel/sdk-nuxt`, the
+  public project id (`NUXT_PUBLIC_ZITADEL_PROJECT_ID`) decides unless
+  `nextgen.projectId` names one, so a built server follows it at runtime. A JWT
+  session token must name the project in its `aud` claim. `auth()` in
+  `@zitadel/sdk-next` also takes the project of `configureZitadel()`; with
+  `createProxy(config)`, pass the same project to `auth()` when it lives only in
+  that handle.
+
+  `GET /sessions/me` takes an optional `project_id` and answers a session of
+  another project with `403 sess.project_mismatch`. The SDKs send it, and so do
+  `getSession()` in `@zitadel/sdk-next`, `<zitadel-session>`, `<zitadel-logout>`
+  and the console. `getSession()` takes the project from its `projectId` option,
+  `configureZitadel()` or `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, and without one reads
+  as signed out. Signing out with `<zitadel-logout>` or `<zitadel-session>` no
+  longer ends another project's session. The `AGENTS.md` guidance that
+  `zitadel setup` writes now tells agents to read the session this way.
+
+  A Bearer token that is not this app's no longer decides what happens to the
+  session cookie that came with it: the cookie is judged, and cleared only when
+  the backend refuses it, on its own.
+
+  In `@zitadel/api`, `getMySession()` now takes its query parameters first: call
+  `getMySession(undefined, init)` where you called `getMySession(init)`. In
+  `@zitadel/sdk-core`, `checkOpaqueSessionToken()` and
+  `validateOpaqueSessionToken()` take the project id as a fourth argument, and
+  `resolveSession()` is the one implementation of these rules behind every server
+  SDK's middleware.
+
+  The `@zitadel/sdk-next` middleware also no longer lets a session that has not
+  finished signing in through `protectedRoutes`.
+
+- [#2110](https://github.com/zitadel/nextgen/pull/2110) [`5bf2573`](https://github.com/zitadel/nextgen/commit/5bf257321b290dc54befe3a32b4c39027bd25a2b) Thanks [@livio-a](https://github.com/livio-a)! - Signing out with the session cookie (`DELETE /sessions/me`) now needs the
+  session's CSRF token in `X-Zitadel-CSRF`, like every other write the cookie
+  authenticates; without it the server answers `403 auth.csrf_invalid` and the
+  session stays signed in. `<zitadel-session>` and `<zitadel-logout>` read the
+  token from `GET /sessions/me/csrf` and send it.
+
+  **Breaking:** an app on an older `@zitadel/components` cannot sign out against
+  this server. Update `@zitadel/components` (or the SDK that bundles it) together
+  with the server. Code that calls `revokeMySession()` itself must first read the
+  token with `getMySessionCsrfToken()` and send it in the `X-Zitadel-CSRF` header,
+  or set it once with `setApiCsrfToken()`.
+
+- [#2098](https://github.com/zitadel/nextgen/pull/2098) [`f65cebe`](https://github.com/zitadel/nextgen/commit/f65cebe8142daaab33882a8ae22822a75bd94e6f) Thanks [@fforootd](https://github.com/fforootd)! - `GET /users/me`, `PATCH /users/me` and `GET /users/me/projects` take the same
+  optional `project_id` as `GET /sessions/me`, and answer a session of another
+  project with `403 sess.project_mismatch` without reading or changing the user.
+  The console sends its project on these calls: when the cookie holds an app's
+  session instead, as on `localhost` after an app on another port signs in, the
+  console asks you to sign in again rather than showing that app's user or
+  projects.
+
+  In `@zitadel/api`, `getMyUser()` and `patchMyUser()` now take their query
+  parameters before the request options: call `getMyUser(undefined, init)` and
+  `patchMyUser(body, undefined, init)` where you passed `init` directly.
+
+- [#2134](https://github.com/zitadel/nextgen/pull/2134) [`e90dade`](https://github.com/zitadel/nextgen/commit/e90dade940d52ce4827ed63d0171d0de68cf2959) Thanks [@fforootd](https://github.com/fforootd)! - `GET /users/me/schema` and `GET /users/me/teams` take the same optional
+  `project_id` as `GET /users/me`, and answer a session of another project with
+  `403 sess.project_mismatch` without reading that user's schema or teams.
+
+  In `@zitadel/api`, `getMyUserSchema()` now takes its query parameters before the
+  request options: call `getMyUserSchema(undefined, init)` where you passed `init`
+  directly.
+
+### Patch Changes
+
+- [#2056](https://github.com/zitadel/nextgen/pull/2056) [`d04f94b`](https://github.com/zitadel/nextgen/commit/d04f94b50061418b1dba90f3f8b8ddfa0dee9adf) Thanks [@fforootd](https://github.com/fforootd)! - Built-in schemas are now named under `https://zitadel.com/schemas/v1`, for example `https://zitadel.com/schemas/v1/user-schema.json`, instead of `https://nextgen.com/api/schemas`, a domain Zitadel does not own. The base is an identifier, not an address: the server never fetches a URL in either namespace. Existing projects need no change: a built-in schema's id resolves under either base everywhere the API reads one, including `GET /schemas/{id}`, a flow definition's `user_schema`, a release's schema pointer, the users list's `schema` filter, and bootstrap user documents. A server still configured with the previous base accepts the new ids too. Projects created by `zitadel setup` from now on reference the new URLs, so pair this CLI with a server from this release or later.
+
+- [#2137](https://github.com/zitadel/nextgen/pull/2137) [`2981820`](https://github.com/zitadel/nextgen/commit/2981820879b27d300c0c39b792c891df1ff9f341) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Reloading or opening a console or login UI link whose last path segment holds a dot, such as a schema whose id is its `$id` URL, now loads the page instead of answering 404, and so does any other missing path under the console or login UI. Missing files under `assets/` still answer 404.
+
+- [#2152](https://github.com/zitadel/nextgen/pull/2152) [`61fad70`](https://github.com/zitadel/nextgen/commit/61fad700031c3d7331a1f0bd0dcda188e513254d) Thanks [@fforootd](https://github.com/fforootd)! - The console now opens on Users instead of an empty Teams page, after
+  `zitadel console`, sign-in and "Open the console" after a claim, so the people
+  who signed up through your app are the first thing you see. The Users table
+  shows each value once: a user's email no longer repeats across the User,
+  Identifier and Email columns under the default user schema, the identifier sits
+  under a display name when the schema has one, and the table fits a 1024px
+  window without scrolling sideways (a long user ID is shortened, with the full
+  ID in its tooltip).
+
+- [#1853](https://github.com/zitadel/nextgen/pull/1853) [`bd5b5f6`](https://github.com/zitadel/nextgen/commit/bd5b5f67c5adf50067716c012183efa73b175cc3) Thanks [@peintnermax](https://github.com/peintnermax)! - Login and registration fields now measure `minLength` and `maxLength` in characters, as the user schema does, rather than in bytes. A value with accented letters or emoji could previously pass a minimum length while being too short, and a name at its maximum length was rejected before reaching it.
+
+- [#2150](https://github.com/zitadel/nextgen/pull/2150) [`437c7f1`](https://github.com/zitadel/nextgen/commit/437c7f127395ac45c8b014948c627516c1f9b4af) Thanks [@fforootd](https://github.com/fforootd)! - `<zitadel-login>` and `<zitadel-session>` no longer load Arimo from Google Fonts
+  by default, so an unbranded sign-in page sends no visitor data to a font CDN.
+  Without a branding `typography.font_url` the login renders in Arimo where the
+  browser already has it and in the system font otherwise; set `font_url` (on a
+  `variant="page"` login) or load a face in your app to choose one. The server's
+  hosted login page now serves Arimo from its own origin.
+
+- [#2036](https://github.com/zitadel/nextgen/pull/2036) [`f2b8ff4`](https://github.com/zitadel/nextgen/commit/f2b8ff40807523e42cc0fc8318f4aceb11e4021e) Thanks [@wim07101993](https://github.com/wim07101993)! - `PATCH /users/{user_id}` now moves a user only to another revision of its own schema, one with the same `objectType`, older or newer. A `schema` with a different `objectType` is rejected with `user.invalid`, and `details` names the user's current schema and the requested one with their `objectType`s. Before, any registered schema was accepted. Moving back to an older revision is validated like moving forward: send the attribute changes it needs, such as `null` for an attribute it does not declare. Values removed by an earlier move are not restored.
+
 ## 1.0.0-alpha.27
 
 ### Patch Changes

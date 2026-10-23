@@ -81,6 +81,20 @@ export class AngularPatcher extends AbstractRulePatcher {
     await assertMountsRootComponent(cwd, await angularEntry(cwd), ROOT);
   }
 
+  protected devPortOps(ctx: PatchContext, previousPort: number | undefined): FileOp[] {
+    return [
+      {
+        kind: "edit",
+        path: "angular.json",
+        edit: angularProxyEdit({
+          proxyConfig: "proxy.conf.cjs",
+          port: ctx.framework.devPort,
+          previousPort,
+        }),
+      },
+    ];
+  }
+
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
       {

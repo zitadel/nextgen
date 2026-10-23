@@ -139,6 +139,8 @@
         "scripts/ci-mode.mjs",
         "scripts/ci-mode.test.mjs",
         "scripts/dev-process.mjs",
+        "scripts/dev-process.test.mjs",
+        "scripts/shims/pnpm",
         "scripts/generate-meta-schemas.ts",
         "scripts/generate-meta-schemas.test.ts",
         "scripts/release-artifacts.mjs",

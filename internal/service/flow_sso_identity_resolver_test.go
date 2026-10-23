@@ -76,14 +76,14 @@ func newSSOResolverFixture(t *testing.T) *ssoResolverFixture {
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
 	hasher := cryptomock.NewMockHasher(ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
-	users := service.NewUserService(pool, schemaStore, nil, nil)
+	users := service.NewUserService(pool, schemaStore, nil, nil, nil, domain.BuiltinSchemaBases{})
 	return &ssoResolverFixture{
 		pool:        pool,
 		stmts:       stmts,
 		connections: connections,
 		schemaStore: schemaStore,
 		hasher:      hasher,
-		resolver:    service.NewFlowSSOIdentityResolver(pool, connections, users, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}),
+		resolver:    service.NewFlowSSOIdentityResolver(pool, connections, users, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}, noPolicyGate(t)),
 	}
 }
 
@@ -888,7 +888,8 @@ func TestFlowSSOIdentityResolver_CreateLinked_InvalidUserLogsLocations(t *testin
 	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logged, nil)))
 
 	_, err := f.resolver.CreateLinked(ctx, in)
-	require.ErrorIs(t, err, domain.ErrUserInvalid())
+	require.ErrorIs(t, err, domain.ErrUserAttributesInvalid(nil))
+	assert.True(t, domain.IsUserInvalid(err))
 	assert.Contains(t, logged.String(), "level=WARN")
 	assert.Contains(t, logged.String(), "/email")
 	assert.NotContains(t, logged.String(), "secret-value")
@@ -902,6 +903,22 @@ func TestFlowSSOIdentityResolver_CreateLinked_LostRaceEmitsUserCreateFailed(t *t
 	f.inTransaction(t)
 	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
 	f.expectCreateUser(database.NewUniqueError("users", "uq_unique_attributes", nil))
+
+	_, err := f.resolver.CreateLinked(t.Context(), createInput())
+	require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
+	assert.NotNil(t, f.event(domain.EventTypeUserCreateFailed))
+}
+
+// Losing the link race rolls the created user back, so it is audited like a
+// lost create.
+func TestFlowSSOIdentityResolver_CreateLinked_LostLinkRaceEmitsUserCreateFailed(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
+	f.expectCreateUser(nil)
+	f.stmts.EXPECT().CreateIDPIdentityLink(gomock.Any(), gomock.Any()).
+		Return(database.NewUniqueError("idp_identity_links", "uq_idp_identity_links_connection_subject", nil))
 
 	_, err := f.resolver.CreateLinked(t.Context(), createInput())
 	require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
@@ -1020,6 +1037,34 @@ func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// One passkey row is enough to answer, so the read asks for one, of this
+// user in this project.
+func TestFlowSSOIdentityResolver_UserHasPasskey(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		keys []*domain.UserPasskey
+		want bool
+	}{
+		{name: "none", want: false},
+		{name: "one", keys: []*domain.UserPasskey{{UserID: "user-1"}}, want: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newSSOResolverFixture(t)
+			f.stmts.EXPECT().
+				ListUserPasskeys(gomock.Any(), gomock.Cond(func(opts *database.ListOptions[domain.UserPasskeyField]) bool {
+					return opts.Pagination.Limit == 1 && opts.Filter != nil
+				})).
+				Return(&database.ListResult[*domain.UserPasskey]{Items: tt.keys}, nil)
+
+			got, err := f.resolver.UserHasPasskey(t.Context(), ssoProjectID, "user-1")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
