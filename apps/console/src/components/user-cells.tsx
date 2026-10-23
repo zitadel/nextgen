@@ -258,8 +258,20 @@ export function UserAttributesCell({
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent align="start" className="w-[min(28rem,calc(100vw-2rem))] p-3">
-            <div className="mb-3 flex items-start justify-between gap-3 px-1">
+          {/* Focus lands on the popover itself, not on its first tab: an
+              auto-focused tab would open with its focus ring drawn. Tab still
+              walks on to View details, the tabs and Copy. */}
+          <PopoverContent
+            align="start"
+            tabIndex={-1}
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              (event.currentTarget as HTMLElement).focus();
+            }}
+            className="w-[min(28rem,calc(100vw-2rem))] overflow-hidden p-0"
+          >
+            {/* 16px inset, the same as the viewer's tab labels and code. */}
+            <div className="flex items-start justify-between gap-3 px-4 py-3">
               <PopoverHeader className="min-w-0">
                 <PopoverTitle>Attributes</PopoverTitle>
                 <PopoverDescription className="truncate text-xs">{user.name}</PopoverDescription>
@@ -272,12 +284,7 @@ export function UserAttributesCell({
                 View details
               </Link>
             </div>
-            <DocumentViewer
-              document={user.attributes}
-              noun="attributes"
-              hint={false}
-              codeClassName="max-h-80"
-            />
+            <DocumentViewer document={user.attributes} noun="attributes" compact />
           </PopoverContent>
         </Popover>
       )}
