@@ -100,6 +100,9 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.Contains(t, idpIDs(read.queryOK(t, &api.QueryIdpsRequest{}).Idps), created.ID)
 		got := read.get(t, created.ID)
 		require.IsType(t, &api.IdpResponse{}, got, helpers.MustMarshal(t, got))
+		revision, err := session.GetIdpRevisionById(t.Context(), api.GetIdpRevisionByIdParams{ProjectID: api.ProjectID(console.ID), RevisionID: created.RevisionID})
+		require.NoError(t, err)
+		require.IsType(t, &api.IdpResponse{}, revision, helpers.MustMarshal(t, revision))
 	})
 
 	t.Run("teams", func(t *testing.T) {
@@ -539,6 +542,9 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		require.Contains(t, idpIDs(read.queryOK(t, &api.QueryIdpsRequest{}).Idps), created.ID)
 		got := read.get(t, created.ID)
 		require.IsType(t, &api.IdpResponse{}, got, helpers.MustMarshal(t, got))
+		revision, err := session.GetIdpRevisionById(t.Context(), api.GetIdpRevisionByIdParams{ProjectID: api.ProjectID(customer.ID), RevisionID: created.RevisionID})
+		require.NoError(t, err)
+		require.IsType(t, &api.IdpResponse{}, revision, helpers.MustMarshal(t, revision))
 	})
 
 	t.Run("without a grant the resource is not found", func(t *testing.T) {

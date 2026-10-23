@@ -12985,6 +12985,7 @@ type CreateDeploymentErrorResponse struct {
 	NotImplemented      NotImplemented
 	ProjNotFound        ProjNotFound
 	RelNotFound         RelNotFound
+	RelRevoked          RelRevoked
 	ReqInvalid          ReqInvalid
 }
 
@@ -13004,6 +13005,7 @@ const (
 	NotImplementedCreateDeploymentErrorResponse      CreateDeploymentErrorResponseType = "not_implemented"
 	ProjNotFoundCreateDeploymentErrorResponse        CreateDeploymentErrorResponseType = "proj.not_found"
 	RelNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "rel.not_found"
+	RelRevokedCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "rel.revoked"
 	ReqInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "req.invalid"
 )
 
@@ -13060,6 +13062,11 @@ func (s CreateDeploymentErrorResponse) IsProjNotFound() bool {
 // IsRelNotFound reports whether CreateDeploymentErrorResponse is RelNotFound.
 func (s CreateDeploymentErrorResponse) IsRelNotFound() bool {
 	return s.Type == RelNotFoundCreateDeploymentErrorResponse
+}
+
+// IsRelRevoked reports whether CreateDeploymentErrorResponse is RelRevoked.
+func (s CreateDeploymentErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedCreateDeploymentErrorResponse
 }
 
 // IsReqInvalid reports whether CreateDeploymentErrorResponse is ReqInvalid.
@@ -13295,6 +13302,27 @@ func (s CreateDeploymentErrorResponse) GetRelNotFound() (v RelNotFound, ok bool)
 func NewRelNotFoundCreateDeploymentErrorResponse(v RelNotFound) CreateDeploymentErrorResponse {
 	var s CreateDeploymentErrorResponse
 	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets CreateDeploymentErrorResponse to RelRevoked.
+func (s *CreateDeploymentErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedCreateDeploymentErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if CreateDeploymentErrorResponse is RelRevoked.
+func (s CreateDeploymentErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from RelRevoked.
+func NewRelRevokedCreateDeploymentErrorResponse(v RelRevoked) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -55621,6 +55649,52 @@ func (o OptQueryUsersRequestSorting) Or(d QueryUsersRequestSorting) QueryUsersRe
 	return d
 }
 
+// NewOptRelInUseDetails returns new OptRelInUseDetails with value set to v.
+func NewOptRelInUseDetails(v RelInUseDetails) OptRelInUseDetails {
+	return OptRelInUseDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelInUseDetails is optional RelInUseDetails.
+type OptRelInUseDetails struct {
+	Value RelInUseDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelInUseDetails was set.
+func (o OptRelInUseDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelInUseDetails) Reset() {
+	var v RelInUseDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelInUseDetails) SetTo(v RelInUseDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelInUseDetails) Get() (v RelInUseDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelInUseDetails) Or(d RelInUseDetails) RelInUseDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptRelInvalidDetails returns new OptRelInvalidDetails with value set to v.
 func NewOptRelInvalidDetails(v RelInvalidDetails) OptRelInvalidDetails {
 	return OptRelInvalidDetails{
@@ -69371,6 +69445,59 @@ func (*QueryUsersUnauthorized) queryUsersRes() {}
 
 // Merged schema.
 // Ref: #
+type RelInUse struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelInUseDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelInUse) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelInUse) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelInUse) GetDetails() OptRelInUseDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelInUse) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelInUse) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelInUse) SetDetails(val OptRelInUseDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelInUseDetails map[string]jx.Raw
+
+func (s *RelInUseDetails) init() RelInUseDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type RelInvalid struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -72899,14 +73026,13 @@ func (s *RevokeReleaseConflictDetails) SetOrigins(val []RevokeReleaseConflictDet
 }
 
 type RevokeReleaseConflictDetailsOriginsItem struct {
-	// The origin, as scheme and host.
-	Origin url.URL `json:"origin"`
+	Origin Origin `json:"origin"`
 	// The newest deployment to the origin, which pins the release.
 	DeploymentID DeploymentID `json:"deployment_id"`
 }
 
 // GetOrigin returns the value of Origin.
-func (s *RevokeReleaseConflictDetailsOriginsItem) GetOrigin() url.URL {
+func (s *RevokeReleaseConflictDetailsOriginsItem) GetOrigin() Origin {
 	return s.Origin
 }
 
@@ -72916,7 +73042,7 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) GetDeploymentID() DeploymentID
 }
 
 // SetOrigin sets the value of Origin.
-func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val url.URL) {
+func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val Origin) {
 	s.Origin = val
 }
 
@@ -72927,11 +73053,15 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) SetDeploymentID(val Deployment
 
 // RevokeReleaseErrorResponse represents sum type.
 type RevokeReleaseErrorResponse struct {
-	Type             RevokeReleaseErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
+	Type                RevokeReleaseErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	RelInUse            RelInUse
+	RelNotFound         RelNotFound
+	RelPermissionDenied RelPermissionDenied
+	RelProjectNotFound  RelProjectNotFound
+	ReqInvalid          ReqInvalid
 }
 
 // RevokeReleaseErrorResponseType is oneOf type of RevokeReleaseErrorResponse.
@@ -72939,10 +73069,14 @@ type RevokeReleaseErrorResponseType string
 
 // Possible values for RevokeReleaseErrorResponseType.
 const (
-	AuthUnauthorizedRevokeReleaseErrorResponse RevokeReleaseErrorResponseType = "auth.unauthorized"
-	InternalRevokeReleaseErrorResponse         RevokeReleaseErrorResponseType = "internal"
-	NotImplementedRevokeReleaseErrorResponse   RevokeReleaseErrorResponseType = "not_implemented"
-	ReqInvalidRevokeReleaseErrorResponse       RevokeReleaseErrorResponseType = "req.invalid"
+	AuthUnauthorizedRevokeReleaseErrorResponse    RevokeReleaseErrorResponseType = "auth.unauthorized"
+	EvtInvalidRevokeReleaseErrorResponse          RevokeReleaseErrorResponseType = "evt.invalid"
+	InternalRevokeReleaseErrorResponse            RevokeReleaseErrorResponseType = "internal"
+	RelInUseRevokeReleaseErrorResponse            RevokeReleaseErrorResponseType = "rel.in_use"
+	RelNotFoundRevokeReleaseErrorResponse         RevokeReleaseErrorResponseType = "rel.not_found"
+	RelPermissionDeniedRevokeReleaseErrorResponse RevokeReleaseErrorResponseType = "rel.permission_denied"
+	RelProjectNotFoundRevokeReleaseErrorResponse  RevokeReleaseErrorResponseType = "rel.project_not_found"
+	ReqInvalidRevokeReleaseErrorResponse          RevokeReleaseErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether RevokeReleaseErrorResponse is AuthUnauthorized.
@@ -72950,14 +73084,34 @@ func (s RevokeReleaseErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedRevokeReleaseErrorResponse
 }
 
+// IsEvtInvalid reports whether RevokeReleaseErrorResponse is EvtInvalid.
+func (s RevokeReleaseErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidRevokeReleaseErrorResponse
+}
+
 // IsInternal reports whether RevokeReleaseErrorResponse is Internal.
 func (s RevokeReleaseErrorResponse) IsInternal() bool {
 	return s.Type == InternalRevokeReleaseErrorResponse
 }
 
-// IsNotImplemented reports whether RevokeReleaseErrorResponse is NotImplemented.
-func (s RevokeReleaseErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedRevokeReleaseErrorResponse
+// IsRelInUse reports whether RevokeReleaseErrorResponse is RelInUse.
+func (s RevokeReleaseErrorResponse) IsRelInUse() bool {
+	return s.Type == RelInUseRevokeReleaseErrorResponse
+}
+
+// IsRelNotFound reports whether RevokeReleaseErrorResponse is RelNotFound.
+func (s RevokeReleaseErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundRevokeReleaseErrorResponse
+}
+
+// IsRelPermissionDenied reports whether RevokeReleaseErrorResponse is RelPermissionDenied.
+func (s RevokeReleaseErrorResponse) IsRelPermissionDenied() bool {
+	return s.Type == RelPermissionDeniedRevokeReleaseErrorResponse
+}
+
+// IsRelProjectNotFound reports whether RevokeReleaseErrorResponse is RelProjectNotFound.
+func (s RevokeReleaseErrorResponse) IsRelProjectNotFound() bool {
+	return s.Type == RelProjectNotFoundRevokeReleaseErrorResponse
 }
 
 // IsReqInvalid reports whether RevokeReleaseErrorResponse is ReqInvalid.
@@ -72986,6 +73140,27 @@ func NewAuthUnauthorizedRevokeReleaseErrorResponse(v AuthUnauthorized) RevokeRel
 	return s
 }
 
+// SetEvtInvalid sets RevokeReleaseErrorResponse to EvtInvalid.
+func (s *RevokeReleaseErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidRevokeReleaseErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if RevokeReleaseErrorResponse is EvtInvalid.
+func (s RevokeReleaseErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from EvtInvalid.
+func NewEvtInvalidRevokeReleaseErrorResponse(v EvtInvalid) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets RevokeReleaseErrorResponse to Internal.
 func (s *RevokeReleaseErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalRevokeReleaseErrorResponse
@@ -73007,24 +73182,87 @@ func NewInternalRevokeReleaseErrorResponse(v Internal) RevokeReleaseErrorRespons
 	return s
 }
 
-// SetNotImplemented sets RevokeReleaseErrorResponse to NotImplemented.
-func (s *RevokeReleaseErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedRevokeReleaseErrorResponse
-	s.NotImplemented = v
+// SetRelInUse sets RevokeReleaseErrorResponse to RelInUse.
+func (s *RevokeReleaseErrorResponse) SetRelInUse(v RelInUse) {
+	s.Type = RelInUseRevokeReleaseErrorResponse
+	s.RelInUse = v
 }
 
-// GetNotImplemented returns NotImplemented and true boolean if RevokeReleaseErrorResponse is NotImplemented.
-func (s RevokeReleaseErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
-	if !s.IsNotImplemented() {
+// GetRelInUse returns RelInUse and true boolean if RevokeReleaseErrorResponse is RelInUse.
+func (s RevokeReleaseErrorResponse) GetRelInUse() (v RelInUse, ok bool) {
+	if !s.IsRelInUse() {
 		return v, false
 	}
-	return s.NotImplemented, true
+	return s.RelInUse, true
 }
 
-// NewNotImplementedRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from NotImplemented.
-func NewNotImplementedRevokeReleaseErrorResponse(v NotImplemented) RevokeReleaseErrorResponse {
+// NewRelInUseRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelInUse.
+func NewRelInUseRevokeReleaseErrorResponse(v RelInUse) RevokeReleaseErrorResponse {
 	var s RevokeReleaseErrorResponse
-	s.SetNotImplemented(v)
+	s.SetRelInUse(v)
+	return s
+}
+
+// SetRelNotFound sets RevokeReleaseErrorResponse to RelNotFound.
+func (s *RevokeReleaseErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundRevokeReleaseErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if RevokeReleaseErrorResponse is RelNotFound.
+func (s RevokeReleaseErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelNotFound.
+func NewRelNotFoundRevokeReleaseErrorResponse(v RelNotFound) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelPermissionDenied sets RevokeReleaseErrorResponse to RelPermissionDenied.
+func (s *RevokeReleaseErrorResponse) SetRelPermissionDenied(v RelPermissionDenied) {
+	s.Type = RelPermissionDeniedRevokeReleaseErrorResponse
+	s.RelPermissionDenied = v
+}
+
+// GetRelPermissionDenied returns RelPermissionDenied and true boolean if RevokeReleaseErrorResponse is RelPermissionDenied.
+func (s RevokeReleaseErrorResponse) GetRelPermissionDenied() (v RelPermissionDenied, ok bool) {
+	if !s.IsRelPermissionDenied() {
+		return v, false
+	}
+	return s.RelPermissionDenied, true
+}
+
+// NewRelPermissionDeniedRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelPermissionDenied.
+func NewRelPermissionDeniedRevokeReleaseErrorResponse(v RelPermissionDenied) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetRelPermissionDenied(v)
+	return s
+}
+
+// SetRelProjectNotFound sets RevokeReleaseErrorResponse to RelProjectNotFound.
+func (s *RevokeReleaseErrorResponse) SetRelProjectNotFound(v RelProjectNotFound) {
+	s.Type = RelProjectNotFoundRevokeReleaseErrorResponse
+	s.RelProjectNotFound = v
+}
+
+// GetRelProjectNotFound returns RelProjectNotFound and true boolean if RevokeReleaseErrorResponse is RelProjectNotFound.
+func (s RevokeReleaseErrorResponse) GetRelProjectNotFound() (v RelProjectNotFound, ok bool) {
+	if !s.IsRelProjectNotFound() {
+		return v, false
+	}
+	return s.RelProjectNotFound, true
+}
+
+// NewRelProjectNotFoundRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelProjectNotFound.
+func NewRelProjectNotFoundRevokeReleaseErrorResponse(v RelProjectNotFound) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetRelProjectNotFound(v)
 	return s
 }
 
@@ -73306,11 +73544,17 @@ func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
 type RollbackDeploymentErrorResponse struct {
 	Type                RollbackDeploymentErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
+	DepConflict         DepConflict
+	DepInvalid          DepInvalid
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	EnvProjectNotFound  EnvProjectNotFound
+	EvtInvalid          EvtInvalid
 	Internal            Internal
 	NotImplemented      NotImplemented
+	ProjNotFound        ProjNotFound
+	RelNotFound         RelNotFound
+	RelRevoked          RelRevoked
 	ReqInvalid          ReqInvalid
 }
 
@@ -73320,17 +73564,33 @@ type RollbackDeploymentErrorResponseType string
 // Possible values for RollbackDeploymentErrorResponseType.
 const (
 	AuthUnauthorizedRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.invalid"
 	DepNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.not_found"
 	DepPermissionDeniedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.permission_denied"
 	EnvProjectNotFoundRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "evt.invalid"
 	InternalRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "internal"
 	NotImplementedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundRollbackDeploymentErrorResponse        RollbackDeploymentErrorResponseType = "proj.not_found"
+	RelNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "rel.not_found"
+	RelRevokedRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.revoked"
 	ReqInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether RollbackDeploymentErrorResponse is AuthUnauthorized.
 func (s RollbackDeploymentErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedRollbackDeploymentErrorResponse
+}
+
+// IsDepConflict reports whether RollbackDeploymentErrorResponse is DepConflict.
+func (s RollbackDeploymentErrorResponse) IsDepConflict() bool {
+	return s.Type == DepConflictRollbackDeploymentErrorResponse
+}
+
+// IsDepInvalid reports whether RollbackDeploymentErrorResponse is DepInvalid.
+func (s RollbackDeploymentErrorResponse) IsDepInvalid() bool {
+	return s.Type == DepInvalidRollbackDeploymentErrorResponse
 }
 
 // IsDepNotFound reports whether RollbackDeploymentErrorResponse is DepNotFound.
@@ -73348,6 +73608,11 @@ func (s RollbackDeploymentErrorResponse) IsEnvProjectNotFound() bool {
 	return s.Type == EnvProjectNotFoundRollbackDeploymentErrorResponse
 }
 
+// IsEvtInvalid reports whether RollbackDeploymentErrorResponse is EvtInvalid.
+func (s RollbackDeploymentErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidRollbackDeploymentErrorResponse
+}
+
 // IsInternal reports whether RollbackDeploymentErrorResponse is Internal.
 func (s RollbackDeploymentErrorResponse) IsInternal() bool {
 	return s.Type == InternalRollbackDeploymentErrorResponse
@@ -73356,6 +73621,21 @@ func (s RollbackDeploymentErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether RollbackDeploymentErrorResponse is NotImplemented.
 func (s RollbackDeploymentErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedRollbackDeploymentErrorResponse
+}
+
+// IsProjNotFound reports whether RollbackDeploymentErrorResponse is ProjNotFound.
+func (s RollbackDeploymentErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundRollbackDeploymentErrorResponse
+}
+
+// IsRelNotFound reports whether RollbackDeploymentErrorResponse is RelNotFound.
+func (s RollbackDeploymentErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundRollbackDeploymentErrorResponse
+}
+
+// IsRelRevoked reports whether RollbackDeploymentErrorResponse is RelRevoked.
+func (s RollbackDeploymentErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedRollbackDeploymentErrorResponse
 }
 
 // IsReqInvalid reports whether RollbackDeploymentErrorResponse is ReqInvalid.
@@ -73381,6 +73661,48 @@ func (s RollbackDeploymentErrorResponse) GetAuthUnauthorized() (v AuthUnauthoriz
 func NewAuthUnauthorizedRollbackDeploymentErrorResponse(v AuthUnauthorized) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetDepConflict sets RollbackDeploymentErrorResponse to DepConflict.
+func (s *RollbackDeploymentErrorResponse) SetDepConflict(v DepConflict) {
+	s.Type = DepConflictRollbackDeploymentErrorResponse
+	s.DepConflict = v
+}
+
+// GetDepConflict returns DepConflict and true boolean if RollbackDeploymentErrorResponse is DepConflict.
+func (s RollbackDeploymentErrorResponse) GetDepConflict() (v DepConflict, ok bool) {
+	if !s.IsDepConflict() {
+		return v, false
+	}
+	return s.DepConflict, true
+}
+
+// NewDepConflictRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from DepConflict.
+func NewDepConflictRollbackDeploymentErrorResponse(v DepConflict) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetDepConflict(v)
+	return s
+}
+
+// SetDepInvalid sets RollbackDeploymentErrorResponse to DepInvalid.
+func (s *RollbackDeploymentErrorResponse) SetDepInvalid(v DepInvalid) {
+	s.Type = DepInvalidRollbackDeploymentErrorResponse
+	s.DepInvalid = v
+}
+
+// GetDepInvalid returns DepInvalid and true boolean if RollbackDeploymentErrorResponse is DepInvalid.
+func (s RollbackDeploymentErrorResponse) GetDepInvalid() (v DepInvalid, ok bool) {
+	if !s.IsDepInvalid() {
+		return v, false
+	}
+	return s.DepInvalid, true
+}
+
+// NewDepInvalidRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from DepInvalid.
+func NewDepInvalidRollbackDeploymentErrorResponse(v DepInvalid) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetDepInvalid(v)
 	return s
 }
 
@@ -73447,6 +73769,27 @@ func NewEnvProjectNotFoundRollbackDeploymentErrorResponse(v EnvProjectNotFound) 
 	return s
 }
 
+// SetEvtInvalid sets RollbackDeploymentErrorResponse to EvtInvalid.
+func (s *RollbackDeploymentErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidRollbackDeploymentErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if RollbackDeploymentErrorResponse is EvtInvalid.
+func (s RollbackDeploymentErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from EvtInvalid.
+func NewEvtInvalidRollbackDeploymentErrorResponse(v EvtInvalid) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets RollbackDeploymentErrorResponse to Internal.
 func (s *RollbackDeploymentErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalRollbackDeploymentErrorResponse
@@ -73486,6 +73829,69 @@ func (s RollbackDeploymentErrorResponse) GetNotImplemented() (v NotImplemented, 
 func NewNotImplementedRollbackDeploymentErrorResponse(v NotImplemented) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjNotFound sets RollbackDeploymentErrorResponse to ProjNotFound.
+func (s *RollbackDeploymentErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundRollbackDeploymentErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if RollbackDeploymentErrorResponse is ProjNotFound.
+func (s RollbackDeploymentErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from ProjNotFound.
+func NewProjNotFoundRollbackDeploymentErrorResponse(v ProjNotFound) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetRelNotFound sets RollbackDeploymentErrorResponse to RelNotFound.
+func (s *RollbackDeploymentErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundRollbackDeploymentErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if RollbackDeploymentErrorResponse is RelNotFound.
+func (s RollbackDeploymentErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from RelNotFound.
+func NewRelNotFoundRollbackDeploymentErrorResponse(v RelNotFound) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets RollbackDeploymentErrorResponse to RelRevoked.
+func (s *RollbackDeploymentErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedRollbackDeploymentErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if RollbackDeploymentErrorResponse is RelRevoked.
+func (s RollbackDeploymentErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from RelRevoked.
+func NewRelRevokedRollbackDeploymentErrorResponse(v RelRevoked) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 

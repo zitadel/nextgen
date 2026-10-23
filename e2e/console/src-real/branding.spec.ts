@@ -31,26 +31,19 @@ test("previews the project's own login beside the settings", async ({ page, zita
   await expectNoErrorBoundary(page);
 });
 
-test("is reached from the sidebar, nested under the flows it brands", async ({
-  page,
-  zitadel,
-  seed,
-}) => {
+test("is reached from the sidebar, beside the flows it brands", async ({ page, zitadel, seed }) => {
   await signIn(page, zitadel, await seed.user());
 
   // The sidebar lists a project's screens once one is selected; `/` selects
   // this lane's pinned project and lands on its first screen.
   await page.goto("/");
 
-  // Branding is a sub-row of Login flows, as the design nests it: it is how
-  // those flows render rather than a destination of its own.
+  // Branding is a row of its own in the single-level sidebar, right after
+  // Login flows.
   const nav = page.getByRole("navigation", { name: "Primary" });
-  const flows = nav
-    .locator('[data-slot="sidebar-menu-item"]')
-    .filter({ has: page.getByRole("link", { name: "Login flows" }) });
-  const branding = flows.locator('[data-slot="sidebar-menu-sub"]').getByRole("link", {
-    name: "Branding",
-  });
+  const rows = nav.locator('[data-slot="sidebar-menu-item"]');
+  await expect(rows.filter({ hasText: "Login flows" }).locator("+ *")).toContainText("Branding");
+  const branding = nav.getByRole("link", { name: "Branding" });
   await expect(branding).toBeVisible();
   await branding.click();
 

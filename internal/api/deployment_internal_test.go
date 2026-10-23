@@ -76,6 +76,14 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 	}), resp.DeploymentGuardConflict.Details.Deployment)
 }
 
+// A revoked release is the other member of the 409 union.
+func TestDeploymentConflictRendersARevokedRelease(t *testing.T) {
+	resp, ok := deploymentConflictResponse(domain.ErrReleaseRevoked())
+	require.True(t, ok)
+	assert.Equal(t, api.ReleaseRevokedConflictDeploymentConflict, resp.Type)
+	assert.Equal(t, domain.ErrReleaseRevoked().Code, resp.ReleaseRevokedConflict.Code)
+}
+
 // Any other error is left to NewError.
 func TestDeploymentConflictResponseIgnoresOtherErrors(t *testing.T) {
 	_, ok := deploymentConflictResponse(domain.ErrDeploymentNotFound())

@@ -5,14 +5,9 @@ import { Fragment, type ReactNode, useEffect, useId, useMemo, useState } from "r
 import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
-import {
-  DETAIL_BODY,
-  DETAIL_CARD,
-  DetailHeader,
-  DetailPage,
-  DetailSection,
-} from "@/components/detail-page";
+import { DETAIL_BODY, DETAIL_CARD, DetailHeader, DetailSection } from "@/components/detail-page";
 import { FormError } from "@/components/form-error";
+import { Page } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +26,7 @@ import {
   fetchAllIdps,
   fetchUserIdentityLinks,
 } from "@/lib/idp";
+import { passwordState } from "@/lib/sign-in-methods";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { displayValue, field } from "@/lib/record";
 import {
@@ -138,7 +134,7 @@ function UserDetail() {
   const [tab, setTab] = useState("overview");
 
   return (
-    <DetailPage>
+    <Page>
       {/* `User`, the sidebar's glyph for Users, as each detail title carries its
           section's. */}
       <DetailHeader
@@ -219,7 +215,7 @@ function UserDetail() {
           </DetailSection>
         </TabsContent>
       </Tabs>
-    </DetailPage>
+    </Page>
   );
 }
 
@@ -248,13 +244,6 @@ function AuthenticationRows({ rows }: { rows: AuthenticationRow[] }) {
       ))}
     </ul>
   );
-}
-
-function passwordState(setAt: string | null | undefined): string {
-  if (setAt === undefined) return "Could not be loaded";
-  // When it was set, not "verified": an operator may have set it, and no
-  // check of it is recorded.
-  return setAt === null ? "Not set" : `Set ${formatDateTime(setAt)}`;
 }
 
 /**

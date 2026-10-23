@@ -126,7 +126,7 @@ func NewestOriginDeployment(deployments []OriginDeployment) *OriginDeployment {
 // newest primary deployment: the same release to the same origins, so writing
 // it would change nothing. A deployment to preview URLs never equals one,
 // since writing it renews its previews.
-// TODO(#1781): compare the frozen variable set too.
+// TODO(#1781): compare the variable set create resolves too.
 func DeploymentsEqual(candidate, current *Deployment) bool {
 	return candidate.OriginKind == DeploymentOriginKindPrimary && current != nil &&
 		current.OriginKind == DeploymentOriginKindPrimary &&
