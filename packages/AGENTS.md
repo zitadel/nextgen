@@ -26,7 +26,8 @@ change needs a changeset, and the whole train versions together.
   here.
 - **Build an SDK with plain Vite**: its `vite.config.ts` lists
   `libraryBuild()` (`vite.shared.mjs`), the framework's Vite plugin and
-  `unplugin-dts` (`svelteTypes()` for `.svelte`).
+  `unplugin-dts` (`svelteTypes()` for `.svelte`). `sdk-angular` has no
+  `unplugin-dts`: Analog's plugin writes its `.d.ts`.
 - **Add an entry point to `exports` and give it a source, never to a config**:
   `libraryBuild()` derives the entries from `exports` and fails on any warning.
 - **Allow a warning code only with a comment saying why.**
@@ -36,8 +37,9 @@ change needs a changeset, and the whole train versions together.
   lists `nuxtModule({ extension: ".js", entry })`, and the plugin writes what
   `nuxt-module-build` writes. The entries beside `src/module.ts` go in `entry`,
   not in `exports`; `src/runtime` is built file by file.
-- **`sdk-angular` stays on Vite and `ngc`** until it gets its own plugin; the
-  non-SDK packages build with `tsdown`.
+- **Check `sdk-angular` templates in `typecheck`, not the build**: Analog's plugin
+  does not type-check templates, so `ngc --noEmit` enforces `strictTemplates`.
+- **The non-SDK packages build with `tsdown`.**
 - **The same-origin proxy is the shared concept**: every SDK fronts the API
   through `/__nextgen/*` on the app's own origin
   ([ADR 036](../docs/adrs/036-api-credential-planes.md), ADR 005). Server SDKs

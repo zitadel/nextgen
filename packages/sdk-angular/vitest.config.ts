@@ -31,7 +31,7 @@ function angularLinker(): Plugin {
 
 // The edge spec loads the built package, as a consumer's app does.
 const alias = {
-  "@zitadel/sdk-angular": fileURLToPath(new URL("./dist/index.js", import.meta.url)),
+  "@zitadel/sdk-angular": fileURLToPath(new URL("./dist/public-api.js", import.meta.url)),
 };
 
 // The analog plugin compiles the Angular components so specs can render them
