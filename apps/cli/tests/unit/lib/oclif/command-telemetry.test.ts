@@ -51,7 +51,7 @@ describe("commandEventProperties", () => {
 });
 
 describe("VERCEL_EVENT_KEYS", () => {
-  it("gives the Vercel copy of a failed command its outcome and whether it ran without prompts", () => {
+  it("gives the Vercel copy of a failed command the header, its outcome and whether it ran without prompts", () => {
     const props = commandEventProperties(meta({ command: "doctor" }), "sess-1", {
       status: "error",
       reason: "E_NETWORK",
@@ -68,6 +68,7 @@ describe("VERCEL_EVENT_KEYS", () => {
     );
     expect(Object.keys(body.ed)).toEqual([...VERCEL_EVENT_KEYS]);
     expect(body.ed).toMatchObject({
+      surface: "cli",
       command: "doctor",
       status: "error",
       reason: "E_NETWORK",

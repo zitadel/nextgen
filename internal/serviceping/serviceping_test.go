@@ -36,7 +36,7 @@ func TestSendPostsOneCustomEvent(t *testing.T) {
 	if r.body.Name != EventName || r.body.Timestamp != now.UnixMilli() || r.body.Origin != intake.URL {
 		t.Errorf("event = %+v", r.body)
 	}
-	if r.body.Data["version"] != "v1.2.3" || r.body.Data["dialect"] != "sqlite" || r.body.Data["platform"] != "self_hosted" {
+	if r.body.Data["surface"] != "server" || r.body.Data["server_version"] != "v1.2.3" || r.body.Data["dialect"] != "sqlite" {
 		t.Errorf("data = %v", r.body.Data)
 	}
 	if r.header.Get("X-Va-Server") != "1" || r.header.Get("Content-Type") != "application/json" {
@@ -53,6 +53,43 @@ func TestSendFailsOnARejectedEvent(t *testing.T) {
 	p := New(Config{Enabled: true, Endpoint: intake.URL}, Facts{})
 	if err := p.send(t.Context(), time.Now()); err == nil {
 		t.Fatal("send succeeded on a 400")
+	}
+}
+
+func TestPropertiesNameTheDeployment(t *testing.T) {
+	tests := []struct {
+		name        string
+		facts       Facts
+		wantVersion string
+		wantKind    string
+	}{
+		{name: "self-hosted", facts: Facts{Version: "v1.2.3", Commit: "3f2c1ab", PublicBase: "https://auth.example.com"}, wantVersion: "v1.2.3", wantKind: "self_hosted"},
+		{name: "unparsable origin", facts: Facts{Version: "v1.2.3", PublicBase: "://"}, wantVersion: "v1.2.3", wantKind: "self_hosted"},
+		{name: "localhost", facts: Facts{Version: "v1.2.3", PublicBase: "http://localhost:8080"}, wantVersion: "v1.2.3", wantKind: "local"},
+		{name: "loopback IPv4", facts: Facts{Version: "v1.2.3", PublicBase: "http://127.0.0.1:8080"}, wantVersion: "v1.2.3", wantKind: "local"},
+		{name: "loopback IPv6", facts: Facts{Version: "v1.2.3", PublicBase: "http://[::1]:8080"}, wantVersion: "v1.2.3", wantKind: "local"},
+		{name: "cloud reports its commit", facts: Facts{Version: "v1.2.3+cloud", Commit: "3f2c1ab", OnVercel: true, PublicBase: "http://localhost:3000"}, wantVersion: "3f2c1ab", wantKind: "cloud"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.facts.Properties()
+			if got["server_version"] != tt.wantVersion || got["server_kind"] != tt.wantKind {
+				t.Errorf("server_version = %v, server_kind = %v; want %s, %s", got["server_version"], got["server_kind"], tt.wantVersion, tt.wantKind)
+			}
+		})
+	}
+}
+
+func TestPlatformIsNamedAsNodeNamesIt(t *testing.T) {
+	for goName, want := range map[string]string{"windows": "win32", "linux": "linux", "darwin": "darwin"} {
+		if got := nodeOS(goName); got != want {
+			t.Errorf("nodeOS(%q) = %q, want %q", goName, got, want)
+		}
+	}
+	for goName, want := range map[string]string{"amd64": "x64", "arm64": "arm64"} {
+		if got := nodeArch(goName); got != want {
+			t.Errorf("nodeArch(%q) = %q, want %q", goName, got, want)
+		}
 	}
 }
 

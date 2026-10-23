@@ -17,7 +17,8 @@ export const VERCEL_MAX_PROPERTIES = 8;
 /** The intake's limit on an event name or value. */
 const MAX_LENGTH = 255;
 
-const EVENT_PREFIX = "poc_";
+/** What the copy's event names start with. */
+export const VERCEL_EVENT_PREFIX = "poc_";
 
 /** Where the copy goes, and which properties it keeps, in priority order. */
 export type VercelSink = {
@@ -69,7 +70,7 @@ export function vercelEventBody(
     sdkn: "zitadel-cli",
     sdkv: typeof version === "string" ? version : "",
     r: "",
-    en: `${EVENT_PREFIX}${event}`.slice(0, MAX_LENGTH),
+    en: `${VERCEL_EVENT_PREFIX}${event}`.slice(0, MAX_LENGTH),
     ed: data,
   });
 }

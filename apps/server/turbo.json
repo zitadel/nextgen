@@ -5,7 +5,8 @@
   // package, so every task lists its inputs: the `serverInputs` file group of
   // apps/server/moon.yml, repeated per task because turbo has no file groups.
   // Also compiled in through //go:embed or read by tests: the config defaults
-  // (incl. presets), the integration-test fixtures and the events catalog.
+  // (incl. presets), the integration-test fixtures, the events catalog and
+  // the product analytics catalog.
   // GOFLAGS and the target platform change what Go produces, so they are
   // hashed; the cache locations pass through globally (root turbo.json).
   "tasks": {
@@ -22,6 +23,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -43,6 +45,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -67,6 +70,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -102,6 +106,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -128,6 +133,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -153,6 +159,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
@@ -174,6 +181,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -198,6 +206,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -229,6 +238,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
@@ -250,6 +260,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
@@ -271,6 +282,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
@@ -293,6 +305,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",

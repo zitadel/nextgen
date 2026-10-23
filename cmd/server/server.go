@@ -426,9 +426,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	defer shipper.Close()
 
 	pinger := serviceping.New(cfg.ServicePing, serviceping.Facts{
-		Version:  build.Version(),
-		Dialect:  databaseDialectName(cfg),
-		OnVercel: os.Getenv("VERCEL") == "1",
+		Version:    build.Version(),
+		Commit:     build.Commit(),
+		Dialect:    databaseDialectName(cfg),
+		OnVercel:   os.Getenv("VERCEL") == "1",
+		PublicBase: cfg.Server.PublicBase,
 	})
 	pinger.Start()
 	defer pinger.Close()

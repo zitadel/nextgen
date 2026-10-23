@@ -186,6 +186,24 @@ properties:
     type: number
     description: How long the command, flow or operation took.
 
+  # Platform
+  os:
+    type: string
+    description: >-
+      The operating system, as Node.js names it (`darwin`, `linux`, `win32`);
+      the server maps Go's names to these.
+  arch:
+    type: string
+    description: >-
+      The CPU architecture, as Node.js names it (`arm64`, `x64`); the server
+      maps Go's names to these.
+
+  # Server
+  dialect:
+    type: string
+    values: [sqlite, postgres, spanner, unknown]
+    description: The server's storage dialect; `unknown` when its database configuration is invalid.
+
   # CLI invocation
   command:
     type: string
@@ -193,15 +211,9 @@ properties:
   node_version:
     type: string
     description: The Node.js version running the CLI.
-  os:
-    type: string
-    description: The platform, as Node.js names it (`darwin`, `linux`, `win32`).
   $os:
     type: string
     description: The platform, as Mixpanel labels it (`Mac OS X`).
-  arch:
-    type: string
-    description: The CPU architecture, such as `arm64`.
   mp_country_code:
     type: string
     description: The country of the system timezone, on events; none for timezones the CLI does not know.
@@ -368,20 +380,26 @@ components:
       - invocation_id
       - distinct_id
       - $insert_id
+    # Proof of concept: the copy of an event sent to Vercel Web Analytics, from
+    # runs on the production channel. Its name takes the prefix, and it keeps
+    # the first 8 of these properties that hold a value, in this order.
+    vercel:
+      prefix: poc_
+      properties: [surface, cli_version, server_kind, command, status, reason, host_agent, non_interactive]
     events:
       cli_command_started:
         status: emitted
         trigger: A command has read its flags.
-        destinations: [mixpanel]
+        destinations: [mixpanel, vercel]
       cli_command_completed:
         status: emitted
         trigger: A command finished.
-        destinations: [mixpanel]
+        destinations: [mixpanel, vercel]
         properties: [status, duration_ms]
       cli_command_failed:
         status: emitted
         trigger: A command failed.
-        destinations: [mixpanel]
+        destinations: [mixpanel, vercel]
         properties: [status, reason, exit_code, duration_ms]
       flow_started:
         status: planned
@@ -553,4 +571,13 @@ components:
 
   server:
     source: internal
-    events: {}
+    # Every server event carries this after the header.
+    context: [dialect, os, arch]
+    # Proof of concept: an event's name takes the prefix on Vercel.
+    vercel:
+      prefix: poc_
+    events:
+      service_ping:
+        status: emitted
+        trigger: At start and then daily, when `service_ping.enabled` is set; it is off by default.
+        destinations: [vercel]

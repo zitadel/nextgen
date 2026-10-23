@@ -20,15 +20,15 @@ export const CLI_COMMAND_FAILED = "cli_command_failed";
 
 /**
  * The properties the Vercel Web Analytics copy of a lifecycle event keeps, in
- * priority order: the intake takes 8 (proof of concept).
+ * priority order, the header first: the intake takes 8 (proof of concept).
  */
 export const VERCEL_EVENT_KEYS = [
+  "surface",
+  "cli_version",
+  "server_kind",
   "command",
   "status",
   "reason",
-  "cli_version",
-  "os",
-  "server_kind",
   "host_agent",
   "non_interactive",
 ] as const;

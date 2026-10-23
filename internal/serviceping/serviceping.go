@@ -18,8 +18,12 @@ import (
 	"time"
 )
 
+// EventPrefix keeps proof traffic apart from a released ping's events; the
+// product analytics catalog lists the event without it.
+const EventPrefix = "poc_"
+
 // EventName is the event every ping sends.
-const EventName = "poc_service_ping"
+const EventName = EventPrefix + "service_ping"
 
 // DefaultEndpoint is the cloud project's Web Analytics intake, the URL
 // `@vercel/analytics/server` posts custom events to.
@@ -39,25 +43,69 @@ type Config struct {
 // id or anything else that identifies a deployment.
 type Facts struct {
 	Version string
+	// Commit is the git commit the server was built from.
+	Commit  string
 	Dialect string
 	// OnVercel is true when the server runs as a Vercel Function, which is
 	// what the hosted cloud does.
 	OnVercel bool
+	// PublicBase is the origin the server is reachable at. Only whether its
+	// host is loopback is reported, never the origin.
+	PublicBase string
 }
 
-// Properties returns the event data; it holds at most MaxProperties keys.
+// Properties returns the event data: the header every Zitadel component
+// sends, as docs/product-analytics-events.yaml defines it, then the server's
+// context. It holds at most MaxProperties keys.
 func (f Facts) Properties() map[string]any {
-	platform := "self_hosted"
-	if f.OnVercel {
-		platform = "vercel"
-	}
 	return map[string]any{
-		"version":  f.Version,
-		"dialect":  f.Dialect,
-		"platform": platform,
-		"os":       runtime.GOOS,
-		"arch":     runtime.GOARCH,
+		"surface":        "server",
+		"server_version": f.version(),
+		"server_kind":    f.kind(),
+		"dialect":        f.Dialect,
+		"os":             nodeOS(runtime.GOOS),
+		"arch":           nodeArch(runtime.GOARCH),
 	}
+}
+
+// version is the release version, except in the cloud, which deploys every
+// commit under the same one and so reports the commit.
+func (f Facts) version() string {
+	if f.OnVercel {
+		return f.Commit
+	}
+	return f.Version
+}
+
+// kind sorts the deployment as the CLI sorts the servers it talks to: a
+// server on a loopback host, such as one `zitadel start` runs, is local.
+func (f Facts) kind() string {
+	if f.OnVercel {
+		return "cloud"
+	}
+	if base, err := url.Parse(f.PublicBase); err == nil {
+		switch base.Hostname() {
+		case "localhost", "127.0.0.1", "::1":
+			return "local"
+		}
+	}
+	return "self_hosted"
+}
+
+// nodeOS and nodeArch name the platform as Node.js does, like the CLI's
+// events and the server's npm packages (server-win32-x64).
+func nodeOS(goos string) string {
+	if goos == "windows" {
+		return "win32"
+	}
+	return goos
+}
+
+func nodeArch(goarch string) string {
+	if goarch == "amd64" {
+		return "x64"
+	}
+	return goarch
 }
 
 // event is the body `@vercel/analytics/server` sends for a custom event.
