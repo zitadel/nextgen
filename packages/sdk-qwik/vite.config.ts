@@ -4,10 +4,16 @@ import { defineConfig } from "vite";
 
 import { libraryBuild } from "../../vite.shared.mjs";
 
+// qwikVite writes an app's client manifest (`q-manifest.json`, a bundle graph) in a post hook, and
+// prints a warning for every import the library keeps external. A library has no use for either.
+const qwik = [qwikVite()]
+  .flat()
+  .map((plugin) =>
+    plugin && "name" in plugin && plugin.name === "vite-plugin-qwik-post"
+      ? { ...plugin, generateBundle: undefined }
+      : plugin,
+  );
+
 export default defineConfig({
-  plugins: [
-    libraryBuild(import.meta.dirname),
-    qwikVite(),
-    dts({ tsconfigPath: "./tsconfig.lib.json" }),
-  ],
+  plugins: [libraryBuild(import.meta.dirname), qwik, dts({ tsconfigPath: "./tsconfig.lib.json" })],
 });
