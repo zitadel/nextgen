@@ -18,8 +18,8 @@ type RuntimeResolution struct {
 	// request carried none.
 	Origin string
 	// Target is the project origin pattern that admitted Origin, "" when
-	// admission was open (empty allowlist or loopback) rather than a stored
-	// pattern.
+	// admission was open (empty allowlist, loopback or the server's own
+	// origin) rather than a stored pattern.
 	Target string
 	// Source is "origin" when a deployment to the exact origin answered, or
 	// empty when resolution refused before a target was found.
@@ -62,9 +62,15 @@ func NewRuntimeResolver(v2Pool *DB, releases ReleaseService) *RuntimeResolver {
 }
 
 // WithFirstPartyOrigin admits the server's own public origin for every
-// project. The console runs there and starts real flows of the selected
-// project for its branding preview; that page is the server's own code, not
-// the project's app, so the project's patterns do not describe it.
+// project whose patterns do not name it. The console runs there and starts
+// real flows of the selected project for its branding preview, so any page
+// on that host can start a flow of any project: the trust domain is the
+// server's host, which only the server's own code is served from (ADR 036).
+//
+// Admission is open, so with nothing deployed to the server's origin the
+// flow takes the project's newest revisions, which is what the branding page
+// previews. It admits release resolution only: the passkey check
+// (validateOriginAgainstProject) does not take this origin as a relying party.
 func (r *RuntimeResolver) WithFirstPartyOrigin(origin string) (*RuntimeResolver, error) {
 	normalized, err := domain.NormalizeOrigin(origin)
 	if err != nil {
@@ -127,7 +133,8 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 		return nil, err
 	}
 	if dep == nil {
-		// Empty allowlist and loopback admit without a stored pattern. Until the
+		// Empty allowlist, loopback and the server's own origin admit without a
+		// stored pattern. Until the
 		// project default target lands, that open admission keeps the
 		// pre-resolution newest-revision path when nothing is deployed yet —
 		// the same interim createFlow uses for a missing Origin header.
@@ -176,7 +183,8 @@ func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origi
 // matchedOrigin is an origin the gate admitted: the normalized request
 // origin, the project origin pattern that matched it (empty when open),
 // whether it was admitted by a preview row rather than a primary pattern,
-// and whether admission was open (empty allowlist or loopback).
+// and whether admission was open (empty allowlist, loopback or the server's
+// own origin).
 type matchedOrigin struct {
 	origin  string
 	pattern string
@@ -186,9 +194,9 @@ type matchedOrigin struct {
 
 // Gate decides whether a request from origin may be served at all. An absent
 // origin is not a browser and passes with no match. An empty origin list
-// admits every origin. A loopback origin and the server's own public origin
-// are always admitted. A preview pattern admits nothing by itself: the
-// preview row for the exact URL does.
+// admits every origin. A loopback origin is always admitted, and so is the
+// server's own public origin when no pattern names it. A preview pattern
+// admits nothing by itself: the preview row for the exact URL does.
 func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	origin = strings.TrimSpace(origin)
 	if origin == "" {
@@ -199,10 +207,13 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 		return nil, domain.ErrProjectOriginNotAllowed(map[string]string{"origin": origin}).
 			WithMessage(origin + " is not an origin of this project")
 	}
-	if len(project.Origins) == 0 || domain.IsLoopbackOrigin(normalized) || normalized == r.firstParty {
+	if len(project.Origins) == 0 || domain.IsLoopbackOrigin(normalized) {
 		return &matchedOrigin{origin: normalized, open: true}, nil
 	}
 	entry, ok := domain.MatchOrigin(project.Origins, normalized)
+	if !ok && normalized == r.firstParty {
+		return &matchedOrigin{origin: normalized, open: true}, nil
+	}
 	if !ok {
 		return nil, domain.ErrProjectOriginNotAllowed(map[string]string{"origin": normalized}).
 			WithMessage(normalized + " is not an origin of this project")

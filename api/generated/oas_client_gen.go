@@ -155,8 +155,11 @@ type Invoker interface {
 	// previews, the newest deployment to that exact origin is the target, and
 	// that deployment's release supplies flow definitions, user schemas and
 	// branding. The resolved deployment is sealed into the `_zflow` cookie so
-	// later steps keep the same configuration. An origin that matches no pattern
-	// answers `403` with `proj.origin_not_allowed`; one that matches a preview
+	// later steps keep the same configuration. Loopback origins and the server's
+	// own public origin are admitted without a pattern and, with nothing
+	// deployed to them, use the project's newest revisions. Any other origin
+	// that matches no pattern answers `403` with `proj.origin_not_allowed`;
+	// one that matches a preview
 	// pattern with no live preview answers `403` with `proj.preview_not_live`;
 	// nothing deployed to the target answers `409` with `rel.not_deployed`; a
 	// revoked release answers `409` with `rel.revoked`. A request with no
@@ -2249,8 +2252,11 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 // previews, the newest deployment to that exact origin is the target, and
 // that deployment's release supplies flow definitions, user schemas and
 // branding. The resolved deployment is sealed into the `_zflow` cookie so
-// later steps keep the same configuration. An origin that matches no pattern
-// answers `403` with `proj.origin_not_allowed`; one that matches a preview
+// later steps keep the same configuration. Loopback origins and the server's
+// own public origin are admitted without a pattern and, with nothing
+// deployed to them, use the project's newest revisions. Any other origin
+// that matches no pattern answers `403` with `proj.origin_not_allowed`;
+// one that matches a preview
 // pattern with no live preview answers `403` with `proj.preview_not_live`;
 // nothing deployed to the target answers `409` with `rel.not_deployed`; a
 // revoked release answers `409` with `rel.revoked`. A request with no
