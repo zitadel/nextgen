@@ -46,6 +46,17 @@ SELECT id, project_id, catalog_id,
        expires_at, revoked_at, created_at, updated_at
 FROM zitadel_nextgen.authz_assignments`
 
+	listActiveAuthzAssignmentsByRelationStmt = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM zitadel_nextgen.authz_assignments
+WHERE project_id = $1 AND object_type = $2 AND relation = $3
+  AND revoked_at IS NULL
+ORDER BY created_at, id`
+
 	listAuthzAssignmentsStmt = `
 SELECT id, project_id, catalog_id,
        principal_type, principal_id, object_type, relation,
@@ -137,6 +148,19 @@ func (s authzAssignmentStatements) GetAuthzAssignment(ctx context.Context, proje
 // ListAuthzAssignments implements [service.AuthzAssignmentStatements].
 func (s authzAssignmentStatements) ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error) {
 	rows, err := s.client.Query(ctx, listAuthzAssignmentsStmt, projectID, principalType.String(), principalID, includeRevoked)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	assignments, err := pgx.CollectRows(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return assignments, nil
+}
+
+// ListActiveAuthzAssignmentsByRelation implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListActiveAuthzAssignmentsByRelation(ctx context.Context, projectID, objectType, relation string) ([]*domain.AuthzAssignment, error) {
+	rows, err := s.client.Query(ctx, listActiveAuthzAssignmentsByRelationStmt, projectID, objectType, relation)
 	if err != nil {
 		return nil, wrapError(err)
 	}

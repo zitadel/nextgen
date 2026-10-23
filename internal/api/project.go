@@ -112,19 +112,35 @@ func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsReque
 // ListMyProjects answers "which projects can the person behind this session act
 // on". There is no requireProjectAccess here on purpose: the query is itself the
 // authorization, so a caller with no grants gets an empty page rather than a 403.
-// The session is held to project_id when the caller names one (requireSelf).
+// A platform operator can act on every project of the deployment, so the answer
+// is all of them, listed like anyone's (ADR 075 §6). The session is held to
+// project_id when the caller names one (requireSelf).
 func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsParams) (api.ListMyProjectsRes, error) {
 	self, err := requireSelf(ctx, params.ProjectID)
 	if err != nil {
 		return nil, err
 	}
+	scope, _ := GetScopeContext(ctx)
+	operator, err := h.platformOperator(ctx, scope)
+	if err != nil {
+		return nil, err
+	}
+	if operator {
+		markPlatformOperator(ctx, scope)
+	}
 
-	listed, err := h.projectService.ListAuthorized(ctx, service.ListAuthorizedProjectsRequest{
+	req := service.ListAuthorizedProjectsRequest{
 		HomeProjectID: self.ProjectID(),
 		UserID:        self.UserID(),
 		Limit:         int(params.Limit.Value),
 		PageToken:     string(params.PageToken.Value),
-	})
+	}
+	var listed *service.ListProjectsResponse
+	if operator {
+		listed, err = h.projectService.ListEveryProject(ctx, req)
+	} else {
+		listed, err = h.projectService.ListAuthorized(ctx, req)
+	}
 	if err != nil {
 		// A refused session answers exactly like an anonymous one. Letting
 		// sess.token_invalid through here would tell a caller that its cookie is

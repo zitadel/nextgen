@@ -46,3 +46,21 @@ func TestValidateAssignment_SKTeamProjectScope(t *testing.T) {
 	userGrant.ApplyScope(domain.NewProjectAssignmentScope())
 	require.NoError(t, authz.ValidateAssignment(userGrant))
 }
+
+func TestValidateAssignment_PlatformShape(t *testing.T) {
+	t.Parallel()
+
+	require.NoError(t, authz.ValidateAssignment(domain.NewPlatformOperatorAssignment("proj_platform", "user_op")))
+
+	team := domain.NewPlatformOperatorAssignment("proj_platform", "team_ops")
+	team.PrincipalType = domain.AuthzPrincipalTypeTeam
+	assert.ErrorIs(t, authz.ValidateAssignment(team), authz.ErrPlatformAssignmentShape, "a team roster must not mint operators")
+
+	secret := domain.NewPlatformOperatorAssignment("proj_platform", "proj_platform")
+	secret.PrincipalType = domain.AuthzPrincipalTypeSKProj
+	assert.ErrorIs(t, authz.ValidateAssignment(secret), authz.ErrPlatformAssignmentShape)
+
+	scoped := domain.NewPlatformOperatorAssignment("proj_platform", "user_op")
+	scoped.ApplyScope(domain.NewTeamAssignmentScope("team_1"))
+	assert.ErrorIs(t, authz.ValidateAssignment(scoped), authz.ErrPlatformAssignmentShape)
+}

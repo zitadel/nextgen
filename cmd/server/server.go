@@ -284,6 +284,12 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to bootstrap users: %w", err)
 	}
 
+	// After the import, so a bootstrap admin named in platform.operators
+	// exists by the time it is granted (ADR 075 §4).
+	if err := platform.ReconcileOperators(ctx, serviceDBPool, cfg.Platform.ResolvedProjectID(), cfg.Platform.Operators); err != nil {
+		return fmt.Errorf("failed to reconcile platform operators: %w", err)
+	}
+
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator, builtinBases)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		serviceDBPool,
@@ -444,7 +450,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			cfg.Platform.ResolvedProjectID(),
 		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).
 			WithFlowDiagnostics(api.FlowDiagnosticsFor(cfg.Server.PublicBase)),
-		api.NewSecurityHandler(tokenService),
+		// The same platform project the handler resolves: sessions homed there
+		// can reach the platform operator path (ADR 075).
+		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
 		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider())...)
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
@@ -648,6 +656,8 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	// platform.bootstrap_project explicitly opts in (#605).
 	v.SetDefault("platform.project_id", "")
 	v.SetDefault("platform.bootstrap_project", false)
+	// Empty: nobody is a platform operator (ADR 075).
+	v.SetDefault("platform.operators", []string{})
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
 	v.SetDefault("events.retention.interval", time.Hour)
 	v.SetDefault("events.retention.enabled", true)

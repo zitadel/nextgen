@@ -1129,6 +1129,40 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 	}
 }
 
+// A platform operator can act on every project (ADR 075 §6): ListEveryProject
+// pages all of them, in the same order and with the same cursor as the grant
+// query, and never asks the grant query.
+func TestProjectService_ListEveryProject(t *testing.T) {
+	t.Parallel()
+
+	svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+	expectActiveSessionUser(statements)
+	statements.EXPECT().ListAuthorizedProjects(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+			assert.Nil(t, opts.Filter, "every project: no filter")
+			assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
+			assert.Equal(t, uint32(20), opts.Pagination.Limit)
+			assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
+			assert.Equal(t, []database.Column[domain.ProjectField]{
+				database.Col(domain.ProjectFieldID),
+			}, opts.Pagination.OrderBy.Columns)
+			return &database.ListResult[*domain.Project]{
+				Items:      []*domain.Project{{ID: "proj_a"}, {ID: "proj_b"}},
+				NextCursor: []byte("next"),
+			}, nil
+		})
+
+	resp, err := svc.ListEveryProject(context.Background(), service.ListAuthorizedProjectsRequest{
+		HomeProjectID: "proj_platform",
+		UserID:        "user_a",
+		PageToken:     "tok",
+	})
+	require.NoError(t, err)
+	assert.Len(t, resp.Projects, 2)
+	assert.Equal(t, "next", resp.NextPageToken)
+}
+
 // An empty user or home project must never reach storage: the predicate would
 // bind empty strings and the query stops being an authorization question.
 func TestProjectService_ListAuthorizedFailsClosed(t *testing.T) {
