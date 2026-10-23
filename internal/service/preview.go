@@ -39,7 +39,7 @@ func (s *DeploymentService) ListPreviews(ctx context.Context, input ListPreviews
 }
 
 // RemovePreview ends a preview at once. Idempotent: an origin with no
-// live preview is not an error, and an expired one is left for the sweep. The deployments to it stay in the history.
+// live preview is not an error, and an expired one is left for the sweep.
 func (s *DeploymentService) RemovePreview(ctx context.Context, projectID, origin string) (err error) {
 	ctx, end := startSpan(ctx, "DeploymentService.RemovePreview")
 	defer end(&err)
@@ -58,7 +58,6 @@ func (s *DeploymentService) RemovePreview(ctx context.Context, projectID, origin
 			ProjectID:  projectID,
 			EntityType: "preview",
 			EntityID:   origin,
-			Payload:    domain.PreviewPayload{Origin: origin},
 		})
 	})
 }

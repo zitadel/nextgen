@@ -13,4 +13,4 @@ allOf:
         type: string
         const: preview.removed
       payload:
-        $ref: ../payloads/preview-payload.yaml
+        $ref: ../payloads/empty-event-payload.yaml

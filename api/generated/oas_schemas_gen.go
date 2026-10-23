@@ -69284,22 +69284,6 @@ func (s *Preview) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
 
-// Allowlisted fields for `preview.removed`.
-// Ref: #
-type PreviewPayload struct {
-	Origin string `json:"origin"`
-}
-
-// GetOrigin returns the value of Origin.
-func (s *PreviewPayload) GetOrigin() string {
-	return s.Origin
-}
-
-// SetOrigin sets the value of Origin.
-func (s *PreviewPayload) SetOrigin(val string) {
-	s.Origin = val
-}
-
 // PreviewRemoved2XX is 2XX pattern response for PreviewRemoved operation.
 type PreviewRemoved2XX struct {
 	StatusCode int
@@ -69373,9 +69357,9 @@ type PreviewRemovedEvent struct {
 	// Session correlation id.
 	SessionID OptNilString `json:"session_id"`
 	// Login flow correlation id.
-	FlowID   OptNilString     `json:"flow_id"`
-	Metadata OptEventMetadata `json:"metadata"`
-	Payload  PreviewPayload   `json:"payload"`
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -69484,7 +69468,7 @@ func (s *PreviewRemovedEvent) GetMetadata() OptEventMetadata {
 }
 
 // GetPayload returns the value of Payload.
-func (s *PreviewRemovedEvent) GetPayload() PreviewPayload {
+func (s *PreviewRemovedEvent) GetPayload() EmptyEventPayload {
 	return s.Payload
 }
 
@@ -69594,7 +69578,7 @@ func (s *PreviewRemovedEvent) SetMetadata(val OptEventMetadata) {
 }
 
 // SetPayload sets the value of Payload.
-func (s *PreviewRemovedEvent) SetPayload(val PreviewPayload) {
+func (s *PreviewRemovedEvent) SetPayload(val EmptyEventPayload) {
 	s.Payload = val
 }
 

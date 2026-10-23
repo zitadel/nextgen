@@ -129,7 +129,7 @@ tracked below.
 | `DeleteProjectByID` (when a row was deleted) | `project.deleted` | `entity` | `project` | _(empty)_ |
 | `AddOrigin` | `origin.added` | `entity` | `origin` | `pattern`, `kind` |
 | `RemoveOrigin` | `origin.removed` | `entity` | `origin` | `pattern`, `kind` |
-| `RemovePreview` (when a row was deleted) | `preview.removed` | `entity` | `preview` | `origin` |
+| `RemovePreview` (when a row was deleted) | `preview.removed` | `entity` | `preview` | _(empty)_ |
 | `CreateUser` | `user.created` | `entity` | `user` | `schema_id`, `attribute_keys[]`, `attributes` (`x-audit` values only) |
 | Unique violation on create | `user.create.failed` | `entity` | `user` | `key_name` |
 | `PatchUser` (attribute patch) | `user.updated` | `entity` | `user` | `attribute_keys[]`, `attributes` (`x-audit` values only) |

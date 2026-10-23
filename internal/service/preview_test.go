@@ -41,7 +41,7 @@ func TestDeploymentServiceRemovePreviewAuditsRemoval(t *testing.T) {
 			assert.Equal(t, previewOrigin, *event.EntityID)
 			assert.Equal(t, "proj_1", event.ProjectID)
 			assert.Equal(t, "preview", *event.EntityType)
-			assert.JSONEq(t, `{"origin":"`+previewOrigin+`"}`, string(event.Payload))
+			assert.JSONEq(t, `{}`, string(event.Payload))
 			return nil
 		})
 

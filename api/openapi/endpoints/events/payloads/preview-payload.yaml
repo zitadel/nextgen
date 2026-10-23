@@ -1,9 +1,0 @@
-title: PreviewPayload
-type: object
-description: |
-  Allowlisted fields for `preview.removed`.
-required:
-  - origin
-properties:
-  origin:
-    type: string
