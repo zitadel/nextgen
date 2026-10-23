@@ -66,6 +66,7 @@ apps/demo-next/
 apps/demo-nuxt/
 packages/api/
 packages/components/
+packages/go/
 packages/config/
 packages/design-tokens/
 packages/testing/

@@ -97,6 +97,7 @@ jobs:
           cache: true
           cache-dependency-path: |
             apps/api/go.sum
+            packages/go/go.sum
             tools/bench/go.sum
             tools/oidc-mock/go.sum
 

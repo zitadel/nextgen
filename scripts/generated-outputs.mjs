@@ -29,6 +29,9 @@ export const GENERATED_GLOBS = [
   "apps/api/api/openapi/endpoints/schemas/*.json",
   "apps/api/internal/**/*_enumer.go",
   "apps/api/internal/**/*.mock.go",
+  // The public Go client (go.zitadel.com/zitadel/v5/api), ogen output of
+  // apps/api/api/.ogen-client.yaml.
+  "packages/go/api/**/*.go",
 ];
 
 /**

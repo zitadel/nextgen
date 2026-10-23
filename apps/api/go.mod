@@ -195,6 +195,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.1 // indirect
+	go.zitadel.com/zitadel/v5 v5.0.0
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
@@ -217,3 +218,5 @@ tool (
 )
 
 replace github.com/zitadel/nextgen/packages/config/defaults => ../../packages/config/defaults
+
+replace go.zitadel.com/zitadel/v5 => ../../packages/go

@@ -13,12 +13,12 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
 
-	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // fixture is one user to patch with a project secret, which is a revocable

@@ -11,9 +11,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	api "github.com/zitadel/nextgen/api/generated"
 	internalapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // cookieRequest sends one request with the session cookie and exactly the

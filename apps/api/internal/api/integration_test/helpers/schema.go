@@ -7,9 +7,9 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/stretchr/testify/require"
-	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 const BuiltinSchemaBaseURL = "https://test.example.schemas.com/schemas"

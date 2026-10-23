@@ -26,6 +26,7 @@ conflict.
 | `apps/cloud/` | the hosted cloud | [runbook](docs/runbooks/cloud.md) |
 | `e2e/` | every end-to-end lane, moon project `e2e` | [journey](e2e/journey/AGENTS.md), [console](e2e/console/AGENTS.md), [demo-next](e2e/demo-next/AGENTS.md), [demo-nuxt](e2e/demo-nuxt/AGENTS.md) |
 | `packages/` | SDKs (`sdk-*`), API client, config schemas | [packages](packages/AGENTS.md) |
+| `packages/go/` | the Go API client module `go.zitadel.com/zitadel/v5`, generated with the server | [go](packages/go/AGENTS.md) |
 | `packages/components/` | `<zl-*>` atoms, the `<zitadel-login>` orchestrator | [components](packages/components/AGENTS.md) |
 | `packages/design-tokens/` | the `--zl-*` tokens both UIs share | [design-tokens](packages/design-tokens/AGENTS.md) |
 | `packages/api-mock/` | mock API for demos and tests | [api-mock](packages/api-mock/AGENTS.md) |

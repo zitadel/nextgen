@@ -5,6 +5,7 @@ projects:
     release: "tools/release"
     bench: "tools/bench"
     oidc-mock: "tools/oidc-mock"
+    go: "packages/go"
     cli: "apps/cli"
     e2e: "e2e"
     console: "apps/console"

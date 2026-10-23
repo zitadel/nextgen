@@ -15,11 +15,11 @@ import (
 	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	api "github.com/zitadel/nextgen/api/generated"
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // mustInitClaim starts a claim on the project and returns the 201 body.

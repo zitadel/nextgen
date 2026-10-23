@@ -1,0 +1,22 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // The public Go API client, a nested Go module whose api/ package the
+  // server's generation writes; vet waits for it, as bench's does.
+  "tasks": {
+    // Tracked Go files only, as the server project checks them.
+    "format": {},
+    "vet": {
+      "dependsOn": ["@zitadel/server#check-generate"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
+    },
+    "build": {
+      "dependsOn": ["vet"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
+    },
+    "test": {
+      "dependsOn": ["format", "vet"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
+    }
+  }
+}

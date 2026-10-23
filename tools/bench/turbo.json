@@ -22,6 +22,9 @@
         "$TURBO_ROOT$/apps/api/**/*.go",
         "$TURBO_ROOT$/apps/api/go.mod",
         "$TURBO_ROOT$/apps/api/go.sum",
+        "$TURBO_ROOT$/packages/go/**/*.go",
+        "$TURBO_ROOT$/packages/go/go.mod",
+        "$TURBO_ROOT$/packages/go/go.sum",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**"
       ]
@@ -38,6 +41,9 @@
         "$TURBO_ROOT$/apps/api/**/*.go",
         "$TURBO_ROOT$/apps/api/go.mod",
         "$TURBO_ROOT$/apps/api/go.sum",
+        "$TURBO_ROOT$/packages/go/**/*.go",
+        "$TURBO_ROOT$/packages/go/go.mod",
+        "$TURBO_ROOT$/packages/go/go.sum",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**"
       ],
@@ -51,6 +57,9 @@
         "$TURBO_ROOT$/apps/api/**/*.go",
         "$TURBO_ROOT$/apps/api/go.mod",
         "$TURBO_ROOT$/apps/api/go.sum",
+        "$TURBO_ROOT$/packages/go/**/*.go",
+        "$TURBO_ROOT$/packages/go/go.mod",
+        "$TURBO_ROOT$/packages/go/go.sum",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**"
       ]

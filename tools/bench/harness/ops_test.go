@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	api "github.com/zitadel/nextgen/api/generated"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 func newClient(t *testing.T, srv *httptest.Server) *api.Client {

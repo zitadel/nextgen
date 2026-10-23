@@ -120,7 +120,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('apps/api/go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}
+          key: go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('apps/api/go.sum', 'packages/go/go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}
           restore-keys: |
             go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-
 
