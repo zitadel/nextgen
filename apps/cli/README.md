@@ -3040,9 +3040,9 @@ USAGE
     next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|svelte|qwik-r
     outer|qwik|angular] [--renderer react] [--dev-port <value>] [--skip-install]
     [--preset password-first|passkey-first] [--use-case
-    minimal|consumer|business] [--sso google|custom] [--sso-client-id <value>]
-    [--sso-slug <value>] [--sso-display-name <value>] [--sso-issuer <value>]
-    [--sso-scopes <value>]
+    minimal|consumer|business] [--password-min-length <value>] [--sso
+    google|custom] [--sso-client-id <value>] [--sso-slug <value>]
+    [--sso-display-name <value>] [--sso-issuer <value>] [--sso-scopes <value>]
 
 FLAGS
   -c, --cwd=<value>
@@ -3081,6 +3081,11 @@ FLAGS
       Framework to target.
       <options: next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|sve
       lte|qwik-router|qwik|angular>
+
+  --password-min-length=<value>
+      Minimum password length for the project's password policy, for example 15; 0
+      sets none. Without it, setup writes the policy with no rules; change it in
+      .zitadel/policies/ later.
 
   --preset=<option>
       Sign-in preset for the scaffolded schema and login flow (default:
