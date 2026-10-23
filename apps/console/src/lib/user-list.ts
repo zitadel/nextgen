@@ -62,27 +62,6 @@ export async function fetchUsers(
 }
 
 /**
- * One page of a team's members: the project's users holding an active
- * membership in it (`team_id`, ADR 024). The filter reads memberships, so it
- * needs `team_membership.read` like `expand: ["teams"]` does, and is refused
- * the same way to a grant on only part of the project.
- */
-export function fetchTeamMembers(
-  projectId: string,
-  teamId: string,
-  pageToken?: string,
-): Promise<UsersPage> {
-  return api.queryUsers(
-    {
-      limit: PAGE_SIZE,
-      page_token: pageToken,
-      filter: [{ field: "team_id", operation: "equals", value: teamId }],
-    },
-    { project_id: projectId },
-  );
-}
-
-/**
  * Columns for a set of users, from the schemas those users reference.
  *
  * Only the loaded users' schemas are fetched, not every schema in the project:

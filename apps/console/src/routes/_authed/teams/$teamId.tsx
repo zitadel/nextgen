@@ -1,34 +1,18 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Box } from "lucide-react";
-import { useMemo } from "react";
 
 import { api } from "@/api/zitadel";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { RenameCard } from "@/components/rename-card";
-import {
-  LoadMore,
-  RESOURCE_CELL,
-  RESOURCE_TABLE_WRAP,
-  ResourceEmptyRow,
-  ResourceHeadCell,
-  ResourceHeaderRow,
-  ResourceRow,
-} from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
-import { UserIdCell, UserIdentityCell } from "@/components/user-cells";
-import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
+import { TeamUsers } from "@/components/team-users";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useLoadMore } from "@/hooks/use-load-more";
 import { nullOnForbidden } from "@/lib/api-error";
 import { formatDate } from "@/lib/date";
-import {
-  projectScopeDeps,
-  requireProjectScope,
-  useRequiredProjectScope,
-} from "@/lib/project-scope";
-import { fetchTeamMembers, toUserRow } from "@/lib/user-list";
+import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { fetchTeamUsers } from "@/lib/team-users";
 
 /**
  * Team detail: a resource inside Teams, not a scope of its own. The sidebar
@@ -41,41 +25,30 @@ import { fetchTeamMembers, toUserRow } from "@/lib/user-list";
  * claims a team is security-relevant, so it needs its own model — verification,
  * and more than one domain per team — rather than a string on `team-response`.
  * That model is not defined yet, so the cell is left out rather than shown empty.
+ *
+ * Members and Owned are the two relations ADR 024 keeps apart — who
+ * collaborates in the team, and whose lifecycle it owns — each its own query.
  */
 export const Route = createFileRoute("/_authed/teams/$teamId")({
   staticData: { scope: "project" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const projectId = requireProjectScope(deps.project);
-    const [team, members] = await Promise.all([
+    const [team, members, owned] = await Promise.all([
       api.getTeam(params.teamId),
       // Listing members needs `team_membership.read`, which a grant on only
       // part of the project does not carry: a refusal costs the Members tab
       // its list, not the team its page.
-      nullOnForbidden(fetchMembers(projectId, params.teamId)),
+      nullOnForbidden(fetchTeamUsers(projectId, params.teamId, "members")),
+      nullOnForbidden(fetchTeamUsers(projectId, params.teamId, "owned")),
     ]);
-    return { team, members };
+    return { team, members, owned };
   },
   component: TeamDetail,
 });
 
-interface MembersPage {
-  items: Record<string, unknown>[];
-  nextPageToken?: string;
-}
-
-/** One page of members. */
-async function fetchMembers(
-  projectId: string,
-  teamId: string,
-  pageToken?: string,
-): Promise<MembersPage> {
-  const page = await fetchTeamMembers(projectId, teamId, pageToken);
-  return { items: page.users, nextPageToken: page.next_page_token ?? undefined };
-}
-
 function TeamDetail() {
-  const { team, members } = Route.useLoaderData();
+  const { team, members, owned } = Route.useLoaderData();
   const router = useRouter();
 
   return (
@@ -97,6 +70,7 @@ function TeamDetail() {
         <TabsList aria-label="Team detail sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="owned">Owned</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -117,65 +91,34 @@ function TeamDetail() {
 
         <TabsContent value="members">
           {members ? (
-            <Members teamId={team.id} loaded={members} />
+            <TeamUsers
+              team={team}
+              relation="members"
+              loaded={members}
+              onChanged={() => router.invalidate()}
+            />
           ) : (
             <p className="text-sm text-muted-foreground">
               Your access does not include this team&apos;s members.
             </p>
           )}
         </TabsContent>
+
+        <TabsContent value="owned">
+          {owned ? (
+            <TeamUsers
+              team={team}
+              relation="owned"
+              loaded={owned}
+              onChanged={() => router.invalidate()}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Your access does not include the users this team owns.
+            </p>
+          )}
+        </TabsContent>
       </Tabs>
     </Page>
-  );
-}
-
-/**
- * The team's active members, by the identity the Users list leads with
- * (display → identifier → id, ADR 058), each opening their user. Read-only:
- * no endpoint adds or removes a membership yet.
- */
-function Members({ teamId, loaded }: { teamId: string; loaded: MembersPage }) {
-  const projectId = useRequiredProjectScope();
-  const paging = useLoadMore(
-    loaded,
-    // A later page refused shows as Load more's error rather than an empty list.
-    (pageToken) => fetchMembers(projectId, teamId, pageToken),
-    "Could not load more members.",
-  );
-  const rows = useMemo(
-    () => [...loaded.items, ...paging.extra].map((user, index) => toUserRow(user, index, [])),
-    [loaded.items, paging.extra],
-  );
-
-  return (
-    <>
-      <div className={RESOURCE_TABLE_WRAP}>
-        <Table className="text-xs">
-          <TableHeader>
-            <ResourceHeaderRow>
-              <ResourceHeadCell>User</ResourceHeadCell>
-              <ResourceHeadCell>Status</ResourceHeadCell>
-              <ResourceHeadCell>ID</ResourceHeadCell>
-            </ResourceHeaderRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <ResourceEmptyRow colSpan={3}>No members yet.</ResourceEmptyRow>
-            ) : (
-              rows.map((user) => (
-                <ResourceRow key={user.id} className="group">
-                  <UserIdentityCell user={user} />
-                  <TableCell className={RESOURCE_CELL}>
-                    <StatusBadge status={user.status} />
-                  </TableCell>
-                  <UserIdCell user={user} />
-                </ResourceRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <LoadMore paging={paging} />
-    </>
   );
 }

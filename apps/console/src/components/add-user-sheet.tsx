@@ -46,31 +46,43 @@ const LABEL_ROW = "flex w-full items-center gap-2";
  * the grant endpoints do not exist (#419). D6 expects it back in a future
  * version, so the block and its component are parked, not deleted — see
  * issue #633.
+ *
+ * Opened from a team, the drawer adds the user to it: `team` is the current
+ * context, preselected and read-only (decisions log D15). It is sent as
+ * `team_id`, which makes the new user a member of the team — not owned by it.
+ * `POST /users` cannot set a lifecycle owner (ADR 024), so the user stays
+ * self-owned whichever team they join.
  */
 export function AddUserSheet({
   children,
+  team,
   onCreated,
 }: {
   /** The trigger — the Users toolbar's `Add` button. */
   children: ReactNode;
+  /** The team the new user joins, when the drawer is opened from one. */
+  team?: { id: string; name: string };
   /** Called after a successful create so the caller can refresh its list. */
   onCreated: () => void | Promise<void>;
 }) {
   return (
     <FormSheet trigger={children}>
-      {(close) => <AddUserForm onCreated={onCreated} onClose={close} />}
+      {(close) => <AddUserForm team={team} onCreated={onCreated} onClose={close} />}
     </FormSheet>
   );
 }
 
 function AddUserForm({
+  team,
   onCreated,
   onClose,
 }: {
+  team?: { id: string; name: string };
   onCreated: () => void | Promise<void>;
   onClose: () => void;
 }) {
   const projectId = useRequiredProjectScope();
+  const teamFieldId = useId();
   const [schemas, setSchemas] = useState<SchemaOption[] | undefined>(undefined);
   const [schemaId, setSchemaId] = useState<string | undefined>(undefined);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -135,7 +147,10 @@ function AddUserForm({
       if (value === "") continue;
       attributes[entry.key] = attributeValue(entry, value);
     }
-    await api.createUser({ schema: selected.id, attributes }, { project_id: projectId });
+    await api.createUser(
+      { schema: selected.id, attributes },
+      { project_id: projectId, team_id: team?.id },
+    );
     await onCreated();
     onClose();
   }, "Could not create the user.");
@@ -168,6 +183,17 @@ function AddUserForm({
       onClose={onClose}
     >
       <div className={SECTION}>
+        {team && (
+          <Field>
+            <div className={LABEL_ROW}>
+              <FieldLabel htmlFor={teamFieldId}>Team</FieldLabel>
+            </div>
+            {/* Read-only, not a picker: the drawer was opened from this team,
+                and the multi-select D1 describes has no endpoint to add a user
+                to a second team yet. */}
+            <Input id={teamFieldId} value={team.name} readOnly disabled />
+          </Field>
+        )}
         <Field>
           <div className={LABEL_ROW}>
             <FieldLabel>User Schema</FieldLabel>
