@@ -1,15 +1,18 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, test } from "vitest";
 
+import { APP_RELEASE_PACKAGES } from "../../../scripts/release-manifest.mjs";
 import {
   localRegistryPaths,
   localRegistryPort,
   npmEnvironment,
   packageDirs,
   prepareLocalRegistry,
+  startLocalRegistry,
 } from "./local-registry.mjs";
 
 const tempDirs = [];
@@ -61,7 +64,7 @@ test("prepares local package tarballs and publishes them to Verdaccio", async ()
 
   assert.ok(
     logs.includes(
-      "building release npm tarballs for @zitadel/cli, @zitadel/server, @zitadel/server-linux-x64, @zitadel/server-linux-arm64, @zitadel/server-darwin-x64, @zitadel/server-darwin-arm64, @zitadel/server-win32-x64, @zitadel/api, @zitadel/config, @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt, @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular, @zitadel/sdk-solid, @zitadel/sdk-svelte, @zitadel/sdk-qwik, @zitadel/sdk-sveltekit, @zitadel/sdk-solid-start, @zitadel/sdk-qwik-city, @zitadel/sdk-tanstack-start, @zitadel/testing",
+      "building release npm tarballs for @zitadel/cli, @zitadel/server, @zitadel/server-linux-x64, @zitadel/server-linux-arm64, @zitadel/server-darwin-x64, @zitadel/server-darwin-arm64, @zitadel/server-win32-x64, @zitadel/api, @zitadel/config, @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt, @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular, @zitadel/sdk-solid, @zitadel/sdk-svelte, @zitadel/sdk-qwik, @zitadel/sdk-sveltekit, @zitadel/sdk-solid-start, @zitadel/sdk-qwik-router, @zitadel/sdk-tanstack-start, @zitadel/testing",
     ),
     logs.join("\n"),
   );
@@ -190,6 +193,59 @@ test("uses prebuilt tarballs without rebuilding release packages", async () => {
   );
 });
 
+test("builds and packs only what a generated app installs for the app package set", async () => {
+  const repoRoot = await fixtureRepo();
+  for (const pkg of APP_RELEASE_PACKAGES) {
+    await mkdir(join(repoRoot, pkg.dir, "dist"), { recursive: true });
+  }
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  tempDirs.push(workDir);
+  const paths = localRegistryPaths(workDir);
+  const env = { PATH: "/bin" };
+  const runCalls = [];
+  const packs = [];
+
+  await prepareLocalRegistry({
+    env,
+    packageSet: "app",
+    paths,
+    registryPort: 51_234,
+    registryUrl: "http://127.0.0.1:51234",
+    repoRoot,
+    run: async (command, args, options) => {
+      runCalls.push({ command, args, options });
+    },
+    runCapture: async (command, args, options) => {
+      packs.push({ command, args, options });
+      return { stdout: "", stderr: "" };
+    },
+    startLocalRegistry: async () => ({ exitCode: null, logFile: paths.registryLogPath }),
+    waitForHttp: async () => undefined,
+    workDir,
+  });
+
+  // The packages' cached dev builds; no release:pack, no server binaries.
+  assert.deepEqual(runCalls[0], {
+    command: "moon",
+    args: ["run", ...APP_RELEASE_PACKAGES.map((pkg) => `${pkg.moonProject}:build`)],
+    options: { cwd: repoRoot, env },
+  });
+  assert.ok(!runCalls.some((call) => call.args.includes("release:pack")));
+  assert.deepEqual(
+    packs.map((call) => call.args[2]).sort(),
+    APP_RELEASE_PACKAGES.map((pkg) => pkg.dir).sort(),
+  );
+  for (const call of packs) {
+    assert.equal(call.command, "corepack");
+    assert.deepEqual(call.args.slice(3), ["pack", "--pack-destination", paths.tarballsDir]);
+    assert.equal(call.options.env, env);
+  }
+  assert.deepEqual(
+    runCalls.find((call) => call.args[0] === "e2e/journey/scripts/verify-tarballs.mjs").args,
+    ["e2e/journey/scripts/verify-tarballs.mjs", paths.tarballsDir, "--app-packages"],
+  );
+});
+
 test("keeps a reused store's proxied packages and trusts their metadata for an hour", async () => {
   const repoRoot = await fixtureRepo();
   const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
@@ -227,6 +283,29 @@ test("keeps a reused store's proxied packages and trusts their metadata for an h
     verdaccioConfig.includes("  npmjs:\n    url: https://registry.npmjs.org/\n    maxage: 1h\n"),
     verdaccioConfig,
   );
+});
+
+test("refuses to start Verdaccio on a port something already serves", async () => {
+  const server = createServer((_request, response) => response.end("{}"));
+  await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  tempDirs.push(workDir);
+  try {
+    const { port } = server.address();
+    await assert.rejects(
+      startLocalRegistry({
+        env: {},
+        paths: localRegistryPaths(workDir),
+        registryPort: port,
+        repoRoot: workDir,
+      }),
+      new RegExp(`127\\.0\\.0\\.1:${port} is already in use`),
+    );
+    // Refused before anything was started or logged.
+    await assert.rejects(stat(localRegistryPaths(workDir).registryLogPath), { code: "ENOENT" });
+  } finally {
+    await new Promise((resolveClose) => server.close(resolveClose));
+  }
 });
 
 test("validates explicit local registry ports and derives stable defaults", () => {

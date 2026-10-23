@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import { frameworkForId, frameworkIds } from "./frameworks.mjs";
 
 // The pre-existing-app lane covers the widget posture (ADR 044), which is
@@ -67,6 +69,21 @@ export function assertPrebuiltTarballs(options, env) {
   }
 }
 
+/**
+ * The framework lanes start the mock OIDC provider (tools/oidc-mock) when
+ * `moon run oidc-mock:build` has built it; run by hand without it, the specs
+ * that need it skip themselves. Under --ci a missing binary stops the run, so
+ * those specs never skip silently there.
+ */
+export function assertOidcMock(options, binary) {
+  if (options.ci && !existsSync(binary)) {
+    throw new Error(
+      `the mock OIDC provider binary is missing (${binary}); ` +
+        "build it with `moon run oidc-mock:build`",
+    );
+  }
+}
+
 export function parseLocalJourneyArgs(args) {
   const parsed = {
     ci: false,
@@ -100,7 +117,7 @@ export function parseLocalJourneyArgs(args) {
         throw new Error(
           [
             "--backend was removed from the journey runner.",
-            "The journey now always exercises `npx @zitadel/cli@alpha start`.",
+            "The journey now always exercises `npx @zitadel/cli@latest start`.",
             "Remove `--backend`, or pass `--image <docker-tag>` / set ZITADEL_LOCAL_IMAGE to choose the local runtime image.",
           ].join(" "),
         );

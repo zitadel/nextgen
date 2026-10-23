@@ -19,17 +19,17 @@ The SolidStart SDK is request middleware that proxies and verifies sessions on t
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/sdk-solid-start@alpha @zitadel/sdk-solid@alpha
+    pnpm add @zitadel/sdk-solid-start@latest @zitadel/sdk-solid@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/sdk-solid-start@alpha @zitadel/sdk-solid@alpha
+    npm install @zitadel/sdk-solid-start@latest @zitadel/sdk-solid@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/sdk-solid-start@alpha @zitadel/sdk-solid@alpha
+    yarn add @zitadel/sdk-solid-start@latest @zitadel/sdk-solid@latest
     ```
   </Tab>
 </Tabs>
@@ -109,10 +109,10 @@ The SolidStart SDK is request middleware that proxies and verifies sessions on t
 <Steps>
   <Step>The middleware proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
   <Step>It verifies the session token and puts the result on `event.locals.nextgenAuth`; read it with `getAuth(getRequestEvent()!)` in a server function.</Step>
-  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`.</Step>
+  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
 </Steps>
 
-Nitro loads `.env` and `.env.local` into `process.env` in development, so the middleware finds `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` there. Only `VITE_`-prefixed variables reach the browser.
+Nitro loads `.env` and `.env.local` into `process.env` in development, so the middleware finds `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `ZITADEL_PROJECT_ID` there. Only `VITE_`-prefixed variables reach the browser.
 
 ## Verify
 
@@ -123,5 +123,5 @@ Nitro loads `.env` and `.env.local` into `process.env` in development, so the mi
 
 ## See also
 
-- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
 - [`@zitadel/sdk-solid-start` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-solid-start) and the [CLI SolidStart patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/solid-start).

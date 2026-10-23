@@ -118,6 +118,18 @@ var brandingAccess = resourceAccess{
 	denied:    domain.ErrBrandingPermissionDenied,
 }
 
+// policyAccess gates operation policies (ADR 066). Publish and the revision
+// read are project-scoped like releases: both carry a project_id and filter by
+// it, so no route resolves a path id through RSI.
+var policyAccess = resourceAccess{
+	kind:     domain.ResourceKindPolicy,
+	readMiss: domain.ErrPolicyNotFound,
+	writeMiss: func() domain.Error {
+		return domain.ErrPolicyInvalid(nil, nil).WithMessage("policy: invalid: project does not exist")
+	},
+	denied: domain.ErrPolicyPermissionDenied,
+}
+
 // variableAccess gates the project's variables and secrets (ADR 062). Like
 // grants and events, a variable has no minted id and no resource_scope_index
 // row — it is addressed by name under the project_id the request carries — so
@@ -213,12 +225,18 @@ func (h *Handler) requireResourceAccess(ctx context.Context, resourceID string, 
 
 // requireResourceAccessInProject is requireResourceAccess for ids that are unique only
 // within a project (schemas): projectHint, when set, names the project to
-// resolve the id in instead of the credential's own.
+// resolve the id in instead of the credential's own. A schema id under one of
+// the built-in bases is looked up under every base the namespace knows,
+// because the index holds the row's own spelling only.
 func (h *Handler) requireResourceAccessInProject(ctx context.Context, projectHint, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
 	if h == nil || h.pool == nil {
 		return "", domain.ErrInternal(errors.New("authz statements not configured"))
 	}
-	return requireResourceAccess(ctx, h.pool.Statements(), projectHint, resourceID, res, op)
+	ids := []string{resourceID}
+	if res.kind == domain.ResourceKindSchema {
+		ids = h.builtinBases.Equivalents(resourceID)
+	}
+	return requireResourceAccessAmong(ctx, h.pool.Statements(), projectHint, ids, res, op)
 }
 
 // lookupResourceScope finds the project a path id lives in. A project-bound
@@ -269,7 +287,23 @@ func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, project
 }
 
 func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, projectHint, resourceID string, res resourceAccess, op accessOp) (string, error) {
-	scope, err := lookupResourceScope(ctx, stmts, projectHint, resourceID, res)
+	return requireResourceAccessAmong(ctx, stmts, projectHint, []string{resourceID}, res, op)
+}
+
+// requireResourceAccessAmong is requireResourceAccess for a resource that may
+// be indexed under any of several ids (a built-in schema's `$id` under each
+// of its bases): the first id with an index row is the resource; the first
+// id names it in a miss.
+func requireResourceAccessAmong(ctx context.Context, stmts resourceAccessStmts, projectHint string, ids []string, res resourceAccess, op accessOp) (string, error) {
+	resourceID := ids[0]
+	var scope *domain.ResourceScope
+	var err error
+	for _, id := range ids {
+		scope, err = lookupResourceScope(ctx, stmts, projectHint, id, res)
+		if err == nil || !errors.Is(err, new(database.NoRowFoundError)) {
+			break
+		}
+	}
 	if err != nil {
 		if errors.Is(err, new(database.NoRowFoundError)) {
 			if op == opDelete {
@@ -445,8 +479,8 @@ func requireExpandScope(ctx context.Context, scope string, denied func() domain.
 // Console session) with read on the whole of projectID, which stands in for the
 // team_membership.read / team.read scopes such a principal never mints. The
 // system catalog has no finer read permission than the project viewer role
-// (ADR 054 §5). For an operation that has no list check whose decision it can
-// use (GET /users/{id}?team_id=), it asks the resolver.
+// (ADR 054 §5). Operations with no list check whose decision they can use ask
+// the resolver through requireMembershipReadIn.
 func (h *Handler) userReadsProject(ctx context.Context, projectID string) (bool, error) {
 	sc, ok := GetScopeContext(ctx)
 	if !ok || sc.PrincipalType != domain.AuthzPrincipalTypeUser {
@@ -462,10 +496,20 @@ func (h *Handler) userReadsProject(ctx context.Context, projectID string) (bool,
 	return dec == resolver.DecisionAllow, nil
 }
 
+// requireMembershipReadIn gates a membership read of a user in projectID that
+// has no list check to lean on (GET /users/{id}?team_id=, GET /users/{id}/teams):
+// by scope for a project secret, by project-wide read for a session.
+func (h *Handler) requireMembershipReadIn(ctx context.Context, projectID string) error {
+	reads, err := h.userReadsProject(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	return requireMembershipReadUnless(ctx, reads)
+}
+
 // requireMembershipReadUnless is requireMembershipRead, waived when the caller
-// is a session with read on the whole project (userReadsProject, or the list
-// check's project-wide decision): the gate POST /users/query and
-// GET /users/{id}?team_id= share.
+// is a session with read on the whole project (the list check's project-wide
+// decision on POST /users/query, or requireMembershipReadIn).
 func requireMembershipReadUnless(ctx context.Context, sessionReadsProject bool) error {
 	if sessionReadsProject {
 		return nil

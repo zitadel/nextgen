@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Shield, Users } from "lucide-react";
+import { Braces, Shield } from "lucide-react";
 import { useEffect } from "react";
 
 import {
@@ -13,7 +13,6 @@ import {
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
-  ResourcePage,
   ResourceRow,
   ResourceTitle,
   RowMenu,
@@ -35,6 +34,7 @@ import {
 } from "@/lib/idp";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { fetchAllSchemas, type SchemaEntry } from "@/lib/schema";
+import { Page } from "@/components/layout";
 
 /**
  * Authentication — the sign-in methods in use across the project's user
@@ -51,8 +51,8 @@ export interface AuthenticationSearch {
 }
 
 export const Route = createFileRoute("/_authed/authentication/")({
-  // Order 4: between Users (3) and Login flows (5), as the design places it.
-  staticData: { scope: "project", nav: { label: "Authentication", order: 4, icon: Shield } },
+  // Order 7: after Branding, as the design's single-level sidebar places it.
+  staticData: { scope: "project", nav: { label: "Authentication", order: 7, icon: Shield } },
   validateSearch: (search: Record<string, unknown>): AuthenticationSearch =>
     search.tab === "identity-providers" ? { tab: "identity-providers" } : {},
   loaderDeps: projectScopeDeps,
@@ -93,7 +93,7 @@ function AuthenticationScreen() {
   const tab = canReadIdps && search.tab === "identity-providers" ? search.tab : "sign-in";
 
   return (
-    <ResourcePage>
+    <Page>
       <ResourceTitle>Authentication</ResourceTitle>
 
       {/* 8px under the title and 16px over the table, as the page header
@@ -128,7 +128,7 @@ function AuthenticationScreen() {
           </TabsContent>
         )}
       </Tabs>
-    </ResourcePage>
+    </Page>
   );
 }
 
@@ -206,14 +206,14 @@ function MethodRow({ row }: { row: SignInMethodRow }) {
 }
 
 /**
- * The user schemas a row concerns, behind the users glyph: the first two by
+ * The user schemas a row concerns, behind the User schemas glyph: the first two by
  * name and a count for the rest, as the design truncates them.
  */
 function SchemaNames({ items }: { items: IdpReference[] }) {
   if (items.length === 0) return <>Not used</>;
   return (
     <span className="inline-flex max-w-full items-center gap-2">
-      <Users aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
+      <Braces aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
       <span className="truncate">{nameSummary(items.map((item) => item.name))}</span>
     </span>
   );

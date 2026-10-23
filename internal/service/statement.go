@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/authz/compiler"
@@ -32,6 +33,7 @@ type AllStatements interface {
 	JSONSchemaStatements
 	ReleaseStatements
 	IDPConnectionStatements
+	PolicyStatements
 	IDPIdentityLinkStatements
 	DeploymentStatements
 	PreviewStatements
@@ -185,6 +187,34 @@ type ReleaseStatements interface {
 	// RevokeRelease stamps revoked_at once; revoking again returns the first
 	// stamp.
 	RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error)
+}
+
+// PolicyStatements persists operation policies and their revisions (ADR 066,
+// ADR 063): a policy per operation per project, and an immutable revision per
+// publish.
+type PolicyStatements interface {
+	Statements
+	// CreatePolicy writes the policy, its first revision and the
+	// resource-scope row in one transaction, and sets the ids and timestamps
+	// on entity. An operation that already has a policy in the project
+	// returns *database.UniqueError.
+	CreatePolicy(ctx context.Context, entity *domain.Policy) error
+	// RevisePolicy appends a revision holding entity.Config and sets
+	// RevisionID and UpdatedAt on entity. An unknown policy returns
+	// *database.NoRowFoundError; a second revision of one policy in the same
+	// instant returns *database.UniqueError.
+	RevisePolicy(ctx context.Context, entity *domain.Policy) error
+	// LockPolicy takes the policy row's write lock for the rest of the
+	// transaction, so concurrent revisions of one policy serialize. It must be
+	// called inside a transaction. An unknown id returns
+	// *database.NoRowFoundError.
+	LockPolicy(ctx context.Context, projectID, id string) error
+	// GetPolicy returns the policy of operation in the project at its newest
+	// revision, or *database.NoRowFoundError when the project has none.
+	GetPolicy(ctx context.Context, projectID, operation string) (*domain.Policy, error)
+	// GetPolicyRevision returns the policy at the given revision, newest or
+	// not, or *database.NoRowFoundError.
+	GetPolicyRevision(ctx context.Context, projectID, revisionID string) (*domain.Policy, error)
 }
 
 // IDPConnectionStatements persists identity provider connections and their
@@ -435,6 +465,15 @@ type AuthAttemptStatements interface {
 	MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error
 }
 
+// UniqueAttributeClaim is a value of a unique attribute as the
+// unique-attributes registry stores it: under a team scope ("" for
+// project-wide), by key and value hash.
+type UniqueAttributeClaim struct {
+	TeamID    string
+	Key       domain.AttributeKey
+	ValueHash [sha256.Size]byte
+}
+
 // UserQueryOptions carries EAV match/hydrate options for GetUser / ListUsers.
 // Column predicates stay in Filter / ListOptions.
 type UserQueryOptions struct {
@@ -494,6 +533,10 @@ type UserStatements interface {
 	// attribute key, so a patch keeps the scope an existing claim was created
 	// under. An unknown user reads as an empty map, not an error.
 	GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error)
+	// GetTakenUniqueAttributeKeys returns the keys of the claims whose value a
+	// user other than userID holds in the unique-attributes registry, in no
+	// particular order.
+	GetTakenUniqueAttributeKeys(ctx context.Context, projectID, userID string, claims []UniqueAttributeClaim) ([]domain.AttributeKey, error)
 	GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts UserQueryOptions) (*domain.User, error)
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error

@@ -52,6 +52,11 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // history is that command's to read. Registry CRUD would offer a `create`
   // that skips the release construction the command exists to do.
   deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
+  // Operation policies are configuration, written from .zitadel/policies/ by
+  // the declarative path; their syncer and `policies list|get` are the CLI
+  // follow-up (ADR 066, #1444).
+  policies:
+    "configuration written from .zitadel/ by the declarative path; CLI support is a follow-up (#1444)",
 };
 
 /**
@@ -92,6 +97,11 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // operator credential (ADR 036), so these are not its to call.
   getMyUser: "the end user's own view of themselves, on their own credential",
   patchMyUser: "the end user's own view of themselves, on their own credential",
+  getMyUserSchema: "the end user's own view of themselves, on their own credential",
+  listMyTeams: "the end user's own view of themselves, on their own credential",
+  listMyPasskeys: "the end user's own view of themselves, on their own credential",
+  listMyIdentityLinks: "the end user's own view of themselves, on their own credential",
+  getMyPasswordState: "the end user's own view of themselves, on their own credential",
   getMySession: "the end user's own session, on their own credential",
   getMySessionCsrfToken:
     "the session's CSRF token (ADR 053 §5), read on the session's own credential; only the local-admin claim helper, not a command, uses it",
@@ -118,6 +128,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   listUserTeams: "not yet exposed — follow-up, a user sub-resource listing",
   listUserPasskeys: "not yet exposed — follow-up, a user sub-resource listing",
   listUserIdentityLinks: "not yet exposed — follow-up, a user sub-resource listing",
+  getUserPasswordState: "not yet exposed — follow-up, a user sub-resource read",
   addOrigin: "not yet exposed — `zitadel origin add` lands with the origins CLI surface (#1578)",
   removeOrigin:
     "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",

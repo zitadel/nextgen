@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-qwik",
-  "version": "1.0.0-alpha.25",
+  "version": "0.1.0",
   "description": "Qwik components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik#readme",
   "bugs": {
@@ -47,6 +47,7 @@
     "@qwik.dev/core": "^2.0.0-beta.45"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@qwik.dev/core": "catalog:",
     "@types/node": "catalog:",
     "@vitest/browser": "catalog:",

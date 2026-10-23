@@ -1,15 +1,18 @@
 import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import { joinURL } from "ufo";
 
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
+  proxySessionCookies,
+  SESSION_COOKIE_CACHE_CONTROL,
   requiresProjectSecret,
-  validateOpaqueSessionToken,
+  resolveSession,
+  serializeSessionCookie,
 } from "@zitadel/sdk-core/middleware";
-
-import { verifyJwt, base64UrlDecode } from "./lib/jwt";
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
@@ -21,8 +24,10 @@ const PROCESS_ENV: Record<string, string | undefined> =
 
 /**
  * The decision produced by {@link handleNextgenRequest}: either a ready-to-send
- * `Response` (proxy or login redirect) or an instruction to continue the request
- * with the resolved {@link AuthResult} attached to the router context.
+ * `Response` (proxy, login redirect, or a refusal: `400` for a request carrying
+ * the internal auth header, `503` for a protected route whose session the
+ * backend could not check) or an instruction to continue the request with the
+ * resolved {@link AuthResult} attached to the router context.
  */
 export type NextgenRequestDecision =
   | { readonly type: "proxy"; readonly response: Response }
@@ -32,8 +37,11 @@ export type NextgenRequestDecision =
       readonly type: "continue";
       readonly auth: AuthResult;
       /**
-       * `Set-Cookie` values the response to this request must carry — the
-       * clearing of dead session cookies. Empty or absent when there are none.
+       * `Set-Cookie` values the response to this request must carry: a dead
+       * session cookie cleared, or a session of this project copied out of the
+       * shared cookie into the project's own. Empty or absent when there are
+       * none. A response that carries them also sends
+       * `Cache-Control: private, no-store`, so no shared cache keeps them.
        */
       readonly setCookies?: readonly string[];
     };
@@ -42,7 +50,10 @@ export type NextgenRequestDecision =
 export type NextgenRequestOptions = NextgenMiddlewareOptions & {
   /** Project secret, sent as the bearer on the `POST /sessions/exchange` handoff only. */
   readonly projectSecret?: string;
-  /** Direct client address appended to the `X-Forwarded-For` chain. */
+  /**
+   * Direct client address appended to the `X-Forwarded-For` chain. Supply the
+   * address your server runtime provides; a request header is never used.
+   */
   readonly clientAddress?: string;
 };
 
@@ -60,7 +71,7 @@ function buildUpstreamHeaders(
     headers.set(key, value);
   }
 
-  const clientIp = clientAddress ?? request.headers.get("x-real-ip") ?? undefined;
+  const clientIp = clientAddress;
   if (clientIp) {
     const existingXff = headers.get("x-forwarded-for");
     headers.set("x-forwarded-for", existingXff ? `${existingXff}, ${clientIp}` : clientIp);
@@ -77,23 +88,47 @@ function buildUpstreamHeaders(
   return headers;
 }
 
+/**
+ * Forwards a `/__nextgen/*` request to the upstream auth backend. The session
+ * cookie travels under this project's name in the browser and the server's name
+ * upstream ({@link proxySessionCookies}).
+ */
 async function proxyRequest(
   request: Request,
   url: URL,
   authUrl: string,
   proxyPath: string,
+  projectId: string | undefined,
   projectSecret: string | undefined,
   clientAddress: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
   const suffix = url.pathname.slice(proxyPath.length);
-  const target = `${authUrl}${suffix}${url.search}`;
+  const target = `${joinURL(authUrl, suffix)}${url.search}`;
 
   const method = request.method;
   const hasBody = !["GET", "HEAD"].includes(method);
   const body = hasBody ? await request.arrayBuffer() : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(request, url, clientAddress);
+  const sessionCookies = proxySessionCookies(
+    {
+      method,
+      path: suffix,
+      search: url.search,
+      cookie: request.headers.get("cookie"),
+      requestUrl: url,
+      forwardedProto: request.headers.get("x-forwarded-proto"),
+      forwardedHost: request.headers.get("x-forwarded-host"),
+    },
+    projectId,
+    { url: authUrl, timeoutMs: proxyTimeoutMs },
+  );
+  if (sessionCookies.upstreamCookie === null) {
+    upstreamHeaders.delete("cookie");
+  } else {
+    upstreamHeaders.set("cookie", sessionCookies.upstreamCookie);
+  }
 
   // ADR 036: attach the project secret only to the handoff exchange — on every
   // operation it would make this public boundary an open relay with project
@@ -117,28 +152,18 @@ async function proxyRequest(
   // The app's own request URL: the origin a proxied redirect may name, and the
   // base a relative one resolves against (the IdP callback's 303 needs it).
   const responseHeaders = filterResponseHeaders(upstream.headers, url.toString());
-  const setCookies = upstream.headers.getSetCookie?.() ?? [];
-  for (const cookie of setCookies) {
+  const answer = await sessionCookies.toBrowser(upstream);
+  for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
   }
+  if (answer.setCookies.length > 0) {
+    responseHeaders.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
+  }
 
-  return new Response(upstream.body, {
+  return new Response(answer.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
-}
-
-const DECODER = new TextDecoder();
-
-function isJwtShaped(token: string): boolean {
-  const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
-  try {
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
-    return typeof header?.alg === "string" && !("enc" in header);
-  } catch {
-    return false;
-  }
 }
 
 function parseCookieHeader(header: string | null): Map<string, string> {
@@ -154,16 +179,15 @@ function parseCookieHeader(header: string | null): Map<string, string> {
   return jar;
 }
 
-function clearCookie(name: string): string {
-  return `${name}=; Path=/; Max-Age=0`;
-}
-
 /**
  * Framework-agnostic core that proxies, verifies the session JWT, and decides
  * route protection for a single request. The TanStack Start middleware is a thin
  * wrapper over this; the function is pure (a Web `Request` in, a
  * {@link NextgenRequestDecision} out) so it carries the full, independently
  * testable auth contract regardless of TanStack's evolving middleware surface.
+ *
+ * A session counts only in the app's own project: `projectId`, else
+ * `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID`.
  *
  * @param request - The incoming Web `Request`.
  * @param options - Configuration; `projectSecret` and `clientAddress` augment
@@ -176,6 +200,7 @@ export async function handleNextgenRequest(
 ): Promise<NextgenRequestDecision> {
   const {
     url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
+    projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -203,16 +228,10 @@ export async function handleNextgenRequest(
   const url2 = new URL(request.url);
   const { pathname } = url2;
 
-  // Strip any client-supplied x-nextgen-auth-token so downstream server code
-  // cannot read an attacker-controlled value; getAuth() is canonical.
-  // If the adapter's headers are immutable the value cannot be removed, so
-  // refuse the request rather than let it reach downstream handlers.
-  try {
-    request.headers.delete("x-nextgen-auth-token");
-  } catch {
-    if (request.headers.has("x-nextgen-auth-token")) {
-      return { type: "reject", response: new Response("Bad Request", { status: 400 }) };
-    }
+  // Clients never send x-nextgen-auth-token: it is an internal channel. Refuse any
+  // request that carries it, on every route, before anything else runs.
+  if (request.headers.has("x-nextgen-auth-token")) {
+    return { type: "reject", response: new Response("Bad Request", { status: 400 }) };
   }
 
   if (matchesRoutes(pathname, ignoredRoutes)) {
@@ -225,6 +244,7 @@ export async function handleNextgenRequest(
       url2,
       url,
       proxyPath,
+      projectId,
       projectSecret,
       clientAddress,
       proxyTimeoutMs,
@@ -235,80 +255,59 @@ export async function handleNextgenRequest(
   const cookies = parseCookieHeader(request.headers.get("cookie"));
   const authHeader = request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cookieToken = cookies.get("__nextgen_session") ?? null;
-  // Bearer token takes explicit precedence over the session cookie.
-  const token = bearerToken ?? cookieToken;
+  const {
+    auth,
+    undecided,
+    cookies: sessionCookies,
+  } = await resolveSession(
+    {
+      bearer: bearerToken,
+      cookie: (name) => cookies.get(name),
+      requestUrl: url2,
+      forwardedProto: request.headers.get("x-forwarded-proto"),
+      forwardedHost: request.headers.get("x-forwarded-host"),
+    },
+    {
+      url,
+      projectId,
+      allowedAlgorithms,
+      clockSkewMs,
+      audience,
+      allowedTokenTypes,
+      jwksTimeoutMs,
+      opaqueTokenTimeoutMs,
+    },
+  );
 
-  const payload = token
-    ? await verifyJwt(token, {
-        issuerUrl: url,
-        allowedAlgorithms,
-        clockSkewMs,
-        audience,
-        allowedTokenTypes,
-        jwksTimeoutMs,
-      })
-    : null;
+  // A dead session's cookie is cleared so the browser stops replaying it (each
+  // replay costs a backend session check), and a session of this project still
+  // under the shared name is copied to the project's own cookie. A live session
+  // that signs no one in here (an anonymous one, whose sign-in may still
+  // complete, or one of another project) keeps its cookie, and so does one the
+  // backend gave no verdict on.
+  const setCookies = sessionCookies.map(serializeSessionCookie);
 
-  if (payload && token && payload.sub) {
-    return {
-      type: "continue",
-      auth: {
-        isAuthenticated: true,
-        session: {
-          userId: payload.sub,
-          identifier: payload.email ?? null,
-          identifierProperty: null,
-          display: payload.name ?? null,
-          token,
-        },
-      },
-    };
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    return { type: "reject", response: new Response("Service Unavailable", { status: 503 }) };
   }
 
-  let liveAnonymousSession = false;
-  if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    // A session without a user is anonymous: its sign-in has not verified a
-    // factor yet. It is not signed in, but it is live — keep its cookie.
-    if (opaque?.userId) {
-      return {
-        type: "continue",
-        auth: {
-          isAuthenticated: true,
-          session: {
-            userId: opaque.userId,
-            identifier: opaque.identifier,
-            identifierProperty: opaque.identifierProperty,
-            display: opaque.display,
-            token: cookieToken,
-          },
-        },
-      };
-    }
-    liveAnonymousSession = opaque !== null;
-  }
-
-  // Dead credentials are cleared on every unauthenticated response so the
-  // browser stops replaying them (each replay costs a backend session check);
-  // a live anonymous session's cookie stays, since its sign-in may complete.
-  const setCookies = liveAnonymousSession
-    ? []
-    : [...cookies.keys()].filter((name) => name.startsWith("__nextgen")).map(clearCookie);
-
-  if (matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, url2);
-    loginUrl.searchParams.set("next", pathname);
-    const headers = new Headers({ location: loginUrl.toString() });
+  if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
+    const headers = new Headers({ location: loginRedirectUrl(loginPath, url2).toString() });
     for (const cookie of setCookies) {
       headers.append("set-cookie", cookie);
+    }
+    if (setCookies.length > 0) {
+      headers.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
     }
     return { type: "redirect", response: new Response(null, { status: 302, headers }) };
   }
 
   return {
     type: "continue",
-    auth: { isAuthenticated: false, session: null },
+    auth,
     ...(setCookies.length > 0 ? { setCookies } : {}),
   };
 }
@@ -363,8 +362,7 @@ export function createNextgenRequestMiddleware(
   options: NextgenRequestOptions = {},
 ): (ctx: RequestMiddlewareContext) => Promise<Response> {
   return async ({ request, next }: RequestMiddlewareContext): Promise<Response> => {
-    const clientAddress = options.clientAddress ?? request.headers.get("x-real-ip") ?? undefined;
-    const decision = await handleNextgenRequest(request, { ...options, clientAddress });
+    const decision = await handleNextgenRequest(request, options);
 
     if (decision.type === "continue") {
       const result = await next({ context: { [CONTEXT_KEY]: decision.auth } });
@@ -376,6 +374,7 @@ export function createNextgenRequestMiddleware(
       for (const cookie of decision.setCookies) {
         response.headers.append("set-cookie", cookie);
       }
+      response.headers.set("cache-control", SESSION_COOKIE_CACHE_CONTROL);
       return response;
     }
     return decision.response;

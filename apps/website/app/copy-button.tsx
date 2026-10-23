@@ -1,18 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BAR_BUTTON } from "./window";
 
-// Copies the commands beside it, and says so for two seconds. Where the
-// browser offers no clipboard (an insecure origin), it does nothing: the
-// commands stay selectable. Icons from zitadel/new-website's components/icons.
-export function CopyButton({ text, label }: { text: string; label: string }) {
+// Copies `text`, and says so for a moment. Where the browser offers no
+// clipboard (an insecure origin), it does nothing: the text stays selectable.
+// `label` names what it copies for screen readers; `withLabel` shows the word
+// beside the icon. Icons from zitadel/new-website's components/icons.
+export function CopyButton({
+  text,
+  label,
+  withLabel = false,
+  className = "",
+}: {
+  text: string;
+  label: string;
+  withLabel?: boolean;
+  className?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!copied) {
       return;
     }
-    const reset = setTimeout(() => setCopied(false), 2000);
+    const reset = setTimeout(() => setCopied(false), 1600);
     return () => clearTimeout(reset);
   }, [copied]);
 
@@ -27,11 +39,16 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
       <button
         type="button"
         onClick={copy}
-        aria-label={label}
-        title={copied ? "Copied" : label}
-        className="absolute top-3 right-3 flex size-8 cursor-pointer items-center justify-center rounded-md border border-border-primary bg-surface-black-secondary text-text-primary transition-colors hover:bg-background"
+        aria-label={withLabel ? undefined : `Copy ${label}`}
+        className={`${BAR_BUTTON} ${copied ? "text-success" : "text-text-secondary"} ${className}`}
       >
         {copied ? <Check /> : <Copy />}
+        {withLabel && (
+          <span>
+            {copied ? "Copied" : "Copy"}
+            <span className="sr-only"> {label}</span>
+          </span>
+        )}
       </button>
       <span role="status" className="sr-only">
         {copied ? "Copied" : ""}

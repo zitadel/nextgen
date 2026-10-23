@@ -3,6 +3,8 @@
 Integrates Zitadel auth into a Nuxt app. Like Next, Nuxt proxies and verifies
 the session server-side — here through the `@zitadel/sdk-nuxt` module.
 
+The detector requires `nuxt` 4 or newer; older versions are refused.
+
 ## What it patches
 
 - `app.vue` — router root
@@ -11,9 +13,10 @@ the session server-side — here through the `@zitadel/sdk-nuxt` module.
 - `.env.example`, `.env.local` — `NUXT_PUBLIC_ZITADEL_PROJECT_ID` (client-exposed),
   plus the shared `ZITADEL_*` keys the base patcher writes (`ZITADEL_PROJECT_ID`,
   `ZITADEL_PROJECT_SECRET`, `ZITADEL_ISSUER`, `ZITADEL_URL`, `ZITADEL_ENVIRONMENT`) —
-  Nuxt loads only `.env`, so the module reads `ZITADEL_URL`,
+  Nuxt loads only `.env`, so in `nuxt dev` the module reads `ZITADEL_URL`,
   `NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and `ZITADEL_PROJECT_SECRET` from `.env.local`
-  itself when the environment does not set them
+  itself when the environment does not set them; a built server reads `ZITADEL_URL`
+  and `ZITADEL_PROJECT_SECRET` from its runtime environment, never from the build
 - `package.json` — adds `@zitadel/sdk-nuxt` (and nothing else from `@zitadel/*`)
 
 ## No plugins

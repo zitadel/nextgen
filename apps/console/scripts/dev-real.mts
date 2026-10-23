@@ -240,12 +240,16 @@ if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
  * and the plain methods by several, and the connection's "Used by" names one.
  *
  * Both schemas are the bootstrapped one with their own type, title and methods,
- * so they carry the properties the seeded users already validate against. The
+ * so they carry the properties the seeded users already validate against.
+ * `Employees` adds an optional boolean and integer, and one employee is seeded
+ * with both set, so the user page shows a switch and a number field. The
  * client id and secret are `${{ VAR }}` references: no variable backs them, so
  * the connection renders but cannot complete a sign-in — which nothing here
  * asks of it. Best-effort, like the grant: a failure costs the screen its
  * data, not the instance.
  */
+const EMPLOYEE_EMAIL = "employee@zitadel.local";
+
 async function seedAuthentication(): Promise<boolean> {
   const headers = {
     authorization: `Bearer ${projectSecret}`,
@@ -293,6 +297,7 @@ async function seedAuthentication(): Promise<boolean> {
     // document a schema rather than a revision of the bootstrapped one.
     const { $id: _id, ...document } = base;
     const methods = (document["x-auth-methods"] ?? {}) as Record<string, unknown>;
+    const properties = (document.properties ?? {}) as Record<string, unknown>;
 
     const customers = await post("/schemas", {
       ...document,
@@ -307,8 +312,31 @@ async function seedAuthentication(): Promise<boolean> {
       objectType: "employee",
       title: "Employees",
       "x-auth-methods": { ...methods, sso: { enabled: false } },
+      properties: {
+        ...properties,
+        newsletter: { type: "boolean", title: "Newsletter" },
+        deskNumber: { type: "integer", title: "Desk number" },
+      },
     });
-    return customers.ok && employees.ok;
+    if (!customers.ok || !employees.ok) return false;
+    const { id: schema } = (await employees.json()) as { id: string };
+    // Its own warning: the provider and schemas above are seeded either way.
+    const employee = await post("/users", {
+      schema,
+      attributes: {
+        email: EMPLOYEE_EMAIL,
+        givenName: "Evelyn",
+        familyName: "Berezin",
+        newsletter: true,
+        deskNumber: 42,
+      },
+    }).catch(() => undefined);
+    if (!employee?.ok) {
+      console.warn(
+        `[console-dev-real] could not seed ${EMPLOYEE_EMAIL}; the user page has no boolean or number field to show.`,
+      );
+    }
+    return true;
   } catch {
     return false;
   }
@@ -362,6 +390,7 @@ console.log(
     `  │  instance   ${baseUrl}`,
     `  │  project    ${projectId}`,
     `  │  users      ${seeded.length} seeded`,
+    ...(claimMode ? [] : [`  │             + ${EMPLOYEE_EMAIL}, no password (cannot sign in)`]),
     "  │",
     `  │  sign in at ${consoleOrigin}/login`,
     `  │    email     ${DEV_USER.email}`,

@@ -11,7 +11,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 The Svelte SDK is the SPA wrapper for the shared Zitadel login and logout widgets, built for Svelte 5.
 
 <Callout title="SPA proxy requirement" type="warn">
-  Vite-based Svelte SPAs do not have server middleware by default. The CLI configures a Vite dev proxy; production deployments need an equivalent same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/concepts/sdk-proxy).
+  Vite-based Svelte SPAs do not have server middleware by default. The CLI configures a Vite dev proxy; production deployments need an equivalent same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/sdks/proxy).
 </Callout>
 
 ## Install
@@ -19,17 +19,17 @@ The Svelte SDK is the SPA wrapper for the shared Zitadel login and logout widget
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/sdk-svelte@alpha
+    pnpm add @zitadel/sdk-svelte@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/sdk-svelte@alpha
+    npm install @zitadel/sdk-svelte@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/sdk-svelte@alpha
+    yarn add @zitadel/sdk-svelte@latest
     ```
   </Tab>
 </Tabs>
@@ -82,7 +82,8 @@ The Svelte SDK is the SPA wrapper for the shared Zitadel login and logout widget
 | `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
 | `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
 | `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
-| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. |
+| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
+| `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
 | `postSignOutUrl` | `string` | unset | Logout, Session | Where to navigate after sign-out. |
 | `resumeFlowId` | `string` or `null` | unset | Login | An existing flow's id to resume instead of starting a new flow; unset, `null` or `""` falls back to the `flow` query parameter, and an id that no longer resolves starts a new flow. |
 | `variant` | `"widget"` or `"page"` | `"widget"` | Login, Session | `widget` is content-sized and paints no page chrome; `page` claims the viewport, paints the surface background and loads the brand font, and on Login focuses the first field. |
@@ -109,12 +110,22 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin {project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
 
+## Standard HTML attributes
+
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`) and pass them to the widget element, so you can position, style and label the widget without an extra wrapper element. Nothing else reaches the element: any other prop is ignored.
+
+```svelte
+<ZitadelLogin {project} class="login" data-testid="login" aria-label="Sign in" />
+```
+
+In Svelte, removing the `title` prop leaves `title="null"` on the element, because Svelte assigns it as a property.
+
 ## Runtime model
 
 <Steps>
   <Step>The widgets call the configured proxy path on the same origin.</Step>
   <Step>In local Vite development, the generated proxy forwards `/__nextgen/*` to Zitadel and adds the project secret to the session exchange, and to no other call.</Step>
-  <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, so that proxy must add the project secret to the session exchange, and to no other call. A plain rewrite cannot do that (see [SDK proxy](/docs/concepts/sdk-proxy#spas-in-production)).</Step>
+  <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, so that proxy must add the project secret to the session exchange, and to no other call. A plain rewrite cannot do that (see [SDK proxy](/docs/sdks/proxy#spas-in-production)).</Step>
 </Steps>
 
 If your app renders on the server, mount the widget on the client only, after hydration, or pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow.
@@ -128,6 +139,6 @@ If your app renders on the server, mount the widget on the client only, after hy
 
 ## See also
 
-- [SDK proxy](/docs/concepts/sdk-proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and what it must do in production.
+- [SDK proxy](/docs/sdks/proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and what it must do in production.
 - [Components](/docs/sdks/components) — the shared web components these wrappers render.
 - [`@zitadel/sdk-svelte` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-svelte) and the [CLI Svelte patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/svelte).

@@ -6,9 +6,16 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { failureAdvice } from "../../../src/commands/doctor";
+import type { LocalServers } from "../../../src/lib/local-server/processes";
 import { publicCliCommand } from "../../../src/lib/public-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
+import { nextPort } from "../../helpers/ports";
+import {
+  aMachineRunning,
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+} from "../../helpers/run-cli";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
 
@@ -18,14 +25,14 @@ const servers: Server[] = [];
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
   objectType: "human-user",
-  metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+  metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
   "x-auth-methods": { password: { enabled: true } },
   properties: { email: { type: "string" } },
 };
 
 async function doctor(cwd: string, extra: string[] = []) {
   const fake = await fakeDocker();
-  const port = await freePort();
+  const port = nextPort();
   return runCliForTest(
     [
       "doctor",
@@ -447,6 +454,25 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
         message: expect.stringContaining("is healthy"),
       });
     });
+
+    it("points at that server's log", async () => {
+      const { app } = await appUnderStartedServer();
+
+      const res = await doctorWithoutPort(app);
+
+      const data = (parseJson(res.stdout) as { data: { next_actions?: string[] } }).data;
+      expect(data.next_actions).toContainEqual(
+        expect.stringContaining(expectedPublicCliCommand("logs --follow")),
+      );
+    });
+  });
+
+  it("points at no server log where no server was started", async () => {
+    const cwd = await makeHealthyProject();
+
+    const res = await doctor(cwd);
+
+    expect(res.stdout).not.toContain("logs --follow");
   });
 
   it("fails the project-match check when secret and config disagree", async () => {
@@ -643,16 +669,82 @@ async function startHealthServer(): Promise<string> {
   return `http://127.0.0.1:${String(address.port)}`;
 }
 
-async function freePort(): Promise<number> {
-  const server = createServer();
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
-  const address = server.address();
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  if (!address || typeof address === "string") {
-    throw new Error("free port probe did not expose a TCP address");
+describe("doctor's managed runtime process check", () => {
+  const HOST_WIDE_SERVER = {
+    pid: 999_991,
+    ppid: 1,
+    command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+  };
+
+  /** A `ps` that fails, so a doctor that reads the host's processes cannot find them supported. */
+  async function failingPs(): Promise<string> {
+    const binDir = await mkdtemp(join(tmpdir(), "zitadel-failing-ps-"));
+    tempDirs.push(binDir);
+    await writeFile(join(binDir, "ps"), "#!/usr/bin/env node\nprocess.exit(1);\n");
+    await chmod(join(binDir, "ps"), 0o755);
+    return binDir;
   }
-  return address.port;
-}
+
+  async function doctorOn(servers: LocalServers) {
+    const cwd = await makeHealthyProject();
+    const fake = await fakeDocker();
+    const res = await runCliForTest(
+      [
+        "doctor",
+        "--cwd",
+        cwd,
+        "--json",
+        "--port",
+        String(nextPort()),
+        "--server",
+        "https://api.zitadel.cloud",
+      ],
+      {
+        PATH: `${await failingPs()}:${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+      undefined,
+      servers,
+    );
+    return parseJson(res.stdout);
+  }
+
+  it("reports the servers of the machine it is given", async () => {
+    const json = await doctorOn(aMachineRunning(HOST_WIDE_SERVER));
+
+    expect(json).toMatchObject({
+      data: {
+        checks: expect.arrayContaining([
+          expect.objectContaining({
+            name: "managed-runtime-processes",
+            status: "warn",
+            details: {
+              supported: true,
+              scope: "host",
+              processes: [expect.objectContaining({ pid: 999_991 })],
+            },
+          }),
+        ]),
+      },
+    });
+  });
+
+  it("reports none for a machine running none, whatever the host runs", async () => {
+    const json = await doctorOn(aMachineRunning());
+
+    expect(json).toMatchObject({
+      data: {
+        checks: expect.arrayContaining([
+          expect.objectContaining({
+            name: "managed-runtime-processes",
+            status: "pass",
+            details: { supported: true, scope: "host", processes: [] },
+          }),
+        ]),
+      },
+    });
+  });
+});
 
 describe("failureAdvice for a runtime found in a parent directory", () => {
   const failed = [{ name: "runtime", status: "fail" as const, message: "not healthy" }];

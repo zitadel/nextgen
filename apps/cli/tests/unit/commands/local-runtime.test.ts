@@ -20,7 +20,13 @@ import {
   type RuntimeMetadata,
 } from "../../../src/lib/local-server/runtime";
 import Reset from "../../../src/commands/reset";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
+import { nextPort } from "../../helpers/ports";
+import {
+  aMachineRunning,
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+} from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
@@ -84,7 +90,7 @@ describe("local runtime commands", () => {
   it("doctor --json passes with the binary runtime before app setup", async () => {
     const cwd = await tempProject("zitadel-doctor-binary-");
     const fake = await fakeServerBinary();
-    const port = await freePort();
+    const port = nextPort();
 
     const result = await runCliForTest(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
       ZITADEL_SERVER_BINARY: fake.binPath,
@@ -107,7 +113,7 @@ describe("local runtime commands", () => {
   it("doctor --json passes with Docker mocked before app setup", async () => {
     const cwd = await tempProject("zitadel-doctor-");
     const fake = await fakeDocker();
-    const port = await freePort();
+    const port = nextPort();
 
     const result = await runCliForTest(
       ["doctor", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
@@ -133,7 +139,7 @@ describe("local runtime commands", () => {
   it("doctor warns when Docker is unreachable before app setup", async () => {
     const cwd = await tempProject("zitadel-doctor-fail-");
     const fake = await fakeDocker({ dockerAvailable: false });
-    const port = await freePort();
+    const port = nextPort();
 
     const result = await runCliForTest(
       ["doctor", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
@@ -169,7 +175,7 @@ describe("local runtime commands", () => {
   it("does not print duplicate warning lines in human doctor output", async () => {
     const cwd = await tempProject("zitadel-doctor-human-warn-");
     const fake = await fakeDocker({ dockerAvailable: false });
-    const port = await freePort();
+    const port = nextPort();
 
     const result = await runCliForTest(
       ["doctor", "--cwd", cwd, "--runtime", "docker", "--port", String(port)],
@@ -189,7 +195,7 @@ describe("local runtime commands", () => {
   it("doctor warns about unavailable images without pulling", async () => {
     const cwd = await tempProject("zitadel-doctor-image-fail-");
     const fake = await fakeDocker({ imageAvailable: false });
-    const port = await freePort();
+    const port = nextPort();
 
     const result = await runCliForTest(
       [
@@ -232,7 +238,7 @@ describe("local runtime commands", () => {
   it("doctor still fails when existing local runtime metadata is unhealthy", async () => {
     const cwd = await tempProject("zitadel-doctor-runtime-fail-");
     const fake = await fakeDocker();
-    const port = await freePort();
+    const port = nextPort();
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, `http://localhost:${String(port)}`));
 
     const result = await runCliForTest(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
@@ -282,20 +288,19 @@ describe("local runtime commands", () => {
   it("doctor warns about other host-wide managed runtime processes and suggests stop --all", async () => {
     const cwd = await tempProject("zitadel-doctor-orphan-");
     const fake = await fakeServerBinary();
-    const fakePs = await fakeProcessTable([
-      {
-        pid: 999_991,
-        ppid: 1,
-        command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
-      },
-      { pid: 999_992, ppid: 1, command: "/usr/local/bin/node /tmp/not-zitadel.js" },
-    ]);
-    const port = await freePort();
-
-    const result = await runCliForTest(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
-      PATH: `${fakePs.binDir}:${process.env.PATH ?? ""}`,
-      ZITADEL_SERVER_BINARY: fake.binPath,
+    const servers = aMachineRunning({
+      pid: 999_991,
+      ppid: 1,
+      command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
     });
+    const port = nextPort();
+
+    const result = await runCliForTest(
+      ["doctor", "--cwd", cwd, "--json", "--port", String(port)],
+      { ZITADEL_SERVER_BINARY: fake.binPath },
+      undefined,
+      servers,
+    );
 
     expect(result.exitCode).toBe(0);
     const envelope = parseJson(result.stdout) as {
@@ -324,7 +329,7 @@ describe("local runtime commands", () => {
   it("start fails before image work when Docker is unreachable", async () => {
     const cwd = await tempProject("zitadel-start-docker-fail-");
     const fake = await fakeDocker({ dockerAvailable: false });
-    const port = await freePort();
+    const port = nextPort();
 
     const result = await runCliForTest(
       ["start", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
@@ -357,7 +362,7 @@ describe("local runtime commands", () => {
   it("start hands NEXTGEN_* variables from .env.local and .env to the runtime, names only on disk", async () => {
     const cwd = await tempProject("zitadel-start-env-");
     const fake = await fakeServerBinary();
-    const port = await freePort();
+    const port = nextPort();
     const serverUrl = `http://localhost:${String(port)}`;
     await writeFile(
       join(cwd, ".env.local"),
@@ -387,10 +392,14 @@ describe("local runtime commands", () => {
     await expect(childEnv(serverUrl, "NEXTGEN_GOOGLE_SECRET")).resolves.toBe("canary-local");
     await expect(childEnv(serverUrl, "NEXTGEN_GITHUB_SECRET")).resolves.toBe("canary-github");
     await expect(childEnv(serverUrl, "UNDECLARED_SECRET")).resolves.toBeUndefined();
+    // The local defaults ride along: loopback is fetchable on a local server.
+    await expect(childEnv(serverUrl, "NEXTGEN_HTTPCLIENT_ALLOW_LIST")).resolves.toBe(
+      "localhost,127.0.0.0/8,::1/128",
+    );
 
     // Names only, in the envelope and on disk.
     expect(envelope.data.runtime.env).toEqual({
-      injected: ["NEXTGEN_GITHUB_SECRET", "NEXTGEN_GOOGLE_SECRET"],
+      injected: ["NEXTGEN_GITHUB_SECRET", "NEXTGEN_GOOGLE_SECRET", "NEXTGEN_HTTPCLIENT_ALLOW_LIST"],
     });
     expect(result.stdout).not.toContain("canary");
     expect(result.stderr).not.toContain("canary");
@@ -456,7 +465,7 @@ describe("local runtime commands", () => {
     // Its API is that release's, and setup against it fails halfway.
     const cwd = await tempProject("zitadel-start-binary-release-");
     const fake = await fakeServerBinary();
-    const port = await freePort();
+    const port = nextPort();
 
     const older = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
       ZITADEL_SERVER_BINARY: fake.binPath,
@@ -491,7 +500,7 @@ describe("local runtime commands", () => {
   it("start --json defaults to the npm binary runtime and writes metadata", async () => {
     const cwd = await tempProject("zitadel-start-binary-");
     const fake = await fakeServerBinary();
-    const port = await freePort();
+    const port = nextPort();
     const serverUrl = `http://localhost:${String(port)}`;
 
     const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
@@ -505,6 +514,7 @@ describe("local runtime commands", () => {
         runtime: { backend: string; pid: number; log_path: string; server_package: string };
         urls: { api: string };
         console: { signed_in_as: string; sign_in_url?: string; error?: string; hint?: string };
+        next_actions: string[];
         next_commands: string[];
       };
     };
@@ -527,6 +537,9 @@ describe("local runtime commands", () => {
     });
     expect(envelope.data.console.sign_in_url).toBeUndefined();
     expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
+    expect(envelope.data.next_actions).toContainEqual(
+      expect.stringContaining(expectedPublicCliCommand("logs --follow")),
+    );
 
     const runtime = await readRuntimeMetadata(cwd);
     expect(runtime).toMatchObject({
@@ -588,7 +601,7 @@ describe("local runtime commands", () => {
       const cwd = await tempProject("zitadel-start-no-platform-");
       if (envLocal) await writeFile(join(cwd, ".env.local"), envLocal);
       const fake = await fakeServerBinary();
-      const port = await freePort();
+      const port = nextPort();
 
       const result = await runCliForTest(
         ["start", "--cwd", cwd, "--json", "--port", String(port)],
@@ -621,7 +634,7 @@ describe("local runtime commands", () => {
   it("start fails if its spawned binary exits even when another health server appears", async () => {
     const cwd = await tempProject("zitadel-start-dead-pid-");
     const fake = await fakeExitingServerWithForeignHealth();
-    const port = await freePort();
+    const port = nextPort();
 
     const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
       ZITADEL_SERVER_BINARY: fake.binPath,
@@ -637,7 +650,7 @@ describe("local runtime commands", () => {
   it("start --json starts the single-container runtime and writes metadata", async () => {
     const cwd = await tempProject("zitadel-start-");
     const fake = await fakeDocker();
-    const port = await freePort();
+    const port = nextPort();
     const serverUrl = `http://localhost:${String(port)}`;
 
     const result = await runCliForTest(
@@ -681,7 +694,7 @@ describe("local runtime commands", () => {
   it("start uses a prebuilt local image without pulling it", async () => {
     const cwd = await tempProject("zitadel-start-local-image-");
     const fake = await fakeDocker({ imageExists: true });
-    const port = await freePort();
+    const port = nextPort();
 
     const result = await runCliForTest(
       ["start", "--cwd", cwd, "--json", "--port", String(port), "--image", "zitadel-nextgen:test"],
@@ -701,7 +714,7 @@ describe("local runtime commands", () => {
   it("start uses ZITADEL_LOCAL_IMAGE before the derived alpha image", async () => {
     const cwd = await tempProject("zitadel-start-env-image-");
     const fake = await fakeDocker({ imageExists: true });
-    const port = await freePort();
+    const port = nextPort();
 
     const result = await runCliForTest(
       ["start", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
@@ -720,7 +733,7 @@ describe("local runtime commands", () => {
   it("start --image overrides ZITADEL_LOCAL_IMAGE", async () => {
     const cwd = await tempProject("zitadel-start-replace-image-");
     const fake = await fakeDocker({ imageExists: true });
-    const port = await freePort();
+    const port = nextPort();
 
     const result = await runCliForTest(
       [
@@ -750,7 +763,7 @@ describe("local runtime commands", () => {
   it("start replaces an existing container from another image", async () => {
     const cwd = await tempProject("zitadel-start-replace-image-");
     const fake = await fakeDocker({ existingContainerImage: "ghcr.io/zitadel/nextgen:old" });
-    const port = await freePort();
+    const port = nextPort();
 
     const result = await runCliForTest(
       ["start", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
@@ -775,7 +788,7 @@ describe("local runtime commands", () => {
       existingContainerImage: "ghcr.io/zitadel/nextgen:old",
     });
     const fakeBinary = await fakeServerBinary();
-    const port = await freePort();
+    const port = nextPort();
     const serverUrl = `http://localhost:${String(port)}`;
     const containerName = localContainerName(cwd);
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
@@ -862,18 +875,18 @@ describe("local runtime commands", () => {
 
   it("stop --all reports only discovered CLI-managed runtime candidates", async () => {
     const cwd = await tempProject("zitadel-stop-all-");
-    const fakePs = await fakeProcessTable([
-      {
-        pid: 999_981,
-        ppid: 1,
-        command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
-      },
-      { pid: 999_982, ppid: 1, command: "/usr/local/bin/node /tmp/unrelated.js" },
-    ]);
-
-    const result = await runCliForTest(["stop", "--cwd", cwd, "--json", "--all"], {
-      PATH: `${fakePs.binDir}:${process.env.PATH ?? ""}`,
+    const servers = aMachineRunning({
+      pid: 999_981,
+      ppid: 1,
+      command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
     });
+
+    const result = await runCliForTest(
+      ["stop", "--cwd", cwd, "--json", "--all"],
+      {},
+      undefined,
+      servers,
+    );
 
     expect(result.exitCode).toBe(0);
     const envelope = parseJson(result.stdout) as {
@@ -1178,36 +1191,6 @@ process.exit(0);
   return { binPath };
 }
 
-async function fakeProcessTable(
-  rows: Array<{ command: string; pid: number; ppid: number }>,
-): Promise<{ binDir: string }> {
-  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-ps-"));
-  tempDirs.push(binDir);
-  const psPath = join(binDir, "ps");
-  await writeFile(
-    psPath,
-    `#!/usr/bin/env node
-const rows = ${JSON.stringify(rows)};
-const args = process.argv.slice(2);
-if (args[0] === "axo") {
-  for (const row of rows) {
-    console.log(String(row.pid).padStart(6) + " " + String(row.ppid).padStart(6) + " " + row.command);
-  }
-  process.exit(0);
-}
-if (args[0] === "eww") {
-  const pid = Number(args[2]);
-  const row = rows.find((candidate) => candidate.pid === pid);
-  if (row) console.log(row.command);
-  process.exit(0);
-}
-process.exit(1);
-`,
-  );
-  await chmod(psPath, 0o755);
-  return { binDir };
-}
-
 /**
  * The image of a recorded `docker run`. It is the last argument unless the run
  * passes server arguments after it (`--migrate --user-file …` for the local
@@ -1242,17 +1225,6 @@ async function startHealthServer(): Promise<string> {
     throw new Error("health server did not expose a TCP address");
   }
   return `http://localhost:${String(address.port)}`;
-}
-
-async function freePort(): Promise<number> {
-  const server = createServer();
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
-  const address = server.address();
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  if (!address || typeof address === "string") {
-    throw new Error("free port probe did not expose a TCP address");
-  }
-  return address.port;
 }
 
 function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {

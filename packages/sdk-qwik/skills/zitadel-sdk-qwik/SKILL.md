@@ -16,7 +16,7 @@ shared SPA config/handler types.
 
 ## When to use
 
-- **Fresh Qwik app → use the CLI instead.** `npx @zitadel/cli@alpha setup --framework qwik`
+- **Fresh Qwik app → use the CLI instead.** `npx @zitadel/cli@latest setup --framework qwik`
   scaffolds auth into a new or detected Qwik project end to end (it wires this
   SDK, the dev proxy, and config). Reach for the `zitadel-cli` skill for that.
   Note the CLI scaffolds against **Qwik 2**, which this package also targets.
@@ -26,7 +26,7 @@ shared SPA config/handler types.
 ## Install
 
 ```sh
-pnpm add @zitadel/sdk-qwik@alpha
+pnpm add @zitadel/sdk-qwik@latest
 ```
 
 The package declares a peer dependency on `@qwik.dev/core` (`^2.0.0-beta.45`),
@@ -70,7 +70,8 @@ export default component$(() => {
 | `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
 | `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
 | `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
-| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. |
+| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
+| `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
 | `postSignOutUrl` | `string` | unset | Logout, Session | Where to navigate after sign-out. |
 | `resumeFlowId` | `string` or `null` | unset | Login | An existing flow's id to resume instead of starting a new flow; unset, `null` or `""` falls back to the `flow` query parameter, and an id that no longer resolves starts a new flow. |
 | `variant` | `"widget"` or `"page"` | `"widget"` | Login, Session | `widget` is content-sized and paints no page chrome; `page` claims the viewport, paints the surface background and loads the brand font, and on Login focuses the first field. |
@@ -97,6 +98,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin project={project} theme="light" onFlowComplete$={(detail) => track(detail)} />
 ```
 
+When your callback for `zitadel-flow-complete`, `zitadel-flow-redirect` or `zitadel-signout` returns a promise, the widget waits for it to settle (up to two seconds) before it navigates.
+
 ## Read these, don't guess
 
 Confirm the current surface before wiring — do not rely on memory:
@@ -113,7 +116,7 @@ Confirm the current surface before wiring — do not rely on memory:
 
 ## Gotchas
 
-- **Server rendering.** If your app renders on the server, pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow. `ZitadelLogout` and `ZitadelSession` do the same, and the other string and boolean options (`purpose`, `flowName`, `postSignInUrl`, `resumeFlowId`, `postSignOutUrl`, `variant`, `theme`, `heading`, `logoutLabel`, `lang`, `suppressHeader`, `suppressPasswordToggle`) are written as attributes too. A `project` handle contributes its `projectId`, `proxyPath`, `url` and `publishableKey` as attributes; the rest of the handle, and `locales`, are set as element properties after hydration, so a widget that needs `locales` still gets them only on the client.
+- **Server rendering.** If your app renders on the server, pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow. `ZitadelLogout` and `ZitadelSession` do the same, and the other string and boolean options (`purpose`, `flowName`, `postSignInUrl`, `forcePostSignInUrl`, `resumeFlowId`, `postSignOutUrl`, `variant`, `theme`, `heading`, `logoutLabel`, `lang`, `suppressHeader`, `suppressPasswordToggle`) are written as attributes too. A `project` handle contributes its `projectId`, `proxyPath`, `url` and `publishableKey` as attributes; the rest of the handle, and `locales`, are set as element properties after hydration, so a widget that needs `locales` still gets them only on the client.
 - **Qwik 2 only.** The peer dep is `@qwik.dev/core ^2.0.0-beta.45` and imports
   come from `@qwik.dev/core` (not `@builder.io/qwik`). A Qwik 1 app will not
   satisfy the peer range.

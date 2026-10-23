@@ -19,12 +19,15 @@ import type {
   ZitadelLoginReactProps,
   ZitadelLogoutConfig,
   ZitadelLogoutProps,
+  ZitadelLogoutReactProps,
   ZitadelSessionConfig,
   ZitadelSessionProps,
+  ZitadelSessionReactProps,
   ZitadelSignoutDetail,
 } from "../react";
 import * as tanstackReact from "../react";
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "../react";
+import { widgetTags } from "@zitadel/sdk-core/types";
 
 // React only flushes effects synchronously inside act() when it knows it runs
 // under a test.
@@ -139,11 +142,8 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
     });
     await settle();
 
-    const element = container.querySelector("zitadel-login") as HTMLElement & {
-      purpose: string;
-      variant: string;
-    };
-    expect([element.purpose, element.variant]).toEqual(["register", "page"]);
+    const element = container.querySelector(widgetTags.login);
+    expect([element?.purpose, element?.variant]).toEqual(["register", "page"]);
   });
 
   it("mounts at once on a client render", async () => {
@@ -157,9 +157,9 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
   });
 
   it.each([
-    ["ZitadelLogin", ZitadelLogin, "zitadel-login"],
-    ["ZitadelLogout", ZitadelLogout, "zitadel-logout"],
-    ["ZitadelSession", ZitadelSession, "zitadel-session"],
+    ["ZitadelLogin", ZitadelLogin, widgetTags.login],
+    ["ZitadelLogout", ZitadelLogout, widgetTags.logout],
+    ["ZitadelSession", ZitadelSession, widgetTags.session],
   ])("forwards a ref on %s to the element", async (_name, Widget, tag) => {
     const ref = createRef<HTMLElement>();
     await act(async () => {
@@ -198,7 +198,9 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
     expectTypeOf<ZitadelLoginProps>().toEqualTypeOf<sdkReact.ZitadelLoginProps>();
     expectTypeOf<ZitadelLoginReactProps>().toEqualTypeOf<sdkReact.ZitadelLoginReactProps>();
     expectTypeOf<ZitadelLogoutProps>().toEqualTypeOf<sdkReact.ZitadelLogoutProps>();
+    expectTypeOf<ZitadelLogoutReactProps>().toEqualTypeOf<sdkReact.ZitadelLogoutReactProps>();
     expectTypeOf<ZitadelSessionProps>().toEqualTypeOf<sdkReact.ZitadelSessionProps>();
+    expectTypeOf<ZitadelSessionReactProps>().toEqualTypeOf<sdkReact.ZitadelSessionReactProps>();
   });
 });
 
@@ -215,6 +217,7 @@ const loginConfig: Required<ZitadelLoginConfig> = {
   purpose: "register",
   flowName: "parity-flow",
   postSignInUrl: "/parity-after-login",
+  forcePostSignInUrl: true,
   resumeFlowId: "flow_parity",
   locales: { en: { "identifier.title": "Parity" } },
   lang: "de",
@@ -246,9 +249,9 @@ const elementValues = (el: object, config: object): Record<string, unknown> =>
 
 describe("wrapper config parity", () => {
   it.each([
-    ["ZitadelLoginConfig", "zitadel-login", ZitadelLogin, loginConfig],
-    ["ZitadelSessionConfig", "zitadel-session", ZitadelSession, sessionConfig],
-    ["ZitadelLogoutConfig", "zitadel-logout", ZitadelLogout, logoutConfig],
+    ["ZitadelLoginConfig", widgetTags.login, ZitadelLogin, loginConfig],
+    ["ZitadelSessionConfig", widgetTags.session, ZitadelSession, sessionConfig],
+    ["ZitadelLogoutConfig", widgetTags.logout, ZitadelLogout, logoutConfig],
   ])("forwards every %s key to <%s>", async (_name, tag, Widget, config) => {
     await act(async () => {
       root = createRoot(container);

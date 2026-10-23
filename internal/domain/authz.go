@@ -27,6 +27,7 @@ const (
 	ResourceKindRelease        ResourceKind = "release"
 	ResourceKindIDPConnection  ResourceKind = "idp_connection"
 	ResourceKindDeployment     ResourceKind = "deployment"
+	ResourceKindPolicy         ResourceKind = "policy"
 )
 
 func (k ResourceKind) String() string { return string(k) }
@@ -328,6 +329,23 @@ func NewClaimTeamAssignment(projectID, teamID string) *AuthzAssignment {
 		Relation:      "team",
 	}
 	a.ApplyScope(NewProjectAssignmentScope())
+	return a
+}
+
+// NewPersonalTeamOwnerAssignment lets the user a personal team was created for
+// read and rename it: editor scoped to that one team, so it reaches no other
+// resource in the project and cannot delete the team. It stands in for ADR 054
+// §2's team.owner relation, which is not seeded yet.
+func NewPersonalTeamOwnerAssignment(projectID, teamID, userID string) *AuthzAssignment {
+	a := &AuthzAssignment{
+		ProjectID:     projectID,
+		CatalogID:     SystemCatalogID,
+		PrincipalType: AuthzPrincipalTypeUser,
+		PrincipalID:   userID,
+		ObjectType:    "project",
+		Relation:      "editor",
+	}
+	a.ApplyScope(NewTeamAssignmentScope(teamID))
 	return a
 }
 

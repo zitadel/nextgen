@@ -26,7 +26,7 @@ For a **fresh** scaffold, prefer the CLI instead — it wires the proxy, env, an
 components for you:
 
 ```sh
-npx @zitadel/cli@alpha setup --framework vue --non-interactive --json
+npx @zitadel/cli@latest setup --framework vue --non-interactive --json
 ```
 
 Use this skill when `setup` is not appropriate (an app with its own structure,
@@ -35,7 +35,7 @@ a partial integration, or customizing what the CLI produced).
 ## Install
 
 ```sh
-npm install @zitadel/sdk-vue@alpha
+npm install @zitadel/sdk-vue@latest
 ```
 
 Peer dependencies: `vue >=3.2`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).
@@ -87,7 +87,8 @@ Logout and the signed-in session card take the same `:project` handle:
 | `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
 | `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
 | `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
-| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. |
+| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
+| `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
 | `postSignOutUrl` | `string` | unset | Logout, Session | Where to navigate after sign-out. |
 | `resumeFlowId` | `string` or `null` | unset | Login | An existing flow's id to resume instead of starting a new flow; unset, `null` or `""` falls back to the `flow` query parameter, and an id that no longer resolves starts a new flow. |
 | `variant` | `"widget"` or `"page"` | `"widget"` | Login, Session | `widget` is content-sized and paints no page chrome; `page` claims the viewport, paints the surface background and loads the brand font, and on Login focuses the first field. |
@@ -113,6 +114,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 ```vue
 <ZitadelLogin :project="project" theme="light" @flowComplete="track" />
 ```
+
+The `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` details carry a `waitUntil(promise)`; call it from your handler to make the widget wait for your async work before it navigates.
 
 ## Read these, don't guess
 

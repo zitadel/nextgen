@@ -132,10 +132,10 @@ export const PUBLIC_RELEASE_PACKAGES = [
     buildTarget: "sdk-solid-start:build-release",
   },
   {
-    name: "@zitadel/sdk-qwik-city",
-    dir: "packages/sdk-qwik-city",
-    moonProject: "sdk-qwik-city",
-    buildTarget: "sdk-qwik-city:build-release",
+    name: "@zitadel/sdk-qwik-router",
+    dir: "packages/sdk-qwik-router",
+    moonProject: "sdk-qwik-router",
+    buildTarget: "sdk-qwik-router:build-release",
   },
   {
     name: "@zitadel/sdk-tanstack-start",
@@ -156,3 +156,13 @@ export const PUBLIC_PACKAGE_NAMES = PUBLIC_RELEASE_PACKAGES.map((pkg) => pkg.nam
 export const PUBLIC_PACKAGE_BUILD_TARGETS = PUBLIC_RELEASE_PACKAGES.map(
   (pkg) => pkg.buildTarget,
 ).filter(Boolean);
+
+// What `setup` installs into a generated app: the SDKs and the packages they
+// depend on, not the CLI, the server or the test kit (which depends on the
+// CLI). The contributor CLI wrapper (scripts/run-cli.mjs) publishes only
+// these, from their cached dev builds, to its local registry.
+export const APP_RELEASE_PACKAGES = PUBLIC_RELEASE_PACKAGES.filter(
+  (pkg) =>
+    !["@zitadel/cli", "@zitadel/testing"].includes(pkg.name) &&
+    !pkg.name.startsWith("@zitadel/server"),
+);

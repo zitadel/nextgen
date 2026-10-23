@@ -24,13 +24,13 @@ If the user is starting fresh, prefer the `zitadel` CLI instead — it scaffolds
 working Svelte app and wires the dev proxy for you:
 
 ```sh
-npx @zitadel/cli@alpha setup --framework svelte --non-interactive --json
+npx @zitadel/cli@latest setup --framework svelte --non-interactive --json
 ```
 
 ## Install
 
 ```sh
-npm install @zitadel/sdk-svelte@alpha
+npm install @zitadel/sdk-svelte@latest
 ```
 
 Peer dependencies: `svelte ^5.0.0`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).
@@ -76,7 +76,8 @@ The widgets are **browser** components. In SvelteKit, mount them in a
 | `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
 | `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
 | `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
-| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. |
+| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
+| `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
 | `postSignOutUrl` | `string` | unset | Logout, Session | Where to navigate after sign-out. |
 | `resumeFlowId` | `string` or `null` | unset | Login | An existing flow's id to resume instead of starting a new flow; unset, `null` or `""` falls back to the `flow` query parameter, and an id that no longer resolves starts a new flow. |
 | `variant` | `"widget"` or `"page"` | `"widget"` | Login, Session | `widget` is content-sized and paints no page chrome; `page` claims the viewport, paints the surface background and loads the brand font, and on Login focuses the first field. |
@@ -102,6 +103,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 ```svelte
 <ZitadelLogin {project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
+
+When your callback for `zitadel-flow-complete`, `zitadel-flow-redirect` or `zitadel-signout` returns a promise, the widget waits for it to settle (up to two seconds) before it navigates.
 
 ## Read these, don't guess
 

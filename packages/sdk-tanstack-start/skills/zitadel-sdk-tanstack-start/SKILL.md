@@ -29,10 +29,10 @@ Start app by hand, or adjusting a scaffolded wiring.
 ## Install
 
 ```bash
-pnpm add @zitadel/sdk-tanstack-start@alpha
+pnpm add @zitadel/sdk-tanstack-start@latest
 ```
 
-Peer deps: `@tanstack/react-start >=1`, `react >=18`, `react-dom >=18`.
+Peer deps: `@tanstack/react-start >=1.168.10`, `react >=18`, `react-dom >=18`.
 
 ## Integrate
 
@@ -61,6 +61,10 @@ export const startInstance = createStart(() => ({
   requestMiddleware: [csrfMiddleware, authMiddleware],
 }));
 ```
+
+Sessions count only in the app's own project: `projectId`, else
+`ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID`. With none set, nobody is
+signed in.
 
 The same proxy/verify/protect decision is exported as the framework-agnostic
 `handleNextgenRequest(request, options)` for a custom server entry.

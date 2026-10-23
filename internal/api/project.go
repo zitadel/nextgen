@@ -112,15 +112,16 @@ func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsReque
 // ListMyProjects answers "which projects can the person behind this session act
 // on". There is no requireProjectAccess here on purpose: the query is itself the
 // authorization, so a caller with no grants gets an empty page rather than a 403.
+// The session is held to project_id when the caller names one (requireSelf).
 func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsParams) (api.ListMyProjectsRes, error) {
-	token, ok := sessionTokenFromContext(ctx)
-	if !ok || token.UserID == "" {
-		return nil, invalidSessionCredential(domain.ErrSessionTokenInvalid())
+	self, err := requireSelf(ctx, params.ProjectID)
+	if err != nil {
+		return nil, err
 	}
 
 	listed, err := h.projectService.ListAuthorized(ctx, service.ListAuthorizedProjectsRequest{
-		HomeProjectID: token.ProjectID,
-		UserID:        token.UserID,
+		HomeProjectID: self.ProjectID(),
+		UserID:        self.UserID(),
 		Limit:         int(params.Limit.Value),
 		PageToken:     string(params.PageToken.Value),
 	})
@@ -341,7 +342,10 @@ func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrProjectNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrProjectPermissionDenied().Code:
+	case domain.ErrProjectPermissionDenied().Code,
+		domain.ErrProjectOriginNotAllowed(nil).Code,
+		domain.ErrProjectPreviewNotLive(nil).Code,
+		domain.ErrProjectMismatch().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	case domain.ErrProjectNameInvalid().Code, domain.ErrProjectMissingID().Code,
 		domain.ErrProjectPasswordHashInvalid().Code:

@@ -238,7 +238,7 @@
       "cache": false,
       "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH", "ZITADEL_TEST_SPANNER_INSTANCE"],
-      "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*", "GOOGLE_*", "CLOUDSDK_*"],
+      "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*", "GOOGLE_*", "CLOUDSDK_*", "SPANNER_EMULATOR_HOST"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",

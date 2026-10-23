@@ -1,15 +1,17 @@
 name: spanner
 
-# The Spanner emulator suite, split out of ci.yml's required `full-pr` job.
-# Spanner support is not on the critical path at this stage, and the emulator
-# serves one transaction at a time, so the lane was the slowest Go suite on
-# every PR. It runs here instead: nightly on main, on demand against any branch
+# The Spanner suite, split out of ci.yml's required `full-pr` job. Spanner
+# support is not on the critical path at this stage, so the lane runs here
+# instead: weekly on main (Mondays, 03:00 UTC), on demand against any branch
 # (`gh workflow run spanner.yml --ref <branch>`), and on PRs that change this
 # file. It is not a required check.
+#
+# It runs against Spanner Omni, Google's self-hosted Spanner, started once per
+# job. Each test package provisions its own database on it (#1011).
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *"
+    - cron: "0 3 * * 1"
   pull_request:
     paths:
       - .github/workflows/spanner.yml
@@ -22,20 +24,18 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  spanner-emulator:
-    # A plain GitHub-hosted runner is enough: the emulator serves one
-    # transaction at a time, so only the dependency builds use the extra cores
-    # a Depot runner would bring. It also keeps fork PRs off Depot (see ci.yml).
+  spanner-omni:
+    # A plain GitHub-hosted runner: its 4 vCPUs and 16 GB are Spanner Omni's
+    # documented minimum for a VM, and it keeps fork PRs off Depot (see ci.yml).
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
-      # Uncomment together with the Spanner test-instance steps below to mint the
-      # OIDC token for Workload Identity Federation (trusted runs only).
-      # id-token: write
     env:
       # See ci.yml: names failed tasks in plain text and replays their output.
       MOON_SUMMARY: detailed
+      # See ci.yml: Ryuk would be the lane's only image from Docker Hub.
+      TESTCONTAINERS_RYUK_DISABLED: "true"
     steps:
       # Full history, same as ci.yml: in CI, `moon run` loads changed files
       # against `main` before running anything, and fails outright on a shallow
@@ -67,46 +67,33 @@ jobs:
       - name: Put workspace binaries on PATH
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
-      # ---------------------------------------------------------------------
-      # Spanner test instance — kept, deliberately not wired (#788, removal #793).
-      #
-      # The flake this was built for turned out to be an application bug, not an
-      # emulator limitation, so CI runs the emulator only: it is what forces the
-      # aborts that keep the abort-retry path honest. Re-enable ONLY if the
-      # emulator is shown to be inadequate, never to make a failing test pass.
-      #
-      # To re-wire: uncomment `id-token: write` in permissions above, uncomment
-      # the two steps below, add an `if` guard to the emulator step so the two
-      # do not both run:
-      #   if: ${{ steps.spanner-auth.outcome != 'success' }}
-      # and set the `SPANNER_TEST_INSTANCE` variable plus the
-      # `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_SERVICE_ACCOUNT` secrets.
-      # The Go side (internal/storage/testdb) already supports this and needs
-      # no change.
-      #
-      # Auth when SPANNER_TEST_INSTANCE is set (trusted runs). Vars are safe in
-      # if:; secrets stay only in with:. Unset var / forks → emulator step.
-      # Auth hard-fails if the var is set but WIF is broken (no silent fallback).
-      #
-      # - name: Authenticate to Google Cloud (Spanner test instance)
-      #   id: spanner-auth
-      #   if: ${{ (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && vars.SPANNER_TEST_INSTANCE != '' }}
-      #   uses: google-github-actions/auth@v2
-      #   with:
-      #     workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      #     service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      #
-      # - name: Run Go integration tests (spanner test instance)
-      #   if: ${{ steps.spanner-auth.outcome == 'success' }}
-      #   env:
-      #     ZITADEL_TEST_SPANNER_INSTANCE: ${{ vars.SPANNER_TEST_INSTANCE }}
-      #   run: moon exec server:test-spanner --ignore-ci-checks
-      # ---------------------------------------------------------------------
+      # Host networking, because Omni hands clients its own addresses and they
+      # must be reachable from the runner. Pinned by digest: an Omni upgrade
+      # moves every timing this lane reports. The log tail step below shows
+      # Omni's output if it never gets ready.
+      - name: Start Spanner Omni
+        run: |
+          docker run -d --name omni --network host \
+            "us-docker.pkg.dev/spanner-omni/images/spanner-omni:2026.r4-lts@sha256:9dcfd3d25f25fb608436c98678311197e15fb3ab25f354f721d10ed2b1208939" \
+            start-single-server
+          timeout 180 sh -c 'until docker logs omni 2>&1 | grep -q "Spanner is ready"; do sleep 2; done' \
+            || { echo "::error::Spanner Omni was not ready after 180s"; exit 1; }
 
-      # The emulator is the canary: its one-transaction-at-a-time limit forces the
-      # aborts that prove the retry path still works. Do not move these off it.
+      # ZITADEL_TEST_SPANNER_INSTANCE makes every package provision its own
+      # database on the Omni instance instead of starting an emulator.
+      # SPANNER_EMULATOR_HOST keeps its name although nothing here is an
+      # emulator: it is the Go client library's own variable, the only one that
+      # points it at a plaintext endpoint without credentials, which Omni's
+      # Developer edition serves.
       # The task is `runInCI: "skip"` so that ci.yml's `moon ci` leaves it out;
       # in CI `moon run` refuses such a task, `moon exec --ignore-ci-checks`
       # runs it (and its UI build deps).
-      - name: Run Go integration tests (spanner emulator)
+      - name: Run Go integration tests (Spanner Omni)
+        env:
+          ZITADEL_TEST_SPANNER_INSTANCE: projects/default/instances/default
+          SPANNER_EMULATOR_HOST: localhost:15000
         run: moon exec server:test-spanner --ignore-ci-checks
+
+      - name: Spanner Omni log tail
+        if: ${{ always() }}
+        run: docker logs omni 2>&1 | tail -40 || true

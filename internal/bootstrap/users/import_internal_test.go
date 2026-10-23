@@ -1,12 +1,14 @@
 package users
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func scopesOf(t *testing.T, attrs domain.CreateAttributes) map[domain.AttributeKey]domain.AttributeUniqueness {
@@ -110,4 +112,40 @@ func TestBuildCreateAttributes_placeholderSchemaDeclaresNothingUnique(t *testing
 		"username": domain.AttributeUniquenessProject,
 		"email":    domain.AttributeUniquenessUnspecified,
 	}, scopesOf(t, got))
+}
+
+// schemaRows is a JSONSchemaGetter over the URLs a project stores.
+type schemaRows map[string]bool
+
+func (r schemaRows) GetJSONSchemaByID(_ context.Context, projectID, schemaID string) (*domain.JSONSchema, error) {
+	if !r[schemaID] {
+		return nil, database.NewNoRowFoundError(nil)
+	}
+	return &domain.JSONSchema{ProjectID: projectID, URL: schemaID}, nil
+}
+
+func TestStoredSchemaURL(t *testing.T) {
+	bases := domain.NewBuiltinSchemaBases("https://schemas.test/builtin/v1", "https://nextgen.com/api/schemas")
+	current := "https://schemas.test/builtin/v1/default-human-user.json"
+	legacy := "https://nextgen.com/api/schemas/default-human-user.json"
+
+	tests := []struct {
+		name   string
+		stored schemaRows
+		header string
+		want   string
+	}{
+		{"legacy document meets a project seeded under the current base", schemaRows{current: true}, legacy, current},
+		{"current document meets a project seeded under the legacy base", schemaRows{legacy: true}, current, legacy},
+		{"the exact row wins over its twin", schemaRows{current: true, legacy: true}, legacy, legacy},
+		{"a missing schema keeps the document's URL", schemaRows{}, legacy, legacy},
+		{"a schema outside the namespace is looked up as written", schemaRows{current: true}, "https://schemas.test/custom.json", "https://schemas.test/custom.json"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := storedSchemaURL(t.Context(), tt.stored, bases, Header{ProjectID: "proj_1", SchemaURL: tt.header})
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
 }

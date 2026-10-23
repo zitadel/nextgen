@@ -20,11 +20,6 @@ import { EYEBROW, PAGE_TITLE } from "./typography";
  * tile ({@link ICON_PLATE}) and the header card (`MetaCard`).
  */
 
-/** Page wrapper: the list shell's gutter, 22px under the navbar. */
-export function DetailPage({ children }: { children: ReactNode }) {
-  return <div className="px-4 pt-5.5 pb-8">{children}</div>;
-}
-
 /** The 24px gap between the header row and the first body element. */
 export const DETAIL_BODY = "mt-6";
 
@@ -83,23 +78,29 @@ export function DetailSection({
   );
 }
 
-/** The single panel card of a configuration detail screen (`DETAIL_PANEL_PAGE`). */
+/** The single panel card of a configuration detail screen (inside `<Page inset="panel">`). */
 export function DetailPanel({ children }: { children: ReactNode }) {
   return <Card className="gap-4 border-foreground/10 px-6 py-5 shadow-xs">{children}</Card>;
 }
 
-/** A panel's title lockup: the icon tile, an optional eyebrow, and the `h1`. */
+/**
+ * A panel's title lockup: the icon tile, an optional eyebrow, and the heading —
+ * the `h1` of a configuration screen, or an `h2` on a body card under a
+ * {@link DetailHeader}, which already owns the `h1`.
+ */
 export function PanelTitle({
   icon: Icon,
   eyebrow,
   title,
+  as: Heading = "h1",
 }: {
   icon: LucideIcon;
   eyebrow?: string;
   title: string;
+  as?: "h1" | "h2";
 }) {
   const heading = (
-    <h1 className="truncate font-serif text-lg leading-6 text-foreground">{title}</h1>
+    <Heading className="truncate font-serif text-lg leading-6 text-foreground">{title}</Heading>
   );
   return (
     <div className="flex min-w-0 items-center gap-3">
@@ -143,8 +144,11 @@ export function DetailHeader({
   meta: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 px-2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
-      <div className="flex min-w-0 items-center gap-3">
+    // Top-aligned, not centred against the meta card: the 36px icon tile is the
+    // title row (`PAGE_TITLE_ROW`), so the title lands on the same line as
+    // every list's and settings screen's.
+    <div className="flex flex-col gap-4 px-2 lg:flex-row lg:flex-wrap lg:items-start lg:justify-between">
+      <div className="flex min-h-9 min-w-0 items-center gap-3">
         <span className={ICON_PLATE}>
           <Icon className="size-4" strokeWidth={1.5} aria-hidden />
         </span>

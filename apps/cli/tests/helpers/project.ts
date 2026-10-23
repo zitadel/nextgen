@@ -7,6 +7,7 @@ import { Readable } from "node:stream";
 
 import { expect } from "vitest";
 
+import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
@@ -226,6 +227,25 @@ export class ScaffoldedApp {
       PACKAGE_MANAGER_LOG: npm.logPath,
       PATH: `${npm.binDir}:${process.env.PATH ?? ""}`,
     });
+  }
+
+  /**
+   * `setup --framework next` in a directory without an app, so setup creates
+   * one: with stand-ins for the generator on PATH, nothing is downloaded.
+   */
+  async setupNewApp(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(
+      [
+        "setup",
+        "--non-interactive",
+        "--json",
+        "--skip-install",
+        "--framework",
+        "next",
+        ...extraArgs,
+      ],
+      { PATH: await aFakeAppGeneratorPath() },
+    );
   }
 
   /** The client secret is never a flag, so it is piped as a script would. */
@@ -484,18 +504,31 @@ export class ScaffoldedApp {
 
   /** The port a start reported its server on. */
   localPortOf(result: CliResult): number {
-    return this.envelopeOf<{ runtime: { port: number } }>(result).data.runtime.port;
+    return this.localRuntimeOf(result).port;
   }
 
   /** The process a start reported its server as. */
   localPidOf(result: CliResult): number {
-    return this.envelopeOf<{ runtime: { pid: number } }>(result).data.runtime.pid;
+    return this.localRuntimeOf(result).pid;
+  }
+
+  /** The server a start reported; a refused start fails here with its error code. */
+  private localRuntimeOf(result: CliResult): { port: number; pid: number } {
+    expect(result, "start should have succeeded").toSucceed();
+    return this.envelopeOf<{ runtime: { port: number; pid: number } }>(result).data.runtime;
   }
 
   /** Leaves this directory with a record of its local server that cannot be read. */
   async corruptLocalServerRecord(): Promise<void> {
     await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
     await writeFile(join(this.path, ".zitadel/local/runtime.json"), "{not json");
+  }
+
+  /** The log lines a `logs --json` run returned. */
+  loggedLinesOf(result: CliResult): string[] {
+    expect(result, "logs should have succeeded").toSucceed();
+    const { logs } = this.envelopeOf<{ logs: string }>(result).data;
+    return logs.split("\n").filter((line) => line !== "");
   }
 
   /** The lifecycle `status` reports for the local server. */
@@ -577,6 +610,31 @@ export class ScaffoldedApp {
         ...(secret ? ["--secret"] : []),
       ]),
     );
+  }
+
+  /** `zitadel api` with an operation and its arguments, as a script runs it. */
+  api(...args: string[]): Promise<CliResult> {
+    return this.cli(["api", ...args, "--non-interactive", "--json"]);
+  }
+
+  /** `zitadel api` with `body` piped in on stdin. */
+  apiPiping(body: string, ...args: string[]): Promise<CliResult> {
+    return this.pipingStdin(body, () => this.api(...args));
+  }
+
+  /** `zitadel api` without `--json`, for a spec asserting what the developer reads. */
+  apiRendered(...args: string[]): Promise<CliResult> {
+    return this.cli(["api", ...args, "--non-interactive"]);
+  }
+
+  /** `zitadel api ls` with its arguments. */
+  apiOperations(...args: string[]): Promise<CliResult> {
+    return this.cli(["api", "ls", ...args, "--non-interactive", "--json"]);
+  }
+
+  /** `zitadel api ls` without `--json`. */
+  apiOperationsRendered(...args: string[]): Promise<CliResult> {
+    return this.cli(["api", "ls", ...args, "--non-interactive"]);
   }
 
   getVariable(name: string): Promise<CliResult> {
@@ -1002,6 +1060,17 @@ export async function anApp({
     join(path, "app/layout.tsx"),
     "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
+  return new ScaffoldedApp(path);
+}
+
+/**
+ * An empty directory for setup to create a new app in, under a name npm
+ * accepts for a package, which setup requires of one.
+ */
+export async function aNewAppDirectory(): Promise<ScaffoldedApp> {
+  const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
+  const path = join(parent, "my-app");
+  await mkdir(path);
   return new ScaffoldedApp(path);
 }
 

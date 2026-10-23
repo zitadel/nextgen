@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
 
 /**
  * Two projects in one config:
@@ -25,7 +25,7 @@ export default defineConfig({
           globals: true,
           environment: "node",
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/react.test.tsx"],
+          exclude: ["src/**/react.test.tsx", edgeSpecs],
         },
       },
       {
@@ -38,6 +38,8 @@ export default defineConfig({
           include: ["src/**/react.test.tsx"],
         },
       },
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
+      edgeProject({}),
     ],
   },
 });

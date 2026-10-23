@@ -27,7 +27,9 @@ This ADR records the floors and the enforcement point.
 
 - **Floors:** every framework the CLI detects declares one, as a plain
   semver string: Next.js **15.2.3**, React **18**, Vue **3.2**, Nuxt **4**,
-  Angular **17** (`@angular/core`), Solid **1.6** (`solid-js`), Svelte **5**
+  Angular **17** (`@angular/core`), Solid **1.6** (`solid-js`), Svelte **5**,
+  TanStack Start **1.168.10** (`@tanstack/react-start`, the first release that exports
+  `createCsrfMiddleware`, which the generated `src/start.ts` imports),
   and Qwik **2.0.0-beta.45** (`@qwik.dev/core`, the first release the SDK's peer
   range accepts, so the floor is a prerelease and is the bound as written). Both 18 and 19 are
   supported for React; templates that need React-19-only behavior must degrade safely on 18, as the
@@ -69,7 +71,8 @@ This ADR records the floors and the enforcement point.
 - **Peer ranges follow the floor, and a test keeps them aligned.** Each SDK
   package's peer range for the framework starts at the detector's floor
   (`next >=15.2.3`, `nuxt >=4`, `react >=18`, `vue >=3.2`, `@angular/core >=17`,
-  `solid-js >=1.6`, `svelte ^5.0.0`, `@qwik.dev/core ^2.0.0-beta.45`). The
+  `solid-js >=1.6`, `svelte ^5.0.0`, `@tanstack/react-start >=1.168.10`,
+  `@qwik.dev/core ^2.0.0-beta.45`). The
   registry's mirror test reads each `packages/sdk-<framework>/package.json` and
   fails unless the floor, read as written (`2.0.0-beta.45`) or as the first
   release of its line (`18`), equals the peer minimum's version and satisfies

@@ -1,3 +1,11 @@
+import type {
+  StandardAttributeProps,
+  ZitadelLoginProps,
+  ZitadelLogoutProps,
+  ZitadelSessionProps,
+} from "@zitadel/sdk-core/types";
+import type { HTMLAttributes } from "svelte/elements";
+
 /**
  * Re-exports the shared SPA widget types from `@zitadel/sdk-core`.
  *
@@ -7,3 +15,19 @@
  * of the browser SDK surface.
  */
 export type * from "@zitadel/sdk-core/types";
+
+/**
+ * The standard HTML attributes a widget wrapper accepts besides its own props,
+ * and nothing else, so no prop the type accepts is dropped. They are passed to
+ * the widget element.
+ */
+export type ZitadelWidgetAttributes = StandardAttributeProps<HTMLAttributes<HTMLElement>>;
+
+/** Props of `ZitadelLogin`: the widget's own plus the standard HTML attributes. */
+export type ZitadelLoginSvelteProps = ZitadelLoginProps & ZitadelWidgetAttributes;
+
+/** Props of `ZitadelLogout`: the widget's own plus the standard HTML attributes. */
+export type ZitadelLogoutSvelteProps = ZitadelLogoutProps & ZitadelWidgetAttributes;
+
+/** Props of `ZitadelSession`: the widget's own plus the standard HTML attributes. */
+export type ZitadelSessionSvelteProps = ZitadelSessionProps & ZitadelWidgetAttributes;

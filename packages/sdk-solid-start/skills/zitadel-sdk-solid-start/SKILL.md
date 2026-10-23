@@ -30,9 +30,9 @@ adjusting a scaffolded wiring.
 ## Install
 
 ```bash
-pnpm add @zitadel/sdk-solid-start@alpha
+pnpm add @zitadel/sdk-solid-start@latest
 # the login/logout/session widgets are a separate package:
-pnpm add @zitadel/sdk-solid@alpha
+pnpm add @zitadel/sdk-solid@latest
 ```
 
 Peer deps: `@solidjs/start ^2.0.0`, `solid-js ^1.8.0`.
@@ -67,7 +67,9 @@ export default defineConfig({
 ```
 
 `url` and `projectSecret` default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET`
-from the server environment; pass them only to override. To compose with your own
+from the server environment; pass them only to override. Sessions count only in
+the app's own project: `projectId`, else `ZITADEL_PROJECT_ID`, else
+`VITE_ZITADEL_PROJECT_ID`. With none set, nobody is signed in. To compose with your own
 handlers, spread the config's `onRequest` into your own `createMiddleware` call.
 
 **2. Read auth server-side** with `getAuth(getRequestEvent()!)` inside a

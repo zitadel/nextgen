@@ -1,17 +1,16 @@
 # @zitadel/cli
 
-Scaffolds Zitadel auth (login, register, profile, middleware/proxy) into a Next.js, Nuxt, SvelteKit, SolidStart, Qwik City, TanStack Start, React, Vue, Angular, Solid, Svelte, or Qwik app.
+Scaffolds Zitadel auth (login, register, profile, middleware/proxy) into a Next.js, Nuxt, SvelteKit, SolidStart, Qwik Router, TanStack Start, React, Vue, Angular, Solid, Svelte, or Qwik app.
 
 ```sh
-npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --server local
+npx @zitadel/cli@latest start
+npx @zitadel/cli@latest setup --server local
 ```
 
-Always pass `@alpha`: bare `npx @zitadel/cli` resolves npm's `latest` tag, which
-still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N` selector in
-bug reports and automation when reproducibility matters.
+Use an exact version (`npx @zitadel/cli@0.1.0`) in bug reports and automation
+when reproducibility matters.
 
-> **Beta.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change.
+> **Preview.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change: until 1.0.0, a breaking change ships in a minor version, and its release note marks it **Breaking:**.
 
 ## Requirements
 
@@ -25,9 +24,9 @@ bug reports and automation when reproducibility matters.
 ```sh
 mkdir my-app
 cd my-app
-npx @zitadel/cli@alpha doctor
-npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --server local
+npx @zitadel/cli@latest doctor
+npx @zitadel/cli@latest start
+npx @zitadel/cli@latest setup --server local
 npm run dev
 ```
 
@@ -65,13 +64,13 @@ log back in, and end on the signed-in profile page. That user is an end user
 of your app. The management console is a separate sign-in: run
 `zitadel console` for a fresh one-time link as the local admin.
 
-For a reproducible tester report, use the exact alpha train from the GitHub
+For a reproducible tester report, use the exact version from the GitHub
 Release:
 
 ```sh
-npx @zitadel/cli@1.0.0-alpha.N doctor
-npx @zitadel/cli@1.0.0-alpha.N start
-npx @zitadel/cli@1.0.0-alpha.N setup --server local
+npx @zitadel/cli@0.1.0 doctor
+npx @zitadel/cli@0.1.0 start
+npx @zitadel/cli@0.1.0 setup --server local
 ```
 
 The default project flow supports password registration/login, passkey
@@ -2119,8 +2118,8 @@ Create a Zitadel project and scaffold local auth.
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f] [--framework
-    next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|svelte|qwik-c
-    ity|qwik|angular] [--renderer react] [--dev-port <value>] [--skip-install]
+    next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|svelte|qwik-r
+    outer|qwik|angular] [--renderer react] [--dev-port <value>] [--skip-install]
     [--preset password-first|passkey-first] [--use-case
     minimal|consumer|business] [--sso google|custom] [--sso-client-id <value>]
     [--sso-slug <value>] [--sso-display-name <value>] [--sso-issuer <value>]
@@ -2161,7 +2160,7 @@ FLAGS
   --framework=<option>
       Framework to target.
       <options: next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|sve
-      lte|qwik-city|qwik|angular>
+      lte|qwik-router|qwik|angular>
 
   --preset=<option>
       Sign-in preset for the scaffolded schema and login flow (default:

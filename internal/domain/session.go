@@ -9,9 +9,16 @@ import (
 )
 
 const (
-	PrefixSession       ResourcePrefix = "sess"
-	PrefixUserAgent     ResourcePrefix = "ua"
-	SessionAnonymousTTL                = 10 * time.Minute
+	PrefixSession   ResourcePrefix = "sess"
+	PrefixUserAgent ResourcePrefix = "ua"
+	// SessionAnonymousTTL is the lifetime of an anonymous session shell
+	// (POST /sessions): no user and no factors yet, so it expires fast.
+	SessionAnonymousTTL = 10 * time.Minute
+	// SessionDefaultTTL is the lifetime of a session that a completed sign-in
+	// creates or upgrades (POST /sessions/exchange) when neither the request
+	// nor the server's session.default_ttl names one. It runs from the
+	// exchange; using the session does not extend it.
+	SessionDefaultTTL = 24 * time.Hour
 )
 
 func ErrSessionNotFound() Error {
@@ -36,6 +43,15 @@ func ErrSessionTokenInvalid() Error {
 
 func ErrSessionPermissionDenied() Error {
 	return newError(PrefixSession.ErrorCodePrefix("permission_denied"), "session: requires a session scope bound to the project", nil, nil)
+}
+
+// ErrSessionProjectMismatch answers a request on the caller's own session (its
+// read, its CSRF token, sign-out) that names a project the session does not
+// belong to. The session itself is fine: it is a live session of another
+// project, so it signs no one in to the named one, and the caller must not treat
+// its cookie as dead.
+func ErrSessionProjectMismatch() Error {
+	return newError("sess.project_mismatch", "The session belongs to a different project.", nil, nil)
 }
 
 func ErrSessionInvalidTTL() Error {

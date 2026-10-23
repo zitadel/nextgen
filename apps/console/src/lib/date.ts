@@ -11,11 +11,21 @@
  * nothing, and beats showing a lie.
  */
 export function formatDate(value: string): string {
+  return format(value, DATE);
+}
+
+/**
+ * `2026-04-28T15:32:00Z` → `28 Apr 2026, 15:32` in the viewer's locale and
+ * time zone — {@link formatDate} with the time of day, and the same fallback.
+ */
+export function formatDateTime(value: string): string {
+  return format(value, { ...DATE, hour: "2-digit", minute: "2-digit" });
+}
+
+const DATE: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
+
+function format(value: string, options: Intl.DateTimeFormatOptions): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return parsed.toLocaleString(undefined, options);
 }

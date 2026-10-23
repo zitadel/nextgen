@@ -7,7 +7,13 @@ import { AbstractRulePatcher } from "../base";
 import { angularEntry, assertMountsRootComponent, type RootMount } from "../root-component";
 import { angularProxyEdit } from "./angular-json";
 import { angularRoutesEdit } from "./angular-routes";
-import { appComponentTemplate, appTemplateHtml, proxyConfEdit } from "./templates";
+import {
+  appComponentTemplate,
+  appTemplateHtml,
+  proxyConfEdit,
+  proxyConfSessionCookieEdit,
+  proxyConfSessionCookieVerdict,
+} from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-angular";
 
@@ -75,6 +81,20 @@ export class AngularPatcher extends AbstractRulePatcher {
     await assertMountsRootComponent(cwd, await angularEntry(cwd), ROOT);
   }
 
+  protected devPortOps(ctx: PatchContext, previousPort: number | undefined): FileOp[] {
+    return [
+      {
+        kind: "edit",
+        path: "angular.json",
+        edit: angularProxyEdit({
+          proxyConfig: "proxy.conf.cjs",
+          port: ctx.framework.devPort,
+          previousPort,
+        }),
+      },
+    ];
+  }
+
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
       {
@@ -97,6 +117,16 @@ export class AngularPatcher extends AbstractRulePatcher {
         // The transform creates the managed proxy when absent and safely
         // migrates the exact unconditional bearer hook emitted by older CLIs.
         wiring: "infrastructure",
+      },
+      {
+        kind: "edit",
+        path: "proxy.conf.cjs",
+        edit: proxyConfSessionCookieEdit(),
+        // A session cookie per project (ADR 073) keeps the Console and the app
+        // from signing each other out on localhost. Sign-in works without it,
+        // so the doctor only warns while it is missing.
+        wiring: "convenience",
+        verify: proxyConfSessionCookieVerdict,
       },
       {
         kind: "edit",

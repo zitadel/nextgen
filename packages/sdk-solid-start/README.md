@@ -1,11 +1,11 @@
 # @zitadel/sdk-solid-start
 
-SolidStart middleware and helpers for Nextgen Auth.
+SolidStart middleware and helpers for Zitadel.
 
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-solid-start@alpha
+pnpm add @zitadel/sdk-solid-start@latest
 ```
 
 ## Requirements
@@ -61,7 +61,7 @@ The middleware runs on every request and does three things in one pass:
    never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and writes the
    result to `event.locals.nextgenAuth`.
-3. **Redirects** unauthenticated requests to `loginPath` for protected routes.
+3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in.
 
 To compose with your own handlers, spread the config's `onRequest`:
 
@@ -129,7 +129,7 @@ Install the Solid component library and render its `ZitadelLogin` component.
 `@zitadel/sdk-solid-start` is server-only; the widget comes from `@zitadel/sdk-solid`:
 
 ```bash
-pnpm add @zitadel/sdk-solid@alpha
+pnpm add @zitadel/sdk-solid@latest
 ```
 
 Load it with SolidStart's `clientOnly`, so the widget is created in the browser
@@ -201,8 +201,9 @@ const ZitadelLogin = clientOnly(() =>
 
 | Option              | Type                 | Default                      | Description                                                          |
 | ------------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------- |
-| `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend                                 |
+| `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend. A trailing slash is ignored.   |
 | `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project secret, sent as the bearer on the handoff exchange only           |
+| `projectId`         | `string`             | `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID` env | The project this app signs its users in to. A session of any other project on the server reads as signed out and keeps its cookie; with no project, no session counts |
 | `proxyPath`         | `string`             | `"/__nextgen"`               | Path prefix proxied to the auth backend                              |
 | `protectedRoutes`   | `string[]`           | `[]`                         | Paths requiring a valid session. Trailing `*` matches sub-paths      |
 | `ignoredRoutes`     | `string[]`           | `[]`                         | Paths skipped entirely — no JWT check. Trailing `*` matches sub-paths |

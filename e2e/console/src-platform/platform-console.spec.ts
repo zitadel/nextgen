@@ -75,12 +75,12 @@ test("a platform operator reaches every management screen without an error", asy
   await expect(page.locator("zitadel-login").getByRole("textbox", { name: "Email" })).toBeVisible();
 
   // The granted customer project: listed on the overview, where a row opens
-  // the project (selects it, lands on Teams); its own page is Project settings.
+  // the project (selects it, lands on Users); its own page is Project settings.
   await page.goto("/ui/console/projects");
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();
   await projectLink.click();
-  await expect(page).toHaveURL(new RegExp(`/teams\\?.*project=${zitadel.handle.projectId}`));
+  await expect(page).toHaveURL(new RegExp(`/users\\?.*project=${zitadel.handle.projectId}`));
   await page
     .getByRole("navigation", { name: "Primary" })
     .getByRole("link", { name: "Project settings" })
@@ -94,4 +94,37 @@ test("a platform operator reaches every management screen without an error", asy
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("heading", { name: renamed, exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
+});
+
+/**
+ * A platform operator names themselves (#1801, #1802): the platform project's
+ * user schema designates an optional `name` for display, the profile is generated
+ * from the operator's own schema — read through the self-access
+ * `GET /users/me/schema`, since they hold no grant in the platform project —
+ * and once saved the account menu shows the name over the email.
+ */
+test("a platform operator adds their name from the account menu", async ({ page, seed }) => {
+  const operator = seed.identity();
+
+  await page.goto("/ui/console/");
+  await registerWithPassword(page, operator);
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+
+  const account = page.getByRole("button", { name: `Account: ${operator.email}` });
+  await account.click();
+  // The person heading the menu opens their profile.
+  await page.getByRole("menuitem", { name: operator.email }).click();
+
+  await expect(page).toHaveURL(/\/settings\/profile/);
+  await expect(page.getByLabel("Email", { exact: true })).toBeDisabled();
+  const name = page.getByLabel("Name", { exact: true });
+  await name.fill("Ada Lovelace");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expectNoErrorBoundary(page);
+
+  // The footer now leads with the name, the email beneath it.
+  const named = page.getByRole("button", { name: "Account: Ada Lovelace" });
+  await expect(named).toContainText(operator.email);
+  await named.click();
+  await expect(page.getByRole("menuitem", { name: /^Ada Lovelace/ })).toContainText(operator.email);
 });

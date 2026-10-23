@@ -25,7 +25,7 @@ tasks:
   # Full lane (the CI gate): `test:all` runs the node `unit` project and the
   # real-Chromium `browser` smoke test in one Vitest process, so both land in
   # one aggregated junit.xml. moon invokes `test:all` uniformly across every
-  # package. The fast unit-only lane is `pnpm test` for local iteration;
+  # package. The fast unit-only lane is `pnpm test:unit` for local iteration;
   # `pnpm test:browser` runs the browser project alone.
   test:
     deps:

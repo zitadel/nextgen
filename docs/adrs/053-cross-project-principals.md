@@ -262,6 +262,14 @@ unchanged; only the cookie-authenticated browser leg it opens is affected.
 >   `POST …/query` reads. A refusal is `403 auth.csrf_invalid`, listed in each
 >   affected operation's default error responses.
 >
+> **Amendment (2026-10-20):** sign-out is no longer exempt. Since each app's
+> SDK proxy forwards only its own project's session cookie (ADR 073), the
+> session widgets read the token through it from
+> `GET /sessions/me/csrf?project_id=…` and send it with
+> `DELETE /sessions/me`. The `POST …/query` reads remain the only exemption.
+> An older `@zitadel/components` that signs out without the token is refused
+> with `403 auth.csrf_invalid`.
+>
 > Session liveness (the "active user session" condition above) needs no
 > check of its own: revoking or rotating a session deletes its token records,
 > a token record expires with its session, and every request introspects the

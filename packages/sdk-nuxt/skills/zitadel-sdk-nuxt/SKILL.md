@@ -18,7 +18,7 @@ into SSR and hydrates it on the client, and gates protected routes.
 
 ## When to use
 
-The `zitadel` CLI (`npx @zitadel/cli@alpha setup --framework nuxt`) scaffolds the module,
+The `zitadel` CLI (`npx @zitadel/cli@latest setup --framework nuxt`) scaffolds the module,
 plugin, login page, and `.env.local` into a fresh or detected Nuxt project —
 prefer it for greenfield work. Reach for **this skill** when you are adding auth
 to an **existing or custom** Nuxt app by hand, adjusting a scaffolded wiring, or
@@ -27,7 +27,7 @@ wiring the middleware without the module.
 ## Install
 
 ```bash
-pnpm add @zitadel/sdk-nuxt@alpha
+pnpm add @zitadel/sdk-nuxt@latest
 ```
 
 Peer dependencies: `nuxt >=4`, `h3 >=1`.
@@ -50,10 +50,15 @@ export default defineNuxtConfig({
 The module registers the Nitro middleware and auth plugin and auto-imports the
 composables — no manual `server/middleware/auth.ts`. It reads `ZITADEL_URL`,
 `NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and the server-only `ZITADEL_PROJECT_SECRET`
-from the environment, or from `.env.local` when the environment has none (Nuxt
-itself loads only `.env`). A `nextgen.url` or
-`runtimeConfig.public.zitadelProjectId` in `nuxt.config.ts` wins over the
-variables.
+from the environment, or in `nuxt dev` from `.env.local` when the environment
+has none (Nuxt itself loads only `.env`). `url` and the project secret default to `ZITADEL_URL` and
+`ZITADEL_PROJECT_SECRET`; pass `nextgen.url` only to override. A built server
+reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from its own runtime environment (`NUXT_NEXTGEN_URL`
+and `NUXT_NEXTGEN_PROJECT_SECRET` take precedence) and never has them baked
+into `.output/`. A `nextgen.url` or `runtimeConfig.public.zitadelProjectId` in
+`nuxt.config.ts` wins over the variables. Sessions count only in the app's own
+project, the public project id unless `nextgen.projectId` names one: with none,
+nobody is signed in.
 
 The module also loads the web components in the browser through a client-only
 plugin and provides the business copy overlay as

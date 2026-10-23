@@ -538,9 +538,9 @@ describe("setupMockHandlers — the provider round trip", () => {
     });
   }
 
-  // The callback redirects to this value, and the mock is publicly deployed:
-  // a foreign target would turn it into an open redirect. The engine binds the
-  // target to the request origin the same way (`internal/api/flow.go`).
+  // The callback redirects to this value: a foreign target would turn it into
+  // an open redirect. The engine binds the target to the request origin the
+  // same way (`internal/api/flow.go`).
   test.each([
     ["on another origin", "https://evil.example/phish"],
     ["carrying userinfo", "http://localhost@evil.example/"],
@@ -550,6 +550,40 @@ describe("setupMockHandlers — the provider round trip", () => {
 
     expect(res.status).toBe(400);
     expect(((await res.json()) as { code: string }).code).toBe("req.invalid");
+  });
+
+  // The same targets the server refuses (`internal/httputil/redirect.go`); the
+  // full list is in redirect-target.spec.ts. These cover the ones that are on
+  // the request origin, so the origin check alone lets them through.
+  test.each([
+    ["a path that starts with two slashes", "http://localhost//evil.example/login"],
+    ["a backslash in the path", "http://localhost/\\evil.example"],
+    ["an encoded slash first", "http://localhost/%2Fevil.example"],
+    ["a tab in the path", "http://localhost/\t/evil.example"],
+    ["a dot segment before two slashes", "http://localhost/%2e//evil.example"],
+  ])("refuses a return target on the origin with %s", async (_case, target) => {
+    const res = await submitSso(target);
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("req.invalid");
+    expect(body.message).toContain("not a valid redirect target");
+  });
+
+  test("refuses an empty return target as not a redirect target", async () => {
+    const res = await submitSso("");
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { message: string }).message).toContain("it is empty");
+  });
+
+  test("answers the callback with the return target as the server stores it", async () => {
+    expect((await submitSso("HTTP://localhost/50%off")).status).toBe(200);
+
+    const res = await callback({ state: "s", code: "c" });
+
+    // The scheme is folded and the stray percent sign written as an escape.
+    expect(res.headers.get("location")).toBe("http://localhost/50%25off");
   });
 
   test("binds the return target to the Origin header over the request host", async () => {

@@ -7,6 +7,7 @@ import { createServer, type Server } from "node:net";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { BinaryLauncher } from "../../../../src/lib/local-server/internal/binary-launcher";
 import { DockerLauncher } from "../../../../src/lib/local-server/internal/docker-launcher";
 import {
   LOCAL_DATA_DIR,
@@ -90,6 +91,15 @@ describe("LocalServer", () => {
 
   describe("stop", () => {
     it("reports nothing stopped for a directory that never started a server", async () => {
+      await expect(at(await directory()).stop()).resolves.toMatchObject({
+        runtime: undefined,
+        stopped: false,
+      });
+    });
+
+    it("reports nothing stopped where Docker is not installed", async () => {
+      vi.stubEnv("PATH", await directory());
+
       await expect(at(await directory()).stop()).resolves.toMatchObject({
         runtime: undefined,
         stopped: false,
@@ -184,7 +194,56 @@ describe("LocalServer", () => {
       const cwd = await directoryWithAGoneServer();
       await writeFile(join(cwd, "server.log"), "one\ntwo\nthree\n");
 
-      await expect(at(cwd).logs({ tail: 2 })).resolves.toMatchObject({ logs: "two\nthree\n" });
+      const { lines } = await at(cwd).logs({ tail: 2 });
+
+      expect(lines.map((line) => line.text)).toEqual(["two", "three"]);
+    });
+
+    it("picks the last lines at a level from the whole log", async () => {
+      const cwd = await directoryWithAGoneServer();
+      await writeFile(
+        join(cwd, "server.log"),
+        "level=WARN msg=first\nlevel=WARN msg=second\nlevel=INFO msg=a\nlevel=INFO msg=b\n",
+      );
+
+      const { lines } = await at(cwd).logs({ tail: 1, level: "warn" });
+
+      expect(lines.map((line) => line.text)).toEqual(["level=WARN msg=second"]);
+    });
+
+    it("reads all of a container's log to pick the lines at a level", async () => {
+      const cwd = await directory();
+      await writeRuntimeMetadata(cwd, aDockerRecord());
+      const read = vi
+        .spyOn(DockerLauncher, "readLogs")
+        .mockResolvedValue("level=ERROR msg=a\nlevel=INFO msg=b\n");
+
+      const { lines } = await at(cwd).logs({ tail: 5, level: "error" });
+
+      expect(read).toHaveBeenCalledWith("zitadel-server-abc", "all");
+      expect(lines.map((line) => line.text)).toEqual(["level=ERROR msg=a"]);
+    });
+
+    it("prints the end of the log at a level, then each line at it the server writes", async () => {
+      const cwd = await directoryWithAGoneServer();
+      vi.spyOn(BinaryLauncher, "followLogs").mockImplementation(async (_path, sink) => {
+        sink.existing("level=WARN msg=old\nlevel=ERROR msg=recent\nlevel=INFO msg=a\n");
+        sink.appended("level=INFO msg=b\nlevel=WARN msg=ne");
+        sink.appended("w\nlevel=ERROR msg=unfinished");
+      });
+      const printed: string[] = [];
+
+      await at(cwd).followLogs({
+        tail: 1,
+        level: "warn",
+        print: (lines) => printed.push(...lines.map((line) => line.text)),
+      });
+
+      expect(printed).toEqual([
+        "level=ERROR msg=recent",
+        "level=WARN msg=new",
+        "level=ERROR msg=unfinished",
+      ]);
     });
   });
 

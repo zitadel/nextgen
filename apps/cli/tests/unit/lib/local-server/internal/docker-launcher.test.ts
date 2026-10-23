@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DockerLauncher } from "../../../../../src/lib/local-server/internal/docker-launcher";
 import { CONTAINER_DATA_DIR } from "../../../../../src/lib/local-server/runtime";
+import type { LogSink } from "../../../../../src/lib/local-server/server-log";
 
 vi.mock("node:child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:child_process")>();
@@ -256,6 +257,12 @@ describe("DockerLauncher", () => {
       await expect(DockerLauncher.remove("zitadel-server-test")).resolves.toBe(false);
     });
 
+    it("removes nothing, and does not fail, where Docker is not installed", async () => {
+      dockerIsNotInstalled();
+
+      await expect(DockerLauncher.remove("zitadel-server-test")).resolves.toBe(false);
+    });
+
     it("reads the end of the container's log", async () => {
       const calls = fakeDocker({ existing: { running: true } });
 
@@ -275,7 +282,77 @@ describe("DockerLauncher", () => {
       expect(calls.map((call) => call.args[0])).not.toContain("rm");
     });
   });
+
+  describe("reading the container's log", () => {
+    /** Answers each `docker` the code spawns with the next of `answers`, and records its arguments. */
+    function dockerAnswering(...answers: Array<{ stdout?: string; stderr?: string }>): string[][] {
+      const calls: string[][] = [];
+      vi.mocked(spawn).mockImplementation(((_command: string, args: string[]) => {
+        calls.push(args);
+        const answer = answers.shift() ?? {};
+        return fakeDockerProcess(answer.stdout ?? "", 0, answer.stderr ?? "");
+      }) as unknown as typeof spawn);
+      return calls;
+    }
+
+    function aSink(): LogSink & { existingText: string[]; appendedText: string[] } {
+      const existingText: string[] = [];
+      const appendedText: string[] = [];
+      return {
+        existingText,
+        appendedText,
+        existing: (text) => existingText.push(text),
+        appended: (text) => appendedText.push(text),
+      };
+    }
+
+    it("reads the whole log when asked for all of it", async () => {
+      const calls = dockerAnswering({ stderr: "level=INFO msg=a\n" });
+
+      await expect(DockerLauncher.readLogs("zitadel-server-test", "all")).resolves.toBe(
+        "level=INFO msg=a\n",
+      );
+      expect(calls).toEqual([["logs", "--tail", "all", "zitadel-server-test"]]);
+    });
+
+    it("follows the last lines Docker picks, handing them over with what comes after", async () => {
+      const calls = dockerAnswering({ stderr: "level=INFO msg=a\nlevel=WARN msg=b\n" });
+      const sink = aSink();
+
+      await DockerLauncher.followLogs("zitadel-server-test", 50, sink);
+
+      expect(calls).toEqual([["logs", "--tail", "50", "--follow", "zitadel-server-test"]]);
+      expect(sink.existingText).toEqual([]);
+      expect(sink.appendedText.join("")).toBe("level=INFO msg=a\nlevel=WARN msg=b\n");
+    });
+
+    it("hands over the whole log first, then only what the follow adds to it", async () => {
+      dockerAnswering(
+        { stderr: "level=INFO msg=a\nlevel=WARN msg=still bei" },
+        { stderr: "level=INFO msg=a\nlevel=WARN msg=still being written\nlevel=ERROR msg=new\n" },
+      );
+      const sink = aSink();
+
+      await DockerLauncher.followLogs("zitadel-server-test", "all", sink);
+
+      expect(sink.existingText).toEqual(["level=INFO msg=a\n"]);
+      expect(sink.appendedText.join("")).toBe(
+        "level=WARN msg=still being written\nlevel=ERROR msg=new\n",
+      );
+    });
+  });
 });
+
+/** Fails each `docker` the code spawns the way Node does when there is none on `PATH`. */
+function dockerIsNotInstalled(): void {
+  vi.mocked(spawn).mockImplementation((() => {
+    const child = new EventEmitter();
+    queueMicrotask(() =>
+      child.emit("error", Object.assign(new Error("spawn docker ENOENT"), { code: "ENOENT" })),
+    );
+    return child;
+  }) as unknown as typeof spawn);
+}
 
 type DockerCall = { command: string; args: string[]; env: NodeJS.ProcessEnv };
 

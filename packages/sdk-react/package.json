@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-react",
-  "version": "1.0.0-alpha.25",
+  "version": "0.1.0",
   "description": "React components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-react#readme",
   "bugs": {
@@ -45,6 +45,7 @@
     "react-dom": ">=18"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

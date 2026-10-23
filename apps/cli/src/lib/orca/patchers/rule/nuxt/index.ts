@@ -40,6 +40,10 @@ export class NuxtPatcher extends AbstractRulePatcher {
     return framework === "nuxt";
   }
 
+  protected devPortOps(ctx: PatchContext): FileOp[] {
+    return [devScriptPortOp(ctx.issuer)];
+  }
+
   protected routeOps(ctx: PatchContext): FileOp[] {
     const src = (rel: string) => join(ctx.framework.appDir, rel);
     return [

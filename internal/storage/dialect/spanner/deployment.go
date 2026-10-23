@@ -22,7 +22,8 @@ const (
 )
 
 var (
-	deploymentSchema = deployment.NewSchema(deploymentTable, originsTable, previewTable)
+	deploymentTables = deployment.Tables{Deployments: deploymentTable, Origins: originsTable, Previews: previewTable, ProjectOrigins: "project_origins"}
+	deploymentSchema = deployment.NewSchema(deploymentTables)
 
 	deploymentColumns = []string{"project_id", "id", "release_id", "origin_kind", "metadata", "deployed_at"}
 	originColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "origin_kind", "deployed_at", "seq"}
@@ -30,11 +31,9 @@ var (
 	originsQuery        = deployment.OriginsSelect(originsTable) + ` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2)`
 	newestPerOriginStmt = deployment.OriginsSelect(originsTable) +
 		` WHERE t.project_id = @p1 AND t.origin IN UNNEST(@p2) AND NOT ` + deployment.NewerOriginRowExists(originsTable)
-	liveOriginsStmt = originsQuery + ` AND NOT ` + deployment.NewerOriginRowExists(originsTable) +
-		` AND ` + deployment.OriginServes(previewTable, "@p3")
+	liveOriginsStmt    = originsQuery + ` AND ` + deployment.RowServes(deploymentTables, "@p3")
 	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (SELECT t.deployment_id FROM ` + originsTable + ` t` +
-		` WHERE t.project_id = @p1 AND t.origin = @p2 AND NOT ` + deployment.NewerOriginRowExists(originsTable) +
-		` AND ` + deployment.OriginServes(previewTable, "@p3") + `)`
+		` WHERE t.project_id = @p1 AND t.origin = @p2 AND ` + deployment.RowServes(deploymentTables, "@p3") + `)`
 )
 
 type deploymentStatements struct{ statement }

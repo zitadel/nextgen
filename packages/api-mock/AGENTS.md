@@ -1,204 +1,99 @@
-# api-mock Agent Notes
+# Agent Instructions — `packages/api-mock`
 
-Scoped instructions for `packages/api-mock/`. Read together with the
-[root `AGENTS.md`](../../AGENTS.md).
+`@zitadel/api-mock` stands in for the Zitadel API: MSW handlers for the typed
+`@zitadel/api` Flow API and the platform API, and a standalone server built on
+the same handlers. Storybook, the component, SDK and CLI tests use it in
+process; the demos run the server (`moon run api-mock:start`).
 
-## What's in here
+It is not published, but it builds to `dist/` (tsdown) like every package:
+consumers resolve its export map (`@zitadel/source` points in-repo tooling at
+the source) and depend on `api-mock:build`.
 
-`@zitadel/api-mock` is a workspace-internal MSW handler library
-for the typed `@zitadel/api` Flow API. Consumers:
+## The flow shape mirrors the real default flow
 
-- `apps/storybook` — the `Orchestrator/Login` stories boot the worker
-  through `msw-storybook-addon`.
-- `packages/components/src/orchestrator/zitadel-login.spec.ts` — feeds
-  the handlers into `msw/node`'s `setupServer`.
-- The widget SDKs (`packages/sdk-{angular,qwik,react,solid,svelte,vue}`) —
-  their `test-setup.ts` calls `serveMockFlowApi()` from the test-only
-  `./vitest` (`msw/node`) or `./vitest-browser` (`msw/browser`) entry point.
-- `apps/demo-next/` and `apps/demo-nuxt/` — hit the standalone TCP server
-  started by `pnpm --filter @zitadel/api-mock start` (not an
-  in-browser worker).
-
-It is **not** published. It still builds to `dist/` like every other
-workspace package, so consumers resolve it through its export map (the
-`@zitadel/source` condition points in-repo tooling at the source) and depend
-on `api-mock:build` in moon like any other package.
-
-## The flow shape must mirror the real default flow
-
-This mock is the substrate for the orchestrator's own test suite, the Storybook
-stories, and the demo e2e suites. When its flow shape diverges from the server's,
-every one of those consumers silently proves the wrong thing.
-
-The authority is
+A mock flow that drifts from the server's makes every consumer prove the wrong
+thing. The authority is
 [`packages/config/defaults/default-login.json`](../config/defaults/default-login.json),
-embedded into the server via `configdefaults.DefaultLoginFlowDefinition()`. Two
-properties it fixes, both of which this mock got wrong until they were corrected:
+which the server embeds (`configdefaults.DefaultLoginFlowDefinition()`).
 
-- **Sign-in is split**: `identifier` (email) → `password` → `done`. It is not a
-  combined email+password card. The mock served a combined card for a long time,
-  so the orchestrator's tests, the Storybook story, and both demo e2e suites were
-  all walking a screen the server never emits.
-- **Credential fields are keyed by the schema pointer** `x-auth-methods#password`
-  (exported as `PASSWORD_FIELD`), on both `password` and `register-password`. The
-  server answers `req.invalid` to a submit keyed on plain `password`, so the short
-  name let the orchestrator send a key the real backend refuses — invisible to
-  every mock-backed test.
-
-Steps that `zitadel sso enable` adds (`register-sso`, `sso-conflict`) are not in
-`default-login.json`. Their authority is
-[`docs/design/idp/schemas/default-login.scaffold.json`](../../docs/design/idp/schemas/default-login.scaffold.json),
-which the CLI's `applySsoToFlow` test keeps in step with the generator. The
-`sso-conflict` password field is keyed by `PASSWORD_FIELD` as well.
-
-Three knowing, documented exceptions: the `identifier` step keeps a `recover`
-navigate action (the default flow defines no recovery step yet) so that screen
-stays reachable; the `passkey-upsell`/`passkey-setup` pair is retained for
-direct actor injection though the default flow no longer routes through it; and
-`register-sso` serves `given_name`/`family_name` plus a `sign_in` navigate
-where the scaffold collects `email` with a single `submit`.
-(`register` on identifier and `sign_in` on register used to be listed here;
-they are real now — the default declares them as navigate actions with
-purposed transitions.)
-
-**Before changing a step fixture, diff it against that JSON.** The per-step
-action surface is enforced automatically by
-`src/fixtures/default-conformance.spec.ts` — a fixture can neither miss a
-declared action nor grow an extra beyond its documented allowlist. If a design
-or test needs a shape the server does not emit, the flow definition changes
-first.
+- Diff a step fixture against that JSON before changing it.
+  `src/fixtures/default-conformance.spec.ts` fails a fixture that misses a
+  declared action or grows one beyond its documented allowlist.
+- Never invent a step shape for a test or a design: the flow definition
+  changes first.
+- Sign-in is split: `identifier` → `password` → `done`, never a combined
+  email-and-password card.
+- Credential fields are keyed by the schema pointer `x-auth-methods#password`
+  (`PASSWORD_FIELD`), never `"password"`, which the server refuses with
+  `req.invalid`.
+- The steps `zitadel auth-method sso enable` adds (`register-sso`,
+  `sso-conflict`) follow
+  [`default-login.scaffold.json`](../../docs/design/idp/schemas/default-login.scaffold.json),
+  which the CLI's `applySsoToFlow` test keeps in step with the generator.
+- The documented exceptions: `identifier` keeps a `recover` navigate (the
+  default flow has no recovery step yet); `passkey-upsell`/`passkey-setup`
+  stay for direct actor injection; `register-sso` serves
+  `given_name`/`family_name` and a `sign_in` navigate where the scaffold
+  collects `email` with one `submit`.
 
 ## Architecture
 
-```
-xstate flowMachine (src/flow-machine.ts)
-   ↓ snapshot.value picks the next step
-fixtures (src/fixtures/login.ts)        — orval-typed CreateFlow201 builders
-   ↓ withBranding(...) overlay
-handlers (src/handlers.ts)              — orval `getCreateFlowMockHandler` etc.
-   ↓
-setupMock(worker) / setupMockHandlers() (src/index.ts)
-```
+- The xstate machine (`src/flow-machine.ts`) picks the step. Its state names,
+  the `FlowStepName` union, are the wire step names; there is no mapping.
+- Fixtures (`src/fixtures/login.ts`) return orval's `CreateFlow201`, which is
+  structurally the get and submit responses too, so one set serves all three
+  handlers (`src/handlers.ts`). Never declare shadow step, field or branding
+  types.
+- Only `setupMock(worker)` and the test-only `./vitest-browser` harness may
+  use `msw/browser`: the same handlers must run in node.
 
-Every step fixture returns the orval `CreateFlow201` shape. There are
-no shadow step types — fixtures import from
-`@zitadel/api/generated/model` and the structural identity of
-the three orval response aliases (`CreateFlow201`, `GetFlowStep200`,
-`SubmitFlowStep200`) lets a single fixture set drive all three handlers.
+## Adding a flow step
 
-## Adding a new flow step
+1. Add a state named as on the wire to `src/flow-machine.ts`, wire it into its
+   `SUBMIT` transition, and add the name to `FlowStepName`.
+2. Add a fixture builder returning `CreateFlow201` to `src/fixtures/login.ts`
+   (or a sibling for other flows), wrapped with `wrap(...)`.
+3. Add its `case` to `currentResponse()` in `src/handlers.ts`.
+4. Walk the new branch through the typed orval client in `src/index.spec.ts`.
 
-State names in the xstate machine **are** the canonical wire step names
-(`identifier`, `register`, `recover`, `password`, `passkey-login`, `passkey-upsell`, `passkey-setup`, `sso-redirect`, `done`) — no
-mapping function. To add a step:
+## Fixtures for error paths
 
-1. Add a state to the machine in `src/flow-machine.ts` named exactly as
-   it appears on the wire, and wire it into the relevant `SUBMIT`
-   transition. Add the name to the `FlowStepName` union.
-2. Add a fixture builder in `src/fixtures/login.ts` (or a sibling file
-   for non-login flows). Builder must return `CreateFlow201` typed from
-   orval; use `wrap(...)` for the standard envelope.
-3. Add a `case` in `currentResponse()` in `src/handlers.ts` that calls
-   the new fixture.
-4. Add a walk test in `src/index.spec.ts` that exercises the typed
-   orval client through the new branch.
-
-## Dev fixture emails
-
-`src/handlers.ts` recognizes special emails for the `Orchestrator/Login`
-Storybook stories (`moon run storybook:dev`). The story docs note the same
-table.
-
-| When | Email | Result |
-|------|-------|--------|
-| Sign in submit | `wrong@example.com` | Stays on identifier; `error.invalid_credentials` on password |
-| Sign in submit | `server@example.com` | Stays on identifier; `error.sign_in_server` form alert |
-| Sign up submit | `exists@example.com` | Stays on register; `error.email_exists` on email |
-
-Happy path: any other email → identifier/register → `done`. The
-`passkey-upsell` / `passkey-setup` states still exist in the machine but are
-no longer routed to by the default paths (passkey registration is offered up
-front instead); their fixture emails (`passkey-cancel@…`, `passkey-unsupported@…`,
-`passkey-fail@…`) only matter for tests that inject those states directly.
+Emails that trigger error paths (`REGISTRATION_ERRORS`, `LOGIN_ERRORS`,
+`PASSKEY_UPSELL_ERRORS`) are in `src/lib/authn/authn-store.ts`; any other email
+takes the happy path.
 
 ## The provider's return
 
-Choosing a provider is the `sso` submit; it answers `sso-redirect` with a
-`redirect_url` and records the submission's `return_target`. As on the engine
-(`internal/api/flow.go`), that target must be on the request origin (the
-`Origin` header, else the request's own host) and carry no userinfo, or the
-submit is refused with `req.invalid`: the callback redirects to it, and this
-mock is publicly deployed, so anything else is an open redirect. The provider's
-return is **not** a submit: as on the engine (`internal/api/idp_callback.go`),
-it is `GET /__nextgen/idp/callback` (also `/idp/callback`, the path an SDK proxy
-forwards), answered with `303` to the recorded `return_target`, after which the
-orchestrator resumes with `GET /flow/{id}`. A submit while the flow waits on the
-provider is refused with `flow.invalid_action`.
-
-The mock reads the provider's answer from the callback query:
-
-| Query | Result |
-|-------|--------|
-| `code=…` (`email=…` optional, standing in for the `id_token` email claim) | Resolves the identity: linked → `done`, account without link → `sso-conflict`, else `register-sso` |
-| `error=access_denied` | Back on the originating step with `error.sso_cancelled` |
-| any other `error=…`, or neither `code` nor `error` | Back on the originating step with `error.sso_failed` |
-
-A callback with no sign-in pending, or a replayed one, gets the engine's static
-error page (`400`). `returnFromProvider({ provider, email, error? })` drives the
-same transition in-process for callers that cannot leave the page (Storybook,
-component tests).
+- The `sso` submit answers `sso-redirect` and records the submission's
+  `return_target`. As on the engine (`internal/api/flow.go`), the target must
+  pass `parseRedirectTarget` (`src/redirect-target.ts`, a port of
+  `httputil.ParseRedirectTarget`) and be on the request origin, or the submit
+  is refused with `req.invalid`, so a client the server would refuse fails
+  against the mock too.
+- The refused and accepted targets are one list,
+  `internal/httputil/testdata/redirect_targets.json`, read by the Go tests and
+  `src/redirect-target.spec.ts`. A new way around the check goes there and
+  into both implementations.
+- The return is `GET /__nextgen/idp/callback` (or `/idp/callback`), not a
+  submit, as on the engine (`internal/api/idp_callback.go`): its query
+  (`code`, `email`, `error`) decides the next step, and it answers with a
+  `303` to the recorded target. `returnFromProvider(...)` drives the same
+  transition in process.
 
 ## Branding
 
-`applyBranding(branding)` writes a module-level overlay merged into
-every response. The overlay type is `CreateFlow201Branding &
-Record<string, unknown>`: the wire baseline gets full TS guidance, and
-the open record allows orchestrator-side v2 extension fields
-(`palette`, `typography`, `shape`, `assets`, `theme`) without making
-this package depend on the components type surface. The orchestrator's
-branding-validator strips anything the OpenAPI doesn't model. Tests
-should clear the overlay between cases via `clearBranding()`.
-
-`src/server.ts` exposes two functions. `createMockApp({ issuer })` builds
-the configured Express app and returns it without binding a port; it
-calls `applyBranding(defaultDevBranding)` on boot so demo apps receive a
-baseline `font_url` (Google Fonts Arimo) without extra setup.
-`startMockServer(port)` wraps it for the standalone TCP server (deriving a
-localhost issuer from `port`). The bare app is published via the
-`./server` export so a serverless host can use it directly as a request
-handler — see `apps/mock-zitadel`, which serves it as per-PR Vercel
-previews. The branding payload lives in `src/default-dev-branding.ts` and
-mirrors `docs/design/branding/branding.example.json`. MSW-only consumers
-(`setupMockHandlers` / `setupMock`) do **not** get this overlay unless
-they call `applyBranding` themselves — same as before.
+- `applyBranding(...)` overlays every response; clear it between tests with
+  `clearBranding()`. Its type stays open (`CreateFlow201Branding &
+  Record<string, unknown>`) so this package never depends on the components'
+  types.
+- `createMockApp({ issuer })` (`src/server.ts`, the `./server` export) applies
+  `defaultDevBranding` on boot. `setupMockHandlers()` / `setupMock()` apply
+  nothing unless the caller does.
 
 ## Testing
 
-Two Vitest projects, mirroring `packages/components`:
-
-- `unit` — node mode against `msw/node`'s `setupServer`. Picks up
-  `*.spec.ts`. The end-to-end walk in `src/index.spec.ts` is the
-  canonical contract test for the handlers, run locally by `pnpm test`.
-- `browser` — real Chromium via Playwright against `msw/browser`'s
-  `setupWorker`. Picks up `*.browser.spec.ts`. `index.browser.spec.ts`
-  smoke-tests the `setupMock(worker)` browser entry point. Run alone
-  via `pnpm test:browser`; it needs a Playwright browser install
-  (`pnpm exec playwright install`).
-
-`pnpm test:all` runs both projects, and is what CI runs (the `api-mock:test`
-moon task invokes it with an `install-browsers` dep). When fixing a regression in step
-routing, add a case to the unit spec first — it is the canonical contract for the
-handlers.
-
-## Don't
-
-- Don't introduce shadow types for step / field / branding shapes. Use
-  orval's `CreateFlow201*` aliases directly.
-- Don't depend on `msw/browser` from anything other than the
-  `setupMock(worker)` entry point and the test-only `./vitest-browser`
-  harness — the same handlers must work in node.
-- Don't ship a build artifact. Consumers import source via the workspace
-  export map; the Moon build task is intentionally a no-op.
-- Don't invent a step shape to make a test or a design convenient. The flow
-  definition is the authority — see the section above.
-- Don't hard-code `"password"` as a field name. Import `PASSWORD_FIELD`.
+- `pnpm test` runs both Vitest projects: `unit` (node, `*.spec.ts`) and
+  `browser` (Chromium, `*.browser.spec.ts`; needs
+  `pnpm exec playwright install`). `pnpm test:unit` is the fast lane.
+- `src/index.spec.ts` is the handlers' contract: for a step-routing
+  regression, add its case there first.

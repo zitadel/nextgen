@@ -24,8 +24,13 @@ import {
   ZitadelSession as ReactZitadelSession,
 } from "@zitadel/sdk-react";
 import * as React from "react";
+// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
+// The edge build of the components package has no elements, so this does nothing there.
+import "@zitadel/components";
 
-export { businessLocales } from "@zitadel/sdk-react";
+// Re-exported so scaffolded apps can wire the business copy overlay without a
+// direct @zitadel/components dependency (strict package managers reject those).
+export { businessLocales } from "@zitadel/components";
 // Every type `@zitadel/sdk-react` exports. A TanStack Start app installs only
 // this package, so under a strict package manager it cannot import
 // `@zitadel/sdk-react` to type a widget callback.
@@ -36,6 +41,15 @@ export { businessLocales } from "@zitadel/sdk-react";
 // shipping them. react.test.tsx fails when this list and sdk-react's drift.
 export type {
   CreateFlowBodyPurpose,
+  isStandardAttributeName,
+  StandardAttributeName,
+  StandardAttributeProps,
+  StandardAttributes,
+  standardAttributes,
+  WidgetName,
+  widgetNames,
+  WidgetTag,
+  widgetTags,
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGIN_EVENTS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
@@ -57,12 +71,16 @@ export type {
   ZitadelLogoutEventMap,
   ZitadelLogoutHandlers,
   ZitadelLogoutProps,
+  ZitadelLogoutReactProps,
+  ZitadelNavigationDetail,
   ZitadelProject,
   ZitadelSessionConfig,
   ZitadelSessionEventMap,
   ZitadelSessionHandlers,
   ZitadelSessionProps,
+  ZitadelSessionReactProps,
   ZitadelSignoutDetail,
+  ZitadelWidgetAttributes,
 } from "@zitadel/sdk-react";
 
 const subscribeNever = () => () => {};
@@ -85,7 +103,7 @@ type Widget<P, R> = React.ForwardRefExoticComponent<
 
 function clientOnly<P, R>(Component: Widget<P, R>, displayName: string): Widget<P, R> {
   const ClientOnlyWidget = React.forwardRef<R, P>(function ClientOnlyWidget(props, ref) {
-    return useHydrated() ? <Component {...(props as React.PropsWithoutRef<P>)} ref={ref} /> : null;
+    return useHydrated() ? <Component {...props} ref={ref} /> : null;
   });
   ClientOnlyWidget.displayName = displayName;
   return ClientOnlyWidget;

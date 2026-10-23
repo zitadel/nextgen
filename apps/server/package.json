@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/server",
-  "version": "1.0.0-alpha.25",
+  "version": "0.1.0",
   "description": "Zitadel server binary launcher.",
   "homepage": "https://github.com/zitadel/nextgen#readme",
   "bugs": {
@@ -38,7 +38,7 @@
     "lint": "cd ../.. && node scripts/go-lint.mjs",
     "test": "cd ../.. && go test -v -timeout 10m ./...",
     "test-postgres": "cd ../.. && go test -v -count=1 -tags postgres_integration -timeout 10m ./...",
-    "test-spanner": "cd ../.. && go test -v -count=1 -tags spanner_integration -timeout 10m -p 1 ./...",
+    "test-spanner": "cd ../.. && go test -v -count=1 -tags spanner_integration -timeout 30m ./internal/api/integration_test/ ./internal/storage/dialect/spanner/ ./internal/storage/stmttest/",
     "test-sqlite": "cd ../.. && go test -v -count=1 -tags sqlite_integration -timeout 5m ./...",
     "build": "cd ../.. && node scripts/server-build.mjs",
     "prepack": "publint --strict"

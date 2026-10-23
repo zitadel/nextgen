@@ -25,11 +25,20 @@ const (
 	flowCookieMaxAgeSeconds = 600
 )
 
-func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
+func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, params api.CreateFlowParams) (api.CreateFlowRes, error) {
 	audit.BindPublicRequest(ctx, string(req.ProjectID), "", "")
+
 	purpose, err := domain.FlowDefinitionPurposeString(string(req.Purpose))
 	if err != nil {
 		return nil, domain.ErrFlowInvalidPurpose().WithMessage(fmt.Sprintf("unknown purpose %q", req.Purpose))
+	}
+
+	// Which release serves the attempt is decided here, once, from the origin
+	// the request arrived on; the answer is sealed into the flow state so
+	// later steps read the same configuration.
+	ctx, err = h.resolveRuntime(ctx, string(req.ProjectID), params)
+	if err != nil {
+		return nil, err
 	}
 
 	resolveReq := service.ResolveFlowRequest{
@@ -64,9 +73,13 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 	if id, ok := req.AuthRequestID.Get(); ok {
 		startReq.AuthRequestID = &id
 	}
-	if id, ok := req.SessionID.Get(); ok {
-		startReq.SessionID = &id
+	sessionID, err := h.provenSessionID(ctx, string(req.ProjectID),
+		req.SessionID.Or(""), string(req.SessionToken.Or("")),
+		domain.ErrRequestInvalid)
+	if err != nil {
+		return nil, err
 	}
+	startReq.SessionID = sessionID
 	if ua, ok := middleware.UserAgentFromContext(ctx); ok {
 		startReq.UserAgent = ua
 	}
@@ -289,6 +302,32 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 		CacheControl: api.NewOptString(sessionStateCacheControl),
 		Response:     h.buildFlowResponse(ctx, result, terminal),
 	}, nil
+}
+
+// resolveRuntime decides which release serves the attempt from the browser
+// Origin header and puts the answer on the context. A request with no Origin,
+// or an open admission (empty allowlist / loopback) with nothing deployed yet,
+// keeps the pre-resolution newest-revision path until the project default
+// target lands; a present Origin that resolves to a deployment is sealed.
+func (h *Handler) resolveRuntime(ctx context.Context, projectID string, params api.CreateFlowParams) (context.Context, error) {
+	if h.runtime == nil {
+		return ctx, nil
+	}
+	origin := ""
+	if o, ok := params.Origin.Get(); ok {
+		origin = o.String()
+	}
+	if origin == "" {
+		return ctx, nil
+	}
+	resolution, err := h.runtime.Resolve(ctx, projectID, origin)
+	if err != nil {
+		return ctx, err
+	}
+	if resolution == nil {
+		return ctx, nil
+	}
+	return service.WithRuntimeResolution(ctx, resolution), nil
 }
 
 func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState, error) {

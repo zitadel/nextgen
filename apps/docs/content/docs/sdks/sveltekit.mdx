@@ -19,17 +19,17 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/sdk-sveltekit@alpha @zitadel/sdk-svelte@alpha
+    pnpm add @zitadel/sdk-sveltekit@latest @zitadel/sdk-svelte@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/sdk-sveltekit@alpha @zitadel/sdk-svelte@alpha
+    npm install @zitadel/sdk-sveltekit@latest @zitadel/sdk-svelte@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/sdk-sveltekit@alpha @zitadel/sdk-svelte@alpha
+    yarn add @zitadel/sdk-sveltekit@latest @zitadel/sdk-svelte@latest
     ```
   </Tab>
 </Tabs>
@@ -99,7 +99,7 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
 <Steps>
   <Step>The hook proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
   <Step>It verifies the session token and puts the result on `event.locals.nextgenAuth`; read it with `getAuth(event)` in a load function or endpoint.</Step>
-  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`.</Step>
+  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
 </Steps>
 
 ## Verify
@@ -111,5 +111,5 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
 
 ## See also
 
-- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
 - [`@zitadel/sdk-sveltekit` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-sveltekit) and the [CLI SvelteKit patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/sveltekit).

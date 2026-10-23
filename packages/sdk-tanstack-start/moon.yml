@@ -11,7 +11,8 @@ dependsOn:
 tasks:
   typecheck:
     deps:
-      - "sdk-react:build"
+      # The edge spec imports this package's built dist.
+      - "build"
 
   build:
     deps:
