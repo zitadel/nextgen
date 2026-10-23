@@ -503,10 +503,10 @@ ADR 063 like identity provider connections: a `policies` row per operation per
 project carries the fixed `id` (`pol_`), a `policy_revisions` row per publish
 carries the `revision_id` (`polrev_`) and the config, and the newest revision
 is the one with the greatest `created_at`. It has no URL identity or `$ref`
-handling, which a policy does not need. Today the API publishes
-(`POST /policies`) and reads one revision
-(`GET /policies/revisions/{revision_id}`); the other ADR 063 reads (the
-list, the read by `id`, the revisions of one policy) follow. Templates are not
+handling, which a policy does not need. The API publishes
+(`POST /policies`) and has the ADR 063 reads: the list (`GET /policies`),
+the read by `id`, the revisions of one policy and one revision
+(`GET /policies/revisions/{revision_id}`). Templates are not
 release content: they ship with the server, and a release records the catalog
 version it was validated against. Release validation runs the same check as
 publishing (`policy.Engine.ValidateInstance`: known operation and settings,

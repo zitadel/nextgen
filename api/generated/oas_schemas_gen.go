@@ -35128,12 +35128,14 @@ func (*GetMyUserSchemaErrorResponseStatusCode) getMyUserSchemaRes() {}
 
 // GetPolicyErrorResponse represents sum type.
 type GetPolicyErrorResponse struct {
-	Type             GetPolicyErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
-	Unavailable      Unavailable
+	Type                GetPolicyErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	PolNotFound         PolNotFound
+	PolPermissionDenied PolPermissionDenied
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // GetPolicyErrorResponseType is oneOf type of GetPolicyErrorResponse.
@@ -35141,11 +35143,13 @@ type GetPolicyErrorResponseType string
 
 // Possible values for GetPolicyErrorResponseType.
 const (
-	AuthUnauthorizedGetPolicyErrorResponse GetPolicyErrorResponseType = "auth.unauthorized"
-	InternalGetPolicyErrorResponse         GetPolicyErrorResponseType = "internal"
-	NotImplementedGetPolicyErrorResponse   GetPolicyErrorResponseType = "not_implemented"
-	ReqInvalidGetPolicyErrorResponse       GetPolicyErrorResponseType = "req.invalid"
-	UnavailableGetPolicyErrorResponse      GetPolicyErrorResponseType = "unavailable"
+	AuthUnauthorizedGetPolicyErrorResponse    GetPolicyErrorResponseType = "auth.unauthorized"
+	InternalGetPolicyErrorResponse            GetPolicyErrorResponseType = "internal"
+	NotImplementedGetPolicyErrorResponse      GetPolicyErrorResponseType = "not_implemented"
+	PolNotFoundGetPolicyErrorResponse         GetPolicyErrorResponseType = "pol.not_found"
+	PolPermissionDeniedGetPolicyErrorResponse GetPolicyErrorResponseType = "pol.permission_denied"
+	ReqInvalidGetPolicyErrorResponse          GetPolicyErrorResponseType = "req.invalid"
+	UnavailableGetPolicyErrorResponse         GetPolicyErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetPolicyErrorResponse is AuthUnauthorized.
@@ -35159,6 +35163,16 @@ func (s GetPolicyErrorResponse) IsInternal() bool { return s.Type == InternalGet
 // IsNotImplemented reports whether GetPolicyErrorResponse is NotImplemented.
 func (s GetPolicyErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedGetPolicyErrorResponse
+}
+
+// IsPolNotFound reports whether GetPolicyErrorResponse is PolNotFound.
+func (s GetPolicyErrorResponse) IsPolNotFound() bool {
+	return s.Type == PolNotFoundGetPolicyErrorResponse
+}
+
+// IsPolPermissionDenied reports whether GetPolicyErrorResponse is PolPermissionDenied.
+func (s GetPolicyErrorResponse) IsPolPermissionDenied() bool {
+	return s.Type == PolPermissionDeniedGetPolicyErrorResponse
 }
 
 // IsReqInvalid reports whether GetPolicyErrorResponse is ReqInvalid.
@@ -35231,6 +35245,48 @@ func (s GetPolicyErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) 
 func NewNotImplementedGetPolicyErrorResponse(v NotImplemented) GetPolicyErrorResponse {
 	var s GetPolicyErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetPolNotFound sets GetPolicyErrorResponse to PolNotFound.
+func (s *GetPolicyErrorResponse) SetPolNotFound(v PolNotFound) {
+	s.Type = PolNotFoundGetPolicyErrorResponse
+	s.PolNotFound = v
+}
+
+// GetPolNotFound returns PolNotFound and true boolean if GetPolicyErrorResponse is PolNotFound.
+func (s GetPolicyErrorResponse) GetPolNotFound() (v PolNotFound, ok bool) {
+	if !s.IsPolNotFound() {
+		return v, false
+	}
+	return s.PolNotFound, true
+}
+
+// NewPolNotFoundGetPolicyErrorResponse returns new GetPolicyErrorResponse from PolNotFound.
+func NewPolNotFoundGetPolicyErrorResponse(v PolNotFound) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetPolNotFound(v)
+	return s
+}
+
+// SetPolPermissionDenied sets GetPolicyErrorResponse to PolPermissionDenied.
+func (s *GetPolicyErrorResponse) SetPolPermissionDenied(v PolPermissionDenied) {
+	s.Type = PolPermissionDeniedGetPolicyErrorResponse
+	s.PolPermissionDenied = v
+}
+
+// GetPolPermissionDenied returns PolPermissionDenied and true boolean if GetPolicyErrorResponse is PolPermissionDenied.
+func (s GetPolicyErrorResponse) GetPolPermissionDenied() (v PolPermissionDenied, ok bool) {
+	if !s.IsPolPermissionDenied() {
+		return v, false
+	}
+	return s.PolPermissionDenied, true
+}
+
+// NewPolPermissionDeniedGetPolicyErrorResponse returns new GetPolicyErrorResponse from PolPermissionDenied.
+func NewPolPermissionDeniedGetPolicyErrorResponse(v PolPermissionDenied) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetPolPermissionDenied(v)
 	return s
 }
 
@@ -44891,12 +44947,14 @@ func (*ListMyTeamsErrorResponseStatusCode) listMyTeamsRes() {}
 
 // ListPoliciesErrorResponse represents sum type.
 type ListPoliciesErrorResponse struct {
-	Type             ListPoliciesErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
-	Unavailable      Unavailable
+	Type                ListPoliciesErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	PolNotFound         PolNotFound
+	PolPermissionDenied PolPermissionDenied
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // ListPoliciesErrorResponseType is oneOf type of ListPoliciesErrorResponse.
@@ -44904,11 +44962,13 @@ type ListPoliciesErrorResponseType string
 
 // Possible values for ListPoliciesErrorResponseType.
 const (
-	AuthUnauthorizedListPoliciesErrorResponse ListPoliciesErrorResponseType = "auth.unauthorized"
-	InternalListPoliciesErrorResponse         ListPoliciesErrorResponseType = "internal"
-	NotImplementedListPoliciesErrorResponse   ListPoliciesErrorResponseType = "not_implemented"
-	ReqInvalidListPoliciesErrorResponse       ListPoliciesErrorResponseType = "req.invalid"
-	UnavailableListPoliciesErrorResponse      ListPoliciesErrorResponseType = "unavailable"
+	AuthUnauthorizedListPoliciesErrorResponse    ListPoliciesErrorResponseType = "auth.unauthorized"
+	InternalListPoliciesErrorResponse            ListPoliciesErrorResponseType = "internal"
+	NotImplementedListPoliciesErrorResponse      ListPoliciesErrorResponseType = "not_implemented"
+	PolNotFoundListPoliciesErrorResponse         ListPoliciesErrorResponseType = "pol.not_found"
+	PolPermissionDeniedListPoliciesErrorResponse ListPoliciesErrorResponseType = "pol.permission_denied"
+	ReqInvalidListPoliciesErrorResponse          ListPoliciesErrorResponseType = "req.invalid"
+	UnavailableListPoliciesErrorResponse         ListPoliciesErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether ListPoliciesErrorResponse is AuthUnauthorized.
@@ -44924,6 +44984,16 @@ func (s ListPoliciesErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether ListPoliciesErrorResponse is NotImplemented.
 func (s ListPoliciesErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedListPoliciesErrorResponse
+}
+
+// IsPolNotFound reports whether ListPoliciesErrorResponse is PolNotFound.
+func (s ListPoliciesErrorResponse) IsPolNotFound() bool {
+	return s.Type == PolNotFoundListPoliciesErrorResponse
+}
+
+// IsPolPermissionDenied reports whether ListPoliciesErrorResponse is PolPermissionDenied.
+func (s ListPoliciesErrorResponse) IsPolPermissionDenied() bool {
+	return s.Type == PolPermissionDeniedListPoliciesErrorResponse
 }
 
 // IsReqInvalid reports whether ListPoliciesErrorResponse is ReqInvalid.
@@ -44996,6 +45066,48 @@ func (s ListPoliciesErrorResponse) GetNotImplemented() (v NotImplemented, ok boo
 func NewNotImplementedListPoliciesErrorResponse(v NotImplemented) ListPoliciesErrorResponse {
 	var s ListPoliciesErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetPolNotFound sets ListPoliciesErrorResponse to PolNotFound.
+func (s *ListPoliciesErrorResponse) SetPolNotFound(v PolNotFound) {
+	s.Type = PolNotFoundListPoliciesErrorResponse
+	s.PolNotFound = v
+}
+
+// GetPolNotFound returns PolNotFound and true boolean if ListPoliciesErrorResponse is PolNotFound.
+func (s ListPoliciesErrorResponse) GetPolNotFound() (v PolNotFound, ok bool) {
+	if !s.IsPolNotFound() {
+		return v, false
+	}
+	return s.PolNotFound, true
+}
+
+// NewPolNotFoundListPoliciesErrorResponse returns new ListPoliciesErrorResponse from PolNotFound.
+func NewPolNotFoundListPoliciesErrorResponse(v PolNotFound) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetPolNotFound(v)
+	return s
+}
+
+// SetPolPermissionDenied sets ListPoliciesErrorResponse to PolPermissionDenied.
+func (s *ListPoliciesErrorResponse) SetPolPermissionDenied(v PolPermissionDenied) {
+	s.Type = PolPermissionDeniedListPoliciesErrorResponse
+	s.PolPermissionDenied = v
+}
+
+// GetPolPermissionDenied returns PolPermissionDenied and true boolean if ListPoliciesErrorResponse is PolPermissionDenied.
+func (s ListPoliciesErrorResponse) GetPolPermissionDenied() (v PolPermissionDenied, ok bool) {
+	if !s.IsPolPermissionDenied() {
+		return v, false
+	}
+	return s.PolPermissionDenied, true
+}
+
+// NewPolPermissionDeniedListPoliciesErrorResponse returns new ListPoliciesErrorResponse from PolPermissionDenied.
+func NewPolPermissionDeniedListPoliciesErrorResponse(v PolPermissionDenied) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetPolPermissionDenied(v)
 	return s
 }
 
@@ -45103,12 +45215,14 @@ func (*ListPoliciesResponse) listPoliciesRes() {}
 
 // ListPolicyRevisionsErrorResponse represents sum type.
 type ListPolicyRevisionsErrorResponse struct {
-	Type             ListPolicyRevisionsErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
-	Unavailable      Unavailable
+	Type                ListPolicyRevisionsErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	PolNotFound         PolNotFound
+	PolPermissionDenied PolPermissionDenied
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // ListPolicyRevisionsErrorResponseType is oneOf type of ListPolicyRevisionsErrorResponse.
@@ -45116,11 +45230,13 @@ type ListPolicyRevisionsErrorResponseType string
 
 // Possible values for ListPolicyRevisionsErrorResponseType.
 const (
-	AuthUnauthorizedListPolicyRevisionsErrorResponse ListPolicyRevisionsErrorResponseType = "auth.unauthorized"
-	InternalListPolicyRevisionsErrorResponse         ListPolicyRevisionsErrorResponseType = "internal"
-	NotImplementedListPolicyRevisionsErrorResponse   ListPolicyRevisionsErrorResponseType = "not_implemented"
-	ReqInvalidListPolicyRevisionsErrorResponse       ListPolicyRevisionsErrorResponseType = "req.invalid"
-	UnavailableListPolicyRevisionsErrorResponse      ListPolicyRevisionsErrorResponseType = "unavailable"
+	AuthUnauthorizedListPolicyRevisionsErrorResponse    ListPolicyRevisionsErrorResponseType = "auth.unauthorized"
+	InternalListPolicyRevisionsErrorResponse            ListPolicyRevisionsErrorResponseType = "internal"
+	NotImplementedListPolicyRevisionsErrorResponse      ListPolicyRevisionsErrorResponseType = "not_implemented"
+	PolNotFoundListPolicyRevisionsErrorResponse         ListPolicyRevisionsErrorResponseType = "pol.not_found"
+	PolPermissionDeniedListPolicyRevisionsErrorResponse ListPolicyRevisionsErrorResponseType = "pol.permission_denied"
+	ReqInvalidListPolicyRevisionsErrorResponse          ListPolicyRevisionsErrorResponseType = "req.invalid"
+	UnavailableListPolicyRevisionsErrorResponse         ListPolicyRevisionsErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether ListPolicyRevisionsErrorResponse is AuthUnauthorized.
@@ -45136,6 +45252,16 @@ func (s ListPolicyRevisionsErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether ListPolicyRevisionsErrorResponse is NotImplemented.
 func (s ListPolicyRevisionsErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedListPolicyRevisionsErrorResponse
+}
+
+// IsPolNotFound reports whether ListPolicyRevisionsErrorResponse is PolNotFound.
+func (s ListPolicyRevisionsErrorResponse) IsPolNotFound() bool {
+	return s.Type == PolNotFoundListPolicyRevisionsErrorResponse
+}
+
+// IsPolPermissionDenied reports whether ListPolicyRevisionsErrorResponse is PolPermissionDenied.
+func (s ListPolicyRevisionsErrorResponse) IsPolPermissionDenied() bool {
+	return s.Type == PolPermissionDeniedListPolicyRevisionsErrorResponse
 }
 
 // IsReqInvalid reports whether ListPolicyRevisionsErrorResponse is ReqInvalid.
@@ -45208,6 +45334,48 @@ func (s ListPolicyRevisionsErrorResponse) GetNotImplemented() (v NotImplemented,
 func NewNotImplementedListPolicyRevisionsErrorResponse(v NotImplemented) ListPolicyRevisionsErrorResponse {
 	var s ListPolicyRevisionsErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetPolNotFound sets ListPolicyRevisionsErrorResponse to PolNotFound.
+func (s *ListPolicyRevisionsErrorResponse) SetPolNotFound(v PolNotFound) {
+	s.Type = PolNotFoundListPolicyRevisionsErrorResponse
+	s.PolNotFound = v
+}
+
+// GetPolNotFound returns PolNotFound and true boolean if ListPolicyRevisionsErrorResponse is PolNotFound.
+func (s ListPolicyRevisionsErrorResponse) GetPolNotFound() (v PolNotFound, ok bool) {
+	if !s.IsPolNotFound() {
+		return v, false
+	}
+	return s.PolNotFound, true
+}
+
+// NewPolNotFoundListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from PolNotFound.
+func NewPolNotFoundListPolicyRevisionsErrorResponse(v PolNotFound) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetPolNotFound(v)
+	return s
+}
+
+// SetPolPermissionDenied sets ListPolicyRevisionsErrorResponse to PolPermissionDenied.
+func (s *ListPolicyRevisionsErrorResponse) SetPolPermissionDenied(v PolPermissionDenied) {
+	s.Type = PolPermissionDeniedListPolicyRevisionsErrorResponse
+	s.PolPermissionDenied = v
+}
+
+// GetPolPermissionDenied returns PolPermissionDenied and true boolean if ListPolicyRevisionsErrorResponse is PolPermissionDenied.
+func (s ListPolicyRevisionsErrorResponse) GetPolPermissionDenied() (v PolPermissionDenied, ok bool) {
+	if !s.IsPolPermissionDenied() {
+		return v, false
+	}
+	return s.PolPermissionDenied, true
+}
+
+// NewPolPermissionDeniedListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from PolPermissionDenied.
+func NewPolPermissionDeniedListPolicyRevisionsErrorResponse(v PolPermissionDenied) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetPolPermissionDenied(v)
 	return s
 }
 

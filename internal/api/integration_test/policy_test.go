@@ -62,8 +62,8 @@ func publishRawPolicy(t *testing.T, token, projectID, body string) (int, api.Err
 	return resp.StatusCode, helpers.MustUnmarshal[api.ErrorDetails](t, raw).Code
 }
 
-// TestPolicies covers publishing a policy and reading revisions back
-// (ADR 066, ADR 063).
+// TestPolicies covers publishing a policy and reading it back: by id, in the
+// list and through its revisions (ADR 066, ADR 063).
 func TestPolicies(t *testing.T) {
 	t.Parallel()
 
@@ -128,6 +128,89 @@ func TestPolicies(t *testing.T) {
 		denied := resp.(*api.PublishPolicyErrorResponseStatusCode)
 		assert.Equal(t, http.StatusBadRequest, denied.StatusCode)
 		assert.True(t, denied.Response.IsPolInvalid(), helpers.MustMarshal(t, resp))
+		details, ok := denied.Response.PolInvalid.Details.Get()
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.JSONEq(t, `{"violations": [
+			{"config_rule": "min_length_not_above_max_length", "settings": ["max_length", "min_length"]}
+		]}`, string(details["details"]), "the details name the rule and the settings it reads")
+	})
+
+	t.Run("the policy reads at its newest revision", func(t *testing.T) {
+		resp, err := client.GetPolicy(t.Context(), api.GetPolicyParams{ProjectID: api.ProjectID(project.ID), PolicyID: rev1.ID})
+		require.NoError(t, err)
+		got := passwordSetPolicy(t, resp)
+		assert.Equal(t, rev2.RevisionID, got.RevisionID)
+		assert.Equal(t, rev2.Config, got.Config)
+	})
+
+	t.Run("the list holds each policy at its newest revision", func(t *testing.T) {
+		resp, err := client.ListPolicies(t.Context(), api.ListPoliciesParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPoliciesResponse{}, resp, helpers.MustMarshal(t, resp))
+		list := resp.(*api.ListPoliciesResponse)
+		require.Len(t, list.Policies, 1)
+		assert.Equal(t, rev2.RevisionID, passwordSetPolicy(t, &list.Policies[0]).RevisionID)
+		assert.False(t, list.NextPageToken.Set)
+
+		resp, err = client.ListPolicies(t.Context(), api.ListPoliciesParams{
+			ProjectID: api.ProjectID(project.ID),
+			Operation: api.NewOptPolicyOperation(api.PolicyOperation(passwordSetOperation)),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPoliciesResponse{}, resp, helpers.MustMarshal(t, resp))
+		assert.Len(t, resp.(*api.ListPoliciesResponse).Policies, 1, "the operation filter keeps the operation's policy")
+	})
+
+	t.Run("a project without a policy lists none", func(t *testing.T) {
+		empty, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		emptyClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, emptyClient, empty)
+
+		resp, err := emptyClient.ListPolicies(t.Context(), api.ListPoliciesParams{ProjectID: api.ProjectID(empty.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPoliciesResponse{}, resp, helpers.MustMarshal(t, resp))
+		assert.Empty(t, resp.(*api.ListPoliciesResponse).Policies)
+	})
+
+	t.Run("the revisions page newest first", func(t *testing.T) {
+		list := func(token api.OptPageToken) *api.ListPolicyRevisionsResponse {
+			t.Helper()
+			resp, err := client.ListPolicyRevisions(t.Context(), api.ListPolicyRevisionsParams{
+				ProjectID: api.ProjectID(project.ID),
+				PolicyID:  rev1.ID,
+				Limit:     api.NewOptLimit(1),
+				PageToken: token,
+			})
+			require.NoError(t, err)
+			require.IsType(t, &api.ListPolicyRevisionsResponse{}, resp, helpers.MustMarshal(t, resp))
+			return resp.(*api.ListPolicyRevisionsResponse)
+		}
+		first := list(api.OptPageToken{})
+		require.Len(t, first.Revisions, 1)
+		assert.Equal(t, rev2.RevisionID, passwordSetPolicy(t, &first.Revisions[0]).RevisionID)
+		token, ok := first.NextPageToken.Get()
+		require.True(t, ok, "a full page carries a token")
+
+		second := list(api.NewOptPageToken(token))
+		require.Len(t, second.Revisions, 1)
+		assert.Equal(t, rev1.RevisionID, passwordSetPolicy(t, &second.Revisions[0]).RevisionID)
+		assert.Equal(t, api.PasswordSetConfig{MinLength: api.NewOptInt(12)}, passwordSetPolicy(t, &second.Revisions[0]).Config)
+	})
+
+	t.Run("an unknown policy is not found", func(t *testing.T) {
+		resp, err := client.GetPolicy(t.Context(), api.GetPolicyParams{ProjectID: api.ProjectID(project.ID), PolicyID: "pol_unknown"})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetPolicyErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, http.StatusNotFound, resp.(*api.GetPolicyErrorResponseStatusCode).StatusCode)
+
+		revisions, err := client.ListPolicyRevisions(t.Context(), api.ListPolicyRevisionsParams{ProjectID: api.ProjectID(project.ID), PolicyID: "pol_unknown"})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPolicyRevisionsErrorResponseStatusCode{}, revisions, helpers.MustMarshal(t, revisions))
+		notFound := revisions.(*api.ListPolicyRevisionsErrorResponseStatusCode)
+		assert.Equal(t, http.StatusNotFound, notFound.StatusCode)
+		assert.True(t, notFound.Response.IsPolNotFound(), "not an empty page")
 	})
 
 	t.Run("another project's credentials cannot publish", func(t *testing.T) {
@@ -169,6 +252,52 @@ func TestPolicies(t *testing.T) {
 		notFound := resp.(*api.GetPolicyRevisionErrorResponseStatusCode)
 		assert.Equal(t, http.StatusNotFound, notFound.StatusCode)
 		assert.True(t, notFound.Response.IsPolNotFound())
+	})
+
+	t.Run("the project's own credentials naming another project get not found", func(t *testing.T) {
+		other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+
+		for name, projectID := range map[string]string{"another project": other.ID, "an unknown project": "proj_unknown"} {
+			t.Run(name, func(t *testing.T) {
+				resp, err := client.GetPolicy(t.Context(), api.GetPolicyParams{ProjectID: api.ProjectID(projectID), PolicyID: rev1.ID})
+				require.NoError(t, err)
+				require.IsType(t, &api.GetPolicyErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+				notFound := resp.(*api.GetPolicyErrorResponseStatusCode)
+				assert.Equal(t, http.StatusNotFound, notFound.StatusCode)
+				assert.True(t, notFound.Response.IsPolNotFound())
+
+				revisions, err := client.ListPolicyRevisions(t.Context(), api.ListPolicyRevisionsParams{ProjectID: api.ProjectID(projectID), PolicyID: rev1.ID})
+				require.NoError(t, err)
+				require.IsType(t, &api.ListPolicyRevisionsErrorResponseStatusCode{}, revisions, helpers.MustMarshal(t, revisions))
+				assert.Equal(t, http.StatusNotFound, revisions.(*api.ListPolicyRevisionsErrorResponseStatusCode).StatusCode)
+			})
+		}
+	})
+
+	t.Run("a policy of another project is not found", func(t *testing.T) {
+		other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		otherClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, otherClient, other)
+
+		resp, err := otherClient.GetPolicy(t.Context(), api.GetPolicyParams{ProjectID: api.ProjectID(other.ID), PolicyID: rev1.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetPolicyErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		notFound := resp.(*api.GetPolicyErrorResponseStatusCode)
+		assert.Equal(t, http.StatusNotFound, notFound.StatusCode)
+		assert.True(t, notFound.Response.IsPolNotFound())
+
+		revisions, err := otherClient.ListPolicyRevisions(t.Context(), api.ListPolicyRevisionsParams{ProjectID: api.ProjectID(other.ID), PolicyID: rev1.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPolicyRevisionsErrorResponseStatusCode{}, revisions, helpers.MustMarshal(t, revisions))
+		assert.Equal(t, http.StatusNotFound, revisions.(*api.ListPolicyRevisionsErrorResponseStatusCode).StatusCode)
+
+		list, err := otherClient.ListPolicies(t.Context(), api.ListPoliciesParams{ProjectID: api.ProjectID(other.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPoliciesResponse{}, list, helpers.MustMarshal(t, list))
+		assert.Empty(t, list.(*api.ListPoliciesResponse).Policies)
 	})
 }
 
