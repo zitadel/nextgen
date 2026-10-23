@@ -31,7 +31,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && (attw --pack . --profile=esm-only || true)",
     "typecheck": "svelte-check --tsconfig ./tsconfig.lib.json && svelte-check --tsconfig ./tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test",

@@ -24,6 +24,11 @@ export default defineConfig({
   },
   plugins: [
     qwikVite(),
-    dts({ tsconfigPath: "./tsconfig.lib.json", include: ["src"], exclude: ["src/**/*.spec.*"] }),
+    dts({
+      tsconfigPath: "./tsconfig.lib.json",
+      include: ["src"],
+      exclude: ["src/**/*.spec.*"],
+      bundleTypes: true,
+    }),
   ],
 });

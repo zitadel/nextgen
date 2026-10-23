@@ -8,6 +8,8 @@ packages:
   - "tools/*"
 
 catalog:
+  "@microsoft/api-extractor": ^7.58.9
+  "@arethetypeswrong/cli": ^0.18.5
   "@angular/platform-server": ^22.2.3
   # Babel 7 for the Nuxt projects: Nuxt's sub-packages have optional peers on
   # Babel 7 plugins, which pnpm auto-installs into every project with Nuxt in

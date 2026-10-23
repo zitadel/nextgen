@@ -14,13 +14,14 @@
   "license": "MIT",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "!dist/types"
   ],
   "module": "./dist/index.js",
-  "types": "./dist/types/public-api.d.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/types/public-api.d.ts",
+      "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
   },
@@ -28,7 +29,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vite build && ngc -p tsconfig.lib.json",
+    "build": "vite build && ngc -p tsconfig.lib.json && api-extractor run --local && (attw --pack . --profile=esm-only || true)",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test",

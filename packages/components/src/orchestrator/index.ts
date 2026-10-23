@@ -40,9 +40,10 @@ export {
   mandatoryGatesMarkerComment,
   MANDATORY_GATES_MARKER,
 } from "./mandatory-gates.js";
+import layoutChromeCssSource from "./templates/layout-chrome.css?inline";
 export { createSanitiser } from "./sanitiser.js";
 export { default as defaultTemplate } from "./templates/default.liquid";
-export { default as layoutChromeCss } from "./templates/layout-chrome.css?inline";
+export const layoutChromeCss: string = layoutChromeCssSource;
 export { startFlow, submitStep, getCurrentStep } from "./api-client.js";
 export {
   validateBranding,

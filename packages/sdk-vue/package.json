@@ -26,7 +26,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && (attw --pack . --profile=esm-only || true)",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test",

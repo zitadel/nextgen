@@ -16,6 +16,11 @@ export default defineConfig({
     },
   },
   plugins: [
-    dts({ tsconfigPath: "./tsconfig.lib.json", include: ["src"], exclude: ["src/**/*.spec.*"] }),
+    dts({
+      tsconfigPath: "./tsconfig.lib.json",
+      include: ["src"],
+      exclude: ["src/**/*.spec.*"],
+      bundleTypes: true,
+    }),
   ],
 });
