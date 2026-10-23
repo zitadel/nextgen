@@ -58296,34 +58296,14 @@ func (o OptTeamPermissionDeniedDetails) Or(d TeamPermissionDeniedDetails) TeamPe
 	return d
 }
 
-<<<<<<< HEAD
-// NewOptTeamRef returns new OptTeamRef with value set to v.
-func NewOptTeamRef(v TeamRef) OptTeamRef {
-	return OptTeamRef{
-=======
 // NewOptTeamProjectNotFoundDetails returns new OptTeamProjectNotFoundDetails with value set to v.
 func NewOptTeamProjectNotFoundDetails(v TeamProjectNotFoundDetails) OptTeamProjectNotFoundDetails {
 	return OptTeamProjectNotFoundDetails{
->>>>>>> origin/main
 		Value: v,
 		Set:   true,
 	}
 }
 
-<<<<<<< HEAD
-// OptTeamRef is optional TeamRef.
-type OptTeamRef struct {
-	Value TeamRef
-	Set   bool
-}
-
-// IsSet returns true if OptTeamRef was set.
-func (o OptTeamRef) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptTeamRef) Reset() {
-	var v TeamRef
-=======
 // OptTeamProjectNotFoundDetails is optional TeamProjectNotFoundDetails.
 type OptTeamProjectNotFoundDetails struct {
 	Value TeamProjectNotFoundDetails
@@ -58336,27 +58316,18 @@ func (o OptTeamProjectNotFoundDetails) IsSet() bool { return o.Set }
 // Reset unsets value.
 func (o *OptTeamProjectNotFoundDetails) Reset() {
 	var v TeamProjectNotFoundDetails
->>>>>>> origin/main
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-<<<<<<< HEAD
-func (o *OptTeamRef) SetTo(v TeamRef) {
-=======
 func (o *OptTeamProjectNotFoundDetails) SetTo(v TeamProjectNotFoundDetails) {
->>>>>>> origin/main
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-<<<<<<< HEAD
-func (o OptTeamRef) Get() (v TeamRef, ok bool) {
-=======
 func (o OptTeamProjectNotFoundDetails) Get() (v TeamProjectNotFoundDetails, ok bool) {
->>>>>>> origin/main
 	if !o.Set {
 		return v, false
 	}
@@ -58364,11 +58335,53 @@ func (o OptTeamProjectNotFoundDetails) Get() (v TeamProjectNotFoundDetails, ok b
 }
 
 // Or returns value if set, or given parameter if does not.
-<<<<<<< HEAD
-func (o OptTeamRef) Or(d TeamRef) TeamRef {
-=======
 func (o OptTeamProjectNotFoundDetails) Or(d TeamProjectNotFoundDetails) TeamProjectNotFoundDetails {
->>>>>>> origin/main
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptTeamRef returns new OptTeamRef with value set to v.
+func NewOptTeamRef(v TeamRef) OptTeamRef {
+	return OptTeamRef{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTeamRef is optional TeamRef.
+type OptTeamRef struct {
+	Value TeamRef
+	Set   bool
+}
+
+// IsSet returns true if OptTeamRef was set.
+func (o OptTeamRef) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTeamRef) Reset() {
+	var v TeamRef
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTeamRef) SetTo(v TeamRef) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTeamRef) Get() (v TeamRef, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTeamRef) Or(d TeamRef) TeamRef {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -65248,7 +65261,59 @@ func (s *ProjPermissionDeniedDetails) init() ProjPermissionDeniedDetails {
 	return m
 }
 
-<<<<<<< HEAD
+// Merged schema.
+// Ref: #
+type ProjPreviewNotLive struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjPreviewNotLiveDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjPreviewNotLive) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjPreviewNotLive) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjPreviewNotLive) GetDetails() OptProjPreviewNotLiveDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjPreviewNotLive) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjPreviewNotLive) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjPreviewNotLive) SetDetails(val OptProjPreviewNotLiveDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjPreviewNotLiveDetails map[string]jx.Raw
+
+func (s *ProjPreviewNotLiveDetails) init() ProjPreviewNotLiveDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // One person who can administer the project, with every way they hold that
 // access.
 // Ref: #
@@ -65494,59 +65559,6 @@ func NewProjectAdminGrantSourceProjectAdminSource(v ProjectAdminGrantSource) Pro
 	var s ProjectAdminSource
 	s.SetProjectAdminGrantSource(v)
 	return s
-=======
-// Merged schema.
-// Ref: #
-type ProjPreviewNotLive struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptProjPreviewNotLiveDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *ProjPreviewNotLive) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *ProjPreviewNotLive) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *ProjPreviewNotLive) GetDetails() OptProjPreviewNotLiveDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *ProjPreviewNotLive) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *ProjPreviewNotLive) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *ProjPreviewNotLive) SetDetails(val OptProjPreviewNotLiveDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type ProjPreviewNotLiveDetails map[string]jx.Raw
-
-func (s *ProjPreviewNotLiveDetails) init() ProjPreviewNotLiveDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
->>>>>>> origin/main
 }
 
 // ProjectCreated2XX is 2XX pattern response for ProjectCreated operation.
@@ -80792,40 +80804,6 @@ func (s *TeamPermissionDeniedDetails) init() TeamPermissionDeniedDetails {
 	return m
 }
 
-<<<<<<< HEAD
-// A resolved reference to a team. Carries the team's id and name so a grant
-// list is readable without embedding the full Team body. Id and display ride
-// `project.read` (ADR 059 rule 8): a reference field carrying only the
-// target's id and display strings needs no gate of its own. Missing or
-// deleted teams degrade to `team_id` only.
-// Ref: #
-type TeamRef struct {
-	// The referenced team's id (`team_<opaque>`). Always present.
-	TeamID string `json:"team_id"`
-	// The team's name. Absent when the team can no longer be loaded, or where
-	// the referencing endpoint leaves it out for a team the caller may not see.
-	Name OptString `json:"name"`
-}
-
-// GetTeamID returns the value of TeamID.
-func (s *TeamRef) GetTeamID() string {
-	return s.TeamID
-}
-
-// GetName returns the value of Name.
-func (s *TeamRef) GetName() OptString {
-	return s.Name
-}
-
-// SetTeamID sets the value of TeamID.
-func (s *TeamRef) SetTeamID(val string) {
-	s.TeamID = val
-}
-
-// SetName sets the value of Name.
-func (s *TeamRef) SetName(val OptString) {
-	s.Name = val
-=======
 // Merged schema.
 // Ref: #
 type TeamProjectNotFound struct {
@@ -80877,7 +80855,40 @@ func (s *TeamProjectNotFoundDetails) init() TeamProjectNotFoundDetails {
 		*s = m
 	}
 	return m
->>>>>>> origin/main
+}
+
+// A resolved reference to a team. Carries the team's id and name so a grant
+// list is readable without embedding the full Team body. Id and display ride
+// `project.read` (ADR 059 rule 8): a reference field carrying only the
+// target's id and display strings needs no gate of its own. Missing or
+// deleted teams degrade to `team_id` only.
+// Ref: #
+type TeamRef struct {
+	// The referenced team's id (`team_<opaque>`). Always present.
+	TeamID string `json:"team_id"`
+	// The team's name. Absent when the team can no longer be loaded, or where
+	// the referencing endpoint leaves it out for a team the caller may not see.
+	Name OptString `json:"name"`
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *TeamRef) GetTeamID() string {
+	return s.TeamID
+}
+
+// GetName returns the value of Name.
+func (s *TeamRef) GetName() OptString {
+	return s.Name
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *TeamRef) SetTeamID(val string) {
+	s.TeamID = val
+}
+
+// SetName sets the value of Name.
+func (s *TeamRef) SetName(val OptString) {
+	s.Name = val
 }
 
 // Details of a team.

@@ -38,7 +38,10 @@ type ProjectAdmins struct {
 	NextPageToken string
 }
 
-func (s *GrantService) ListProjectAdmins(ctx context.Context, input ListProjectAdminsInput) (*ProjectAdmins, error) {
+func (s *GrantService) ListProjectAdmins(ctx context.Context, input ListProjectAdminsInput) (_ *ProjectAdmins, err error) {
+	ctx, end := startSpan(ctx, "GrantService.ListProjectAdmins")
+	defer end(&err)
+
 	if input.ProjectID == "" {
 		return nil, domain.ErrProjectMissingID()
 	}

@@ -321,14 +321,9 @@ func emitFlowdefCreated(ctx context.Context, stmts EventStatements, flowDef *dom
 	})
 }
 
-<<<<<<< HEAD
-func (s *projectService) Get(ctx context.Context, id string, opts ProjectQueryOptions) (*domain.Project, error) {
-=======
-func (s *projectService) Get(ctx context.Context, id string) (_ *domain.Project, err error) {
+func (s *projectService) Get(ctx context.Context, id string, opts ProjectQueryOptions) (_ *domain.Project, err error) {
 	ctx, end := startSpan(ctx, "ProjectService.Get")
 	defer end(&err)
-
->>>>>>> origin/main
 	logger := getLoggingContext(ctx, "project")
 	logger.Info("getting project", slog.String("project_id", id))
 	project, err := s.v2Pool.Statements().GetProject(ctx, id, opts)

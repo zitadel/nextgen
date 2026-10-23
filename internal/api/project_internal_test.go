@@ -119,11 +119,11 @@ func TestCreateProject_StampsActorSlot(t *testing.T) {
 func TestProjectDetailResponseCarriesProjectResponse(t *testing.T) {
 	now := time.Now()
 	project := &domain.Project{
-		ID:             "proj_detail",
-		Name:           "Acme",
-		Origins:        []domain.Origin{{Pattern: "https://preview.example.com", Kind: domain.OriginKindPreview}},
-		CreatedAt:      now.Add(-time.Hour),
-		UpdatedAt:      now,
+		ID:        "proj_detail",
+		Name:      "Acme",
+		Origins:   []domain.Origin{{Pattern: "https://preview.example.com", Kind: domain.OriginKindPreview}},
+		CreatedAt: now.Add(-time.Hour),
+		UpdatedAt: now,
 		PasswordHashPolicy: &domain.PasswordHashPolicy{
 			Algorithm: "bcrypt",
 			Params:    map[string]any{"cost": float64(10)},

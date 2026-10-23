@@ -82304,27 +82304,14 @@ func (s *OptTeamPermissionDeniedDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-<<<<<<< HEAD
-// Encode encodes TeamRef as json.
-func (o OptTeamRef) Encode(e *jx.Encoder) {
-=======
 // Encode encodes TeamProjectNotFoundDetails as json.
 func (o OptTeamProjectNotFoundDetails) Encode(e *jx.Encoder) {
->>>>>>> origin/main
 	if !o.Set {
 		return
 	}
 	o.Value.Encode(e)
 }
 
-<<<<<<< HEAD
-// Decode decodes TeamRef from json.
-func (o *OptTeamRef) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptTeamRef to nil")
-	}
-	o.Set = true
-=======
 // Decode decodes TeamProjectNotFoundDetails from json.
 func (o *OptTeamProjectNotFoundDetails) Decode(d *jx.Decoder) error {
 	if o == nil {
@@ -82332,7 +82319,6 @@ func (o *OptTeamProjectNotFoundDetails) Decode(d *jx.Decoder) error {
 	}
 	o.Set = true
 	o.Value = make(TeamProjectNotFoundDetails)
->>>>>>> origin/main
 	if err := o.Value.Decode(d); err != nil {
 		return err
 	}
@@ -82340,22 +82326,47 @@ func (o *OptTeamProjectNotFoundDetails) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-<<<<<<< HEAD
-func (s OptTeamRef) MarshalJSON() ([]byte, error) {
-=======
 func (s OptTeamProjectNotFoundDetails) MarshalJSON() ([]byte, error) {
->>>>>>> origin/main
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-<<<<<<< HEAD
-func (s *OptTeamRef) UnmarshalJSON(data []byte) error {
-=======
 func (s *OptTeamProjectNotFoundDetails) UnmarshalJSON(data []byte) error {
->>>>>>> origin/main
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes TeamRef as json.
+func (o OptTeamRef) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes TeamRef from json.
+func (o *OptTeamRef) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptTeamRef to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptTeamRef) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptTeamRef) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -93632,43 +93643,13 @@ func (s *ProjPermissionDeniedDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-<<<<<<< HEAD
-func (s *ProjectAdmin) Encode(e *jx.Encoder) {
-=======
 func (s *ProjPreviewNotLive) Encode(e *jx.Encoder) {
->>>>>>> origin/main
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-<<<<<<< HEAD
-func (s *ProjectAdmin) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("user")
-		s.User.Encode(e)
-	}
-	{
-		e.FieldStart("sources")
-		e.ArrStart()
-		for _, elem := range s.Sources {
-			elem.Encode(e)
-		}
-		e.ArrEnd()
-	}
-}
-
-var jsonFieldsNameOfProjectAdmin = [2]string{
-	0: "user",
-	1: "sources",
-}
-
-// Decode decodes ProjectAdmin from json.
-func (s *ProjectAdmin) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode ProjectAdmin to nil")
-=======
 func (s *ProjPreviewNotLive) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("code")
@@ -93696,30 +93677,204 @@ var jsonFieldsNameOfProjPreviewNotLive = [3]string{
 func (s *ProjPreviewNotLive) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode ProjPreviewNotLive to nil")
->>>>>>> origin/main
 	}
 	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-<<<<<<< HEAD
-		case "user":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				if err := s.User.Decode(d); err != nil {
-=======
 		case "code":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
 				v, err := d.Str()
 				s.Code = string(v)
 				if err != nil {
->>>>>>> origin/main
 					return err
 				}
 				return nil
 			}(); err != nil {
-<<<<<<< HEAD
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ProjPreviewNotLive")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfProjPreviewNotLive) {
+					name = jsonFieldsNameOfProjPreviewNotLive[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ProjPreviewNotLive) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ProjPreviewNotLive) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s ProjPreviewNotLiveDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s ProjPreviewNotLiveDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes ProjPreviewNotLiveDetails from json.
+func (s *ProjPreviewNotLiveDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ProjPreviewNotLiveDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ProjPreviewNotLiveDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ProjPreviewNotLiveDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ProjPreviewNotLiveDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ProjectAdmin) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ProjectAdmin) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("user")
+		s.User.Encode(e)
+	}
+	{
+		e.FieldStart("sources")
+		e.ArrStart()
+		for _, elem := range s.Sources {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
+	}
+}
+
+var jsonFieldsNameOfProjectAdmin = [2]string{
+	0: "user",
+	1: "sources",
+}
+
+// Decode decodes ProjectAdmin from json.
+func (s *ProjectAdmin) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ProjectAdmin to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "user":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.User.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
 				return errors.Wrap(err, "decode field \"user\"")
 			}
 		case "sources":
@@ -93851,55 +94006,29 @@ func (s *ProjectAdminGrantSource) Decode(d *jx.Decoder) error {
 			if err := func() error {
 				v, err := d.Str()
 				s.GrantID = string(v)
-=======
-				return errors.Wrap(err, "decode field \"code\"")
-			}
-		case "message":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Str()
-				s.Message = string(v)
->>>>>>> origin/main
 				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-<<<<<<< HEAD
 				return errors.Wrap(err, "decode field \"grant_id\"")
 			}
 		case "team":
 			if err := func() error {
 				s.Team.Reset()
 				if err := s.Team.Decode(d); err != nil {
-=======
-				return errors.Wrap(err, "decode field \"message\"")
-			}
-		case "details":
-			if err := func() error {
-				s.Details.Reset()
-				if err := s.Details.Decode(d); err != nil {
->>>>>>> origin/main
 					return err
 				}
 				return nil
 			}(); err != nil {
-<<<<<<< HEAD
 				return errors.Wrap(err, "decode field \"team\"")
-=======
-				return errors.Wrap(err, "decode field \"details\"")
->>>>>>> origin/main
 			}
 		default:
 			return d.Skip()
 		}
 		return nil
 	}); err != nil {
-<<<<<<< HEAD
 		return errors.Wrap(err, "decode ProjectAdminGrantSource")
-=======
-		return errors.Wrap(err, "decode ProjPreviewNotLive")
->>>>>>> origin/main
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
@@ -93916,13 +94045,8 @@ func (s *ProjectAdminGrantSource) Decode(d *jx.Decoder) error {
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-<<<<<<< HEAD
 				if fieldIdx < len(jsonFieldsNameOfProjectAdminGrantSource) {
 					name = jsonFieldsNameOfProjectAdminGrantSource[fieldIdx]
-=======
-				if fieldIdx < len(jsonFieldsNameOfProjPreviewNotLive) {
-					name = jsonFieldsNameOfProjPreviewNotLive[fieldIdx]
->>>>>>> origin/main
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -93943,18 +94067,13 @@ func (s *ProjectAdminGrantSource) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-<<<<<<< HEAD
 func (s *ProjectAdminGrantSource) MarshalJSON() ([]byte, error) {
-=======
-func (s *ProjPreviewNotLive) MarshalJSON() ([]byte, error) {
->>>>>>> origin/main
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-<<<<<<< HEAD
 func (s *ProjectAdminGrantSource) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
@@ -93994,25 +94113,17 @@ func (s ProjectAdminGrantSourceType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *ProjectAdminGrantSourceType) UnmarshalJSON(data []byte) error {
-=======
-func (s *ProjPreviewNotLive) UnmarshalJSON(data []byte) error {
->>>>>>> origin/main
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
 // Encode implements json.Marshaler.
-<<<<<<< HEAD
 func (s *ProjectAdminOwningTeamSource) Encode(e *jx.Encoder) {
-=======
-func (s ProjPreviewNotLiveDetails) Encode(e *jx.Encoder) {
->>>>>>> origin/main
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-<<<<<<< HEAD
 // encodeFields encodes fields.
 func (s *ProjectAdminOwningTeamSource) encodeFields(e *jx.Encoder) {
 	{
@@ -94097,59 +94208,19 @@ func (s *ProjectAdminOwningTeamSource) Decode(d *jx.Decoder) error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
-=======
-// encodeFields implements json.Marshaler.
-func (s ProjPreviewNotLiveDetails) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		if len(elem) != 0 {
-			e.Raw(elem)
-		}
-	}
-}
-
-// Decode decodes ProjPreviewNotLiveDetails from json.
-func (s *ProjPreviewNotLiveDetails) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode ProjPreviewNotLiveDetails to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem jx.Raw
-		if err := func() error {
-			v, err := d.RawAppend(nil)
-			elem = jx.Raw(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode ProjPreviewNotLiveDetails")
->>>>>>> origin/main
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-<<<<<<< HEAD
 func (s *ProjectAdminOwningTeamSource) MarshalJSON() ([]byte, error) {
-=======
-func (s ProjPreviewNotLiveDetails) MarshalJSON() ([]byte, error) {
->>>>>>> origin/main
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-<<<<<<< HEAD
 func (s *ProjectAdminOwningTeamSource) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
@@ -94297,9 +94368,6 @@ func (s ProjectAdminSource) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *ProjectAdminSource) UnmarshalJSON(data []byte) error {
-=======
-func (s *ProjPreviewNotLiveDetails) UnmarshalJSON(data []byte) error {
->>>>>>> origin/main
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -120829,28 +120897,13 @@ func (s *TeamPermissionDeniedDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-<<<<<<< HEAD
-func (s *TeamRef) Encode(e *jx.Encoder) {
-=======
 func (s *TeamProjectNotFound) Encode(e *jx.Encoder) {
->>>>>>> origin/main
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-<<<<<<< HEAD
-func (s *TeamRef) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("team_id")
-		e.Str(s.TeamID)
-	}
-	{
-		if s.Name.Set {
-			e.FieldStart("name")
-			s.Name.Encode(e)
-=======
 func (s *TeamProjectNotFound) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("code")
@@ -120864,22 +120917,10 @@ func (s *TeamProjectNotFound) encodeFields(e *jx.Encoder) {
 		if s.Details.Set {
 			e.FieldStart("details")
 			s.Details.Encode(e)
->>>>>>> origin/main
 		}
 	}
 }
 
-<<<<<<< HEAD
-var jsonFieldsNameOfTeamRef = [2]string{
-	0: "team_id",
-	1: "name",
-}
-
-// Decode decodes TeamRef from json.
-func (s *TeamRef) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode TeamRef to nil")
-=======
 var jsonFieldsNameOfTeamProjectNotFound = [3]string{
 	0: "code",
 	1: "message",
@@ -120890,38 +120931,21 @@ var jsonFieldsNameOfTeamProjectNotFound = [3]string{
 func (s *TeamProjectNotFound) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode TeamProjectNotFound to nil")
->>>>>>> origin/main
 	}
 	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-<<<<<<< HEAD
-		case "team_id":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.TeamID = string(v)
-=======
 		case "code":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
 				v, err := d.Str()
 				s.Code = string(v)
->>>>>>> origin/main
 				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-<<<<<<< HEAD
-				return errors.Wrap(err, "decode field \"team_id\"")
-			}
-		case "name":
-			if err := func() error {
-				s.Name.Reset()
-				if err := s.Name.Decode(d); err != nil {
-=======
 				return errors.Wrap(err, "decode field \"code\"")
 			}
 		case "message":
@@ -120930,14 +120954,10 @@ func (s *TeamProjectNotFound) Decode(d *jx.Decoder) error {
 				v, err := d.Str()
 				s.Message = string(v)
 				if err != nil {
->>>>>>> origin/main
 					return err
 				}
 				return nil
 			}(); err != nil {
-<<<<<<< HEAD
-				return errors.Wrap(err, "decode field \"name\"")
-=======
 				return errors.Wrap(err, "decode field \"message\"")
 			}
 		case "details":
@@ -120949,27 +120969,18 @@ func (s *TeamProjectNotFound) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"details\"")
->>>>>>> origin/main
 			}
 		default:
 			return d.Skip()
 		}
 		return nil
 	}); err != nil {
-<<<<<<< HEAD
-		return errors.Wrap(err, "decode TeamRef")
-=======
 		return errors.Wrap(err, "decode TeamProjectNotFound")
->>>>>>> origin/main
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-<<<<<<< HEAD
-		0b00000001,
-=======
 		0b00000011,
->>>>>>> origin/main
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -120981,13 +120992,8 @@ func (s *TeamProjectNotFound) Decode(d *jx.Decoder) error {
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-<<<<<<< HEAD
-				if fieldIdx < len(jsonFieldsNameOfTeamRef) {
-					name = jsonFieldsNameOfTeamRef[fieldIdx]
-=======
 				if fieldIdx < len(jsonFieldsNameOfTeamProjectNotFound) {
 					name = jsonFieldsNameOfTeamProjectNotFound[fieldIdx]
->>>>>>> origin/main
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -121008,20 +121014,13 @@ func (s *TeamProjectNotFound) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-<<<<<<< HEAD
-func (s *TeamRef) MarshalJSON() ([]byte, error) {
-=======
 func (s *TeamProjectNotFound) MarshalJSON() ([]byte, error) {
->>>>>>> origin/main
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-<<<<<<< HEAD
-func (s *TeamRef) UnmarshalJSON(data []byte) error {
-=======
 func (s *TeamProjectNotFound) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
@@ -121081,7 +121080,119 @@ func (s TeamProjectNotFoundDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *TeamProjectNotFoundDetails) UnmarshalJSON(data []byte) error {
->>>>>>> origin/main
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *TeamRef) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *TeamRef) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("team_id")
+		e.Str(s.TeamID)
+	}
+	{
+		if s.Name.Set {
+			e.FieldStart("name")
+			s.Name.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfTeamRef = [2]string{
+	0: "team_id",
+	1: "name",
+}
+
+// Decode decodes TeamRef from json.
+func (s *TeamRef) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TeamRef to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "team_id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.TeamID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_id\"")
+			}
+		case "name":
+			if err := func() error {
+				s.Name.Reset()
+				if err := s.Name.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"name\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode TeamRef")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfTeamRef) {
+					name = jsonFieldsNameOfTeamRef[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *TeamRef) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TeamRef) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
