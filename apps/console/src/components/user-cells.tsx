@@ -9,6 +9,8 @@ import {
 import { TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { InlineCode } from "@/components/ui/inline-code";
 import {
   Popover,
   PopoverContent,
@@ -17,6 +19,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { formatDate } from "@/lib/date";
 import type { AttributeSummary, UserRow } from "@/lib/user-list";
 import { cn } from "@/lib/utils";
 
@@ -32,16 +35,42 @@ const ROW_COPY =
 /**
  * The User cell of a user table: the server-resolved identity (display →
  * identifier → id, ADR 058 §3a) as the link to the user, and the designated
- * identifier (x-identifier) beneath a display name, its tooltip naming the
- * property it came from. Schema-driven columns cannot promise a meaningful
- * leading value; this cell always can, so a mixed-schema list still reads the
- * identifier down one column.
+ * identifier (x-identifier) beneath a display name. Schema-driven columns
+ * cannot promise a meaningful leading value; this cell always can, so a
+ * mixed-schema list still reads the identifier down one column.
+ *
+ * The identifier carries its property as a chip (`email`, `username`), once,
+ * beside whichever line shows it: a list that mixes schemas signs people in
+ * with different properties, and a tooltip hid that (D21).
  *
  * `sticky` pins it to the card's left edge while the other columns scroll
  * under it (the Users list); the header cell over it takes
- * `RESOURCE_STICKY_START` too.
+ * `RESOURCE_STICKY_START` too. `card` adds the identity hover card.
  */
-export function UserIdentityCell({ user, sticky = false }: { user: UserRow; sticky?: boolean }) {
+export function UserIdentityCell({
+  user,
+  sticky = false,
+  card,
+}: {
+  user: UserRow;
+  sticky?: boolean;
+  card?: IdentityCardContext;
+}) {
+  const chip = user.identifierProperty && (
+    <InlineCode className="text-muted-foreground shrink-0">{user.identifierProperty}</InlineCode>
+  );
+  // No display name: the identifier is the link text itself.
+  const chipOnName =
+    !user.secondary && user.identifier !== undefined && user.name === user.identifier;
+  const link = (
+    <Link
+      to="/users/$userId"
+      params={{ userId: user.id }}
+      className="text-foreground block min-w-0 truncate font-medium underline-offset-2 hover:underline"
+    >
+      {user.name}
+    </Link>
+  );
   return (
     <TableCell
       className={cn(
@@ -51,22 +80,113 @@ export function UserIdentityCell({ user, sticky = false }: { user: UserRow; stic
         sticky && [RESOURCE_STICKY_START, RESOURCE_STICKY_BODY],
       )}
     >
-      <Link
-        to="/users/$userId"
-        params={{ userId: user.id }}
-        className="text-foreground block truncate font-medium underline-offset-2 hover:underline"
-      >
-        {user.name}
-      </Link>
+      <span className="flex min-w-0 items-center gap-1.5">
+        {card ? (
+          <HoverCard openDelay={400} closeDelay={100}>
+            <HoverCardTrigger asChild>{link}</HoverCardTrigger>
+            <HoverCardContent align="start" className="w-80 p-3">
+              <UserIdentityCard user={user} context={card} />
+            </HoverCardContent>
+          </HoverCard>
+        ) : (
+          link
+        )}
+        {chipOnName && chip}
+      </span>
       {user.secondary && (
-        <span
-          className="text-muted-foreground block truncate text-xs"
-          title={user.identifierProperty}
-        >
-          {user.secondary}
+        <span className="text-muted-foreground mt-0.5 flex min-w-0 items-center gap-1.5 text-xs">
+          {chip}
+          <span className="truncate">{user.secondary}</span>
         </span>
       )}
     </TableCell>
+  );
+}
+
+/** What the identity hover card knows about the list besides the row. */
+export interface IdentityCardContext {
+  /** The title of the user's schema, else its id. */
+  schemaTitle: string;
+  /** False when the list was served without memberships (a 403 on `expand`). */
+  teamsKnown: boolean;
+}
+
+/**
+ * The identity hover card: what the user's schema designates (what they sign
+ * in with, what the console calls them), their memberships and the team that
+ * owns their lifecycle, which is not a membership (ADR 024).
+ *
+ * Supplementary by design: a hover card opens on the link's hover and focus
+ * but its content is not reachable by keyboard, and everything in it is on the
+ * detail screen too.
+ */
+function UserIdentityCard({ user, context }: { user: UserRow; context: IdentityCardContext }) {
+  const display = user.secondary ? user.name : undefined;
+  const owner = user.lifecycleOwnerTeamId;
+  const ownerName = owner && user.teams.find((team) => team.id === owner)?.name;
+  return (
+    <div className="text-xs">
+      <div className="border-border border-b pb-2.5">
+        <p className="text-foreground truncate text-sm font-medium">{user.name}</p>
+        <p className="text-muted-foreground truncate">{context.schemaTitle} schema</p>
+      </div>
+      <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 py-2.5 leading-4.5">
+        <dt className="text-muted-foreground">Signs in with</dt>
+        <dd className="flex min-w-0 items-center gap-1.5">
+          {user.identifier ? (
+            <>
+              {user.identifierProperty && (
+                <InlineCode className="text-muted-foreground shrink-0">
+                  {user.identifierProperty}
+                </InlineCode>
+              )}
+              <span className="truncate">{user.identifier}</span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">No identifier</span>
+          )}
+        </dd>
+        <dt className="text-muted-foreground">Display name</dt>
+        <dd className={display ? "truncate" : "text-muted-foreground"}>{display ?? "None"}</dd>
+        <dt className="text-muted-foreground">Member of</dt>
+        <dd className={user.teams.length > 0 ? "" : "text-muted-foreground"}>
+          {!context.teamsKnown
+            ? "Not readable with your access"
+            : user.teams.length > 0
+              ? user.teams
+                  .map((team) =>
+                    team.status && team.status !== "active"
+                      ? `${team.name} (${team.status})`
+                      : team.name,
+                  )
+                  .join(", ")
+              : "No teams"}
+        </dd>
+        {owner !== undefined && (
+          <>
+            <dt className="text-muted-foreground">Lifecycle owner</dt>
+            <dd className="min-w-0 truncate">
+              {owner === null ? (
+                <span className="text-muted-foreground">Self-owned</span>
+              ) : (
+                (ownerName ?? <InlineCode>{owner}</InlineCode>)
+              )}
+            </dd>
+          </>
+        )}
+        {user.createdAt && (
+          <>
+            <dt className="text-muted-foreground">Created</dt>
+            <dd>{formatDate(user.createdAt)}</dd>
+          </>
+        )}
+      </dl>
+      <p className="text-muted-foreground border-border border-t pt-2 text-[11px] leading-4">
+        The schema decides what a user signs in with (
+        <code className="whitespace-nowrap">x-identifier</code>) and what the console calls them (
+        <code className="whitespace-nowrap">x-display</code>).
+      </p>
+    </div>
   );
 }
 

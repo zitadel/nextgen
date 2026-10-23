@@ -29,6 +29,7 @@ import {
   UserIdCell,
   UserIdentityCell,
 } from "@/components/user-cells";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -159,6 +160,10 @@ function UsersScreen() {
     [rows, pinned],
   );
   const scroll = useScrollEdges();
+  const schemaTitles = useMemo(
+    () => new Map(columns.map((group) => [group.schemaId, group.title])),
+    [columns],
+  );
 
   return (
     <Page>
@@ -205,7 +210,10 @@ function UsersScreen() {
               {showAttributes && <ResourceHeadCell>Attributes</ResourceHeadCell>}
               <ResourceHeadCell>Status</ResourceHeadCell>
               {/* After `Status`, where the design's column order puts it. */}
-              {teamsExpanded && <ResourceHeadCell>Team</ResourceHeadCell>}
+              {/* Memberships, not ownership: the team that owns a user's
+                  lifecycle is a different relation (ADR 024), in the User
+                  cell's hover card (D21). */}
+              {teamsExpanded && <ResourceHeadCell>Member of</ResourceHeadCell>}
               <ResourceHeadCell>ID</ResourceHeadCell>
               <ResourceMenuHead className={`w-15 ${RESOURCE_STICKY_END}`} />
             </ResourceHeaderRow>
@@ -220,7 +228,14 @@ function UsersScreen() {
             ) : (
               rows.map((user) => (
                 <ResourceRow key={user.id} className="group">
-                  <UserIdentityCell user={user} sticky />
+                  <UserIdentityCell
+                    user={user}
+                    sticky
+                    card={{
+                      schemaTitle: schemaTitles.get(user.schemaId) ?? user.schemaId,
+                      teamsKnown: teamsExpanded,
+                    }}
+                  />
                   {pinned.map((column) => (
                     <TableCell key={column.key} className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
                       {user.values[column.key] ?? "—"}
@@ -341,7 +356,9 @@ function ColumnsMenu({
 
 /**
  * The teams a user belongs to, glyphed the way the design draws the cell and the
- * way the Teams directory draws a team row.
+ * way the Teams directory draws a team row. A membership that is not active yet
+ * (`pending`) or any more (`inactive`) says so: the roster returns them beside
+ * the active ones, and an unmarked name would read as a full member.
  *
  * Each name opens its team, as the Teams directory's own rows do — the embedded
  * entry carries the id, so the link costs no extra read.
@@ -374,6 +391,14 @@ function TeamCell({ teams, truncated }: { teams: UserTeam[]; truncated: boolean 
             >
               {team.name}
             </Link>
+            {team.status && team.status !== "active" && (
+              <Badge
+                variant="outline"
+                className="text-muted-foreground ml-1 h-4 rounded-sm border-dashed px-1 align-middle text-[11px] font-normal"
+              >
+                {team.status}
+              </Badge>
+            )}
           </span>
         ))}
       </span>

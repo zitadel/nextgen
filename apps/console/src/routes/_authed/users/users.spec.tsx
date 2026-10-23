@@ -203,10 +203,13 @@ describe("users screen", () => {
     await renderUsers();
     expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
     // The User column leads with the resolved display and carries the link;
-    // the designated identifier sits under it, its tooltip naming the property.
-    expect(await screen.findByRole("link", { name: "Maya Patel" })).toBeInTheDocument();
+    // the designated identifier sits under it, its property as a chip beside
+    // it rather than in a tooltip (D21).
+    const link = await screen.findByRole("link", { name: "Maya Patel" });
     const table = within(screen.getByRole("table"));
-    expect(table.getByText("maya.patel@acme.com")).toHaveAttribute("title", "email");
+    const identifier = table.getByText("maya.patel@acme.com").parentElement as HTMLElement;
+    expect(within(identifier).getByText("email")).toBeInTheDocument();
+    expect(within(link.parentElement as HTMLElement).queryByText("email")).not.toBeInTheDocument();
     // Schema properties are not columns until the viewer pins one (D21): the
     // rest of the record reads in one Attributes cell, in the schema's field
     // order, without the email that would only repeat the line under the name.
@@ -214,7 +217,7 @@ describe("users screen", () => {
       "User",
       "Attributes",
       "Status",
-      "Team",
+      "Member of",
       "ID",
       "",
     ]);
@@ -254,12 +257,14 @@ describe("users screen", () => {
     await renderUsers();
 
     const table = within(await screen.findByRole("table"));
-    expect(table.getByRole("link", { name: "maya@acme.com" })).toBeInTheDocument();
+    const link = table.getByRole("link", { name: "maya@acme.com" });
     expect(table.getAllByText("maya@acme.com")).toHaveLength(1);
+    // With no display name the identifier is the link, and the chip sits beside it.
+    expect(within(link.parentElement as HTMLElement).getByText("email")).toBeInTheDocument();
     expect(table.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
       "User",
       "Status",
-      "Team",
+      "Member of",
       "ID",
       "",
     ]);
@@ -290,6 +295,66 @@ describe("users screen", () => {
     const headers = screen.getAllByRole("columnheader");
     expect(headers[0]).toHaveClass("sm:sticky", "sm:left-0");
     expect(headers.at(-1)).toHaveClass("sticky", "right-0");
+  });
+
+  it("explains the user's identity in a hover card", async () => {
+    // What the schema designates (what the user signs in with, what the console
+    // calls them), the memberships, and the lifecycle owner, which is a
+    // different relation from a membership (ADR 024).
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              schema: "sch_staff",
+              identifier: "evelyn.berezin",
+              identifier_property: "username",
+              attributes: { username: "evelyn.berezin", email: "evelyn@acme.com" },
+              metadata: {
+                status: "active",
+                created_at: "2026-02-01T09:00:00Z",
+                lifecycle_owner_team_id: "team_1",
+              },
+              teams: [
+                { id: "team_1", name: "Field Ops", membership_status: "active" },
+                { id: "team_2", name: "Platform", membership_status: "pending" },
+              ],
+            },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_staff`, () =>
+        HttpResponse.json({
+          id: "sch_staff",
+          schema: {
+            title: "Employees",
+            "x-identifier": "username",
+            properties: { username: { type: "string" }, email: { type: "string" } },
+          },
+        }),
+      ),
+    );
+    await renderUsers();
+
+    await userEvent.hover(await screen.findByRole("link", { name: "evelyn.berezin" }));
+    const card = within(
+      (await screen.findByText("Signs in with")).closest(
+        '[data-slot="hover-card-content"]',
+      ) as HTMLElement,
+    );
+    expect(card.getByText("Employees schema")).toBeInTheDocument();
+    expect(card.getByText("username")).toBeInTheDocument();
+    expect(card.getByText("None")).toBeInTheDocument();
+    expect(card.getByText("Field Ops, Platform (pending)")).toBeInTheDocument();
+    expect(card.getByText("Lifecycle owner").nextElementSibling).toHaveTextContent("Field Ops");
+    expect(card.getByText("Created").nextElementSibling).toHaveTextContent(
+      new Date("2026-02-01T09:00:00Z").toLocaleString(undefined, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }),
+    );
   });
 
   it("names the first unpinned attributes and counts the rest", async () => {
@@ -900,8 +965,14 @@ describe("users screen", () => {
     await renderUsers();
 
     const table = within(await screen.findByRole("table"));
-    expect(table.getByText("Team")).toBeInTheDocument();
+    // Memberships, not ownership (ADR 024), so the header says which.
+    expect(table.getByRole("columnheader", { name: "Member of" })).toBeInTheDocument();
     expect(bodies.at(-1)).toMatchObject({ expand: ["teams"] });
+    // A membership that is not active says so; an active one carries no tag.
+    const platform = table.getByRole("link", { name: "Platform" }).parentElement as HTMLElement;
+    expect(within(platform).getByText("pending")).toBeInTheDocument();
+    const acme = table.getByRole("link", { name: "Acme Web" }).parentElement as HTMLElement;
+    expect(within(acme).queryByText("active")).not.toBeInTheDocument();
 
     // Every membership the endpoint returns, `pending` included: it omits the
     // ones the user was removed from, so what arrives is the roster. Each is its
@@ -970,7 +1041,7 @@ describe("users screen", () => {
 
     const table = within(await screen.findByRole("table"));
     expect(table.getByText("email: maya@acme.com")).toBeInTheDocument();
-    expect(table.queryByText("Team")).not.toBeInTheDocument();
+    expect(table.queryByText("Member of")).not.toBeInTheDocument();
     // The retry drops the expansion rather than the request.
     expect(bodies).toHaveLength(2);
     expect(bodies.at(-1)).not.toHaveProperty("expand");

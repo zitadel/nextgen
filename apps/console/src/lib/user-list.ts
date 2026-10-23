@@ -201,6 +201,10 @@ export interface UserRow {
   values: Record<string, string>;
   /** `metadata.status`, absent on a record the server has not stamped. */
   status?: string;
+  /** `metadata.created_at`. */
+  createdAt?: string;
+  /** `metadata.lifecycle_owner_team_id`: `null` when self-owned, absent when unreported. */
+  lifecycleOwnerTeamId?: string | null;
   /** The teams the user belongs to, empty when the user is on none. */
   teams: UserTeam[];
   /** True when the user is on more teams than the embedded list carries. */
@@ -215,6 +219,7 @@ export function toUserRow(
   const id = field(user, "id") ?? `unknown-user-${index}`;
   const schemaId = field(user, "schema") ?? "";
   const attributes = userAttributes(user);
+  const metadata = userMetadata(user);
   const declared = groups.find((group) => group.schemaId === schemaId)?.fields ?? [];
   const keys = new Set(declared.map((entry) => entry.key).filter((key) => key in attributes));
   for (const key of Object.keys(attributes).sort()) keys.add(key);
@@ -237,7 +242,9 @@ export function toUserRow(
     identifier: userIdentifier(user),
     secondary: userIdentitySecondary(user),
     identifierProperty: field(user, "identifier_property"),
-    status: userMetadata(user).status,
+    status: metadata.status,
+    createdAt: metadata.createdAt,
+    lifecycleOwnerTeamId: metadata.lifecycleOwnerTeamId,
     teams: userTeams(user),
     teamsTruncated: user.teams_truncated === true,
   };
