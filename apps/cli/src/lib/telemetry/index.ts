@@ -123,9 +123,13 @@ export class Telemetry {
     } catch {
       return inert(identity.isFirstRun);
     }
-    const vercel = deps.vercelKeys?.length
-      ? { endpoint: resolveVercelEndpoint(deps.env), keys: deps.vercelKeys }
-      : undefined;
+    const vercelKeys = deps.vercelKeys?.length ? deps.vercelKeys : undefined;
+    const vercelEndpoint = vercelKeys && resolveVercelEndpoint(deps.env);
+    if (debug && vercelKeys && !vercelEndpoint) {
+      process.stderr.write("[telemetry] vercel: no copy on the development channel\n");
+    }
+    const vercel =
+      vercelKeys && vercelEndpoint ? { endpoint: vercelEndpoint, keys: vercelKeys } : undefined;
     return new Telemetry(
       client,
       identity.distinctId,

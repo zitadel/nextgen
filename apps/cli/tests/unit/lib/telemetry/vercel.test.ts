@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { Telemetry } from "../../../../src/lib/telemetry";
 import {
+  resolveVercelEndpoint,
   VERCEL_ENDPOINT,
   VERCEL_MAX_PROPERTIES,
   vercelEventBody,
@@ -50,20 +51,50 @@ describe("vercelEventBody", () => {
   });
 });
 
+describe("resolveVercelEndpoint", () => {
+  it("sends production runs to the cloud's intake", () => {
+    expect(resolveVercelEndpoint({})).toBe(VERCEL_ENDPOINT);
+    expect(resolveVercelEndpoint({ ZITADEL_TELEMETRY_ENV: "production" })).toBe(VERCEL_ENDPOINT);
+  });
+
+  it("sends no copy on the development channel, CI included", () => {
+    expect(resolveVercelEndpoint({ ZITADEL_TELEMETRY_ENV: "development" })).toBeUndefined();
+    expect(resolveVercelEndpoint({ CI: "true" })).toBeUndefined();
+    expect(resolveVercelEndpoint({ GITHUB_ACTIONS: "true" })).toBeUndefined();
+  });
+
+  it("lets an explicit production env win over the CI safeguard", () => {
+    expect(resolveVercelEndpoint({ CI: "true", ZITADEL_TELEMETRY_ENV: "production" })).toBe(
+      VERCEL_ENDPOINT,
+    );
+  });
+
+  it("lets ZITADEL_TELEMETRY_VERCEL_ENDPOINT name an intake for any run", () => {
+    const env = {
+      ZITADEL_TELEMETRY_ENV: "development",
+      ZITADEL_TELEMETRY_VERCEL_ENDPOINT: " https://intake.test/event ",
+    };
+    expect(resolveVercelEndpoint(env)).toBe("https://intake.test/event");
+  });
+});
+
 describe("Telemetry's Vercel copy", () => {
   const client = {
     track: (_event: string, _properties: unknown, callback?: Callback) => callback?.(undefined),
     people: { set: () => undefined, set_once: () => undefined },
   } as unknown as MixpanelClient;
 
-  function create(vercelKeys?: readonly string[], flag?: boolean) {
+  function create(
+    vercelKeys: readonly string[] | undefined,
+    { flag, env = {} }: { flag?: boolean; env?: NodeJS.ProcessEnv } = {},
+  ) {
     const posts: { url: string; body: string }[] = [];
     const fetchFn = (async (url: string, init?: RequestInit) => {
       posts.push({ url, body: String(init?.body) });
       return new Response("OK");
     }) as typeof fetch;
     const telemetry = Telemetry.create({
-      env: {},
+      env,
       flag,
       vercelKeys,
       initClient: () => client,
@@ -90,9 +121,19 @@ describe("Telemetry's Vercel copy", () => {
   });
 
   it("sends no copy when telemetry is off", async () => {
-    const { telemetry, posts } = create(["command"], false);
+    const { telemetry, posts } = create(["command"], { flag: false });
     telemetry.track("cli_command_started", { command: "doctor" });
     await telemetry.shutdown();
+    expect(posts).toHaveLength(0);
+  });
+
+  it("sends no copy on the development channel", async () => {
+    const { telemetry, posts } = create(["command"], {
+      env: { ZITADEL_TELEMETRY_ENV: "development" },
+    });
+    telemetry.track("cli_command_started", { command: "doctor" });
+    await telemetry.shutdown();
+    expect(telemetry.enabled).toBe(true);
     expect(posts).toHaveLength(0);
   });
 });

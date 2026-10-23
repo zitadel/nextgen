@@ -1,5 +1,7 @@
 import type { Properties } from "mixpanel";
 
+import { resolveChannel } from "./config";
+
 /**
  * Proof of concept: a copy of each event for Vercel Web Analytics, posted the
  * way `@vercel/analytics/server` posts a custom event. Names carry a `poc_`
@@ -23,9 +25,18 @@ export type VercelSink = {
   readonly keys: readonly string[];
 };
 
-/** `ZITADEL_TELEMETRY_VERCEL_ENDPOINT` overrides the cloud's intake. */
-export function resolveVercelEndpoint(env: NodeJS.ProcessEnv): string {
-  return env.ZITADEL_TELEMETRY_VERCEL_ENDPOINT?.trim() || VERCEL_ENDPOINT;
+/**
+ * Where the copy goes, or `undefined` for no copy. A run on the development
+ * channel, the one whose Mixpanel events go to the dev project (CI included),
+ * sends none: the cloud's intake has no dev counterpart.
+ * `ZITADEL_TELEMETRY_VERCEL_ENDPOINT` names an intake for any run.
+ */
+export function resolveVercelEndpoint(env: NodeJS.ProcessEnv): string | undefined {
+  const override = env.ZITADEL_TELEMETRY_VERCEL_ENDPOINT?.trim();
+  if (override) {
+    return override;
+  }
+  return resolveChannel(env) === "production" ? VERCEL_ENDPOINT : undefined;
 }
 
 /**
