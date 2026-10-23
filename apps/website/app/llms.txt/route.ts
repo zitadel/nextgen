@@ -26,7 +26,7 @@ ${[folderCommand, ...commands].join("\n")}
 
 ${files}
 
-To change the user model or the login flow, edit those files, then publish the change: \`${planCommand}\` shows what changes, \`${applyCommand}\` makes it live. To match a brand, set the login's \`--zl-*\` design tokens on \`zitadel-login\` in the app's own stylesheet.
+To change the user model or the login flow, edit those files, then publish the change: \`${planCommand}\` shows what changes, \`${applyCommand}\` makes it live. To match a brand, set the login's \`--zl-*\` design tokens on \`zitadel-login\` in the app's own stylesheet, and restyle its card, fields and buttons with \`::part()\`.
 
 Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 
@@ -44,7 +44,7 @@ Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 - [Flows and schemas](/docs/concepts/flows-and-schemas.md): how login flows, user schemas and the generated UI relate
 - [Edit the login flow and schema](/docs/guides/plan-apply.md): edit the local configuration and sync it
 - [Add social sign-in](/docs/guides/social-sign-in.md): "Sign in with Google" or any OpenID Connect provider, with \`zitadel auth-method sso enable\`
-- [Customize the login design](/docs/guides/customize-design.md): a starter design, your branding, published as a revision
+- [Customize the login design](/docs/guides/customize-design.md): the stable tokens and CSS parts, or a starter design with your branding, published as a revision
 - [Docs MCP server](/docs/api/mcp): the tools search, list_pages and get_page
 
 ## Optional
