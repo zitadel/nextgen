@@ -80561,6 +80561,50 @@ func NewUserSchemaSchemaDocument(v UserSchema) SchemaDocument {
 	return s
 }
 
+// Extra fields to add onto each returned schema (ADR 059).
+// - `in_use`: whether any user of the project is on this revision, as
+// `metadata.in_use`. A revision in use cannot be deleted, and the users on it
+// are found with `POST /users/query` filtering on `schema`. The property is
+// omitted entirely when not requested, so "did not ask" is distinguishable
+// from `false`.
+// Requires `user.read` in addition to `schema.read`. A Console session
+// carries no scopes; it may ask for `in_use` when it may read the whole
+// project, and is refused with `403` otherwise.
+// Ref: #
+type SchemaExpand string
+
+const (
+	SchemaExpandInUse SchemaExpand = "in_use"
+)
+
+// AllValues returns all SchemaExpand values.
+func (SchemaExpand) AllValues() []SchemaExpand {
+	return []SchemaExpand{
+		SchemaExpandInUse,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SchemaExpand) MarshalText() ([]byte, error) {
+	switch s {
+	case SchemaExpandInUse:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SchemaExpand) UnmarshalText(data []byte) error {
+	switch SchemaExpand(data) {
+	case SchemaExpandInUse:
+		*s = SchemaExpandInUse
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // SchemaHeaders wraps Schema with response headers.
 type SchemaHeaders struct {
 	CacheControl OptString
@@ -80593,6 +80637,9 @@ func (*SchemaHeaders) getMyUserSchemaRes() {}
 type SchemaMetadata struct {
 	// The time when the schema was created.
 	CreatedAt time.Time `json:"created_at"`
+	// Whether any user of the project is on this revision. Only set when
+	// `GET /schemas` is asked for it with `expand=in_use`; omitted otherwise.
+	InUse OptBool `json:"in_use"`
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -80600,9 +80647,19 @@ func (s *SchemaMetadata) GetCreatedAt() time.Time {
 	return s.CreatedAt
 }
 
+// GetInUse returns the value of InUse.
+func (s *SchemaMetadata) GetInUse() OptBool {
+	return s.InUse
+}
+
 // SetCreatedAt sets the value of CreatedAt.
 func (s *SchemaMetadata) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
+}
+
+// SetInUse sets the value of InUse.
+func (s *SchemaMetadata) SetInUse(val OptBool) {
+	s.InUse = val
 }
 
 type SchemaURI url.URL
@@ -89195,7 +89252,15 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // - `created_at`: RFC3339 timestamp
 // - `id`: user id
 // - `schema`: the schema the user's attributes satisfy, matched against the
-// value the user carries as `schema`
+// value the user carries as `schema`. Each revision of a schema has its own
+// URL, so `equals` selects the users on one revision and `not_equals` the
+// users on any other.
+// - `schema_object_type`: the `object_type` of the user's schema, which every
+// revision of that schema shares. It may be repeated, like any field: give
+// `not_equals` once per object type to exclude several. A schema without an
+// object type reads as `""`, so `not_equals` matches its users and `equals`
+// `""` selects them. Combine `equals` here with `schema` `not_equals` the
+// newest revision to find the users still on an older one.
 // - `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`
 // - `team_id`: restricts the result to users holding an **active** membership
 // in that team. A user who has been invited but has not accepted does not
@@ -89210,8 +89275,8 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // team may deprovision the user. A user can belong to many teams while owning
 // their own lifecycle, so the two disagree often and neither implies the other
 // (ADR 024).
-// `team_id` is filterable but not sortable — it is not a column on the user, so
-// it is absent from the sort-field enum.
+// `team_id` and `schema_object_type` are filterable but not sortable: neither
+// is a column on the user, so both are absent from the sort-field enum.
 // Filtering on `team_id` requires `team_membership.read` in addition to
 // `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
 // A Console session, which carries no scopes, may filter on it when it may read
@@ -89224,6 +89289,7 @@ const (
 	UserFilterFieldCreatedAt            UserFilterField = "created_at"
 	UserFilterFieldID                   UserFilterField = "id"
 	UserFilterFieldSchema               UserFilterField = "schema"
+	UserFilterFieldSchemaObjectType     UserFilterField = "schema_object_type"
 	UserFilterFieldStatus               UserFilterField = "status"
 	UserFilterFieldTeamID               UserFilterField = "team_id"
 	UserFilterFieldLifecycleOwnerTeamID UserFilterField = "lifecycle_owner_team_id"
@@ -89235,6 +89301,7 @@ func (UserFilterField) AllValues() []UserFilterField {
 		UserFilterFieldCreatedAt,
 		UserFilterFieldID,
 		UserFilterFieldSchema,
+		UserFilterFieldSchemaObjectType,
 		UserFilterFieldStatus,
 		UserFilterFieldTeamID,
 		UserFilterFieldLifecycleOwnerTeamID,
@@ -89249,6 +89316,8 @@ func (s UserFilterField) MarshalText() ([]byte, error) {
 	case UserFilterFieldID:
 		return []byte(s), nil
 	case UserFilterFieldSchema:
+		return []byte(s), nil
+	case UserFilterFieldSchemaObjectType:
 		return []byte(s), nil
 	case UserFilterFieldStatus:
 		return []byte(s), nil
@@ -89272,6 +89341,9 @@ func (s *UserFilterField) UnmarshalText(data []byte) error {
 		return nil
 	case UserFilterFieldSchema:
 		*s = UserFilterFieldSchema
+		return nil
+	case UserFilterFieldSchemaObjectType:
+		*s = UserFilterFieldSchemaObjectType
 		return nil
 	case UserFilterFieldStatus:
 		*s = UserFilterFieldStatus

@@ -129,6 +129,38 @@ func TestUserService_ListUsers_ValidationErrors(t *testing.T) {
 			wantErr: domain.ErrRequestInvalid(),
 		},
 		{
+			name: "schema_object_type cannot be sorted by",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Sorting:   &service.Sorting{Field: "schema_object_type", Direction: "asc"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "ordering operation on schema_object_type is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "schema_object_type", Operation: "less_than", Value: "consumer"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "non-string schema_object_type value is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "schema_object_type", Operation: "equals", Value: 42}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "not_contains on schema not implemented",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "schema", Operation: "not_contains", Value: "v1"}},
+			},
+			wantErr: domain.ErrNotImplemented(),
+		},
+		{
 			name: "contains on team_id is invalid",
 			input: service.ListUsersInput{
 				ProjectID: "proj_1",
@@ -239,6 +271,7 @@ func TestUserService_ListUsers_TranslatesQuery(t *testing.T) {
 				{Field: "created_at", Operation: "greater_than", Value: time.Now().UTC().Format(time.RFC3339)},
 				{Field: "id", Operation: "equals", Value: "usr_1"},
 				{Field: "schema", Operation: "contains", Value: "sch_"},
+				{Field: "schema_object_type", Operation: "equals", Value: "consumer"},
 				{Field: "status", Operation: "equals", Value: "active"},
 				{Field: "team_id", Operation: "equals", Value: "team_1"},
 				{Field: "lifecycle_owner_team_id", Operation: "equals", Value: "team_2"},
@@ -273,6 +306,37 @@ func TestUserService_ListUsers_TranslatesQuery(t *testing.T) {
 		assert.Equal(t, "team_1", *gotOpts.MembershipTeamID)
 		// Only the implicit project predicate is left on the row filter.
 		assert.NotNil(t, gotList.Filter)
+	})
+
+	t.Run("schema and object type filters compile to row filters", func(t *testing.T) {
+		t.Parallel()
+
+		svc, stmts := newMockedUserService(t)
+		var got *database.ListOptions[domain.UserField]
+		stmts.EXPECT().
+			ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.UserField], _ service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+				got = opts
+				return &database.ListResult[*domain.User]{}, nil
+			})
+
+		_, err := svc.ListUsers(t.Context(), service.ListUsersInput{
+			ProjectID: "proj_1",
+			Filters: []service.Filter{
+				{Field: "schema_object_type", Operation: "contains", Value: "consum"},
+				{Field: "schema_object_type", Operation: "not_equals", Value: "business"},
+				{Field: "schema", Operation: "not_equals", Value: "https://example.test/consumer-v2.json"},
+			},
+		})
+		require.NoError(t, err)
+
+		objectType := database.Col(domain.UserFieldSchemaObjectType)
+		assert.Equal(t, database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), "proj_1"),
+			database.StringContainsFold(objectType, "consum"),
+			database.Not[domain.UserField](database.StringEqual(objectType, "business")),
+			database.Not[domain.UserField](database.StringEqual(database.Col(domain.UserFieldSchemaURL), "https://example.test/consumer-v2.json")),
+		), got.Filter)
 	})
 
 	t.Run("no membership filter leaves the query option unset", func(t *testing.T) {

@@ -686,6 +686,32 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(typeof row?.metadata.created_at).toBe("string");
   });
 
+  test("GET /schemas adds metadata.in_use only when expanded", async () => {
+    const create = await fetch(`${BASE}/schemas?project_id=proj_schema_in_use`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        objectType: "conformance-in-use",
+        "x-auth-methods": { password: { enabled: true } },
+      }),
+    });
+    const { id } = (await create.json()) as { id: string };
+    const metadataOf = async (query: string) => {
+      const res = await fetch(`${BASE}/schemas?project_id=proj_schema_in_use${query}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        schemas: Array<{ id: string; metadata: Record<string, unknown> }>;
+      };
+      return body.schemas.find((entry) => entry.id === id)?.metadata;
+    };
+
+    expect(await metadataOf("")).not.toHaveProperty("in_use");
+    // The mock keeps no users, so an expanded revision is never in use.
+    expect(await metadataOf("&expand=in_use")).toMatchObject({ in_use: false });
+  });
+
   test("GET /schemas pages with limit and next_page_token", async () => {
     // The consumer suites replace this handler with local MSW handlers, so
     // the mock's own slicing, token emission and continuation are only

@@ -46,6 +46,22 @@ func (f OrFilter[F]) isFilter() {}
 
 var _ Filter[uint8] = OrFilter[uint8]{}
 
+type NotFilter[F ~uint8] struct {
+	Filter Filter[F]
+}
+
+func Not[F ~uint8](filter Filter[F]) NotFilter[F] {
+	return NotFilter[F]{Filter: filter}
+}
+
+func (f NotFilter[F]) Restricts(column Column[F]) bool {
+	return f.Filter.Restricts(column)
+}
+
+func (f NotFilter[F]) isFilter() {}
+
+var _ Filter[uint8] = NotFilter[uint8]{}
+
 type CompareOp uint8
 
 const (

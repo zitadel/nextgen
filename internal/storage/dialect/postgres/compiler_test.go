@@ -285,6 +285,20 @@ func TestCompileFilterNestedAndOr(t *testing.T) {
 	require.Len(t, args, 3)
 }
 
+func TestCompileNotFilter(t *testing.T) {
+	t.Parallel()
+
+	filter := database.And(
+		database.Equal(database.Col(domain.ProjectFieldID), "proj_1"),
+		database.Not[domain.ProjectField](database.StringEqual(database.Col(domain.ProjectFieldName), "n1")),
+	)
+
+	var c statementCompiler
+	compileFilter(&c, filter, projectSchema)
+	assert.Equal(t, "(id = $1 AND NOT (name = $2))", c.String())
+	assert.Equal(t, []any{"proj_1", "n1"}, c.args)
+}
+
 func TestCompileCompareFilterSingleColumn(t *testing.T) {
 	t.Parallel()
 
