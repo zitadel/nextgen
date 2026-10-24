@@ -7,11 +7,11 @@
 > ([runbook](../runbooks/cloud.md#layout)). The console ships with most of
 > those merges. What each test layer proves about a change, what each service
 > of a deployment is checked for, which checks hold back a merge, a production
-> deployment and a self-hosted release, what says production is still up
-> between deployments, and how a suite signs in on a deployment it did not
-> boot.
+> deployment and a self-hosted release, what the server's health endpoints
+> mean, and how a suite signs in on a deployment it did not boot.
 > **Related:** [ADR 002](002-multi-package-release-strategy.md),
 > [ADR 046](046-claim-lifecycle-v2.md),
+> [ADR 048](048-wide-events-internal-audit-primitive.md),
 > [ADR 053](053-cross-project-principals.md) §9,
 > [ADR 067](067-benchmark-harness-http-path-ownership.md),
 > [ADR 075](075-platform-operators.md),
@@ -46,24 +46,23 @@
 - **The login atoms** are gated in Storybook on render and on accessibility:
   axe, where any violation fails
   ([`preview.ts`](../../apps/storybook/.storybook/preview.ts),
-  `a11y: { test: "error" }`).
+  `a11y: { test: "error" }`). The gate runs in CI, not on the deployed
+  storybook.
 - **The health endpoints.** `/healthz`, `/livez` and `/readyz` answer `ok`
-  without touching the database ([`health.go`](../../internal/api/health.go)).
-  The CLI's `start`, `doctor` and `setup`, the test kit and the benchmark
-  harness wait on or probe `/healthz`; orchestrators look for all three at
-  the root (ADR 077).
+  without touching the database ([`health.go`](../../internal/api/health.go)),
+  and the spec lists their `fail` under `200`. The CLI's `start`, `doctor`
+  and `setup`, the test kit, the benchmark harness and the console's System
+  screen read `/healthz`; orchestrators look for all three at the root
+  (ADR 077).
 - **Between deployments** nothing runs against production, and nothing pages
-  anyone. The repository's scheduled workflows are the scaffold advisories
-  and the Spanner lane.
+  anyone.
 
 ### What is missing
 
 1. **Half of the deployment has no suite of its own.** The server is reached
-   only through the console's suite, which never opens the login UI at
-   `/ui/login/` or makes a call with a credential. The website and the
-   storybook have none: nothing loads `/`, `/changelog` or the favicons the
-   console, the login UI and the docs link, and nothing checks that the
-   storybook's service worker stays out of the other services' paths.
+   only through the console's suite, which makes no call with a credential.
+   The website and the storybook have none: nothing loads `/`, `/changelog`,
+   the favicons the other services link, or the storybook.
 2. **Nothing signed in runs against a deployment.** The lanes boot a local
    server. The cloud's stack, Vercel in front of PlanetScale Postgres, is
    reached only signed out.
@@ -73,10 +72,9 @@
    only once they are added as blocking Deployment Checks in the project's
    settings; until then a red status shows on a commit that is already
    serving.
-4. **Production can break between deployments and nobody hears of it.** The
-   changelog rebuilds from GitHub's API at most every fifteen minutes, the
-   database is PlanetScale's and telemetry goes on to Mixpanel's API: any of
-   them can fail with no deployment, and only a user notices.
+4. **No endpoint says whether the server works.** All three health endpoints
+   answer `ok` with the database down, so a check that reads one proves only
+   that the process started.
 5. **Accessibility and visual regressions in console screens pass every
    check.** No console screen runs axe, and nothing in the repository compares
    screenshots.
@@ -93,8 +91,6 @@
 - `deployment-checks.yml` runs on `deployment_status` with the file as it is
   on the deployed commit, and with the repository's secrets: a branch Vercel
   deploys can read every secret the suites hold.
-- The production domain is public. Any other URL of the project, a preview's
-  or a deployment's own, needs the bypass secret (runbook).
 - Test infrastructure gets its credentials from the kit's boot contract, never
   from a seed default, a server test mode or a database write (ADR 053 §9,
   Console ADR 0004 §2, the kit's
@@ -103,6 +99,8 @@
   one login opens every preview (runbook).
 - Merge-queue branches get no preview, so no deployment check can be required
   for a merge.
+- Released CLIs read `/healthz`: `start` waits on it, and `doctor` and
+  `setup` probe it.
 
 ## Decision
 
@@ -112,12 +110,11 @@
 | --- | --- |
 | Authorization semantics: who may do what | the Go suites ([authz testing](../design/api/authz-testing.md)) |
 | One console screen over the API's shapes: what it renders, its forms, its error states, where it navigates | the route specs, `apps/console/src/routes/**/*.spec.tsx` |
-| What only a real browser shows about one console screen: accessibility, layout | the console's browser specs (§7) |
+| What only a real browser shows about one console screen: accessibility, layout | the console's browser specs (§6) |
 | What the server decides about a console write: that it lands, that it persists, what it changes for another person | `e2e/console/src-real` without the platform project, `src-platform` with it |
 | The path a request takes to a self-hosted server: the embed base, the Go mux | `console-smoke`, `console-embedded` |
 | Onboarding across the CLI, an app and the console | `e2e/journey` |
 | A service of the cloud, on the artifact Vercel built: its paths and what they need behind them | that service's deployment suite (§2) |
-| Production between deployments | the scheduled run (§5) |
 
 - A suite asserts only what no row above it can prove. A journey asserts only
   effects that cross surfaces or people, never one screen's behaviour again.
@@ -135,12 +132,12 @@ status in `production-checks.yml`'s `SUITES`.
 
 | Service | Its suite pins |
 | --- | --- |
-| `server` | New: `/healthz`; the login UI at `/ui/login/` rendering and starting a sign-in; the not-found answer, a page for a browser and the envelope for a program, which moves here from the console's suite; on a preview, signed in through §4, a round trip with the project's secret. |
+| `server` | New: `/readyz`, which covers the database (§5); the not-found answer, a page for a browser and the envelope for a program, which moves here from the console's suite; on a preview, signed in through §4, a round trip with the project's secret. |
 | `console` | As today, and on a preview the admin journey, signed in (§4). |
 | `docs` | As today. |
 | `schemas` | As today. |
-| `website` | New: `/` and `/changelog` render, with the releases GitHub's API returns, and log no errors; `/llms.txt`; `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link. |
-| `storybook` | New: `/storybook/` renders a story, and its service worker is scoped to `/storybook/`, so after a visit the console's and the login UI's requests still reach the server. |
+| `website` | New: `/` and `/changelog` render, with the releases GitHub's API returns, and log no errors; `/llms.txt`; `/favicon.ico` and `/favicons/*`, which the other services link. |
+| `storybook` | New: it replies. `/storybook/` answers with its index; nothing more. Its mock service worker needs no check of its own: it loads from `/storybook/`, and the browser keeps a worker inside the path its script comes from. |
 
 - `/telemetry/mixpanel/*` belongs to no service; its check stays in the
   console's suite.
@@ -166,9 +163,8 @@ status in `production-checks.yml`'s `SUITES`.
 - A regression that reached the domains is answered with Instant Rollback,
   which expand/contract migrations keep safe (runbook).
 - **Reported, never required:** the preview's deployment checks and what they
-  run signed in (§4), and visual review (§8). A red one is read on the pull
-  request; none can hold the merge queue, which has no preview. The scheduled
-  run (§5) alerts instead.
+  run signed in (§4), and visual review (§7). A red one is read on the pull
+  request; none can hold the merge queue, which has no preview.
 
 ### 4. Signing in on a deployment
 
@@ -232,88 +228,35 @@ and the kit's `handle.platform` slot is where it would land.
 A now. Once C exists it may replace the sign-up and claim steps, but the
 journey through them stays worth running.
 
-### 5. Production between deployments
+### 5. Two probes: alive and ready
 
-The production part of every deployment suite (§2) runs again on a schedule
-against the production domain, which is public, so the run needs no secret to
-reach it. A red run is retried once, then alerts whoever is on call for the
-cloud. The proposed interval is ten minutes. How it runs is open.
+An orchestrator asks two questions apart: whether to restart a process, and
+whether to send it requests. One endpoint answers each, and `/healthz`, a
+third name for the first, goes at 1.0.0.
 
-#### A. A scheduled GitHub workflow (recommended to start)
+| Endpoint | Answers | Checks |
+| --- | --- | --- |
+| `/livez` | `200 ok` while the process serves HTTP | nothing behind it: a liveness probe that checked the database would restart every instance when the database blips |
+| `/readyz` | `200 ok` when the server can serve requests, `503 fail` when it cannot | that the database answers, within a short timeout |
+| `/healthz` | as today, with a `Deprecation` header, until 1.0.0 | what `/livez` checks, so released CLIs keep finding a server that is up |
 
-`check:cloud` against the production domain from a workflow on a `schedule`,
-posting to the on-call tool when it fails.
+- **The fix:** `/readyz` checks the database and answers `503 fail` when it
+  cannot reach it, `/livez` keeps checking nothing, and the spec documents
+  `fail` under `503` instead of `200`. The change ships with a
+  `@zitadel/server` changeset.
+- **The readers move to the meaning they want:** the CLI's `start`, `doctor`
+  and `setup`, the test kit's wait and the benchmark harness wait for
+  `/readyz`, so a wait covers the database too; the console's System screen
+  reads it; the README and the quick start name `/livez` and `/readyz`.
+- **`/healthz` stays until 1.0.0,** as ADR 077 keeps the old root paths, and
+  answers as `/livez` does: a released CLI that probes it keeps working, and a
+  liveness probe someone pointed at it never starts restarting instances.
+- **A probe stays cheap:** one round trip on the pool, bounded by its
+  timeout. Probes are skipped by the request events (ADR 048).
+- **On the cloud nothing probes the function.** `/readyz` there serves the
+  server's suite (§2), and whatever watches production later (§8).
 
-- It reuses the suites as they are, on hosted runners that cost a public
-  repository nothing.
-- GitHub starts scheduled runs late under load and may drop one, and five
-  minutes is its shortest interval.
-- The alert's webhook is one more repository secret, readable like the others
-  by any branch's workflow; one that can only open an alert is worth little
-  to anyone else.
-
-#### B. A synthetic monitoring service
-
-A service that runs Playwright checks on a schedule from several regions and
-routes the alerts itself; Checkly is the common one beside Vercel.
-
-- Steady intervals, several regions, and alert routing without a webhook of
-  ours.
-- Another vendor and bill, and the suites have to run in its runtime, outside
-  turbo and the repository's Playwright pin.
-
-#### C. An uptime pinger
-
-One URL, requested every minute or more often.
-
-- The cheapest, with the shortest interval.
-- Only as good as its URL: today's health endpoints answer `ok` with the
-  database down (§6).
-
-A now; B if GitHub's schedule proves too late or too noisy; C beside either,
-once §6 gives it a URL worth pinging. Alerts on the server function's errors,
-from its runtime logs through a log drain (runbook), see what users run into;
-the schedule sees what nobody happened to request. Neither replaces the other.
-
-### 6. A health endpoint that means "up"
-
-`/healthz`, `/livez` and `/readyz` answer `ok` from a process that cannot
-reach its database. That is right for liveness and wrong for anything that
-asks whether the service works. Which endpoint says that is open.
-
-#### A. `/readyz` checks the database
-
-A ping with a short timeout, and `fail` when it does not answer. `/healthz`
-and `/livez` stay as they are, so the CLI's, the kit's and the benchmarks'
-waits do not change.
-
-- The probe orchestrators already read starts to mean what its name says.
-- When the database blips, every instance leaves the load balancer at once,
-  so requests that need no database fail too; and every probe holds one of
-  an instance's pooled connections (four through PlanetScale's PgBouncer on
-  the cloud, runbook).
-
-#### B. A separate check for monitors (recommended)
-
-A new unauthenticated operation that checks the database and whatever else a
-request needs, for monitors and §5 C. The three probes stay as they are.
-
-- No orchestrator behaves differently, and a monitor gets a URL that means
-  the service works.
-- One more public operation that does work per request: it falls under the
-  edge's per-address limit (ADR 078 §2) and says nothing about the
-  deployment beyond up or down.
-
-#### C. Leave them
-
-Monitors make a request that needs the database, as the console's suite does
-with the login widget's first step.
-
-- Nothing to build.
-- Every monitor picks its own request, and none of them is the server's own
-  statement about itself.
-
-### 7. Accessibility
+### 6. Accessibility
 
 The bar is the login atoms': axe, where any violation fails. A violation the
 gate finds on a console screen that already ships is listed in one file the
@@ -348,14 +291,14 @@ test already opens.
 Ruled out: axe in jsdom, which has no layout, so contrast and visibility
 cannot be checked.
 
-### 8. Visual review
+### 7. Visual review
 
 Screenshots of console screens are compared with the base branch's on every
 pull request that touches the console, and reviewed there. They never fail a
 required check: an intended change moves them as surely as a regression does.
 The tool is open.
 
-#### A. Vitest screenshots over §7's fixtures (recommended, as a trial)
+#### A. Vitest screenshots over §6's fixtures (recommended, as a trial)
 
 `toMatchScreenshot` in the browser project, with the reference images in the
 repository.
@@ -374,21 +317,27 @@ Argos, Percy and Chromatic are the common ones.
 - A third party receives screenshots of test data, and its token is one more
   secret a branch's workflow can read.
 
-A once §7 exists, on a few screens; B if reviewing references in the
+A once §6 exists, on a few screens; B if reviewing references in the
 repository turns out to be the bottleneck.
 
-### 9. Out of scope
+### 8. Out of scope, and deferred
 
+- **Deferred: watching production between deployments.** Nothing runs
+  against production between deployments, and nothing pages anyone; the
+  changelog reads GitHub's API at runtime, the database is PlanetScale's and
+  telemetry goes on to Mixpanel's, so production can break without a
+  deployment. A later decision takes it up, starting from §2's suites and
+  §5's `/readyz`.
 - Signed-in checks, test accounts or writes on production.
 - Requiring any deployment check for a merge.
 - A journey per screen, or one screen's behaviour asserted again in a journey.
 - Where the console's client-side errors go: a privacy decision with an ADR of
   its own. The request IDs on error screens (ADR 076) already tie a report to
   the server's logs.
-- The login atoms' gates: Storybook, the demo lanes and the journey stay as
-  they are.
+- The login atoms' gates: Storybook's CI run, the demo lanes and the journey
+  stay as they are.
 - Load and performance, which the benchmark harness owns (ADR 067).
-- Monitoring a self-hosted deployment, which is its operator's; §6 only
+- Monitoring a self-hosted deployment, which is its operator's; §5 only
   decides what the server's endpoints say.
 - Canary and rolling releases: they limit how far a regression reaches, they
   do not find it.
@@ -397,14 +346,14 @@ repository turns out to be the bottleneck.
 
 1. Add the three existing `(Production)` statuses to the `cloud` project's
    Deployment Checks (§3): a setting, no code.
-2. The server, website and storybook suites (§2), each joining the production
+2. The probes (§5): `/readyz` checks the database, the repository's readers
+   move to it, and `/healthz` gets its `Deprecation` header.
+3. The server, website and storybook suites (§2), each joining the production
    checks as it lands.
-3. The scheduled run and its alert route (§5).
-4. The console's browser project, with axe and the exceptions file (§7).
+4. The console's browser project, with axe and the exceptions file (§6).
 5. Verify §4's first items, then build the kit's remote mode, the preview
    journey and the server suite's signed-in round trip.
-6. The screenshot trial (§8), and §6 once whoever runs self-hosted
-   deployments has weighed in.
+6. The screenshot trial (§7).
 
 ## Consequences
 
@@ -414,8 +363,9 @@ repository turns out to be the bottleneck.
   and nothing is proven twice.
 - Every service of a deployment is checked before the deployment takes the
   production domains, and a red one no longer takes them.
-- Someone hears of production breaking between deployments before a user
-  reports it.
+- A server that cannot reach its database says so: to the deployment suites,
+  to the CLI and the test kit as they wait, and to a self-hoster's
+  orchestrator.
 - The cloud's stack is checked signed in on every preview, with no new
   standing credential.
 - A console screen's accessibility regressions fail the way an atom's do.
@@ -423,18 +373,17 @@ repository turns out to be the bottleneck.
 ### Negative and risks
 
 - Production waits on six suites, so a flaky one delays a deployment; it is
-  run again from its run's page (runbook). The storybook, a workbench, can
-  hold back a fix to the server.
-- The scheduled run can page for GitHub's or the runner's trouble rather than
-  production's; the retry narrows that, it does not remove it. Each run's
-  sign-in first step reaches production as a visitor's would.
+  run again from its run's page (runbook). The storybook's only asks that it
+  replies, which a built static site rarely fails.
+- A self-hosted readiness probe on `/readyz` takes every instance out of its
+  load balancer while the database is down, the requests that need no
+  database with them. Nearly every request needs it anyway.
 - Preview databases collect a project and two users per run until preview
   cleanup is automated; today it is by hand (runbook).
 - The preview journey depends on anonymous creation, sign-up and claim staying
   open on previews. A change there turns it red on unrelated pull requests; it
   only reports, so that costs noise, not merges.
-- The bypass secret stays readable by every branch Vercel deploys, as today,
-  and the alert webhook joins it.
+- The bypass secret stays readable by every branch Vercel deploys, as today.
 - The browser project adds Chromium's start-up to the console's tests. axe may
   fail on markup the console takes from shadcn/ui and Radix; that goes in the
   exceptions file with an upstream issue.
@@ -445,8 +394,11 @@ repository turns out to be the bottleneck.
 
 1. Does `createProject` answer through Deployment Protection with the bypass
    header, and are sign-up and claim open on previews (§4 A)?
-2. Where do the cloud's alerts go, and who is on call for it (§5)?
-3. Is §6 B what self-hosted operators want, or do their orchestrators need A?
+2. Is the storybook part of the cloud for customers, curated to the login's
+   customization surface and linked from the docs, or a team tool that leaves
+   the production deployment? Its suite and its status follow the answer.
+3. Does `/readyz` also check that the schema is migrated as far as the binary
+   needs (§5)?
 4. Should the version PR run `console-embedded` against the binary the release
    publishes? Its console comes from `console:build-release`, not from the
    build every pull request tested.
@@ -458,8 +410,11 @@ repository turns out to be the bottleneck.
 
 - **One suite for the whole bundle.** A red check would not say which service
   broke, and a path would have two homes. Rejected: a suite per service (§2).
-- **Deployment checks alone, no schedule.** They run once per deployment, and
-  the bundle depends on services that change without one. Rejected (§5).
+- **One health endpoint that checks everything.** A liveness probe on it
+  would restart every instance whenever the database blips. Rejected: two
+  probes (§5).
+- **Removing `/healthz` now.** Released CLIs probe it. Rejected: it stays,
+  deprecated, until 1.0.0 (§5).
 - **A journey per admin task, across every screen.** It repeats the lanes'
   tests of each write, takes minutes, and fails without naming the screen.
   Rejected: one journey covers what crosses people (§1).
@@ -477,7 +432,6 @@ repository turns out to be the bottleneck.
   console write beside the runtime boundaries, and gains the rule that a new
   write lands with its test (§1).
 - The runbook's "Deployment checks" section lists every service's status as
-  part of the project's setup and describes the scheduled run (§3, §5); its
-  "Operating" section names the alert route.
+  part of the project's setup (§3).
 - `e2e/console/README.md` lists the preview journey, and
   `packages/testing/README.md` the remote mode, when they land (§4).
