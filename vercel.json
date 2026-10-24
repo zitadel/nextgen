@@ -5,7 +5,12 @@
       "root": ".",
       "framework": "go",
       "entrypoint": "apps/cloud/launcher/main.go",
-      "buildCommand": "sh apps/cloud/build.sh"
+      "buildCommand": "sh apps/cloud/build.sh",
+      "functions": {
+        "apps/cloud/launcher/main.go": {
+          "regions": ["fra1"]
+        }
+      }
     },
     "console": {
       "root": "apps/console",
@@ -189,7 +194,7 @@
       }
     }
   ],
-  "regions": ["fra1"],
+  "regions": ["iad1", "sfo1", "fra1", "sin1", "hnd1"],
   "git": {
     "deploymentEnabled": {
       "changeset-release/*": false,

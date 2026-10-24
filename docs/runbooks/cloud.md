@@ -10,9 +10,11 @@
 > **PlanetScale:** organization `zitadel`, Postgres databases `production`
 > and `preview`, both in AWS `eu-central-1`
 
-The hosted cloud is the current `main`, built by Vercel from the repository
-and run in Frankfurt (`fra1`) against PlanetScale Postgres in the same AWS
-region. **`main` is production:** every merge deploys. Every other branch
+The hosted cloud is the current `main`, built by Vercel from the repository.
+The server runs in Frankfurt (`fra1`) against PlanetScale Postgres in the
+same AWS region; the docs' and website's functions run in the five regions
+of `vercel.json`'s top-level `regions`, Pro's limit, and the static services
+from Vercel's CDN. **`main` is production:** every merge deploys. Every other branch
 gets a preview deployment with a database of its own, except the Changesets
 version PR's and the merge queue's (see [Deploying](#deploying)). Version
 tags and their npm packages remain the self-hosted artifact; this cloud does
@@ -565,8 +567,9 @@ project and imports the root admin.
   cloud provider, asynchronous, with a host of their own.
 - The server has no read/write split yet; reads in another region need one
   before a replica helps.
-- Vercel's Go preset ignores per-function regions. Pinning functions to a
-  second region needs the Build Output API, as tried in the research PR
-  [zitadel/nextgen#1518](https://github.com/zitadel/nextgen/pull/1518).
+- The server's region is its service's `functions` entry, keyed by its
+  `entrypoint` path; the Go preset ignores a key that does not match it
+  ([zitadel/nextgen#1871](https://github.com/zitadel/nextgen/pull/1871)).
+  `TestVercelJSONKeepsTheServerInFrankfurt` holds the two together.
 - Writes stay in Frankfurt. Nothing in this setup has to change to add a
   read path later.

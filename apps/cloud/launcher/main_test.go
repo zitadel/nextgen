@@ -310,6 +310,29 @@ func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
 	assert.Equal(t, []string{"/console/runtime.json → server", consolePath + "/(.*) → console"}, routes)
 }
 
+// The other services' functions run in the project-wide regions; the server
+// stays beside its database in Frankfurt. @vercel/go matches a functions key
+// against the entrypoint's path and silently ignores one that does not match.
+func TestVercelJSONKeepsTheServerInFrankfurt(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "vercel.json"))
+	require.NoError(t, err)
+	var config struct {
+		Services map[string]struct {
+			Entrypoint string `json:"entrypoint"`
+			Functions  map[string]struct {
+				Regions []string `json:"regions"`
+			} `json:"functions"`
+		} `json:"services"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &config))
+
+	server := config.Services["server"]
+	require.Len(t, server.Functions, 1)
+	function, ok := server.Functions[server.Entrypoint]
+	require.True(t, ok, "the server's functions key is its entrypoint, %q", server.Entrypoint)
+	assert.Equal(t, []string{"fra1"}, function.Regions, "the region of the PlanetScale databases")
+}
+
 // The console service builds into the server's embed directory in the same
 // checkout, so the function is compiled without it; a plain build would
 // carry the console whenever that service built first.
