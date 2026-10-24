@@ -4,7 +4,7 @@
 
 ## Thesis
 
-One surface: `api.zitadel.cloud/*`. Stripe-shaped, Vercel-shaped. No frontend/backend/platform product split. One bearer-token auth model. Self-hosted exposes the identical API shape as cloud — the SDK does not branch on deployment mode. No version segment in URLs; header-selected versioning (`Zitadel-Version`) is target design, not shipped ([`conventions.md`](conventions.md#direction-not-shipped)).
+One surface: the resource API under `/api/v1/` on the deployment's host, beside the login UI, the console and the protocol endpoints at the root (RECOMMENDED, [ADR 076](../../adrs/076-api-path-prefix.md); the shipped API is still at the root). Stripe-shaped, Vercel-shaped. No frontend/backend/platform product split. One bearer-token auth model. Self-hosted exposes the identical API shape as cloud — the SDK does not branch on deployment mode. Header-selected versioning (`Zitadel-Version`) for opt-in changes within a major is target design, not shipped ([`conventions.md`](conventions.md#direction-not-shipped)).
 
 Target properties:
 
@@ -26,7 +26,7 @@ Individual decisions are marked inline in each doc:
 
 1. [`hierarchy.md`](hierarchy.md) — three-layer model (Project / Team / User). Platform is a reserved project.
 2. [`credentials.md`](credentials.md) — bearer tokens (`sk_proj_` / `sk_team_`), origin-bound browser challenges, handoff tokens, api_keys as resources.
-3. [`url-architecture.md`](url-architecture.md) — flat-by-ID, resource-scope index, scope-bound DAL, slash verbs, no version segment.
+3. [`url-architecture.md`](url-architecture.md) — flat-by-ID, resource-scope index, scope-bound DAL, slash verbs.
 4. [`conventions.md`](conventions.md) — IDs, errors, pagination, idempotency A/B split, capabilities split, header-based versioning.
 5. [`authn-and-auth-flows.md`](authn-and-auth-flows.md) — auth_attempts state machine, OIDC adapter, SSR handoff.
 6. [`authz.md`](authz.md) — credential × scope × permission.
