@@ -115,6 +115,98 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		assert.Nil(t, got)
 	})
 
+	// A project that lists the deployment's own origin keeps its own rules
+	// there: the exemption only opens what the project would refuse.
+	t.Run("own origin a project lists serves what is deployed there", func(t *testing.T) {
+		resolver, statements, releases := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+			Origins: []domain.Origin{
+				{Pattern: ownOrigin, Kind: domain.OriginKindPrimary},
+			},
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).Return([]domain.OriginDeployment{{
+			Origin: ownOrigin, DeploymentID: "dep_1", ReleaseID: "rel_1", DeployedAt: time.Now(),
+		}}, nil)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), projectID, "dep_1").Return(&domain.Deployment{
+			ID: "dep_1", ProjectID: projectID, ReleaseID: "rel_1",
+		}, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, "rel_1").Return(&domain.Release{
+			ID: "rel_1", ProjectID: projectID,
+		}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
+		require.NoError(t, err)
+		require.NotNil(t, got.Release)
+		assert.Equal(t, "rel_1", got.Release.ID)
+		assert.Equal(t, ownOrigin, got.Target, "admitted by the project's pattern")
+	})
+
+	t.Run("own origin a project lists with no deployment is not deployed", func(t *testing.T) {
+		resolver, statements, _ := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+			Origins: []domain.Origin{
+				{Pattern: ownOrigin, Kind: domain.OriginKindPrimary},
+			},
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).
+			Return([]domain.OriginDeployment{}, nil)
+
+		_, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, domain.ErrReleaseNotDeployed(nil)))
+	})
+
+	t.Run("own origin under a live preview serves the preview", func(t *testing.T) {
+		resolver, statements, releases := newMockedRuntimeResolver(t)
+		pattern := "https://*.example.com"
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+			Origins: []domain.Origin{
+				{Pattern: origin, Kind: domain.OriginKindPrimary},
+				{Pattern: pattern, Kind: domain.OriginKindPreview},
+			},
+		}, nil)
+		statements.EXPECT().GetPreview(gomock.Any(), projectID, ownOrigin).Return(&domain.Preview{
+			ProjectID: projectID, Origin: ownOrigin, ExpiresAt: time.Now().Add(time.Hour),
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).Return([]domain.OriginDeployment{{
+			Origin: ownOrigin, DeploymentID: "dep_1", ReleaseID: "rel_1", DeployedAt: time.Now(),
+		}}, nil)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), projectID, "dep_1").Return(&domain.Deployment{
+			ID: "dep_1", ProjectID: projectID, ReleaseID: "rel_1",
+		}, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, "rel_1").Return(&domain.Release{
+			ID: "rel_1", ProjectID: projectID,
+		}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
+		require.NoError(t, err)
+		require.NotNil(t, got.Release)
+		assert.Equal(t, "rel_1", got.Release.ID)
+		assert.Equal(t, pattern, got.Target, "admitted by the project's live preview")
+	})
+
+	t.Run("own origin under a preview pattern with no live preview keeps pre-resolution path", func(t *testing.T) {
+		resolver, statements, _ := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+			Origins: []domain.Origin{
+				{Pattern: origin, Kind: domain.OriginKindPrimary},
+				{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+			},
+		}, nil)
+		statements.EXPECT().GetPreview(gomock.Any(), projectID, ownOrigin).
+			Return(nil, &database.NoRowFoundError{})
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).
+			Return([]domain.OriginDeployment{}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
 	t.Run("primary origin with no deployment is not deployed", func(t *testing.T) {
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
@@ -215,4 +307,21 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		require.Error(t, err)
 		assert.True(t, errors.Is(err, domain.ErrReleaseRevoked()))
 	})
+}
+
+// Gate is what the steps of an attempt answer to, not only its opening. The
+// deployment's own origin opens a flow (Resolve above) but passes no Gate of
+// a project that lists its origins.
+func TestRuntimeResolver_Gate(t *testing.T) {
+	resolver, _, _ := newMockedRuntimeResolver(t)
+	project := &domain.Project{
+		ID: "proj_1",
+		Origins: []domain.Origin{
+			{Pattern: "https://app.acme.com", Kind: domain.OriginKindPrimary},
+		},
+	}
+
+	_, err := resolver.Gate(t.Context(), project, ownOrigin)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)))
 }

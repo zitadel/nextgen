@@ -102,7 +102,7 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 	}
 	resolution := &RuntimeResolution{Project: project}
 
-	matched, err := r.Gate(ctx, project, origin)
+	matched, err := r.gateOpening(ctx, project, origin)
 	if err != nil {
 		return nil, err
 	}
@@ -176,12 +176,31 @@ type matchedOrigin struct {
 	open    bool
 }
 
+// gateOpening is Gate for the request that opens an attempt, which also
+// opens the deployment's own origin where the project's origins refuse it:
+// its console previews a project's login from there with the project's own
+// flow. A project that admits that origin itself keeps its own rules there,
+// deployments and previews included. Only the opening takes this exemption;
+// every later step answers to Gate alone, so that origin can show a project's
+// first step but never sign anyone in.
+func (r *RuntimeResolver) gateOpening(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
+	matched, err := r.Gate(ctx, project, origin)
+	if err == nil || r.ownOrigin == "" {
+		return matched, err
+	}
+	if !errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)) && !errors.Is(err, domain.ErrProjectPreviewNotLive(nil)) {
+		return nil, err
+	}
+	if normalized, normErr := domain.NormalizeOrigin(strings.TrimSpace(origin)); normErr == nil && normalized == r.ownOrigin {
+		return &matchedOrigin{origin: normalized, open: true}, nil
+	}
+	return nil, err
+}
+
 // Gate decides whether a request from origin may be served at all. An absent
 // origin is not a browser and passes with no match. An empty origin list
-// admits every origin. A loopback origin is always admitted, and so is the
-// deployment's own origin: its console previews a project's login from there
-// with the project's own flow. A preview pattern admits nothing by itself:
-// the preview row for the exact URL does.
+// admits every origin. A loopback origin is always admitted. A preview
+// pattern admits nothing by itself: the preview row for the exact URL does.
 func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	origin = strings.TrimSpace(origin)
 	if origin == "" {
@@ -192,7 +211,7 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 		return nil, domain.ErrProjectOriginNotAllowed(map[string]string{"origin": origin}).
 			WithMessage(origin + " is not an origin of this project")
 	}
-	if len(project.Origins) == 0 || domain.IsLoopbackOrigin(normalized) || normalized == r.ownOrigin {
+	if len(project.Origins) == 0 || domain.IsLoopbackOrigin(normalized) {
 		return &matchedOrigin{origin: normalized, open: true}, nil
 	}
 	entry, ok := domain.MatchOrigin(project.Origins, normalized)
