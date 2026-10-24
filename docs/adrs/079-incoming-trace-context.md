@@ -75,12 +75,17 @@ callers.
   in a deployment where the whole path is trusted. The setting already exists
   and costs a middleware to honor.
 - **Always continue, own ratio** is a one-line sampler change
-  (`WithRemoteParentSampled(fraction)`) and would take the cost risk away, but
-  it still lets any anonymous caller choose the trace ID and `tracestate` we
-  record, and it samples a continued trace independently of the caller's
-  decision, which can leave a caller's sampled trace with a hole where we
-  dropped our span. It is compatible with this decision and is the natural
-  follow-up if operators ask to continue traces from untrusted callers.
+  (`WithRemoteParentSampled(fraction)`), but it does not take the cost risk
+  away. It ignores the caller's sampled flag, yet `fraction` is a
+  `TraceIDRatioBased` sampler, which decides from the low 64 bits of the trace
+  ID, and a continued trace ID is the caller's: a caller that sends one below
+  the threshold gets every request sampled. Keeping callers from forcing
+  sampling needs a decision that does not depend on the trace ID they send, or
+  a trusted edge that replaces their context. The option also lets any
+  anonymous caller choose the trace ID and `tracestate` we record, and it
+  samples a continued trace independently of the caller's decision, which can
+  leave a caller's sampled trace with a hole where we dropped our span.
+  Continuing traces from untrusted callers needs one of those first.
 
 ## Consequences
 
