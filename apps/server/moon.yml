@@ -14,9 +14,12 @@ fileGroups:
     - "/api/**/*.yaml"
     - "/api/**/*.json"
     # Also compiled in through //go:embed or read by tests: the config defaults
-    # (incl. presets), the integration-test fixtures, the events catalog and
-    # the product analytics catalog.
+    # (incl. presets), the error page and the design tokens it inlines, the
+    # integration-test fixtures, the events catalog and the product analytics
+    # catalog.
     - "/packages/config/defaults/**/*"
+    - "/internal/errorpage/*"
+    - "/packages/design-tokens/src/generated/tokens.css"
     - "/internal/**/*.json"
     - "/docs/design/api/events-catalog.md"
     - "/docs/product-analytics-events.yaml"

@@ -330,12 +330,15 @@ func prepareServer(extra []string) ([]string, error) {
 	// how vercel.json routes, so a leftover variable must not move them. The
 	// login UI stays on because the console service reads
 	// /console/runtime.json, which the server only mounts while one of its
-	// UIs is enabled.
+	// UIs is enabled. The request ID is Vercel's, the one its dashboard shows
+	// for the request: Vercel sets x-vercel-id on every request and replaces
+	// the ID a client sends.
 	for key, value := range map[string]string{
-		"NEXTGEN_SERVER_ADDRESS":         ":" + port,
-		"NEXTGEN_SERVER_CONSOLE_ENABLED": "false",
-		"NEXTGEN_SERVER_CONSOLE_PATH":    consolePath,
-		"NEXTGEN_SERVER_LOGIN_ENABLED":   "true",
+		"NEXTGEN_SERVER_ADDRESS":           ":" + port,
+		"NEXTGEN_SERVER_CONSOLE_ENABLED":   "false",
+		"NEXTGEN_SERVER_CONSOLE_PATH":      consolePath,
+		"NEXTGEN_SERVER_LOGIN_ENABLED":     "true",
+		"NEXTGEN_SERVER_REQUEST_ID_HEADER": "x-vercel-id",
 	} {
 		if err := os.Setenv(key, value); err != nil {
 			return nil, err
