@@ -44,6 +44,7 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"NEXTGEN_SERVER_CONSOLE_ENABLED",
 		"NEXTGEN_SERVER_CONSOLE_PATH",
 		"NEXTGEN_SERVER_LOGIN_ENABLED",
+		"NEXTGEN_SERVER_LOGIN_PATH",
 		"NEXTGEN_SERVER_PUBLIC_BASE",
 		"PORT",
 		"VERCEL_BRANCH_URL",
@@ -255,6 +256,7 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_ENABLED", "true")
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_PATH", "/ui/console")
 	t.Setenv("NEXTGEN_SERVER_LOGIN_ENABLED", "false")
+	t.Setenv("NEXTGEN_SERVER_LOGIN_PATH", "/login")
 
 	_, err := prepareServer(nil)
 	require.NoError(t, err)
@@ -262,6 +264,7 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	assert.Equal(t, "false", os.Getenv("NEXTGEN_SERVER_CONSOLE_ENABLED"), "the console is a service of its own")
 	assert.Equal(t, "/console", os.Getenv("NEXTGEN_SERVER_CONSOLE_PATH"), "where vercel.json mounts the console")
 	assert.Equal(t, "true", os.Getenv("NEXTGEN_SERVER_LOGIN_ENABLED"), "keeps /console/runtime.json mounted")
+	assert.Equal(t, "/ui/login", os.Getenv("NEXTGEN_SERVER_LOGIN_PATH"), "where vercel.json routes the login")
 	assert.Equal(t, "true", os.Getenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"))
 	assert.Equal(t, "json", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))

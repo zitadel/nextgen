@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
 	"go.uber.org/mock/gomock"
@@ -715,4 +716,139 @@ func TestOgenErrorHandlerMalformedCredentialHeader(t *testing.T) {
 			})
 		}
 	}
+}
+
+// newRouterTestServer is newErrorHandlerTestServer with the answers to a path
+// or method no operation takes, as the server mounts them (ADR 076).
+func newRouterTestServer(t *testing.T, home *errorpage.Link) *api.Server {
+	t.Helper()
+	srv, err := api.NewServer(&Handler{}, NewSecurityHandler(nil),
+		api.WithErrorHandler(OgenErrorHandler),
+		api.WithNotFound(OgenNotFound(home)),
+		api.WithMethodNotAllowed(OgenMethodNotAllowed),
+	)
+	require.NoError(t, err)
+	return srv
+}
+
+// A path no operation matches answers a program with the envelope, so a client
+// can tell a path this server lacks from a server that is not a Zitadel API,
+// and a person with the error page.
+func TestOgenNotFound(t *testing.T) {
+	t.Parallel()
+	srv := newRouterTestServer(t, &errorpage.Link{Label: "Open the console", Href: "/ui/console/"})
+
+	for _, accept := range []string{"", "*/*", "application/json"} {
+		t.Run("accept "+accept, func(t *testing.T) {
+			t.Parallel()
+			req := httptest.NewRequest(http.MethodGet, "/no-such-path", nil)
+			if accept != "" {
+				req.Header.Set("Accept", accept)
+			}
+			rec := httptest.NewRecorder()
+			srv.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusNotFound, rec.Code)
+			require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+			require.Equal(t, "Accept", rec.Header().Get("Vary"))
+			require.JSONEq(t, `{"code":"req.not_found","message":"No API operation matches this path."}`, rec.Body.String())
+		})
+	}
+
+	t.Run("a browser navigation", func(t *testing.T) {
+		t.Parallel()
+		req := httptest.NewRequest(http.MethodGet, "/no-such-path", nil)
+		req.Header.Set("Accept", "text/html,application/xhtml+xml,*/*;q=0.8")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+		require.Equal(t, "text/html; charset=utf-8", rec.Header().Get("Content-Type"))
+		require.Equal(t, "Accept", rec.Header().Get("Vary"))
+		require.Contains(t, rec.Body.String(), `<h1 class="error-title">Page not found</h1>`)
+		require.Contains(t, rec.Body.String(), `href="/ui/console/"`)
+	})
+
+	t.Run("a form post", func(t *testing.T) {
+		t.Parallel()
+		req := httptest.NewRequest(http.MethodPost, "/no-such-path", nil)
+		req.Header.Set("Accept", "text/html")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+		require.JSONEq(t, `{"code":"req.not_found","message":"No API operation matches this path."}`, rec.Body.String())
+	})
+}
+
+// A path the API defines answers the envelope for a method its operations do
+// not take, with the methods they do, while a CORS preflight keeps ogen's 204.
+func TestOgenMethodNotAllowed(t *testing.T) {
+	t.Parallel()
+	srv := newRouterTestServer(t, nil)
+
+	t.Run("wrong method", func(t *testing.T) {
+		t.Parallel()
+		req := httptest.NewRequest(http.MethodDelete, "/healthz", nil)
+		// A path the API defines is an API URL, browser or not.
+		req.Header.Set("Accept", "text/html")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+		require.Equal(t, "GET", rec.Header().Get("Allow"))
+		require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+		require.JSONEq(t, `{"code":"req.method_not_allowed","message":"The operations at this path do not accept this method."}`, rec.Body.String())
+	})
+
+	t.Run("CORS preflight", func(t *testing.T) {
+		t.Parallel()
+		req := httptest.NewRequest(http.MethodOptions, "/healthz", nil)
+		req.Header.Set("Access-Control-Request-Method", "GET")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNoContent, rec.Code)
+		require.Equal(t, "GET", rec.Header().Get("Access-Control-Allow-Methods"))
+		require.Empty(t, rec.Header().Get("Allow"))
+		require.Empty(t, rec.Body.String())
+	})
+}
+
+// A parameter that will not decode is named in details, as a body field is,
+// so the req.invalid message never points at details that are not there.
+func TestOgenErrorHandlerNamesTheInvalidParameter(t *testing.T) {
+	t.Parallel()
+	mock := gomock.NewController(t)
+	tokenService := mocks.NewMockTokenService(mock)
+	tokenService.EXPECT().IntrospectToken(gomock.Any(), "credential").
+		Return(&domain.Token{Type: domain.TokenTypeProjectToken, ProjectID: "proj_1"}, nil)
+	srv := newErrorHandlerTestServer(t, tokenService)
+
+	req := httptest.NewRequest(http.MethodGet, "/users/123", nil)
+	req.Header.Set("Authorization", "Bearer credential")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.JSONEq(t,
+		`{"code":"req.invalid","message":"The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.","details":{"details":{"fields":["user_id"]}}}`,
+		rec.Body.String(),
+	)
+}
+
+func TestInvalidRequestFields(t *testing.T) {
+	t.Parallel()
+
+	param := &ogenerrors.DecodeParamsError{Err: &ogenerrors.DecodeParamError{
+		Name: "user_id", In: "path", Err: errors.New(`pattern "^user_" does not match "123"`),
+	}}
+	require.Equal(t, []string{"user_id"}, invalidRequestFields(param))
+
+	body := &ogenerrors.DecodeRequestError{Err: &validate.Error{Fields: []validate.FieldError{
+		{Name: "attributes", Error: &validate.Error{Fields: []validate.FieldError{{Name: "email", Error: errors.New("required")}}}},
+	}}}
+	require.Equal(t, []string{"attributes.email"}, invalidRequestFields(body))
+
+	require.Nil(t, invalidRequestFields(&ogenerrors.DecodeRequestError{Err: errors.New("unexpected end of JSON input")}))
 }

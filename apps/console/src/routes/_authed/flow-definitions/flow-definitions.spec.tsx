@@ -150,7 +150,10 @@ describe("login flows list", () => {
         ),
       );
       await renderAt("/flow-definitions");
-      expect(await screen.findByText("Request failed (500)")).toBeInTheDocument();
+      expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+      expect(screen.getByText("Error 500")).toBeInTheDocument();
+      expect(screen.getByText("boom")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
     } finally {
       errorSpy.mockRestore();
       warnSpy.mockRestore();

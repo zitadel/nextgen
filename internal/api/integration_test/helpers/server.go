@@ -85,6 +85,8 @@ func (h *Harness) EnsureGeneratedServer(t testing.TB) *generated.Server {
 			h.EnsureHandler(t),
 			h.EnsureSecurityHandler(t),
 			generated.WithErrorHandler(api.OgenErrorHandler),
+			generated.WithNotFound(api.OgenNotFound(nil)),
+			generated.WithMethodNotAllowed(api.OgenMethodNotAllowed),
 			generated.WithTracerProvider(api.NewOgenTracerProvider(otel.GetTracerProvider())),
 		)
 		require.NoError(t, err)

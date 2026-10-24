@@ -37,6 +37,7 @@ import (
 	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
@@ -458,7 +459,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
 		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
-		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider())...)
+		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider(), consoleLink(cfg.Server.ConsolePath))...)
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
 	}
@@ -810,8 +811,9 @@ func mustBindEnv(v *viper.Viper, key string) {
 // ----------------------------- HTTP --------------------------------------
 
 // apiServerOptions are the options of the ogen API server that buildHTTPMux
-// mounts, shared with the test of that chain.
-func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider) []oasapi.ServerOption {
+// mounts, shared with the test of that chain. home is the way on that the
+// error page of a path nothing answers offers a person (ADR 076).
+func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider, home *errorpage.Link) []oasapi.ServerOption {
 	return []oasapi.ServerOption{
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
@@ -820,7 +822,21 @@ func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.
 		oasapi.WithMeterProvider(meterProvider),
 		oasapi.WithTracerProvider(api.NewOgenTracerProvider(tracerProvider)),
 		oasapi.WithErrorHandler(api.OgenErrorHandler),
+		oasapi.WithNotFound(api.OgenNotFound(home)),
+		oasapi.WithMethodNotAllowed(api.OgenMethodNotAllowed),
 	}
+}
+
+// consoleLink is the console's start page as an error page's way on. The
+// path is where the console lives even when this server does not serve it:
+// the hosted cloud runs it as a service of its own, and the claim and
+// dashboard links the server hands out assume the same.
+func consoleLink(consolePath string) *errorpage.Link {
+	consolePath = strings.TrimSuffix(consolePath, "/")
+	if consolePath == "" {
+		return nil
+	}
+	return &errorpage.Link{Label: "Open the console", Href: consolePath + "/"}
 }
 
 func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {

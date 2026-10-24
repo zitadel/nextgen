@@ -431,11 +431,16 @@ Where it differs from a deployment:
 - `vercel dev` drops a redirect's query, so an old
   `/ui/console/claim?challenge_id=…` link arrives without its challenge; open
   `/console/claim?…` instead.
+- `vercel dev` drops a rewrite with a `has` condition, so a browser on a path
+  no service answers gets the server's error page, not the website's 404
+  ([ADR 076](../adrs/076-error-pages-and-unmatched-routes.md)); the website's
+  own port shows that page.
 - `CLOUD_URL=http://localhost:3000 pnpm check:cloud` runs the deployment
-  checks against it. Three fail by design: the redirect's query above; the
-  docs' assets, which `next dev` serves without the deployment's immutable
-  caching; and the schemas' headers, which `vercel dev` replaces with its own
-  (`application/json`, revalidated on every request).
+  checks against it. Four fail by design: the redirect's query and the
+  website's 404 above; the docs' assets, which `next dev` serves without the
+  deployment's immutable caching; and the schemas' headers, which
+  `vercel dev` replaces with its own (`application/json`, revalidated on every
+  request).
 - Services is a beta of the Vercel CLI, and `vercel dev` changes from one
   major to the next. The script drives a `vercel` on `PATH` of the major it
   pins and otherwise runs the pinned version through npx; its first lines say

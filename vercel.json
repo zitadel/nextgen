@@ -179,6 +179,37 @@
       }
     },
     {
+      "source": "/(auth_attempts|branding|deployments|events|flow|flow_definitions|grants|healthz|idps|livez|policies|projects|readyz|releases|schemas|sessions|teams|users|variables)(/.*)?",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
+      "source": "/ui/login(/.*)?",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
+      "source": "/(idp|__nextgen/idp)/(.*)",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*text/html.*"
+        }
+      ],
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
       "source": "/(.*)",
       "destination": {
         "service": "server"

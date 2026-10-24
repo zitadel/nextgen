@@ -61,6 +61,11 @@ const (
 	// server's /ui/console. The server derives the console's URLs (claim,
 	// dashboard) from it, so the three must agree; a test holds them together.
 	consolePath = "/console"
+
+	// loginPath is the hosted login the server serves, the self-hosted
+	// default kept. vercel.json routes it to the server by name, as it does
+	// the API's paths; a test holds the two together.
+	loginPath = "/ui/login"
 )
 
 // servingParams size the pgx pool of one function instance and keep pgx off
@@ -336,6 +341,7 @@ func prepareServer(extra []string) ([]string, error) {
 		"NEXTGEN_SERVER_CONSOLE_ENABLED": "false",
 		"NEXTGEN_SERVER_CONSOLE_PATH":    consolePath,
 		"NEXTGEN_SERVER_LOGIN_ENABLED":   "true",
+		"NEXTGEN_SERVER_LOGIN_PATH":      loginPath,
 	} {
 		if err := os.Setenv(key, value); err != nil {
 			return nil, err

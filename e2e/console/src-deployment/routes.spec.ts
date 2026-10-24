@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
  * console service at /console/, the server's runtime document under that
  * path, and the old /ui/console links sent on. A wrong rule shows here by
  * name, where the browser test (console.browser.spec.ts) only times out on a
- * blank page.
+ * blank page. Last, what answers a path no service serves.
  */
 
 test("the server answers /console/runtime.json, under the console's path", async ({ request }) => {
@@ -44,4 +44,22 @@ test("/console and the old /ui/console links redirect, query kept", async ({ req
     }
   }
   expect(wrong).toEqual([]);
+});
+
+// A browser gets the website's 404 and a program the server's envelope
+// (ADR 076). Only a deployment proves it: the rule that tells them apart is a
+// `has` condition, which `vercel dev` ignores.
+test("a path no service answers: a page for a browser, the envelope for a program", async ({
+  request,
+}) => {
+  const path = "/no-such-page-routes-spec";
+
+  const page = await request.get(path, { headers: { accept: "text/html" } });
+  expect(page.status()).toBe(404);
+  // The website's title, where the server's page would say "· Zitadel".
+  expect(await page.text()).toContain("<title>Page not found — Zitadel preview</title>");
+
+  const envelope = await request.get(path, { headers: { accept: "application/json" } });
+  expect(envelope.status()).toBe(404);
+  expect(await envelope.json()).toEqual({ code: "req.not_found", message: expect.any(String) });
 });
