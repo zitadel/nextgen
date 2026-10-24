@@ -1,16 +1,65 @@
-import { LitElement } from "lit";
+import { LitElement, type PropertyValues } from "lit";
 import { property } from "../internal/property.js";
 import type { ZitadelProject } from "@zitadel/api/config";
 
 import type { Branding } from "./branding.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
+import { stampExportparts } from "./exportparts.js";
 import { applyFontUrl } from "./font-loader.js";
 import type { ProjectAttrs } from "./resolve-api.js";
 import { ThemeController, type ThemeMode } from "./theme-controller.js";
 
 /**
  * Base for every orchestrator element: the project config `resolveApi` reads,
- * as an SDK handle or as declarative attributes.
+ * as an SDK handle or as declarative attributes, and the part forwarding that
+ * lets the embedding page style the atoms the element renders.
+ *
+ * The `@cssprop` names are the stable tokens
+ * (`docs/design/branding/tokens.md`, "What each branding key sets"): the
+ * variables a branding revision sets, which a host page can also set on any
+ * orchestrator and rely on across releases. `custom-elements-manifest.spec.ts`
+ * holds this list to what `buildBrandingStylesheet` emits.
+ *
+ * @cssprop --zl-primary
+ * @cssprop --zl-primary-foreground
+ * @cssprop --zl-background
+ * @cssprop --zl-card
+ * @cssprop --zl-popover
+ * @cssprop --zl-muted
+ * @cssprop --zl-secondary
+ * @cssprop --zl-accent
+ * @cssprop --zl-border
+ * @cssprop --zl-input
+ * @cssprop --zl-foreground
+ * @cssprop --zl-card-foreground
+ * @cssprop --zl-popover-foreground
+ * @cssprop --zl-secondary-foreground
+ * @cssprop --zl-accent-foreground
+ * @cssprop --zl-muted-foreground
+ * @cssprop --zl-link
+ * @cssprop --zl-success
+ * @cssprop --zl-warning
+ * @cssprop --zl-destructive
+ * @cssprop --zl-font-family-sans
+ * @cssprop --zl-font-family-heading
+ * @cssprop --zl-text-xs-size
+ * @cssprop --zl-text-xs-leading
+ * @cssprop --zl-text-sm-size
+ * @cssprop --zl-text-sm-leading
+ * @cssprop --zl-text-base-size
+ * @cssprop --zl-text-base-leading
+ * @cssprop --zl-text-lg-size
+ * @cssprop --zl-text-lg-leading
+ * @cssprop --zl-text-xl-size
+ * @cssprop --zl-text-xl-leading
+ * @cssprop --zl-radius-xs
+ * @cssprop --zl-radius-sm
+ * @cssprop --zl-radius-md
+ * @cssprop --zl-radius-lg
+ * @cssprop --zl-radius-xl
+ * @cssprop --zl-spacing-4
+ * @cssprop --zl-spacing-8
+ * @cssprop --zl-logo-scale
  */
 export class ZitadelConfigured extends LitElement {
   /**
@@ -56,6 +105,18 @@ export class ZitadelConfigured extends LitElement {
       url: this.url,
       publishableKey: this.publishableKey,
     };
+  }
+
+  /**
+   * Forwards the parts of every atom in the shadow root as `<atom>-<part>`,
+   * so `zitadel-session::part(card-card)` reaches its card as
+   * `zitadel-login::part(card-card)` reaches the login's. Here rather than in
+   * each element, so a new orchestrator forwards too. On every commit, since
+   * one can add atoms: a conditional branch, or `unsafeHTML` re-parsing a step.
+   */
+  protected override updated(changed: PropertyValues<this>): void {
+    super.updated(changed);
+    if (this.shadowRoot) stampExportparts(this.shadowRoot);
   }
 }
 

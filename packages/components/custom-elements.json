@@ -459,7 +459,12 @@
             "package": "lit"
           },
           "tagName": "zl-account",
-          "customElement": true
+          "customElement": true,
+          "cssParts": [
+            {
+              "name": "chip"
+            }
+          ]
         },
         {
           "kind": "variable",
@@ -581,7 +586,33 @@
             "package": "lit"
           },
           "tagName": "zl-alert",
-          "customElement": true
+          "customElement": true,
+          "cssParts": [
+            {
+              "name": "alert"
+            },
+            {
+              "name": "icon"
+            },
+            {
+              "name": "body"
+            },
+            {
+              "name": "title"
+            },
+            {
+              "name": "message"
+            },
+            {
+              "name": "detail"
+            },
+            {
+              "name": "link"
+            },
+            {
+              "name": "close"
+            }
+          ]
         },
         {
           "kind": "variable",
@@ -653,7 +684,12 @@
             "package": "lit"
           },
           "tagName": "zl-avatar",
-          "customElement": true
+          "customElement": true,
+          "cssParts": [
+            {
+              "name": "avatar"
+            }
+          ]
         },
         {
           "kind": "variable",
@@ -1051,7 +1087,15 @@
             "package": "lit"
           },
           "tagName": "zl-button",
-          "customElement": true
+          "customElement": true,
+          "cssParts": [
+            {
+              "name": "root"
+            },
+            {
+              "name": "spinner"
+            }
+          ]
         },
         {
           "kind": "variable",
@@ -1130,7 +1174,21 @@
             "package": "lit"
           },
           "tagName": "zl-card",
-          "customElement": true
+          "customElement": true,
+          "cssParts": [
+            {
+              "name": "card"
+            },
+            {
+              "name": "header"
+            },
+            {
+              "name": "body"
+            },
+            {
+              "name": "footer"
+            }
+          ]
         },
         {
           "kind": "variable",
@@ -1672,7 +1730,33 @@
             "module": "/src/internal/form-atom.js"
           },
           "tagName": "zl-checkbox",
-          "customElement": true
+          "customElement": true,
+          "cssParts": [
+            {
+              "name": "field"
+            },
+            {
+              "name": "root"
+            },
+            {
+              "name": "input"
+            },
+            {
+              "name": "box"
+            },
+            {
+              "name": "face"
+            },
+            {
+              "name": "check"
+            },
+            {
+              "name": "label"
+            },
+            {
+              "name": "error"
+            }
+          ]
         },
         {
           "kind": "variable",
@@ -2546,7 +2630,45 @@
             "module": "/src/internal/form-atom.js"
           },
           "tagName": "zl-field",
-          "customElement": true
+          "customElement": true,
+          "cssParts": [
+            {
+              "name": "root"
+            },
+            {
+              "name": "label"
+            },
+            {
+              "name": "label-row"
+            },
+            {
+              "name": "forgot-link"
+            },
+            {
+              "name": "input-wrap"
+            },
+            {
+              "name": "input"
+            },
+            {
+              "name": "trailing-icon"
+            },
+            {
+              "name": "trailing-action"
+            },
+            {
+              "name": "password-toggle"
+            },
+            {
+              "name": "help"
+            },
+            {
+              "name": "success"
+            },
+            {
+              "name": "error"
+            }
+          ]
         },
         {
           "kind": "variable",
@@ -2794,7 +2916,21 @@
             "package": "lit"
           },
           "tagName": "zl-page-shell",
-          "customElement": true
+          "customElement": true,
+          "cssParts": [
+            {
+              "name": "shell"
+            },
+            {
+              "name": "header"
+            },
+            {
+              "name": "main"
+            },
+            {
+              "name": "footer"
+            }
+          ]
         },
         {
           "kind": "variable",
@@ -3303,7 +3439,12 @@
             "package": "lit"
           },
           "tagName": "zl-pill",
-          "customElement": true
+          "customElement": true,
+          "cssParts": [
+            {
+              "name": "pill"
+            }
+          ]
         },
         {
           "kind": "variable",
@@ -3984,7 +4125,33 @@
             "module": "/src/internal/form-atom.js"
           },
           "tagName": "zl-select",
-          "customElement": true
+          "customElement": true,
+          "cssParts": [
+            {
+              "name": "root"
+            },
+            {
+              "name": "label"
+            },
+            {
+              "name": "field"
+            },
+            {
+              "name": "native"
+            },
+            {
+              "name": "trigger"
+            },
+            {
+              "name": "listbox"
+            },
+            {
+              "name": "option"
+            },
+            {
+              "name": "error"
+            }
+          ]
         },
         {
           "kind": "variable",
@@ -4169,7 +4336,24 @@
             "package": "lit"
           },
           "tagName": "zl-sso-providers",
-          "customElement": true
+          "customElement": true,
+          "cssParts": [
+            {
+              "name": "root"
+            },
+            {
+              "name": "divider"
+            },
+            {
+              "name": "list"
+            },
+            {
+              "name": "provider"
+            },
+            {
+              "name": "provider-button"
+            }
+          ]
         },
         {
           "kind": "variable",
@@ -7482,8 +7666,130 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "Base for every orchestrator element: the project config `resolveApi` reads,\nas an SDK handle or as declarative attributes.",
+          "description": "Base for every orchestrator element: the project config `resolveApi` reads,\nas an SDK handle or as declarative attributes, and the part forwarding that\nlets the embedding page style the atoms the element renders.\n\nThe `@cssprop` names are the stable tokens\n(`docs/design/branding/tokens.md`, \"What each branding key sets\"): the\nvariables a branding revision sets, which a host page can also set on any\norchestrator and rely on across releases. `custom-elements-manifest.spec.ts`\nholds this list to what `buildBrandingStylesheet` emits.",
           "name": "ZitadelConfigured",
+          "cssProperties": [
+            {
+              "name": "--zl-primary"
+            },
+            {
+              "name": "--zl-primary-foreground"
+            },
+            {
+              "name": "--zl-background"
+            },
+            {
+              "name": "--zl-card"
+            },
+            {
+              "name": "--zl-popover"
+            },
+            {
+              "name": "--zl-muted"
+            },
+            {
+              "name": "--zl-secondary"
+            },
+            {
+              "name": "--zl-accent"
+            },
+            {
+              "name": "--zl-border"
+            },
+            {
+              "name": "--zl-input"
+            },
+            {
+              "name": "--zl-foreground"
+            },
+            {
+              "name": "--zl-card-foreground"
+            },
+            {
+              "name": "--zl-popover-foreground"
+            },
+            {
+              "name": "--zl-secondary-foreground"
+            },
+            {
+              "name": "--zl-accent-foreground"
+            },
+            {
+              "name": "--zl-muted-foreground"
+            },
+            {
+              "name": "--zl-link"
+            },
+            {
+              "name": "--zl-success"
+            },
+            {
+              "name": "--zl-warning"
+            },
+            {
+              "name": "--zl-destructive"
+            },
+            {
+              "name": "--zl-font-family-sans"
+            },
+            {
+              "name": "--zl-font-family-heading"
+            },
+            {
+              "name": "--zl-text-xs-size"
+            },
+            {
+              "name": "--zl-text-xs-leading"
+            },
+            {
+              "name": "--zl-text-sm-size"
+            },
+            {
+              "name": "--zl-text-sm-leading"
+            },
+            {
+              "name": "--zl-text-base-size"
+            },
+            {
+              "name": "--zl-text-base-leading"
+            },
+            {
+              "name": "--zl-text-lg-size"
+            },
+            {
+              "name": "--zl-text-lg-leading"
+            },
+            {
+              "name": "--zl-text-xl-size"
+            },
+            {
+              "name": "--zl-text-xl-leading"
+            },
+            {
+              "name": "--zl-radius-xs"
+            },
+            {
+              "name": "--zl-radius-sm"
+            },
+            {
+              "name": "--zl-radius-md"
+            },
+            {
+              "name": "--zl-radius-lg"
+            },
+            {
+              "name": "--zl-radius-xl"
+            },
+            {
+              "name": "--zl-spacing-4"
+            },
+            {
+              "name": "--zl-spacing-8"
+            },
+            {
+              "name": "--zl-logo-scale"
+            }
+          ],
           "members": [
             {
               "kind": "field",
@@ -7842,7 +8148,289 @@
           "superclass": {
             "name": "ZitadelConfigured",
             "module": "src/orchestrator/surface.ts"
-          }
+          },
+          "cssProperties": [
+            {
+              "name": "--zl-primary",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-primary-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-background",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-card",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-popover",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-muted",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-secondary",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-accent",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-border",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-input",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-card-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-popover-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-secondary-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-accent-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-muted-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-link",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-success",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-warning",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-destructive",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-font-family-sans",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-font-family-heading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xs-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xs-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-sm-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-sm-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-base-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-base-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-lg-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-lg-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xl-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xl-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-xs",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-sm",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-md",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-lg",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-xl",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-spacing-4",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-spacing-8",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-logo-scale",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            }
+          ]
         }
       ],
       "exports": [
@@ -8091,6 +8679,240 @@
           "kind": "class",
           "description": "Orchestrator element `<zitadel-login>` — drives a login flow end to end and\nsurfaces its progress through the public `zitadel-*` events.",
           "name": "ZitadelLogin",
+          "cssParts": [
+            {
+              "description": "The form every step renders into.",
+              "name": "form"
+            },
+            {
+              "description": "The clipped, read-only copy of the step's identifier that a password manager pairs with the password.",
+              "name": "paired-identifier"
+            },
+            {
+              "description": "The attribution under the card.",
+              "name": "attribution"
+            },
+            {
+              "description": "The attribution's link: the Zitadel trustmark, or the branding's custom link.",
+              "name": "attribution-mark"
+            },
+            {
+              "description": "Forwarded `chip` part of `<zl-account>`.",
+              "name": "account-chip"
+            },
+            {
+              "description": "Forwarded `alert` part of `<zl-alert>`.",
+              "name": "alert-alert"
+            },
+            {
+              "description": "Forwarded `icon` part of `<zl-alert>`.",
+              "name": "alert-icon"
+            },
+            {
+              "description": "Forwarded `body` part of `<zl-alert>`.",
+              "name": "alert-body"
+            },
+            {
+              "description": "Forwarded `title` part of `<zl-alert>`.",
+              "name": "alert-title"
+            },
+            {
+              "description": "Forwarded `message` part of `<zl-alert>`.",
+              "name": "alert-message"
+            },
+            {
+              "description": "Forwarded `detail` part of `<zl-alert>`.",
+              "name": "alert-detail"
+            },
+            {
+              "description": "Forwarded `link` part of `<zl-alert>`.",
+              "name": "alert-link"
+            },
+            {
+              "description": "Forwarded `close` part of `<zl-alert>`.",
+              "name": "alert-close"
+            },
+            {
+              "description": "Forwarded `avatar` part of `<zl-avatar>`.",
+              "name": "avatar-avatar"
+            },
+            {
+              "description": "Forwarded `root` part of `<zl-button>`.",
+              "name": "button-root"
+            },
+            {
+              "description": "Forwarded `spinner` part of `<zl-button>`.",
+              "name": "button-spinner"
+            },
+            {
+              "description": "Forwarded `card` part of `<zl-card>`.",
+              "name": "card-card"
+            },
+            {
+              "description": "Forwarded `header` part of `<zl-card>`.",
+              "name": "card-header"
+            },
+            {
+              "description": "Forwarded `body` part of `<zl-card>`.",
+              "name": "card-body"
+            },
+            {
+              "description": "Forwarded `footer` part of `<zl-card>`.",
+              "name": "card-footer"
+            },
+            {
+              "description": "Forwarded `field` part of `<zl-checkbox>`.",
+              "name": "checkbox-field"
+            },
+            {
+              "description": "Forwarded `root` part of `<zl-checkbox>`.",
+              "name": "checkbox-root"
+            },
+            {
+              "description": "Forwarded `input` part of `<zl-checkbox>`.",
+              "name": "checkbox-input"
+            },
+            {
+              "description": "Forwarded `box` part of `<zl-checkbox>`.",
+              "name": "checkbox-box"
+            },
+            {
+              "description": "Forwarded `face` part of `<zl-checkbox>`.",
+              "name": "checkbox-face"
+            },
+            {
+              "description": "Forwarded `check` part of `<zl-checkbox>`.",
+              "name": "checkbox-check"
+            },
+            {
+              "description": "Forwarded `label` part of `<zl-checkbox>`.",
+              "name": "checkbox-label"
+            },
+            {
+              "description": "Forwarded `error` part of `<zl-checkbox>`.",
+              "name": "checkbox-error"
+            },
+            {
+              "description": "Forwarded `root` part of `<zl-field>`.",
+              "name": "field-root"
+            },
+            {
+              "description": "Forwarded `label` part of `<zl-field>`.",
+              "name": "field-label"
+            },
+            {
+              "description": "Forwarded `label-row` part of `<zl-field>`.",
+              "name": "field-label-row"
+            },
+            {
+              "description": "Forwarded `forgot-link` part of `<zl-field>`.",
+              "name": "field-forgot-link"
+            },
+            {
+              "description": "Forwarded `input-wrap` part of `<zl-field>`.",
+              "name": "field-input-wrap"
+            },
+            {
+              "description": "Forwarded `input` part of `<zl-field>`.",
+              "name": "field-input"
+            },
+            {
+              "description": "Forwarded `trailing-icon` part of `<zl-field>`.",
+              "name": "field-trailing-icon"
+            },
+            {
+              "description": "Forwarded `trailing-action` part of `<zl-field>`.",
+              "name": "field-trailing-action"
+            },
+            {
+              "description": "Forwarded `password-toggle` part of `<zl-field>`.",
+              "name": "field-password-toggle"
+            },
+            {
+              "description": "Forwarded `help` part of `<zl-field>`.",
+              "name": "field-help"
+            },
+            {
+              "description": "Forwarded `success` part of `<zl-field>`.",
+              "name": "field-success"
+            },
+            {
+              "description": "Forwarded `error` part of `<zl-field>`.",
+              "name": "field-error"
+            },
+            {
+              "description": "Forwarded `shell` part of `<zl-page-shell>`.",
+              "name": "page-shell-shell"
+            },
+            {
+              "description": "Forwarded `header` part of `<zl-page-shell>`.",
+              "name": "page-shell-header"
+            },
+            {
+              "description": "Forwarded `main` part of `<zl-page-shell>`.",
+              "name": "page-shell-main"
+            },
+            {
+              "description": "Forwarded `footer` part of `<zl-page-shell>`.",
+              "name": "page-shell-footer"
+            },
+            {
+              "description": "Forwarded `pill` part of `<zl-pill>`.",
+              "name": "pill-pill"
+            },
+            {
+              "description": "Forwarded `root` part of `<zl-select>`.",
+              "name": "select-root"
+            },
+            {
+              "description": "Forwarded `label` part of `<zl-select>`.",
+              "name": "select-label"
+            },
+            {
+              "description": "Forwarded `field` part of `<zl-select>`.",
+              "name": "select-field"
+            },
+            {
+              "description": "Forwarded `native` part of `<zl-select>`.",
+              "name": "select-native"
+            },
+            {
+              "description": "Forwarded `trigger` part of `<zl-select>`.",
+              "name": "select-trigger"
+            },
+            {
+              "description": "Forwarded `listbox` part of `<zl-select>`.",
+              "name": "select-listbox"
+            },
+            {
+              "description": "Forwarded `option` part of `<zl-select>`.",
+              "name": "select-option"
+            },
+            {
+              "description": "Forwarded `error` part of `<zl-select>`.",
+              "name": "select-error"
+            },
+            {
+              "description": "Forwarded `root` part of `<zl-sso-providers>`.",
+              "name": "sso-providers-root"
+            },
+            {
+              "description": "Forwarded `divider` part of `<zl-sso-providers>`.",
+              "name": "sso-providers-divider"
+            },
+            {
+              "description": "Forwarded `list` part of `<zl-sso-providers>`.",
+              "name": "sso-providers-list"
+            },
+            {
+              "description": "Forwarded `provider` part of `<zl-sso-providers>`.",
+              "name": "sso-providers-provider"
+            },
+            {
+              "description": "Forwarded `provider-button` part of `<zl-sso-providers>`.",
+              "name": "sso-providers-provider-button"
+            }
+          ],
           "members": [
             {
               "kind": "field",
@@ -9305,7 +10127,289 @@
             "module": "/src/orchestrator/surface.js"
           },
           "tagName": "zitadel-login",
-          "customElement": true
+          "customElement": true,
+          "cssProperties": [
+            {
+              "name": "--zl-primary",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-primary-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-background",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-card",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-popover",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-muted",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-secondary",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-accent",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-border",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-input",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-card-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-popover-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-secondary-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-accent-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-muted-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-link",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-success",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-warning",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-destructive",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-font-family-sans",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-font-family-heading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xs-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xs-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-sm-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-sm-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-base-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-base-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-lg-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-lg-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xl-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xl-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-xs",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-sm",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-md",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-lg",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-xl",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-spacing-4",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-spacing-8",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-logo-scale",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            }
+          ]
         },
         {
           "kind": "variable",
@@ -9684,7 +10788,289 @@
             "module": "/src/orchestrator/surface.js"
           },
           "tagName": "zitadel-logout",
-          "customElement": true
+          "customElement": true,
+          "cssProperties": [
+            {
+              "name": "--zl-primary",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-primary-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-background",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-card",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-popover",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-muted",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-secondary",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-accent",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-border",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-input",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-card-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-popover-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-secondary-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-accent-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-muted-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-link",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-success",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-warning",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-destructive",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-font-family-sans",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-font-family-heading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xs-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xs-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-sm-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-sm-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-base-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-base-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-lg-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-lg-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xl-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xl-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-xs",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-sm",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-md",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-lg",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-xl",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-spacing-4",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-spacing-8",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-logo-scale",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            }
+          ]
         }
       ],
       "exports": [
@@ -10067,7 +11453,331 @@
             "module": "/src/orchestrator/surface.js"
           },
           "tagName": "zitadel-session",
-          "customElement": true
+          "customElement": true,
+          "cssProperties": [
+            {
+              "name": "--zl-primary",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-primary-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-background",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-card",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-popover",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-muted",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-secondary",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-accent",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-border",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-input",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-card-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-popover-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-secondary-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-accent-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-muted-foreground",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-link",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-success",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-warning",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-destructive",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-font-family-sans",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-font-family-heading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xs-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xs-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-sm-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-sm-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-base-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-base-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-lg-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-lg-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xl-size",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-text-xl-leading",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-xs",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-sm",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-md",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-lg",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-radius-xl",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-spacing-4",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-spacing-8",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            },
+            {
+              "name": "--zl-logo-scale",
+              "inheritedFrom": {
+                "name": "ZitadelConfigured",
+                "module": "src/orchestrator/surface.ts"
+              }
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "Forwarded `root` part of `<zl-button>`.",
+              "name": "button-root"
+            },
+            {
+              "description": "Forwarded `spinner` part of `<zl-button>`.",
+              "name": "button-spinner"
+            },
+            {
+              "description": "Forwarded `card` part of `<zl-card>`.",
+              "name": "card-card"
+            },
+            {
+              "description": "Forwarded `header` part of `<zl-card>`.",
+              "name": "card-header"
+            },
+            {
+              "description": "Forwarded `body` part of `<zl-card>`.",
+              "name": "card-body"
+            },
+            {
+              "description": "Forwarded `footer` part of `<zl-card>`.",
+              "name": "card-footer"
+            },
+            {
+              "description": "Forwarded `shell` part of `<zl-page-shell>`.",
+              "name": "page-shell-shell"
+            },
+            {
+              "description": "Forwarded `header` part of `<zl-page-shell>`.",
+              "name": "page-shell-header"
+            },
+            {
+              "description": "Forwarded `main` part of `<zl-page-shell>`.",
+              "name": "page-shell-main"
+            },
+            {
+              "description": "Forwarded `footer` part of `<zl-page-shell>`.",
+              "name": "page-shell-footer"
+            }
+          ]
         }
       ],
       "exports": [

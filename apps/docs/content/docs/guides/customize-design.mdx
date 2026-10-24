@@ -7,7 +7,7 @@ The login component ships with a built-in template that follows your project wit
 
 ## Style the login from your app
 
-Two hooks reach inside the login's shadow DOM from your app's stylesheet. Both are stable across releases, and both win over the branding your project publishes, so the login matches your app without a branding revision.
+Two hooks reach inside the login's shadow DOM from your app's stylesheet. Both are stable across releases, and both win over the branding your project publishes, so the login matches your app without a branding revision. `@zitadel/components` also lists both in its `custom-elements.json`, as `cssProperties` and `cssParts`, for tools and coding agents that read the Custom Elements Manifest.
 
 ### Tokens
 
@@ -71,7 +71,7 @@ zitadel-login::part(button-root) {
 
 The login draws its own card, so give that card your frame through `card-card` rather than wrapping the element in a second box.
 
-`<zitadel-session>` and `<zitadel-logout>` take the same tokens but expose no parts: frame them from your own markup.
+`<zitadel-session>` takes the same tokens and forwards the same part names for the components it draws, `zl-page-shell`, `zl-card` and `zl-button`: `zitadel-session::part(card-card)` frames the signed-in card. `<zitadel-logout>` takes the same tokens but has no parts; to draw its menu yourself, give it a `<template>` child, as the [package README](https://github.com/zitadel/nextgen/tree/main/packages/components#zitadel-logout) describes.
 
 ## Starter designs
 

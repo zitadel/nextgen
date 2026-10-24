@@ -42,8 +42,12 @@ The Lit atoms (`<zl-*>`) and the orchestrators under `src/orchestrator/`
 - Atom CSS references `var(--zl-*)`; a Lit `css` template uses the `t` helper
   (`src/styles/tokens.ts`). New tokens belong in `@zitadel/design-tokens`.
 - A new attribute or part on an atom goes into its manifest
-  (`src/manifests.ts`): the sanitiser's allowlist and `exportparts` derive
-  from `manifestRegistry`, so an unlisted part is unreachable.
+  (`src/manifests.ts`): the sanitiser's allowlist, `exportparts` and the
+  published `cssParts` derive from `manifestRegistry`, so an unlisted part is
+  unreachable.
+- Run `pnpm cem` after changing an element, a manifest or the stable tokens
+  (the `@cssprop` list in `surface.ts`); `custom-elements-manifest.spec.ts`
+  fails while `custom-elements.json` is stale.
 - Never mutate `innerHTML`; only the orchestrator renders Liquid output, with
   `unsafeHTML` inside `render()`.
 - Coordinate before adding a `template` accessor to `<zitadel-login>`: it

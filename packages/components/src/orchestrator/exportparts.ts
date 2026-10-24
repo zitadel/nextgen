@@ -6,15 +6,16 @@
  * inside the orchestrator's shadow root — but not to the embedding page,
  * because `::part()` pierces a single boundary unless each host in the chain
  * re-exports (`exportparts`). Templates never author the forwarding (the
- * sanitiser strips `exportparts`); the orchestrator stamps it after every
- * render commit so the mapping stays canonical for template-rendered and
- * gate-patched atoms alike.
+ * sanitiser strips `exportparts`); every orchestrator stamps it after every
+ * render commit (`ZitadelConfigured.updated`) so the mapping stays canonical
+ * for template-rendered and gate-patched atoms alike.
  *
  * Exported names are mechanical, collision-free, and public contract
  * (override-ladder Tier 2, same stability rules as token names):
  * `<atom>-<part>` with the `zl-` prefix dropped — `zl-field`'s `input` part
  * becomes `zitadel-login::part(field-input)` on the host page. Manifests are
- * the canonical part catalogue; this module derives, never curates.
+ * the canonical part catalogue; this module derives, never curates, and so
+ * does the `cssParts` list in `custom-elements.json`.
  */
 import { manifestRegistry } from "../manifests.js";
 

@@ -244,7 +244,13 @@ Atom internals forward through the orchestrator as `<atom>-<part>` names —
 `zitadel-login::part(field-input)`, `zitadel-login::part(button-root)` — for
 every part an atom's manifest declares; bare names (`zl-field::part(input)`)
 apply when composing atoms directly without the orchestrator
-(`exportparts.browser.spec.ts` pins the forwarding).
+(`exportparts.browser.spec.ts` pins the forwarding). `<zitadel-session>`
+forwards its card, button and page shell the same way
+(`zitadel-session::part(card-card)`). `<zitadel-logout>` has no parts: for a
+menu of your own, give it a `<template>` child. `custom-elements.json` lists
+every element's parts as `cssParts`, and the `--zl-*` tokens a branding
+revision sets, which stay stable across releases, as `cssProperties` on each
+`zitadel-*` element.
 
 Automation can use the stable host and native shadow-root hooks that the default
 template emits. Host atoms expose hooks such as `zitadel-field-email`,

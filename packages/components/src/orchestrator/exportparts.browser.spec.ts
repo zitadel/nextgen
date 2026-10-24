@@ -5,12 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./zitadel-login.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
+import "./zitadel-session.js";
 import { exportpartsFor } from "./exportparts.js";
 
 /**
- * Real-browser checks for override-ladder Tier 2 through the orchestrator:
+ * Real-browser checks for override-ladder Tier 2 through the orchestrators:
  * a host page restyles atom internals with
- * `zitadel-login::part(<atom>-<part>)`. Atoms stamp `part="..."` inside
+ * `zitadel-login::part(<atom>-<part>)`, and the session card's with
+ * `zitadel-session::part(<atom>-<part>)`. Atoms stamp `part="..."` inside
  * their own shadow roots; the orchestrator forwards them across its
  * boundary by stamping manifest-derived `exportparts` after every render —
  * including atoms the mandatory-gates patcher appends after sanitisation,
@@ -149,5 +151,63 @@ describe("<zitadel-login> ::part() forwarding (chromium)", () => {
     for (const icon of element.shadowRoot?.querySelectorAll("zl-icon") ?? []) {
       expect(icon.hasAttribute("exportparts")).toBe(false);
     }
+  });
+});
+
+describe("<zitadel-session> ::part() forwarding (chromium)", () => {
+  let host: HTMLDivElement;
+  let hostStyles: HTMLStyleElement;
+
+  beforeEach(() => {
+    // No project: the card renders without its identity fetch, which the
+    // parts do not need.
+    _resetConfigForTesting();
+    // The frame a host page gives the session card to match its own layout.
+    hostStyles = document.createElement("style");
+    hostStyles.textContent = `
+      zitadel-session::part(card-card) {
+        border: 3px solid #0a0a0a;
+        box-shadow: 6px 6px 0 #0a0a0a;
+      }
+      zitadel-session::part(button-root) {
+        text-transform: uppercase;
+      }
+    `;
+    document.head.appendChild(hostStyles);
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+    hostStyles.remove();
+  });
+
+  async function mountedAtom(tag: "zl-card" | "zl-button"): Promise<HTMLElement> {
+    const element = document.createElement("zitadel-session");
+    host.appendChild(element);
+    await element.updateComplete;
+    const atom = element.shadowRoot?.querySelector(tag) as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    expect(atom.getAttribute("exportparts")).toBe(exportpartsFor(tag));
+    await atom.updateComplete;
+    return atom;
+  }
+
+  it("host-page ::part() restyles the card", async () => {
+    const card = await mountedAtom("zl-card");
+    const section = card.shadowRoot?.querySelector('[part="card"]') as HTMLElement;
+    expect(section).toBeTruthy();
+    const style = getComputedStyle(section);
+    expect(style.borderTopWidth).toBe("3px");
+    expect(style.boxShadow).toContain("6px 6px 0px");
+  });
+
+  it("host-page ::part() restyles the sign-out button", async () => {
+    const button = await mountedAtom("zl-button");
+    const root = button.shadowRoot?.querySelector('[part="root"]') as HTMLElement;
+    expect(root).toBeTruthy();
+    expect(getComputedStyle(root).textTransform).toBe("uppercase");
   });
 });

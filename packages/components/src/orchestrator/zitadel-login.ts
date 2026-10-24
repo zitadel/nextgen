@@ -31,7 +31,6 @@ import { validateBranding } from "./branding-validator.js";
 import { resolveLogoUrl } from "./branding.js";
 import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
-import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
@@ -170,6 +169,11 @@ function apiErrorCode(error: unknown): string {
  * @fires {CustomEvent<ZitadelFlowRedirectDetail>} zitadel-flow-redirect - The flow is navigating to an external target.
  * @fires {CustomEvent<ZitadelFlowCompleteDetail>} zitadel-flow-complete - The flow reached a terminal step.
  * @fires {CustomEvent<ZitadelFlowErrorDetail>} zitadel-flow-error - The flow failed; carries the error message.
+ *
+ * @csspart form - The form every step renders into.
+ * @csspart paired-identifier - The clipped, read-only copy of the step's identifier that a password manager pairs with the password.
+ * @csspart attribution - The attribution under the card.
+ * @csspart attribution-mark - The attribution's link: the Zitadel trustmark, or the branding's custom link.
  */
 @customElement("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
@@ -533,14 +537,14 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   override updated(changed: PropertyValues<this>): void {
-    // Re-stamp part forwarding and widget-mode chrome on every commit:
-    // `unsafeHTML` re-parses whenever the rendered string changes (step
-    // swap, loading toggle, error dismiss), replacing previously stamped
-    // nodes. The template's `zl-page-shell` sits in a different shadow
-    // scope, so the variant reaches it as a stamped attribute, not a
-    // `:host([variant])` selector.
+    // The base re-stamps part forwarding; widget-mode chrome is re-stamped
+    // here on every commit too: `unsafeHTML` re-parses whenever the rendered
+    // string changes (step swap, loading toggle, error dismiss), replacing
+    // previously stamped nodes. The template's `zl-page-shell` sits in a
+    // different shadow scope, so the variant reaches it as a stamped
+    // attribute, not a `:host([variant])` selector.
+    super.updated(changed);
     if (this.shadowRoot) {
-      stampExportparts(this.shadowRoot);
       // A configured-but-dead logo_url/hero_url is invisible everywhere else
       // in the pipeline; this is the only layer that can see the image fail.
       armAssetFallbacks(this.shadowRoot);
