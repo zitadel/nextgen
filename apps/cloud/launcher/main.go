@@ -106,10 +106,11 @@ var executeServer = func(args []string) error {
 	return cmd.Execute()
 }
 
-// runMigrate prepares and runs deploy-time migrations. On a preview, when goose
-// refuses because the sticky branch database still has an older version set
-// (missing out-of-order migrations after a renumber), drop the preview database
-// once, recreate it, and remigrate from empty. Production is never dropped.
+// runMigrate prepares and runs deploy-time migrations. On a preview, when the
+// sticky branch database cannot remigrate after a version renumber (goose
+// out-of-order, or ADD COLUMN colliding with columns left under the old
+// version number), drop the preview database once, recreate it, and remigrate
+// from empty. Production is never dropped.
 func runMigrate(extra []string) error {
 	args, err := prepareMigration(extra)
 	if err != nil {
@@ -117,7 +118,7 @@ func runMigrate(extra []string) error {
 	}
 	if err := executeServer(args); err == nil {
 		return nil
-	} else if os.Getenv("VERCEL_ENV") != "preview" || !isOutOfOrderMigration(err) {
+	} else if os.Getenv("VERCEL_ENV") != "preview" || !shouldRecreatePreviewOnMigrateError(err) {
 		return err
 	}
 
@@ -127,7 +128,7 @@ func runMigrate(extra []string) error {
 		return err
 	}
 	baseDSN := os.Getenv(migratorDatabaseURLVar)
-	fmt.Fprintf(os.Stderr, "launcher: preview migrate hit out-of-order migrations; recreating %s\n", name)
+	fmt.Fprintf(os.Stderr, "launcher: preview migrate hit a poisoned sticky schema; recreating %s\n", name)
 	if dropErr := dropDatabase(context.Background(), baseDSN, name); dropErr != nil {
 		return fmt.Errorf("%v (also failed to drop preview database: %w)", err, dropErr)
 	}
@@ -138,14 +139,17 @@ func runMigrate(extra []string) error {
 	return executeServer(args)
 }
 
-// isOutOfOrderMigration reports goose's refusal when filesystem migrations sit
-// below the database's max applied version but are not recorded as applied —
-// typical after a PR renumbers a migration on a sticky preview database.
-func isOutOfOrderMigration(err error) bool {
+// shouldRecreatePreviewOnMigrateError reports migrate failures that a fresh
+// empty preview database would clear after a migration renumber on the branch:
+// goose out-of-order versions, or Postgres duplicate_column (42701) when the
+// sticky DB still has columns from the migration under its previous number.
+func shouldRecreatePreviewOnMigrateError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(err.Error(), "missing (out-of-order) migration")
+	msg := err.Error()
+	return strings.Contains(msg, "missing (out-of-order) migration") ||
+		strings.Contains(msg, "SQLSTATE 42701")
 }
 
 // productionBranch is the branch production deploys from: main, unless
