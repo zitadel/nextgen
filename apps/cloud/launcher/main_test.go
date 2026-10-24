@@ -581,13 +581,15 @@ func TestPrepareMigrationCreatesAndMigratesAPreviewDatabase(t *testing.T) {
 	assert.Equal(t, defaultDataDir, os.Getenv("NEXTGEN_SERVER_DATA_DIR"))
 }
 
-func TestIsOutOfOrderMigration(t *testing.T) {
-	assert.False(t, isOutOfOrderMigration(nil))
-	assert.False(t, isOutOfOrderMigration(assert.AnError))
-	assert.True(t, isOutOfOrderMigration(fmt.Errorf(
+func TestShouldRecreatePreviewOnMigrateError(t *testing.T) {
+	assert.False(t, shouldRecreatePreviewOnMigrateError(nil))
+	assert.False(t, shouldRecreatePreviewOnMigrateError(assert.AnError))
+	assert.True(t, shouldRecreatePreviewOnMigrateError(fmt.Errorf(
 		"unknown database error: detected 2 missing (out-of-order) migrations lower than database version (37): versions 34,35")))
-	assert.True(t, isOutOfOrderMigration(fmt.Errorf(
+	assert.True(t, shouldRecreatePreviewOnMigrateError(fmt.Errorf(
 		"detected 1 missing (out-of-order) migration lower than database version (3): version 2")))
+	assert.True(t, shouldRecreatePreviewOnMigrateError(fmt.Errorf(
+		`launcher: unknown database error: ERROR: column "deployment_id" of relation "auth_attempts" already exists (SQLSTATE 42701)`)))
 }
 
 func TestRunMigrateRecreatesPreviewOnOutOfOrder(t *testing.T) {
@@ -621,6 +623,39 @@ func TestRunMigrateRecreatesPreviewOnOutOfOrder(t *testing.T) {
 	assert.Equal(t, 2, attempts)
 	assert.Equal(t, []string{previewName(t)}, dropped)
 	assert.Len(t, *ensureCalls, 2, "ensure runs before each migrate attempt")
+}
+
+func TestRunMigrateRecreatesPreviewOnDuplicateColumn(t *testing.T) {
+	ensureCalls := stubEnsureDatabase(t)
+	var dropped []string
+	previousDrop := dropDatabase
+	dropDatabase = func(_ context.Context, _, name string) error {
+		dropped = append(dropped, name)
+		return nil
+	}
+	t.Cleanup(func() { dropDatabase = previousDrop })
+
+	attempts := 0
+	previousExec := executeServer
+	executeServer = func([]string) error {
+		attempts++
+		if attempts == 1 {
+			return fmt.Errorf(`unknown database error: ERROR: column "deployment_id" of relation "auth_attempts" already exists (SQLSTATE 42701)`)
+		}
+		return nil
+	}
+	t.Cleanup(func() { executeServer = previousExec })
+
+	setLauncherEnv(t, "")
+	t.Setenv("VERCEL_ENV", "preview")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+
+	require.NoError(t, runMigrate(nil))
+	assert.Equal(t, 2, attempts)
+	assert.Equal(t, []string{previewName(t)}, dropped)
+	assert.Len(t, *ensureCalls, 2)
 }
 
 func TestRunMigrateDoesNotDropProductionOnOutOfOrder(t *testing.T) {

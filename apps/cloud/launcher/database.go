@@ -51,10 +51,11 @@ func gitRef() string {
 var notIdentifierChar = regexp.MustCompile(`[^a-z0-9_]+`)
 
 // previewSchemaEpoch is mixed into the preview database name hash. Bump it
-// when sticky preview databases cannot remigrate (goose out-of-order after a
-// migration renumber) so the next deploy gets a fresh empty database. The
-// orphaned name is left for later cleanup.
-const previewSchemaEpoch = "2"
+// when sticky preview databases cannot remigrate (goose out-of-order or a
+// renumber that left columns applied under a reused version) so the next
+// deploy gets a fresh empty database. The orphaned name is left for later
+// cleanup.
+const previewSchemaEpoch = "3"
 
 // previewDatabaseName is the database of a preview: one per Git branch, so a
 // branch keeps its data across pushes and from before its pull request
