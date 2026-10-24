@@ -16,7 +16,6 @@
  * state even when running in the same worker.
  */
 import {
-  getCreateFlowMockHandler,
   getExchangeHandoffMockHandler,
   getExchangeHandoffResponseMock,
   getGetFlowStepMockHandler,
@@ -376,11 +375,36 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
   }
 
   const handlers: RequestHandler[] = [
-    getCreateFlowMockHandler(async ({ request }) => {
+    // Hand-written rather than the generated wrapper so a bad redirect_uri is
+    // a 400, as the engine answers it; the generated one only ever answers 201.
+    http.post("*/flow", async ({ request }) => {
       const body = (await request.clone().json()) as CreateFlowBody;
       captured.push({ kind: "createFlow", body });
+      // redirect_uri is caller input a terminal `redirect` step sends the
+      // browser to, so the engine (`internal/api/flow.go`) parses it with the
+      // same hardened check as return_target before storing it. Unlike
+      // return_target it is not bound to the request origin: the RP
+      // redirect_uri allowlist is the host authority, still to come when OIDC
+      // lands. Running only `parseRedirectTarget`, with no origin check, keeps
+      // the mock in step with the engine.
+      if (body.redirect_uri !== undefined && body.redirect_uri !== null) {
+        try {
+          parseRedirectTarget(body.redirect_uri);
+        } catch (error) {
+          if (error instanceof RedirectTargetError) {
+            return HttpResponse.json(
+              {
+                code: "req.invalid",
+                message: `redirect_uri ${JSON.stringify(body.redirect_uri)} is ${error.message}`,
+              },
+              { status: 400 },
+            );
+          }
+          throw error;
+        }
+      }
       startFlow(body.purpose);
-      return currentResponse();
+      return HttpResponse.json(await currentResponse(), { status: 201 });
     }),
     // Hand-written rather than the generated wrapper: that one answers 200
     // with whatever it is given, and the refusal below is a 400.
