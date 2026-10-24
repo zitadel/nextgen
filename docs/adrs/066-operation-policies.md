@@ -268,7 +268,7 @@ operation, and no policy when the project published none, in which case the
 gate applies only the server's own length cap. A flow step where the user
 chooses a password shows and checks the same length bounds before the gate
 runs ([End to end](#end-to-end-a-user-enters-their-password-during-sign-up-via-flow-engine)). The newest stored
-revision is a stand-in: ADR 035 says an environment sees only what its active
+revision is a stand-in: ADR 035 says a deployment serves only what its
 release pins, so resolution moves to the release's pinned policy revision once
 release-pinned reads exist (scope table in
 [`docs/design/policies/`](../design/policies/README.md)). The

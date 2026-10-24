@@ -1,7 +1,13 @@
 # ADR 057: Login Customization Categories and Ownership
 
-> **Status:** Proposed
+> **Status:** Accepted — 2026-10-24 (originally Proposed 2026-08-28)
 > **Date:** 2026-08-28
+>
+> **Amendment (2026-10-24):** the first iteration is built: console branding
+> settings beside a live preview (#1247) and setup embedding the login while
+> the eject catalog keeps widget structure (#1297). Translations stay a
+> separate setting, tracked in
+> [#1038](https://github.com/zitadel/nextgen/issues/1038).
 > **Context:** Where each kind of login customization is authored, stored, and
 > applied across the three presentation models in
 > [#678](https://github.com/zitadel/nextgen/issues/678). First visual
