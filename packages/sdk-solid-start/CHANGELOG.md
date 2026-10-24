@@ -1,5 +1,13 @@
 # @zitadel/sdk-solid-start
 
+## 0.2.0
+
+### Patch Changes
+
+- Updated dependencies [[`53386a7`](https://github.com/zitadel/nextgen/commit/53386a7de897e2e0605495246231d42558b27e87), [`fedce7e`](https://github.com/zitadel/nextgen/commit/fedce7e399b15ebe9e1068e072f864f89ffb7bc8), [`db036a5`](https://github.com/zitadel/nextgen/commit/db036a50ad5ae80f7d7d5159ceaeecca4fb5992d), [`b8fb271`](https://github.com/zitadel/nextgen/commit/b8fb271bacc623010daedf8d2b019fba5b374171)]:
+  - @zitadel/api@0.2.0
+  - @zitadel/sdk-core@0.2.0
+
 ## 0.1.0
 
 ### Patch Changes

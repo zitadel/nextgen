@@ -1,5 +1,14 @@
 # @zitadel/testing
 
+## 0.2.0
+
+### Patch Changes
+
+- Updated dependencies [[`5d164ad`](https://github.com/zitadel/nextgen/commit/5d164adc0c0bc6d03b66583e41416c5677842905), [`6392fe2`](https://github.com/zitadel/nextgen/commit/6392fe2ce79e9d0c1534a832af3dc356e65b1765), [`f2660b2`](https://github.com/zitadel/nextgen/commit/f2660b2d0f5008bd11da45d85866cf5fb21d2e90), [`1a29816`](https://github.com/zitadel/nextgen/commit/1a298167a0ee56e8446e1862d0ad7b569c6d4105), [`0529137`](https://github.com/zitadel/nextgen/commit/05291373c78982cf31f8ee303101298db8ca1893), [`b4d0e4a`](https://github.com/zitadel/nextgen/commit/b4d0e4af5a1e6dc07acb7af3c0a9d45bc114d30d), [`53386a7`](https://github.com/zitadel/nextgen/commit/53386a7de897e2e0605495246231d42558b27e87), [`fedce7e`](https://github.com/zitadel/nextgen/commit/fedce7e399b15ebe9e1068e072f864f89ffb7bc8), [`db036a5`](https://github.com/zitadel/nextgen/commit/db036a50ad5ae80f7d7d5159ceaeecca4fb5992d), [`c0e9b41`](https://github.com/zitadel/nextgen/commit/c0e9b417cc1814294ef337b1f9e0713553a54bd5), [`ad626b9`](https://github.com/zitadel/nextgen/commit/ad626b94fc28df60d412b610e694d9dcd768a4b3), [`b8fb271`](https://github.com/zitadel/nextgen/commit/b8fb271bacc623010daedf8d2b019fba5b374171)]:
+  - @zitadel/cli@0.2.0
+  - @zitadel/config@0.2.0
+  - @zitadel/api@0.2.0
+
 ## 0.1.0
 
 ### Patch Changes

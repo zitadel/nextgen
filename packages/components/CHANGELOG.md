@@ -1,5 +1,18 @@
 # @zitadel/components
 
+## 0.2.0
+
+### Minor Changes
+
+- [#2231](https://github.com/zitadel/nextgen/pull/2231) [`c0e9b41`](https://github.com/zitadel/nextgen/commit/c0e9b417cc1814294ef337b1f9e0713553a54bd5) Thanks [@peintnermax](https://github.com/peintnermax)! - The password step of `<zitadel-login>` now shows the account it signs in to as a full-width chip with a generated avatar, and the whole chip takes the visitor back to use another account. The avatar is generated from the identifier the visitor typed, so it never confirms that an account exists, and sign-up steps show the chip without it, since no account exists yet. The SSO-conflict step shows the provider's email the same way, without the switch. The console's avatar is now generated from the same identifier, so a person sees one avatar in the login and the console. Custom templates get the chip as the new `<zl-account>` atom (`identifier`, optional `action`, `label` and `avatar`), and `<zl-avatar>` and the `@zitadel/components/avatar` entry export the avatar for your own pages.
+
+- [#2126](https://github.com/zitadel/nextgen/pull/2126) [`4bcb7c3`](https://github.com/zitadel/nextgen/commit/4bcb7c3a56d988929099e5c5431f705841963f92) Thanks [@livio-a](https://github.com/livio-a)! - Sign-up forms now follow the project's password policy. On a step where the user chooses a password, the password field carries the policy's `min_length` and `max_length` (the 64-character cap when the policy sets no maximum), and a password outside them is refused on that step. The field's fixed minimum of 8 is gone: a project without a password policy has no minimum. A sign-in step carries no length rule, so a password set before a stricter policy still signs in. The login shows the bound in its message, for example "Password must be at least 12 characters."
+
+### Patch Changes
+
+- Updated dependencies [[`b4d0e4a`](https://github.com/zitadel/nextgen/commit/b4d0e4af5a1e6dc07acb7af3c0a9d45bc114d30d), [`c0e9b41`](https://github.com/zitadel/nextgen/commit/c0e9b417cc1814294ef337b1f9e0713553a54bd5)]:
+  - @zitadel/config@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes

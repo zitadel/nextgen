@@ -1,5 +1,15 @@
 # @zitadel/sdk-tanstack-start
 
+## 0.2.0
+
+### Patch Changes
+
+- Updated dependencies [[`53386a7`](https://github.com/zitadel/nextgen/commit/53386a7de897e2e0605495246231d42558b27e87), [`fedce7e`](https://github.com/zitadel/nextgen/commit/fedce7e399b15ebe9e1068e072f864f89ffb7bc8), [`db036a5`](https://github.com/zitadel/nextgen/commit/db036a50ad5ae80f7d7d5159ceaeecca4fb5992d), [`c0e9b41`](https://github.com/zitadel/nextgen/commit/c0e9b417cc1814294ef337b1f9e0713553a54bd5), [`4bcb7c3`](https://github.com/zitadel/nextgen/commit/4bcb7c3a56d988929099e5c5431f705841963f92), [`b8fb271`](https://github.com/zitadel/nextgen/commit/b8fb271bacc623010daedf8d2b019fba5b374171)]:
+  - @zitadel/api@0.2.0
+  - @zitadel/components@0.2.0
+  - @zitadel/sdk-core@0.2.0
+  - @zitadel/sdk-react@0.2.0
+
 ## 0.1.0
 
 ### Patch Changes
