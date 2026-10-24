@@ -14,6 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/serviceping"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -34,6 +35,9 @@ type Config struct {
 	HTTPClient httputil.ClientConfig `mapstructure:"httpclient"`
 	// Origins configures write validation for project origin patterns.
 	Origins OriginsConfig `mapstructure:"origins"`
+	// ServicePing reports the deployment's version and dialect to Vercel
+	// Web Analytics and Mixpanel (proof of concept, off by default).
+	ServicePing serviceping.Config `mapstructure:"service_ping"`
 }
 
 // OriginsConfig is the instance-level origins policy. SharedHosts maps a shared

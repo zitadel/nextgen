@@ -68,6 +68,9 @@ func TestVercelJSONSendsAPathNothingServesByWhoAsks(t *testing.T) {
 		{"/", browser, "website"},
 		{"/console/runtime.json", program, "server"},
 		{"/schemas/v1/user-schema.json", program, "schemas"},
+		// Proxied to another host before any rule here looks at Accept.
+		{"/telemetry/mixpanel/track", browser, "https://api-eu.mixpanel.com/:path"},
+		{"/telemetry/mixpanel/track", program, "https://api-eu.mixpanel.com/:path"},
 	} {
 		assert.Equal(t, tt.want, route(t, rewrites, tt.path, tt.accept), "%s (Accept %s)", tt.path, tt.accept)
 	}
@@ -94,7 +97,8 @@ func readRewrites(t *testing.T) []vercelRewrite {
 	return config.Rewrites
 }
 
-// route is the service the first matching rewrite names, as Vercel picks it.
+// route is the service the first matching rewrite names, as Vercel picks it,
+// or the URL of one that proxies to another host.
 func route(t *testing.T, rewrites []vercelRewrite, path, accept string) string {
 	t.Helper()
 	header := http.Header{"Accept": {accept}}
@@ -111,6 +115,10 @@ func route(t *testing.T, rewrites []vercelRewrite, path, accept string) string {
 		if !matched {
 			continue
 		}
+		var url string
+		if json.Unmarshal(rewrite.Destination, &url) == nil {
+			return url
+		}
 		var destination struct{ Service string }
 		require.NoError(t, json.Unmarshal(rewrite.Destination, &destination), rewrite.Source)
 		return destination.Service
@@ -118,29 +126,45 @@ func route(t *testing.T, rewrites []vercelRewrite, path, accept string) string {
 	return "(no rewrite)"
 }
 
+// paramName is a path-to-regexp parameter's name, after its colon.
+var paramName = regexp.MustCompile(`^[A-Za-z0-9_]+`)
+
 // sourcePattern reads a rewrite's source the way path-to-regexp does for the
 // forms vercel.json uses: literal text, groups that are regular expressions,
-// and a group's `?`, `*` or `+` modifier. A named parameter would need more,
-// so it fails the test.
+// named parameters (`:path`, or `:path(.*)` with a pattern of its own), and
+// the `?`, `*` or `+` modifier after a group or a parameter.
 func sourcePattern(t *testing.T, source string) *regexp.Regexp {
 	t.Helper()
-	require.NotContains(t, source, ":", "named parameters are not modelled here: %s", source)
 	var pattern strings.Builder
 	depth := 0
-	var previous rune
-	for _, r := range source {
+	afterToken := false
+	for i := 0; i < len(source); i++ {
+		c := source[i]
 		switch {
-		case r == '(':
+		case depth == 0 && c == ':':
+			name := paramName.FindString(source[i+1:])
+			require.NotEmpty(t, name, "a parameter without a name: %s", source)
+			i += len(name)
+			// A parameter without a pattern of its own matches one segment.
+			if i+1 >= len(source) || source[i+1] != '(' {
+				pattern.WriteString(`([^/]+)`)
+				afterToken = true
+			}
+			continue
+		case c == '(':
 			depth++
-		case r == ')':
+		case c == ')':
 			depth--
-		case depth == 0 && !(previous == ')' && strings.ContainsRune("?*+", r)):
-			pattern.WriteString(regexp.QuoteMeta(string(r)))
-			previous = r
+			pattern.WriteByte(c)
+			afterToken = depth == 0
+			continue
+		case depth == 0 && afterToken && strings.IndexByte("?*+", c) >= 0:
+		case depth == 0:
+			pattern.WriteString(regexp.QuoteMeta(string(c)))
+			afterToken = false
 			continue
 		}
-		pattern.WriteRune(r)
-		previous = r
+		pattern.WriteByte(c)
 	}
 	return regexp.MustCompile("^" + pattern.String() + "$")
 }

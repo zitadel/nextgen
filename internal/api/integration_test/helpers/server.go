@@ -94,6 +94,11 @@ func (h *Harness) EnsureGeneratedServer(t testing.TB) *generated.Server {
 	return h.generatedServer.value
 }
 
+// ConsoleOrigin is the test server's own origin, the one its
+// server.public_base would name: claim URLs point at its console, and the flow
+// gate admits it to open any project's flow.
+const ConsoleOrigin = "https://console.invalid"
+
 func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 	t.Helper()
 	h.handler.mutex.Lock()
@@ -123,12 +128,12 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			h.EnsureEventService(t),
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),
-			service.NewClaimService(db, "https://console.invalid/ui/console", platform.ID),
+			service.NewClaimService(db, ConsoleOrigin+"/ui/console", platform.ID),
 			service.NewGrantService(db, service.StatementsUserRefResolver{Pool: db}, platform.ID),
 			service.NewVariableService(db, h.EnsureKeyService(t)),
 			db,
 			platform.ID,
-		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, "")).WithPolicyService(h.EnsurePolicyService(t))
+		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t))
 	}
 	return h.handler.value
 }

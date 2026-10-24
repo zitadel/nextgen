@@ -24,11 +24,11 @@ One Vercel deployment, six [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then migrates | every path except the console's, the storybook's, the docs' and the website's, including `/console/runtime.json` and the login UI at `/ui/login/` |
+| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then migrates | by name: the API's paths, the login UI at `/ui/login/`, the sign-in provider callbacks and `/console/runtime.json`; then every other request that is not a browser navigation, answering a path nothing serves with the API's `req.not_found` ([ADR 076](../adrs/076-error-pages-and-unmatched-routes.md)) |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `storybook` | Storybook; `turbo run build` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
-| `website` | Next.js; `turbo run build --filter=@zitadel/components`, for the atoms its showcase renders, then `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there), and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
+| `website` | Next.js; `turbo run build --filter=@zitadel/components`, for the atoms its showcase renders, then `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there), and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link; and the host's 404, for a browser navigation to any path no service serves |
 | `schemas` | Static files: Node runs [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs), which needs no install, into `dist/cloud-schemas`. The service is rooted at `apps/cloud`, which holds no `package.json`, so Vercel detects no framework | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
 
 The console lives on the same origin, at `/console/` rather than a
@@ -41,6 +41,11 @@ same checkout, so `build.sh` compiles the launcher with `-tags noconsole`.
 The server's `/console/runtime.json` lies under the console's path, so its
 rewrite comes first in `vercel.json`, and a launcher test holds the mount,
 the build's base and the console path together.
+
+`/telemetry/mixpanel/*` belongs to no service: a rewrite forwards it to
+Mixpanel's EU API, `api-eu.mixpanel.com`. The CLI's usage analytics and
+the server's service ping go there, so released CLIs and servers depend on
+the path: keep it, ahead of the server's catch-all.
 
 The storybook, the login surface's component workbench, is deployed only
 here. Its orchestrator stories mock the API in the browser with a service
@@ -281,7 +286,7 @@ service's contract suite against the deployment, today the docs'
 schemas' ([`e2e/schemas/`](../../e2e/schemas/)), as the turbo tasks
 `pnpm check:cloud` runs [by hand](#checking-a-deployment-by-hand). The console's
 signs nobody in: it checks how `vercel.json` routes the console's paths and
-that the signed-out console comes up, down to the login widget's first step,
+the Mixpanel proxy, and that the signed-out console comes up, down to the login widget's first step,
 which needs the server and its database behind it. The schemas' fetches every
 built-in from `/schemas/v1/` and compares it with the deployed commit's own
 rendering, checks the headers `vercel.json` gives them, and that `/schemas`

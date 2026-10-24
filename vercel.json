@@ -131,6 +131,10 @@
       }
     },
     {
+      "source": "/telemetry/mixpanel/:path(.*)",
+      "destination": "https://api-eu.mixpanel.com/:path"
+    },
+    {
       "source": "/docs",
       "destination": {
         "service": "docs"

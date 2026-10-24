@@ -38,9 +38,14 @@
 
 ## Telemetry
 
-Anonymous product analytics through Mixpanel's Node SDK (`mixpanel`).
+Anonymous product analytics through Mixpanel's Node SDK (`mixpanel`), plus a
+copy of each event to Vercel Web Analytics (`src/lib/telemetry/vercel.ts`).
 
 - Add no other analytics tool or SDK, browser SDK included.
+- The Vercel copy sends only `VERCEL_EVENT_KEYS` (`src/lib/oclif/command-telemetry.ts`),
+  the catalog's `vercel` list (`catalog.test.ts`); Vercel locates it by IP.
+- Development runs (`resolveChannel`, CI included) send no Vercel copy unless
+  `ZITADEL_TELEMETRY_VERCEL_ENDPOINT` names an intake.
 - Send nothing that identifies a person, machine or credential: no user,
   email, name, IP, URL, project id, file path, secret or free text. Allowed
   values are enums, booleans, counts and versions.
@@ -58,6 +63,8 @@ Anonymous product analytics through Mixpanel's Node SDK (`mixpanel`).
   and published on purpose. Without settings, events go to the production
   project; `ZITADEL_TELEMETRY_ENV=development` selects the dev project, and CI
   sets `DO_NOT_TRACK=1`.
+- Events for the EU projects go through the cloud's `/telemetry/mixpanel/*`
+  rewrite in `vercel.json`, which released CLIs depend on (`config.test.ts`).
 - `ci_provider` and `host_agent` also travel in the HTTP `User-Agent`
   (`src/lib/user-agent.ts`) and obey the same opt-out.
 - The docs' [telemetry page](../docs/content/docs/reference/cli/telemetry.mdx)
