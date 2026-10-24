@@ -114,6 +114,23 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	if state.ID != params.ID {
 		return nil, domain.ErrFlowNotFound()
 	}
+	// Admit Origin before reading the sealed release: a project that refuses
+	// the Origin should answer 403 without a release lookup (and without 409
+	// when that release has since been revoked). Sealing still pins which
+	// release serves the attempt after admission.
+	// Any origin the request carries is held to the project's, an opaque one
+	// (`null`) included; only the passkey params need it to have a host.
+	originStr := ""
+	if origin, ok := params.Origin.Get(); ok {
+		originStr = origin.String()
+	} else if host, ok := requestOriginFromContext(ctx); ok {
+		originStr = host
+	}
+	if originStr != "" {
+		if err := h.admitOrigin(ctx, state.ProjectID, originStr); err != nil {
+			return nil, err
+		}
+	}
 	ctx, err = h.withSealedRelease(ctx, state)
 	if err != nil {
 		return nil, err
@@ -158,23 +175,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 			Proof:       proof,
 		}
 	}
-	// The browser Origin header (or the effective request host when a same-origin
-	// fetch omits it) is admitted on every submit — sealing pins which release
-	// serves the attempt, it does not skip the project allowlist. Origin also
-	// drives WebAuthn RP params and SSO return-target binding below.
-	// Any origin the request carries is held to the project's, an opaque one
-	// (`null`) included; only the passkey params need it to have a host.
-	originStr := ""
-	if origin, ok := params.Origin.Get(); ok {
-		originStr = origin.String()
-	} else if h, ok := requestOriginFromContext(ctx); ok {
-		originStr = h
-	}
-	if originStr != "" {
-		if err := h.admitOrigin(ctx, state.ProjectID, originStr); err != nil {
-			return nil, err
-		}
-	}
+	// Origin also drives WebAuthn RP params and SSO return-target binding.
 	requestOrigin := ""
 	if originStr != "" {
 		if originURL, err := url.Parse(originStr); err == nil {
