@@ -1,4 +1,4 @@
-# ADR 076: The Resource API Under `/api/v1/`
+# ADR 077: The Resource API Under `/api/v1/`
 
 > **Status:** Proposed
 > **Date:** 2026-10-23
@@ -103,8 +103,12 @@ scaffolds (ADR 074), so apps on an older SDK will call the root paths for a
 while. Until 1.0.0 the server also answers every operation at its old,
 unprefixed path, with a `Deprecation` header
 ([RFC 9745](https://www.rfc-editor.org/rfc/rfc9745)). The alias covers only
-the spec's own paths: an unknown root path is not routed to the API. GA
-removes the alias with the other 0.x allowances.
+the spec's own paths. Any other path, at the root or under the prefix,
+answers as [ADR 076](076-error-pages-and-unmatched-routes.md) says: the error
+page to a browser navigation, `404 req.not_found` to a program. A client
+still on the root paths after GA therefore learns that it runs a different
+version, not that the server isn't Zitadel. GA removes the alias with the
+other 0.x allowances.
 
 ### 5. What changes
 
@@ -121,9 +125,12 @@ removes the alias with the other 0.x allowances.
   ([ADR 073](073-session-cookie-per-project.md)). A browser call becomes
   `/__nextgen/api/v1/…` with no change to an app's configuration or
   scaffolded files, and `ZITADEL_URL` stays the bare origin.
-- **Cloud:** `vercel.json` routes `/api/*` to the server. Once the alias is
-  gone, the server's root paths can be routed by name and the website can
-  take any other path.
+- **Cloud:** `vercel.json` routes `/api/*` to the server, and its catch-all
+  stays on the server, as ADR 076 keeps it. ADR 076 rejected routing the
+  server's paths by name because every new API path needed a rewrite of its
+  own. Under the prefix one `/api/*` rule covers them all, so once the alias
+  is gone that option is open again, and with it a website that can take any
+  other path.
 - **Release:** a `minor` changeset with a **Breaking:** paragraph. The CLI's
   `SKILL.md` and the docs say where the API lives.
 

@@ -52,7 +52,7 @@ contract — do not code against them.
   console's own runtime config, not a general capability contract.
 - **Date-based versioning** — a `Zitadel-Version` header with per-credential
   pinning, for opt-in changes within a path major
-  ([ADR 076](../../adrs/076-api-path-prefix.md)). The shipped API is
+  ([ADR 077](../../adrs/077-api-path-prefix.md)). The shipped API is
   unversioned; breaking changes ride the release train.
 - **Rate-limit headers** — `X-RateLimit-*` on responses.
 - **Expansion** — `expand=` parameters for embedding related resources.
