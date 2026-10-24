@@ -15,6 +15,9 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+// ownOrigin is the deployment's own origin the mocked resolver is built with.
+const ownOrigin = "https://zitadel.example.com"
+
 func newMockedRuntimeResolver(t *testing.T) (*service.RuntimeResolver, *servicemocks.MockAllStatements, *servicemocks.MockReleaseService) {
 	t.Helper()
 	ctrl := gomock.NewController(t)
@@ -22,7 +25,7 @@ func newMockedRuntimeResolver(t *testing.T) (*service.RuntimeResolver, *servicem
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
 	releases := servicemocks.NewMockReleaseService(ctrl)
-	return service.NewRuntimeResolver(service.NewPool(pool), releases), statements, releases
+	return service.NewRuntimeResolver(service.NewPool(pool), releases, ownOrigin), statements, releases
 }
 
 func TestRuntimeResolver_Resolve(t *testing.T) {
@@ -92,6 +95,22 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 			Return([]domain.OriginDeployment{}, nil)
 
 		got, err := resolver.Resolve(t.Context(), projectID, loopback)
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("own origin with no deployment keeps pre-resolution path", func(t *testing.T) {
+		resolver, statements, _ := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+			Origins: []domain.Origin{
+				{Pattern: origin, Kind: domain.OriginKindPrimary},
+			},
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).
+			Return([]domain.OriginDeployment{}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
 		require.NoError(t, err)
 		assert.Nil(t, got)
 	})
