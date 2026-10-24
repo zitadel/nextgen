@@ -74,11 +74,12 @@ function profileDeviceProperties(meta: GlobalOptions): Properties {
 
 /**
  * Build the dimensions shared by every lifecycle event, merged with any
- * per-command `extra`. The allow-list: only enums, booleans, counts, and
- * versions cross the boundary — never URLs, project ids, file paths, emails, or
- * secrets. `extra` is spread first so the canonical base dimensions always win;
- * callers order their own extras so reserved lifecycle fields win over command
- * props.
+ * per-command `extra`. They include the header every Zitadel component sends,
+ * as `docs/product-analytics-events.yaml` defines it. The allow-list: only
+ * enums, booleans, counts, and versions cross the boundary — never URLs,
+ * project ids, file paths, emails, or secrets. `extra` is spread first so the
+ * canonical base dimensions always win; callers order their own extras so
+ * reserved lifecycle fields win over command props.
  */
 export function commandEventProperties(
   meta: GlobalOptions,
@@ -88,6 +89,7 @@ export function commandEventProperties(
   const { env } = meta;
   return {
     ...extra,
+    surface: "cli",
     ...eventDeviceProperties(meta),
     ip: 0,
     invocation_id: invocationId,
