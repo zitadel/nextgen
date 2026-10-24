@@ -51,11 +51,11 @@ export default class Apply extends BaseCommand {
     });
 
     if (!dryRun) {
-      consola.start("Syncing schemas and flows to Zitadel");
+      consola.start("Syncing configuration to Zitadel");
       const { filesUpdated, applied, unsupported } = await runSyncLoop(cwd, syncers);
       if (applied.length === 0 && unsupported.length > 0) {
         reportWarning(
-          `Nothing was applied: ${unsupported.length} removed file${unsupported.length === 1 ? "" : "s"} cannot be deleted from the platform yet.`,
+          `Nothing was applied: ${unsupported.length} removed file${unsupported.length === 1 ? "" : "s"} cannot be deleted from the platform.`,
         );
       } else {
         consola.success("Sync complete");
@@ -74,7 +74,7 @@ export default class Apply extends BaseCommand {
             applied.length === 0
               ? [
                   unsupported.length > 0
-                    ? `${unsupported.length} removed file${unsupported.length === 1 ? " was" : "s were"} not deleted from the platform: deleting is not supported yet (#1013). Restore ${unsupported.length === 1 ? "it" : "them"} if that was a mistake.`
+                    ? `${unsupported.length} removed file${unsupported.length === 1 ? " was" : "s were"} not deleted from the platform; the warnings say why and what to do instead. Restore ${unsupported.length === 1 ? "it" : "them"} if that was a mistake.`
                     : "Everything is already in sync — no changes were applied.",
                 ]
               : [
@@ -103,7 +103,7 @@ export default class Apply extends BaseCommand {
         `${summary.moves} moved, ` +
         `${summary.deletes} delete${summary.deletes === 1 ? "" : "s"}` +
         (summary.unsupported_deletions > 0
-          ? `, ${summary.unsupported_deletions} removed but kept (cannot be deleted yet)`
+          ? `, ${summary.unsupported_deletions} removed but kept (cannot be deleted)`
           : ""),
     );
     return this.emit({

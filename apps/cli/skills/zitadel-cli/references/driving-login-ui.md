@@ -77,7 +77,19 @@ revision; an unpinned login serves the newest active unscoped revision for its
 purpose in the project, whatever its flow's name. Older revisions stay active,
 so an `audience` added after a flow was applied without one doesn't take that
 earlier revision out of the running. Removing a flow file does not retire the
-flow. Managed files carry a marker comment; `eject` removes only
+flow. Operation policies are synced from `.zitadel/policies/`: one
+`<operation>.json` per guarded operation, named after its `operation`, holding
+`{"$schema": "../meta/policy.json", "operation": "auth.factor.password.set",
+"config": {"min_length": 15}}`. `plan` checks the file against
+`.zitadel/meta/policy.json` (known operation, only the template's settings,
+within their bounds) and its name; settings that contradict each other (a
+`min_length` above `max_length`) fail `apply`, with the server's `pol.invalid`
+naming every violation. An edit publishes a new revision of the same policy;
+the newest revision applies the next time a password is set. A setting left
+out is off, and `"config": {}` switches every rule off. A policy cannot be
+deleted: removing its file is reported and leaves the policy in place, so
+switch it off with an empty `config` instead. `policies list` and
+`policies get <id|operation>` read them back. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy

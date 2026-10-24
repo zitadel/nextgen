@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ConnectionDocument, type ScaffoldedApp } from "../helpers/project";
+import {
+  aSetUpApp,
+  type ConnectionDocument,
+  PASSWORD_POLICY,
+  type ScaffoldedApp,
+} from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -286,6 +291,102 @@ describe("apply", () => {
         expect(result).toFailWith("E_CREDENTIAL_MISSING");
         expect(result).toPrint("GOOGLE_CLIENT_SECRET");
         expect(await app.registeredIdps()).toEqual([]);
+      });
+    });
+
+    describe("a password policy file", () => {
+      it("publishes the policy", async () => {
+        const app = await aSetUpApp();
+        await app.writePasswordPolicy({ min_length: 12 });
+
+        const result = await app.apply();
+
+        expect(result).toSucceed();
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 12 } }),
+        ]);
+      });
+
+      it("publishes an edit as a new revision of the same policy", async () => {
+        const app = await aSetUpApp();
+        await app.writePasswordPolicy({ min_length: 12 });
+        await app.apply();
+        const [before] = await app.publishedPolicies();
+        await app.writePasswordPolicy({ min_length: 15, history_depth: 4 });
+
+        await app.apply();
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({
+            id: before?.id,
+            config: { min_length: 15, history_depth: 4 },
+          }),
+        ]);
+        expect((await app.publishedPolicies())[0]?.revision_id).not.toBe(before?.revision_id);
+      });
+
+      it.each([
+        ["a setting the template lacks", { min_lenght: 12 }],
+        ["a value outside its bounds", { min_length: 65 }],
+      ])("with %s stops before sending anything", async (_case, config) => {
+        const app = await aSetUpApp();
+        await app.writePasswordPolicy(config);
+
+        const result = await app.apply();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(await app.publishedPolicies()).toEqual([]);
+      });
+
+      it("not named after its operation stops before sending anything", async () => {
+        const app = await aSetUpApp();
+        await app.writePasswordPolicy({ min_length: 12 }, { name: "password" });
+
+        const result = await app.apply();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toPrint(`${PASSWORD_POLICY}.json`);
+        expect(await app.publishedPolicies()).toEqual([]);
+      });
+
+      it("with a minimum above the maximum is refused by the server", async () => {
+        const app = await aSetUpApp();
+        await app.writePasswordPolicy({ min_length: 20, max_length: 10 });
+
+        const result = await app.apply();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(await app.publishedPolicies()).toEqual([]);
+      });
+    });
+
+    describe("a password policy file removed after it was applied", () => {
+      /** A set-up project whose password policy was applied, then its file removed. */
+      async function aProjectThatRemovedItsPolicy(): Promise<ScaffoldedApp> {
+        const app = await aSetUpApp();
+        await app.writePasswordPolicy({ min_length: 12 });
+        await app.apply();
+        await app.removePasswordPolicy();
+        return app;
+      }
+
+      it("leaves the policy in place", async () => {
+        const app = await aProjectThatRemovedItsPolicy();
+
+        await app.apply();
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 12 } }),
+        ]);
+      });
+
+      it("lists the kept file apart from what it applied", async () => {
+        const app = await aProjectThatRemovedItsPolicy();
+
+        const result = await app.apply();
+
+        const { data } = app.envelopeOf<{ unsupported_deletion_files: string[] }>(result);
+        expect(data.unsupported_deletion_files).toEqual([app.policyFile()]);
       });
     });
 

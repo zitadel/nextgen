@@ -1,3 +1,5 @@
+import { basename } from "node:path";
+
 import type {
   CreateBranding201,
   CreateBrandingBody,
@@ -19,6 +21,7 @@ import {
   brandingConfigSchema,
   flowConfigSchema,
   idpConnectionConfigSchema,
+  policyConfigSchema,
   schemaConfigSchema,
 } from "@zitadel/config/schemas";
 import { validateLoginTemplate } from "@zitadel/config/template";
@@ -31,6 +34,7 @@ import {
 } from "../branding";
 import { FLOWS_DIR, flowEnvRefs } from "../flows";
 import { IDPS_DIR, refuseResolvedSecret } from "../idp";
+import { POLICIES_DIR, type PolicyFile, policyFileName, toPolicyWireBody } from "../policies";
 import { SCHEMAS_DIR } from "../user-schema";
 import { primaryValues } from "../variables";
 import { ZitadelError } from "../errors";
@@ -59,7 +63,13 @@ export function makeSyncers(opts: {
    * when inlining templates for hashing and upload.
    */
   cwd: string;
-}): readonly [SchemaSyncer, IdpConnectionSyncer, FlowDefinitionSyncer, BrandingSyncer] {
+}): readonly [
+  SchemaSyncer,
+  IdpConnectionSyncer,
+  FlowDefinitionSyncer,
+  BrandingSyncer,
+  PolicySyncer,
+] {
   return [
     new SchemaSyncer(opts.client, opts.projectId, opts.env),
     // Before flows: a flow step naming a connection slug is only valid once
@@ -67,6 +77,8 @@ export function makeSyncers(opts: {
     new IdpConnectionSyncer(opts.client, opts.projectId),
     new FlowDefinitionSyncer(opts.client, opts.projectId, opts.env),
     new BrandingSyncer(opts.client, opts.projectId, opts.env, opts.cwd),
+    // Nothing depends on a policy, and a policy depends on nothing.
+    new PolicySyncer(opts.client, opts.projectId),
   ];
 }
 
@@ -654,5 +666,108 @@ class BrandingSyncer implements ResourceSyncer {
   async fetch(id: string): Promise<object> {
     const envelope = await this.client.getBrandingById(id);
     return envelope.branding as object;
+  }
+}
+
+/**
+ * Operation policies (ADR 066), one `.zitadel/policies/<operation>.json` per
+ * operation. Like an IdP connection, a policy keeps one id while the server
+ * keeps its revisions, and the document addresses the row: `POST /policies`
+ * creates the operation's policy on its first publish and revises it after.
+ * So it is mutable and not revisioned here, and both writes are that call.
+ */
+class PolicySyncer implements ResourceSyncer {
+  readonly kind = "policy";
+  readonly directory = POLICIES_DIR;
+  readonly mutable = true;
+  readonly revisioned = false;
+  /** Revisions are kept for releases and records, so a policy is never deleted. */
+  readonly deletion = "unsupported";
+
+  private readonly client: ZitadelClient;
+  private readonly projectId: string;
+
+  constructor(client: ZitadelClient, projectId: string) {
+    this.client = client;
+    this.projectId = projectId;
+  }
+
+  /**
+   * Parse against the strict `policyConfigSchema`, built from the generated
+   * publish body, then hold the file to its name: one file per operation,
+   * named after it, so two files can never publish over each other. The
+   * rules that relate settings to each other (a minimum above the maximum)
+   * are the server's template's, and fail `apply`.
+   */
+  validate(data: object, path?: string): void {
+    const result = policyConfigSchema.safeParse(data);
+    if (!result.success) {
+      throw new ZitadelError("E_VALIDATION", `${path ?? "Policy file"} is not a valid policy`, {
+        hint: "Check the file against .zitadel/meta/policy.json: the operation, and only the settings its template has, within their bounds.",
+        details: { file: path, issues: result.error.issues },
+      });
+    }
+    const expected = policyFileName(result.data.operation);
+    if (path !== undefined && basename(path) !== expected) {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        `${path} holds the ${result.data.operation} policy, so it must be named ${expected}`,
+        {
+          hint: `Rename the file to ${expected}: a policy file is named after its operation.`,
+          details: { file: path, operation: result.data.operation, expected },
+        },
+      );
+    }
+  }
+
+  /** Comparison form: the publish body, without the editor pointer. */
+  normalize(data: object): object {
+    return toPolicyWireBody(data as PolicyFile);
+  }
+
+  /** `POST /policies` creates the operation's policy when the project has none. */
+  create(data: object): Promise<{ id: string }> {
+    return this.publish(data);
+  }
+
+  /**
+   * The same call: the operation inside the document addresses the policy,
+   * and the server appends a revision under the id it already has.
+   */
+  update(_id: string, data: object): Promise<{ id?: string }> {
+    return this.publish(data);
+  }
+
+  /** Publishes the file as the operation's newest revision, answering with the policy id. */
+  private async publish(data: object): Promise<{ id: string }> {
+    const result = await this.client.publishPolicy(toPolicyWireBody(data as PolicyFile), {
+      project_id: this.projectId,
+    });
+    return { id: result.id };
+  }
+
+  /** The stored policy at its newest revision, in the file's comparison form. */
+  async fetch(id: string): Promise<object> {
+    const stored = await this.client.getPolicy(id, { project_id: this.projectId });
+    return { operation: stored.operation, config: stored.config };
+  }
+
+  /** Never reached: `deletion` is unsupported, so the loop reports a removed file and sends nothing. */
+  async delete(_id: string): Promise<void> {
+    throw new ZitadelError("E_NOT_IMPLEMENTED", "A policy cannot be deleted", {
+      hint: 'Keep the file with "config": {} to switch every rule off.',
+    });
+  }
+
+  /**
+   * A policy keeps its revisions, so a removed file deletes nothing. Saying
+   * how to switch the policy off is the useful answer, since the removal
+   * cannot do it.
+   */
+  deletionNote(path: string): string {
+    return (
+      `${path} was removed, but a policy keeps its revisions and cannot be deleted, so the ` +
+      `policy still applies. To switch it off, restore the file with "config": {} and apply.`
+    );
   }
 }

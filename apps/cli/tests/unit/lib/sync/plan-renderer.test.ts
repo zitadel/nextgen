@@ -206,6 +206,30 @@ describe("renderPlan — no changes", () => {
     ]);
   });
 
+  it("uses the resource's own note for a removed file when it has one", () => {
+    const policies: ResourceSyncer = {
+      ...makeSyncer("policy", ".zitadel/policies", { mutable: true }),
+      deletionNote: (path) => `${path}: switch it off with an empty config`,
+    };
+
+    const out = collectPlanWarnings([
+      {
+        kind: "skip",
+        path: ".zitadel/policies/auth.factor.password.set.json",
+        reason: "unsupported-deletion",
+        syncer: policies,
+        id: "pol_1",
+      },
+    ]);
+
+    expect(out).toEqual([
+      expect.objectContaining({
+        message:
+          ".zitadel/policies/auth.factor.password.set.json: switch it off with an empty config",
+      }),
+    ]);
+  });
+
   it("still names a removed file whose resource cannot be deleted yet", () => {
     const idp = makeSyncer("idp", ".zitadel/idps", { mutable: true });
     const out = renderPlan(

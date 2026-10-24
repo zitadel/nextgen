@@ -188,8 +188,10 @@ Each invocation prints one JSON object:
   from a removed one (`moved_from`). Plan rows preview; apply rows report, with
   the resulting platform ids. Use it to verify an edit did what you intended.
   `data.unsupported_deletions` counts removed files whose resource cannot be
-  deleted yet (they are kept, and are not part of `total`); on `apply` the files
-  are listed in `data.unsupported_deletion_files`.
+  deleted (an identity provider connection not yet, a policy never; they are
+  kept, and are not part of `total`); on `apply` the files are listed in
+  `data.unsupported_deletion_files`, and each one's warning says what to do
+  instead.
 - `apply` leaves the files under `.zitadel/` as written: what the server stores
   is never written back, and a field a file leaves out reads as the server's
   default, so `plan` reports no change after an `apply`. `data.files_updated`
@@ -449,4 +451,4 @@ Load on demand:
 
 - [`references/driving-login-ui.md`](references/driving-login-ui.md) — driving the
   `<zitadel-login>` component in a browser, and the authoritative repo-config
-  workflow (schemas, flows, branding).
+  workflow (schemas, flows, branding, policies).

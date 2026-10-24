@@ -125,6 +125,8 @@ which ships in this package.
 <summary>Full command reference</summary>
 
 <!-- commands -->
+* [`zitadel api [OPERATION]`](#zitadel-api-operation)
+* [`zitadel api ls [FILTER]`](#zitadel-api-ls-filter)
 * [`zitadel apply`](#zitadel-apply)
 * [`zitadel auth-method passkey disable`](#zitadel-auth-method-passkey-disable)
 * [`zitadel auth-method passkey enable`](#zitadel-auth-method-passkey-enable)
@@ -155,6 +157,8 @@ which ships in this package.
 * [`zitadel idps list`](#zitadel-idps-list)
 * [`zitadel logs`](#zitadel-logs)
 * [`zitadel plan`](#zitadel-plan)
+* [`zitadel policies get POLICY`](#zitadel-policies-get-policy)
+* [`zitadel policies list`](#zitadel-policies-list)
 * [`zitadel projects get ID`](#zitadel-projects-get-id)
 * [`zitadel projects list`](#zitadel-projects-list)
 * [`zitadel projects update ID`](#zitadel-projects-update-id)
@@ -189,6 +193,112 @@ which ships in this package.
 * [`zitadel variables set NAME`](#zitadel-variables-set-name)
 * [`zitadel version`](#zitadel-version)
 * [`zitadel which`](#zitadel-which)
+
+## `zitadel api [OPERATION]`
+
+Call any operation of the Zitadel API, with this project's server and project secret.
+
+```
+USAGE
+  $ zitadel api [OPERATION...] [--json] [-c <value>] [-s <value>]
+    [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-X
+    GET|POST|PUT|PATCH|DELETE] [-F <value>...] [--input <value>] [--paginate]
+
+ARGUMENTS
+  [OPERATION...]  An operationId (queryUsers) or a path (/users/query), then the
+                  path parameters. Omit it to choose one.
+
+FLAGS
+  -F, --field=<value>...                  A field: name=value, or name:=json for
+                                          JSON, typed by the operation's schema.
+                                          A query parameter's name sets it; any
+                                          other name is a dot path into the
+                                          body. Repeatable.
+  -X, --method=GET|POST|PUT|PATCH|DELETE  The HTTP method, to choose among a
+                                          path's operations.
+  -c, --cwd=<value>                       Project directory to operate on.
+  -n, --non-interactive                   Disable prompts. Required when
+                                          scripting or running as an agent.
+  -s, --server=<value>                    Override the resolved server URL.
+  -v, --verbose                           Verbose logging.
+      --[no-]color                        Colorize human output. Disable with
+                                          --no-color; NO_COLOR and FORCE_COLOR
+                                          are honored too.
+      --debug                             Debug logging.
+      --dry-run                           Preview without mutating files or the
+                                          platform.
+      --input=<value>                     Read the JSON body from a file, or
+                                          from stdin with -. --field lays over
+                                          it.
+      --paginate                          Follow next_page_token to the last
+                                          page, and answer with every page's
+                                          items in one list.
+      --[no-]telemetry                    Send anonymous usage analytics.
+                                          Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Call any operation of the Zitadel API, with this project's server and project
+  secret.
+
+EXAMPLES
+  $ zitadel api queryUsers -F limit=5
+
+  $ zitadel api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W
+
+  $ zitadel api /users/user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W/passkeys --json
+
+  $ zitadel api listEvents -F category=auth --paginate --json
+
+  $ zitadel api createTeam -F name=Support --dry-run
+
+  $ zitadel api createTeam --input - < team.json
+```
+
+## `zitadel api ls [FILTER]`
+
+List the operations of the Zitadel API that `zitadel api` calls.
+
+```
+USAGE
+  $ zitadel api ls [FILTER] [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--tag <value>]
+
+ARGUMENTS
+  [FILTER]  Only operations whose id, path, summary or tag contains this text.
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --tag=<value>      Only the operations of this part of the API (Users,
+                         Teams, …).
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List the operations of the Zitadel API that `zitadel api` calls.
+
+EXAMPLES
+  $ zitadel api ls
+
+  $ zitadel api ls passkey
+
+  $ zitadel api ls --tag Users --json
+
+  $ zitadel api ls --json | jq -r '.data.operations[] | select(.command == null) | .id'
+```
 
 ## `zitadel apply`
 
@@ -906,7 +1016,7 @@ EXAMPLES
 
 ## `zitadel flow-definitions get FLOW`
 
-Get one flow definition by id.
+Get one flow definition by flow name (newest revision) or revision id.
 
 ```
 USAGE
@@ -935,12 +1045,12 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Get one flow definition by id.
+  Get one flow definition by flow name (newest revision) or revision id.
 
 EXAMPLES
-  $ zitadel flow-definitions get <id>
+  $ zitadel flow-definitions get <flow>
 
-  $ zitadel flow-definitions get <id> --json
+  $ zitadel flow-definitions get <flow> --json
 ```
 
 ## `zitadel flow-definitions list`
@@ -1484,8 +1594,8 @@ Show local Zitadel server logs.
 ```
 USAGE
   $ zitadel logs [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--follow] [--tail
-    <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--follow] [--level
+    debug|info|warn|error] [--tail <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -1497,8 +1607,11 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --follow           Follow logs.
-      --tail=<value>     [default: 200] Number of lines to show.
+      --follow           Keep printing lines as the server writes them.
+      --level=<option>   Show only lines at this level or above.
+                         <options: debug|info|warn|error>
+      --tail=<value>     [default: 200] Number of lines to show, counting only
+                         those --level shows.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -1507,6 +1620,15 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Show local Zitadel server logs.
+
+  On a terminal, warnings are yellow and errors red. Run it in the directory
+  `zitadel start` ran in, or one inside it: the server is found from the nearest
+  `.zitadel/local/` on the way up.
+
+EXAMPLES
+  $ zitadel logs --follow
+
+  $ zitadel logs --level warn
 ```
 
 ## `zitadel plan`
@@ -1536,6 +1658,92 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Validate config without mutation and preview the sync diff.
+```
+
+## `zitadel policies get POLICY`
+
+Get one policy by policy id or operation.
+
+```
+USAGE
+  $ zitadel policies get POLICY [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
+
+ARGUMENTS
+  POLICY  policy id or operation
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
+                         the resource's own; `--json` is unaffected.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Get one policy by policy id or operation.
+
+EXAMPLES
+  $ zitadel policies get <policy>
+
+  $ zitadel policies get <policy> --json
+```
+
+## `zitadel policies list`
+
+List policies.
+
+```
+USAGE
+  $ zitadel policies list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
+    --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
+
+FLAGS
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+  -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the resource's own
+                            columns; `--json` is unaffected.
+      --filter=<value>...   Filter as field=operation:value (operation defaults
+                            to equals). Fields: operation (equals).
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List policies.
+
+EXAMPLES
+  $ zitadel policies list --json
+
+  $ zitadel policies list --all --json
+
+  $ zitadel policies list --filter operation=equals:<value>
 ```
 
 ## `zitadel projects get ID`
@@ -1851,7 +2059,7 @@ EXAMPLES
 
 ## `zitadel schemas get SCHEMA`
 
-Get one schema by id.
+Get one schema by object type (current revision) or revision id.
 
 ```
 USAGE
@@ -1880,12 +2088,12 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Get one schema by id.
+  Get one schema by object type (current revision) or revision id.
 
 EXAMPLES
-  $ zitadel schemas get <id>
+  $ zitadel schemas get <schema>
 
-  $ zitadel schemas get <id> --json
+  $ zitadel schemas get <schema> --json
 ```
 
 ## `zitadel schemas list`
@@ -2152,7 +2360,8 @@ FLAGS
   --dev-port=<value>
       Dev-server port; also the issuer origin registered with Zitadel. Defaults to
       the detected port. Use distinct ports to run several scaffolded apps side by
-      side.
+      side. In an app already set up, moves it to this port: the dev script,
+      ZITADEL_ISSUER and the allowed origin.
 
   --dry-run
       Preview without mutating files or the platform.
