@@ -54,7 +54,7 @@ export type TelemetryRegion = keyof typeof HOSTS;
  * Ambient `NODE_ENV` is deliberately NOT consulted: a run with
  * `NODE_ENV=development` must not silently switch projects.
  */
-function resolveChannel(env: NodeJS.ProcessEnv): "development" | "production" {
+export function resolveChannel(env: NodeJS.ProcessEnv): "development" | "production" {
   const explicit = (env.ZITADEL_TELEMETRY_ENV ?? "").trim().toLowerCase();
   if (explicit === "development") {
     return "development";

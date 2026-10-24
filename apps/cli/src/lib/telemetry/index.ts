@@ -11,6 +11,7 @@ import { resolveTelemetryHost } from "./config";
 import { resolveConsent } from "./consent";
 import { type Identity, loadOrCreateIdentity } from "./identity";
 import { compact } from "./util";
+import { resolveVercelEndpoint, type VercelSink, vercelEventBody } from "./vercel";
 
 export type { Properties, Modifiers } from "mixpanel";
 export type { TelemetryRegion } from "./config";
@@ -34,9 +35,16 @@ export type TelemetryDeps = {
   readonly flag?: boolean;
   /** Emit each payload to stderr before sending — for `--debug`. */
   readonly debug?: boolean;
+  /**
+   * The properties a copy of each event sends to Vercel Web Analytics, in
+   * priority order (proof of concept). Without them no copy is sent.
+   */
+  readonly vercelKeys?: readonly string[];
   readonly initClient?: (token: string, host: string) => MixpanelClient;
   readonly loadIdentity?: (env: NodeJS.ProcessEnv) => Identity;
   readonly newId?: () => string;
+  /** Sends the Vercel copy; defaults to the global `fetch`. */
+  readonly fetch?: typeof fetch;
 };
 
 /**
@@ -61,6 +69,8 @@ export class Telemetry {
   readonly isFirstRun: boolean;
   private readonly debug: boolean;
   private readonly newId: () => string;
+  private readonly vercel: VercelSink | undefined;
+  private readonly fetch: typeof fetch;
 
   private constructor(
     client: MixpanelClient | undefined,
@@ -68,12 +78,16 @@ export class Telemetry {
     isFirstRun: boolean,
     debug: boolean,
     newId: () => string,
+    vercel: VercelSink | undefined,
+    fetchFn: typeof fetch,
   ) {
     this.client = client;
     this.distinctId = distinctId;
     this.isFirstRun = isFirstRun;
     this.debug = debug;
     this.newId = newId;
+    this.vercel = vercel;
+    this.fetch = fetchFn;
   }
 
   /** Whether events will actually be sent (consent granted and a token configured). */
@@ -89,8 +103,9 @@ export class Telemetry {
   static create(deps: TelemetryDeps): Telemetry {
     const newId = deps.newId ?? randomUUID;
     const debug = deps.debug ?? false;
+    const fetchFn = deps.fetch ?? fetch;
     const inert = (firstRun: boolean): Telemetry =>
-      new Telemetry(undefined, "", firstRun, debug, newId);
+      new Telemetry(undefined, "", firstRun, debug, newId, undefined, fetchFn);
 
     const consent = resolveConsent({ env: deps.env, flag: deps.flag });
     if (debug) {
@@ -108,7 +123,22 @@ export class Telemetry {
     } catch {
       return inert(identity.isFirstRun);
     }
-    return new Telemetry(client, identity.distinctId, identity.isFirstRun, debug, newId);
+    const vercelKeys = deps.vercelKeys?.length ? deps.vercelKeys : undefined;
+    const vercelEndpoint = vercelKeys && resolveVercelEndpoint(deps.env);
+    if (debug && vercelKeys && !vercelEndpoint) {
+      process.stderr.write("[telemetry] vercel: no copy on the development channel\n");
+    }
+    const vercel =
+      vercelKeys && vercelEndpoint ? { endpoint: vercelEndpoint, keys: vercelKeys } : undefined;
+    return new Telemetry(
+      client,
+      identity.distinctId,
+      identity.isFirstRun,
+      debug,
+      newId,
+      vercel,
+      fetchFn,
+    );
   }
 
   /** Send an event with the given properties; `distinct_id`/`$insert_id` are stamped here. */
@@ -125,6 +155,44 @@ export class Telemetry {
       process.stderr.write(`[telemetry] ${event} ${JSON.stringify(payload)}\n`);
     }
     this.enqueue((client, done) => client.track(event, payload, done));
+    this.sendVercel(event, payload);
+  }
+
+  /** Send the Vercel copy of an event, fire-and-forget like every send. */
+  private sendVercel(event: string, payload: TelemetryProperties): void {
+    const sink = this.vercel;
+    if (!sink) {
+      return;
+    }
+    let body: string;
+    try {
+      body = vercelEventBody(event, payload, sink, Date.now());
+    } catch {
+      return;
+    }
+    if (this.debug) {
+      process.stderr.write(`[telemetry] vercel ${body}\n`);
+    }
+    this.pending.push(
+      Promise.resolve()
+        .then(() =>
+          this.fetch(sink.endpoint, {
+            method: "POST",
+            // The global dispatcher sets the CLI's User-Agent; `x-va-server`
+            // is what `@vercel/analytics/server` sends.
+            headers: { "content-type": "application/json", "x-va-server": "1" },
+            body,
+          }),
+        )
+        .then(
+          (response) => {
+            if (this.debug) {
+              process.stderr.write(`[telemetry] vercel answered ${response.status}\n`);
+            }
+          },
+          () => undefined,
+        ),
+    );
   }
 
   /** Write a user profile via the People API. `modifiers` carries `$ip` etc. */

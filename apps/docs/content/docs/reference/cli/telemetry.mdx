@@ -43,9 +43,13 @@ Some commands add what they did, as counts and fixed values:
 
 Run a command with `--debug` to see each event on stderr before it is sent.
 
+### The copy for Vercel Web Analytics
+
+Each event also goes, as a copy, to Vercel Web Analytics on the Zitadel cloud (`preview.zitadel.com`). The copy keeps at most eight properties: `surface`, `cli_version`, `server_kind`, `command`, `status`, `reason`, `host_agent` and `non_interactive`. Vercel records a location (country, region and city) worked out from the IP address the copy comes from. Runs in CI send no copy.
+
 ## What it never sends
 
-Nothing that identifies you, your machine or your project: no name, email address, server URL, project or resource id, file path, secret, variable, or error message. Every value is a fixed name, a boolean, a count or a version. Mixpanel is told not to locate you by your IP address (`ip: 0`); the country comes from your timezone instead.
+Nothing that identifies you, your machine or your project: no name, email address, server URL, project or resource id, file path, secret, variable, or error message. Every value is a fixed name, a boolean, a count or a version. Mixpanel is told not to locate you by your IP address (`ip: 0`); the country comes from your timezone instead. The [Vercel copy](#the-copy-for-vercel-web-analytics) is located by its IP address.
 
 ## The install id
 
