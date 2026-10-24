@@ -156,9 +156,10 @@ describe("login flows list", () => {
       expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
       expect(screen.getByText("Error 500")).toBeInTheDocument();
       expect(screen.getByText("boom")).toBeInTheDocument();
-      // The references to quote: the code and the request ID from the response.
-      expect(screen.getByText("internal")).toBeInTheDocument();
+      // The reference to quote is the request ID from the response; the code
+      // would only repeat the sentence.
       expect(screen.getByText("req_01TEST")).toBeInTheDocument();
+      expect(screen.queryByText("internal")).toBeNull();
       expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
     } finally {
       errorSpy.mockRestore();
