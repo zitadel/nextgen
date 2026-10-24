@@ -1,4 +1,4 @@
-import { Link, useRouter } from "@tanstack/react-router";
+import { Link, useMatch, useRouter } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
 import { Loader2 } from "lucide-react";
@@ -9,8 +9,21 @@ import { Button } from "@/components/ui/button";
 import { fetchSession, invalidateSessionCache } from "@/auth/session";
 import { describeError } from "@/lib/api-error";
 import { routerRelativeHref } from "@/lib/base-path";
+import { withoutTrailingSlash } from "@/lib/project-scope";
 
+import { navItemFor, useNavItems } from "./app-shell/use-nav-items";
 import { EYEBROW } from "./typography";
+
+declare module "@tanstack/react-router" {
+  interface StaticDataRouteOption {
+    /**
+     * What a detail screen shows, as a lower-case noun: `"user"`. A 404 there
+     * says which thing is gone, "User not found", and leads back to the
+     * sidebar entry the screen sits beneath.
+     */
+    resource?: string;
+  }
+}
 
 const STATE_ROW = "flex items-center justify-center gap-2 text-muted-foreground";
 
@@ -31,24 +44,22 @@ function StatePage({ children }: { children: ReactNode }) {
 
 /**
  * The anatomy every error page shares (ADR 076): the status, a title, one
- * sentence, a way on and, for a refused request, the references to quote:
- * the error code, and the request ID that finds the request in the server's
- * logs. The docs and the server's own page show the same parts in their own
- * chrome.
+ * sentence, a way on and, for a refused request, the request ID to quote,
+ * which finds the request in the server's logs. Not the error code: it is for
+ * programs, the sentence already says it for people, and the logs hold it.
+ * The docs and the server's own page show the same parts in their own chrome.
  */
 function ErrorPage({
   status,
   title,
   children,
   action,
-  code,
   requestId,
 }: {
   status?: number;
   title: string;
   children: ReactNode;
   action?: ReactNode;
-  code?: string;
   requestId?: string;
 }) {
   return (
@@ -58,20 +69,11 @@ function ErrorPage({
         <h1 className="text-foreground font-serif text-2xl leading-8 tracking-tight text-balance">
           {title}
         </h1>
-        <p className="text-muted-foreground max-w-md text-sm leading-6 text-pretty">{children}</p>
+        <p className="text-muted-foreground max-w-md text-sm leading-6 text-balance">{children}</p>
         {action && <div className="mt-3">{action}</div>}
-        {(code || requestId) && (
-          <p className="text-muted-foreground mt-3 flex flex-wrap justify-center gap-x-3 text-xs">
-            {code && (
-              <span>
-                Code <code className="font-mono">{code}</code>
-              </span>
-            )}
-            {requestId && (
-              <span>
-                Request ID <code className="font-mono">{requestId}</code>
-              </span>
-            )}
+        {requestId && (
+          <p className="text-muted-foreground mt-3 text-xs">
+            Request ID <code className="font-mono">{requestId}</code>
           </p>
         )}
       </div>
@@ -89,12 +91,35 @@ function ErrorPage({
  */
 function ProjectsLink() {
   return (
-    <Button asChild variant="secondary">
+    <Button asChild>
       <Link to="/projects" search={{ project: undefined }}>
         Go to Projects
       </Link>
     </Button>
   );
+}
+
+interface NavLink {
+  to: string;
+  label: string;
+}
+
+/**
+ * For a 404 on a detail screen, what is gone and the list the screen sits
+ * beneath, where the person was a step before. The project stays selected; if
+ * it is what is missing, the list fails in turn and offers Projects.
+ */
+function useGone(error: unknown): { resource: string; list: NavLink } | undefined {
+  const match = useMatch({ strict: false, shouldThrow: false });
+  const items = useNavItems();
+  const resource = match?.staticData.resource;
+  if (!match || !resource || !(error instanceof ApiError) || error.status !== 404) {
+    return undefined;
+  }
+  const path = withoutTrailingSlash(match.fullPath);
+  const item = navItemFor(items, path);
+  if (!item?.to || item.to === path) return undefined;
+  return { resource, list: { to: item.to, label: item.nav.label } };
 }
 
 /** Shared pending boundary (Console ADR 0001). */
@@ -131,6 +156,7 @@ export function PendingState() {
  */
 export function ErrorState({ error }: ErrorComponentProps) {
   const router = useRouter();
+  const gone = useGone(error);
   const unauthenticated =
     error instanceof ApiError &&
     (error.status === 401 || apiErrorCode(error) === "sess.project_mismatch");
@@ -165,7 +191,6 @@ export function ErrorState({ error }: ErrorComponentProps) {
         <ErrorPage
           status={error.status}
           title="Console API not authorized"
-          code={apiErrorCode(error)}
           requestId={error.requestId}
           action={<ProjectsLink />}
         >
@@ -185,18 +210,35 @@ export function ErrorState({ error }: ErrorComponentProps) {
     );
   }
 
+  // The page names what is gone itself: the server's `user not found` only
+  // repeats the status, under a title that would say it again.
+  if (gone) {
+    const { resource, list } = gone;
+    return (
+      <ErrorPage
+        status={404}
+        title={`${resource.charAt(0).toUpperCase()}${resource.slice(1)} not found`}
+        requestId={error instanceof ApiError ? error.requestId : undefined}
+        action={
+          <Button asChild>
+            <Link to={list.to}>Back to {list.label}</Link>
+          </Button>
+        }
+      >
+        There is no {resource} with this ID. It may have been deleted, or the link may be broken.
+      </ErrorPage>
+    );
+  }
+
   const { title, message, retry } = describeBoundaryError(error);
   return (
     <ErrorPage
       status={error instanceof ApiError ? error.status : undefined}
       title={title}
-      code={apiErrorCode(error)}
       requestId={error instanceof ApiError ? error.requestId : undefined}
       action={
         retry ? (
-          <Button variant="secondary" onClick={() => void router.invalidate()}>
-            Try again
-          </Button>
+          <Button onClick={() => void router.invalidate()}>Try again</Button>
         ) : (
           <ProjectsLink />
         )
