@@ -31,9 +31,10 @@ function StatePage({ children }: { children: ReactNode }) {
 
 /**
  * The anatomy every error page shares (ADR 076): the status, a title, one
- * sentence, a way on and, for a refused request, the code to quote. The
- * website, the docs and the server's own page show the same parts in their
- * own chrome.
+ * sentence, a way on and, for a refused request, the references to quote:
+ * the error code, and the request ID that finds the request in the server's
+ * logs. The docs and the server's own page show the same parts in their own
+ * chrome.
  */
 function ErrorPage({
   status,
@@ -41,12 +42,14 @@ function ErrorPage({
   children,
   action,
   code,
+  requestId,
 }: {
   status?: number;
   title: string;
   children: ReactNode;
   action?: ReactNode;
   code?: string;
+  requestId?: string;
 }) {
   return (
     <StatePage>
@@ -57,9 +60,18 @@ function ErrorPage({
         </h1>
         <p className="text-muted-foreground max-w-md text-sm leading-6 text-pretty">{children}</p>
         {action && <div className="mt-3">{action}</div>}
-        {code && (
-          <p className="text-muted-foreground mt-3 text-xs">
-            Code <code className="font-mono">{code}</code>
+        {(code || requestId) && (
+          <p className="text-muted-foreground mt-3 flex flex-wrap justify-center gap-x-3 text-xs">
+            {code && (
+              <span>
+                Code <code className="font-mono">{code}</code>
+              </span>
+            )}
+            {requestId && (
+              <span>
+                Request ID <code className="font-mono">{requestId}</code>
+              </span>
+            )}
           </p>
         )}
       </div>
@@ -67,11 +79,20 @@ function ErrorPage({
   );
 }
 
-/** The way on from an error page: the console's start page. */
-function StartPageLink() {
+/**
+ * The way on from an error page: Projects, without the selected project. Not
+ * the start page, which lands on Users while a project is selected, and not
+ * with the project, which every link keeps (`retainSearchParams` in
+ * `routes/_authed.tsx`): either would lead back to the screen that failed,
+ * as it does for a `?project=` the server refuses. An explicit `undefined`
+ * is what tells the middleware to drop it.
+ */
+function ProjectsLink() {
   return (
     <Button asChild variant="secondary">
-      <Link to="/">Go to the start page</Link>
+      <Link to="/projects" search={{ project: undefined }}>
+        Go to Projects
+      </Link>
     </Button>
   );
 }
@@ -145,7 +166,8 @@ export function ErrorState({ error }: ErrorComponentProps) {
           status={error.status}
           title="Console API not authorized"
           code={apiErrorCode(error)}
-          action={<StartPageLink />}
+          requestId={error.requestId}
+          action={<ProjectsLink />}
         >
           You are signed in, but the server did not accept your session for this request. Signing
           out and in again may help; if it persists, this screen calls an operation the console
@@ -169,13 +191,14 @@ export function ErrorState({ error }: ErrorComponentProps) {
       status={error instanceof ApiError ? error.status : undefined}
       title={title}
       code={apiErrorCode(error)}
+      requestId={error instanceof ApiError ? error.requestId : undefined}
       action={
         retry ? (
           <Button variant="secondary" onClick={() => void router.invalidate()}>
             Try again
           </Button>
         ) : (
-          <StartPageLink />
+          <ProjectsLink />
         )
       }
     >
@@ -187,7 +210,7 @@ export function ErrorState({ error }: ErrorComponentProps) {
 /** Shared not-found boundary: a path no route matches. */
 export function NotFoundState() {
   return (
-    <ErrorPage status={404} title="Page not found" action={<StartPageLink />}>
+    <ErrorPage status={404} title="Page not found" action={<ProjectsLink />}>
       There is nothing at this address. The link may be broken, or the page may have moved.
     </ErrorPage>
   );

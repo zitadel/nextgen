@@ -146,14 +146,46 @@ describe("login flows list", () => {
     try {
       server.use(
         http.get(FLOWS_URL, () =>
-          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+          HttpResponse.json(
+            { code: "internal", message: "boom" },
+            { status: 500, headers: { "x-request-id": "req_01TEST" } },
+          ),
         ),
       );
       await renderAt("/flow-definitions");
       expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
       expect(screen.getByText("Error 500")).toBeInTheDocument();
       expect(screen.getByText("boom")).toBeInTheDocument();
+      // The references to quote: the code and the request ID from the response.
+      expect(screen.getByText("internal")).toBeInTheDocument();
+      expect(screen.getByText("req_01TEST")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+  it("leaves a refused project for Projects, without it", async () => {
+    // A `?project=` the server refuses fails every scoped screen, and every
+    // link keeps it: the way on must drop it, or it leads back here.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      server.use(
+        http.get(FLOWS_URL, () =>
+          HttpResponse.json({ code: "req.invalid", message: "invalid" }, { status: 400 }),
+        ),
+        http.get("http://localhost/api/users/me/projects", () =>
+          HttpResponse.json({ projects: [] }),
+        ),
+      );
+      const router = await renderAt("/flow-definitions", "proj_bad\\");
+      const way = await screen.findByRole("link", { name: "Go to Projects" });
+      expect(way.getAttribute("href")).not.toContain("project=");
+
+      way.click();
+      await vi.waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+      expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
     } finally {
       errorSpy.mockRestore();
       warnSpy.mockRestore();
