@@ -18,8 +18,8 @@ type RuntimeResolution struct {
 	// request carried none.
 	Origin string
 	// Target is the project origin pattern that admitted Origin, "" when
-	// admission was open (empty allowlist or loopback) rather than a stored
-	// pattern.
+	// admission was open (empty allowlist, loopback or the deployment's own
+	// origin) rather than a stored pattern.
 	Target string
 	// Source is "origin" when a deployment to the exact origin answered, or
 	// empty when resolution refused before a target was found.
@@ -53,11 +53,15 @@ func (res *RuntimeResolution) logAttrs() []any {
 type RuntimeResolver struct {
 	v2Pool   *DB
 	releases ReleaseService
-	now      func() time.Time
+	// ownOrigin is the deployment's own origin, normalized; "" when unknown.
+	ownOrigin string
+	now       func() time.Time
 }
 
-func NewRuntimeResolver(v2Pool *DB, releases ReleaseService) *RuntimeResolver {
-	return &RuntimeResolver{v2Pool: v2Pool, releases: releases, now: time.Now}
+// NewRuntimeResolver builds the resolver. ownOrigin is the origin of the
+// deployment's public base, where its console runs; "" names none.
+func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigin string) *RuntimeResolver {
+	return &RuntimeResolver{v2Pool: v2Pool, releases: releases, ownOrigin: ownOrigin, now: time.Now}
 }
 
 // Resolve walks the three layers: the gate refuses an origin no pattern
@@ -113,10 +117,11 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 		return nil, err
 	}
 	if dep == nil {
-		// Empty allowlist and loopback admit without a stored pattern. Until the
-		// project default target lands, that open admission keeps the
-		// pre-resolution newest-revision path when nothing is deployed yet —
-		// the same interim createFlow uses for a missing Origin header.
+		// An empty allowlist, loopback and the deployment's own origin admit
+		// without a stored pattern. Until the project default target lands, that
+		// open admission keeps the pre-resolution newest-revision path when
+		// nothing is deployed yet — the same interim createFlow uses for a
+		// missing Origin header.
 		// A primary/preview pattern match still refuses with rel.not_deployed.
 		if matched.open {
 			return nil, nil
@@ -162,7 +167,8 @@ func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origi
 // matchedOrigin is an origin the gate admitted: the normalized request
 // origin, the project origin pattern that matched it (empty when open),
 // whether it was admitted by a preview row rather than a primary pattern,
-// and whether admission was open (empty allowlist or loopback).
+// and whether admission was open (empty allowlist, loopback or the
+// deployment's own origin).
 type matchedOrigin struct {
 	origin  string
 	pattern string
@@ -172,8 +178,10 @@ type matchedOrigin struct {
 
 // Gate decides whether a request from origin may be served at all. An absent
 // origin is not a browser and passes with no match. An empty origin list
-// admits every origin. A loopback origin is always admitted. A preview
-// pattern admits nothing by itself: the preview row for the exact URL does.
+// admits every origin. A loopback origin is always admitted, and so is the
+// deployment's own origin: its console previews a project's login from there
+// with the project's own flow. A preview pattern admits nothing by itself:
+// the preview row for the exact URL does.
 func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	origin = strings.TrimSpace(origin)
 	if origin == "" {
@@ -184,7 +192,7 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 		return nil, domain.ErrProjectOriginNotAllowed(map[string]string{"origin": origin}).
 			WithMessage(origin + " is not an origin of this project")
 	}
-	if len(project.Origins) == 0 || domain.IsLoopbackOrigin(normalized) {
+	if len(project.Origins) == 0 || domain.IsLoopbackOrigin(normalized) || normalized == r.ownOrigin {
 		return &matchedOrigin{origin: normalized, open: true}, nil
 	}
 	entry, ok := domain.MatchOrigin(project.Origins, normalized)

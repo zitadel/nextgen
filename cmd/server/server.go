@@ -307,6 +307,12 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	if err != nil {
 		return err
 	}
+	// The console previews a project's login from the public base, so the
+	// flow gate admits its origin to every project, as it admits loopback.
+	ownOrigin, err := publicOrigin(cfg.Server.PublicBase)
+	if err != nil {
+		return err
+	}
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
@@ -435,7 +441,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	pinger.Start()
 	defer pinger.Close()
 
-	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService)
+	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, ownOrigin)
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			flowService,
@@ -544,6 +550,25 @@ func consoleBaseURL(publicBase, consolePath string) (string, error) {
 	}
 	base.Path = strings.TrimRight(base.Path, "/") + strings.TrimRight(consolePath, "/")
 	return base.String(), nil
+}
+
+// publicOrigin is the browser origin of the deployment's public base: where
+// its console runs. A browser never spells out the scheme's default port, so
+// neither does this.
+func publicOrigin(publicBase string) (string, error) {
+	base, err := url.Parse(publicBase)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse server public base: %w", err)
+	}
+	host := base.Host
+	if port := base.Port(); (base.Scheme == "https" && port == "443") || (base.Scheme == "http" && port == "80") {
+		host = strings.TrimSuffix(host, ":"+port)
+	}
+	origin, err := domain.NormalizeOrigin(base.Scheme + "://" + host)
+	if err != nil {
+		return "", fmt.Errorf("server public base %q has no valid origin: %w", publicBase, err)
+	}
+	return origin, nil
 }
 
 // ----------------------------- CONFIG --------------------------------------
