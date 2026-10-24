@@ -146,13 +146,19 @@ describe("login flows list", () => {
     try {
       server.use(
         http.get(FLOWS_URL, () =>
-          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+          HttpResponse.json(
+            { code: "internal", message: "boom" },
+            { status: 500, headers: { "x-request-id": "req_01TEST" } },
+          ),
         ),
       );
       await renderAt("/flow-definitions");
       expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
       expect(screen.getByText("Error 500")).toBeInTheDocument();
       expect(screen.getByText("boom")).toBeInTheDocument();
+      // The references to quote: the code and the request ID from the response.
+      expect(screen.getByText("internal")).toBeInTheDocument();
+      expect(screen.getByText("req_01TEST")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
     } finally {
       errorSpy.mockRestore();

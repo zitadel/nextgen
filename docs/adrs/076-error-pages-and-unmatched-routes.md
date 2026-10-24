@@ -86,7 +86,9 @@ Every error page a person sees shows, in this order:
    server's `message`, which the API owns (ADR 030 §4);
 4. the ways on: one primary action, at most one secondary;
 5. a reference to quote, when there is one: the request ID (§3) on the
-   server's page, the error code in the console.
+   server's page; the error code and the failed call's request ID, from its
+   `X-Request-Id`, in the console. A 404 the browser draws for a route no app
+   defines has none: no server handled a request that failed.
 
 | Failure | Title | Sentence the page writes itself |
 |---|---|---|

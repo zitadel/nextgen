@@ -31,9 +31,10 @@ function StatePage({ children }: { children: ReactNode }) {
 
 /**
  * The anatomy every error page shares (ADR 076): the status, a title, one
- * sentence, a way on and, for a refused request, the code to quote. The
- * website, the docs and the server's own page show the same parts in their
- * own chrome.
+ * sentence, a way on and, for a refused request, the references to quote:
+ * the error code, and the request ID that finds the request in the server's
+ * logs. The docs and the server's own page show the same parts in their own
+ * chrome.
  */
 function ErrorPage({
   status,
@@ -41,12 +42,14 @@ function ErrorPage({
   children,
   action,
   code,
+  requestId,
 }: {
   status?: number;
   title: string;
   children: ReactNode;
   action?: ReactNode;
   code?: string;
+  requestId?: string;
 }) {
   return (
     <StatePage>
@@ -57,9 +60,18 @@ function ErrorPage({
         </h1>
         <p className="text-muted-foreground max-w-md text-sm leading-6 text-pretty">{children}</p>
         {action && <div className="mt-3">{action}</div>}
-        {code && (
-          <p className="text-muted-foreground mt-3 text-xs">
-            Code <code className="font-mono">{code}</code>
+        {(code || requestId) && (
+          <p className="text-muted-foreground mt-3 flex flex-wrap justify-center gap-x-3 text-xs">
+            {code && (
+              <span>
+                Code <code className="font-mono">{code}</code>
+              </span>
+            )}
+            {requestId && (
+              <span>
+                Request ID <code className="font-mono">{requestId}</code>
+              </span>
+            )}
           </p>
         )}
       </div>
@@ -145,6 +157,7 @@ export function ErrorState({ error }: ErrorComponentProps) {
           status={error.status}
           title="Console API not authorized"
           code={apiErrorCode(error)}
+          requestId={error.requestId}
           action={<StartPageLink />}
         >
           You are signed in, but the server did not accept your session for this request. Signing
@@ -169,6 +182,7 @@ export function ErrorState({ error }: ErrorComponentProps) {
       status={error instanceof ApiError ? error.status : undefined}
       title={title}
       code={apiErrorCode(error)}
+      requestId={error instanceof ApiError ? error.requestId : undefined}
       action={
         retry ? (
           <Button variant="secondary" onClick={() => void router.invalidate()}>
