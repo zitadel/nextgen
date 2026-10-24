@@ -146,7 +146,6 @@ docker compose up -d
 | Surface            | URL                               |
 | ------------------ | --------------------------------- |
 | Management console | http://localhost:8080/ui/console/ |
-| Sign-in shell      | http://localhost:8080/ui/login/   |
 | Health             | http://localhost:8080/healthz     |
 
 A fresh Compose server has no project and no user yet, so this console shows
@@ -174,7 +173,7 @@ search, and publishes LLM-friendly text at `/docs/llms.txt`,
 ## Current status
 
 This repository is pre-release. The Go `server` command serves the OpenAPI
-surface and embeds the console and login UIs at `/ui/console/` and `/ui/login/`.
+surface and embeds the console at `/ui/console/`; the login lives in your app.
 Releases are `0.x` previews on npm's `latest` tag, and until 1.0.0 a minor
 release can carry a breaking change
 ([ADR 074](docs/adrs/074-preview-releases-on-0x.md)).

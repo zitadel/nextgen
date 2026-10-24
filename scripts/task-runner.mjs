@@ -37,8 +37,8 @@ export function taskRunner(env = process.env) {
 /**
  * The command that runs `targets` (moon `project:task` ids) under the
  * selected runner. Under turbo every named task runs in every named package,
- * so callers pass targets that share one task name (`console:build
- * login-ui:build`), which is what the scripts do.
+ * so callers pass targets that share one task name (`sdk-react:build
+ * components:build`), which is what the scripts do.
  */
 export function runnerCommand(targets, env = process.env) {
   if (targets.length === 0) {

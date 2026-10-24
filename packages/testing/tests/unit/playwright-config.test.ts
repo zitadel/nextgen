@@ -147,10 +147,9 @@ describe("withZitadel", () => {
     );
   });
 
-  // The Zitadel binary embeds the console and hosted login shells, so a suite
-  // testing those has no app server to boot — and booting one would defeat the
-  // point, since a dev server's proxy rewrites the API requests the binary
-  // serves directly.
+  // The Zitadel binary embeds the console, so a suite testing it has no app
+  // server to boot — and booting one would defeat the point, since a dev
+  // server's proxy rewrites the API requests the binary serves directly.
   describe("when the instance serves the app itself", () => {
     const embedded = (): WithZitadelOptions => {
       const { app: _app, ...rest } = options();
