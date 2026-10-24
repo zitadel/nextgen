@@ -59,11 +59,18 @@ export function useRequestedNavItem(items: NavItem[]): NavItem | undefined {
   if (!onProjects || !next) return undefined;
   // `next` is router-relative and sanitized on the way in (`sanitizeNextPath`).
   const { pathname } = new URL(next, "http://console.invalid");
-  // The longest match, so an entry nested under another is not taken for it.
+  return navItemFor(items, pathname);
+}
+
+/**
+ * The entry a path is, or sits beneath: `/users/usr_1` → Users. The longest
+ * match, so an entry nested under another is not taken for it.
+ */
+export function navItemFor(items: NavItem[], path: string): NavItem | undefined {
   let match: NavItem | undefined;
   for (const item of items) {
     const { to } = item;
-    if (!to || to === "/" || (pathname !== to && !pathname.startsWith(`${to}/`))) continue;
+    if (!to || to === "/" || (path !== to && !path.startsWith(`${to}/`))) continue;
     if (!match?.to || to.length > match.to.length) match = item;
   }
   return match;

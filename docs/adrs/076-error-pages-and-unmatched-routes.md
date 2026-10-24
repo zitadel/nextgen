@@ -83,8 +83,13 @@ Every error page a person sees shows, in this order:
 1. the status as an overline, `Error 404`, when there is one;
 2. a title, from the table below;
 3. one sentence: the page's own from the table, or for a refused request the
-   server's `message`, which the API owns (ADR 030 §4);
-4. the ways on: one primary action, at most one secondary;
+   server's `message`, which the API owns (ADR 030 §4). A screen that shows
+   one resource names it when it is gone instead: the server's `user not
+   found` would only repeat the title;
+4. the ways on: one primary action, at most one secondary. In the console,
+   from a missing resource back to the list it was opened from, the project
+   kept; after a server fault, Try again; otherwise Projects, without the
+   project;
 5. a reference to quote, when there is one: the request ID (§3), on the
    server's page its own and in the console the failed call's, from its
    `X-Request-Id`. Not the error code: it is for programs, the sentence says
@@ -95,7 +100,8 @@ Every error page a person sees shows, in this order:
 | Failure | Title | Sentence the page writes itself |
 |---|---|---|
 | A path nothing serves | Page not found | There is nothing at this address. The link may be broken, or the page may have moved. |
-| A resource that is gone (`404`) | Not found | — |
+| A screen's resource that is gone (`404`) | User not found, naming it | There is no user with this ID. It may have been deleted, or the link may be broken. |
+| Any other `404` | Not found | — |
 | A refusal (`403`) | No access | You are signed in, but this account cannot open this page. |
 | Any other refusal (`4xx`) | Request failed | — |
 | A server fault (`5xx`) or a throw | Something went wrong | The server could not complete this request. Try again in a moment. |

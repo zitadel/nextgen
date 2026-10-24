@@ -851,4 +851,40 @@ describe("user detail", () => {
     // The record the screen is about is gone, so staying on it would 404.
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
   });
+
+  it("names a user that does not exist, and leads back to Users in the same project", async () => {
+    // The loader error is expected: silence the error boundary's dump and the
+    // router's route-match warning.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      server.use(
+        http.get(`${USERS_URL}/${USER_ID}`, () =>
+          HttpResponse.json(
+            { code: "user.not_found", message: "user not found" },
+            { status: 404, headers: { "x-request-id": "req_01TEST" } },
+          ),
+        ),
+        http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
+      );
+      const router = await renderDetail();
+
+      expect(await screen.findByRole("heading", { name: "User not found" })).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "There is no user with this ID. It may have been deleted, or the link may be broken.",
+        ),
+      ).toBeInTheDocument();
+      // The server's message would only repeat the title.
+      expect(screen.queryByText("user not found")).not.toBeInTheDocument();
+      expect(screen.getByText("req_01TEST")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("link", { name: "Back to Users" }));
+      await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: TEST_PROJECT_ID });
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
 });
