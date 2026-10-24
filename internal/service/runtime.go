@@ -176,18 +176,25 @@ type matchedOrigin struct {
 	open    bool
 }
 
-// gateOpening is Gate for the request that opens an attempt, which the
-// deployment's own origin passes as well: its console previews a project's
-// login from there with the project's own flow. Only the opening takes this
-// exemption; every later step answers to Gate alone, so that origin can show
-// a project's first step but never sign anyone in.
+// gateOpening is Gate for the request that opens an attempt, which also
+// opens the deployment's own origin where the project's origins refuse it:
+// its console previews a project's login from there with the project's own
+// flow. A project that admits that origin itself keeps its own rules there,
+// deployments and previews included. Only the opening takes this exemption;
+// every later step answers to Gate alone, so that origin can show a project's
+// first step but never sign anyone in.
 func (r *RuntimeResolver) gateOpening(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
-	if r.ownOrigin != "" {
-		if normalized, err := domain.NormalizeOrigin(strings.TrimSpace(origin)); err == nil && normalized == r.ownOrigin {
-			return &matchedOrigin{origin: normalized, open: true}, nil
-		}
+	matched, err := r.Gate(ctx, project, origin)
+	if err == nil || r.ownOrigin == "" {
+		return matched, err
 	}
-	return r.Gate(ctx, project, origin)
+	if !errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)) && !errors.Is(err, domain.ErrProjectPreviewNotLive(nil)) {
+		return nil, err
+	}
+	if normalized, normErr := domain.NormalizeOrigin(strings.TrimSpace(origin)); normErr == nil && normalized == r.ownOrigin {
+		return &matchedOrigin{origin: normalized, open: true}, nil
+	}
+	return nil, err
 }
 
 // Gate decides whether a request from origin may be served at all. An absent
