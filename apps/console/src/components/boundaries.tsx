@@ -79,11 +79,20 @@ function ErrorPage({
   );
 }
 
-/** The way on from an error page: the console's start page. */
-function StartPageLink() {
+/**
+ * The way on from an error page: Projects, without the selected project. Not
+ * the start page, which lands on Users while a project is selected, and not
+ * with the project, which every link keeps (`retainSearchParams` in
+ * `routes/_authed.tsx`): either would lead back to the screen that failed,
+ * as it does for a `?project=` the server refuses. An explicit `undefined`
+ * is what tells the middleware to drop it.
+ */
+function ProjectsLink() {
   return (
     <Button asChild variant="secondary">
-      <Link to="/">Go to the start page</Link>
+      <Link to="/projects" search={{ project: undefined }}>
+        Go to Projects
+      </Link>
     </Button>
   );
 }
@@ -158,7 +167,7 @@ export function ErrorState({ error }: ErrorComponentProps) {
           title="Console API not authorized"
           code={apiErrorCode(error)}
           requestId={error.requestId}
-          action={<StartPageLink />}
+          action={<ProjectsLink />}
         >
           You are signed in, but the server did not accept your session for this request. Signing
           out and in again may help; if it persists, this screen calls an operation the console
@@ -189,7 +198,7 @@ export function ErrorState({ error }: ErrorComponentProps) {
             Try again
           </Button>
         ) : (
-          <StartPageLink />
+          <ProjectsLink />
         )
       }
     >
@@ -201,7 +210,7 @@ export function ErrorState({ error }: ErrorComponentProps) {
 /** Shared not-found boundary: a path no route matches. */
 export function NotFoundState() {
   return (
-    <ErrorPage status={404} title="Page not found" action={<StartPageLink />}>
+    <ErrorPage status={404} title="Page not found" action={<ProjectsLink />}>
       There is nothing at this address. The link may be broken, or the page may have moved.
     </ErrorPage>
   );
