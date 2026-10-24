@@ -48,6 +48,7 @@ export {
   customFlagValues,
   ENABLE_FLAG_KEYS,
   flagText,
+  shellWord,
   SETUP_FLAG_KEYS,
   loopbackIssuerWarning,
   type LoopbackReach,
@@ -57,7 +58,46 @@ export {
   type CustomFlagValues,
 } from "./custom";
 
+export { askClaims } from "./claim-wizard";
+
+export {
+  applyRequest,
+  asksForClaims,
+  claimFlagText,
+  attributesOf,
+  type ClaimFlagNames,
+  type ClaimFlagValues,
+  claimRequestFromFlags,
+  claimsOrRefuse,
+  ENABLE_CLAIM_FLAGS,
+  SETUP_CLAIM_FLAGS,
+  CLAIM_TYPES,
+  claimedConnection,
+  claimNotes,
+  type ClaimEntry,
+  type ClaimRequest,
+  type ClaimType,
+  describeMapping,
+  fieldLabelFor,
+  summariseClaims,
+  type MappingState,
+  NO_CLAIM_REQUEST,
+  parseClaimEntry,
+  parseScopeList,
+  parseVerifiedEntry,
+  type SchemaAttribute,
+  seedMapping,
+  type VerifiedEntry,
+  withClaims,
+} from "./claims";
+
 export { callbackUriFor } from "./callback";
+
+export { registrationLines } from "./registration";
+
+export { askScopes, parseScopeToken } from "./scopes";
+
+export { addAttributesToFlow, addAttributesToSchema } from "./new-attributes";
 
 export { askConnectionEndpoints } from "./endpoints";
 

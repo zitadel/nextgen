@@ -1,3 +1,5 @@
+import type { Writable } from "node:stream";
+
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import {
   type ConnectionEndpoints,
@@ -6,7 +8,9 @@ import {
   providerOf,
 } from "@zitadel/config/idp";
 
+import type { ClaimRequest } from "../../../lib/idp";
 import type { Asker } from "../../../lib/input";
+import type { Wizard } from "../../../lib/wizard";
 import type { FrameworkFacts } from "../../../lib/orca";
 
 /**
@@ -38,6 +42,11 @@ export type SsoDraft = {
    * up locally — see {@link import("./social-sign-in").SocialSignInPrompt}.
    */
   readonly endpoints?: ConnectionEndpoints;
+  /**
+   * The claims asked for beyond the defaults, from `--sso-claim` or from the
+   * wizard. Checked against the schema where the connection is built.
+   */
+  readonly claims?: ClaimRequest;
 };
 
 /**
@@ -93,12 +102,20 @@ export type SetupAnswers = {
 /** Read-only facts a prompt may need. */
 export type PromptContext = {
   /**
+   * The wizard the flow is drawn on, when the command runs it as steps a
+   * person can go back through. A prompt without one makes its own over
+   * {@link PromptContext.input}.
+   */
+  readonly wizard?: Wizard;
+  /** Where the wizard draws, left out for the terminal. Only a test sets it. */
+  readonly wizardOutput?: Writable;
+  /**
    * How a prompt asks its question: `input`, so every question the wizard
    * asks behaves like every other question the CLI asks.
    *
    * Deliberately not the command's `this.input`. That one answers a `confirm`
    * when the command's `--force` is given, and setup's `--force` means "overwrite
-   * files", so with it a prompt such as "Detected next. Proceed?" would be
+   * files", so with it a prompt such as "Set up Zitadel in this Next.js app?" would be
    * answered yes without asking. This one never is.
    */
   readonly input: Asker;

@@ -444,6 +444,82 @@ describe("setup", () => {
         });
       });
 
+      describe("with a custom provider and claim mappings", () => {
+        const BUSINESS = ["--use-case", "business"];
+
+        it("registers the connection with the claim it was given", async () => {
+          const app = await anApp();
+          await app.setupWithCustomSso(ACME, ACME_CREDENTIALS, [
+            ...BUSINESS,
+            "--sso-claim",
+            "companyName=organization",
+          ]);
+
+          const [registered] = await app.registeredIdps();
+
+          expect(registered?.definition?.claim_mapping).toMatchObject({
+            companyName: "organization",
+            givenName: "given_name",
+          });
+        });
+
+        it("leaves nothing to reconcile after the provider is set up with a claim", async () => {
+          const app = await anApp();
+          await app.setupWithCustomSso(ACME, ACME_CREDENTIALS, [
+            ...BUSINESS,
+            "--sso-claim",
+            "companyName=organization",
+          ]);
+
+          expect(await app.plan()).toReportNothingToDo();
+        });
+
+        it("refuses a claim for a property the schema does not define", async () => {
+          const app = await anApp();
+
+          const result = await app.setupWithCustomSso(ACME, ACME_CREDENTIALS, [
+            ...BUSINESS,
+            "--sso-claim",
+            "shoeSize=shoe",
+          ]);
+
+          expect(result).toExplain("shoeSize is not a property of the user schema");
+        });
+
+        it("refuses a claim that already fills a property", async () => {
+          const app = await anApp();
+
+          const result = await app.setupWithCustomSso(ACME, ACME_CREDENTIALS, [
+            ...BUSINESS,
+            "--sso-claim",
+            "companyName=given_name",
+          ]);
+
+          expect(result).toExplain("given_name already fills givenName");
+        });
+
+        it("writes nothing when the claim is refused", async () => {
+          const app = await anApp();
+          const before = await app.snapshot();
+
+          await app.setupWithCustomSso(ACME, ACME_CREDENTIALS, [
+            ...BUSINESS,
+            "--sso-claim",
+            "shoeSize=shoe",
+          ]);
+
+          expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        });
+
+        it("refuses a claim given without a provider", async () => {
+          const app = await anApp();
+
+          const result = await app.setup(["--sso-claim", "companyName=organization"]);
+
+          expect(result).toExplain("--sso-claim needs --sso");
+        });
+      });
+
       describe("with a custom provider but not both credentials", () => {
         const flags = [
           "--sso",

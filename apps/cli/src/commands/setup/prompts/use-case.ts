@@ -21,13 +21,13 @@ export class UseCasePrompt implements SetupPrompt {
     // truth.
     const options: Record<SetupUseCase, { label: string; hint: string }> = {
       minimal: { label: "Just me or a small group", hint: "collects email" },
-      consumer: { label: "Consumers", hint: "collects email, given & family name" },
-      business: { label: "Business", hint: "collects email, given & family name, company" },
+      consumer: { label: "Consumers", hint: "collects email, given name and family name" },
+      business: { label: "Business", hint: "collects email, given name, family name and company" },
     };
     const useCase = await ctx.input({
       kind: "select",
       name: "use case",
-      message: "Who will sign in to your app? Collected fields stay editable after setup.",
+      message: "Who will sign in to your app?",
       initialValue: answers.useCase,
       options: SETUP_USE_CASES.map((useCase) => ({
         value: useCase,

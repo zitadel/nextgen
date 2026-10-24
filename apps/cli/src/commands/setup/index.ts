@@ -39,7 +39,11 @@ import {
 } from "../../lib/claim-state";
 import { isErrno, toZitadelError, ZitadelError } from "../../lib/errors";
 import {
+  asksForClaims,
   callbackUriFor,
+  claimFlagText,
+  claimRequestFromFlags,
+  type ClaimRequest,
   customFlagText,
   checkGivenCustomFlags,
   customExample,
@@ -54,6 +58,7 @@ import {
   reportClientIdOutcome,
   reportSecretOutcome,
   republishCommands,
+  SETUP_CLAIM_FLAGS,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
   storeClientSecret,
@@ -113,6 +118,7 @@ import {
   formatFrameworkLine,
   id as styleId,
   path as stylePath,
+  prettyFramework,
   relativeDisplayPath as relativeDisplay,
   renderSummary,
   url as styleUrl,
@@ -121,6 +127,7 @@ import {
 } from "./summary";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
+import { Wizard } from "../../lib/wizard";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -221,6 +228,20 @@ export default class Setup extends BaseCommand {
       description:
         "With --sso custom: the scopes to request, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),
+    "sso-claim": Flags.string({
+      multiple: true,
+      description:
+        "With --sso: fill a user-schema property from a provider claim, <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned as a number or boolean says so after a colon. Repeatable. Given, it replaces the wizard's claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+    }),
+    "sso-verified-claim": Flags.string({
+      multiple: true,
+      description:
+        "With --sso: how a mapped property is verified, <property>=<claim> for the boolean claim that must be true or <property>=true to trust the provider. Repeatable.",
+    }),
+    "sso-claim-scope": nonBlankString({
+      description:
+        "With --sso: extra scopes the mapped claims need, separated by spaces or commas.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -307,7 +328,13 @@ export default class Setup extends BaseCommand {
 
     const orca = createOrca();
 
-    consola.start(`Detecting framework in ${shortPath(cwd)}`);
+    // A person at a terminal is shown the wizard's own opening line instead of
+    // these two log lines, which would print above its frame.
+    const willAsk = !nonInteractive && !dryRun;
+    if (!willAsk) {
+      consola.start(`Detecting framework in ${shortPath(cwd)}`);
+    }
+    let foundApp: string | undefined;
     // The app the questions are about: the one detected here, or else a new
     // one. Setup creates a new app only once it has every answer, just before
     // it patches it, so cancelling a question leaves the directory as it was,
@@ -321,9 +348,13 @@ export default class Setup extends BaseCommand {
     try {
       detected = await orca.detect(cwd, flags.framework);
       app = { framework: detected.id, devPort: detected.devPort };
-      consola.success(
-        `Detected ${detected.id}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
-      );
+      if (willAsk) {
+        foundApp = `Found a ${prettyFramework(detected.id)} app in this folder. Setup adds sign-in pages to it and connects it to Zitadel.`;
+      } else {
+        consola.success(
+          `Detected ${detected.id}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
+        );
+      }
     } catch (error) {
       if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
         const target = await inspectScaffoldTarget(cwd);
@@ -387,8 +418,13 @@ export default class Setup extends BaseCommand {
       if (!scaffoldedFramework || flags.framework !== undefined) {
         intro("Zitadel setup");
       }
+      const wizard = new Wizard({ ask: wizardInput });
+      if (foundApp !== undefined) {
+        wizard.say(foundApp);
+      }
       const promptCtx = {
-        input: wizardInput,
+        input: wizard.ask,
+        wizard,
         framework: { id: app.framework },
         cwd,
         frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
@@ -1177,6 +1213,9 @@ export async function ssoFromFlags(
     "sso-display-name"?: string;
     "sso-issuer"?: string;
     "sso-scopes"?: string;
+    "sso-claim"?: string[];
+    "sso-verified-claim"?: string[];
+    "sso-claim-scope"?: string;
   },
   nonInteractive: boolean,
   dryRun: boolean,
@@ -1184,7 +1223,25 @@ export async function ssoFromFlags(
   cliVersion: string,
 ): Promise<SsoDraft | undefined> {
   const customValues = customFlagValues(flags, SETUP_FLAG_KEYS);
+  const claims = claimRequestFromFlags(
+    {
+      claim: flags["sso-claim"],
+      scope: flags["sso-claim-scope"],
+      verified: flags["sso-verified-claim"],
+    },
+    SETUP_CLAIM_FLAGS,
+  );
   if (flags.sso === undefined) {
+    if (asksForClaims(claims)) {
+      const given = [
+        ...(claims.entries.length > 0 ? [SETUP_CLAIM_FLAGS.claim] : []),
+        ...(claims.verified.length > 0 ? [SETUP_CLAIM_FLAGS.verified] : []),
+        ...(claims.scopes.length > 0 ? [SETUP_CLAIM_FLAGS.scope] : []),
+      ];
+      throw new ZitadelError("E_VALIDATION", `${given.join(", ")} needs --sso`, {
+        hint: "Name the provider with --sso, e.g. --sso google.",
+      });
+    }
     if (flags["sso-client-id"] !== undefined) {
       throw new ZitadelError("E_VALIDATION", "--sso-client-id needs --sso", {
         hint: "Name the provider with --sso, e.g. --sso google.",
@@ -1206,7 +1263,7 @@ export async function ssoFromFlags(
   const selection = selectionFromFlags(
     flags.sso,
     flags.sso === CUSTOM_PROVIDER && !nonInteractive
-      ? await askCustomSettings(customValues, ask)
+      ? await askCustomSettings(customValues, new Wizard({ ask }))
       : customValues,
     SETUP_FLAG_NAMES,
     SSO_CUSTOM_EXAMPLE,
@@ -1222,7 +1279,7 @@ export async function ssoFromFlags(
     // answers and no other, the way `--preset` does. Only a scripted run has
     // nobody to ask.
     if (!nonInteractive) {
-      return { selection, credentials: {} };
+      return { selection, credentials: {}, claims };
     }
     const entry = providerOf(selection);
     throw new ZitadelError("E_VALIDATION", `--sso ${flags.sso} needs --sso-client-id`, {
@@ -1238,7 +1295,7 @@ export async function ssoFromFlags(
     // materialises nothing, so demanding a real credential to see what setup
     // would do is a toll for no reason -- and `auth-method sso enable --dry-run`
     // returns before asking for one at all.
-    return { selection, credentials: { clientId: clientId.value } };
+    return { selection, credentials: { clientId: clientId.value }, claims };
   }
   // Required, not optional: scaffolding the connection without it writes a
   // sign-in button that fails at the provider with `invalid_client`, long
@@ -1254,7 +1311,7 @@ export async function ssoFromFlags(
     // piped from the caller's own environment.
     retry: `printf '%s' "$CLIENT_SECRET" | ${publicCliCommand(`setup --sso ${flags.sso} --sso-client-id <id> ...`, cliVersion)}`,
   });
-  return { selection, credentials: { clientId: clientId.value, secret } };
+  return { selection, credentials: { clientId: clientId.value, secret }, claims };
 }
 
 /**
@@ -1284,6 +1341,8 @@ export type SetupRetryOptions = {
    * Dropping them would send the developer back without what they typed.
    */
   ssoTyped?: string;
+  /** The claims asked for with `--sso-claim`, which are not credentials and travel in the command. */
+  ssoClaims?: ClaimRequest;
   /**
    * The social provider and its client id. The secret is deliberately absent:
    * a retry asks for it again, or takes it on stdin, because putting a
@@ -1338,6 +1397,9 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
       parts.push(customFlagText(firstSso.connection, SETUP_FLAG_NAMES));
     }
   }
+  if (opts.ssoClaims !== undefined && asksForClaims(opts.ssoClaims)) {
+    parts.push(claimFlagText(opts.ssoClaims, SETUP_CLAIM_FLAGS));
+  }
   // `--non-interactive` is dropped when a provider is being configured: that
   // combination reads the client secret from stdin, and a command handed over
   // as text has no stdin to read. Offering it would advertise a retry that
@@ -1374,6 +1436,9 @@ export function retryOptionsFromFlags(flags: {
   "sso-display-name"?: string;
   "sso-issuer"?: string;
   "sso-scopes"?: string;
+  "sso-claim"?: string[];
+  "sso-verified-claim"?: string[];
+  "sso-claim-scope"?: string;
 }): SetupRetryOptions {
   // The provider survives on its own. A suggested retry carries `--sso`
   // without `--sso-client-id` -- the id is never put in command text -- so
@@ -1406,7 +1471,23 @@ export function retryOptionsFromFlags(flags: {
           .filter((part) => part !== "")
           .join(" ")
       : undefined;
+  // A claim request the checks refuse is left out, like a refused connection.
+  const claims = (() => {
+    try {
+      return claimRequestFromFlags(
+        {
+          claim: flags["sso-claim"],
+          scope: flags["sso-claim-scope"],
+          verified: flags["sso-verified-claim"],
+        },
+        SETUP_CLAIM_FLAGS,
+      );
+    } catch {
+      return undefined;
+    }
+  })();
   return {
+    ssoClaims: claims,
     ssoTyped: typed,
     framework: flags.framework,
     preset: flags.preset as SetupPreset | undefined,

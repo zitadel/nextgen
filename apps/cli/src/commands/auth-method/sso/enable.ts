@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
@@ -27,7 +28,22 @@ import { isDevelopmentBuild } from "../../../lib/build-channel";
 import { ZitadelError } from "../../../lib/errors";
 import { stableStringify } from "../../../lib/json";
 import {
+  addAttributesToFlow,
+  addAttributesToSchema,
+  applyRequest,
   applySsoToFlow,
+  asksForClaims,
+  askClaims,
+  claimFlagText,
+  claimNotes,
+  claimRequestFromFlags,
+  claimsOrRefuse,
+  ENABLE_CLAIM_FLAGS,
+  type MappingState,
+  type SchemaAttribute,
+  seedMapping,
+  summariseClaims,
+  withClaims,
   applySsoToSchema,
   askConnectionEndpoints,
   callbackUriFor,
@@ -42,6 +58,7 @@ import {
   ENABLE_FLAG_NAMES,
   loopbackIssuerWarning,
   planConnection,
+  registrationLines,
   publishClientId,
   type PublishState,
   readConnectionFiles,
@@ -72,6 +89,7 @@ import {
 } from "../../../lib/project";
 import { portableCommands, publicCliCommand } from "../../../lib/public-cli";
 import { reportWarning } from "../../../lib/warnings";
+import { Wizard } from "../../../lib/wizard";
 
 /**
  * The `auth-method sso enable` command (ADR 070) — add a provider to a
@@ -120,6 +138,20 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     "client-id": nonBlankString({
       description: "Client id of the application registered with the provider.",
     }),
+    claim: Flags.string({
+      multiple: true,
+      description:
+        "Fill a user-schema property from a provider claim: <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim the provider returns as a number or boolean says so after a colon (string is the default). Repeatable. Given, it replaces the interactive claim questions; the standard claims whose names match the schema are mapped either way, and a claim you give replaces the default for its property.",
+    }),
+    "verified-claim": Flags.string({
+      multiple: true,
+      description:
+        "Say how a mapped property is verified: <property>=<claim> names the boolean claim that must be true, <property>=true trusts the provider. Repeatable.",
+    }),
+    "claim-scope": nonBlankString({
+      description:
+        "Extra scopes the mapped claims need before the provider returns them, separated by spaces or commas.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -147,6 +179,14 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // catalog provider: a custom connection needs its settings repeated too.
     // `--cwd` only when it can be written unquoted on every shell.
     const cwdText = portableCommands([cwdArgs], cliVersion).length > 0 ? cwdArgs : [];
+    const claimRequest = claimRequestFromFlags(
+      { claim: flags.claim, scope: flags["claim-scope"], verified: flags["verified-claim"] },
+      ENABLE_CLAIM_FLAGS,
+    );
+    const claimsGiven = asksForClaims(claimRequest);
+    // The claims travel in the retry: a rerun that dropped them would create the
+    // connection with the defaults and report success.
+    const claimText = claimsGiven ? [claimFlagText(claimRequest, ENABLE_CLAIM_FLAGS)] : [];
     const retryFor = (clientId: string, pipe = ""): string | undefined =>
       selection.kind === "catalog"
         ? `${pipe}${publicCliCommand(
@@ -155,6 +195,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
               provider,
               "--client-id",
               clientId,
+              ...claimText,
               ...cwdText,
             ].join(" "),
             cliVersion,
@@ -187,6 +228,34 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         `${plan.file.path} already exists, so the ${plan.notApplied.join(" and ")} you gave ${plan.notApplied.length === 1 ? "was" : "were"} not applied. Edit the file to change ${plan.notApplied.length === 1 ? "it" : "them"}.`,
       );
     }
+    // The mapping a new connection will carry, checked against the schema now,
+    // before a secret is asked for or a file is written, like the edits below.
+    // A reused connection keeps the mapping it has: it is the developer's file.
+    const mapped = reusing
+      ? undefined
+      : claimsOrRefuse(
+          applyRequest(
+            seedMapping(
+              entry.connection({
+                slug: plan.slug,
+                schemaProperties: schema.properties,
+                schemaRef: CONNECTION_SCHEMA_REF,
+              }),
+              schema.attributes,
+            ),
+            claimRequest,
+          ),
+          "",
+        );
+    for (const note of mapped === undefined ? [] : claimNotes(mapped)) {
+      reportWarning(note);
+    }
+    if (reusing && claimsGiven) {
+      reportWarning(
+        `${plan.file.path} already exists, so the claims you gave were not applied. Edit claim_mapping in the file to change them.`,
+      );
+    }
+
     // What a newly written connection will reference: this command writes both
     // as `${{ NAME }}`, so on the create path the names are certain.
     const scaffolded = credentialVariables(plan.slug);
@@ -210,7 +279,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // and before the connection is written or a credential published, so a
     // refusal (an edit the editors cannot make, or a flow `plan` would then
     // reject) stops the run with nothing changed (ADR 070 §3).
-    const edits = planEdits(schema, plan.slug, flows);
+    let edits = planEdits(schema, plan.slug, flows);
     refuseBrokenFlows(
       schema,
       edits.schema.document as Record<string, unknown>,
@@ -219,12 +288,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         after: result.document as Record<string, unknown>,
       })),
     );
-    const outcome = {
+    const outcomeOf = (planned: PlannedEdits) => ({
       schema,
       before: schema.body,
-      after: edits.schema.document as Record<string, unknown>,
-      flowsAfter: edits.flows.map(({ result }) => result.document as Record<string, unknown>),
-    };
+      after: planned.schema.document as Record<string, unknown>,
+      flowsAfter: planned.flows.map(({ result }) => result.document as Record<string, unknown>),
+    });
+    let outcome = outcomeOf(edits);
 
     consola.info(`Project   ${secretFile.project_id}`);
     consola.info(
@@ -246,6 +316,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           clientId: undefined,
           idVariable,
           changed: editedFiles(schema, edits),
+          claims: mapped,
         }),
         pretty: `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
       });
@@ -257,6 +328,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // written, both arrive here.
     let secret: SecretOutcome | undefined;
     let clientIdState: PublishState | undefined;
+    let createdClaims: MappingState | undefined;
 
     if (reusing) {
       consola.success(`Reusing ${plan.file.path}`);
@@ -309,16 +381,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         }
       }
     } else {
-      consola.info(`${entry.displayName} needs an OAuth application.`);
-      consola.info(`Callback URI   ${callbackUri}`);
-      // A custom provider has no console to send the developer to: it is
-      // theirs, and the issuer they gave is the only address known.
-      consola.info(
-        entry.consoleUrl === undefined
-          ? `Register it as a client at ${entry.issuer}, with the callback URI above.`
-          : `Create it at   ${entry.consoleUrl}`,
-      );
-
       // Before the credentials: on a development run (ZITADEL_CLI_DEV) the
       // provider may be a local stand-in, and the client is registered with
       // whatever answers. Not asked of a custom connection, whose issuer the
@@ -331,10 +393,24 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
               ask: this.input,
             })
           : undefined;
-      const clientId = await this.input({
+
+      if (mapped === undefined) {
+        throw new Error("a connection being created has a claim mapping");
+      }
+      // A person at a terminal is walked through it as a wizard; a script or an
+      // agent gets the same facts as log lines and answers by flag.
+      const wizard = new Wizard({ ask: this.input });
+      const registration = registrationLines(entry, callbackUri, endpoints?.issuer);
+      if (nonInteractive) {
+        consola.info(registration.join("\n"));
+      } else {
+        intro(`Add "${entry.displayName}"`);
+        wizard.say(registration);
+      }
+      const clientId = await wizard.ask({
         kind: "text",
         name: `client id for ${entry.displayName}`,
-        message: "Client ID",
+        message: "What is the OAuth client ID?",
         flag: "--client-id",
         parse: parseClientId,
         given: flags["client-id"],
@@ -343,24 +419,62 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // Required, like the client id. The connection document references the
       // secret as `${{ NAME }}` and the engine resolves that from the project's
       // variables, so enabling a provider without one writes a sign-in button
-      // that fails at the token endpoint with `invalid_client` -- a failure
-      // that surfaces in a browser, not here. Refusing now is the cheaper answer.
-      const secretValue = await this.input({
+      // that fails at the token endpoint with `invalid_client` -- a failure that
+      // surfaces in a browser, not here. Refusing now is the cheaper answer.
+      const secretValue = await wizard.ask({
         kind: "secret",
         name: `client secret for ${scaffolded.clientSecret}`,
-        message: `Client secret (published to the project as ${scaffolded.clientSecret})`,
+        message: "What is the OAuth client secret?",
         parse: parseClientSecret,
         stdin: true,
         retry: retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
       });
 
+      // Flags that name claims are the whole answer, as `--preset` is for its
+      // question; a run nobody can answer takes the defaults.
+      const claims =
+        nonInteractive || claimsGiven
+          ? mapped
+          : claimsOrRefuse(
+              applyRequest(mapped, await askClaims(mapped, wizard, entry.displayName)),
+              "",
+            );
+      if (!nonInteractive) {
+        outro("Configuration captured");
+      }
+      createdClaims = claims;
+      // Attributes created while mapping claims join the schema and the steps
+      // that ask for a person's details, and the result is checked like any
+      // other edit before anything is written.
+      if (claims.created.length > 0) {
+        edits = withNewAttributes(edits, claims.created);
+        refuseBrokenFlows(
+          schema,
+          edits.schema.document as Record<string, unknown>,
+          edits.flows.map(({ flow, result }) => ({
+            file: flow,
+            after: result.document as Record<string, unknown>,
+          })),
+        );
+        outcome = outcomeOf(edits);
+      }
+      const heard = new Set(claimNotes(mapped));
+      for (const note of claimNotes(claims)) {
+        if (!heard.has(note)) {
+          reportWarning(note);
+        }
+      }
+
       const publish = this.publisher(secretFile);
-      const connection = entry.connection({
-        slug: plan.slug,
-        schemaProperties: schema.properties,
-        schemaRef: CONNECTION_SCHEMA_REF,
-        endpoints,
-      });
+      const connection = withClaims(
+        entry.connection({
+          slug: plan.slug,
+          schemaProperties: schema.properties,
+          schemaRef: CONNECTION_SCHEMA_REF,
+          endpoints,
+        }),
+        claims,
+      );
       // A connection is scaffolded with the properties the provider maps by
       // default, narrowed to what the schema defines. A schema that defines none
       // of them leaves it with no mapping, and `plan` refuses a connection that
@@ -395,6 +509,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         publish,
       });
       consola.success(`Wrote ${plan.path}`);
+      consola.info(`Claims in ${plan.path}:\n  ${summariseClaims(claims).join("\n  ")}`);
     }
 
     const written = await this.enableInConfiguration(cwd, schema, edits);
@@ -450,6 +565,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           idVariable,
           changed: written,
           skipped: edits.skipped,
+          claims: createdClaims,
         }),
         // An ok result carries its follow-ups in data.next_commands (errors
         // use the top-level nextCommands instead).
@@ -520,6 +636,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     idVariable: ClientIdVariable | undefined;
     changed?: string[];
     skipped?: SsoSkipped[];
+    /** What a connection this run creates maps and requests. */
+    claims?: MappingState;
   }): Record<string, unknown> {
     return {
       project_id: input.projectId,
@@ -529,6 +647,14 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         action: input.plan.action,
         slug: input.plan.slug,
         file: input.plan.action === "reuse" ? input.plan.file.path : input.plan.path,
+        ...(input.claims === undefined
+          ? {}
+          : {
+              claim_mapping: input.claims.mapping,
+              new_attributes: input.claims.created.map((one) => one.name),
+              verified_claims: input.claims.verified,
+              scopes: input.claims.scopes,
+            }),
       },
       callback_uri: input.callbackUri,
       changed: input.changed ?? [],
@@ -657,6 +783,30 @@ function planEdits(
     skipped: results.flatMap(({ flow, result }) =>
       result.skipped.map((entry) => ({ ...entry, region: `${flow.path} ${entry.region}` })),
     ),
+  };
+}
+
+/** The planned edits with the user attributes a claim mapping created added to them. */
+function withNewAttributes(edits: PlannedEdits, created: readonly SchemaAttribute[]): PlannedEdits {
+  const names = created.map((one) => one.name);
+  return {
+    ...edits,
+    schema: {
+      ...edits.schema,
+      document: addAttributesToSchema(edits.schema.document as Record<string, unknown>, created),
+      changed: true,
+    },
+    flows: edits.flows.map(({ flow, result }) => {
+      const document = addAttributesToFlow(result.document as Record<string, unknown>, names);
+      return {
+        flow,
+        result: {
+          ...result,
+          document,
+          changed: result.changed || JSON.stringify(document) !== JSON.stringify(result.document),
+        },
+      };
+    }),
   };
 }
 

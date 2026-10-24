@@ -15,6 +15,7 @@ import {
 
 import {
   assertNoSetupResourceConflicts,
+  defaultSchemaAttributes,
   materializeSetupResources,
 } from "../../../src/lib/setup-resources";
 import { IDPS_DIR } from "../../../src/lib/idp";
@@ -786,5 +787,149 @@ describe("assertNoSetupResourceConflicts", () => {
     await writeFile(join(cwd, IDPS_DIR, "google.json"), JSON.stringify({ slug: "google" }));
 
     await expect(assertNoSetupResourceConflicts({ cwd, force: false })).resolves.toBe(undefined);
+  });
+});
+
+describe("materializeSetupResources with a created attribute", () => {
+  const client = () =>
+    ({
+      createIdp: vi.fn().mockResolvedValue({ id: "idp_1" }),
+      createSchema: vi.fn().mockResolvedValue({ id: "sch_1" }),
+      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_1", status: "active" }),
+    }) as unknown as ZitadelClient;
+
+  const claims = {
+    entries: [
+      { attribute: "employeeNumber", claim: "employee_id", type: "integer" as const, create: true },
+    ],
+    verified: [],
+    scopes: [],
+  };
+
+  it("adds the attribute to the schema it uploads", async () => {
+    const api = client();
+
+    await materializeSetupResources({
+      cwd,
+      client: api,
+      projectId: "project_123",
+      force: false,
+      cliVersion: TEST_CLI_VERSION,
+      sso: [{ selection: googleSelection, claims }],
+    });
+
+    const body = vi.mocked(api.createSchema).mock.calls[0]?.[0] as {
+      properties: Record<string, unknown>;
+    };
+    expect(body.properties).toMatchObject({ employeeNumber: { type: "integer" } });
+  });
+
+  it("asks for it on the register step of the flow it uploads", async () => {
+    const api = client();
+
+    await materializeSetupResources({
+      cwd,
+      client: api,
+      projectId: "project_123",
+      force: false,
+      cliVersion: TEST_CLI_VERSION,
+      sso: [{ selection: googleSelection, claims }],
+    });
+
+    const flow = vi.mocked(api.createFlowDefinition).mock.calls[0]?.[0] as {
+      flow_definition: { steps: { name: string; fields?: string[] }[] };
+    };
+    expect(flow.flow_definition.steps.find((step) => step.name === "register")?.fields).toContain(
+      "employeeNumber",
+    );
+  });
+
+  it("maps the claim in the connection it creates", async () => {
+    const api = client();
+
+    await materializeSetupResources({
+      cwd,
+      client: api,
+      projectId: "project_123",
+      force: false,
+      cliVersion: TEST_CLI_VERSION,
+      sso: [{ selection: googleSelection, claims }],
+    });
+
+    const body = vi.mocked(api.createIdp).mock.calls[0]?.[0] as {
+      idp: { claim_mapping: Record<string, string> };
+    };
+    expect(body.idp.claim_mapping).toMatchObject({ employeeNumber: "employee_id" });
+  });
+
+  it("adds nothing to the schema when no attribute was created", async () => {
+    const api = client();
+
+    await materializeSetupResources({
+      cwd,
+      client: api,
+      projectId: "project_123",
+      force: false,
+      cliVersion: TEST_CLI_VERSION,
+    });
+
+    const body = vi.mocked(api.createSchema).mock.calls[0]?.[0] as {
+      properties: Record<string, unknown>;
+    };
+    expect(body.properties).not.toHaveProperty("employeeNumber");
+  });
+});
+
+describe("defaultSchemaAttributes", () => {
+  it("lists the properties the use case's schema defines, with their types", () => {
+    expect(
+      defaultSchemaAttributes("passkey-first", "business").map((one) => [one.name, one.type]),
+    ).toEqual([
+      ["email", "string"],
+      ["givenName", "string"],
+      ["familyName", "string"],
+      ["companyName", "string"],
+    ]);
+  });
+});
+
+describe("assertNoSetupResourceConflicts with claims", () => {
+  it("refuses a claim for a property the schema does not define, before the project exists", async () => {
+    await expect(
+      assertNoSetupResourceConflicts({
+        cwd,
+        force: true,
+        sso: [
+          {
+            selection: googleSelection,
+            claims: {
+              entries: [{ attribute: "shoeSize", claim: "shoe" }],
+              verified: [],
+              scopes: [],
+            },
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("accepts a claim for a property the schema defines", async () => {
+    await expect(
+      assertNoSetupResourceConflicts({
+        cwd,
+        force: true,
+        useCase: "business",
+        sso: [
+          {
+            selection: googleSelection,
+            claims: {
+              entries: [{ attribute: "companyName", claim: "organization" }],
+              verified: [],
+              scopes: [],
+            },
+          },
+        ],
+      }),
+    ).resolves.toBe(undefined);
   });
 });

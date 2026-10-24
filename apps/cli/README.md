@@ -416,36 +416,75 @@ USAGE
   $ zitadel auth-method sso enable [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
     [--provider google|custom] [--slug <value>] [--display-name <value>]
-    [--issuer <value>] [--scopes <value>] [--client-id <value>]
+    [--issuer <value>] [--scopes <value>] [--client-id <value>] [--claim
+    <value>...] [--verified-claim <value>...] [--claim-scope <value>]
 
 FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-  -v, --verbose               Verbose logging.
-      --client-id=<value>     Client id of the application registered with the
-                              provider.
-      --[no-]color            Colorize human output. Disable with --no-color;
-                              NO_COLOR and FORCE_COLOR are honored too.
-      --debug                 Debug logging.
-      --display-name=<value>  Name shown on the custom connection's sign-in
-                              button.
-      --dry-run               Preview without mutating files or the platform.
-      --issuer=<value>        Issuer URL of the custom provider. Its endpoints
-                              are found by OIDC discovery.
-      --provider=<option>     Identity provider to enable, or "custom" for any
-                              other OpenID Connect provider.
-                              <options: google|custom>
-      --schema=<value>        User schema to change. Required when the Project
-                              has more than one.
-      --scopes=<value>        Scopes the custom connection requests, separated
-                              by spaces or commas. Must include openid. Default:
-                              openid profile email.
-      --slug=<value>          Name of the custom connection. Schemas and flows
-                              refer to it by this.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
+  -c, --cwd=<value>
+      Project directory to operate on.
+
+  -n, --non-interactive
+      Disable prompts. Required when scripting or running as an agent.
+
+  -s, --server=<value>
+      Override the resolved server URL.
+
+  -v, --verbose
+      Verbose logging.
+
+  --claim=<value>...
+      Fill a user-schema property from a provider claim: <property>=<claim>, e.g.
+      staffNumber=employee_id:integer. A claim the provider returns as a number or
+      boolean says so after a colon (string is the default). Repeatable. Given, it
+      replaces the interactive claim questions; the standard claims whose names
+      match the schema are mapped either way, and a claim you give replaces the
+      default for its property.
+
+  --claim-scope=<value>
+      Extra scopes the mapped claims need before the provider returns them,
+      separated by spaces or commas.
+
+  --client-id=<value>
+      Client id of the application registered with the provider.
+
+  --[no-]color
+      Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are
+      honored too.
+
+  --debug
+      Debug logging.
+
+  --display-name=<value>
+      Name shown on the custom connection's sign-in button.
+
+  --dry-run
+      Preview without mutating files or the platform.
+
+  --issuer=<value>
+      Issuer URL of the custom provider. Its endpoints are found by OIDC
+      discovery.
+
+  --provider=<option>
+      Identity provider to enable, or "custom" for any other OpenID Connect
+      provider.
+      <options: google|custom>
+
+  --schema=<value>
+      User schema to change. Required when the Project has more than one.
+
+  --scopes=<value>
+      Scopes the custom connection requests, separated by spaces or commas. Must
+      include openid. Default: openid profile email.
+
+  --slug=<value>
+      Name of the custom connection. Schemas and flows refer to it by this.
+
+  --[no-]telemetry
+      Send anonymous usage analytics. Disable with --no-telemetry.
+
+  --verified-claim=<value>...
+      Say how a mapped property is verified: <property>=<claim> names the boolean
+      claim that must be true, <property>=true trusts the provider. Repeatable.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -2123,7 +2162,8 @@ USAGE
     [--preset password-first|passkey-first] [--use-case
     minimal|consumer|business] [--sso google|custom] [--sso-client-id <value>]
     [--sso-slug <value>] [--sso-display-name <value>] [--sso-issuer <value>]
-    [--sso-scopes <value>]
+    [--sso-scopes <value>] [--sso-claim <value>...] [--sso-verified-claim
+    <value>...] [--sso-claim-scope <value>]
 
 FLAGS
   -c, --cwd=<value>
@@ -2181,6 +2221,18 @@ FLAGS
       stdin; never pass it as a flag.
       <options: google|custom>
 
+  --sso-claim=<value>...
+      With --sso: fill a user-schema property from a provider claim,
+      <property>=<claim>, e.g. staffNumber=employee_id:integer. A claim returned
+      as a number or boolean says so after a colon. Repeatable. Given, it replaces
+      the wizard's claim questions; the standard claims whose names match the
+      schema are mapped either way, and a claim you give replaces the default for
+      its property.
+
+  --sso-claim-scope=<value>
+      With --sso: extra scopes the mapped claims need, separated by spaces or
+      commas.
+
   --sso-client-id=<value>
       Client id of the OAuth application registered with the --sso provider.
 
@@ -2198,6 +2250,11 @@ FLAGS
   --sso-slug=<value>
       With --sso custom: the name of the connection. Schemas and flows refer to
       it.
+
+  --sso-verified-claim=<value>...
+      With --sso: how a mapped property is verified, <property>=<claim> for the
+      boolean claim that must be true or <property>=true to trust the provider.
+      Repeatable.
 
   --[no-]telemetry
       Send anonymous usage analytics. Disable with --no-telemetry.

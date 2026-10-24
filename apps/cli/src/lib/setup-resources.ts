@@ -1,6 +1,8 @@
 import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { consola } from "consola";
+
 import type {
   CreateFlowDefinition201,
   CreateIdpBodyIdp,
@@ -38,8 +40,16 @@ import { FLOWS_DIR } from "./flows";
 import {
   applySsoToFlow,
   applySsoToSchema,
+  addAttributesToFlow,
+  addAttributesToSchema,
+  attributesOf,
   authMethods,
+  claimedConnection,
+  type ClaimRequest,
+  claimsOrRefuse,
   CONNECTION_SCHEMA_REF,
+  NO_CLAIM_REQUEST,
+  type SchemaAttribute,
   customFlagText,
   ENABLE_FLAG_NAMES,
   SETUP_FLAG_NAMES,
@@ -53,6 +63,7 @@ import { hashForState } from "./sync";
 import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
 import { ZitadelError } from "./errors";
+import { reportWarning } from "./warnings";
 
 export type MaterializeSetupResourcesResult = {
   filesWritten: string[];
@@ -87,7 +98,11 @@ export async function materializeSetupResources(opts: {
    * The providers to enable, in the order they were chosen. One connection is
    * created per entry, and every slug is added to the schema and the flow.
    */
-  sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
+  sso?: readonly {
+    selection: ProviderSelection;
+    endpoints?: ConnectionEndpoints;
+    claims?: ClaimRequest;
+  }[];
   /**
    * CLI version used to render `zitadel …` command mentions in the scaffolded
    * READMEs as runnable `npx @zitadel/cli@<version> …` commands — the CLI is
@@ -118,9 +133,12 @@ export async function materializeSetupResources(opts: {
   // before it creates the project, through assertNoSetupResourceConflicts.
   const planned = planConnections(schemaTemplate, opts.sso);
   await refuseResourceConflicts(opts.cwd, opts.force, planned);
+  for (const note of planned.flatMap((entry) => entry.notes)) {
+    reportWarning(note);
+  }
 
   const slugs = planned.map((entry) => entry.slug);
-  for (const { connectionPath, connection, selection } of planned) {
+  for (const { connectionPath, connection, selection, summary } of planned) {
     // The create comes before the file. Setup does not remove a connection
     // file it wrote -- that rule is what keeps a developer's own file safe --
     // so writing first would leave one behind on any failure here and the
@@ -148,6 +166,7 @@ export async function materializeSetupResources(opts: {
       )
     ) {
       filesWritten.push(join(opts.cwd, connectionPath));
+      consola.info(`Claims in ${connectionPath}:\n  ${summary.join("\n  ")}`);
     }
     // The file stays as written: the stored connection spells out defaults
     // the file leaves to the server, and `plan` reads those as no change.
@@ -159,9 +178,14 @@ export async function materializeSetupResources(opts: {
 
   // Each slug in turn: the edits are additive and idempotent, so folding them
   // builds one schema that names every chosen provider.
+  // Properties the person chose to create while mapping claims join the schema,
+  // and the register step that asks for a person's details.
+  const created = [
+    ...new Map(planned.flatMap((entry) => entry.created).map((one) => [one.name, one])).values(),
+  ];
   const schemaBody = slugs.reduce<Record<string, unknown>>(
     (document, slug) => applySsoToSchema(document, slug).document as Record<string, unknown>,
-    schemaTemplate,
+    addAttributesToSchema(schemaTemplate, created),
   );
 
   const schemaWritten = await writeResourceFile(
@@ -182,7 +206,10 @@ export async function materializeSetupResources(opts: {
     hash: hashForState({ normalize: normalizeSchemaBody }, schemaBody),
   });
 
-  const flowTemplate = getDefaultLoginFlow({ preset, useCase });
+  const flowTemplate = addAttributesToFlow(
+    getDefaultLoginFlow({ preset, useCase }),
+    created.map((one) => one.name),
+  ) as ReturnType<typeof getDefaultLoginFlow>;
   // The conflict step the provider needs can only offer what this schema
   // actually enables, so the methods are read back off the composed document
   // rather than inferred from the preset.
@@ -254,13 +281,29 @@ export async function assertNoSetupResourceConflicts(opts: {
   force: boolean;
   preset?: SetupPreset;
   useCase?: SetupUseCase;
-  sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
+  sso?: readonly {
+    selection: ProviderSelection;
+    endpoints?: ConnectionEndpoints;
+    claims?: ClaimRequest;
+  }[];
 }): Promise<void> {
   const schemaTemplate = defaultSchemaTemplate(
     opts.preset ?? DEFAULT_SETUP_PRESET,
     opts.useCase ?? DEFAULT_SETUP_USE_CASE,
   );
   await refuseResourceConflicts(opts.cwd, opts.force, planConnections(schemaTemplate, opts.sso));
+}
+
+/**
+ * The properties the default schema for a preset and use case defines, which
+ * bound what a claim can fill. What the wizard maps against before the schema
+ * file exists.
+ */
+export function defaultSchemaAttributes(
+  preset: SetupPreset,
+  useCase: SetupUseCase,
+): SchemaAttribute[] {
+  return attributesOf(defaultSchemaTemplate(preset, useCase));
 }
 
 /** The default human user schema for a preset and use case, without the template's `$id`. */
@@ -281,26 +324,51 @@ type PlannedConnection = {
   connectionPath: string;
   connection: object;
   selection: ProviderSelection;
+  /** What the claim request changed that the developer should hear about. */
+  notes: readonly string[];
+  /** The mapping and scopes the file carries, one line each, for the developer to read. */
+  summary: readonly string[];
+  /** Properties the claim mapping adds to the user schema. */
+  created: readonly SchemaAttribute[];
 };
 
 /** The connection each chosen provider gets, and the file it is written to. */
 function planConnections(
   schemaTemplate: Record<string, unknown>,
-  sso: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[] | undefined,
+  sso:
+    | readonly {
+        selection: ProviderSelection;
+        endpoints?: ConnectionEndpoints;
+        claims?: ClaimRequest;
+      }[]
+    | undefined,
 ): PlannedConnection[] {
   const planned: PlannedConnection[] = [];
   for (const chosen of sso ?? []) {
     const provider = providerOf(chosen.selection);
-    const connection = provider.connection({
-      endpoints: chosen.endpoints,
-      schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
-      schemaRef: CONNECTION_SCHEMA_REF,
-    });
+    // The provider's own mapping, then the standard claims the schema names,
+    // then what was asked for. A request the schema refuses stops setup here,
+    // before a Project exists, like a connection file that is in the way.
+    const claimed = claimsOrRefuse(
+      claimedConnection(
+        provider.connection({
+          endpoints: chosen.endpoints,
+          schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
+          schemaRef: CONNECTION_SCHEMA_REF,
+        }),
+        attributesOf(schemaTemplate),
+        chosen.claims ?? NO_CLAIM_REQUEST,
+      ),
+      "",
+    );
     planned.push({
       slug: provider.slug,
       connectionPath: `${IDPS_DIR}/${provider.slug}.json`,
-      connection,
+      connection: claimed.document,
       selection: chosen.selection,
+      notes: claimed.notes,
+      summary: claimed.summary,
+      created: claimed.created,
     });
   }
   return planned;

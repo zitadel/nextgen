@@ -18,6 +18,7 @@ vi.mock("../../../src/commands/setup/prompts", async (importOriginal) => ({
 import { confirm, intro, isCancel, multiselect, select, text } from "@clack/prompts";
 
 import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
+import { Wizard } from "../../../src/lib/wizard";
 import {
   localServerHostsPlatform,
   retryOptionsFromFlags,
@@ -972,6 +973,25 @@ describe("a retry after a failure before the wizard", () => {
 
     expect(setupRetryFlags(retry)).not.toContain("--sso");
   });
+
+  it("carries the claims that were asked for, since a retry must scaffold the same connection", () => {
+    const retry = retryOptionsFromFlags({
+      sso: "google",
+      "sso-claim": ["staffNumber=employee_id:integer"],
+      "sso-verified-claim": ["staffNumber=true"],
+      "sso-claim-scope": "employee",
+    });
+
+    expect(setupRetryFlags(retry)).toContain(
+      "--sso google --sso-claim staffNumber=employee_id:integer --sso-verified-claim staffNumber=true --sso-claim-scope employee",
+    );
+  });
+
+  it("leaves out a claim it cannot read, as it leaves out a connection the checks refuse", () => {
+    const retry = retryOptionsFromFlags({ sso: "google", "sso-claim": ["nonsense"] });
+
+    expect(setupRetryFlags(retry)).not.toContain("--sso-claim");
+  });
 });
 
 describe("a custom provider named with --sso", () => {
@@ -1004,7 +1024,7 @@ describe("a custom provider named with --sso", () => {
 
     expect(askCustomSettings).toHaveBeenCalledWith(
       expect.objectContaining({ slug: "acme-sso" }),
-      ask,
+      expect.any(Wizard),
     );
   });
 
@@ -1083,7 +1103,7 @@ describe("setup asked on a terminal", () => {
     await settingUp(cwd, "--force").catch(() => undefined);
 
     expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "Detected next. Proceed?" }),
+      expect.objectContaining({ message: "Set up Zitadel in this Next.js app?" }),
     );
   });
 
@@ -1124,7 +1144,9 @@ describe("setup asked on a terminal", () => {
 
       await expect(settingUp(cwd)).rejects.toThrow();
 
-      expect(text).toHaveBeenCalledWith(expect.objectContaining({ message: "Dev server port" }));
+      expect(text).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "Where will your app run during development?" }),
+      );
       expect(await readdir(cwd)).toEqual([]);
     });
 

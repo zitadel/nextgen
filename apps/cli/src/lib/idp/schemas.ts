@@ -5,6 +5,7 @@ import { FLOWS_DIR } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
 import { isErrno, ZitadelError } from "../errors";
 import { isObject } from "../json";
+import { attributesOf, type SchemaAttribute } from "./claims";
 
 /** A user-schema file, with what the command has to show about it. */
 export type SchemaFile = {
@@ -14,6 +15,8 @@ export type SchemaFile = {
   readonly path: string;
   /** Property names the schema defines, used to build the claim mapping. */
   readonly properties: string[];
+  /** The same properties with their types, which bound what a claim can fill. */
+  readonly attributes: SchemaAttribute[];
   /** Authentication methods the schema enables today, for the summary. */
   readonly methods: string[];
   readonly body: Record<string, unknown>;
@@ -78,6 +81,7 @@ export async function readSchemaFiles(cwd: string): Promise<SchemaFile[]> {
       name: basename(entry, ".json"),
       path,
       properties: isObject(body.properties) ? Object.keys(body.properties) : [],
+      attributes: attributesOf(body),
       methods: methodsOf(body),
       body,
     });

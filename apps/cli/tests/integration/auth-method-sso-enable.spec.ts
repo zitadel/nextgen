@@ -492,6 +492,211 @@ describe("auth-method sso enable", () => {
         });
       });
 
+      describe("a custom connection with claim mappings", () => {
+        const STAFF_NUMBER = ["--claim", "staffNumber=employee_id:integer"];
+
+        /** A project whose user schema also holds an integer `staffNumber`. */
+        async function anAppWithStaffNumbers(): Promise<ScaffoldedApp> {
+          const app = await aSetUpApp(["--use-case", "business"]);
+          await app.editUserSchema((schema) => {
+            schema.properties.staffNumber = { type: "integer" };
+            schema.properties.badge = { type: "string" };
+          });
+          return app;
+        }
+
+        const reported = (app: ScaffoldedApp, result: CliResult) =>
+          app.envelopeOf<{ connection: Record<string, unknown> }>(result).data.connection;
+
+        it("maps the standard claims whose names the schema has", async () => {
+          const app = await anAppWithStaffNumbers();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS);
+
+          expect(reported(app, result).claim_mapping).toEqual({
+            email: "email",
+            givenName: "given_name",
+            familyName: "family_name",
+          });
+        });
+
+        it("fills a property from the claim it is given", async () => {
+          const app = await anAppWithStaffNumbers();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS, STAFF_NUMBER);
+
+          expect(reported(app, result).claim_mapping).toMatchObject({ staffNumber: "employee_id" });
+        });
+
+        it("applies once the mapping is in", async () => {
+          const app = await anAppWithStaffNumbers();
+          await app.enableCustomSso(ACME, ACME_CREDENTIALS, STAFF_NUMBER);
+
+          const result = await app.apply();
+
+          expect(result).toSucceed();
+        });
+
+        it("registers the mapping, its verification and its scopes with the platform", async () => {
+          const app = await anAppWithStaffNumbers();
+          await app.enableCustomSso(ACME, ACME_CREDENTIALS, [
+            ...STAFF_NUMBER,
+            "--verified-claim",
+            "staffNumber=true",
+            "--claim-scope",
+            "employee",
+          ]);
+          await app.apply();
+
+          const [registered] = await app.registeredIdps();
+
+          expect(registered?.definition).toMatchObject({
+            claim_mapping: { staffNumber: "employee_id", email: "email" },
+            verified_claims: { staffNumber: true, email: "email_verified" },
+            oidc: { scopes: ["openid", "profile", "email", "employee"] },
+          });
+        });
+
+        it("asks the provider for the scopes the claims need", async () => {
+          const app = await anAppWithStaffNumbers();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS, [
+            ...STAFF_NUMBER,
+            "--claim-scope",
+            "employee",
+          ]);
+
+          expect(reported(app, result).scopes).toEqual(["openid", "profile", "email", "employee"]);
+        });
+
+        it("records how a mapped property is verified", async () => {
+          const app = await anAppWithStaffNumbers();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS, [
+            ...STAFF_NUMBER,
+            "--verified-claim",
+            "staffNumber=true",
+          ]);
+
+          expect(reported(app, result).verified_claims).toMatchObject({ staffNumber: true });
+        });
+
+        it("refuses a string claim for an integer property and says how to declare it", async () => {
+          const app = await anAppWithStaffNumbers();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS, [
+            "--claim",
+            "staffNumber=employee_id",
+          ]);
+
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("refuses a claim that already fills another property", async () => {
+          const app = await anAppWithStaffNumbers();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS, [
+            "--claim",
+            "badge=given_name",
+          ]);
+
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("refuses a property the schema does not define", async () => {
+          const app = await anAppWithStaffNumbers();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS, [
+            "--claim",
+            "shoeSize=shoe",
+          ]);
+
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("refuses to verify a property it does not map", async () => {
+          const app = await anAppWithStaffNumbers();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS, [
+            "--verified-claim",
+            "staffNumber=true",
+          ]);
+
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("names the flag that carried an entry it cannot read", async () => {
+          const app = await anAppWithStaffNumbers();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS, ["--claim", "nonsense"]);
+
+          expect(result).toExplain("--claim");
+        });
+
+        it("writes nothing for a mapping it refuses", async () => {
+          const app = await anAppWithStaffNumbers();
+          const before = await app.snapshot();
+
+          await app.enableCustomSso(ACME, ACME_CREDENTIALS, ["--claim", "staffNumber=employee_id"]);
+
+          expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        });
+
+        it("replaces a mapped default with the claim it is given", async () => {
+          const app = await anAppWithStaffNumbers();
+          await app.enableCustomSso(ACME, ACME_CREDENTIALS, ["--claim", "email=mail"]);
+          await app.apply();
+
+          const [registered] = await app.registeredIdps();
+
+          expect(registered?.definition?.claim_mapping).toMatchObject({ email: "mail" });
+        });
+
+        it("no longer verifies a default it replaced, and says so", async () => {
+          const app = await anAppWithStaffNumbers();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS, [
+            "--claim",
+            "email=mail",
+          ]);
+
+          expect(result).toSay("--verified-claim email=<claim>");
+        });
+
+        it("registers no verification for a default it replaced", async () => {
+          const app = await anAppWithStaffNumbers();
+          await app.enableCustomSso(ACME, ACME_CREDENTIALS, ["--claim", "email=mail"]);
+          await app.apply();
+
+          const [registered] = await app.registeredIdps();
+
+          expect(registered?.definition?.verified_claims).toBeUndefined();
+        });
+
+        it("verifies a replaced default by the claim it is then given", async () => {
+          const app = await anAppWithStaffNumbers();
+          await app.enableCustomSso(ACME, ACME_CREDENTIALS, [
+            "--claim",
+            "email=mail",
+            "--verified-claim",
+            "email=mail_verified",
+          ]);
+          await app.apply();
+
+          const [registered] = await app.registeredIdps();
+
+          expect(registered?.definition?.verified_claims).toEqual({ email: "mail_verified" });
+        });
+
+        it("warns that the claims were not applied to a connection that already exists", async () => {
+          const app = await anAppWithAcme();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS, STAFF_NUMBER);
+
+          expect(result).toSay("claims you gave were not applied");
+        });
+      });
+
       describe("a custom connection enabled again", () => {
         it("warns when the scopes differ", async () => {
           const app = await anAppWithAcme();
@@ -662,7 +867,47 @@ describe("auth-method sso enable", () => {
       });
     });
 
+    describe("a catalog provider with claims but without a client secret", () => {
+      it("suggests the command to run with the claims it was given", async () => {
+        const app = await aSetUpApp(["--use-case", "business"]);
+
+        const result = await app.enableSsoWith(
+          [
+            "--provider",
+            "google",
+            "--client-id",
+            "a-client-id",
+            "--claim",
+            "companyName=organization",
+            "--claim-scope",
+            "organization",
+          ],
+          "",
+        );
+
+        expect(result).toSuggest(
+          "--client-id a-client-id --claim companyName=organization --claim-scope organization",
+        );
+      });
+    });
+
     describe("rendered for a terminal", () => {
+      it("shows the claims the connection maps, and how they are verified", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+
+        expect(result).toSay("email ← email (verified by email_verified)");
+      });
+
+      it("shows the scopes the connection asks for", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+
+        expect(result).toSay("scopes: openid profile email");
+      });
+
       it("says which provider it enabled, and for which schema", async () => {
         const app = await aSetUpApp();
 

@@ -28,6 +28,10 @@
 - Ask for input through `this.input(...)` (`src/lib/input.ts`), never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. A unit test
   fails on a clack import elsewhere.
+- Draw a prompted flow that needs messages, tables or grouped questions with
+  `Wizard` (`src/lib/wizard`), never a log line or a box between prompts. It
+  keeps messages on the prompt rail and nests a group of questions in a branch;
+  the command still owns what to ask.
 - A command whose `--force` means something other than "yes to every
   confirm" builds its own asker with `force: false`, as `setup` does.
 - The flag surface follows the [WebCLI spec](https://webcli.com/). Record a new

@@ -228,9 +228,17 @@ into the external provider's claim names (values):
   scaffolding by intersecting the provider catalog's claim table with the active
   schema's property names (matching strictly by name) to ensure the file never
   starts with unknown targets.
-  For any remaining unmapped properties, tenants must manually add rows mapping
-  their local property name to the exact claim name found in the provider's
-  documentation.
+  The CLI also maps the standard OpenID Connect claims whose names match a
+  schema property (`given_name` to `givenName`) when the connection requests
+  the claim's scope. For any remaining unmapped properties, `--claim
+  <property>=<claim>` or the interactive claim questions add rows, and
+  tenants may add rows by hand with the exact claim name found in the
+  provider's documentation. An explicit `--claim` replaces the default for
+  its property, and the replaced default stops being verified until
+  `--verified-claim` says how. A claim fills one property, a property takes one
+  claim, and a claim's declared type (`string` unless it is a standard claim or
+  is declared with `:integer`, `:number` or `:boolean`) must fit the
+  property's type.
   Once scaffolded, this block is strictly tenant-owned; re-running the setup
   journey will only append new mappings and will never overwrite existing rows.
 - **Known Limitation:** If two schemas use the exact same property name but need
