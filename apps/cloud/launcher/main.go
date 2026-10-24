@@ -61,11 +61,6 @@ const (
 	// server's /ui/console. The server derives the console's URLs (claim,
 	// dashboard) from it, so the three must agree; a test holds them together.
 	consolePath = "/console"
-
-	// loginPath is the hosted login the server serves, the self-hosted
-	// default kept. vercel.json routes it to the server by name, as it does
-	// the API's paths; a test holds the two together.
-	loginPath = "/ui/login"
 )
 
 // servingParams size the pgx pool of one function instance and keep pgx off
@@ -335,13 +330,15 @@ func prepareServer(extra []string) ([]string, error) {
 	// how vercel.json routes, so a leftover variable must not move them. The
 	// login UI stays on because the console service reads
 	// /console/runtime.json, which the server only mounts while one of its
-	// UIs is enabled.
+	// UIs is enabled. The request ID is Vercel's, the one its dashboard shows
+	// for the request: Vercel sets x-vercel-id on every request and replaces
+	// the ID a client sends.
 	for key, value := range map[string]string{
-		"NEXTGEN_SERVER_ADDRESS":         ":" + port,
-		"NEXTGEN_SERVER_CONSOLE_ENABLED": "false",
-		"NEXTGEN_SERVER_CONSOLE_PATH":    consolePath,
-		"NEXTGEN_SERVER_LOGIN_ENABLED":   "true",
-		"NEXTGEN_SERVER_LOGIN_PATH":      loginPath,
+		"NEXTGEN_SERVER_ADDRESS":           ":" + port,
+		"NEXTGEN_SERVER_CONSOLE_ENABLED":   "false",
+		"NEXTGEN_SERVER_CONSOLE_PATH":      consolePath,
+		"NEXTGEN_SERVER_LOGIN_ENABLED":     "true",
+		"NEXTGEN_SERVER_REQUEST_ID_HEADER": "x-vercel-id",
 	} {
 		if err := os.Setenv(key, value); err != nil {
 			return nil, err

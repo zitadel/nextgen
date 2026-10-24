@@ -11,11 +11,11 @@ deployment as six [services](https://vercel.com/docs/services):
 
 | Service | Root | What it is | Paths |
 |---|---|---|---|
-| `server` | `.` | the Go server on Vercel's Go preset, login UI embedded, console off and left out of the build (`-tags noconsole`) | the API's paths, `/ui/login/*`, the sign-in provider callbacks and `/console/runtime.json` by name, and any other request that is not a browser navigation |
+| `server` | `.` | the Go server on Vercel's Go preset, login UI embedded, console off and left out of the build (`-tags noconsole`) | everything else, including `/console/runtime.json` |
 | `console` | `apps/console` | the console SPA, built for `/console/` with Vercel Web Analytics and Speed Insights | `/console/*` |
 | `storybook` | `apps/storybook` | the component workbench, a static build | `/storybook/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
-| `website` | `apps/website` | the front page, the changelog and the host's 404, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/changelog`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*`, and a browser navigation to any path no service answers |
+| `website` | `apps/website` | the front page and the changelog, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/changelog`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
 | `schemas` | `apps/cloud` | the built-in schemas, static files that [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) renders from the server's embedded copies | `/schemas/v1/*` |
 
 The console is served on the same origin, so the session cookie and CSRF work
@@ -49,7 +49,7 @@ here, where no `package.json` makes Vercel detect a framework.
 
 | File | Role |
 |---|---|
-| [`launcher/`](launcher/) | the function binary: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key and Vercel's `PORT` onto the server's configuration; at build time it creates a preview's database, checks the function's configuration and migrates |
+| [`launcher/`](launcher/) | the function binary: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key, Vercel's `PORT` and its `x-vercel-id` request ID onto the server's configuration; at build time it creates a preview's database, checks the function's configuration and migrates |
 | [`build.sh`](build.sh) | the `server` service's build: login UI, launcher, migrations |
 | [`setup-secrets.sh`](setup-secrets.sh) | mints an environment's master key and root admin (with [`admin-document.mjs`](admin-document.mjs)) and sets them on the Vercel project; the originals go to 1Password |
 

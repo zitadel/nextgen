@@ -61,20 +61,28 @@ test("/telemetry/mixpanel/* reaches Mixpanel's EU API", async ({ request }) => {
   expect(await response.json()).toEqual({ error: "token, missing or empty", status: 0 });
 });
 
-// A browser gets the website's 404 and a program the server's envelope
-// (ADR 076). Only a deployment proves it: the rule that tells them apart is a
-// `has` condition, which `vercel dev` ignores.
+// A path no service answers reaches the server: a browser gets its error page
+// and a program its envelope, and both quote Vercel's ID for the request, the
+// one Vercel's logs show (ADR 076). Its x-vercel-id names the regions the
+// request passed, then that ID.
 test("a path no service answers: a page for a browser, the envelope for a program", async ({
   request,
 }) => {
   const path = "/no-such-page-routes-spec";
+  const vercelRequestID = (response: { headers(): Record<string, string> }) =>
+    response.headers()["x-vercel-id"]?.split("::").at(-1);
 
   const page = await request.get(path, { headers: { accept: "text/html" } });
   expect(page.status()).toBe(404);
-  // The website's title, where the server's page would say "· Zitadel".
-  expect(await page.text()).toContain("<title>Page not found — Zitadel preview</title>");
+  const pageID = vercelRequestID(page);
+  expect(pageID).toBeTruthy();
+  expect(page.headers()["x-request-id"]).toBe(pageID);
+  const html = await page.text();
+  expect(html).toContain("<title>Page not found · Zitadel</title>");
+  expect(html).toContain(`Request ID <code>${pageID}</code>`);
 
   const envelope = await request.get(path, { headers: { accept: "application/json" } });
   expect(envelope.status()).toBe(404);
+  expect(envelope.headers()["x-request-id"]).toBe(vercelRequestID(envelope));
   expect(await envelope.json()).toEqual({ code: "req.not_found", message: expect.any(String) });
 });

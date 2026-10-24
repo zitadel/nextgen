@@ -24,11 +24,11 @@ One Vercel deployment, six [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then migrates | by name: the API's paths, the login UI at `/ui/login/`, the sign-in provider callbacks and `/console/runtime.json`; then every other request that is not a browser navigation, answering a path nothing serves with the API's `req.not_found` ([ADR 076](../adrs/076-error-pages-and-unmatched-routes.md)) |
+| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then migrates | every path except the console's, the storybook's, the docs', the website's and the Mixpanel proxy's, including `/console/runtime.json` and the login UI at `/ui/login/` |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `storybook` | Storybook; `turbo run build` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
-| `website` | Next.js; `turbo run build --filter=@zitadel/components`, for the atoms its showcase renders, then `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there), and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link; and the host's 404, for a browser navigation to any path no service serves |
+| `website` | Next.js; `turbo run build --filter=@zitadel/components`, for the atoms its showcase renders, then `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there), and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
 | `schemas` | Static files: Node runs [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs), which needs no install, into `dist/cloud-schemas`. The service is rooted at `apps/cloud`, which holds no `package.json`, so Vercel detects no framework | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
 
 The console lives on the same origin, at `/console/` rather than a
@@ -436,16 +436,11 @@ Where it differs from a deployment:
 - `vercel dev` drops a redirect's query, so an old
   `/ui/console/claim?challenge_id=…` link arrives without its challenge; open
   `/console/claim?…` instead.
-- `vercel dev` drops a rewrite with a `has` condition, so a browser on a path
-  no service answers gets the server's error page, not the website's 404
-  ([ADR 076](../adrs/076-error-pages-and-unmatched-routes.md)); the website's
-  own port shows that page.
 - `CLOUD_URL=http://localhost:3000 pnpm check:cloud` runs the deployment
-  checks against it. Four fail by design: the redirect's query and the
-  website's 404 above; the docs' assets, which `next dev` serves without the
-  deployment's immutable caching; and the schemas' headers, which
-  `vercel dev` replaces with its own (`application/json`, revalidated on every
-  request).
+  checks against it. Three fail by design: the redirect's query above; the
+  docs' assets, which `next dev` serves without the deployment's immutable
+  caching; and the schemas' headers, which `vercel dev` replaces with its own
+  (`application/json`, revalidated on every request).
 - Services is a beta of the Vercel CLI, and `vercel dev` changes from one
   major to the next. The script drives a `vercel` on `PATH` of the major it
   pins and otherwise runs the pinned version through npx; its first lines say
@@ -487,7 +482,9 @@ project and imports the root admin.
 
 - **Logs:** Vercel runtime logs of the `server` function (JSON). The
   launcher's first line names the database host and database it serves
-  from. Add a log drain for retention.
+  from. Add a log drain for retention. A line's `request_id` is Vercel's
+  Request ID for the request (the launcher sets `server.request_id_header`
+  to `x-vercel-id`), the one an error page quotes: search for it.
 - **Cold starts:** a Go instance boots in one to two seconds.
 - **Concurrency:** an instance serves several requests at once on its one
   vCPU, the Go service included, although Vercel's Fluid docs name only

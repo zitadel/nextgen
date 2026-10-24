@@ -1,7 +1,7 @@
 import { links } from "./links";
 import { GitHubMark } from "./github-mark";
 
-export const BUTTON =
+const BUTTON =
   "group inline-flex h-11 items-center gap-2 rounded-lg px-5 font-semibold text-sm transition-colors";
 
 /**

@@ -97,15 +97,12 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 ## Routing
 
-The cloud routes `/`, `/changelog`, `/llms.txt`, `/_next/*`, `/favicon.ico`
-and `/favicons/*` here (repo-root [`vercel.json`](../../vercel.json)), and a
-browser navigation to any path no service answers, which `app/not-found.tsx`
-answers as the host's 404
-([ADR 076](../../docs/adrs/076-error-pages-and-unmatched-routes.md)).
+The cloud routes only `/`, `/changelog`, `/llms.txt`, `/_next/*`,
+`/favicon.ico` and `/favicons/*` here (repo-root
+[`vercel.json`](../../vercel.json)).
 
-- A new page or `public/` file needs a rewrite of its own in `vercel.json`:
-  without one only a browser navigation reaches it, and a program gets the
-  server's 404.
+- A new page or `public/` file needs a rewrite of its own in `vercel.json`, or
+  the server answers it with a 404.
 - Load every other asset from `/_next/`: fonts through `next/font`, images as
   imports. Never use Next's metadata files (`app/icon.svg`, `opengraph-image`),
   which Next serves at the root.

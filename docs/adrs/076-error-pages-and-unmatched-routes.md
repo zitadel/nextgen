@@ -4,7 +4,7 @@
 > **Date:** 2026-10-23
 > **Context:** What a Zitadel host answers when it cannot serve a request: the
 > API's answer to a path or method it does not define, the page a person sees,
-> and which service answers a path nothing serves on the hosted cloud.
+> and the request ID that page quotes.
 > **Amends if accepted:** [ADR 030](030-error-model-mapping-and-reporting.md)
 > §2, which gains two cross-cutting codes, and §4, whose envelope now covers
 > the router's answers too.
@@ -26,6 +26,12 @@ The API itself broke its envelope: ogen's defaults answered a path no operation
 matches with Go's plain-text 404 and a wrong method with an empty 405. A client
 could not tell "this server has no such operation" from "this is not a Zitadel
 API", which is the distinction the CLI reads the envelope's presence for.
+
+And one request had three IDs on the cloud: Vercel's request ID, which its
+dashboard and support use; the Fluid invocation ID of the function instance,
+which can serve several requests at once; and the `req_…` ID the server mints
+for its logs, `X-Request-Id` and audit events. Nothing tied the server's to
+Vercel's.
 
 ## Decision
 
@@ -49,18 +55,26 @@ API", which is the distinction the CLI reads the envelope's presence for.
 - The server's page (`internal/errorpage`) inlines the `--zl-*` tokens it embeds
   from `@zitadel/design-tokens`, reflects nothing from the request, and prints
   the request ID to quote. The sign-in callback's failure is the same page.
+- On the hosted cloud every path no other service answers still reaches the
+  server through `vercel.json`'s catch-all, so the server answers people and
+  programs there exactly as it does self-hosted. The docs and the console
+  answer their own paths, in their own chrome.
 
-### 3. On the cloud, the server is routed its own paths by name
+### 3. One request ID, the proxy's when there is one
 
-- `vercel.json` routes the API's top-level path segments, the login and the
-  sign-in provider callbacks to the server by name. A browser navigation to any
-  other path no service answers goes to the website, whose 404 answers it; any
-  other request falls through to the server, which answers `req.not_found`.
-- `TestVercelJSONRoutesTheServersPathsByName` (`apps/cloud/launcher`) fails
-  when a path of the OpenAPI document or the server's own mux is not routed to
-  the server by name.
-- The docs and the console keep answering their own paths, in their own
-  chrome. A self-hosted server answers every path itself, as §2 describes.
+- `server.request_id_header` names a header a proxy in front of the server sets
+  to its own ID for each request. The server then uses that ID as the request
+  ID, instead of minting a `req_…` one: in every log line, in `X-Request-Id`,
+  on audit events and on the error page. A value that lists hops before the ID
+  gives the part after its last `::`.
+- The cloud's launcher sets it to `x-vercel-id`
+  (`sfo1::fra1::2vxlh-1792820352212-3ce3eb4ad630`), so the reference a person
+  quotes from an error page is the Request ID Vercel's dashboard shows, and
+  finds the request and the server's log lines for it there. Vercel replaces an
+  `x-vercel-id` a client sends, so a client cannot choose its own.
+- Empty, the default, the server mints its own. A header no proxy overwrites
+  would let a client choose its request ID, so the setting is for a deployment
+  behind one, and a value that is not an opaque token is ignored.
 
 ### 4. One anatomy, in each surface's own chrome
 
@@ -71,8 +85,8 @@ Every error page a person sees shows, in this order:
 3. one sentence: the page's own from the table, or for a refused request the
    server's `message`, which the API owns (ADR 030 §4);
 4. the ways on: one primary action, at most one secondary;
-5. a reference to quote, when there is one: the request ID on the server's
-   page, the error code in the console.
+5. a reference to quote, when there is one: the request ID (§3) on the
+   server's page, the error code in the console.
 
 | Failure | Title | Sentence the page writes itself |
 |---|---|---|
@@ -82,11 +96,11 @@ Every error page a person sees shows, in this order:
 | Any other refusal (`4xx`) | Request failed | — |
 | A server fault (`5xx`) or a throw | Something went wrong | The server could not complete this request. Try again in a moment. |
 
-Each surface draws it with its own stack: the website and the docs in Next.js
-(`app/not-found.tsx`, the docs inside their layout with search), the console in
-shadcn (`src/components/boundaries.tsx`), the server in `internal/errorpage`.
-The login shell's notices already have the anatomy. This table is the one home
-of the copy; an implementation names this ADR instead of restating it.
+Each surface draws it with its own stack: the docs in Next.js inside their
+layout, with search (`app/docs/not-found.tsx`), the console in shadcn
+(`src/components/boundaries.tsx`), the server in `internal/errorpage`. The
+login shell's notices already have the anatomy. This table is the one home of
+the copy; an implementation names this ADR instead of restating it.
 
 ### 5. No new error package
 
@@ -98,11 +112,8 @@ logic a second frontend needs moves there, not into a new package.
 
 - The CLI tells a server without the operation (`req.not_found`: "different
   versions") from a server that is not a Zitadel API (no envelope).
-- A new top-level API path needs an entry in `vercel.json`'s server rewrite;
-  the launcher test names the path until it has one.
-- A browser navigation to an unrouted website page still reaches the website,
-  but a program gets the server's 404: a website page still needs its own
-  rewrite.
+- On the cloud, request IDs on audit events are Vercel's, not `req_…`; they
+  are opaque strings either way.
 - The server's page inlines about 7 KB of tokens, so it renders with no second
   request, which on a path nothing serves would only fail again.
 
@@ -111,7 +122,7 @@ logic a second frontend needs moves there, not into a new package.
 - **A shared component** (`<zl-error-page>`, or an npm package of error
   pages): rejected. ADR 055 keeps the console on shadcn and the login on Lit,
   the website paints with its own theme, and the server renders Go templates;
-  one component across them costs more than five short pages kept to one
+  one component across them costs more than a few short pages kept to one
   table.
 - **HTML for every browser request, API paths included**: rejected. An API
   URL's answer would depend on who asks, and the people who open one are
@@ -119,6 +130,12 @@ logic a second frontend needs moves there, not into a new package.
 - **Every unmatched path to the website, programs too**: rejected. A client
   would get HTML for an operation its server lacks and could no longer tell it
   from a server that is not Zitadel.
-- **Keep the cloud's catch-all on the server alone**: workable, since the
-  server's page answers browsers, and it is what a self-hosted server does. On
-  the cloud the website's 404 carries the site's header, footer and ways on.
+- **Route the server's paths by name in `vercel.json` and send browsers on
+  any other path to the website's 404**: tried and rejected. Every new API
+  path needs a rewrite, a missed one breaks browser navigations to it in
+  production only, and the `has` condition on `Accept` that tells browsers
+  from programs is dropped by `vercel dev`, so no local run shows it. The
+  website's header and footer are not worth that; the server's page answers.
+- **Show the proxy's ID beside the server's**: rejected. Two references on one
+  page, and logs that still need a mapping between them; one ID everywhere is
+  the point.
