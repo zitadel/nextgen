@@ -85,10 +85,12 @@ Every error page a person sees shows, in this order:
 3. one sentence: the page's own from the table, or for a refused request the
    server's `message`, which the API owns (ADR 030 §4);
 4. the ways on: one primary action, at most one secondary;
-5. a reference to quote, when there is one: the request ID (§3) on the
-   server's page; the error code and the failed call's request ID, from its
-   `X-Request-Id`, in the console. A 404 the browser draws for a route no app
-   defines has none: no server handled a request that failed.
+5. a reference to quote, when there is one: the request ID (§3), on the
+   server's page its own and in the console the failed call's, from its
+   `X-Request-Id`. Not the error code: it is for programs, the sentence says
+   it for people, and the request ID finds it in the logs. A 404 the browser
+   draws for a route no app defines has no reference: no server handled a
+   request that failed.
 
 | Failure | Title | Sentence the page writes itself |
 |---|---|---|

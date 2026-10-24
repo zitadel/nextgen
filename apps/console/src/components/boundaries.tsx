@@ -31,24 +31,22 @@ function StatePage({ children }: { children: ReactNode }) {
 
 /**
  * The anatomy every error page shares (ADR 076): the status, a title, one
- * sentence, a way on and, for a refused request, the references to quote:
- * the error code, and the request ID that finds the request in the server's
- * logs. The docs and the server's own page show the same parts in their own
- * chrome.
+ * sentence, a way on and, for a refused request, the request ID to quote,
+ * which finds the request in the server's logs. Not the error code: it is for
+ * programs, the sentence already says it for people, and the logs hold it.
+ * The docs and the server's own page show the same parts in their own chrome.
  */
 function ErrorPage({
   status,
   title,
   children,
   action,
-  code,
   requestId,
 }: {
   status?: number;
   title: string;
   children: ReactNode;
   action?: ReactNode;
-  code?: string;
   requestId?: string;
 }) {
   return (
@@ -60,18 +58,9 @@ function ErrorPage({
         </h1>
         <p className="text-muted-foreground max-w-md text-sm leading-6 text-pretty">{children}</p>
         {action && <div className="mt-3">{action}</div>}
-        {(code || requestId) && (
-          <p className="text-muted-foreground mt-3 flex flex-wrap justify-center gap-x-3 text-xs">
-            {code && (
-              <span>
-                Code <code className="font-mono">{code}</code>
-              </span>
-            )}
-            {requestId && (
-              <span>
-                Request ID <code className="font-mono">{requestId}</code>
-              </span>
-            )}
+        {requestId && (
+          <p className="text-muted-foreground mt-3 text-xs">
+            Request ID <code className="font-mono">{requestId}</code>
           </p>
         )}
       </div>
@@ -165,7 +154,6 @@ export function ErrorState({ error }: ErrorComponentProps) {
         <ErrorPage
           status={error.status}
           title="Console API not authorized"
-          code={apiErrorCode(error)}
           requestId={error.requestId}
           action={<ProjectsLink />}
         >
@@ -190,7 +178,6 @@ export function ErrorState({ error }: ErrorComponentProps) {
     <ErrorPage
       status={error instanceof ApiError ? error.status : undefined}
       title={title}
-      code={apiErrorCode(error)}
       requestId={error instanceof ApiError ? error.requestId : undefined}
       action={
         retry ? (
