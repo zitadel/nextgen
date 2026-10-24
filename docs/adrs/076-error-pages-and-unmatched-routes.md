@@ -1,13 +1,18 @@
 # ADR 076: One Envelope for Programs, One Page for People
 
-> **Status:** Proposed
+> **Status:** Implemented — 2026-10-24 (originally Proposed 2026-10-23)
 > **Date:** 2026-10-23
 > **Context:** What a Zitadel host answers when it cannot serve a request: the
 > API's answer to a path or method it does not define, the page a person sees,
 > and the request ID that page quotes.
-> **Amends if accepted:** [ADR 030](030-error-model-mapping-and-reporting.md)
+> **Amends:** [ADR 030](030-error-model-mapping-and-reporting.md)
 > §2, which gains two cross-cutting codes, and §4, whose envelope now covers
 > the router's answers too.
+>
+> **Amendment (2026-10-24):** shipped in #2299 (`internal/errorpage/`, the
+> `req.not_found` and `req.method_not_allowed` codes, the request ID header,
+> and the docs and console error pages); the console shows the failed
+> request's ID since #2301.
 
 ## Context
 

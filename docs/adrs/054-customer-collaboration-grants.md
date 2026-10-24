@@ -14,6 +14,9 @@
 > so claim selects an explicitly authorized target team instead of always
 > reusing the claimer's personal team.
 >
+> **Amended by:** [ADR 075](075-platform-operators.md) — §10's time-bounded
+> grant branch does not apply to platform operators, whose access is standing.
+>
 > **Amended 2026-09-21** (§8): deactivating a team that still holds an active
 > owning-team assignment is rejected until ownerless-team recovery exists
 > (zitadel/nextgen#1261).
