@@ -13,8 +13,8 @@
 > [ADR 030](030-error-model-mapping-and-reporting.md),
 > [ADR 036](036-api-credential-planes.md),
 > [ADR 048](048-wide-events-internal-audit-primitive.md),
-> [ADR 066](066-operation-policies.md), ADR 077 (proposed in
-> [#2298](https://github.com/zitadel/nextgen/pull/2298))
+> [ADR 066](066-operation-policies.md),
+> [ADR 077](077-api-path-prefix.md)
 
 ## Context
 
@@ -99,7 +99,8 @@ On the hosted cloud, Vercel WAF rules on the `cloud` project:
   paths, written up in the runbook.
 - The rules are project state, not deployment state; the
   [runbook](../runbooks/cloud.md) lists them. Scoping them by path gets
-  simpler once ADR 077 puts the API under `/api/v1/`.
+  simpler once [ADR 077](077-api-path-prefix.md) puts the API under
+  `/api/v1/`.
 
 Self-hosted, Zitadel ships no edge. The self-hosting docs carry the same two
 rules for nginx, Caddy, Traefik, Envoy and Cloudflare, keyed by address (an
