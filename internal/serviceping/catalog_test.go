@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -24,8 +25,12 @@ type catalog struct {
 	Components map[string]struct {
 		Context []string `yaml:"context"`
 		Vercel  struct {
-			Prefix string `yaml:"prefix"`
+			Prefix     string   `yaml:"prefix"`
+			Properties []string `yaml:"properties"`
 		} `yaml:"vercel"`
+		Mixpanel struct {
+			Prefix string `yaml:"prefix"`
+		} `yaml:"mixpanel"`
 		Events map[string]struct {
 			Properties   []string `yaml:"properties"`
 			Destinations []string `yaml:"destinations"`
@@ -49,16 +54,20 @@ func loadCatalog(t *testing.T) catalog {
 func TestPingSendsWhatTheCatalogLists(t *testing.T) {
 	c := loadCatalog(t)
 	server := c.Components["server"]
-	name, ok := strings.CutPrefix(EventName, server.Vercel.Prefix)
-	if !ok || server.Vercel.Prefix != EventPrefix {
-		t.Fatalf("the catalog's Vercel prefix for the server is %q, the ping's %q", server.Vercel.Prefix, EventPrefix)
+	for destination, prefix := range map[string]string{"vercel": server.Vercel.Prefix, "mixpanel": server.Mixpanel.Prefix} {
+		if prefix != EventPrefix {
+			t.Errorf("the catalog's %s prefix for the server is %q, the ping's %q", destination, prefix, EventPrefix)
+		}
 	}
+	name := strings.TrimPrefix(EventName, EventPrefix)
 	event, ok := server.Events[name]
 	if !ok {
 		t.Fatalf("the catalog lists no server event %q", name)
 	}
-	if !slices.Contains(event.Destinations, "vercel") {
-		t.Errorf("the catalog does not send %q to vercel", name)
+	for _, destination := range []string{"vercel", "mixpanel"} {
+		if !slices.Contains(event.Destinations, destination) {
+			t.Errorf("the catalog does not send %q to %s", name, destination)
+		}
 	}
 
 	var want []string
@@ -72,12 +81,21 @@ func TestPingSendsWhatTheCatalogLists(t *testing.T) {
 	want = append(want, event.Properties...)
 	slices.Sort(want)
 
-	sent := Facts{}.Properties()
-	if got := slices.Sorted(maps.Keys(sent)); !slices.Equal(got, want) {
-		t.Errorf("the ping sends %v, the catalog lists %v", got, want)
-	}
+	// Mixpanel gets all of it. The token and the time are transport, as for
+	// the CLI, whose SDK adds them.
+	sent := New(Config{MixpanelToken: "tok"}, Facts{}).mixpanelProperties(time.Now(), "insert-id")
 	if sent["surface"] != "server" {
 		t.Errorf("surface = %v, want server", sent["surface"])
+	}
+	delete(sent, "token")
+	delete(sent, "time")
+	if got := slices.Sorted(maps.Keys(sent)); !slices.Equal(got, want) {
+		t.Errorf("the ping sends Mixpanel %v, the catalog lists %v", got, want)
+	}
+	// The Vercel copy keeps the catalog's vercel list.
+	got := slices.Sorted(maps.Keys(Facts{}.Properties()))
+	if listed := slices.Sorted(slices.Values(server.Vercel.Properties)); !slices.Equal(got, listed) {
+		t.Errorf("the ping sends Vercel %v, the catalog lists %v", got, listed)
 	}
 }
 

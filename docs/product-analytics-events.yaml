@@ -204,6 +204,15 @@ properties:
     values: [sqlite, postgres, spanner, unknown]
     description: The server's storage dialect; `unknown` when its database configuration is invalid.
 
+  # Mixpanel
+  ip:
+    type: number
+    values: [0]
+    description: Always 0, so Mixpanel does not locate the sender by IP address.
+  $insert_id:
+    type: string
+    description: A random id per event, so a resent event is counted once.
+
   # CLI invocation
   command:
     type: string
@@ -220,10 +229,6 @@ properties:
   $country_code:
     type: string
     description: The same country, on the install profile.
-  ip:
-    type: number
-    values: [0]
-    description: Always 0, so Mixpanel does not locate the sender by IP address.
   is_tty:
     type: boolean
     description: Whether the CLI ran in a terminal.
@@ -259,9 +264,6 @@ properties:
   distinct_id:
     type: string
     description: The CLI's install id, a random UUID tied to no account or machine.
-  $insert_id:
-    type: string
-    description: A random id per event, so a resent event is counted once.
   $name:
     type: string
     description: A readable label for the install profile, built from the host agent or platform and the install id.
@@ -571,13 +573,18 @@ components:
 
   server:
     source: internal
-    # Every server event carries this after the header.
-    context: [dialect, os, arch]
-    # Proof of concept: an event's name takes the prefix on Vercel.
+    # Every server event carries this after the header. It sends no
+    # distinct_id: the server has no install id yet.
+    context: [dialect, os, arch, ip, $insert_id]
+    # Proof of concept: an event's name takes the prefix in both destinations,
+    # and the Vercel copy keeps these properties.
     vercel:
+      prefix: poc_
+      properties: [surface, server_version, server_kind, dialect, os, arch]
+    mixpanel:
       prefix: poc_
     events:
       service_ping:
         status: emitted
         trigger: At start and then daily, when `service_ping.enabled` is set; it is off by default.
-        destinations: [vercel]
+        destinations: [vercel, mixpanel]

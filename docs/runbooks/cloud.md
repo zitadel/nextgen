@@ -43,9 +43,9 @@ rewrite comes first in `vercel.json`, and a launcher test holds the mount,
 the build's base and the console path together.
 
 `/telemetry/mixpanel/*` belongs to no service: a rewrite forwards it to
-Mixpanel's EU API, `api-eu.mixpanel.com`. The CLI sends its usage
-analytics there, so released CLIs depend on the path: keep it, ahead of
-the server's catch-all.
+Mixpanel's EU API, `api-eu.mixpanel.com`. The CLI's usage analytics and
+the server's service ping go there, so released CLIs and servers depend on
+the path: keep it, ahead of the server's catch-all.
 
 The storybook, the login surface's component workbench, is deployed only
 here. Its orchestrator stories mock the API in the browser with a service

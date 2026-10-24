@@ -5,8 +5,8 @@ import { expect, test } from "@playwright/test";
  * console service at /console/, the server's runtime document under that
  * path, and the old /ui/console links sent on. A wrong rule shows here by
  * name, where the browser test (console.browser.spec.ts) only times out on a
- * blank page. It also holds the Mixpanel proxy the CLI's usage analytics go
- * through, which no other suite reaches.
+ * blank page. It also holds the Mixpanel proxy the CLI's usage analytics and
+ * the server's service ping go through, which no other suite reaches.
  */
 
 test("the server answers /console/runtime.json, under the console's path", async ({ request }) => {
@@ -48,7 +48,8 @@ test("/console and the old /ui/console links redirect, query kept", async ({ req
 });
 
 test("/telemetry/mixpanel/* reaches Mixpanel's EU API", async ({ request }) => {
-  // The CLI sends its usage analytics here (apps/cli/src/lib/telemetry/config.ts).
+  // The CLI's usage analytics and the service ping go here
+  // (apps/cli/src/lib/telemetry/config.ts, internal/serviceping).
   // Without a token Mixpanel records nothing and says so; the server's
   // catch-all would answer with anything but this.
   const events = [{ event: "route_probe", properties: {} }];
