@@ -88,6 +88,13 @@ export type SetupAnswers = {
    * provider, each with its own credentials.
    */
   sso: readonly SsoDraft[];
+  /**
+   * The minimum password length to put into the password policy setup
+   * writes, or `undefined` for none: the file is then written with an empty
+   * `config`. Chosen by {@link import("./password-policy").PasswordPolicyPrompt}
+   * or `--password-min-length`.
+   */
+  passwordMinLength?: number;
 };
 
 /** Read-only facts a prompt may need. */
@@ -159,6 +166,12 @@ export type PromptContext = {
    * nobody to ask, and that one is refused rather than left incomplete.
    */
   readonly ssoFromFlag?: boolean;
+  /**
+   * Whether `--password-min-length` was passed explicitly. When set, the flag
+   * is authoritative and {@link import("./password-policy").PasswordPolicyPrompt}
+   * skips itself.
+   */
+  readonly passwordMinLengthFromFlag?: boolean;
   /**
    * Whether this is a development run (the ZITADEL_CLI_DEV opt-in). Only a
    * development run asks where a provider's endpoints are — see

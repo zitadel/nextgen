@@ -330,33 +330,36 @@ describe("apply", () => {
         ["a value outside its bounds", { min_length: 65 }],
       ])("with %s stops before sending anything", async (_case, config) => {
         const app = await aSetUpApp();
+        const before = await app.publishedPolicies();
         await app.writePasswordPolicy(config);
 
         const result = await app.apply();
 
         expect(result).toFailWith("E_VALIDATION");
-        expect(await app.publishedPolicies()).toEqual([]);
+        expect(await app.publishedPolicies()).toEqual(before);
       });
 
       it("not named after its operation stops before sending anything", async () => {
         const app = await aSetUpApp();
+        const before = await app.publishedPolicies();
         await app.writePasswordPolicy({ min_length: 12 }, { name: "password" });
 
         const result = await app.apply();
 
         expect(result).toFailWith("E_VALIDATION");
         expect(result).toPrint(`${PASSWORD_POLICY}.json`);
-        expect(await app.publishedPolicies()).toEqual([]);
+        expect(await app.publishedPolicies()).toEqual(before);
       });
 
       it("with a minimum above the maximum is refused by the server", async () => {
         const app = await aSetUpApp();
+        const before = await app.publishedPolicies();
         await app.writePasswordPolicy({ min_length: 20, max_length: 10 });
 
         const result = await app.apply();
 
         expect(result).toFailWith("E_VALIDATION");
-        expect(await app.publishedPolicies()).toEqual([]);
+        expect(await app.publishedPolicies()).toEqual(before);
       });
     });
 

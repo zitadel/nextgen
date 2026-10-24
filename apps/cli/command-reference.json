@@ -179,6 +179,11 @@
           ]
         },
         {
+          "name": "password-min-length",
+          "description": "Minimum password length for the project's password policy, for example 15; 0 sets none. Without it, setup writes the policy with no rules; change it in .zitadel/policies/ later.",
+          "type": "option"
+        },
+        {
           "name": "sso",
           "description": "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider. Pipe the client secret in on stdin; never pass it as a flag.",
           "type": "option",

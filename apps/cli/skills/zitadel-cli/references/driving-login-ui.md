@@ -89,7 +89,10 @@ the newest revision applies the next time a password is set. A setting left
 out is off, and `"config": {}` switches every rule off. A policy cannot be
 deleted: removing its file is reported and leaves the policy in place, so
 switch it off with an empty `config` instead. `policies list` and
-`policies get <id|operation>` read them back. Managed files carry a marker comment; `eject` removes only
+`policies get <id|operation>` read them back. `setup` writes and publishes
+the password policy with an empty `config`, which enforces nothing; pass
+`--password-min-length <n>` only when the user gives a value, and do not
+choose one for them. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy
