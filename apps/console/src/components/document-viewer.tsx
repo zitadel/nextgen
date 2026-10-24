@@ -5,6 +5,7 @@ import { CLI_APPLY, CliCommand, CliHint } from "@/components/cli-hint";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type CodeLanguage, type CodeLine, highlightCode } from "@/lib/highlight";
+import { cn } from "@/lib/utils";
 
 /**
  * `lineWidth: 0` disables YAML's line folding. Folding is legal and Shiki reads
@@ -12,6 +13,9 @@ import { type CodeLanguage, type CodeLine, highlightCode } from "@/lib/highlight
  * point of the panel is a document an operator copies into their repo.
  */
 const YAML_OPTIONS = { indent: 2, lineWidth: 0 } as const;
+
+/** The compact viewer's active tab: `accent` reads on `popover` in both themes. */
+const ACCENT_TAB = "data-[state=active]:bg-accent";
 
 /**
  * A configuration document, rendered read-only in JSON or YAML with a copy
@@ -25,8 +29,23 @@ const YAML_OPTIONS = { indent: 2, lineWidth: 0 } as const;
  * `noun` is what the footer calls the document ("schema", "definition") and
  * what the copy button announces. The two screens draw the same panel around
  * different documents, so the noun is the only thing that varies.
+ *
+ * `compact` is the viewer inside a popover (a user's attributes on the Users
+ * list). Those are data rather than configuration, so it drops the CLI hint;
+ * it runs edge to edge under the popover's header instead of in a bordered
+ * box of its own, starts the tab labels on the code's 16px inset, and caps the
+ * code at a popover's height. The active tab takes `accent`: on `popover` a
+ * `muted` fill is the surface's own colour in dark mode and would not show.
  */
-export function DocumentViewer({ document, noun }: { document: unknown; noun: string }) {
+export function DocumentViewer({
+  document,
+  noun,
+  compact = false,
+}: {
+  document: unknown;
+  noun: string;
+  compact?: boolean;
+}) {
   const [format, setFormat] = useState<CodeLanguage>("json");
 
   const source = useMemo(
@@ -40,15 +59,27 @@ export function DocumentViewer({ document, noun }: { document: unknown; noun: st
     // `flex-1 min-w-0` so the viewer takes the width the field table leaves and
     // its own long lines scroll inside it — without it the `pre` sizes to its
     // content and pushes the panel out of the card.
-    <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-border">
-      {/* 4px vertical inset: the header is 48px around a 40px tab strip. */}
-      <div className="flex items-center justify-between border-b border-border py-1 pr-2.5 pl-3">
+    <div
+      className={cn(
+        "flex min-w-0 flex-1 flex-col overflow-hidden border-border",
+        compact ? "border-t" : "rounded-md border",
+      )}
+    >
+      {/* 4px vertical inset: the header is 48px around a 40px tab strip.
+          Compact, the 5px start inset plus the strip's 3px and the trigger's
+          8px put the first label on the code's 16px. */}
+      <div
+        className={cn(
+          "flex items-center justify-between border-b border-border py-1",
+          compact ? "pr-2 pl-[5px]" : "pr-2.5 pl-3",
+        )}
+      >
         <Tabs value={format} onValueChange={(next) => setFormat(next as CodeLanguage)}>
           <TabsList>
-            <TabsTrigger value="json" variant="muted">
+            <TabsTrigger value="json" variant="muted" className={cn(compact && ACCENT_TAB)}>
               JSON
             </TabsTrigger>
-            <TabsTrigger value="yaml" variant="muted">
+            <TabsTrigger value="yaml" variant="muted" className={cn(compact && ACCENT_TAB)}>
               YAML
             </TabsTrigger>
           </TabsList>
@@ -66,7 +97,12 @@ export function DocumentViewer({ document, noun }: { document: unknown; noun: st
           pixels below the fold and leave the field table stranded beside a
           column of JSON. Capping the viewport keeps the hint at the foot and
           the two panels the same order of height the design pairs them at. */}
-      <pre className="max-h-[32rem] overflow-auto p-4 font-mono text-xs leading-5 text-(--zl-syntax-punctuation)">
+      <pre
+        className={cn(
+          "overflow-auto p-4 font-mono text-xs leading-5 text-(--zl-syntax-punctuation)",
+          compact ? "max-h-80" : "max-h-[32rem]",
+        )}
+      >
         {/* Plain until the grammars compile — same face, size and leading, so
             the block does not reflow when the colour arrives. */}
         <code>
@@ -87,10 +123,12 @@ export function DocumentViewer({ document, noun }: { document: unknown; noun: st
         </code>
       </pre>
 
-      <CliHint>
-        Edit the {noun} locally, then apply your changes with <CliCommand>{CLI_APPLY}</CliCommand>.
-        Applying creates a new revision.
-      </CliHint>
+      {!compact && (
+        <CliHint>
+          Edit the {noun} locally, then apply your changes with <CliCommand>{CLI_APPLY}</CliCommand>
+          . Applying creates a new revision.
+        </CliHint>
+      )}
     </div>
   );
 }

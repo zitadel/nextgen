@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Box, MoreVertical, Plus, User } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Box, Columns3, MoreVertical, Plus, User } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
@@ -8,6 +8,10 @@ import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_STICKY_BODY,
+  RESOURCE_STICKY_END,
+  RESOURCE_STICKY_START,
+  RESOURCE_TABLE_SCROLL,
   RESOURCE_TABLE_TOP,
   RESOURCE_TABLE_WRAP,
   ResourceEmptyRow,
@@ -19,20 +23,46 @@ import {
   RowMenu,
 } from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
-import { USER_CLAMP, UserIdCell, UserIdentityCell } from "@/components/user-cells";
+import {
+  USER_CLAMP,
+  UserAttributesCell,
+  UserIdCell,
+  UserIdentityCell,
+} from "@/components/user-cells";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
+import { useScrollEdges } from "@/hooks/use-scroll-edges";
 import {
   projectScopeDeps,
   requireProjectScope,
   useRequiredProjectScope,
 } from "@/lib/project-scope";
-import type { SchemaField } from "@/lib/schema";
 import type { UserTeam } from "@/lib/user";
-import { columnsBeyondIdentity, columnsForUsers, fetchUsers, toUserRow } from "@/lib/user-list";
+import {
+  type ColumnGroup,
+  type ColumnPins,
+  attributeSummary,
+  columnsBeyondIdentity,
+  columnsForUsers,
+  fetchUsers,
+  pinnedColumns,
+  readColumnPins,
+  toUserRow,
+  writeColumnPins,
+} from "@/lib/user-list";
 import { Page } from "@/components/layout";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the single-person glyph. The plural two-person one
@@ -57,7 +87,7 @@ export const Route = createFileRoute("/_authed/users/")({
 interface UsersPage {
   items: Record<string, unknown>[];
   nextPageToken?: string;
-  columns: SchemaField[];
+  columns: ColumnGroup[];
   teamsExpanded: boolean;
 }
 
@@ -80,8 +110,8 @@ function UsersScreen() {
       return {
         items: page.users,
         nextPageToken: page.next_page_token ?? undefined,
-        // A later page can carry a schema the first page never referenced, which
-        // would otherwise render its users with every cell blank.
+        // A later page can carry a schema the first page never referenced, whose
+        // properties the Columns menu would otherwise not offer.
         columns: await columnsForUsers(projectId, [...users, ...page.users]),
         teamsExpanded: page.teamsExpanded,
       };
@@ -102,9 +132,39 @@ function UsersScreen() {
     () => users.map((user, index) => toUserRow(user, index, columns)),
     [users, columns],
   );
-  // Each value once per row: a column that only repeats what the User cell
-  // already shows is dropped (under the default schema, the email).
-  const shown = useMemo(() => columnsBeyondIdentity(columns, rows), [columns, rows]);
+  // What the Columns menu offers, per schema: each value reads once per row, so
+  // a property that only repeats what the User cell already shows is not
+  // offered (under the default schema, the email; D20).
+  const pickable = useMemo(
+    () =>
+      columns
+        .map((group) => ({
+          ...group,
+          fields: columnsBeyondIdentity(
+            group.fields,
+            rows.filter((row) => row.schemaId === group.schemaId),
+          ),
+        }))
+        .filter((group) => group.fields.length > 0),
+    [columns, rows],
+  );
+  const [pins, togglePin] = useColumnPins(projectId);
+  // Schema properties are hidden until the viewer pins them (D23); everything
+  // else a row holds reads in its one bounded Attributes cell.
+  const pinned = useMemo(() => pinnedColumns(pickable, pins), [pickable, pins]);
+  const showAttributes = useMemo(
+    () =>
+      rows.some((row) => {
+        const summary = attributeSummary(row, pinned);
+        return summary.entries.length > 0 || summary.more > 0;
+      }),
+    [rows, pinned],
+  );
+  const scroll = useScrollEdges();
+  const schemaTitles = useMemo(
+    () => new Map(columns.map((group) => [group.schemaId, group.title])),
+    [columns],
+  );
 
   return (
     <Page>
@@ -125,38 +185,69 @@ function UsersScreen() {
         Users
       </ResourceTitle>
 
-      {/* The column set is schema-driven and so has no fixed width. The ID
-          gives way first; a schema with more columns than fit scrolls the
-          table horizontally rather than compressing cells. */}
-      <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
+      {pickable.length > 0 && (
+        <div className={`${RESOURCE_TABLE_TOP} flex justify-end`}>
+          <ColumnsMenu groups={pickable} pins={pins} onToggle={togglePin} />
+        </div>
+      )}
+      {/* The pinned columns give the table no fixed width. The ID gives way
+          first; more pinned columns than fit scroll the table horizontally
+          rather than compressing cells. The row menu (and from 640px the User
+          column) stays pinned to the card's edge while the rest scrolls under
+          it, so the menu is reachable at any width. */}
+      <div
+        ref={scroll.ref}
+        data-scroll-start={scroll.edges.start || undefined}
+        data-scroll-end={scroll.edges.end || undefined}
+        className={`${RESOURCE_TABLE_WRAP} ${pickable.length > 0 ? "mt-3" : RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL}`}
+      >
         <Table className="text-xs">
           <TableHeader>
             <ResourceHeaderRow>
-              <ResourceHeadCell>User</ResourceHeadCell>
-              {shown.map((column) => (
+              <ResourceHeadCell className={RESOURCE_STICKY_START}>User</ResourceHeadCell>
+              {pinned.map((column) => (
                 <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
               ))}
+              {showAttributes && <ResourceHeadCell>Attributes</ResourceHeadCell>}
               <ResourceHeadCell>Status</ResourceHeadCell>
               {/* After `Status`, where the design's column order puts it. */}
-              {teamsExpanded && <ResourceHeadCell>Team</ResourceHeadCell>}
+              {/* Memberships, not ownership: the team that owns a user's
+                  lifecycle is a different relation (ADR 024), in the User
+                  cell's hover card (D23). */}
+              {teamsExpanded && <ResourceHeadCell>Member of</ResourceHeadCell>}
               <ResourceHeadCell>ID</ResourceHeadCell>
-              <ResourceMenuHead className="w-15" />
+              {/* 52px: the 36px menu button and 8px either side. The cell
+                  inset the other columns take would make this pinned column
+                  84px wide for one icon. */}
+              <ResourceMenuHead className={`w-13 px-2 ${RESOURCE_STICKY_END}`} />
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <ResourceEmptyRow colSpan={shown.length + (teamsExpanded ? 5 : 4)}>
+              <ResourceEmptyRow
+                colSpan={pinned.length + (showAttributes ? 1 : 0) + (teamsExpanded ? 5 : 4)}
+              >
                 No users yet.
               </ResourceEmptyRow>
             ) : (
               rows.map((user) => (
                 <ResourceRow key={user.id} className="group">
-                  <UserIdentityCell user={user} />
-                  {shown.map((column) => (
+                  <UserIdentityCell
+                    user={user}
+                    sticky
+                    card={{
+                      schemaTitle: schemaTitles.get(user.schemaId) ?? user.schemaId,
+                      teamsKnown: teamsExpanded,
+                    }}
+                  />
+                  {pinned.map((column) => (
                     <TableCell key={column.key} className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
                       {user.values[column.key] ?? "—"}
                     </TableCell>
                   ))}
+                  {showAttributes && (
+                    <UserAttributesCell user={user} summary={attributeSummary(user, pinned)} />
+                  )}
                   <TableCell className={RESOURCE_CELL}>
                     <StatusBadge status={user.status} />
                   </TableCell>
@@ -166,7 +257,9 @@ function UsersScreen() {
                     </TableCell>
                   )}
                   <UserIdCell user={user} />
-                  <TableCell className={RESOURCE_CELL}>
+                  <TableCell
+                    className={cn(RESOURCE_CELL, "px-2", RESOURCE_STICKY_END, RESOURCE_STICKY_BODY)}
+                  >
                     <RowActions
                       userId={user.id}
                       name={user.name}
@@ -186,8 +279,93 @@ function UsersScreen() {
 }
 
 /**
+ * The viewer's pinned columns for the selected project, kept in their browser
+ * (`readColumnPins`). A toggle takes effect at once and is persisted when it
+ * can be; without storage it lasts until the page is left.
+ */
+function useColumnPins(projectId: string): [ColumnPins, (schemaId: string, key: string) => void] {
+  const [state, setState] = useState(() => ({ projectId, pins: readColumnPins(projectId) }));
+  // Switching project swaps in that project's pins rather than carrying over
+  // another project's: schema ids are unique per project only.
+  const pins = state.projectId === projectId ? state.pins : readColumnPins(projectId);
+
+  const toggle = useCallback(
+    (schemaId: string, key: string) => {
+      const current = pins[schemaId] ?? [];
+      const next = {
+        ...pins,
+        [schemaId]: current.includes(key)
+          ? current.filter((pinned) => pinned !== key)
+          : [...current, key],
+      };
+      writeColumnPins(projectId, next);
+      setState({ projectId, pins: next });
+    },
+    [pins, projectId],
+  );
+
+  return [pins, toggle];
+}
+
+/**
+ * The toolbar's Columns menu: a checkbox per schema property, pinning it as its
+ * own column. Grouped under each schema's title when the loaded users mix
+ * schemas, since a pin belongs to one schema's property.
+ *
+ * Selecting an item keeps the menu open, so several can be pinned in one go.
+ */
+function ColumnsMenu({
+  groups,
+  pins,
+  onToggle,
+}: {
+  groups: ColumnGroup[];
+  pins: ColumnPins;
+  onToggle: (schemaId: string, key: string) => void;
+}) {
+  const grouped = groups.length > 1;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Columns3 aria-hidden strokeWidth={1.5} />
+          Columns
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-56"
+      >
+        {groups.map((group, index) => (
+          <Fragment key={group.schemaId}>
+            {index > 0 && <DropdownMenuSeparator />}
+            {grouped && (
+              <DropdownMenuLabel className="text-muted-foreground truncate text-xs">
+                {group.title}
+              </DropdownMenuLabel>
+            )}
+            {group.fields.map((entry) => (
+              <DropdownMenuCheckboxItem
+                key={entry.key}
+                checked={pins[group.schemaId]?.includes(entry.key) ?? false}
+                onCheckedChange={() => onToggle(group.schemaId, entry.key)}
+                onSelect={(event) => event.preventDefault()}
+              >
+                <span className="truncate">{entry.label}</span>
+              </DropdownMenuCheckboxItem>
+            ))}
+          </Fragment>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
  * The teams a user belongs to, glyphed the way the design draws the cell and the
- * way the Teams directory draws a team row.
+ * way the Teams directory draws a team row. A membership that is not active yet
+ * (`pending`) or any more (`inactive`) says so: the roster returns them beside
+ * the active ones, and an unmarked name would read as a full member.
  *
  * Each name opens its team, as the Teams directory's own rows do — the embedded
  * entry carries the id, so the link costs no extra read.
@@ -220,6 +398,14 @@ function TeamCell({ teams, truncated }: { teams: UserTeam[]; truncated: boolean 
             >
               {team.name}
             </Link>
+            {team.status && team.status !== "active" && (
+              <Badge
+                variant="outline"
+                className="text-muted-foreground ml-1 h-4 rounded-sm border-dashed px-1 align-middle text-[11px] font-normal"
+              >
+                {team.status}
+              </Badge>
+            )}
           </span>
         ))}
       </span>

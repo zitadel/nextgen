@@ -145,31 +145,6 @@ export function schemaFields(schema: UserSchema): SchemaField[] {
 }
 
 /**
- * The columns the users table shows, unioned across every schema the loaded
- * users actually reference.
- *
- * The design has no fixed column set: its `Filled` variant lists
- * Given name / Family name / Company name / Email while `Minimal` lists only
- * Email, because the user model is `additionalProperties: true` keyed on
- * `schema`. The design decisions log (D4) settles what to show — every
- * available field rather than a curated default — so this unions rather than
- * intersects: a project with both a `business` and a `minimal` schema shows the
- * business columns, and minimal users render blank in them.
- *
- * Order follows {@link schemaFields} within a schema, and first-seen order
- * across them, so adding a schema appends columns instead of reshuffling.
- */
-export function schemaColumns(schemas: UserSchema[]): SchemaField[] {
-  const columns = new Map<string, SchemaField>();
-  for (const schema of schemas) {
-    for (const entry of schemaFields(schema)) {
-      if (!columns.has(entry.key)) columns.set(entry.key, entry);
-    }
-  }
-  return [...columns.values()];
-}
-
-/**
  * Every property a schema declares, including the nested objects
  * {@link schemaFields} drops.
  *

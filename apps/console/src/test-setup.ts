@@ -117,6 +117,8 @@ if (typeof window !== "undefined" && !window.matchMedia) {
 // (used by the sidebar user menu). A no-op stub is enough for jsdom specs.
 if (typeof window !== "undefined" && !("ResizeObserver" in window)) {
   class ResizeObserverStub {
+    // The real constructor takes the callback; the stub never calls it.
+    constructor(_callback: ResizeObserverCallback) {}
     observe(): void {
       /* no-op: jsdom specs never lay out */
     }
