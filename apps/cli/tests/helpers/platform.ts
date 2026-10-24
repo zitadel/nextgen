@@ -16,6 +16,23 @@ export interface Captured<T> {
 }
 
 /**
+ * How a Google-shaped identity provider answers a connection. Each field
+ * defaults to the answer under which the connection works.
+ */
+export interface ProviderBehaviour {
+  /** The issuer the discovery document reports; Google's own unless a spec says otherwise. */
+  readonly issuer?: string;
+  readonly callbackUri?: "registered" | "unregistered";
+  readonly client?: "known" | "unknown";
+}
+
+const GOOGLE_ISSUER = "https://accounts.google.com";
+
+/** The cause Google puts in the URL of the error page it ends an authorization request on. */
+const refusalPage = (cause: string) =>
+  `${GOOGLE_ISSUER}/signin/oauth/error?authError=${Buffer.from(`\n\x10${cause}`).toString("base64url")}`;
+
+/**
  * The mock platform for one spec file, with the arrangements a spec is allowed
  * to make of it. A spec says what the platform should do in its own terms; the
  * HTTP it takes to arrange that stays in here.
@@ -65,6 +82,25 @@ export interface PlatformMock {
    * for the person who would finish it in a browser.
    */
   completesTheNextClaim(): void;
+
+  /**
+   * Serves Google as the provider behind the `google` connection: its
+   * discovery document, an authorization endpoint and a token endpoint that
+   * answer as `behaviour` says.
+   */
+  hasGoogle(behaviour?: ProviderBehaviour): void;
+
+  /**
+   * Serves a plain OpenID provider at `issuer`: a discovery document naming
+   * endpoints beneath it, which is all a connection without a known provider
+   * is checked against.
+   */
+  hasOidcProvider(issuer: string): void;
+  /** A provider whose discovery document is larger than the CLI will read. */
+  hasOversizedDiscovery(issuer: string): void;
+
+  /** Makes Google unreachable, as a provider that is down or a network that is cut would. */
+  googleIsUnreachable(): void;
 
   /** Records every published branding revision, which the mock does not keep. */
   capturesBrandingPublishes(): Captured<Record<string, unknown>>;
@@ -154,6 +190,62 @@ export function usePlatformMock(): PlatformMock {
         }
       }, 20);
       watchers.push(watcher);
+    },
+
+    hasGoogle({ callbackUri = "registered", client = "known", issuer = GOOGLE_ISSUER } = {}) {
+      const authorizeTo =
+        client === "unknown"
+          ? refusalPage("invalid_client")
+          : callbackUri === "unregistered"
+            ? refusalPage("redirect_uri_mismatch")
+            : `${GOOGLE_ISSUER}/v3/signin/identifier`;
+      server.use(
+        http.get(`${GOOGLE_ISSUER}/.well-known/openid-configuration`, () =>
+          HttpResponse.json({
+            issuer,
+            authorization_endpoint: `${GOOGLE_ISSUER}/o/oauth2/v2/auth`,
+            token_endpoint: `${GOOGLE_ISSUER}/token`,
+            jwks_uri: `${GOOGLE_ISSUER}/certs`,
+            userinfo_endpoint: `${GOOGLE_ISSUER}/userinfo`,
+            scopes_supported: ["openid", "email", "profile"],
+            claims_supported: ["sub", "email", "email_verified", "given_name", "family_name"],
+            code_challenge_methods_supported: ["plain", "S256"],
+          }),
+        ),
+        http.get(`${GOOGLE_ISSUER}/o/oauth2/v2/auth`, () =>
+          HttpResponse.redirect(authorizeTo, 302),
+        ),
+        http.get(`${GOOGLE_ISSUER}/v3/signin/identifier`, () => HttpResponse.html("sign in")),
+        http.get(`${GOOGLE_ISSUER}/signin/oauth/error`, () => HttpResponse.html("error")),
+      );
+    },
+
+    hasOidcProvider(issuer) {
+      server.use(
+        http.get(`${issuer}/.well-known/openid-configuration`, () =>
+          HttpResponse.json({
+            issuer,
+            authorization_endpoint: `${issuer}/authorize`,
+            token_endpoint: `${issuer}/token`,
+            jwks_uri: `${issuer}/jwks`,
+            userinfo_endpoint: `${issuer}/userinfo`,
+            scopes_supported: ["openid", "profile", "email"],
+            code_challenge_methods_supported: ["S256"],
+          }),
+        ),
+      );
+    },
+
+    hasOversizedDiscovery(issuer) {
+      server.use(
+        http.get(`${issuer}/.well-known/openid-configuration`, () =>
+          HttpResponse.json({ issuer, padding: "x".repeat(2_000_000) }),
+        ),
+      );
+    },
+
+    googleIsUnreachable() {
+      server.use(http.all(`${GOOGLE_ISSUER}/*`, () => HttpResponse.error()));
     },
 
     capturesBrandingPublishes() {
