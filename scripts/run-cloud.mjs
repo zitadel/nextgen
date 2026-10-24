@@ -66,7 +66,7 @@ try {
     NEXTGEN_INSTRUMENTATION_LOG_FORMAT: process.env.NEXTGEN_INSTRUMENTATION_LOG_FORMAT || "text",
     GOFLAGS: [process.env.GOFLAGS, "-tags=noconsole"].filter(Boolean).join(" "),
   };
-  console.log(`[cloud] ${origin}/ (website), /docs, /console/, /storybook/, /ui/login/`);
+  console.log(`[cloud] ${origin}/ (website), /docs, /console/, /storybook/`);
   console.log(`[cloud] root admin: ${join(localDir, "admin.json")}`);
   const vercel = await vercelCli();
   console.log(`[cloud] Vercel CLI ${vercel.version} (${vercel.source})`);
@@ -190,14 +190,13 @@ async function ensureLocalSecrets() {
 }
 
 /**
- * What the services' dev commands read from disk: the login UI the server
- * embeds, the packages the console and storybook builds import, and the
- * docs' generated sources. Two calls, because under turbo every named task
- * runs in every named package.
+ * What the services' dev commands read from disk: the packages the console
+ * and storybook builds import, and the docs' generated sources. Two calls,
+ * because under turbo every named task runs in every named package.
  */
 async function buildPrerequisites() {
   for (const targets of [
-    ["login-ui:build", "sdk-react:build", "api-mock:build", "components:build"],
+    ["sdk-react:build", "api-mock:build", "components:build"],
     ["docs:generate", "design-tokens:generate"],
   ]) {
     const { command, args } = runnerCommand(targets);

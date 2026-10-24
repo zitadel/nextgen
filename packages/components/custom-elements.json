@@ -6123,7 +6123,7 @@
               }
             }
           ],
-          "description": "Standalone branding→theme resolution for callers outside the orchestrator\n(SSR, tests, embedders composing atoms by hand). `<zitadel-login>` itself\nuses ThemeController, which layers the element's `theme` property\nand a variant-derived fallback on top of the same branding input.\n\nDefaults to dark: the design system's primary surface, and the mode a\nhosted login page renders when a revision states no preference."
+          "description": "Standalone branding→theme resolution for callers outside the orchestrator\n(SSR, tests, embedders composing atoms by hand). `<zitadel-login>` itself\nuses ThemeController, which layers the element's `theme` property\nand a variant-derived fallback on top of the same branding input.\n\nDefaults to dark: the design system's primary surface, and the mode a\nlogin page renders when a revision states no preference."
         }
       ],
       "exports": [
@@ -7624,7 +7624,7 @@
                 "text": "\"widget\" | \"page\""
               },
               "default": "\"widget\"",
-              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes — the hosted shell and\nthe scaffolded pages — opt into `page`, which claims the viewport, paints\nthe surface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
+              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes, such as the scaffolded\nlogin pages, opt into `page`, which claims the viewport, paints the\nsurface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
               "attribute": "variant",
               "reflects": true
             },
@@ -7765,7 +7765,7 @@
                 "text": "\"widget\" | \"page\""
               },
               "default": "\"widget\"",
-              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes — the hosted shell and\nthe scaffolded pages — opt into `page`, which claims the viewport, paints\nthe surface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
+              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes, such as the scaffolded\nlogin pages, opt into `page`, which claims the viewport, paints the\nsurface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
               "fieldName": "variant"
             },
             {
@@ -8937,7 +8937,7 @@
                 "text": "\"widget\" | \"page\""
               },
               "default": "\"widget\"",
-              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes — the hosted shell and\nthe scaffolded pages — opt into `page`, which claims the viewport, paints\nthe surface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
+              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes, such as the scaffolded\nlogin pages, opt into `page`, which claims the viewport, paints the\nsurface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
               "attribute": "variant",
               "reflects": true,
               "inheritedFrom": {
@@ -9214,7 +9214,7 @@
                 "text": "\"widget\" | \"page\""
               },
               "default": "\"widget\"",
-              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes — the hosted shell and\nthe scaffolded pages — opt into `page`, which claims the viewport, paints\nthe surface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
+              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes, such as the scaffolded\nlogin pages, opt into `page`, which claims the viewport, paints the\nsurface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
               "fieldName": "variant",
               "inheritedFrom": {
                 "name": "ZitadelSurface",
@@ -9788,7 +9788,7 @@
                 "text": "\"widget\" | \"page\""
               },
               "default": "\"widget\"",
-              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes — the hosted shell and\nthe scaffolded pages — opt into `page`, which claims the viewport, paints\nthe surface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
+              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes, such as the scaffolded\nlogin pages, opt into `page`, which claims the viewport, paints the\nsurface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
               "attribute": "variant",
               "reflects": true,
               "inheritedFrom": {
@@ -9976,7 +9976,7 @@
                 "text": "\"widget\" | \"page\""
               },
               "default": "\"widget\"",
-              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes — the hosted shell and\nthe scaffolded pages — opt into `page`, which claims the viewport, paints\nthe surface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
+              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes, such as the scaffolded\nlogin pages, opt into `page`, which claims the viewport, paints the\nsurface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
               "fieldName": "variant",
               "inheritedFrom": {
                 "name": "ZitadelSurface",
