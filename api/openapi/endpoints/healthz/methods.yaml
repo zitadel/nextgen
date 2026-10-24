@@ -3,20 +3,26 @@ get:
   tags:
     - System
   summary: Check server health
-  description: Check whether the server is healthy
+  description: |
+    Answers `ok` while the server process serves HTTP, as `GET /livez` does, without checking the database.
+
+    > **Deprecated:** point a liveness probe at `GET /livez` and a readiness
+    > probe at `GET /readyz`. This endpoint keeps answering until 1.0.0, with
+    > a `Deprecation` header.
+  deprecated: true
   security: []
   responses:
     '200':
-      description: Server is healthy
+      description: The server process serves HTTP.
+      headers:
+        Deprecation:
+          $ref: ../../components/headers/deprecation.yaml
       content:
         text/plain:
           examples:
             ok:
-              summary: Server is healthy
+              summary: Server is up
               value: ok
-            fail:
-              summary: Server is not healthy
-              value: fail
     '4XX':
       description: The request was rejected by the server.
       content:

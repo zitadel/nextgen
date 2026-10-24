@@ -6335,7 +6335,74 @@ func decodeGetHealthResponse(resp *http.Response) (res GetHealthRes, _ error) {
 			}
 
 			response := GetHealthOK{Data: bytes.NewReader(b)}
-			return &response, nil
+			var wrapper GetHealthOKHeaders
+			wrapper.Response = response
+			h := uri.NewHeaderDecoder(resp.Header)
+			// Parse "Deprecation" header.
+			{
+				cfg := uri.HeaderParameterDecodingConfig{
+					Name:    "Deprecation",
+					Explode: false,
+				}
+				if err := func() error {
+					if err := h.HasParam(cfg); err == nil {
+						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							var wrapperDotDeprecationVal string
+							if err := func() error {
+								val, err := d.DecodeValue()
+								if err != nil {
+									return err
+								}
+
+								c, err := conv.ToString(val)
+								if err != nil {
+									return err
+								}
+
+								wrapperDotDeprecationVal = c
+								return nil
+							}(); err != nil {
+								return err
+							}
+							wrapper.Deprecation.SetTo(wrapperDotDeprecationVal)
+							return nil
+						}); err != nil {
+							return err
+						}
+						if err := func() error {
+							if value, ok := wrapper.Deprecation.Get(); ok {
+								if err := func() error {
+									if err := (validate.String{
+										MinLength:     0,
+										MinLengthSet:  false,
+										MaxLength:     0,
+										MaxLengthSet:  false,
+										Email:         false,
+										Hostname:      false,
+										Regex:         regexMap["^@-?[0-9]+$"],
+										MinNumeric:    0,
+										MinNumericSet: false,
+										MaxNumeric:    0,
+										MaxNumericSet: false,
+									}).Validate(string(value)); err != nil {
+										return errors.Wrap(err, "string")
+									}
+									return nil
+								}(); err != nil {
+									return err
+								}
+							}
+							return nil
+						}(); err != nil {
+							return err
+						}
+					}
+					return nil
+				}(); err != nil {
+					return res, errors.Wrap(err, "parse Deprecation header")
+				}
+			}
+			return &wrapper, nil
 		default:
 			return res, validate.InvalidContentType(ct)
 		}
@@ -8558,6 +8625,25 @@ func decodeGetReadyResponse(resp *http.Response) (res GetReadyRes, _ error) {
 			}
 
 			response := GetReadyOK{Data: bytes.NewReader(b)}
+			return &response, nil
+		default:
+			return res, validate.InvalidContentType(ct)
+		}
+	case 503:
+		// Code 503.
+		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if err != nil {
+			return res, errors.Wrap(err, "parse media type")
+		}
+		switch {
+		case ct == "text/plain":
+			reader := resp.Body
+			b, err := io.ReadAll(reader)
+			if err != nil {
+				return res, err
+			}
+
+			response := GetReadyServiceUnavailable{Data: bytes.NewReader(b)}
 			return &response, nil
 		default:
 			return res, validate.InvalidContentType(ct)

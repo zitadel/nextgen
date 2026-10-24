@@ -46,7 +46,7 @@ describe("withZitadel", () => {
     expect(webServer).toHaveLength(2);
     const [boot, app] = [webServer[0]!, webServer[1]!];
     expect(boot.command).toBe('node "/kit/dist/supervisor.mjs"');
-    expect(boot.url).toBe("http://localhost:8092/healthz");
+    expect(boot.url).toBe("http://localhost:8092/readyz");
     expect(boot.reuseExistingServer).toBe(false);
     expect(boot.gracefulShutdown).toEqual({ signal: "SIGTERM", timeout: 30_000 });
     expect(app.command).toBe('node "/kit/dist/app-runner.mjs"');
@@ -162,7 +162,7 @@ describe("withZitadel", () => {
       expect(webServer).toHaveLength(1);
       const boot = webServer[0]!;
       expect(boot.command).toBe('node "/kit/dist/supervisor.mjs"');
-      expect(boot.url).toBe("http://localhost:8092/healthz");
+      expect(boot.url).toBe("http://localhost:8092/readyz");
       // The fixtures still resolve the instance through the handshake.
       const expected = join("/repo/apps/my-e2e", ".zitadel-testing", "handshake.json");
       expect(process.env.ZITADEL_TESTING_HANDSHAKE).toBe(expected);

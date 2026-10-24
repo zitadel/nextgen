@@ -33423,7 +33423,33 @@ func (s GetHealthOK) Read(p []byte) (n int, err error) {
 	return s.Data.Read(p)
 }
 
-func (*GetHealthOK) getHealthRes() {}
+// GetHealthOKHeaders wraps GetHealthOK with response headers.
+type GetHealthOKHeaders struct {
+	Deprecation OptString
+	Response    GetHealthOK
+}
+
+// GetDeprecation returns the value of Deprecation.
+func (s *GetHealthOKHeaders) GetDeprecation() OptString {
+	return s.Deprecation
+}
+
+// GetResponse returns the value of Response.
+func (s *GetHealthOKHeaders) GetResponse() GetHealthOK {
+	return s.Response
+}
+
+// SetDeprecation sets the value of Deprecation.
+func (s *GetHealthOKHeaders) SetDeprecation(val OptString) {
+	s.Deprecation = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetHealthOKHeaders) SetResponse(val GetHealthOK) {
+	s.Response = val
+}
+
+func (*GetHealthOKHeaders) getHealthRes() {}
 
 // GetIdpByIdErrorResponse represents sum type.
 type GetIdpByIdErrorResponse struct {
@@ -36024,6 +36050,22 @@ func (s GetReadyOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetReadyOK) getReadyRes() {}
+
+type GetReadyServiceUnavailable struct {
+	Data io.Reader
+}
+
+// Read reads data from the Data reader.
+//
+// Kept to satisfy the io.Reader interface.
+func (s GetReadyServiceUnavailable) Read(p []byte) (n int, err error) {
+	if s.Data == nil {
+		return 0, io.EOF
+	}
+	return s.Data.Read(p)
+}
+
+func (*GetReadyServiceUnavailable) getReadyRes() {}
 
 // GetReleaseByIdErrorResponse represents sum type.
 type GetReleaseByIdErrorResponse struct {

@@ -506,7 +506,13 @@ type Handler interface {
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
 	// GetHealth implements getHealth operation.
 	//
-	// Check whether the server is healthy.
+	// Answers `ok` while the server process serves HTTP, as `GET /livez` does, without checking the
+	// database.
+	// > **Deprecated:** point a liveness probe at `GET /livez` and a readiness
+	// > probe at `GET /readyz`. This endpoint keeps answering until 1.0.0, with
+	// > a `Deprecation` header.
+	//
+	// Deprecated: schema marks this operation as deprecated.
 	//
 	// GET /healthz
 	GetHealth(ctx context.Context) (GetHealthRes, error)
@@ -528,7 +534,10 @@ type Handler interface {
 	GetIdpRevisionById(ctx context.Context, params GetIdpRevisionByIdParams) (GetIdpRevisionByIdRes, error)
 	// GetLive implements getLive operation.
 	//
-	// Check whether the server is started.
+	// Answers `ok` while the server process serves HTTP, and checks nothing behind it.
+	// Point a liveness probe here. It never checks the database, so an outage
+	// of the database does not restart every instance; `GET /readyz` takes an
+	// instance out of rotation instead.
 	//
 	// GET /livez
 	GetLive(ctx context.Context) (GetLiveRes, error)
@@ -610,7 +619,10 @@ type Handler interface {
 	GetProject(ctx context.Context, params GetProjectParams) (GetProjectRes, error)
 	// GetReady implements getReady operation.
 	//
-	// Check whether the server is ready to accept requests.
+	// Answers whether the server can serve requests, which takes its database answering within a second.
+	// Point a readiness probe here, so that a server whose database does not
+	// answer gets no requests until it does. The check is one round trip to the
+	// database.
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)

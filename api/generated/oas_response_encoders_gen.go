@@ -3055,16 +3055,44 @@ func encodeGetGrantResponse(response GetGrantRes, w http.ResponseWriter, span tr
 
 func encodeGetHealthResponse(response GetHealthRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *GetHealthOK:
+	case *GetHealthOKHeaders:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Access-Control-Expose-Headers", "Deprecation")
+		// Encoding response headers.
+		{
+			h := uri.NewHeaderEncoder(w.Header())
+			// Encode "Deprecation" header.
+			{
+				cfg := uri.HeaderParameterEncodingConfig{
+					Name:    "Deprecation",
+					Explode: false,
+				}
+				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+					if val, ok := response.Deprecation.Get(); ok {
+						return e.EncodeValue(conv.StringToString(val))
+					}
+					return nil
+				}); err != nil {
+					return errors.Wrap(err, "encode Deprecation header")
+				}
+			}
+		}
 		w.WriteHeader(200)
 		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		writer := w
-		if closer, ok := response.Data.(io.Closer); ok {
+		if closer, ok := response.Response.Data.(io.Closer); ok {
 			defer closer.Close()
 		}
-		if _, err := io.Copy(writer, response); err != nil {
+		if _, err := io.Copy(writer, response.Response); err != nil {
 			return errors.Wrap(err, "write")
 		}
 
@@ -4161,6 +4189,21 @@ func encodeGetReadyResponse(response GetReadyRes, w http.ResponseWriter, span tr
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(200)
 		span.SetStatus(codes.Ok, http.StatusText(200))
+
+		writer := w
+		if closer, ok := response.Data.(io.Closer); ok {
+			defer closer.Close()
+		}
+		if _, err := io.Copy(writer, response); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *GetReadyServiceUnavailable:
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(503)
+		span.SetStatus(codes.Error, http.StatusText(503))
 
 		writer := w
 		if closer, ok := response.Data.(io.Closer); ok {

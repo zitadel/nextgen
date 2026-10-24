@@ -143,7 +143,7 @@ async function writeLocalRuntime(serverUrl: string): Promise<void> {
 
 async function startHealthServer(): Promise<string> {
   const server = createServer((req, res) => {
-    if (req.url === "/healthz") {
+    if (req.url === "/readyz") {
       res.writeHead(200).end("ok");
       return;
     }
