@@ -11,8 +11,16 @@ import (
 )
 
 func (h Handler) CreateAuthAttempt(ctx context.Context, req *api.CreateAuthAttemptRequest) (api.CreateAuthAttemptRes, error) {
+	scopeCtx, ok := GetScopeContext(ctx)
+	if !ok {
+		return nil, domain.ErrAuthUnauthorized(nil)
+	}
+	if bodyProjectID := string(req.GetProjectID()); bodyProjectID != "" && bodyProjectID != scopeCtx.ProjectID {
+		return nil, domain.ErrProjectMismatch()
+	}
+
 	input := service.CreateAuthAttemptInput{
-		ProjectID: string(req.GetProjectID()),
+		ProjectID: scopeCtx.ProjectID,
 	}
 	sessionID, err := h.provenSessionID(ctx, input.ProjectID,
 		string(req.GetSessionID().Or("")), string(req.GetSessionToken().Or("")),
