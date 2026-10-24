@@ -204,13 +204,13 @@ describe("users screen", () => {
     expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
     // The User column leads with the resolved display and carries the link;
     // the designated identifier sits under it, its property as a chip beside
-    // it rather than in a tooltip (D21).
+    // it rather than in a tooltip (D23).
     const link = await screen.findByRole("link", { name: "Maya Patel" });
     const table = within(screen.getByRole("table"));
     const identifier = table.getByText("maya.patel@acme.com").parentElement as HTMLElement;
     expect(within(identifier).getByText("email")).toBeInTheDocument();
     expect(within(link.parentElement as HTMLElement).queryByText("email")).not.toBeInTheDocument();
-    // Schema properties are not columns until the viewer pins one (D21): the
+    // Schema properties are not columns until the viewer pins one (D23): the
     // rest of the record reads in one Attributes cell, in the schema's field
     // order, without the email that would only repeat the line under the name.
     expect(table.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([

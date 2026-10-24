@@ -5,10 +5,10 @@ import {
   RESOURCE_CELL,
   RESOURCE_STICKY_BODY,
   RESOURCE_STICKY_START,
+  ResourceIdCell,
 } from "@/components/resource-list";
 import { TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { CopyButton } from "@/components/ui/copy-button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { InlineCode } from "@/components/ui/inline-code";
 import {
@@ -30,12 +30,6 @@ export const USER_CLAMP = "max-w-70";
 // the value it names (`InlineCode` alone is the 12/16 prose size).
 const IDENTIFIER_CHIP = "text-muted-foreground shrink-0 px-1 py-0 text-[10px] leading-3.5";
 
-// The row's copy button rests hidden and shows on the row's hover or its own
-// focus, so a keyboard reaches it; where there is no hover it always shows.
-// The row needs the `group` class for the hover.
-const ROW_COPY =
-  "shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100";
-
 /**
  * The User cell of a user table: the server-resolved identity (display →
  * identifier → id, ADR 058 §3a) as the link to the user, and the designated
@@ -45,7 +39,7 @@ const ROW_COPY =
  *
  * The identifier carries its property as a chip (`email`, `username`), once,
  * beside whichever line shows it: a list that mixes schemas signs people in
- * with different properties, and a tooltip hid that (D21).
+ * with different properties, and a tooltip hid that (D23).
  *
  * `sticky` pins it to the card's left edge while the other columns scroll
  * under it (the Users list); the header cell over it takes
@@ -193,29 +187,19 @@ function UserIdentityCard({ user, context }: { user: UserRow; context: IdentityC
 }
 
 /**
- * The ID cell of a user table. It takes whatever width the other columns leave
- * (`w-full max-w-0`) and truncates inside it, so the default schema's table
- * fits a 1024px window without scrolling. The tooltip keeps the whole id, and
- * the copy button copies it however much of it shows.
+ * The ID cell of a user table: the shared one (`ResourceIdCell`), which takes
+ * the slack, so the default schema's table fits a 1024px window without
+ * scrolling.
  */
 export function UserIdCell({ user }: { user: UserRow }) {
-  return (
-    <TableCell className={`${RESOURCE_CELL} w-full max-w-0 min-w-40`}>
-      <span className="flex items-center gap-1">
-        <span className="text-foreground min-w-0 truncate text-sm" title={user.id}>
-          {user.id}
-        </span>
-        <CopyButton value={user.id} label={`Copy the ID of ${user.name}`} className={ROW_COPY} />
-      </span>
-    </TableCell>
-  );
+  return <ResourceIdCell id={user.id} name={user.name} />;
 }
 
 /**
  * The Attributes cell of the Users list: one muted line naming the first
  * attributes no column shows, and a count of the rest. It is a fixed 280px
  * wherever a schema has more properties than that, which is what keeps the
- * table's width bounded (D21).
+ * table's width bounded (D23).
  *
  * The line opens the user's whole `attributes` tree in a popover, objects and
  * arrays included, which a cell never stringifies (`toUserRow`). A row with

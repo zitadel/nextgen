@@ -148,6 +148,11 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 	if input.HasTTL && kind == domain.DeploymentOriginKindPrimary {
 		return nil, domain.ErrDeploymentInvalid().WithMessage("ttl is only valid for preview URLs")
 	}
+	var ttl time.Duration
+	// TODO(#2210): take the request's ttl instead of the default.
+	if kind == domain.DeploymentOriginKindPreview {
+		ttl = domain.DefaultPreviewTTL
+	}
 	return s.Create(ctx, CreateDeploymentInput{
 		ProjectID:            input.ProjectID,
 		ReleaseID:            input.ReleaseID,
@@ -157,6 +162,7 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 		Message:              input.Message,
 		RollbackTo:           input.RollbackTo,
 		ExpectedDeploymentID: input.ExpectedDeploymentID,
+		PreviewTTL:           ttl,
 	})
 }
 

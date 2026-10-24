@@ -149,7 +149,7 @@ function UsersScreen() {
     [columns, rows],
   );
   const [pins, togglePin] = useColumnPins(projectId);
-  // Schema properties are hidden until the viewer pins them (D21); everything
+  // Schema properties are hidden until the viewer pins them (D23); everything
   // else a row holds reads in its one bounded Attributes cell.
   const pinned = useMemo(() => pinnedColumns(pickable, pins), [pickable, pins]);
   const showAttributes = useMemo(
@@ -213,7 +213,7 @@ function UsersScreen() {
               {/* After `Status`, where the design's column order puts it. */}
               {/* Memberships, not ownership: the team that owns a user's
                   lifecycle is a different relation (ADR 024), in the User
-                  cell's hover card (D21). */}
+                  cell's hover card (D23). */}
               {teamsExpanded && <ResourceHeadCell>Member of</ResourceHeadCell>}
               <ResourceHeadCell>ID</ResourceHeadCell>
               {/* 52px: the 36px menu button and 8px either side. The cell

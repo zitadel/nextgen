@@ -122,9 +122,10 @@ upgrade, so upgrade the app and rerun rather than retrying.
   `${{ NAME }}` reference to a project variable is not a secret and may stay on
   argv (a connection's `client_secret` takes nothing else); write it in single
   quotes, since inside double quotes the shell reads `${` as its own expansion.
-- **Streams.** Capture stdout and stderr separately when scripting. The machine
-  contract is one parseable JSON object on stdout; installer, audit, and
-  package-manager progress belongs on stderr.
+- **Streams.** Capture stdout and stderr separately when scripting, into files
+  outside the app directory: `setup` scaffolds a new app only into an empty
+  directory. The machine contract is one parseable JSON object on stdout;
+  installer, audit, and package-manager progress belongs on stderr.
 
 ## Discovering commands
 

@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -100,12 +101,23 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 		ev.ProjectID = ac.ProjectID
 		ev.Payload = payload
 		if c := clientFromRequest(r); c != nil {
-			if meta, err := events.MarshalPayload(domain.EventMetadata{Client: c}); err == nil {
+			if meta, err := withClient(ev.Metadata, c); err == nil {
 				ev.Metadata = meta
 			}
 		}
 		buf.EnqueueSince(ctx, ev, start)
 	})
+}
+
+// withClient merges the requestor context into the metadata FromContext wrote,
+// so every metadata field has one writer.
+func withClient(raw json.RawMessage, client *domain.EventClientMetadata) (json.RawMessage, error) {
+	var meta domain.EventMetadata
+	if err := json.Unmarshal(raw, &meta); err != nil {
+		return nil, err
+	}
+	meta.Client = client
+	return events.MarshalPayload(meta)
 }
 
 func clientFromRequest(r *http.Request) *domain.EventClientMetadata {

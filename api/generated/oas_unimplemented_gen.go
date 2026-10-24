@@ -139,7 +139,7 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 // - `400 dep.variables_missing`: a referenced variable has no value for
 // the kind; `details` names the kind and every missing variable.
 // - `403 proj.origin_not_allowed`: a preview URL matches no preview
-// pattern.
+// pattern, or is a loopback URL.
 // - `404 rel.not_found`: the release id or digest names no release here.
 // - `409 dep.conflict`: `expected_deployment_id` is not the deployment
 // this write replaces; `details.deployment` is that deployment.
@@ -716,6 +716,18 @@ func (UnimplementedHandler) GetMyUserSchema(ctx context.Context, params GetMyUse
 	return r, ht.ErrNotImplemented
 }
 
+// GetPolicy implements getPolicy operation.
+//
+// Reads a policy as its newest revision, the one that applies the next time
+// its operation runs.
+// The lookup is scoped to the project in `project_id`: a policy of another
+// project answers not found exactly as an unknown id does.
+//
+// GET /policies/{policy_id}
+func (UnimplementedHandler) GetPolicy(ctx context.Context, params GetPolicyParams) (r GetPolicyRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetPolicyRevision implements getPolicyRevision operation.
 //
 // Reads one revision of a policy, newest or not.
@@ -974,12 +986,17 @@ func (UnimplementedHandler) ListMyPasskeys(ctx context.Context, params ListMyPas
 
 // ListMyProjects implements listMyProjects operation.
 //
-// The projects the signed-in user holds an active grant on, either directly or
-// through a team they are a member of. Ordered by project id and paged with an
-// opaque cursor.
+// The projects the signed-in user can act on: those they hold an active grant
+// on, either directly or through a team they are a member of. For a platform
+// operator (ADR 075) that is every project of the deployment. Ordered by
+// project id and paged with an opaque cursor.
 // This is not the same question as `queryProjects`, which answers with the one
 // project the calling credential is bound to. Here the session is the caller
 // and the grants are the answer, so the list spans projects.
+// With `name_contains`, only the projects whose name contains that text are
+// listed. The search runs on the server together with the grants, so it
+// reaches every project the user can act on, however many there are, and
+// pages like the full list.
 // With `project_id`, the projects are listed only when the session belongs to
 // that project. It names the project the session was signed in to, not one to
 // list.
@@ -997,6 +1014,31 @@ func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyPro
 //
 // GET /users/me/teams
 func (UnimplementedHandler) ListMyTeams(ctx context.Context, params ListMyTeamsParams) (r ListMyTeamsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListPolicies implements listPolicies operation.
+//
+// Lists the project's policies, one per operation, each as its newest
+// revision, ordered by `created_at` (first publish) and then `id`. Filter
+// by `operation` to read the policy of one operation; a project that never
+// published one gets an empty list.
+// The lookup is scoped to the project in `project_id`.
+//
+// GET /policies
+func (UnimplementedHandler) ListPolicies(ctx context.Context, params ListPoliciesParams) (r ListPoliciesRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListPolicyRevisions implements listPolicyRevisions operation.
+//
+// Returns every revision of one policy, newest first, paginated with a
+// cursor. The order is fixed, so there is no `sorting`.
+// The lookup is scoped to the project in `project_id`: a policy of another
+// project answers not found exactly as an unknown id does.
+//
+// GET /policies/{policy_id}/revisions
+func (UnimplementedHandler) ListPolicyRevisions(ctx context.Context, params ListPolicyRevisionsParams) (r ListPolicyRevisionsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -1115,14 +1157,20 @@ func (UnimplementedHandler) PatchUserByID(ctx context.Context, req *PatchUserReq
 // applies to the next time the operation runs; nothing already stored is
 // re-evaluated, so a stricter password policy applies the next time a
 // password is set.
-// `config` is checked against the operation's template: an unknown
-// operation or setting, a value of the wrong type or outside its bounds, or
-// settings that contradict each other (a `min_length` above `max_length`)
-// answer `pol.invalid`. A setting left out is off, and `{}` switches every
+// The request is typed by `operation`: an unknown operation or setting, or
+// a value of the wrong type or outside its bounds, answers `req.invalid`
+// like any malformed request. The operation's template then checks the
+// config again, together with the rules that relate settings to each other
+// (a `min_length` above `max_length`), and answers `pol.invalid`. Its
+// `details.details.violations` lists everything that failed, settings
+// first, then rules: `{"setting": "min_length"}` for one setting, or
+// `{"config_rule": "min_length_not_above_max_length", "settings":
+// ["min_length", "max_length"]}` for a rule across settings, with the
+// settings it reads. A setting left out is off, and `{}` switches every
 // rule off; there are no defaults.
 //
 // POST /policies
-func (UnimplementedHandler) PublishPolicy(ctx context.Context, req *PublishPolicyRequest, params PublishPolicyParams) (r PublishPolicyRes, _ error) {
+func (UnimplementedHandler) PublishPolicy(ctx context.Context, req PublishPolicyRequest, params PublishPolicyParams) (r PublishPolicyRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

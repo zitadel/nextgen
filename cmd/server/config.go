@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -69,6 +70,13 @@ type PlatformConfig struct {
 	// resolves it as the default. Off by default: no environment gets a
 	// platform project created silently. Needs no ProjectID. (#605)
 	BootstrapProject bool `mapstructure:"bootstrap_project"`
+
+	// Operators lists, by id, the platform-project users who hold
+	// platform.operator and so administer every project of the deployment
+	// (ADR 075). The server reconciles it at startup: it grants every listed
+	// user that exists and revokes what an earlier list granted. Needs a
+	// platform project, from BootstrapProject or ProjectID.
+	Operators []string `mapstructure:"operators"`
 }
 
 func (c PlatformConfig) Validate() error {
@@ -79,6 +87,15 @@ func (c PlatformConfig) Validate() error {
 	if c.BootstrapProject && c.ProjectID != "" && c.ProjectID != domain.PlatformProjectID {
 		return fmt.Errorf("platform.bootstrap_project uses the built-in id %q; leave platform.project_id empty or set it to that value",
 			domain.PlatformProjectID)
+	}
+	for _, id := range c.Operators {
+		if !domain.PrefixUser.Matches(id) {
+			return fmt.Errorf("platform.operators: %q must be a user id of the form %q",
+				id, domain.PrefixUser.IDPrefix("<id>"))
+		}
+	}
+	if len(c.Operators) > 0 && c.ResolvedProjectID() == "" {
+		return errors.New("platform.operators needs a platform project: set platform.bootstrap_project or platform.project_id")
 	}
 	return nil
 }
