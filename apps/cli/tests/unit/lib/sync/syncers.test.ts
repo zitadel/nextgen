@@ -7,6 +7,7 @@ import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 
 import { FLOWS_DIR } from "../../../../src/lib/flows";
 import { IDPS_DIR } from "../../../../src/lib/idp";
+import { POLICIES_DIR } from "../../../../src/lib/policies";
 import { SCHEMAS_DIR } from "../../../../src/lib/user-schema";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
 import { FatalFetchError } from "../../../../src/lib/sync/types";
@@ -40,8 +41,8 @@ describe("makeSyncers", () => {
 
     // Connections before flows: a flow step naming a slug is only valid once
     // that connection exists on the platform.
-    expect(syncers).toHaveLength(4);
-    expect(syncers.map((s) => s.kind)).toEqual(["schema", "idp", "flow", "branding"]);
+    expect(syncers).toHaveLength(5);
+    expect(syncers.map((s) => s.kind)).toEqual(["schema", "idp", "flow", "branding", "policy"]);
   });
 
   it("configures the schema syncer (immutable, SCHEMAS_DIR)", () => {
@@ -1211,5 +1212,116 @@ describe("IdpConnectionSyncer", () => {
     // No msw handler is registered: a request would fail the test, which is
     // the point — nothing reaches the platform.
     await expect(idp.delete("idp_1")).rejects.toThrow(/not supported yet/);
+  });
+});
+
+describe("PolicySyncer", () => {
+  const policySyncer = () =>
+    makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" })[4];
+  const file = {
+    $schema: "../meta/policy.json",
+    operation: "auth.factor.password.set",
+    config: { min_length: 15 },
+  };
+  const stored = {
+    id: "pol_1",
+    revision_id: "polrev_1",
+    project_id: "proj-1",
+    operation: "auth.factor.password.set",
+    config: { min_length: 15 },
+    created_at: "2026-10-23T09:00:00Z",
+    updated_at: "2026-10-23T09:00:00Z",
+  };
+
+  it("is mutable and not revisioned: a publish revises under one stable id", () => {
+    const policy = policySyncer();
+
+    expect(policy.kind).toBe("policy");
+    expect(policy.directory).toBe(POLICIES_DIR);
+    expect(policy.mutable).toBe(true);
+    expect(policy.revisioned).toBe(false);
+    expect(policy.deletion).toBe("unsupported");
+  });
+
+  it("validate accepts a file named after its operation", () => {
+    expect(() =>
+      policySyncer().validate(file, ".zitadel/policies/auth.factor.password.set.json"),
+    ).not.toThrow();
+  });
+
+  it.each([
+    ["an unknown setting", { ...file, config: { min_lenght: 15 } }],
+    ["a value out of bounds", { ...file, config: { min_length: 65 } }],
+    ["an unknown operation", { ...file, operation: "auth.check" }],
+    ["a key beside operation and config", { ...file, kind: "policy" }],
+    ["no config", { operation: "auth.factor.password.set" }],
+  ])("validate refuses %s", (_case, body) => {
+    expect(() =>
+      policySyncer().validate(body, ".zitadel/policies/auth.factor.password.set.json"),
+    ).toThrow(expect.objectContaining({ code: "E_VALIDATION" }));
+  });
+
+  it("validate leaves the name alone when no file is given", () => {
+    expect(() => policySyncer().validate(file)).not.toThrow();
+  });
+
+  it("validate refuses a file not named after its operation", () => {
+    try {
+      policySyncer().validate(file, ".zitadel/policies/password.json");
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      expect((error as ZitadelError).code).toBe("E_VALIDATION");
+      expect((error as ZitadelError).message).toContain("auth.factor.password.set.json");
+    }
+  });
+
+  it("compares the publish body, without the editor pointer", () => {
+    expect(policySyncer().normalize?.(file)).toEqual({
+      operation: "auth.factor.password.set",
+      config: { min_length: 15 },
+    });
+  });
+
+  it.each(["create", "update"] as const)(
+    "%s publishes the file without $schema and answers with the policy id",
+    async (write) => {
+      let sent: unknown;
+      server.use(
+        http.post(`${BASE}/policies`, async ({ request }) => {
+          expect(new URL(request.url).searchParams.get("project_id")).toBe("proj-1");
+          sent = await request.json();
+          return HttpResponse.json(stored, { status: 201 });
+        }),
+      );
+
+      const result =
+        write === "create"
+          ? await policySyncer().create(file)
+          : await policySyncer().update("pol_1", file);
+
+      expect(sent).toEqual({ operation: "auth.factor.password.set", config: { min_length: 15 } });
+      expect(result.id).toBe("pol_1");
+    },
+  );
+
+  it("fetch answers in the file's comparison form", async () => {
+    server.use(http.get(`${BASE}/policies/pol_1`, () => HttpResponse.json(stored)));
+
+    expect(await policySyncer().fetch?.("pol_1")).toEqual({
+      operation: "auth.factor.password.set",
+      config: { min_length: 15 },
+    });
+  });
+
+  it("says how to switch a policy off when its file is removed", () => {
+    const note = policySyncer().deletionNote?.(".zitadel/policies/auth.factor.password.set.json");
+
+    expect(note).toContain("cannot be deleted");
+    expect(note).toContain('"config": {}');
+    expect(note).not.toContain("#1013");
+  });
+
+  it("refuses to delete without calling the platform", async () => {
+    await expect(policySyncer().delete("pol_1")).rejects.toThrow(/cannot be deleted/);
   });
 });

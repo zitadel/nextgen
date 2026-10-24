@@ -36,6 +36,10 @@ export function isUnsupportedDeletion(action: SyncAction): action is Unsupported
 
 /** What to tell the developer about one removed file, in a plan and in an apply. */
 export function unsupportedDeletionNote(action: UnsupportedDeletion): string {
+  const note = action.syncer.deletionNote?.(action.path);
+  if (note !== undefined) {
+    return note;
+  }
   return (
     `${action.path} was removed, but deleting ${action.syncer.kind} resources is not supported yet (#1013), ` +
     `so nothing was deleted on the platform. Restore the file if you did not mean to remove it.`
@@ -157,7 +161,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
     const headline =
       unsupported.length === 0
         ? "No changes. Your Zitadel configuration matches the current state."
-        : `Nothing to apply, but ${unsupported.length} removed file${unsupported.length === 1 ? "" : "s"} cannot be deleted from the platform yet.`;
+        : `Nothing to apply, but ${unsupported.length} removed file${unsupported.length === 1 ? "" : "s"} cannot be deleted from the platform.`;
     return [paint(headline, A.bold, tty), ...unsupportedNote].join("\n");
   }
 
