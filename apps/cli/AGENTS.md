@@ -63,6 +63,8 @@ copy of each event to Vercel Web Analytics (`src/lib/telemetry/vercel.ts`).
   and published on purpose. Without settings, events go to the production
   project; `ZITADEL_TELEMETRY_ENV=development` selects the dev project, and CI
   sets `DO_NOT_TRACK=1`.
+- Events for the EU projects go through the cloud's `/telemetry/mixpanel/*`
+  rewrite in `vercel.json`, which released CLIs depend on (`config.test.ts`).
 - `ci_provider` and `host_agent` also travel in the HTTP `User-Agent`
   (`src/lib/user-agent.ts`) and obey the same opt-out.
 - The docs' [telemetry page](../docs/content/docs/reference/cli/telemetry.mdx)

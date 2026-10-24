@@ -53,6 +53,8 @@ tasks:
       - "/api/openapi/endpoints/**/methods.yaml"
       # The product analytics catalog the catalog test checks telemetry against.
       - "/docs/product-analytics-events.yaml"
+      # The cloud's rewrite the CLI's Mixpanel endpoint has to match.
+      - "/vercel.json"
     options:
       # The built oclif commands import @zitadel/{api,config,sdk-next} from
       # those packages' dist/ at runtime. Their build-release tasks rewrite
